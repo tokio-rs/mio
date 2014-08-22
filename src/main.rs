@@ -1,9 +1,7 @@
 extern crate nix;
 extern crate mio;
 
-use std::mem;
-use nix::sys::utsname::uname;
-use mio::{Reactor, Handler, IoHandle, TcpSocket, SockAddr};
+use mio::{Reactor, Handler, TcpSocket, SockAddr};
 
 /*
 struct Proxy;
@@ -25,15 +23,21 @@ impl Handler<()> for MyHandler {
 }
 
 pub fn main() {
-    println!("ZOMG; {}", uname().release());
-
+    println!(" * Initializing reactor");
     let mut reactor = Reactor::<()>::new().unwrap();
+
+    println!(" * Parsing socket address");
     let addr = SockAddr::parse("74.125.28.103:80").expect("could not parse InetAddr");
+
+    println!(" * Creating socket");
     let sock = TcpSocket::v4().unwrap();
 
     // Configure options
 
-    reactor.connect(sock, addr, ()).unwrap();
+    println!("Connect socket");
+    reactor.connect(sock, &addr, ()).unwrap();
+
+    println!("Start reactor");
     reactor.run(MyHandler);
 
     /*

@@ -12,7 +12,6 @@ use nix::sys::socket::{
     socket
 };
 
-use nix::SysResult;
 use error::MioResult;
 
 pub use std::io::net::ip::{IpAddr, Port};

@@ -1,7 +1,6 @@
-use std::{mem, u32};
+use std::mem;
 use std::num::FromPrimitive;
 use nix::fcntl::Fd;
-use nix::sys::socket;
 use error::MioResult;
 use handler::Handler;
 use sock::*;
@@ -24,18 +23,24 @@ impl<T> Reactor {
         })
     }
 
-    pub fn connect<S: Socket>(&mut self, io: S, addr: SockAddr, token: T) -> MioResult<()>{
+    /// Connects the socket to the specified address. When the operation
+    /// completes, the handler will be notified with the supplied token.
+    pub fn connect<S: Socket>(&mut self, io: S,
+                              addr: &SockAddr, _token: T) -> MioResult<()> {
+
+        debug!("socket connect; addr={}", addr);
+
         let handle = match self.conns.register(io.ident()) {
             Some(handle) => handle,
             None => fail!("too many connections")
         };
 
         if try!(os::connect(handle, addr)) {
-            // TODO: Queue callback invocation
-            println!("Connected");
+            // On some OSs, connecting to localhost succeeds immediately. In
+            // this case, queue the writable callback for execution during the
+            // next reactor tick.
+            debug!("socket connected immediately; addr={}", addr);
         }
-
-        println!("Registring handle");
 
         // Register interest
         try!(self.selector.register(handle));
@@ -43,7 +48,7 @@ impl<T> Reactor {
         Ok(())
     }
 
-    pub fn listen(&mut self, io: IoHandle, token: T) {
+    pub fn listen(&mut self, _io: IoHandle, _token: T) {
         unimplemented!()
     }
 
@@ -54,16 +59,17 @@ impl<T> Reactor {
     pub fn run<H: Handler<T>>(&mut self, mut handler: H) {
         // Created here for stack allocation
         let mut events = os::Events::new();
+        let run = true;
 
-        while true { // TODO: Have stop condition
+        while run { // TODO: Have stop condition
             println!("Loopin'");
 
             self.io_poll(&mut events, &mut handler);
         }
     }
 
-    fn io_poll<H: Handler<T>>(&mut self, events: &mut os::Events, handler: &mut H) {
-        self.selector.select(events, 100);
+    fn io_poll<H: Handler<T>>(&mut self, events: &mut os::Events, _handler: &mut H) {
+        self.selector.select(events, 1000).unwrap();
 
         let mut i = 0u;
 
@@ -116,6 +122,10 @@ impl IoHandle {
     pub fn read(&self, dst: &mut [u8]) -> MioResult<uint> {
         os::read(self, dst)
     }
+
+    pub fn write(&self, src: &[u8]) -> MioResult<uint> {
+        os::write(self, src)
+    }
 }
 
 struct IoSlab {
@@ -142,7 +152,7 @@ impl IoSlab {
         }
     }
 
-    fn deregister(&mut self, handle: IoHandle) {
+    fn deregister(&mut self, _handle: IoHandle) {
         unimplemented!()
     }
 }
