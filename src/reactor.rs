@@ -12,17 +12,32 @@ use os;
 pub struct ReactorConfig;
 
 pub struct Reactor {
-    selector: os::Selector
+    selector: os::Selector,
+    run: bool
 }
 
-impl<T: Token> Reactor {
+impl Reactor {
     /// Initializes a new reactor. The reactor will not be running yet.
     pub fn new() -> MioResult<Reactor> {
         Ok(Reactor {
-            selector: try!(os::Selector::new())
+            selector: try!(os::Selector::new()),
+            run: true
         })
     }
 
+    /// Tells the reactor to exit after it is done handling all events in the
+    /// current iteration.
+    pub fn shutdown(&mut self) {
+        self.run = false;
+    }
+
+    /// Tells the reactor to exit immidiately. All pending events will be dropped.
+    pub fn shutdown_now(&mut self) {
+        unimplemented!()
+    }
+}
+
+impl<T: Token> Reactor {
     /// Registers an IO descriptor with the reactor.
     pub fn register<S: Socket>(&mut self, io: S, token: T) -> MioResult<()> {
         debug!("registering IO with reactor");
@@ -68,23 +83,13 @@ impl<T: Token> Reactor {
         Ok(())
     }
 
-    /// Tells the reactor to exit after it is done handling all events in the
-    /// current iteration.
-    pub fn shutdown(&mut self) {
-        unimplemented!()
-    }
-
-    /// Tells the reactor to exit immidiately. All pending events will be dropped.
-    pub fn shutdown_now(&mut self) {
-        unimplemented!()
-    }
-
     pub fn run<H: Handler<T>>(&mut self, mut handler: H) {
+        self.run = true;
+
         // Created here for stack allocation
         let mut events = os::Events::new();
-        let run = true;
 
-        while run { // TODO: Have stop condition
+        while self.run {
             debug!("reactor tick");
 
             // Check the registered IO handles for any new events

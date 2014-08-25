@@ -62,7 +62,7 @@ mod client {
 
     pub fn run() {
         println!(" * Initializing reactor");
-        let mut reactor = Reactor::<uint>::new().unwrap();
+        let mut reactor = Reactor::new().unwrap();
 
         println!(" * Parsing socket address");
         let addr = SockAddr::parse("127.0.0.1:9292").expect("could not parse InetAddr");
@@ -124,7 +124,7 @@ mod server {
                                 return;
                             }
                             Err(e) if e.is_would_block() => {
-                                println!("WouldBlock");
+                                reactor.shutdown();
                                 return;
                             }
                             e => {
@@ -144,7 +144,7 @@ mod server {
 
     pub fn run() {
         println!(" * Initializing reactor");
-        let mut reactor = Reactor::<uint>::new().unwrap();
+        let mut reactor = Reactor::new().unwrap();
 
         let addr = SockAddr::parse("127.0.0.1:8080")
             .expect("could not parse InetAddr");
