@@ -1,8 +1,9 @@
 use std::mem;
 use nix::fcntl::Fd;
 use nix::sys::epoll::*;
-use error::MioResult;
-use reactor::{IoEvent, IoEventKind, IoHandle, IoReadable, IoWritable, IoError};
+use error::{MioResult, MioError};
+use os::IoDesc;
+use reactor::{IoEvent, IoEventKind, IoReadable, IoWritable, IoError};
 
 pub struct Selector {
     epfd: Fd
@@ -10,30 +11,32 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> MioResult<Selector> {
-        Ok(Selector {
-            epfd: try!(epoll_create())
-        })
+        let epfd = try!(epoll_create().map_err(MioError::from_sys_error));
+
+        Ok(Selector { epfd: epfd })
     }
 
     /// Wait for events from the OS
     pub fn select(&mut self, evts: &mut Events, timeout_ms: uint) -> MioResult<()> {
         // Wait for epoll events for at most timeout_ms milliseconds
-        let cnt = try!(epoll_wait(self.epfd, evts.events.as_mut_slice(), timeout_ms));
+        let cnt = try!(epoll_wait(self.epfd, evts.events.as_mut_slice(), timeout_ms)
+                           .map_err(MioError::from_sys_error));
 
         evts.len = cnt;
         Ok(())
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, handle: IoHandle) -> MioResult<()> {
+    pub fn register(&mut self, io: IoDesc, token: u64) -> MioResult<()> {
         let interests = EPOLLIN | EPOLLOUT | EPOLLERR;
 
         let info = EpollEvent {
             events: interests | EPOLLET,
-            data: unsafe { mem::transmute(handle) }
+            data: token
         };
 
-        epoll_ctl(self.epfd, EpollCtlAdd, handle.ident(), &info)
+        epoll_ctl(self.epfd, EpollCtlAdd, io.fd, &info)
+            .map_err(MioError::from_sys_error)
     }
 }
 
@@ -64,6 +67,8 @@ impl Events {
         let epoll = self.events[idx].events;
         let mut kind = IoEventKind::empty();
 
+        debug!("epoll event = {}", epoll);
+
         if epoll.contains(EPOLLIN) {
             kind = kind | IoReadable;
         }
@@ -77,8 +82,8 @@ impl Events {
             kind = kind | IoError;
         }
 
-        let handle = unsafe { mem::transmute(self.events[idx].data) };
+        let token = self.events[idx].data;
 
-        IoEvent::new(kind, handle)
+        IoEvent::new(kind, token)
     }
 }

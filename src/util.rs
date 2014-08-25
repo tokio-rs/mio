@@ -26,31 +26,7 @@ mod slab {
             }
         }
 
-        pub fn get<'a>(&'a self, idx: uint) -> &'a T {
-            self.validate(idx);
-
-            let e = self.entry(idx);
-
-            if e.nxt == 0 {
-                fail!("invalid index");
-            }
-
-            &e.val
-        }
-
-        pub fn get_mut<'a>(&'a mut self, idx: uint) -> &'a mut T {
-            self.validate(idx);
-
-            let e = self.mut_entry(idx);
-
-            if e.nxt == 0 {
-                fail!("invalid index");
-            }
-
-            &mut e.val
-        }
-
-        pub fn put(&mut self, val: T) -> Result<uint, T> {
+        pub fn push(&mut self, val: T) -> Result<uint, T> {
             let idx = self.nxt;
 
             if idx == self.len {
@@ -114,6 +90,36 @@ mod slab {
             if idx >= self.len {
                 fail!("invalid index");
             }
+        }
+    }
+
+    impl<T> Index<uint, T> for Slab<T> {
+        fn index<'a>(&'a self, idx: &uint) -> &'a T {
+            let idx = *idx;
+            self.validate(idx);
+
+            let e = self.entry(idx);
+
+            if e.nxt == 0 {
+                fail!("invalid index");
+            }
+
+            &e.val
+        }
+    }
+
+    impl<T> IndexMut<uint, T> for Slab<T> {
+        fn index_mut<'a>(&'a mut self, idx: &uint) -> &'a mut T {
+            let idx = *idx;
+            self.validate(idx);
+
+            let e = self.mut_entry(idx);
+
+            if e.nxt == 0 {
+                fail!("invalid index");
+            }
+
+            &mut e.val
         }
     }
 

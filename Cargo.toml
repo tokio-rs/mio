@@ -6,4 +6,4 @@ authors = ["Carl Lerche <me@carllerche.com>"]
 
 [dependencies.nix]
 
-path = "libs/nix-rust"
+git = "https://github.com/carllerche/nix-rust"
