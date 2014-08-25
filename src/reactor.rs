@@ -1,8 +1,7 @@
 use error::MioResult;
 use handler::{Handler, Token};
-use io::{IoAcceptor};
+use io::*;
 use os;
-use sock::*;
 
 /// A lightweight IO reactor.
 ///

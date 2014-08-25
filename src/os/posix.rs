@@ -1,5 +1,5 @@
 use error::{MioResult, MioError};
-use sock::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IpV4Addr};
+use io::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IpV4Addr};
 
 mod nix {
     pub use nix::fcntl::Fd;
