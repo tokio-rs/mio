@@ -11,14 +11,14 @@ use os;
 #[deriving(Clone, Show)]
 pub struct ReactorConfig;
 
-pub struct Reactor {
+pub struct Reactor<T> {
     selector: os::Selector,
     run: bool
 }
 
-impl Reactor {
+impl<T: Token> Reactor<T> {
     /// Initializes a new reactor. The reactor will not be running yet.
-    pub fn new() -> MioResult<Reactor> {
+    pub fn new() -> MioResult<Reactor<T>> {
         Ok(Reactor {
             selector: try!(os::Selector::new()),
             run: true
@@ -35,9 +35,7 @@ impl Reactor {
     pub fn shutdown_now(&mut self) {
         unimplemented!()
     }
-}
 
-impl<T: Token> Reactor {
     /// Registers an IO descriptor with the reactor.
     pub fn register<S: Socket>(&mut self, io: S, token: T) -> MioResult<()> {
         debug!("registering IO with reactor");

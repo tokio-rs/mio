@@ -1,6 +1,7 @@
 use std::mem;
 use nix::fcntl::Fd;
 use nix::sys::epoll::*;
+use nix::unistd::close;
 use error::{MioResult, MioError};
 use os::IoDesc;
 use reactor::{IoEvent, IoEventKind, IoReadable, IoWritable, IoError};
@@ -37,6 +38,12 @@ impl Selector {
 
         epoll_ctl(self.epfd, EpollCtlAdd, io.fd, &info)
             .map_err(MioError::from_sys_error)
+    }
+}
+
+impl Drop for Selector {
+    fn drop(&mut self) {
+        close(self.epfd);
     }
 }
 
