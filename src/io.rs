@@ -30,6 +30,18 @@ pub trait Socket : IoHandle {
     fn is_acceptor(&self) -> bool {
         unimplemented!();
     }
+
+    fn linger(&self) -> MioResult<uint> {
+        os::linger(self.desc())
+    }
+
+    fn set_linger(&self, dur_s: uint) -> MioResult<()> {
+        os::set_linger(self.desc(), dur_s)
+    }
+
+    fn set_reuseaddr(&self, val: bool) -> MioResult<()> {
+        os::set_reuseaddr(self.desc(), val)
+    }
 }
 
 impl<S: Socket> IoReader for S {

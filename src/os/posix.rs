@@ -1,7 +1,9 @@
+use std::mem;
 use error::{MioResult, MioError};
 use io::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IpV4Addr};
 
 mod nix {
+    pub use nix::c_int;
     pub use nix::fcntl::Fd;
     pub use nix::errno::EINPROGRESS;
     pub use nix::sys::socket::*;
@@ -71,6 +73,42 @@ pub fn read(io: IoDesc, dst: &mut [u8]) -> MioResult<uint> {
 #[inline]
 pub fn write(io: IoDesc, src: &[u8]) -> MioResult<uint> {
     nix::write(io.fd, src).map_err(MioError::from_sys_error)
+}
+
+// ===== Socket options =====
+
+pub fn reuseaddr(_io: IoDesc) -> MioResult<uint> {
+    unimplemented!()
+}
+
+pub fn set_reuseaddr(io: IoDesc, val: bool) -> MioResult<()> {
+    let v: nix::c_int = if val { 1 } else { 0 };
+
+    nix::setsockopt(io.fd, nix::SOL_SOCKET, nix::SO_REUSEADDR, &v)
+        .map_err(MioError::from_sys_error)
+}
+
+pub fn linger(io: IoDesc) -> MioResult<uint> {
+    let mut linger: nix::linger = unsafe { mem::uninitialized() };
+
+    try!(nix::getsockopt(io.fd, nix::SOL_SOCKET, nix::SO_LINGER, &mut linger)
+            .map_err(MioError::from_sys_error));
+
+    if linger.l_onoff > 0 {
+        Ok(linger.l_linger as uint)
+    } else {
+        Ok(0)
+    }
+}
+
+pub fn set_linger(io: IoDesc, dur_s: uint) -> MioResult<()> {
+    let linger = nix::linger {
+        l_onoff: (if dur_s > 0 { 1 } else { 0 }) as nix::c_int,
+        l_linger: dur_s as nix::c_int
+    };
+
+    nix::setsockopt(io.fd, nix::SOL_SOCKET, nix::SO_LINGER, &linger)
+        .map_err(MioError::from_sys_error)
 }
 
 fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {

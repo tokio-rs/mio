@@ -10,15 +10,31 @@ pub struct MioError {
 
 #[deriving(Show, PartialEq, Clone)]
 pub enum MioErrorKind {
-    Eof,
-    WouldBlock,
-    SysError,
+    Eof,          // End of file or socket closed
+    SysError,     // System error not covered by other kinds
+    WouldBlock,   // The operation would have blocked
+    BufUnderflow, // Buf does not contain enough data to perform read op
+    BufOverflow,  // Buf does not contain enough capacity to perform write op
 }
 
 impl MioError {
     pub fn eof() -> MioError {
         MioError {
             kind: Eof,
+            sys: None
+        }
+    }
+
+    pub fn buf_underflow() -> MioError {
+        MioError {
+            kind: BufUnderflow,
+            sys: None
+        }
+    }
+
+    pub fn buf_overflow() -> MioError {
+        MioError {
+            kind: BufOverflow,
             sys: None
         }
     }
@@ -45,6 +61,20 @@ impl MioError {
     pub fn is_would_block(&self) -> bool {
         match self.kind {
             WouldBlock => true,
+            _ => false
+        }
+    }
+
+    pub fn is_buf_underflow(&self) -> bool {
+        match self.kind {
+            BufUnderflow => true,
+            _ => false
+        }
+    }
+
+    pub fn is_buf_overflow(&self) -> bool {
+        match self.kind {
+            BufOverflow => true,
             _ => false
         }
     }

@@ -13,9 +13,10 @@ extern crate log;
 
 pub use error::{MioResult, MioError};
 pub use handler::Handler;
-pub use io::{IoReader, IoWriter, IoAcceptor, TcpSocket, TcpAcceptor, UnixSocket, SockAddr};
+pub use io::{IoReader, IoWriter, IoAcceptor, Socket, TcpSocket, TcpAcceptor, UnixSocket, SockAddr};
 pub use reactor::{Reactor};
 
+mod buf;
 mod error;
 mod handler;
 mod io;
