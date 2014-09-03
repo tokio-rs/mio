@@ -103,7 +103,7 @@ pub fn linger(io: IoDesc) -> MioResult<uint> {
 
 pub fn set_linger(io: IoDesc, dur_s: uint) -> MioResult<()> {
     let linger = nix::linger {
-        l_onoff: (if dur_s > 0 { 1 } else { 0 }) as nix::c_int,
+        l_onoff: (if dur_s > 0 { 1i } else { 0i }) as nix::c_int,
         l_linger: dur_s as nix::c_int
     };
 

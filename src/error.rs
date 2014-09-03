@@ -1,3 +1,4 @@
+use std::io;
 use nix::errno::{SysError, EAGAIN};
 
 pub type MioResult<T> = Result<T, MioError>;
@@ -76,6 +77,17 @@ impl MioError {
         match self.kind {
             BufOverflow => true,
             _ => false
+        }
+    }
+
+    pub fn as_io_error(&self) -> io::IoError {
+        match self.kind {
+            Eof | BufUnderflow | BufOverflow => io::standard_error(io::EndOfFile),
+            WouldBlock => io::standard_error(io::ResourceUnavailable),
+            SysError => match self.sys {
+                Some(err) => io::IoError::from_errno(err.kind as uint, false),
+                None => io::standard_error(io::OtherIoError)
+            }
         }
     }
 }

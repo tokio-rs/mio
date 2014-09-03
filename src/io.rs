@@ -1,6 +1,7 @@
 use std::fmt;
 use std::path::Path;
 use std::from_str::FromStr;
+use buf::{Buf, MutBuf};
 use os;
 use error::MioResult;
 
@@ -13,12 +14,13 @@ pub trait IoHandle {
     fn desc(&self) -> os::IoDesc;
 }
 
+// TODO: Should read / write return bool to indicate whether or not there is more?
 pub trait IoReader {
-    fn read(&mut self, buf: &mut [u8]) -> MioResult<uint>;
+    fn read(&mut self, buf: &mut MutBuf) -> MioResult<()>;
 }
 
 pub trait IoWriter {
-    fn write(&mut self, buf: &[u8]) -> MioResult<uint>;
+    fn write(&mut self, buf: &mut Buf) -> MioResult<()>;
 }
 
 pub trait IoAcceptor<T> {
@@ -45,17 +47,36 @@ pub trait Socket : IoHandle {
 }
 
 impl<S: Socket> IoReader for S {
-    fn read(&mut self, buf: &mut [u8]) -> MioResult<uint> {
-        os::read(self.desc(), buf)
+    fn read(&mut self, buf: &mut MutBuf) -> MioResult<()> {
+        while !buf.is_full() {
+            match os::read(self.desc(), buf.mut_bytes()) {
+                Ok(cnt) => buf.advance(cnt),
+                Err(e) if e.is_eof() => return Ok(()),
+                Err(e) if e.is_would_block() => return Ok(()),
+                Err(e) => return Err(e)
+            }
+        }
+
+        Ok(())
     }
 }
 
 impl<S: Socket> IoWriter for S {
-    fn write(&mut self, buf: &[u8]) -> MioResult<uint> {
-        os::write(self.desc(), buf)
+    fn write(&mut self, buf: &mut Buf) -> MioResult<()> {
+        while !buf.is_full() {
+            match os::write(self.desc(), buf.bytes()) {
+                Ok(cnt) => buf.advance(cnt),
+                Err(e) if e.is_eof() => return Ok(()),
+                Err(e) if e.is_would_block() => return Ok(()),
+                Err(e) => return Err(e)
+            }
+        }
+
+        Ok(())
     }
 }
 
+#[deriving(Show)]
 pub struct TcpSocket {
     desc: os::IoDesc
 }
@@ -88,6 +109,7 @@ impl IoHandle for TcpSocket {
 impl Socket for TcpSocket {
 }
 
+#[deriving(Show)]
 pub struct TcpAcceptor {
     desc: os::IoDesc
 }
@@ -109,6 +131,7 @@ impl IoAcceptor<TcpSocket> for TcpAcceptor {
     }
 }
 
+#[deriving(Show)]
 pub struct UnixSocket {
     desc: os::IoDesc
 }

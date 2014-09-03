@@ -11,16 +11,18 @@ extern crate nix;
 #[phase(plugin, link)]
 extern crate log;
 
+pub use buf::{Buf, MutBuf};
 pub use error::{MioResult, MioError};
 pub use handler::Handler;
 pub use io::{IoReader, IoWriter, IoAcceptor, Socket, TcpSocket, TcpAcceptor, UnixSocket, SockAddr};
-pub use reactor::{Reactor};
+pub use reactor::Reactor;
+pub use slab::Slab;
 
-mod buf;
+pub mod buf;
 mod error;
 mod handler;
 mod io;
 mod os;
 mod reactor;
+mod slab;
 mod timer;
-mod util;
