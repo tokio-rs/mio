@@ -4,7 +4,7 @@ use nix::sys::epoll::*;
 use nix::unistd::close;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use reactor::{IoEvent, IoEventKind, IoReadable, IoWritable, IoError};
+use event::*;
 
 pub struct Selector {
     epfd: Fd
@@ -28,7 +28,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, io: IoDesc, token: u64) -> MioResult<()> {
+    pub fn register(&mut self, io: IoDesc, token: u64, events: IoEventKind) -> MioResult<()> {
         let interests = EPOLLIN | EPOLLOUT | EPOLLERR;
 
         let info = EpollEvent {

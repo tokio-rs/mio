@@ -1,15 +1,3 @@
-use reactor::{Reactor};
-
-#[allow(unused_variable)]
-pub trait Handler<T: Token> {
-    fn readable(&mut self, reactor: &mut Reactor<T>, token: T) {
-        println!("Handler: readable");
-    }
-
-    fn writable(&mut self, reactor: &mut Reactor<T>, token: T) {
-        println!("Handler: writable");
-    }
-}
 
 pub trait Token : Copy {
     fn from_u64(val: u64) -> Self;
