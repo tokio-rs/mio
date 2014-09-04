@@ -40,32 +40,31 @@ impl<T: Token> Reactor<T> {
         self.run = true;
 
         // Created here for stack allocation
-        let mut events = os::Events::new();
+        let mut events = [EpollEvent ..1024];
 
         while self.io_poll(&mut events, &mut handler) {
             debug!("reactor tick");
-
         }
     }
 
-    fn io_poll(&mut self, events: &mut os::Events, handler: fn (token: T, event: IoEventKind) -> bool) -> bool {
+    fn io_poll(&mut self, events: &mut [EpollEvent], handler: fn (token: T, event: IoEventKind) -> bool) -> bool {
 
-        self.selector.select(events, 1000).unwrap();
+        let len = self.selector.select(events, 1000).unwrap();
 
-        let mut i = 0u;
-
-        while i < events.len() {
-            let evt = events.get(i);
+        while i < len && i < events.len() {
+            let evt = events[i].from_mask();
             let tok = Token::from_u64(evt.token);
 
             debug!("event={}", evt);
 
             if ( ! handler(tok, evt)) {
-               return false; 
+               return false;
             }
 
             i += 1;
         }
+
+        true
     }
 }
 

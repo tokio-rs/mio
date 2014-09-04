@@ -1,3 +1,5 @@
+/* Event Traits for converting, building and analyzing events in the selector.
+ * To be implemented by the selector for each os/platform */
 
 bitflags!(
     #[deriving(Show)]
@@ -9,37 +11,20 @@ bitflags!(
     }
 )
 
-#[deriving(Show)]
-pub struct IoEvent {
-    kind: IoEventKind,
-    token: u64
+
+pub impl IoEvent {
+    type MaskType;
+
+    fn is_readable(&self) -> bool;
+
+    fn is_writable(&self) -> bool;
+
+    fn is_hangup(&self) -> bool;
+
+    fn is_error(&self) -> bool;
+
+    fn to_mask(ioevents: IoEventKind) -> MaskType;
+
+    fn from_mask(events: MaskType) -> IoEventKind;
 }
 
-impl IoEvent {
-    pub fn new(kind: IoEventKind, token: u64) -> IoEvent {
-        IoEvent {
-            kind: kind,
-            token: token
-        }
-    }
-
-    pub fn is_readable(&self) -> bool {
-        self.kind.contains(IoReadable)
-    }
-
-    pub fn is_writable(&self) -> bool {
-        self.kind.contains(IoWritable)
-    }
-
-    buf fn is_hangup(&self) -> bool {
-        self.kind.contains(IoHangup)
-    }
-
-    pub fn is_error(&self) -> bool {
-        self.kind.contains(IoError)
-    }
-}
-
-trait IoEventMask {
-
-}
