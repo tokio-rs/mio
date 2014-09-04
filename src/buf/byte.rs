@@ -8,7 +8,7 @@ pub struct ByteBuf {
 }
 
 impl ByteBuf {
-    pub fn new(mut capacity: uint) -> ByteBuf {
+    pub fn new(capacity: uint) -> ByteBuf {
         // Handle 0 capacity case
         if capacity == 0 {
             return ByteBuf {
