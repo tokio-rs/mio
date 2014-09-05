@@ -1,5 +1,5 @@
 use mio::*;
-use mio::buf::RingBuf;
+use mio::buf::{RingBuf, SliceBuf};
 
 #[deriving(Show)]
 struct EchoConn {
@@ -99,14 +99,14 @@ struct EchoClient {
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: TcpSocket, msgs: Vec<&'static str>) {
-        let curr = msgs.remove(0);
+    fn new(sock: TcpSocket, mut msgs: Vec<&'static str>) -> EchoClient {
+        let curr = msgs.remove(0).unwrap();
 
         EchoClient {
             sock: sock,
             msgs: msgs,
-            tx: SliceBuf::wrap(curr),
-            rx: SliceBuf::wrap(curr)
+            tx: SliceBuf::wrap(curr.as_bytes()),
+            rx: SliceBuf::wrap(curr.as_bytes())
         }
     }
 
@@ -133,11 +133,8 @@ impl EchoHandler {
                 sock: srv,
                 conns: Slab::new(128)
             },
-            client: EchoClient {
-                sock: client,
-                msgs: msgs,
-                curr: None
-            }
+
+            client: EchoClient::new(client, msgs)
         }
     }
 }
