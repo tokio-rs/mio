@@ -18,10 +18,6 @@ pub trait Buf {
     fn bytes<'a>(&'a self) -> &'a [u8];
     fn advance(&mut self, cnt: uint);
 
-    fn is_full(&self) -> bool {
-        self.remaining() == 0
-    }
-
     fn has_remaining(&self) -> bool {
         self.remaining() > 0
     }
