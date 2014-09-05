@@ -1,3 +1,5 @@
+use std::cmp;
+use std::io::IoResult;
 use super::{Buf, MutBuf};
 
 pub struct SliceBuf<'a> {
@@ -20,9 +22,15 @@ impl<'a> Buf for SliceBuf<'a> {
         self.bytes.slice_from(self.pos)
     }
 
-    fn advance(&mut self, cnt: uint) {
-        assert!(cnt <= self.remaining(), "advancing too far");
+    fn advance(&mut self, mut cnt: uint) {
+        cnt = cmp::min(cnt, self.remaining());
         self.pos += cnt;
+    }
+}
+
+impl<'a> Reader for SliceBuf<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
+        super::read(self, buf)
     }
 }
 
@@ -49,8 +57,8 @@ impl<'a> Buf for MutSliceBuf<'a> {
         self.bytes.slice_from(self.pos)
     }
 
-    fn advance(&mut self, cnt: uint) {
-        assert!(cnt <= self.remaining(), "advancing too far");
+    fn advance(&mut self, mut cnt: uint) {
+        cnt = cmp::min(cnt, self.remaining());
         self.pos += cnt;
     }
 }
@@ -58,5 +66,17 @@ impl<'a> Buf for MutSliceBuf<'a> {
 impl<'a> MutBuf for MutSliceBuf<'a> {
     fn mut_bytes<'a>(&'a mut self) -> &'a mut [u8] {
         self.bytes.mut_slice_from(self.pos)
+    }
+}
+
+impl<'a> Reader for MutSliceBuf<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
+        super::read(self, buf)
+    }
+}
+
+impl<'a> Writer for MutSliceBuf<'a> {
+    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+        super::write(self, buf)
     }
 }

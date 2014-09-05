@@ -10,6 +10,27 @@ use error::MioResult;
 pub use std::io::net::ip::{IpAddr, Port};
 pub use std::io::net::ip::Ipv4Addr as IpV4Addr;
 
+pub enum NonBlock<T> {
+    Ready(T),
+    WouldBlock
+}
+
+impl<T> NonBlock<T> {
+    pub fn would_block(&self) -> bool {
+        match *self {
+            WouldBlock => true,
+            _ => false
+        }
+    }
+
+    pub fn unwrap(self) -> T {
+        match self {
+            Ready(v) => v,
+            _ => fail!("would have blocked, no result to take")
+        }
+    }
+}
+
 pub trait IoHandle {
     fn desc(&self) -> os::IoDesc;
 }
@@ -22,15 +43,15 @@ impl IoHandle for os::IoDesc {
 
 // TODO: Should read / write return bool to indicate whether or not there is more?
 pub trait IoReader {
-    fn read(&mut self, buf: &mut MutBuf) -> MioResult<()>;
+    fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>>;
 }
 
 pub trait IoWriter {
-    fn write(&mut self, buf: &mut Buf) -> MioResult<()>;
+    fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>>;
 }
 
 pub trait IoAcceptor<T> {
-    fn accept(&mut self) -> MioResult<T>;
+    fn accept(&mut self) -> MioResult<NonBlock<T>>;
 }
 
 pub trait Socket : IoHandle {
@@ -53,32 +74,56 @@ pub trait Socket : IoHandle {
 }
 
 impl<H: IoHandle> IoReader for H {
-    fn read(&mut self, buf: &mut MutBuf) -> MioResult<()> {
-        while !buf.is_full() {
+    fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>> {
+        let mut first_iter = true;
+
+        while buf.has_remaining() {
             match os::read(self.desc(), buf.mut_bytes()) {
-                Ok(cnt) => buf.advance(cnt),
-                Err(e) if e.is_eof() => return Ok(()),
-                Err(e) if e.is_would_block() => return Ok(()),
-                Err(e) => return Err(e)
+                // Successfully read some bytes, advance the cursor
+                Ok(cnt) => {
+                    buf.advance(cnt);
+                    first_iter = false;
+                }
+                Err(e) => {
+                    if e.is_would_block() {
+                        return Ok(WouldBlock);
+                    }
+
+                    // If the EOF is hit the first time around, then propagate
+                    if e.is_eof() {
+                        if first_iter {
+                            return Err(e);
+                        }
+
+                        return Ok(Ready(()));
+                    }
+
+                    // Indicate that the read was successful
+                    return Err(e);
+                }
             }
         }
 
-        Ok(())
+        Ok(Ready(()))
     }
 }
 
 impl<H: IoHandle> IoWriter for H {
-    fn write(&mut self, buf: &mut Buf) -> MioResult<()> {
-        while !buf.is_full() {
+    fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>> {
+        while buf.has_remaining() {
             match os::write(self.desc(), buf.bytes()) {
                 Ok(cnt) => buf.advance(cnt),
-                Err(e) if e.is_eof() => return Ok(()),
-                Err(e) if e.is_would_block() => return Ok(()),
-                Err(e) => return Err(e)
+                Err(e) => {
+                    if e.is_would_block() {
+                        return Ok(WouldBlock);
+                    }
+
+                    return Err(e);
+                }
             }
         }
 
-        Ok(())
+        Ok(Ready(()))
     }
 }
 
@@ -130,10 +175,17 @@ impl Socket for TcpAcceptor {
 }
 
 impl IoAcceptor<TcpSocket> for TcpAcceptor {
-    fn accept(&mut self) -> MioResult<TcpSocket> {
-        Ok(TcpSocket {
-            desc: try!(os::accept(self.desc()))
-        })
+    fn accept(&mut self) -> MioResult<NonBlock<TcpSocket>> {
+        match os::accept(self.desc()) {
+            Ok(sock) => Ok(Ready(TcpSocket { desc: sock })),
+            Err(e) => {
+                if e.is_would_block() {
+                    return Ok(WouldBlock);
+                }
+
+                return Err(e);
+            }
+        }
     }
 }
 

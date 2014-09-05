@@ -1,4 +1,4 @@
-use error::MioResult;
+use error::{MioResult, MioError};
 use handler::{Handler, Token};
 use io::*;
 use os;
@@ -15,6 +15,13 @@ pub struct Reactor<T> {
     selector: os::Selector,
     run: bool
 }
+
+pub struct ReactorError<H> {
+    handler: H,
+    error: MioError
+}
+
+pub type ReactorResult<H> = Result<H, ReactorError<H>>;
 
 impl<T: Token> Reactor<T> {
     /// Initializes a new reactor. The reactor will not be running yet.
@@ -88,7 +95,7 @@ impl<T: Token> Reactor<T> {
 
     /// Keep spinning the reactor indefinitely, and notify the handler whenever
     /// any of the registered handles are ready.
-    pub fn run<H: Handler<T>>(&mut self, mut handler: H) {
+    pub fn run<H: Handler<T>>(&mut self, mut handler: H) -> ReactorResult<H> {
         self.run = true;
 
         // Created here for stack allocation
@@ -102,12 +109,14 @@ impl<T: Token> Reactor<T> {
             // one second before it takes effect.
             self.io_poll(&mut events, &mut handler);
         }
+
+        Ok(handler)
     }
 
     /// Spin the reactor once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once<H: Handler<T>>(&mut self, mut handler: H) {
+    pub fn run_once<H: Handler<T>>(&mut self, mut handler: H) -> ReactorResult<H> {
         // Created here for stack allocation
         let mut events = os::Events::new();
 
@@ -115,6 +124,8 @@ impl<T: Token> Reactor<T> {
         // is for one second, so a shutdown request can last as long as
         // one second before it takes effect.
         self.io_poll(&mut events, &mut handler);
+
+        Ok(handler)
     }
 
     /// Poll the reactor for one second, calling the handler if any
@@ -221,7 +232,7 @@ mod tests {
     }
 
     impl Handler<u64> for Funtimes {
-        fn readable(&mut self, reactor: &mut Reactor<u64>, token: u64) {
+        fn readable(&mut self, _reactor: &mut Reactor<u64>, token: u64) {
             (*self.readable).fetch_add(1, SeqCst);
             assert_eq!(token, 10u64);
         }
@@ -239,10 +250,10 @@ mod tests {
         let read_count = Arc::new(AtomicInt::new(0));
         let write_count = Arc::new(AtomicInt::new(0));
 
-        writer.write(&mut buf);
+        writer.write(&mut buf).unwrap();
 
-        reactor.register(reader, 10u64);
-        reactor.run_once(Funtimes::new(read_count.clone(), write_count.clone()));
+        reactor.register(reader, 10u64).unwrap();
+        let _ = reactor.run_once(Funtimes::new(read_count.clone(), write_count.clone()));
 
         assert_eq!((*read_count).load(SeqCst), 1);
 

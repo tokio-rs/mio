@@ -1,15 +1,33 @@
+use std::{mem, ptr, int};
 use alloc::heap;
-use std::{mem, ptr};
 
+/// A preallocated chunk of memory for storing objects of the same type.
 pub struct Slab<T> {
+    // Chunk of memory
     mem: *mut Entry<T>,
-    len: uint,
-    cap: uint,
-    nxt: uint, // Next available slot
+    // Number of elements currently in the slab
+    len: int,
+    // The total number of elements that the slab can hold
+    cap: int,
+    // Offset of the next available slot in the slab. Set to the slab's
+    // capacity when the slab is full.
+    nxt: int,
+    // The total number of slots that were initialized
+    init: int,
 }
+
+static MAX: uint = int::MAX as uint;
+
+// When Entry.nxt is set to this, the entry is in use
+static IN_USE: int = -1;
 
 impl<T> Slab<T> {
     pub fn new(cap: uint) -> Slab<T> {
+        assert!(cap <= MAX, "capacity too large");
+        // TODO:
+        // - Use a power of 2 capacity
+        // - Ensure that mem size is less than uint::MAX
+
         let size = cap.checked_mul(&mem::size_of::<Entry<T>>())
             .expect("capacity overflow");
 
@@ -17,88 +35,126 @@ impl<T> Slab<T> {
 
         Slab {
             mem: ptr as *mut Entry<T>,
-            cap: cap,
+            cap: cap as int,
             len: 0,
             nxt: 0,
+            init: 0
         }
+    }
+
+    #[inline]
+    pub fn count(&self) -> uint {
+        self.len as uint
+    }
+
+    #[inline]
+    pub fn remaining(&self) -> uint {
+        (self.cap - self.len) as uint
+    }
+
+    #[inline]
+    pub fn has_remaining(&self) -> bool {
+        self.remaining() > 0
+    }
+
+    /// Returns true if the slab contains a value at the given index.
+    pub fn exists(&self, idx: uint) -> bool {
+        if idx > int::MAX as uint {
+            return false;
+        }
+
+        let idx = idx as int;
+        idx < self.init && self.entry(idx).in_use()
     }
 
     pub fn insert(&mut self, val: T) -> Result<uint, T> {
         let idx = self.nxt;
 
-        if idx == self.len {
-            // No more capacity
+        if idx == self.init {
+            // Using an uninitialized entry
             if idx == self.cap {
+                // No more capacity
+                debug!("slab out of capacity; cap={}", self.cap);
                 return Err(val);
             }
 
-            {
-                let entry = self.mut_entry(idx);
-                entry.nxt = 0; // Mark as in use
-                entry.val = val;
-            }
+            self.mut_entry(idx).put(val);
 
-            self.nxt = idx + 1;
-            self.len = idx + 1;
-            Ok(idx)
+            self.init += 1;
+            self.len = self.init;
+            self.nxt = self.init;
+
+            debug!("inserting into new slot; idx={}", idx);
         }
         else {
-            let entry = self.mut_entry(idx);
-            entry.nxt = 0; // Mark as in use
-            entry.val = val;
+            self.len += 1;
+            self.nxt = self.mut_entry(idx).put(val);
 
-            Ok(idx)
+            debug!("inserting into reused slot; idx={}", idx);
         }
+
+        Ok(idx as uint)
     }
 
     /// Releases the given slot
-    pub fn remove(&mut self, idx: uint) {
-        self.validate(idx);
+    pub fn remove(&mut self, idx: uint) -> Option<T> {
+        debug!("removing value; idx={}", idx);
 
-        // Release the value at the entry
-        self.release_entry(idx);
+        if idx > MAX {
+            return None;
+        }
 
-        let old_nxt = self.nxt;
-        self.nxt = idx;
+        let idx = idx as int;
 
-        let entry = self.mut_entry(idx);
-        entry.nxt = old_nxt;
-    }
+        // Ensure index is within capacity of slab
+        if idx >= self.cap {
+            return None;
+        }
 
-    #[inline]
-    fn entry(&self, idx: uint) -> &Entry<T> {
-        unsafe { &*self.mem.offset(idx as int) }
-    }
+        let nxt = self.nxt;
 
-    #[inline]
-    fn mut_entry(&mut self, idx: uint) -> &mut Entry<T> {
-        unsafe { &mut *self.mem.offset(idx as int) }
-    }
-
-    #[inline]
-    fn release_entry(&mut self, idx: uint) {
-        unsafe {
-            ptr::read(self.mem.offset(idx as int) as *const Entry<T>);
+        match self.mut_entry(idx).remove(nxt) {
+            Some(v) => {
+                self.nxt = idx;
+                self.len -= 1;
+                Some(v)
+            }
+            None => None
         }
     }
 
     #[inline]
-    fn validate(&self, idx: uint) {
-        if idx >= self.len {
-            fail!("invalid index {} >= {}", idx, self.len);
+    fn entry(&self, idx: int) -> &Entry<T> {
+        unsafe { &*self.mem.offset(idx) }
+    }
+
+    #[inline]
+    fn mut_entry(&mut self, idx: int) -> &mut Entry<T> {
+        unsafe { &mut *self.mem.offset(idx) }
+    }
+
+    #[inline]
+    fn validate_idx(&self, idx: uint) -> int {
+        if idx <= MAX {
+            let idx = idx as int;
+
+            if idx < self.cap {
+                return idx;
+            }
         }
+
+        fail!("invalid index {} -- greater than capacity {}", idx, self.cap);
     }
 }
 
 impl<T> Index<uint, T> for Slab<T> {
     fn index<'a>(&'a self, idx: &uint) -> &'a T {
-        let idx = *idx;
-        self.validate(idx);
+        let idx = self.validate_idx(*idx);
 
         let e = self.entry(idx);
 
-        if e.nxt != 0 {
-            fail!("invalid index");
+        if !e.in_use() {
+            fail!("invalid index; idx={}", idx);
         }
 
         &e.val
@@ -107,13 +163,12 @@ impl<T> Index<uint, T> for Slab<T> {
 
 impl<T> IndexMut<uint, T> for Slab<T> {
     fn index_mut<'a>(&'a mut self, idx: &uint) -> &'a mut T {
-        let idx = *idx;
-        self.validate(idx);
+        let idx = self.validate_idx(*idx);
 
         let e = self.mut_entry(idx);
 
-        if e.nxt == 0 {
-            fail!("invalid index");
+        if !e.in_use() {
+            fail!("invalid index; idx={}", idx);
         }
 
         &mut e.val
@@ -125,19 +180,51 @@ impl<T> Drop for Slab<T> {
     fn drop(&mut self) {
         let mut i = 0;
 
-        while i < self.len {
-            if self.entry(i).nxt == 0 {
-                self.release_entry(i);
-            }
-
+        while i < self.init {
+            self.mut_entry(i).release();
             i += 1;
         }
     }
 }
 
+// Holds the values in the slab.
 struct Entry<T> {
-    nxt: uint, // Next available slot when available, 0 when in use
-    val: T // Value at slot
+    nxt: int,
+    val: T
+}
+
+impl<T> Entry<T> {
+    #[inline]
+    fn put(&mut self, val: T) -> int {
+        let ret = self.nxt;
+
+        self.val = val;
+        self.nxt = IN_USE;
+
+        // Could be uninitialized memory, but the caller (Slab) should guard
+        // not use the return value in those cases.
+        ret
+    }
+
+    fn remove(&mut self, nxt: int) -> Option<T> {
+        if self.in_use() {
+            self.nxt = nxt;
+            Some(unsafe { ptr::read(&self.val as *const T) })
+        } else {
+            None
+        }
+    }
+
+    fn release(&mut self) {
+        if self.in_use() {
+            let _ = Some(unsafe { ptr::read(&self.val as *const T) });
+        }
+    }
+
+    #[inline]
+    fn in_use(&self) -> bool {
+        self.nxt == IN_USE
+    }
 }
 
 #[cfg(test)]
@@ -195,5 +282,63 @@ mod tests {
         slab.remove(t1);
         let t2 = slab.insert(20u).ok().expect("Failed to insert");
         assert_eq!(slab[t2], 20u);
+    }
+
+    #[test]
+    fn test_mut_retrieval() {
+        let mut slab = Slab::new(1);
+        let t1 = slab.insert("foo".to_string()).ok().expect("Failed to insert");
+
+        slab[t1].push_str("bar");
+
+        assert_eq!(slab[t1].as_slice(), "foobar");
+    }
+
+    #[test]
+    #[should_fail]
+    fn test_reusing_slots_1() {
+        let mut slab = Slab::new(16);
+
+        let t0 = slab.insert(123u).unwrap();
+        let t1 = slab.insert(456u).unwrap();
+
+        assert!(slab.count() == 2);
+        assert!(slab.remaining() == 14);
+
+        slab.remove(t0);
+
+        assert!(slab.count() == 1, "actual={}", slab.count());
+        assert!(slab.remaining() == 15);
+
+        slab.remove(t1);
+
+        assert!(slab.count() == 0);
+        assert!(slab.remaining() == 16);
+
+        let _ = slab[t1];
+    }
+
+    #[test]
+    fn test_reusing_slots_2() {
+        let mut slab = Slab::new(16);
+
+        let t0 = slab.insert(123u).unwrap();
+
+        assert!(slab[t0] == 123u);
+        assert!(slab.remove(t0) == Some(123u));
+
+        let t0 = slab.insert(456u).unwrap();
+
+        assert!(slab[t0] == 456u);
+
+        let t1 = slab.insert(789u).unwrap();
+
+        assert!(slab[t0] == 456u);
+        assert!(slab[t1] == 789u);
+
+        assert!(slab.remove(t0).unwrap() == 456u);
+        assert!(slab.remove(t1).unwrap() == 789u);
+
+        assert!(slab.count() == 0);
     }
 }

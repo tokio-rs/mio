@@ -1,4 +1,4 @@
-use std::{fmt, mem, num, ptr};
+use std::{cmp, fmt, mem, num, ptr};
 use std::io::IoResult;
 use std::raw::Slice as RawSlice;
 use alloc::heap;
@@ -45,6 +45,10 @@ impl RingBuf {
         self.cap == self.len
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     #[inline]
     pub fn capacity(&self) -> uint {
         self.cap
@@ -64,16 +68,16 @@ impl RingBuf {
 
     #[inline]
     fn read_remaining(&self) -> uint {
-        unimplemented!()
+        self.len
     }
 
     #[inline]
     fn write_remaining(&self) -> uint {
-        unimplemented!()
+        self.cap - self.len
     }
 
-    fn advance_reader(&mut self, cnt: uint) {
-        assert!(cnt <= self.len, "attempting to advance ring buffer read cursor by more than available");
+    fn advance_reader(&mut self, mut cnt: uint) {
+        cnt = cmp::min(cnt, self.read_remaining());
 
         self.pos += cnt;
         self.pos %= self.cap;
@@ -81,8 +85,8 @@ impl RingBuf {
     }
 
     #[inline]
-    fn advance_writer(&mut self, cnt: uint) {
-        assert!(cnt <= self.cap - self.len, "attempting to advance ring buffer write cursor by more than available");
+    fn advance_writer(&mut self, mut cnt: uint) {
+        cnt = cmp::min(cnt, self.write_remaining());
         self.len += cnt;
     }
 
@@ -99,11 +103,7 @@ impl RingBuf {
     }
 
     fn as_mut_slice<'a>(&'a mut self) -> &'a mut [u8] {
-        unsafe {
-            mem::transmute(RawSlice {
-                data: self.as_ptr(), len: self.cap
-            })
-        }
+        unsafe { mem::transmute(self.as_slice()) }
     }
 }
 
@@ -159,7 +159,7 @@ pub struct RingBufReader<'a> {
 impl<'a> Buf for RingBufReader<'a> {
     #[inline]
     fn remaining(&self) -> uint {
-        self.ring.len
+        self.ring.read_remaining()
     }
 
     fn bytes<'a>(&'a self) -> &'a [u8] {
@@ -190,7 +190,7 @@ pub struct RingBufWriter<'a> {
 impl<'a> Buf for RingBufWriter<'a> {
     #[inline]
     fn remaining(&self) -> uint {
-        self.ring.cap - self.ring.len
+        self.ring.write_remaining()
     }
 
     fn bytes<'a>(&'a self) -> &'a [u8] {
