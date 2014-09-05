@@ -39,7 +39,7 @@ impl<T> Slab<T> {
             }
 
             self.nxt = idx + 1;
-            self.len = idx;
+            self.len = idx + 1;
             Ok(idx)
         }
         else {
@@ -85,7 +85,7 @@ impl<T> Slab<T> {
     #[inline]
     fn validate(&self, idx: uint) {
         if idx >= self.len {
-            fail!("invalid index");
+            fail!("invalid index {} >= {}", idx, self.len);
         }
     }
 }
@@ -97,7 +97,7 @@ impl<T> Index<uint, T> for Slab<T> {
 
         let e = self.entry(idx);
 
-        if e.nxt == 0 {
+        if e.nxt != 0 {
             fail!("invalid index");
         }
 
@@ -138,4 +138,62 @@ impl<T> Drop for Slab<T> {
 struct Entry<T> {
     nxt: uint, // Next available slot when available, 0 when in use
     val: T // Value at slot
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Slab;
+
+    #[test]
+    fn test_insertion() {
+        let mut slab = Slab::new(1);
+        let token = slab.insert(10u).ok().expect("Failed to insert");
+        assert_eq!(slab[token], 10u);
+    }
+
+    #[test]
+    fn test_repeated_insertion() {
+        let mut slab = Slab::new(10);
+
+        for i in range(0u, 10u) {
+            let token = slab.insert(i + 10u).ok().expect("Failed to insert");
+            assert_eq!(slab[token], i + 10u);
+        }
+
+        slab.insert(20).err().expect("Inserted when full");
+    }
+
+    #[test]
+    fn test_repeated_insertion_and_removal() {
+        let mut slab = Slab::new(10);
+        let mut tokens = vec![];
+
+        for i in range(0u, 10u) {
+            let token = slab.insert(i + 10u).ok().expect("Failed to insert");
+            tokens.push(token);
+            assert_eq!(slab[token], i + 10u);
+        }
+
+        for &i in tokens.iter() {
+            slab.remove(i);
+        }
+
+        slab.insert(20).ok().expect("Failed to insert in newly empty slab");
+    }
+
+    #[test]
+    fn test_insertion_when_full() {
+        let mut slab = Slab::new(1);
+        slab.insert(10u).ok().expect("Failed to insert");
+        slab.insert(10u).err().expect("Inserted into a full slab");
+    }
+
+    #[test]
+    fn test_removal_is_successful() {
+        let mut slab = Slab::new(1);
+        let t1 = slab.insert(10u).ok().expect("Failed to insert");
+        slab.remove(t1);
+        let t2 = slab.insert(20u).ok().expect("Failed to insert");
+        assert_eq!(slab[t2], 20u);
+    }
 }
