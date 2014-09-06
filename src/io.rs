@@ -14,6 +14,12 @@ pub trait IoHandle {
     fn desc(&self) -> os::IoDesc;
 }
 
+impl IoHandle for os::IoDesc {
+    fn desc(&self) -> os::IoDesc {
+        *self
+    }
+}
+
 // TODO: Should read / write return bool to indicate whether or not there is more?
 pub trait IoReader {
     fn read(&mut self, buf: &mut MutBuf) -> MioResult<()>;
@@ -46,7 +52,7 @@ pub trait Socket : IoHandle {
     }
 }
 
-impl<S: Socket> IoReader for S {
+impl<H: IoHandle> IoReader for H {
     fn read(&mut self, buf: &mut MutBuf) -> MioResult<()> {
         while !buf.is_full() {
             match os::read(self.desc(), buf.mut_bytes()) {
@@ -61,7 +67,7 @@ impl<S: Socket> IoReader for S {
     }
 }
 
-impl<S: Socket> IoWriter for S {
+impl<H: IoHandle> IoWriter for H {
     fn write(&mut self, buf: &mut Buf) -> MioResult<()> {
         while !buf.is_full() {
             match os::write(self.desc(), buf.bytes()) {
@@ -143,6 +149,28 @@ impl IoHandle for UnixSocket {
 }
 
 impl Socket for UnixSocket {
+}
+
+#[deriving(Show)]
+pub struct PipeSender {
+    desc: os::IoDesc
+}
+
+#[deriving(Show)]
+pub struct PipeReceiver {
+    desc: os::IoDesc
+}
+
+impl IoHandle for PipeSender {
+    fn desc(&self) -> os::IoDesc {
+        self.desc
+    }
+}
+
+impl IoHandle for PipeReceiver {
+    fn desc(&self) -> os::IoDesc {
+        self.desc
+    }
 }
 
 // Types of sockets

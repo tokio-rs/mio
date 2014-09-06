@@ -99,11 +99,7 @@ impl RingBuf {
     }
 
     fn as_mut_slice<'a>(&'a mut self) -> &'a mut [u8] {
-        unsafe {
-            mem::transmute(RawSlice {
-                data: self.as_ptr(), len: self.cap
-            })
-        }
+        unsafe { mem::transmute(self.as_slice()) }
     }
 }
 

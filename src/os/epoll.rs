@@ -56,7 +56,7 @@ impl Selector {
 
 impl Drop for Selector {
     fn drop(&mut self) {
-        close(self.epfd);
+        let _ = close(self.epfd);
     }
 }
 
