@@ -37,19 +37,21 @@ impl<T: Token> Reactor<T> {
 
 
     pub fn run<T>(&mut self, handler: fn(token: T, event: IoEventKind) -> bool) {
+        
+        // Created here for stack allocation
+        let mut events = [os::IoPollEvent, ..1024];
 
-        while self.io_poll(handler) {
+        while self.io_poll(&events, handler) {
             debug!("reactor tick");
         }
 
     }
 
-    fn io_poll(&mut self, handler: fn(token: T, event: IoEventKind) -> bool) -> bool {
+    fn io_poll(&mut self, events: &mut [os::IoPollEvent], handler: fn(token: T, event: IoEventKind) -> bool) -> bool {
         
-        // Created here for stack allocation
-        let mut events = [os::IoPollEvent, ..1024];
 
-        let len = self.selector.select(events, 1000).unwrap();
+        let len = self.selector.select(events, events.len()).unwrap();
+        let mut i = 0; 
 
         while i < len && i < events.len() {
             let evt = events[i].from_mask();
