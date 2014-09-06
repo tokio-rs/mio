@@ -35,19 +35,19 @@ impl<T: Token> Reactor<T> {
     }
 
 
-    pub fn run(&mut self, handler: fn(token: T, event: IoEventKind) -> bool) {
+    pub fn run(&mut self, timeout: uint, handler: fn(token: T, event: IoEventKind) -> bool) {
         
         // Created here for stack allocation
-        while self.io_poll(handler) {
+        while self.io_poll(timeout, handler) {
             debug!("reactor tick");
         }
 
     }
 
-    fn io_poll(&mut self, handler: fn(token: T, event: IoEventKind) -> bool) -> bool {
+    fn io_poll(&mut self, timeout: uint, handler: fn(token: T, event: IoEventKind) -> bool) -> bool {
         
 
-        let len = self.selector.select(100).unwrap();
+        let len = self.selector.select(timeout).unwrap();
         let mut i = 0; 
 
         while i < len && i < self.selector.event_context.len() {
@@ -67,3 +67,65 @@ impl<T: Token> Reactor<T> {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use std;
+    use std::sync::Arc;
+    use std::sync::atomics::{AtomicInt, SeqCst};
+
+    use super::Reactor;
+    use buf::{SliceBuf, MutSliceBuf};
+    use io::{IoWriter, IoReader};
+    use os;
+    use event::*;
+
+    struct Funtimes {
+        readable: Arc<AtomicInt>,
+        writable: Arc<AtomicInt>
+    }
+
+    impl Funtimes {
+        fn new(readable: Arc<AtomicInt>, writable: Arc<AtomicInt>) -> Funtimes {
+            Funtimes { readable: readable, writable: writable }
+        }
+    }
+
+    #[test]
+    fn test_readable() {
+        let mut reactor = Reactor::<u64>::new().ok().expect("Couldn't make reactor");
+        let pipe = unsafe { std::os::pipe() }.ok().expect("Couldn't create pipe");
+        let mut reader = os::IoDesc { fd: pipe.reader };
+        let mut writer = os::IoDesc { fd: pipe.writer };
+
+        let mut buf = SliceBuf::wrap("hello".as_bytes());
+
+        let read_count = Arc::new(AtomicInt::new(0));
+        let write_count = Arc::new(AtomicInt::new(0));
+
+        writer.write(&mut buf);
+
+        reactor.register(reader, 10u64, IoReadable | IoWritable);
+        
+        let fun = Funtimes::new(read_count.clone(), write_count.clone());
+
+        reactor.run(1000,  |tok: u64, event: IoEventKind| {
+          if event.is_readable() {
+            fun.fetch_add(1, SeqCst);
+            assert_eq!(tok, 10u64);
+          }
+          false;
+        });
+
+        assert_eq!((*read_count).load(SeqCst), 1);
+
+        let mut write_vec = vec![0u8, 0u8, 0u8, 0u8, 0u8];
+
+        {
+            let mut write_into = MutSliceBuf::wrap(write_vec.as_mut_slice());
+            reader.read(&mut write_into).ok().expect("Couldn't read");
+        }
+
+        assert_eq!(String::from_utf8(write_vec).ok().expect("Invalid UTF-8").as_slice(), "hello");
+    }
+}
