@@ -7,13 +7,12 @@ bitflags!(
         static IoReadable = 0x001,
         static IoWritable = 0x002,
         static IoError    = 0x004,
-        static IOHangup   = 0x008
+        static IoHangup   = 0x008
     }
 )
 
 
-pub impl IoEvent {
-    type MaskType;
+pub trait IoEvent {
 
     fn is_readable(&self) -> bool;
 
@@ -23,8 +22,10 @@ pub impl IoEvent {
 
     fn is_error(&self) -> bool;
 
-    fn to_mask(ioevents: IoEventKind) -> MaskType;
-
-    fn from_mask(events: MaskType) -> IoEventKind;
+    fn to_ioevent(&self) -> IoEventKind;
 }
+
+// this should also be part of the trait but until
+// we get associated types, I can't think of a good way
+//fn from_ioevent(ioevents: IoEventKind) -> OSMaskType;
 

@@ -13,14 +13,15 @@ extern crate log;
 
 pub use buf::{Buf, MutBuf};
 pub use error::{MioResult, MioError};
-pub use handler::Handler;
+pub use token::Token;
 pub use io::{IoReader, IoWriter, IoAcceptor, Socket, TcpSocket, TcpAcceptor, UnixSocket, SockAddr};
 pub use reactor::Reactor;
 pub use slab::Slab;
 
 pub mod buf;
 mod error;
-mod handler;
+mod token;
+mod event;
 mod io;
 mod os;
 mod reactor;

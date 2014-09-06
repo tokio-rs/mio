@@ -1,5 +1,5 @@
 use error::MioResult;
-use handler::{Handler, Token};
+use token::Token;
 use io::*;
 use event::*;
 use os;
@@ -30,24 +30,24 @@ impl<T: Token> Reactor<T> {
         debug!("registering IO with reactor");
 
         // Register interets for this socket
-        try!(self.selector.register(io.desc(), token.to_u64()));
+        try!(self.selector.register(io.desc(), token.to_u64(), events));
 
         Ok(())
     }
 
 
-    pub fn run(&mut self, fn (token: T, event: IoEventKind) -> bool) {
-        self.run = true;
+    pub fn run<T>(&mut self, handler: fn(token: T, event: IoEventKind) -> bool) {
 
-        // Created here for stack allocation
-        let mut events = [EpollEvent ..1024];
-
-        while self.io_poll(&mut events, &mut handler) {
+        while self.io_poll(handler) {
             debug!("reactor tick");
         }
+
     }
 
-    fn io_poll(&mut self, events: &mut [EpollEvent], handler: fn (token: T, event: IoEventKind) -> bool) -> bool {
+    fn io_poll(&mut self, handler: fn(token: T, event: IoEventKind) -> bool) -> bool {
+        
+        // Created here for stack allocation
+        let mut events = [os::IoPollEvent, ..1024];
 
         let len = self.selector.select(events, 1000).unwrap();
 

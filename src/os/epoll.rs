@@ -3,8 +3,10 @@ use nix::fcntl::Fd;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 use error::{MioResult, MioError};
-use os::IoDesc;
+use super::posix::{IoDesc};
 use event::*;
+
+pub type IoPollEvent = EpollEvent;
 
 pub struct Selector {
     epfd: Fd
@@ -18,7 +20,7 @@ impl Selector {
     }
 
     /// Wait for events from the OS
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: uint) -> MioResult<()> {
+    pub fn select(&mut self, evts: &mut [EpollEvent], timeout_ms: uint) -> MioResult<uint> {
         // Wait for epoll events for at most timeout_ms milliseconds
         let cnt = try!(epoll_wait(self.epfd, evts.events.as_mut_slice(), timeout_ms)
                            .map_err(MioError::from_sys_error));
@@ -28,7 +30,7 @@ impl Selector {
 
     /// Register event interests for the given IO handle with the OS
     pub fn register(&mut self, io: IoDesc, token: u64, events: IoEventKind) -> MioResult<()> {
-        let interests = events.to_mask();
+        let interests = from_ioevent(events);
 
         let info = EpollEvent {
             events: interests | EPOLLET,
@@ -61,8 +63,7 @@ impl Drop for Selector {
 }
 
 
-impl IoEvent for EpollEvent {
-    type MaskType = EpollEventKind;
+impl IoEvent for IoPollEvent {
 
     fn is_readable(&self) -> bool {
         self.kind.contains(IoReadable)
@@ -80,27 +81,8 @@ impl IoEvent for EpollEvent {
         self.kind.contains(IoError)
     }
 
-    fn to_mask(ioevents: IoEventKind) -> MaskType {
-        let mut mask : u32 = 0;
 
-        if ioevents.contains(IoReadable) {
-            mask = mask | EPOLLIN;
-        }
-        if ioevents.contains(IoWritable) {
-            mask = mask | EPOLLOUT;
-        }
-        if ioevents.contains(IoReadable) {
-            mask = mask | EPOLLHUP | EPOLLRDHUP;
-        }
-        // this one probably isnt' necessary, but for completeness...
-        if ioevents.contains(IoError) {
-            mask = mask | EPOLLERR;
-        }
-
-        mask
-    }
-
-    fn from_mask(&self) -> IoEventKind {
+    fn to_ioevent(&self) -> IoEventKind {
 
         let mut kind = IoEventKind::empty();
 
@@ -117,7 +99,7 @@ impl IoEvent for EpollEvent {
             kind = kind | IoError;
         }
 
-        if self.events.contains(EPOLLHUP) || epoll.contains(EPOLLRDHUP) {
+        if self.events.contains(EPOLLHUP) || self.events.contains(EPOLLRDHUP) {
             kind = kind | IoHangup;
         }
 
@@ -125,3 +107,22 @@ impl IoEvent for EpollEvent {
     }
 }
 
+fn from_ioevent(ioevents: IoEventKind) -> EpollEventKind {
+    let mut mask : EpollEventKind = 0;
+
+    if ioevents.contains(IoReadable) {
+        mask = mask | EPOLLIN;
+    }
+    if ioevents.contains(IoWritable) {
+        mask = mask | EPOLLOUT;
+    }
+    if ioevents.contains(IoReadable) {
+        mask = mask | EPOLLHUP | EPOLLRDHUP;
+    }
+    // this one probably isnt' necessary, but for completeness...
+    if ioevents.contains(IoError) {
+        mask = mask | EPOLLERR;
+    }
+
+    mask
+}
