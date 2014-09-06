@@ -2,7 +2,7 @@
 pub use self::posix::*;
 
 #[cfg(target_os = "linux")]
-pub use self::epoll::{IoPollEvent, Selector};
+pub use self::epoll::{Selector};
 
 #[cfg(target_os = "macos")]
 #[cfg(target_os = "ios")]
@@ -12,7 +12,7 @@ pub use self::kqueue::{Events, Selector};
 pub use self::windows::*;
 
 #[cfg(target_os = "linux")]
-mod epoll;
+pub mod epoll;
 
 #[cfg(target_os = "macos")]
 #[cfg(target_os = "ios")]

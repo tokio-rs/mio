@@ -21,7 +21,6 @@ impl<T: Token> Reactor<T> {
     pub fn new() -> MioResult<Reactor<T>> {
         Ok(Reactor {
             selector: try!(os::Selector::new()),
-            run: true
         })
     }
 
@@ -36,30 +35,28 @@ impl<T: Token> Reactor<T> {
     }
 
 
-    pub fn run<T>(&mut self, handler: fn(token: T, event: IoEventKind) -> bool) {
+    pub fn run(&mut self, handler: fn(token: T, event: IoEventKind) -> bool) {
         
         // Created here for stack allocation
-        let mut events = [os::IoPollEvent, ..1024];
-
-        while self.io_poll(&events, handler) {
+        while self.io_poll(handler) {
             debug!("reactor tick");
         }
 
     }
 
-    fn io_poll(&mut self, events: &mut [os::IoPollEvent], handler: fn(token: T, event: IoEventKind) -> bool) -> bool {
+    fn io_poll(&mut self, handler: fn(token: T, event: IoEventKind) -> bool) -> bool {
         
 
-        let len = self.selector.select(events, events.len()).unwrap();
+        let len = self.selector.select(100).unwrap();
         let mut i = 0; 
 
-        while i < len && i < events.len() {
-            let evt = events[i].from_mask();
-            let tok = Token::from_u64(evt.token);
+        while i < len && i < self.selector.event_context.len() {
+            let evt = self.selector.event_context[i].to_ioevent();
+            let tok : T = Token::from_u64(self.selector.event_context[i].data);
 
             debug!("event={}", evt);
 
-            if ( ! handler(tok, evt)) {
+            if ! handler(tok, evt) {
                return false;
             }
 
