@@ -1,5 +1,5 @@
 use error::{MioResult, MioError};
-use handler::{Handler, Token};
+use handler::{Handler, ReadHint, DataHint, HupHint, UnknownHint, Token};
 use io::*;
 use os;
 
@@ -146,7 +146,7 @@ impl<T: Token> Reactor<T> {
             debug!("event={}", evt);
 
             if evt.is_readable() {
-                handler.readable(self, tok);
+                handler.readable(self, tok, evt.read_hint());
             }
 
             if evt.is_writable() {
@@ -167,7 +167,9 @@ bitflags!(
     flags IoEventKind: uint {
         static IoReadable = 0x001,
         static IoWritable = 0x002,
-        static IoError    = 0x004
+        static IoError    = 0x004,
+        static IoHupHint  = 0x008,
+        static IoHinted   = 0x010
     }
 )
 
@@ -192,9 +194,23 @@ impl IoEvent {
         }
     }
 
+    /// Return an optional hint for a readable IO handle. Currently,
+    /// this method supports the HupHint, which indicates that the
+    /// kernel reported that the remote side hung up. This allows a
+    /// consumer to avoid reading in order to discover the hangup.
+    pub fn read_hint(&self) -> ReadHint {
+        if self.kind.contains(IoHupHint) {
+            HupHint
+        } else if self.kind.contains(IoHinted) {
+            DataHint
+        } else {
+            UnknownHint
+        }
+    }
+
     /// This event indicated that the IO handle is now readable
     pub fn is_readable(&self) -> bool {
-        self.kind.contains(IoReadable)
+        self.kind.contains(IoReadable) || self.kind.contains(IoHupHint)
     }
 
     /// This event indicated that the IO handle is now writable
@@ -217,6 +233,7 @@ mod tests {
     use super::Reactor;
     use buf::{SliceBuf, MutSliceBuf};
     use io::{IoWriter, IoReader};
+    use handler::ReadHint;
     use Handler;
     use os;
 
@@ -232,7 +249,7 @@ mod tests {
     }
 
     impl Handler<u64> for Funtimes {
-        fn readable(&mut self, _reactor: &mut Reactor<u64>, token: u64) {
+        fn readable(&mut self, _reactor: &mut Reactor<u64>, token: u64, _hint: ReadHint) {
             (*self.readable).fetch_add(1, SeqCst);
             assert_eq!(token, 10u64);
         }

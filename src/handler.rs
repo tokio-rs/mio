@@ -1,8 +1,16 @@
 use reactor::{Reactor};
 
+#[deriving(Show)]
+pub enum ReadHint {
+    DataHint,
+    HupHint,
+    ErrorHint,
+    UnknownHint
+}
+
 #[allow(unused_variable)]
 pub trait Handler<T: Token> {
-    fn readable(&mut self, reactor: &mut Reactor<T>, token: T) {
+    fn readable(&mut self, reactor: &mut Reactor<T>, token: T, hint: ReadHint) {
         println!("Handler: readable");
     }
 
