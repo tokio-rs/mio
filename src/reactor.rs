@@ -44,7 +44,7 @@ impl<T: Token> Reactor<T> {
     }
 
     /// Registers an IO handle with the reactor.
-    pub fn register<H: IoHandle>(&mut self, io: H, token: T) -> MioResult<()> {
+    pub fn register<H: IoHandle>(&mut self, io: &H, token: T) -> MioResult<()> {
         debug!("registering IO with reactor");
 
         // Register interets for this socket
@@ -60,7 +60,7 @@ impl<T: Token> Reactor<T> {
     /// notify about the connection, even if the connection happens
     /// immediately. Otherwise, every consumer of the reactor would have
     /// to worry about possibly-immediate connection.
-    pub fn connect<S: Socket>(&mut self, io: S,
+    pub fn connect<S: Socket>(&mut self, io: &S,
                               addr: &SockAddr, token: T) -> MioResult<()> {
 
         debug!("socket connect; addr={}", addr);
@@ -79,8 +79,8 @@ impl<T: Token> Reactor<T> {
         Ok(())
     }
 
-    pub fn listen<S, A: IoHandle + IoAcceptor<S>>(&mut self, io: A, backlog: uint,
-                                                token: T) -> MioResult<()> {
+    pub fn listen<S, A: IoHandle + IoAcceptor<S>>(&mut self, io: &A, backlog: uint,
+                                                  token: T) -> MioResult<()> {
 
         debug!("socket listen");
 
@@ -252,7 +252,7 @@ mod tests {
 
         writer.write(&mut buf).unwrap();
 
-        reactor.register(reader, 10u64).unwrap();
+        reactor.register(&reader, 10u64).unwrap();
         let _ = reactor.run_once(Funtimes::new(read_count.clone(), write_count.clone()));
 
         assert_eq!((*read_count).load(SeqCst), 1);

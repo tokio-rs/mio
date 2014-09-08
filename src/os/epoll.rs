@@ -28,7 +28,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, io: IoDesc, token: u64) -> MioResult<()> {
+    pub fn register(&mut self, io: &IoDesc, token: u64) -> MioResult<()> {
         let interests = EPOLLIN | EPOLLOUT | EPOLLERR;
 
         let info = EpollEvent {

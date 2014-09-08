@@ -32,16 +32,17 @@ impl<T> NonBlock<T> {
 }
 
 pub trait IoHandle {
-    fn desc(&self) -> os::IoDesc;
+    fn desc(&self) -> &os::IoDesc;
 }
 
+// TODO: remove, not all IoDesc should implement both read and write (see
+// pipe())
 impl IoHandle for os::IoDesc {
-    fn desc(&self) -> os::IoDesc {
-        *self
+    fn desc(&self) -> &os::IoDesc {
+        self
     }
 }
 
-// TODO: Should read / write return bool to indicate whether or not there is more?
 pub trait IoReader {
     fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>>;
 }
@@ -146,14 +147,14 @@ impl TcpSocket {
     }
 
     pub fn bind(self, addr: &SockAddr) -> MioResult<TcpAcceptor> {
-        try!(os::bind(self.desc, addr))
+        try!(os::bind(&self.desc, addr))
         Ok(TcpAcceptor { desc: self.desc })
     }
 }
 
 impl IoHandle for TcpSocket {
-    fn desc(&self) -> os::IoDesc {
-        self.desc
+    fn desc(&self) -> &os::IoDesc {
+        &self.desc
     }
 }
 
@@ -166,8 +167,8 @@ pub struct TcpAcceptor {
 }
 
 impl IoHandle for TcpAcceptor {
-    fn desc(&self) -> os::IoDesc {
-        self.desc
+    fn desc(&self) -> &os::IoDesc {
+        &self.desc
     }
 }
 
@@ -195,8 +196,8 @@ pub struct UnixSocket {
 }
 
 impl IoHandle for UnixSocket {
-    fn desc(&self) -> os::IoDesc {
-        self.desc
+    fn desc(&self) -> &os::IoDesc {
+        &self.desc
     }
 }
 
@@ -214,14 +215,14 @@ pub struct PipeReceiver {
 }
 
 impl IoHandle for PipeSender {
-    fn desc(&self) -> os::IoDesc {
-        self.desc
+    fn desc(&self) -> &os::IoDesc {
+        &self.desc
     }
 }
 
 impl IoHandle for PipeReceiver {
-    fn desc(&self) -> os::IoDesc {
-        self.desc
+    fn desc(&self) -> &os::IoDesc {
+        &self.desc
     }
 }
 

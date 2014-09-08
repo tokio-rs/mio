@@ -29,7 +29,7 @@ impl Selector {
         Ok(())
     }
 
-    pub fn register(&mut self, io: IoDesc, token: u64) -> MioResult<()> {
+    pub fn register(&mut self, io: &IoDesc, token: u64) -> MioResult<()> {
         let flag = EV_ADD | EV_CLEAR;
 
         try!(self.ev_push(io, EVFILT_READ, flag, FilterFlag::empty(), token));
@@ -41,7 +41,7 @@ impl Selector {
     // Queues an event change. Events will get submitted to the OS on the next
     // call to select or when the change buffer fills up.
     fn ev_push(&mut self,
-               io: IoDesc,
+               io: &IoDesc,
                filter: EventFilter,
                flags: EventFlag,
                fflags: FilterFlag,

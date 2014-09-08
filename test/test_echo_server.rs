@@ -1,5 +1,6 @@
 use mio::*;
 use mio::buf::{ByteBuf, RingBuf, SliceBuf};
+use super::localhost;
 
 struct EchoConn {
     sock: TcpSocket,
@@ -87,7 +88,7 @@ impl EchoServer {
             .ok().expect("could not add connectiont o slab");
 
         // Register the connection
-        reactor.register(sock, 2 + tok)
+        reactor.register(&self.conns[tok].sock, 2 + tok)
             .ok().expect("could not register socket with reactor");
     }
 
@@ -243,7 +244,7 @@ impl Handler<uint> for EchoHandler {
 pub fn test_echo_server() {
     let mut reactor = Reactor::new().unwrap();
 
-    let addr = SockAddr::parse("127.0.0.1:8080")
+    let addr = SockAddr::parse(localhost().as_slice())
         .expect("could not parse InetAddr");
 
     let srv = TcpSocket::v4().unwrap();
@@ -254,12 +255,12 @@ pub fn test_echo_server() {
     let srv = srv.bind(&addr).unwrap();
 
     info!("listen for connections");
-    reactor.listen(srv, 256u, 0u).unwrap();
+    reactor.listen(&srv, 256u, 0u).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    reactor.connect(sock, &addr, 1u).unwrap();
+    reactor.connect(&sock, &addr, 1u).unwrap();
 
     // Start the reactor
     reactor.run(EchoHandler::new(srv, sock, vec!["foo", "bar"]))

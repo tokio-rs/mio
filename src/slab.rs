@@ -178,6 +178,7 @@ impl<T> IndexMut<uint, T> for Slab<T> {
 #[unsafe_destructor]
 impl<T> Drop for Slab<T> {
     fn drop(&mut self) {
+        // TODO: check whether or not this is needed with intrinsics::needs_drop
         let mut i = 0;
 
         while i < self.init {

@@ -17,6 +17,12 @@ pub struct IoDesc {
     pub fd: nix::Fd
 }
 
+impl Drop for IoDesc {
+    fn drop(&mut self) {
+        let _ = nix::close(self.fd);
+    }
+}
+
 pub fn socket(af: AddressFamily) -> MioResult<IoDesc> {
     let family = match af {
         Inet  => nix::AF_INET,
@@ -30,7 +36,7 @@ pub fn socket(af: AddressFamily) -> MioResult<IoDesc> {
     })
 }
 
-pub fn connect(io: IoDesc, addr: &SockAddr) -> MioResult<bool> {
+pub fn connect(io: &IoDesc, addr: &SockAddr) -> MioResult<bool> {
     match nix::connect(io.fd, &from_sockaddr(addr)) {
         Ok(_) => Ok(true),
         Err(e) => {
@@ -42,17 +48,17 @@ pub fn connect(io: IoDesc, addr: &SockAddr) -> MioResult<bool> {
     }
 }
 
-pub fn bind(io: IoDesc, addr: &SockAddr) -> MioResult<()> {
+pub fn bind(io: &IoDesc, addr: &SockAddr) -> MioResult<()> {
     nix::bind(io.fd, &from_sockaddr(addr))
         .map_err(MioError::from_sys_error)
 }
 
-pub fn listen(io: IoDesc, backlog: uint) -> MioResult<()> {
+pub fn listen(io: &IoDesc, backlog: uint) -> MioResult<()> {
     nix::listen(io.fd, backlog)
         .map_err(MioError::from_sys_error)
 }
 
-pub fn accept(io: IoDesc) -> MioResult<IoDesc> {
+pub fn accept(io: &IoDesc) -> MioResult<IoDesc> {
     Ok(IoDesc {
         fd: try!(nix::accept4(io.fd, nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
                      .map_err(MioError::from_sys_error))
@@ -60,7 +66,7 @@ pub fn accept(io: IoDesc) -> MioResult<IoDesc> {
 }
 
 #[inline]
-pub fn read(io: IoDesc, dst: &mut [u8]) -> MioResult<uint> {
+pub fn read(io: &IoDesc, dst: &mut [u8]) -> MioResult<uint> {
     let res = try!(nix::read(io.fd, dst).map_err(MioError::from_sys_error));
 
     if res == 0 {
@@ -71,24 +77,24 @@ pub fn read(io: IoDesc, dst: &mut [u8]) -> MioResult<uint> {
 }
 
 #[inline]
-pub fn write(io: IoDesc, src: &[u8]) -> MioResult<uint> {
+pub fn write(io: &IoDesc, src: &[u8]) -> MioResult<uint> {
     nix::write(io.fd, src).map_err(MioError::from_sys_error)
 }
 
 // ===== Socket options =====
 
-pub fn reuseaddr(_io: IoDesc) -> MioResult<uint> {
+pub fn reuseaddr(_io: &IoDesc) -> MioResult<uint> {
     unimplemented!()
 }
 
-pub fn set_reuseaddr(io: IoDesc, val: bool) -> MioResult<()> {
+pub fn set_reuseaddr(io: &IoDesc, val: bool) -> MioResult<()> {
     let v: nix::c_int = if val { 1 } else { 0 };
 
     nix::setsockopt(io.fd, nix::SOL_SOCKET, nix::SO_REUSEADDR, &v)
         .map_err(MioError::from_sys_error)
 }
 
-pub fn linger(io: IoDesc) -> MioResult<uint> {
+pub fn linger(io: &IoDesc) -> MioResult<uint> {
     let mut linger: nix::linger = unsafe { mem::uninitialized() };
 
     try!(nix::getsockopt(io.fd, nix::SOL_SOCKET, nix::SO_LINGER, &mut linger)
@@ -101,7 +107,7 @@ pub fn linger(io: IoDesc) -> MioResult<uint> {
     }
 }
 
-pub fn set_linger(io: IoDesc, dur_s: uint) -> MioResult<()> {
+pub fn set_linger(io: &IoDesc, dur_s: uint) -> MioResult<()> {
     let linger = nix::linger {
         l_onoff: (if dur_s > 0 { 1i } else { 0i }) as nix::c_int,
         l_linger: dur_s as nix::c_int
