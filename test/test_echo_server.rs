@@ -223,7 +223,7 @@ impl EchoHandler {
 }
 
 impl Handler<uint> for EchoHandler {
-    fn readable(&mut self, reactor: &mut Reactor<uint>, token: uint) {
+    fn readable(&mut self, reactor: &mut Reactor<uint>, token: uint, _hint: ReadHint) {
         match token {
             0 => self.server.accept(reactor),
             1 => self.client.readable(reactor),

@@ -19,7 +19,10 @@ pub use error::{
     MioResult,
     MioError
 };
-pub use handler::Handler;
+pub use handler::{
+    Handler,
+    ReadHint
+};
 pub use io::{
     NonBlock,
     IoReader,
