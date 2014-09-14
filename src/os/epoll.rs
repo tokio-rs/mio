@@ -74,8 +74,6 @@ impl Events {
         let epoll = self.events[idx].events;
         let mut kind = IoEventKind::empty();
 
-        debug!("epoll event = {}", epoll);
-
         if epoll.contains(EPOLLIN) {
             kind = kind | IoReadable;
         }

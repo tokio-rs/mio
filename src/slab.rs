@@ -197,9 +197,11 @@ struct Entry<T> {
 impl<T> Entry<T> {
     #[inline]
     fn put(&mut self, val: T) -> int {
+        assert!(self.nxt != IN_USE);
+
         let ret = self.nxt;
 
-        self.val = val;
+        unsafe { ptr::write(&mut self.val as *mut T, val); }
         self.nxt = IN_USE;
 
         // Could be uninitialized memory, but the caller (Slab) should guard
