@@ -78,7 +78,7 @@ impl<T> Slab<T> {
                 return Err(val);
             }
 
-            self.mut_entry(idx).put(val);
+            self.mut_entry(idx).put(val, true);
 
             self.init += 1;
             self.len = self.init;
@@ -88,7 +88,7 @@ impl<T> Slab<T> {
         }
         else {
             self.len += 1;
-            self.nxt = self.mut_entry(idx).put(val);
+            self.nxt = self.mut_entry(idx).put(val, false);
 
             debug!("inserting into reused slot; idx={}", idx);
         }
@@ -196,8 +196,8 @@ struct Entry<T> {
 
 impl<T> Entry<T> {
     #[inline]
-    fn put(&mut self, val: T) -> int {
-        assert!(self.nxt != IN_USE);
+    fn put(&mut self, val: T, init: bool) -> int {
+        assert!(init || self.nxt != IN_USE);
 
         let ret = self.nxt;
 
