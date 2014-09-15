@@ -21,15 +21,13 @@ pub use error::{
 };
 pub use handler::Handler;
 pub use io::{
+    pipe,
     NonBlock,
     IoReader,
     IoWriter,
     IoAcceptor,
-    Socket,
-    TcpSocket,
-    TcpAcceptor,
-    UnixSocket,
-    SockAddr
+    PipeReader,
+    PipeWriter
 };
 pub use poll::{
     Poll,
@@ -41,6 +39,13 @@ pub use reactor::{
     ReactorResult
 };
 pub use slab::Slab;
+pub use socket::{
+    Socket,
+    SockAddr,
+    TcpSocket,
+    TcpAcceptor,
+    UnixSocket,
+};
 
 pub mod buf;
 mod error;
@@ -50,4 +55,5 @@ mod os;
 mod poll;
 mod reactor;
 mod slab;
+mod socket;
 mod timer;

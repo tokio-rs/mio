@@ -27,6 +27,14 @@ pub trait MutBuf : Buf {
     fn mut_bytes<'a>(&'a mut self) -> &'a mut [u8];
 }
 
+pub fn wrap<'a>(bytes: &'a [u8]) -> SliceBuf<'a> {
+    SliceBuf::wrap(bytes)
+}
+
+pub fn wrap_mut<'a>(bytes: &'a mut [u8]) -> MutSliceBuf<'a> {
+    MutSliceBuf::wrap(bytes)
+}
+
 // TODO:
 // It would be really nice to automatically implement Reader / Writer for all
 // implementations of Buf, however this is not currently possible at the time

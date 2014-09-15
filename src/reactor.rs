@@ -1,8 +1,9 @@
 use error::{MioResult, MioError};
 use handler::{Handler, Token};
-use io::*;
+use io::{IoAcceptor, IoHandle};
 use os;
 use poll::Poll;
+use socket::{Socket, SockAddr};
 
 /// A lightweight IO reactor.
 ///
@@ -177,30 +178,30 @@ impl<T: Token> Reactor<T> {
 
 #[cfg(test)]
 mod tests {
-    use std;
+    use std::str;
     use std::sync::Arc;
     use std::sync::atomics::{AtomicInt, SeqCst};
-
     use super::Reactor;
-    use buf::{SliceBuf, MutSliceBuf};
     use io::{IoWriter, IoReader};
-    use Handler;
-    use os;
+    use {io, buf, Buf, Handler};
 
     struct Funtimes {
-        readable: Arc<AtomicInt>,
-        writable: Arc<AtomicInt>
+        rcount: Arc<AtomicInt>,
+        wcount: Arc<AtomicInt>
     }
 
     impl Funtimes {
-        fn new(readable: Arc<AtomicInt>, writable: Arc<AtomicInt>) -> Funtimes {
-            Funtimes { readable: readable, writable: writable }
+        fn new(rcount: Arc<AtomicInt>, wcount: Arc<AtomicInt>) -> Funtimes {
+            Funtimes {
+                rcount: rcount,
+                wcount: wcount
+            }
         }
     }
 
     impl Handler<u64> for Funtimes {
         fn readable(&mut self, _reactor: &mut Reactor<u64>, token: u64) {
-            (*self.readable).fetch_add(1, SeqCst);
+            (*self.rcount).fetch_add(1, SeqCst);
             assert_eq!(token, 10u64);
         }
     }
@@ -208,29 +209,24 @@ mod tests {
     #[test]
     fn test_readable() {
         let mut reactor = Reactor::<u64>::new().ok().expect("Couldn't make reactor");
-        let pipe = unsafe { std::os::pipe() }.ok().expect("Couldn't create pipe");
-        let mut reader = os::IoDesc { fd: pipe.reader };
-        let mut writer = os::IoDesc { fd: pipe.writer };
 
-        let mut buf = SliceBuf::wrap("hello".as_bytes());
+        let (mut reader, mut writer) = io::pipe().unwrap();
 
-        let read_count = Arc::new(AtomicInt::new(0));
-        let write_count = Arc::new(AtomicInt::new(0));
+        let rcount = Arc::new(AtomicInt::new(0));
+        let wcount = Arc::new(AtomicInt::new(0));
+        let handler = Funtimes::new(rcount.clone(), wcount.clone());
 
-        writer.write(&mut buf).unwrap();
-
+        writer.write(&mut buf::wrap("hello".as_bytes())).unwrap();
         reactor.register(&reader, 10u64).unwrap();
-        let _ = reactor.run_once(Funtimes::new(read_count.clone(), write_count.clone()));
 
-        assert_eq!((*read_count).load(SeqCst), 1);
+        let _ = reactor.run_once(handler);
+        let mut b = buf::ByteBuf::new(16);
 
-        let mut write_vec = vec![0u8, 0u8, 0u8, 0u8, 0u8];
+        assert_eq!((*rcount).load(SeqCst), 1);
 
-        {
-            let mut write_into = MutSliceBuf::wrap(write_vec.as_mut_slice());
-            reader.read(&mut write_into).ok().expect("Couldn't read");
-        }
+        reader.read(&mut b).unwrap();
+        b.flip();
 
-        assert_eq!(String::from_utf8(write_vec).ok().expect("Invalid UTF-8").as_slice(), "hello");
+        assert_eq!(str::from_utf8(b.bytes()).unwrap(), "hello");
     }
 }

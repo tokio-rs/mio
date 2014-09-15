@@ -1,10 +1,10 @@
 use std::mem;
 use error::{MioResult, MioError};
-use io::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IpV4Addr};
+use socket::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IpV4Addr};
 
 mod nix {
     pub use nix::c_int;
-    pub use nix::fcntl::Fd;
+    pub use nix::fcntl::{Fd, O_NONBLOCK, O_CLOEXEC};
     pub use nix::errno::EINPROGRESS;
     pub use nix::sys::socket::*;
     pub use nix::unistd::*;
@@ -22,6 +22,25 @@ impl Drop for IoDesc {
         let _ = nix::close(self.fd);
     }
 }
+
+/*
+ *
+ * ===== Pipes =====
+ *
+ */
+
+pub fn pipe() -> MioResult<(IoDesc, IoDesc)>{
+    let (rd, wr) = try!(nix::pipe2(nix::O_NONBLOCK | nix::O_CLOEXEC)
+                        .map_err(MioError::from_sys_error));
+
+    Ok((IoDesc { fd: rd }, IoDesc { fd: wr }))
+}
+
+/*
+ *
+ * ===== Sockets =====
+ *
+ */
 
 pub fn socket(af: AddressFamily) -> MioResult<IoDesc> {
     let family = match af {
