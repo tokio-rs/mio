@@ -31,6 +31,11 @@ pub use io::{
     UnixSocket,
     SockAddr
 };
+pub use poll::{
+    Poll,
+    IoEvent,
+    IoEventKind
+};
 pub use reactor::{
     Reactor,
     ReactorResult
@@ -42,6 +47,7 @@ mod error;
 mod handler;
 mod io;
 mod os;
+mod poll;
 mod reactor;
 mod slab;
 mod timer;

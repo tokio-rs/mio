@@ -2,6 +2,7 @@ use error::{MioResult, MioError};
 use handler::{Handler, Token};
 use io::*;
 use os;
+use poll::Poll;
 
 /// A lightweight IO reactor.
 ///
@@ -12,22 +13,31 @@ use os;
 pub struct ReactorConfig;
 
 pub struct Reactor<T> {
-    selector: os::Selector,
+    poll: Poll<T>,
     run: bool
 }
 
+pub type ReactorResult<H> = Result<H, ReactorError<H>>;
+
 pub struct ReactorError<H> {
-    handler: H,
-    error: MioError
+    pub handler: H,
+    pub error: MioError
 }
 
-pub type ReactorResult<H> = Result<H, ReactorError<H>>;
+impl<H> ReactorError<H> {
+    fn new(handler: H, error: MioError) -> ReactorError<H> {
+        ReactorError {
+            handler: handler,
+            error: error
+        }
+    }
+}
 
 impl<T: Token> Reactor<T> {
     /// Initializes a new reactor. The reactor will not be running yet.
     pub fn new() -> MioResult<Reactor<T>> {
         Ok(Reactor {
-            selector: try!(os::Selector::new()),
+            poll: try!(Poll::new()),
             run: true
         })
     }
@@ -45,12 +55,7 @@ impl<T: Token> Reactor<T> {
 
     /// Registers an IO handle with the reactor.
     pub fn register<H: IoHandle>(&mut self, io: &H, token: T) -> MioResult<()> {
-        debug!("registering IO with reactor");
-
-        // Register interets for this socket
-        try!(self.selector.register(io.desc(), token.to_u64()));
-
-        Ok(())
+        self.poll.register(io, token)
     }
 
     /// Connects the socket to the specified address. When the operation
@@ -74,7 +79,7 @@ impl<T: Token> Reactor<T> {
         }
 
         // Register interest with socket on the reactor
-        try!(self.register(io, token));
+        try!(self.poll.register(io, token));
 
         Ok(())
     }
@@ -88,7 +93,7 @@ impl<T: Token> Reactor<T> {
         try!(os::listen(io.desc(), backlog));
 
         // Wait for connections
-        try!(self.register(io, token));
+        try!(self.poll.register(io, token));
 
         Ok(())
     }
@@ -98,16 +103,12 @@ impl<T: Token> Reactor<T> {
     pub fn run<H: Handler<T>>(&mut self, mut handler: H) -> ReactorResult<H> {
         self.run = true;
 
-        // Created here for stack allocation
-        let mut events = os::Events::new();
-
         while self.run {
-            debug!("reactor tick");
-
-            // Check the registered IO handles for any new events. Each poll
-            // is for one second, so a shutdown request can last as long as
-            // one second before it takes effect.
-            self.io_poll(&mut events, &mut handler);
+            // Execute ticks as long as the reactor is running
+            match self.tick(&mut handler) {
+                Err(e) => return Err(ReactorError::new(handler, e)),
+                _ => {}
+            }
         }
 
         Ok(handler)
@@ -117,21 +118,31 @@ impl<T: Token> Reactor<T> {
     /// handler if any of the registered handles become ready during that
     /// time.
     pub fn run_once<H: Handler<T>>(&mut self, mut handler: H) -> ReactorResult<H> {
-        // Created here for stack allocation
-        let mut events = os::Events::new();
-
-        // Check the registered IO handles for any new events. Each poll
-        // is for one second, so a shutdown request can last as long as
-        // one second before it takes effect.
-        self.io_poll(&mut events, &mut handler);
+        // Execute a single tick
+        match self.tick(&mut handler) {
+            Err(e) => return Err(ReactorError::new(handler, e)),
+            _ => {}
+        }
 
         Ok(handler)
     }
 
+    // Executes a single run of the reactor loop
+    fn tick<H: Handler<T>>(&mut self, handler: &mut H) -> MioResult<()> {
+        debug!("reactor tick");
+
+        // Check the registered IO handles for any new events. Each poll
+        // is for one second, so a shutdown request can last as long as
+        // one second before it takes effect.
+        try!(self.io_poll(handler));
+
+        Ok(())
+    }
+
     /// Poll the reactor for one second, calling the handler if any
     /// of the registered handles are ready.
-    fn io_poll<H: Handler<T>>(&mut self, events: &mut os::Events, handler: &mut H) {
-        self.selector.select(events, 1000).unwrap();
+    fn io_poll<H: Handler<T>>(&mut self, handler: &mut H) -> MioResult<()> {
+        let cnt = try!(self.poll.poll(1000));
 
         let mut i = 0u;
 
@@ -139,9 +150,9 @@ impl<T: Token> Reactor<T> {
         // it was registered with (which usually represents, at least, the
         // handle that the event is about) as well as information about
         // what kind of event occurred (readable, writable, signal, etc.)
-        while i < events.len() {
-            let evt = events.get(i);
-            let tok = Token::from_u64(evt.token);
+        while i < cnt {
+            let evt = self.poll.event(i);
+            let tok = evt.token();
 
             debug!("event={}", evt);
 
@@ -159,52 +170,8 @@ impl<T: Token> Reactor<T> {
 
             i += 1;
         }
-    }
-}
 
-bitflags!(
-    #[deriving(Show)]
-    flags IoEventKind: uint {
-        static IoReadable = 0x001,
-        static IoWritable = 0x002,
-        static IoError    = 0x004
-    }
-)
-
-#[deriving(Show)]
-pub struct IoEvent {
-    kind: IoEventKind,
-    token: u64
-}
-
-/// IoEvent represents the raw event that the OS-specific selector
-/// returned. An event can represent more than one kind (such as
-/// readable or writable) at a time.
-///
-/// These IoEvent objects are created by the OS-specific concrete
-/// Selector when they have events to report.
-impl IoEvent {
-    /// Create a new IoEvent.
-    pub fn new(kind: IoEventKind, token: u64) -> IoEvent {
-        IoEvent {
-            kind: kind,
-            token: token
-        }
-    }
-
-    /// This event indicated that the IO handle is now readable
-    pub fn is_readable(&self) -> bool {
-        self.kind.contains(IoReadable)
-    }
-
-    /// This event indicated that the IO handle is now writable
-    pub fn is_writable(&self) -> bool {
-        self.kind.contains(IoWritable)
-    }
-
-    /// This event indicated that the IO handle had an error
-    pub fn is_error(&self) -> bool {
-        self.kind.contains(IoError)
+        Ok(())
     }
 }
 

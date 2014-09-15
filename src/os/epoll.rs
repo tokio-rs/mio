@@ -4,7 +4,7 @@ use nix::sys::epoll::*;
 use nix::unistd::close;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use reactor::{IoEvent, IoEventKind, IoReadable, IoWritable, IoError};
+use poll::{IoEvent, IoEventKind, IoReadable, IoWritable, IoError};
 
 pub struct Selector {
     epfd: Fd

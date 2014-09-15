@@ -3,7 +3,7 @@ use nix::fcntl::Fd;
 use nix::sys::event::*;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use reactor::{IoEvent, IoReadable, IoWritable, IoError};
+use poll::{IoEvent, IoReadable, IoWritable, IoError};
 
 pub struct Selector {
     kq: Fd,
