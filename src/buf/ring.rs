@@ -20,7 +20,7 @@ impl RingBuf {
         // Handle the 0 length buffer case
         if capacity == 0 {
             return RingBuf {
-                ptr: ptr::mut_null(),
+                ptr: ptr::null_mut(),
                 cap: 0,
                 pos: 0,
                 len: 0

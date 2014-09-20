@@ -16,7 +16,7 @@ impl ByteBuf {
         // Handle 0 capacity case
         if capacity == 0 {
             return ByteBuf {
-                ptr: ptr::mut_null(),
+                ptr: ptr::null_mut(),
                 cap: 0,
                 pos: 0,
                 lim: 0
@@ -85,7 +85,7 @@ impl MutBuf for ByteBuf {
     fn mut_bytes<'a>(&'a mut self) -> &'a mut [u8] {
         let pos = self.pos;
         let lim = self.lim;
-        self.as_mut_slice().mut_slice(pos, lim)
+        self.as_mut_slice().slice_mut(pos, lim)
     }
 }
 

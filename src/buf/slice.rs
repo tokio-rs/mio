@@ -65,7 +65,7 @@ impl<'a> Buf for MutSliceBuf<'a> {
 
 impl<'a> MutBuf for MutSliceBuf<'a> {
     fn mut_bytes<'a>(&'a mut self) -> &'a mut [u8] {
-        self.bytes.mut_slice_from(self.pos)
+        self.bytes.slice_from_mut(self.pos)
     }
 }
 
