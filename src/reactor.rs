@@ -1,3 +1,4 @@
+use std::default::Default;
 use error::{MioResult, MioError};
 use handler::{Handler, Token};
 use io::{IoAcceptor, IoHandle};
@@ -11,33 +12,33 @@ use socket::{Socket, SockAddr};
 /// descriptors as well as track whether a socket is a listener or not.
 
 #[deriving(Clone, Show)]
-pub struct ReactorConfig;
-
-pub struct Reactor<T> {
-    poll: Poll<T>,
-    run: bool
+pub struct ReactorConfig {
+    pub io_poll_timeout_ms: uint
 }
 
-pub type ReactorResult<H> = Result<H, ReactorError<H>>;
-
-pub struct ReactorError<H> {
-    pub handler: H,
-    pub error: MioError
-}
-
-impl<H> ReactorError<H> {
-    fn new(handler: H, error: MioError) -> ReactorError<H> {
-        ReactorError {
-            handler: handler,
-            error: error
+impl Default for ReactorConfig {
+    fn default() -> ReactorConfig {
+        ReactorConfig {
+            io_poll_timeout_ms: 1_000
         }
     }
+}
+
+pub struct Reactor<T> {
+    config: ReactorConfig,
+    poll: Poll<T>,
+    run: bool
 }
 
 impl<T: Token> Reactor<T> {
     /// Initializes a new reactor. The reactor will not be running yet.
     pub fn new() -> MioResult<Reactor<T>> {
+        Reactor::configured(Default::default())
+    }
+
+    pub fn configured(config: ReactorConfig) -> MioResult<Reactor<T>> {
         Ok(Reactor {
+            config: config,
             poll: try!(Poll::new()),
             run: true
         })
@@ -143,7 +144,7 @@ impl<T: Token> Reactor<T> {
     /// Poll the reactor for one second, calling the handler if any
     /// of the registered handles are ready.
     fn io_poll<H: Handler<T>>(&mut self, handler: &mut H) -> MioResult<()> {
-        let cnt = try!(self.poll.poll(1000));
+        let cnt = try!(self.poll.poll(self.config.io_poll_timeout_ms));
 
         let mut i = 0u;
 
@@ -173,6 +174,22 @@ impl<T: Token> Reactor<T> {
         }
 
         Ok(())
+    }
+}
+
+pub type ReactorResult<H> = Result<H, ReactorError<H>>;
+
+pub struct ReactorError<H> {
+    pub handler: H,
+    pub error: MioError
+}
+
+impl<H> ReactorError<H> {
+    fn new(handler: H, error: MioError) -> ReactorError<H> {
+        ReactorError {
+            handler: handler,
+            error: error
+        }
     }
 }
 
