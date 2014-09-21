@@ -68,6 +68,6 @@ pub fn test_close_on_drop() {
     reactor.connect(&sock, &addr, 1u).unwrap();
 
     // Start the reactor
-    reactor.run(TestHandler::new(srv, sock))
+    reactor.run(&mut TestHandler::new(srv, sock))
         .ok().expect("failed to execute reactor");
 }

@@ -34,7 +34,6 @@ pub use poll::{
 pub use reactor::{
     Reactor,
     ReactorConfig,
-    ReactorResult
 };
 pub use slab::Slab;
 pub use socket::{

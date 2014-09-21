@@ -1,5 +1,5 @@
 use std::default::Default;
-use error::{MioResult, MioError};
+use error::{MioResult};
 use handler::{Handler, Token};
 use io::{IoAcceptor, IoHandle};
 use os;
@@ -102,31 +102,23 @@ impl<T: Token> Reactor<T> {
 
     /// Keep spinning the reactor indefinitely, and notify the handler whenever
     /// any of the registered handles are ready.
-    pub fn run<H: Handler<T>>(&mut self, mut handler: H) -> ReactorResult<H> {
+    pub fn run<H: Handler<T>>(&mut self, handler: &mut H) -> MioResult<()> {
         self.run = true;
 
         while self.run {
             // Execute ticks as long as the reactor is running
-            match self.tick(&mut handler) {
-                Err(e) => return Err(ReactorError::new(handler, e)),
-                _ => {}
-            }
+            try!(self.tick(handler))
         }
 
-        Ok(handler)
+        Ok(())
     }
 
     /// Spin the reactor once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once<H: Handler<T>>(&mut self, mut handler: H) -> ReactorResult<H> {
+    pub fn run_once<H: Handler<T>>(&mut self, handler: &mut H) -> MioResult<()> {
         // Execute a single tick
-        match self.tick(&mut handler) {
-            Err(e) => return Err(ReactorError::new(handler, e)),
-            _ => {}
-        }
-
-        Ok(handler)
+        self.tick(handler)
     }
 
     // Executes a single run of the reactor loop
@@ -177,22 +169,6 @@ impl<T: Token> Reactor<T> {
     }
 }
 
-pub type ReactorResult<H> = Result<H, ReactorError<H>>;
-
-pub struct ReactorError<H> {
-    pub handler: H,
-    pub error: MioError
-}
-
-impl<H> ReactorError<H> {
-    fn new(handler: H, error: MioError) -> ReactorError<H> {
-        ReactorError {
-            handler: handler,
-            error: error
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use iobuf::{RWIobuf, ROIobuf, Iobuf};
@@ -231,12 +207,12 @@ mod tests {
 
         let rcount = Arc::new(AtomicInt::new(0));
         let wcount = Arc::new(AtomicInt::new(0));
-        let handler = Funtimes::new(rcount.clone(), wcount.clone());
+        let mut handler = Funtimes::new(rcount.clone(), wcount.clone());
 
         writer.write(&mut ROIobuf::from_str("hello")).unwrap();
         reactor.register(&reader, 10u64).unwrap();
 
-        let _ = reactor.run_once(handler);
+        let _ = reactor.run_once(&mut handler);
         let mut b = RWIobuf::new(16);
 
         assert_eq!((*rcount).load(SeqCst), 1);

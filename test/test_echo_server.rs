@@ -1,10 +1,6 @@
 use mio::*;
 use super::localhost;
 
-// reads go into i_buf. If i_buf is full, stop reading for now.
-// writes go into o_buf. If o_buf is empty, swap with i_buf. If still empty, done writing.
-
-
 struct EchoConn {
     sock: TcpSocket,
     readable: bool,
@@ -264,7 +260,7 @@ pub fn test_echo_server() {
     reactor.connect(&sock, &addr, 1u).unwrap();
 
     // Start the reactor
-    reactor.run(EchoHandler::new(srv, sock, vec!["foo", "bar"]))
+    reactor.run(&mut EchoHandler::new(srv, sock, vec!["foo", "bar"]))
         .ok().expect("failed to execute reactor");
 
 }
