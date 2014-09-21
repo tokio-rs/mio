@@ -147,7 +147,7 @@ impl EchoClient {
 
             while !self.buf.is_empty() {
                 let actual: u8 = self.buf.consume_be().unwrap();
-                let expect = self.rx.consume_be().unwrap();
+                let expect: u8 = self.rx.consume_be().unwrap();
 
                 assert_eq!(actual, expect);
             }
