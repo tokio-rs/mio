@@ -35,6 +35,7 @@ pub use reactor::{
     Reactor,
     ReactorConfig,
 };
+pub use server::*;
 pub use slab::Slab;
 pub use socket::{
     Socket,
@@ -52,6 +53,7 @@ mod io;
 mod os;
 mod poll;
 mod reactor;
+mod server;
 mod slab;
 mod socket;
 mod timer;

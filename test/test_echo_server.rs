@@ -1,60 +1,115 @@
 use mio::*;
 use super::localhost;
+use std::mem;
+use collections::Deque;
+use collections::ringbuf::RingBuf;
 
-struct EchoConn {
-    sock: TcpSocket,
-    readable: bool,
-    writable: bool,
-    buf: IORingbuf,
+pub trait Context {
+    fn make_iobuf(&mut self, len: uint) -> RWIobuf<'static>;
+    fn save_iobuf(&mut self, buf: RWIobuf<'static>);
+
+    fn send(&mut self, buf: RWIobuf<'static>);
 }
 
-impl EchoConn {
-    fn new(sock: TcpSocket) -> EchoConn {
-        EchoConn {
-            sock: sock,
-            readable: false,
-            writable: false,
-            buf: IORingbuf::new(1024),
+pub trait Connection {
+    /// Return true if we should stop reading from the socket. This can be used
+    /// to push back on the sender.
+    fn on_read(&mut self, ctx: &mut Context, buf: RWIobuf<'static>);
+}
+
+struct EchoConnection;
+
+impl EchoConnection {
+    fn new() -> EchoConnection {
+        EchoConnection
+    }
+}
+
+impl Connection for EchoConnection {
+    fn on_read(&mut self, ctx: &mut Context, buf: RWIobuf<'static>) {
+        debug!("server read: {}", buf);
+        ctx.send(buf);
+    }
+}
+
+static READ_BUF_SIZE:        uint = 4096;
+static MAX_QUEUE_SIZE:       uint = 32;
+static MAX_IOBUF_CACHE_SIZE: uint = 32;
+
+struct SimpleServerContext {
+    sock:        TcpSocket,
+    readable:    bool,
+    writable:    bool,
+    in_buf:      RWIobuf<'static>,
+    send_queue:  RingBuf<RWIobuf<'static>>,
+    iobuf_cache: Vec<RWIobuf<'static>>,
+}
+
+impl SimpleServerContext {
+    fn new(sock: TcpSocket) -> SimpleServerContext {
+        SimpleServerContext {
+            sock:        sock,
+            readable:    false,
+            writable:    false,
+            in_buf:      RWIobuf::new(READ_BUF_SIZE),
+            send_queue:  RingBuf::new(),
+            iobuf_cache: Vec::new(),
         }
     }
 
-    fn readable(&mut self) -> MioResult<()> {
+    fn readable<C: Connection>(&mut self, connection: &mut C) -> MioResult<()> {
         self.readable = true;
-        self.echo()
+        self.tick(connection)
     }
 
-    fn writable(&mut self) -> MioResult<()> {
+    fn writable<C: Connection>(&mut self, connection: &mut C) -> MioResult<()> {
         self.writable = true;
-        self.echo()
+        self.tick(connection)
     }
 
     fn can_continue(&self) -> bool {
-        (self.readable && !self.buf.is_full())
-            || (self.writable && !self.buf.is_empty())
+        let send_queue_len = self.send_queue.len();
+        debug!("send queue len: {}", send_queue_len);
+        debug!("readable: {}", self.readable);
+        debug!("writable: {}", self.writable);
+
+        // readable, and still room on the send queue.
+        (self.readable && send_queue_len <= MAX_QUEUE_SIZE)
+        // writable, and there's still stuff to send.
+     || (self.writable && send_queue_len != 0)
     }
 
-    fn echo(&mut self) -> MioResult<()> {
+    fn tick<C: Connection>(&mut self, connection: &mut C) -> MioResult<()> {
         while self.can_continue() {
-            try!(self.fill_buf());
+            try!(self.fill_buf(connection));
             try!(self.flush_buf());
         }
 
         Ok(())
     }
 
-    fn fill_buf(&mut self) -> MioResult<()> {
+    fn fill_buf<C: Connection>(&mut self, connection: &mut C) -> MioResult<()> {
         if !self.readable {
             return Ok(());
         }
 
-        debug!("server filling buf");
-        self.sock.read(self.buf.push_buf())
-            .map(|res| {
-                if res.would_block() {
-                    debug!("  WOULDBLOCK");
-                    self.readable = false;
-                }
-            })
+        let res = try!(self.sock.read(&mut self.in_buf));
+
+        if res.would_block() {
+            self.readable = false;
+        }
+
+        let new_iobuf = self.make_iobuf(READ_BUF_SIZE);
+        let mut buf = mem::replace(&mut self.in_buf, new_iobuf);
+        buf.flip_lo();
+
+        if !buf.is_empty() {
+            connection.on_read(self, buf);
+        } else {
+            self.save_iobuf(buf);
+        }
+
+        Ok(())
     }
 
     fn flush_buf(&mut self) -> MioResult<()> {
@@ -62,45 +117,97 @@ impl EchoConn {
             return Ok(());
         }
 
-        self.sock.write(self.buf.pop_buf())
-            .map(|res| {
+        let mut drop_head = false;
+
+        match self.send_queue.front_mut() {
+            Some(buf) => {
+                debug!("trying to send: {}", buf);
+                let res = try!(self.sock.write(buf));
+
                 if res.would_block() {
-                    debug!("  WOULDBLOCK");
                     self.writable = false;
                 }
-            })
+
+                debug!("what's left: {}", buf);
+
+                if buf.is_empty() { drop_head = true; }
+            },
+            None => {}
+        }
+
+        if drop_head {
+            let first_elem = self.send_queue.pop_front().unwrap();
+            self.save_iobuf(first_elem);
+        }
+
+        Ok(())
+    }
+}
+
+impl Context for SimpleServerContext {
+    fn make_iobuf(&mut self, len: uint) -> RWIobuf<'static> {
+        match self.iobuf_cache.pop() {
+            Some(mut buf) => {
+                if len <= buf.len() {
+                    buf.resize(len).unwrap();
+                    buf
+                } else {
+                    warn!("Saved Iobuf is too short for request, and we need to mint a new, bigger iobuf. Try to make all requested Iobufs the same size.");
+                    RWIobuf::new(len)
+                }
+            },
+            None => {
+                warn!("Allocating a new Iobuf for the Iobuf cache. If you see this message a lot, except during startup, either increase the size of the iobuf cache of allocate less iobufs!");
+                RWIobuf::new(len)
+            },
+        }
+    }
+
+    fn save_iobuf(&mut self, mut buf: RWIobuf<'static>) {
+        if self.iobuf_cache.len() >= MAX_IOBUF_CACHE_SIZE {
+            warn!("Iobuf cache filled up. This is likely going to cause useless allocations. Either increase the size of the iobuf cache, or allocate less iobufs!");
+            drop(buf);
+        } else {
+            buf.reset();
+            self.iobuf_cache.push(buf);
+        }
+    }
+
+    fn send(&mut self, buf: RWIobuf<'static>) {
+        self.send_queue.push(buf);
     }
 }
 
 struct EchoServer {
     sock: TcpAcceptor,
-    conns: Slab<EchoConn>
+    conns: Slab<(SimpleServerContext, EchoConnection)>,
 }
 
 impl EchoServer {
     fn accept(&mut self, reactor: &mut Reactor<uint>) {
         debug!("server accepting socket");
         let sock = self.sock.accept().unwrap().unwrap();
-        let conn = EchoConn::new(sock);
-        let tok = self.conns.insert(conn)
+        let tok = self.conns.insert((SimpleServerContext::new(sock), EchoConnection::new()))
             .ok().expect("could not add connectiont o slab");
 
         // Register the connection
-        reactor.register(&self.conns[tok].sock, 2 + tok)
+        reactor.register(&self.conns[tok].ref0().sock, 2 + tok)
             .ok().expect("could not register socket with reactor");
     }
 
     fn conn_readable(&mut self, tok: uint) {
         debug!("server conn readable; tok={}", tok);
-        self.conn(tok).readable().unwrap();
+        let &(ref mut ctx, ref mut conn) = self.conn(tok);
+        ctx.readable(conn).unwrap();
     }
 
     fn conn_writable(&mut self, tok: uint) {
         debug!("server conn writable; tok={}", tok);
-        self.conn(tok).writable().unwrap();
+        let &(ref mut ctx, ref mut conn) = self.conn(tok);
+        ctx.writable(conn).unwrap();
     }
 
-    fn conn<'a>(&'a mut self, tok: uint) -> &'a mut EchoConn {
+    fn conn<'a>(&'a mut self, tok: uint) -> &'a mut (SimpleServerContext, EchoConnection) {
         &mut self.conns[tok - 2]
     }
 }
