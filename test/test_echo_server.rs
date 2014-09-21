@@ -33,17 +33,8 @@ impl EchoConn {
     }
 
     fn can_continue(&self) -> bool {
-        let mut ret = false;
-        debug!("checking can_continue.");
-        if self.readable && !self.buf.is_full() {
-            debug!("can_continue=true because readable and buffer not full.");
-            ret = true;
-        }
-        if self.writable && !self.buf.is_empty() {
-            debug!("can_continue=true because writable and buffer not empty.");
-            ret = true;
-        }
-        ret
+        (self.readable && !self.buf.is_full())
+            || (self.writable && !self.buf.is_empty())
     }
 
     fn echo(&mut self) -> MioResult<()> {
