@@ -2,6 +2,8 @@ use mio::*;
 use mio::buf::{ByteBuf, RingBuf, SliceBuf};
 use super::localhost;
 
+type TestReactor = Reactor<uint, ()>;
+
 struct EchoConn {
     sock: TcpSocket,
     readable: bool,
@@ -80,7 +82,7 @@ struct EchoServer {
 }
 
 impl EchoServer {
-    fn accept(&mut self, reactor: &mut Reactor<uint>) {
+    fn accept(&mut self, reactor: &mut TestReactor) {
         debug!("server accepting socket");
         let sock = self.sock.accept().unwrap().unwrap();
         let conn = EchoConn::new(sock);
@@ -132,7 +134,7 @@ impl EchoClient {
         }
     }
 
-    fn readable(&mut self, reactor: &mut Reactor<uint>) {
+    fn readable(&mut self, reactor: &mut TestReactor) {
         debug!("client socket readable");
 
         loop {
@@ -187,7 +189,7 @@ impl EchoClient {
             })
     }
 
-    fn next_msg(&mut self, reactor: &mut Reactor<uint>) -> MioResult<()> {
+    fn next_msg(&mut self, reactor: &mut TestReactor) -> MioResult<()> {
         let curr = match self.msgs.remove(0) {
             Some(msg) => msg,
             None => {
@@ -222,8 +224,8 @@ impl EchoHandler {
     }
 }
 
-impl Handler<uint> for EchoHandler {
-    fn readable(&mut self, reactor: &mut Reactor<uint>, token: uint) {
+impl Handler<uint, ()> for EchoHandler {
+    fn readable(&mut self, reactor: &mut TestReactor, token: uint) {
         match token {
             0 => self.server.accept(reactor),
             1 => self.client.readable(reactor),
@@ -231,7 +233,7 @@ impl Handler<uint> for EchoHandler {
         }
     }
 
-    fn writable(&mut self, _reactor: &mut Reactor<uint>, token: uint) {
+    fn writable(&mut self, _reactor: &mut TestReactor, token: uint) {
         match token {
             0 => fail!("received writable for token 0"),
             1 => self.client.writable(),

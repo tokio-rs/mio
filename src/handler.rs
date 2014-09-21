@@ -1,13 +1,14 @@
 use reactor::{Reactor};
 
 #[allow(unused_variable)]
-pub trait Handler<T: Token> {
-    fn readable(&mut self, reactor: &mut Reactor<T>, token: T) {
-        println!("Handler: readable");
+pub trait Handler<T: Token, M: Send> {
+    fn readable(&mut self, reactor: &mut Reactor<T, M>, token: T) {
     }
 
-    fn writable(&mut self, reactor: &mut Reactor<T>, token: T) {
-        println!("Handler: writable");
+    fn writable(&mut self, reactor: &mut Reactor<T, M>, token: T) {
+    }
+
+    fn notify(&mut self, reactor: &mut Reactor<T, M>, msg: M) {
     }
 }
 

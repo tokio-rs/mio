@@ -11,11 +11,12 @@ pub struct MioError {
 
 #[deriving(Show, PartialEq, Clone)]
 pub enum MioErrorKind {
-    Eof,          // End of file or socket closed
-    SysError,     // System error not covered by other kinds
-    WouldBlock,   // The operation would have blocked
-    BufUnderflow, // Buf does not contain enough data to perform read op
-    BufOverflow,  // Buf does not contain enough capacity to perform write op
+    Eof,               // End of file or socket closed
+    WouldBlock,        // The operation would have blocked
+    BufUnderflow,      // Buf does not contain enough data to perform read op
+    BufOverflow,       // Buf does not contain enough capacity to perform write op
+    ReactorTerminated, // The reactor is not running anymore
+    OtherError,        // System error not covered by other kinds
 }
 
 impl MioError {
@@ -43,7 +44,7 @@ impl MioError {
     pub fn from_sys_error(err: SysError) -> MioError {
         let kind = match err.kind {
             EAGAIN => WouldBlock,
-            _ => SysError
+            _ => OtherError
         };
 
         MioError {
@@ -81,13 +82,16 @@ impl MioError {
     }
 
     pub fn as_io_error(&self) -> io::IoError {
+        use std::io::OtherIoError;
+
         match self.kind {
             Eof | BufUnderflow | BufOverflow => io::standard_error(io::EndOfFile),
             WouldBlock => io::standard_error(io::ResourceUnavailable),
-            SysError => match self.sys {
+            OtherError => match self.sys {
                 Some(err) => io::IoError::from_errno(err.kind as uint, false),
                 None => io::standard_error(io::OtherIoError)
-            }
+            },
+            ReactorTerminated => io::standard_error(OtherIoError)
         }
     }
 }

@@ -37,7 +37,8 @@ pub use poll::{
 pub use reactor::{
     Reactor,
     ReactorConfig,
-    ReactorResult
+    ReactorResult,
+    ReactorSender,
 };
 pub use slab::Slab;
 pub use socket::{
@@ -52,6 +53,7 @@ pub mod buf;
 mod error;
 mod handler;
 mod io;
+mod notify;
 mod os;
 mod poll;
 mod reactor;

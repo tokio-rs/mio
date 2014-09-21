@@ -10,6 +10,7 @@ pub use ports::localhost;
 
 mod test_close_on_drop;
 mod test_echo_server;
+mod test_notify;
 
 mod ports {
     use std::sync::atomic::{AtomicUint, SeqCst, INIT_ATOMIC_UINT};
