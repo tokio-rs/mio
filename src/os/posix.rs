@@ -10,6 +10,49 @@ mod nix {
     pub use nix::unistd::*;
 }
 
+/*
+ *
+ * ===== Awakener =====
+ *
+ */
+
+pub struct PipeAwakener {
+    reader: IoDesc,
+    writer: IoDesc
+}
+
+impl PipeAwakener {
+    pub fn new() -> MioResult<PipeAwakener> {
+        let (rd, wr) = try!(pipe());
+
+        Ok(PipeAwakener {
+            reader: rd,
+            writer: wr
+        })
+    }
+
+    pub fn wakeup(&self) -> MioResult<()> {
+        write(&self.writer, b"0x01")
+            .map(|_| ())
+    }
+
+    pub fn desc(&self) -> &IoDesc {
+        &self.reader
+    }
+
+    pub fn cleanup(&self) {
+        let mut buf: [u8, ..128] = unsafe { mem::uninitialized() };
+
+        loop {
+            // Consume data until all bytes are purged
+            match read(&self.reader, buf.as_mut_slice()) {
+                Ok(_) => {}
+                Err(_) => return
+            }
+        }
+    }
+}
+
 /// Represents the OS's handle to the IO instance. In this case, it is the file
 /// descriptor.
 #[deriving(Show)]
@@ -29,7 +72,7 @@ impl Drop for IoDesc {
  *
  */
 
-pub fn pipe() -> MioResult<(IoDesc, IoDesc)>{
+pub fn pipe() -> MioResult<(IoDesc, IoDesc)> {
     let (rd, wr) = try!(nix::pipe2(nix::O_NONBLOCK | nix::O_CLOEXEC)
                         .map_err(MioError::from_sys_error));
 

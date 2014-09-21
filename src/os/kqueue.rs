@@ -53,7 +53,8 @@ impl Selector {
         let idx = self.changes.len;
         let ev = &mut self.changes.events[idx];
 
-        ev_set(ev, io.fd as uint, filter, flags, fflags, token);
+        // TODO: Don't cast to uint
+        ev_set(ev, io.fd as uint, filter, flags, fflags, token as uint);
 
         self.changes.len += 1;
 
@@ -120,7 +121,8 @@ impl Events {
             }
         }
 
-        IoEvent::new(kind, token)
+        // TODO: Don't cast
+        IoEvent::new(kind, token as u64)
     }
 
     #[inline]

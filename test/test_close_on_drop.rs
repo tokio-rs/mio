@@ -2,6 +2,8 @@ use mio::*;
 use mio::buf::ByteBuf;
 use super::localhost;
 
+type TestReactor = Reactor<uint, ()>;
+
 struct TestHandler {
     srv: TcpAcceptor,
     cli: TcpSocket
@@ -16,8 +18,8 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint> for TestHandler {
-    fn readable(&mut self, reactor: &mut Reactor<uint>, tok: uint) {
+impl Handler<uint, ()> for TestHandler {
+    fn readable(&mut self, reactor: &mut TestReactor, tok: uint) {
         match tok {
             0 => {
                 debug!("server connection ready for accept");
@@ -35,7 +37,7 @@ impl Handler<uint> for TestHandler {
         }
     }
 
-    fn writable(&mut self, _reactor: &mut Reactor<uint>, tok: uint) {
+    fn writable(&mut self, _reactor: &mut TestReactor, tok: uint) {
         match tok {
             0 => fail!("received writable for token 0"),
             1 => {

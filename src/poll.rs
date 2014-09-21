@@ -1,26 +1,25 @@
 use error::MioResult;
-use handler::Token;
 use io::IoHandle;
 use os;
 
-pub struct Poll<T> {
+pub struct Poll {
     selector: os::Selector,
     events: os::Events
 }
 
-impl<T: Token> Poll<T> {
-    pub fn new() -> MioResult<Poll<T>> {
+impl Poll {
+    pub fn new() -> MioResult<Poll> {
         Ok(Poll {
             selector: try!(os::Selector::new()),
             events: os::Events::new()
         })
     }
 
-    pub fn register<H: IoHandle>(&mut self, io: &H, token: T) -> MioResult<()> {
+    pub fn register<H: IoHandle>(&mut self, io: &H, token: u64) -> MioResult<()> {
         debug!("registering IO with poller");
 
         // Register interests for this socket
-        try!(self.selector.register(io.desc(), token.to_u64()));
+        try!(self.selector.register(io.desc(), token));
 
         Ok(())
     }
@@ -66,8 +65,8 @@ impl IoEvent {
         }
     }
 
-    pub fn token<T: Token>(&self) -> T {
-        Token::from_u64(self.token)
+    pub fn token(&self) -> u64 {
+        self.token
     }
 
     /// This event indicated that the IO handle is now readable
