@@ -1,5 +1,4 @@
 use mio::*;
-use mio::buf::ByteBuf;
 use super::localhost;
 
 struct TestHandler {
@@ -25,7 +24,7 @@ impl Handler<uint> for TestHandler {
             }
             1 => {
                 debug!("client readable");
-                let mut buf = ByteBuf::new(1024);
+                let mut buf = RWIobuf::new(1024);
                 match self.cli.read(&mut buf) {
                     Err(e) if e.is_eof() => reactor.shutdown(),
                     _ => fail!("the client socket should not be readable")

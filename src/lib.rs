@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 extern crate alloc;
+extern crate iobuf;
 extern crate nix;
 
 #[phase(plugin, link)]
@@ -47,6 +48,8 @@ pub use socket::{
     TcpAcceptor,
     UnixSocket,
 };
+
+pub use iobuf::{Iobuf, RWIobuf, ROIobuf, IORingbuf};
 
 pub mod buf;
 mod error;

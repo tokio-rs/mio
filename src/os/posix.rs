@@ -1,3 +1,4 @@
+use iobuf::{Iobuf, RWIobuf};
 use std::mem;
 use error::{MioResult, MioError};
 use socket::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IpV4Addr};
@@ -84,20 +85,32 @@ pub fn accept(io: &IoDesc) -> MioResult<IoDesc> {
     })
 }
 
+/// The buffer is advanced by the amount read.
 #[inline]
-pub fn read(io: &IoDesc, dst: &mut [u8]) -> MioResult<uint> {
-    let res = try!(nix::read(io.fd, dst).map_err(MioError::from_sys_error));
+pub fn read(io: &IoDesc, dst: &mut RWIobuf) -> MioResult<()> {
+    let num_read= try!(unsafe { nix::read(io.fd, dst.as_mut_slice()).map_err(MioError::from_sys_error) });
 
-    if res == 0 {
+    unsafe {
+        debug_assert!(num_read <= dst.len());
+        dst.unsafe_advance(num_read);
+    }
+
+    if num_read == 0 {
         return Err(MioError::eof());
     }
 
-    Ok(res)
+    Ok(())
 }
 
+/// The buffer is advanced by the amount written.
 #[inline]
-pub fn write(io: &IoDesc, src: &[u8]) -> MioResult<uint> {
-    nix::write(io.fd, src).map_err(MioError::from_sys_error)
+pub fn write<B: Iobuf>(io: &IoDesc, src: &mut B) -> MioResult<()> {
+    let num_written = try!(unsafe { nix::write(io.fd, src.as_slice()).map_err(MioError::from_sys_error) });
+    unsafe {
+        debug_assert!(num_written <= src.len());
+        src.unsafe_advance(num_written);
+    }
+    Ok(())
 }
 
 // ===== Socket options =====
