@@ -12,10 +12,6 @@ extern crate nix;
 #[phase(plugin, link)]
 extern crate log;
 
-pub use buf::{
-    Buf,
-    MutBuf
-};
 pub use error::{
     MioResult,
     MioError
@@ -51,7 +47,6 @@ pub use socket::{
 
 pub use iobuf::{Iobuf, RWIobuf, ROIobuf, IORingbuf};
 
-pub mod buf;
 mod error;
 mod handler;
 mod io;
