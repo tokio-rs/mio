@@ -52,6 +52,13 @@ impl MioError {
         }
     }
 
+    pub fn unknown_sys_error() -> MioError {
+        MioError {
+            kind: SysError,
+            sys:  None,
+        }
+    }
+
     pub fn is_eof(&self) -> bool {
         match self.kind {
             Eof => true,

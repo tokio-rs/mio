@@ -28,15 +28,25 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, io: &IoDesc, token: u64) -> MioResult<()> {
+    pub fn register(&mut self, io: &IoDesc, token: uint) -> MioResult<()> {
         let interests = EPOLLIN | EPOLLOUT | EPOLLERR;
 
         let info = EpollEvent {
             events: interests | EPOLLET,
-            data: token
+            data: token as u64,
         };
 
         epoll_ctl(self.epfd, EpollCtlAdd, io.fd, &info)
+            .map_err(MioError::from_sys_error)
+    }
+
+    pub fn unregister_fd(&mut self, fd: Fd) -> MioResult<()> {
+        let arbitrary_info = EpollEvent {
+            events: 0,
+            data:   0,
+        };
+
+        epoll_ctl(self.epfd, EpollCtlDel, fd, &arbitrary_info)
             .map_err(MioError::from_sys_error)
     }
 }
@@ -67,10 +77,7 @@ impl Events {
 
     #[inline]
     pub fn get(&self, idx: uint) -> IoEvent {
-        if idx >= self.len {
-            fail!("invalid index");
-        }
-
+        // TODO(cgaebel): Likely a useless and costly bounds check.
         let epoll = self.events[idx].events;
         let mut kind = IoEventKind::empty();
 
@@ -89,6 +96,6 @@ impl Events {
 
         let token = self.events[idx].data;
 
-        IoEvent::new(kind, token)
+        IoEvent::new(kind, token as uint)
     }
 }

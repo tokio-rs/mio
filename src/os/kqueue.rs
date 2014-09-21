@@ -29,11 +29,20 @@ impl Selector {
         Ok(())
     }
 
-    pub fn register(&mut self, io: &IoDesc, token: u64) -> MioResult<()> {
+    pub fn register(&mut self, io: &IoDesc, token: uint) -> MioResult<()> {
         let flag = EV_ADD | EV_CLEAR;
 
-        try!(self.ev_push(io, EVFILT_READ, flag, FilterFlag::empty(), token));
-        try!(self.ev_push(io, EVFILT_WRITE, flag, FilterFlag::empty(), token));
+        try!(self.ev_push(io.fd, EVFILT_READ,  flag, FilterFlag::empty(), token));
+        try!(self.ev_push(io.fd, EVFILT_WRITE, flag, FilterFlag::empty(), token));
+
+        Ok(())
+    }
+
+    pub fn unregister_fd(&mut self, fd: Fd) -> MioResult<()> {
+        let flag = EV_DELETE;
+
+        try!(self.ev_push(fd, EVFILT_READ,  flag, FilterFlag::empty(), 0));
+        try!(self.ev_push(fd, EVFILT_WRITE, flag, FilterFlag::empty(), 0));
 
         Ok(())
     }
@@ -41,11 +50,11 @@ impl Selector {
     // Queues an event change. Events will get submitted to the OS on the next
     // call to select or when the change buffer fills up.
     fn ev_push(&mut self,
-               io: &IoDesc,
+               fd: Fd,
                filter: EventFilter,
                flags: EventFlag,
                fflags: FilterFlag,
-               token: u64) -> MioResult<()> {
+               token: uint) -> MioResult<()> {
 
         // If the change buffer is full, flush it
         try!(self.maybe_flush_changes());
@@ -53,7 +62,7 @@ impl Selector {
         let idx = self.changes.len;
         let ev = &mut self.changes.events[idx];
 
-        ev_set(ev, io.fd as uint, filter, flags, fflags, token);
+        ev_set(ev, fd as uint, filter, flags, fflags, token);
 
         self.changes.len += 1;
 
