@@ -41,7 +41,7 @@ impl Selector {
 
     pub fn unregister(&mut self, fd: Fd) -> MioResult<()> {
         let arbitrary_info = EpollEvent {
-            events: 0,
+            events: EpollEventKind::empty(),
             data:   0,
         };
 
