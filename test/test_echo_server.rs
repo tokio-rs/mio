@@ -1,269 +1,187 @@
 use mio::*;
-use mio::buf::{ByteBuf, RingBuf, SliceBuf};
 use super::localhost;
+use std::cell::Cell;
+use std::mem;
+use std::rc::Rc;
 
-struct EchoConn {
-    sock: TcpSocket,
-    readable: bool,
-    writable: bool,
-    buf: RingBuf
+struct EchoServer {
+    num_msgs: uint
 }
 
-impl EchoConn {
-    fn new(sock: TcpSocket) -> EchoConn {
-        EchoConn {
-            sock: sock,
-            readable: false,
-            writable: false,
-            buf: RingBuf::new(1024)
+impl EchoServer {
+    fn new(num_msgs: uint) -> EchoServer {
+        EchoServer {
+            num_msgs: num_msgs
+        }
+    }
+}
+
+impl PerClient<()> for EchoServer {
+    fn on_read(&mut self, _reactor: &mut Reactor, c: &mut ConnectionState<()>, buf: RWIobuf<'static>) -> MioResult<()> {
+        assert!(self.num_msgs != 0);
+
+        debug!("EchoServer::on_read");
+        debug!("Recv'd on server (and echoing): {}", buf);
+        c.send(buf);
+
+        self.num_msgs -= 1;
+        if self.num_msgs == 0 {
+            debug!("a server just died!");
+            Err(MioError::eof())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+struct EchoClient {
+    msgs: Vec<&'static str>,
+    rx:   RWIobuf<'static>,
+
+    addr:           Rc<SockAddr>,
+    left_to_start:  Rc<Cell<uint>>,
+    left_to_finish: Rc<Cell<uint>>,
+}
+
+impl EchoClient {
+    fn new(msgs: Vec<&'static str>, addr: Rc<SockAddr>, left_to_start: Rc<Cell<uint>>, left_to_finish: Rc<Cell<uint>>) -> EchoClient {
+        let curr = msgs[0];
+
+        let curr = ROIobuf::from_str(curr);
+
+        EchoClient {
+            msgs: msgs,
+            rx: curr.deep_clone(),
+            addr:           addr,
+            left_to_start:  left_to_start,
+            left_to_finish: left_to_finish,
         }
     }
 
-    fn readable(&mut self) -> MioResult<()> {
-        self.readable = true;
-        self.echo()
+    fn next_msg(&mut self, _reactor: &mut Reactor, c: &mut ConnectionState<()>) -> MioResult<RWIobuf<'static>> {
+        debug!("EchoClient::next_msg");
+        let curr =
+            match self.msgs.remove(0) {
+                Some(msg) => msg,
+                // All done!
+                None => {
+                    return Err(MioError::eof());
+                },
+            };
+
+        let old_rx = mem::replace(&mut self.rx, c.make_iobuf(curr.len()));
+        c.return_iobuf(old_rx);
+        self.rx.fill(curr.as_slice().as_bytes()).unwrap();
+        self.rx.flip_lo();
+
+        let mut tx = c.make_iobuf(curr.len());
+        tx.fill(curr.as_slice().as_bytes()).unwrap();
+        tx.flip_lo();
+        Ok(tx)
+    }
+}
+
+impl PerClient<()> for EchoClient {
+    fn on_start(&mut self, reactor: &mut Reactor, c: &mut ConnectionState<()>) -> MioResult<()> {
+        debug!("EchoClient::on_start");
+
+        let left_to_start = self.left_to_start.get() - 1;
+        self.left_to_start.set(left_to_start);
+
+        // spawn the next client!
+        if left_to_start != 0 {
+            gen_tcp_client(
+                reactor,
+                &*self.addr,
+                |_| {},
+                EchoClient::new(
+                    self.msgs.clone(),
+                    self.addr.clone(),
+                    self.left_to_start.clone(),
+                    self.left_to_finish.clone())).unwrap();
+        }
+
+        let next_msg = try!(self.next_msg(reactor, c));
+        debug!("Sending from the client: {}", next_msg);
+        c.send(next_msg);
+        Ok(())
     }
 
-    fn writable(&mut self) -> MioResult<()> {
-        self.writable = true;
-        self.echo()
-    }
+    fn on_read(&mut self, reactor: &mut Reactor, c: &mut ConnectionState<()>, mut buf: RWIobuf<'static>) -> MioResult<()> {
+        debug!("EchoClient::on_read");
+        debug!("Recv'd on client: {}", buf);
+        while !buf.is_empty() {
+            let actual: u8 = buf.consume_be().unwrap();
+            let expect: u8 = self.rx.consume_be().unwrap();
 
-    fn can_continue(&self) -> bool {
-        (self.readable && !self.buf.is_full()) ||
-            (self.writable && !self.buf.is_empty())
-    }
+            assert_eq!(actual, expect);
+        }
 
-    fn echo(&mut self) -> MioResult<()> {
-        while self.can_continue() {
-            try!(self.fill_buf());
-            try!(self.flush_buf());
+        c.return_iobuf(buf);
+
+        if self.rx.is_empty() {
+            let msg = try!(self.next_msg(reactor, c));
+            println!("sending from the client: {}", msg);
+            c.send(msg);
         }
 
         Ok(())
     }
 
-    fn fill_buf(&mut self) -> MioResult<()> {
-        if !self.readable {
-            return Ok(());
+    fn on_close(&mut self, reactor: &mut Reactor, _c: &mut ConnectionState<()>) -> MioResult<()> {
+        let left_to_finish = self.left_to_finish.get() - 1;
+        self.left_to_finish.set(left_to_finish);
+        if left_to_finish == 0 {
+            reactor.shutdown();
         }
-
-        debug!("server filling buf");
-        self.sock.read(&mut self.buf.writer())
-            .map(|res| {
-                if res.would_block() {
-                    debug!("  WOULDBLOCK");
-                    self.readable = false;
-                }
-            })
-    }
-
-    fn flush_buf(&mut self) -> MioResult<()> {
-        if !self.writable {
-            return Ok(());
-        }
-
-        debug!("server flushing buf");
-        self.sock.write(&mut self.buf.reader())
-            .map(|res| {
-                if res.would_block() {
-                    debug!("  WOULDBLOCK");
-                    self.writable = false;
-                }
-            })
+        Ok(())
     }
 }
 
-struct EchoServer {
-    sock: TcpAcceptor,
-    conns: Slab<EchoConn>
-}
+static test_vec: [&'static str, ..8] =
+    [ "foo", "bar", "hello", "world", "what", "a", "nice", "day" ];
 
-impl EchoServer {
-    fn accept(&mut self, reactor: &mut Reactor<uint>) {
-        debug!("server accepting socket");
-        let sock = self.sock.accept().unwrap().unwrap();
-        let conn = EchoConn::new(sock);
-        let tok = self.conns.insert(conn)
-            .ok().expect("could not add connectiont o slab");
-
-        // Register the connection
-        reactor.register(&self.conns[tok].sock, 2 + tok)
-            .ok().expect("could not register socket with reactor");
-    }
-
-    fn conn_readable(&mut self, tok: uint) {
-        debug!("server conn readable; tok={}", tok);
-        self.conn(tok).readable().unwrap();
-    }
-
-    fn conn_writable(&mut self, tok: uint) {
-        debug!("server conn writable; tok={}", tok);
-        self.conn(tok).writable().unwrap();
-    }
-
-    fn conn<'a>(&'a mut self, tok: uint) -> &'a mut EchoConn {
-        &mut self.conns[tok - 2]
-    }
-}
-
-struct EchoClient {
-    sock: TcpSocket,
-    msgs: Vec<&'static str>,
-    tx: SliceBuf<'static>,
-    rx: SliceBuf<'static>,
-    buf: ByteBuf,
-    writable: bool
-}
-
-
-// Sends a message and expects to receive the same exact message, one at a time
-impl EchoClient {
-    fn new(sock: TcpSocket, mut msgs: Vec<&'static str>) -> EchoClient {
-        let curr = msgs.remove(0).expect("At least one message is required");
-
-        EchoClient {
-            sock: sock,
-            msgs: msgs,
-            tx: SliceBuf::wrap(curr.as_bytes()),
-            rx: SliceBuf::wrap(curr.as_bytes()),
-            buf: ByteBuf::new(1024),
-            writable: false
-        }
-    }
-
-    fn readable(&mut self, reactor: &mut Reactor<uint>) {
-        debug!("client socket readable");
-
-        loop {
-            let res = match self.sock.read(&mut self.buf) {
-                Ok(r) => r,
-                Err(e) => fail!("not implemented; client err={}", e)
-            };
-
-            // prepare for reading
-            self.buf.flip();
-
-            while self.buf.has_remaining() {
-                let actual = self.buf.read_byte().unwrap();
-                let expect = self.rx.read_byte().unwrap();
-
-                assert!(actual == expect);
-            }
-
-            self.buf.clear();
-
-            if !self.rx.has_remaining() {
-                self.next_msg(reactor).unwrap();
-            }
-
-            // Nothing else to do this round
-            if res.would_block() {
-                return;
-            }
-        }
-    }
-
-    fn writable(&mut self) {
-        debug!("client socket writable");
-
-        self.writable = true;
-        self.flush_msg().unwrap();
-    }
-
-    fn flush_msg(&mut self) -> MioResult<()> {
-        if !self.writable {
-            return Ok(());
-        }
-
-        self.sock.write(&mut self.tx)
-            .map(|res| {
-                if res.would_block() {
-                    debug!("client flushing buf; WOULDBLOCK");
-                    self.writable = false
-                } else {
-                    debug!("client flushed buf");
-                }
-            })
-    }
-
-    fn next_msg(&mut self, reactor: &mut Reactor<uint>) -> MioResult<()> {
-        let curr = match self.msgs.remove(0) {
-            Some(msg) => msg,
-            None => {
-                reactor.shutdown();
-                return Ok(());
-            }
-        };
-
-        debug!("client prepping next message");
-        self.tx = SliceBuf::wrap(curr.as_bytes());
-        self.rx = SliceBuf::wrap(curr.as_bytes());
-
-        self.flush_msg()
-    }
-}
-
-struct EchoHandler {
-    server: EchoServer,
-    client: EchoClient,
-}
-
-impl EchoHandler {
-    fn new(srv: TcpAcceptor, client: TcpSocket, msgs: Vec<&'static str>) -> EchoHandler {
-        EchoHandler {
-            server: EchoServer {
-                sock: srv,
-                conns: Slab::new(128)
-            },
-
-            client: EchoClient::new(client, msgs)
-        }
-    }
-}
-
-impl Handler<uint> for EchoHandler {
-    fn readable(&mut self, reactor: &mut Reactor<uint>, token: uint) {
-        match token {
-            0 => self.server.accept(reactor),
-            1 => self.client.readable(reactor),
-            i => self.server.conn_readable(i)
-        }
-    }
-
-    fn writable(&mut self, _reactor: &mut Reactor<uint>, token: uint) {
-        match token {
-            0 => fail!("received writable for token 0"),
-            1 => self.client.writable(),
-            i => self.server.conn_writable(i)
-        }
-    }
-}
+static NUM_CLIENTS: uint = 1;
 
 #[test]
 pub fn test_echo_server() {
+    let test_vector = Vec::from_slice(test_vec.as_slice());
+
     let mut reactor = Reactor::new().unwrap();
 
     let addr = SockAddr::parse(localhost().as_slice())
         .expect("could not parse InetAddr");
 
-    let srv = TcpSocket::v4().unwrap();
+    fn new_echo_server(_reactor: &mut Reactor) -> EchoServer {
+        EchoServer::new(test_vec.len())
+    }
 
-    info!("setting re-use addr");
-    srv.set_reuseaddr(true).unwrap();
+    gen_tcp_server(
+        &mut reactor,
+        &addr,
+        |s| s.set_reuseaddr(true).unwrap(),
+        256u,
+        (),
+        new_echo_server).unwrap();
 
-    let srv = srv.bind(&addr).unwrap();
+    let left_to_start  = Rc::new(Cell::new(NUM_CLIENTS));
+    let left_to_finish = Rc::new(Cell::new(NUM_CLIENTS));
 
-    info!("listen for connections");
-    reactor.listen(&srv, 256u, 0u).unwrap();
+    let addr = Rc::new(addr);
 
-    let sock = TcpSocket::v4().unwrap();
-
-    // Connect to the server
-    reactor.connect(&sock, &addr, 1u).unwrap();
+    gen_tcp_client(
+        &mut reactor,
+        &*addr,
+        |_| {},
+        EchoClient::new(
+            test_vector.clone(),
+            addr.clone(),
+            left_to_start.clone(),
+            left_to_finish.clone())).unwrap();
 
     // Start the reactor
-    reactor.run(EchoHandler::new(srv, sock, vec!["foo", "bar"]))
-        .ok().expect("failed to execute reactor");
+    reactor.run().ok().expect("failed to execute reactor");
 
+    assert_eq!(left_to_start.get(), 0u);
+    assert_eq!(left_to_finish.get(), 0u);
 }

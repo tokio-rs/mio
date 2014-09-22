@@ -6,15 +6,12 @@
 #![allow(dead_code)]
 
 extern crate alloc;
+extern crate iobuf;
 extern crate nix;
 
 #[phase(plugin, link)]
 extern crate log;
 
-pub use buf::{
-    Buf,
-    MutBuf
-};
 pub use error::{
     MioResult,
     MioError
@@ -37,7 +34,13 @@ pub use poll::{
 pub use reactor::{
     Reactor,
     ReactorConfig,
-    ReactorResult
+};
+pub use server::{
+    gen_tcp_client,
+    gen_tcp_server,
+    Global,
+    ConnectionState,
+    PerClient,
 };
 pub use slab::Slab;
 pub use socket::{
@@ -48,13 +51,15 @@ pub use socket::{
     UnixSocket,
 };
 
-pub mod buf;
+pub use iobuf::{Iobuf, RWIobuf, ROIobuf, IORingbuf};
+
 mod error;
 mod handler;
 mod io;
 mod os;
 mod poll;
 mod reactor;
+mod server;
 mod slab;
 mod socket;
 mod timer;

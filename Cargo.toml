@@ -2,11 +2,13 @@
 
 name = "mio"
 version = "0.0.1"
-authors = ["Carl Lerche <me@carllerche.com>"]
+authors = [ "Carl Lerche <me@carllerche.com>", "Clark Gaebel <cgaebel@mozilla.com>" ]
 
 [dependencies.nix]
+git = "https://github.com/cgaebel/nix-rust"
 
-git = "https://github.com/carllerche/nix-rust"
+[dependencies.iobuf]
+git = "https://github.com/cgaebel/iobuf"
 
 [[test]]
 

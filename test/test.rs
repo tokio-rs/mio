@@ -3,6 +3,7 @@
 
 extern crate mio;
 
+extern crate collections;
 #[phase(plugin, link)]
 extern crate log;
 
