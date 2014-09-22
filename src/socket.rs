@@ -117,12 +117,14 @@ impl Socket for UnixSocket {
 }
 
 // Types of sockets
+#[deriving(Clone)]
 pub enum AddressFamily {
     Inet,
     Inet6,
     Unix,
 }
 
+#[deriving(Clone)]
 pub enum SockAddr {
     UnixAddr(Path),
     InetAddr(IpAddr, Port)

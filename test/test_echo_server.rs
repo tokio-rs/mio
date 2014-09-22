@@ -1,6 +1,8 @@
 use mio::*;
 use super::localhost;
+use std::cell::Cell;
 use std::mem;
+use std::rc::Rc;
 
 struct EchoServer {
     num_msgs: uint
@@ -24,6 +26,7 @@ impl PerClient<()> for EchoServer {
 
         self.num_msgs -= 1;
         if self.num_msgs == 0 {
+            debug!("a server just died!");
             Err(MioError::eof())
         } else {
             Ok(())
@@ -34,10 +37,14 @@ impl PerClient<()> for EchoServer {
 struct EchoClient {
     msgs: Vec<&'static str>,
     rx:   RWIobuf<'static>,
+
+    addr:           Rc<SockAddr>,
+    left_to_start:  Rc<Cell<uint>>,
+    left_to_finish: Rc<Cell<uint>>,
 }
 
 impl EchoClient {
-    fn new(msgs: Vec<&'static str>) -> EchoClient {
+    fn new(msgs: Vec<&'static str>, addr: Rc<SockAddr>, left_to_start: Rc<Cell<uint>>, left_to_finish: Rc<Cell<uint>>) -> EchoClient {
         let curr = msgs[0];
 
         let curr = ROIobuf::from_str(curr);
@@ -45,17 +52,19 @@ impl EchoClient {
         EchoClient {
             msgs: msgs,
             rx: curr.deep_clone(),
+            addr:           addr,
+            left_to_start:  left_to_start,
+            left_to_finish: left_to_finish,
         }
     }
 
-    fn next_msg(&mut self, reactor: &mut Reactor, c: &mut ConnectionState<()>) -> MioResult<RWIobuf<'static>> {
+    fn next_msg(&mut self, _reactor: &mut Reactor, c: &mut ConnectionState<()>) -> MioResult<RWIobuf<'static>> {
         debug!("EchoClient::next_msg");
         let curr =
             match self.msgs.remove(0) {
                 Some(msg) => msg,
                 // All done!
                 None => {
-                    reactor.shutdown();
                     return Err(MioError::eof());
                 },
             };
@@ -65,12 +74,9 @@ impl EchoClient {
         self.rx.fill(curr.as_slice().as_bytes()).unwrap();
         self.rx.flip_lo();
 
-        debug!("rx = {}", self.rx);
-
         let mut tx = c.make_iobuf(curr.len());
         tx.fill(curr.as_slice().as_bytes()).unwrap();
         tx.flip_lo();
-        debug!("tx = {}", tx);
         Ok(tx)
     }
 }
@@ -78,6 +84,23 @@ impl EchoClient {
 impl PerClient<()> for EchoClient {
     fn on_start(&mut self, reactor: &mut Reactor, c: &mut ConnectionState<()>) -> MioResult<()> {
         debug!("EchoClient::on_start");
+
+        let left_to_start = self.left_to_start.get() - 1;
+        self.left_to_start.set(left_to_start);
+
+        // spawn the next client!
+        if left_to_start != 0 {
+            gen_tcp_client(
+                reactor,
+                &*self.addr,
+                |_| {},
+                EchoClient::new(
+                    self.msgs.clone(),
+                    self.addr.clone(),
+                    self.left_to_start.clone(),
+                    self.left_to_finish.clone())).unwrap();
+        }
+
         let next_msg = try!(self.next_msg(reactor, c));
         debug!("Sending from the client: {}", next_msg);
         c.send(next_msg);
@@ -104,9 +127,21 @@ impl PerClient<()> for EchoClient {
 
         Ok(())
     }
+
+    fn on_close(&mut self, reactor: &mut Reactor, _c: &mut ConnectionState<()>) -> MioResult<()> {
+        let left_to_finish = self.left_to_finish.get() - 1;
+        self.left_to_finish.set(left_to_finish);
+        if left_to_finish == 0 {
+            reactor.shutdown();
+        }
+        Ok(())
+    }
 }
 
-static test_vec: [&'static str, ..2] = [ "foo", "bar" ];
+static test_vec: [&'static str, ..8] =
+    [ "foo", "bar", "hello", "world", "what", "a", "nice", "day" ];
+
+static NUM_CLIENTS: uint = 1;
 
 #[test]
 pub fn test_echo_server() {
@@ -129,12 +164,24 @@ pub fn test_echo_server() {
         (),
         new_echo_server).unwrap();
 
+    let left_to_start  = Rc::new(Cell::new(NUM_CLIENTS));
+    let left_to_finish = Rc::new(Cell::new(NUM_CLIENTS));
+
+    let addr = Rc::new(addr);
+
     gen_tcp_client(
         &mut reactor,
-        &addr,
+        &*addr,
         |_| {},
-        EchoClient::new(test_vector)).unwrap();
+        EchoClient::new(
+            test_vector.clone(),
+            addr.clone(),
+            left_to_start.clone(),
+            left_to_finish.clone())).unwrap();
 
     // Start the reactor
     reactor.run().ok().expect("failed to execute reactor");
+
+    assert_eq!(left_to_start.get(), 0u);
+    assert_eq!(left_to_finish.get(), 0u);
 }

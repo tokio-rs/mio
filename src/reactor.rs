@@ -207,6 +207,8 @@ impl Reactor {
 
             let tok: uint = evt.token();
 
+            debug!("processing tok: {}", tok);
+
             if tok != 0 {
                 unsafe {
                     let boxed_handler: *mut () = mem::transmute(tok);
@@ -216,6 +218,8 @@ impl Reactor {
 
             i += 1;
         }
+
+        debug!("{} handlers left.", self.outstanding_handlers.len());
 
         if self.outstanding_handlers.is_empty() {
             self.shutdown();

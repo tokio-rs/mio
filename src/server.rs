@@ -5,15 +5,13 @@ use io::{Ready, IoHandle, IoReader, IoWriter, IoAcceptor};
 use iobuf::{Iobuf, RWIobuf};
 use reactor::Reactor;
 use socket::{TcpSocket, TcpAcceptor, SockAddr};
+use std::cell::RefCell;
 use std::collections::{Deque, RingBuf};
 use std::rc::Rc;
-use std::sync::mpmc_bounded_queue;
 
 // TODO(cgaebel): There's currently no way to kill a server waiting on an
 // `accept`.
 
-// TODO(cgaebel): Use a lock-free stack. None of this bounded queue business.
-static READBUF_POOL_SIZE: uint = 32;
 static READBUF_SIZE:      uint = 4096;
 
 // The number of sends that we queue up before pushing back on the client.
@@ -22,13 +20,14 @@ static MAX_OUTSTANDING_SENDS: uint = 1;
 pub trait PerClient<St> {
     fn on_start(&mut self, _reactor: &mut Reactor, _c: &mut ConnectionState<St>) -> MioResult<()> { Ok(()) }
     fn on_read(&mut self, reactor: &mut Reactor, c: &mut ConnectionState<St>, buf: RWIobuf<'static>) -> MioResult<()>;
+    fn on_close(&mut self, _reactor: &mut Reactor, _c: &mut ConnectionState<St>) -> MioResult<()> { Ok(()) }
 }
 
 /// Global state for a server.
 pub struct Global<St> {
     /// This should really be a lock-free stack. Unfortunately, only a bounded
-    /// queue is implemented in the standard library. It'll do for now. =(
-    readbuf_pool: mpmc_bounded_queue::Queue<Vec<u8>>,
+    /// queue is implemented in the standard library. A vec will do for now. =(
+    readbuf_pool: RefCell<Vec<Vec<u8>>>,
 
     custom_state: St,
 }
@@ -37,7 +36,7 @@ impl<St> Global<St> {
     /// Creates a new global state for a server.
     fn new(custom_state: St) -> Global<St> {
         Global {
-            readbuf_pool: mpmc_bounded_queue::Queue::with_capacity(READBUF_POOL_SIZE),
+            readbuf_pool: RefCell::new(Vec::new()),
 
             custom_state: custom_state,
         }
@@ -52,8 +51,10 @@ impl<St> Global<St> {
             return RWIobuf::new(capacity);
         }
 
+        let mut readbuf_pool = self.readbuf_pool.borrow_mut();
+
         let mut ret =
-            match self.readbuf_pool.pop() {
+            match readbuf_pool.pop() {
                 None    => RWIobuf::new(READBUF_SIZE),
                 Some(v) => RWIobuf::from_vec(v),
             };
@@ -67,10 +68,12 @@ impl<St> Global<St> {
     /// back to the pool, but only iobufs constructed with `make_iobuf` (or
     /// luckily compatible other ones) will actually end up in the pool.
     fn return_iobuf(&self, buf: RWIobuf<'static>) {
+        let mut readbuf_pool = self.readbuf_pool.borrow_mut();
+
         match buf.into_vec() {
             Some(v) => {
                 if v.len() == READBUF_SIZE {
-                    self.readbuf_pool.push(v);
+                    readbuf_pool.push(v);
                 }
             },
             _ => {},
@@ -83,12 +86,12 @@ impl<St> Global<St> {
 
 bitflags! {
     flags Flags: u8 {
-        static Readable   = 0x01,
-        static Writable   = 0x02,
+        static Readable     = 0x01,
+        static Writable     = 0x02,
         // Have we ever ticked?
-        static HaveTicked = 0x04,
+        static HaveTicked   = 0x04,
         // Have we seen EOF on the readng end?
-        static HasHitEof  = 0x08,
+        static HasHitEof    = 0x08,
     }
 }
 
@@ -147,6 +150,17 @@ impl<St, C: PerClient<St>> Connection<St, C> {
         Connection {
             state:      ConnectionState::new(fd, global),
             per_client: per_client,
+        }
+    }
+
+    fn checked_tick(&mut self, reactor: &mut Reactor) -> MioResult<()> {
+        match self.tick(reactor) {
+            Ok(x) => Ok(x),
+            Err(e) => {
+                // We can't really use this. We already have an error!
+                let _ = self.per_client.on_close(reactor, &mut self.state);
+                Err(e)
+            },
         }
     }
 
@@ -237,26 +251,26 @@ impl<St, C: PerClient<St>> Connection<St, C> {
 impl<St, C: PerClient<St>> Handler for Connection<St, C> {
     fn readable(&mut self, reactor: &mut Reactor) -> MioResult<()> {
         self.state.flags.insert(Readable);
-        self.tick(reactor)
+        self.checked_tick(reactor)
     }
 
     fn writable(&mut self, reactor: &mut Reactor) -> MioResult<()> {
         self.state.flags.insert(Writable);
-        self.tick(reactor)
+        self.checked_tick(reactor)
     }
 }
 
 struct AcceptHandler<St, C> {
     accept_socket: TcpAcceptor,
     global:        Rc<Global<St>>,
-    on_accept:     Rc<fn(reactor: &mut Reactor) -> C>,
+    on_accept:     fn(reactor: &mut Reactor) -> C,
 }
 
 impl<St, C: PerClient<St>> AcceptHandler<St, C> {
     fn new(
         accept_socket: TcpAcceptor,
         global:        Rc<Global<St>>,
-        on_accept:     Rc<fn(reactor: &mut Reactor) -> C>)
+        on_accept:     fn(reactor: &mut Reactor) -> C)
           -> AcceptHandler<St, C> {
         AcceptHandler {
             accept_socket: accept_socket,
@@ -268,6 +282,7 @@ impl<St, C: PerClient<St>> AcceptHandler<St, C> {
 
 impl<St, C: PerClient<St>> Handler for AcceptHandler<St, C> {
     fn readable(&mut self, reactor: &mut Reactor) -> MioResult<()> {
+        debug!("trying to accept!");
         // If a shutdown has been requested, kill the accept thread.
         let socket: TcpSocket =
             match self.accept_socket.accept() {
@@ -277,10 +292,14 @@ impl<St, C: PerClient<St>> Handler for AcceptHandler<St, C> {
                 _                 => return Ok(()),
             };
 
+        debug!("spawning server.");
+
         let fd = socket.desc().fd;
-        let per_client = (*self.on_accept.deref())(reactor);
+        let per_client = (self.on_accept)(reactor);
         let handler = Connection::new(socket, self.global.clone(), per_client);
-        reactor.register(fd, handler)
+        try!(reactor.register(fd, handler));
+        debug!("done accept.");
+        Ok(())
     }
 
     fn writable(&mut self, _reactor: &mut Reactor) -> MioResult<()> {
@@ -305,9 +324,9 @@ pub fn gen_tcp_server<St, C: PerClient<St>>(
     tweak_sock_opts(&accept_socket);
     let acceptor: TcpAcceptor = try!(accept_socket.bind(listen_on));
     let global    = Rc::new(Global::new(shared_state));
-    let on_accept = Rc::new(on_accept);
+    let mut on_accept = Some(on_accept);
     reactor.listen(acceptor, backlog, |socket| {
-        AcceptHandler::new(socket, global.clone(), on_accept.clone())
+        AcceptHandler::new(socket, global.clone(), on_accept.take().unwrap())
     })
 }
 
