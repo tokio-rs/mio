@@ -2,7 +2,7 @@
 
 name = "mio"
 version = "0.0.1"
-authors = ["Carl Lerche <me@carllerche.com>", "Clark Gaebel <cgaebel@mozilla.com>", "Vlad Kluev <vkluev@fb.com>"]
+authors = [ "Carl Lerche <me@carllerche.com>", "Clark Gaebel <cgaebel@mozilla.com>" ]
 
 [dependencies.nix]
 git = "https://github.com/cgaebel/nix-rust"
