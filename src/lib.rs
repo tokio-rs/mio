@@ -38,6 +38,7 @@ pub use reactor::{
     ReactorConfig,
 };
 pub use server::{
+    gen_tcp_client,
     gen_tcp_server,
     Global,
     ConnectionState,

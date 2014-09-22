@@ -16,11 +16,12 @@ impl Poll {
     }
 
     pub fn register(&mut self, fd: Fd, token: uint) -> MioResult<()> {
-        debug!("registering IO with poller");
+        debug!("registering {} (fd={}) with poller", token, fd);
         self.selector.register(fd, token)
     }
 
     pub fn unregister(&mut self, fd: Fd) -> MioResult<()> {
+        debug!("unregistering {} with poller", fd);
         self.selector.unregister(fd)
     }
 

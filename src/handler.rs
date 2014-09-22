@@ -21,8 +21,6 @@ fn on_error<H: Handler>(when: &'static str, reactor: &mut Reactor, error: &MioEr
 unsafe fn handle<H: Handler>(reactor: &mut Reactor, event: Option<&IoEvent>, boxed_h: *mut ()) {
     let mut h: Box<BoxedHandler<H>> = mem::transmute(boxed_h);
 
-    debug!("evt = {}", event);
-
     let event = match event {
         Some(event) => event,
         None => {

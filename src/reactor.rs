@@ -205,14 +205,20 @@ impl Reactor {
         while i < cnt {
             let evt = self.poll.event(i);
 
-            unsafe {
-                let tok: uint = evt.token();
-                let boxed_handler: *mut () = mem::transmute(tok);
+            let tok: uint = evt.token();
 
-                handler::call_handler(self, &evt, boxed_handler);
+            if tok != 0 {
+                unsafe {
+                    let boxed_handler: *mut () = mem::transmute(tok);
+                    handler::call_handler(self, &evt, boxed_handler);
+                }
             }
 
             i += 1;
+        }
+
+        if self.outstanding_handlers.is_empty() {
+            self.shutdown();
         }
 
         Ok(())
