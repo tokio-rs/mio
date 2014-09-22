@@ -6,6 +6,8 @@ use nix::fcntl::Fd;
 use os;
 use poll::Poll;
 use socket::{Socket, SockAddr};
+use std::collections::hashmap::HashMap;
+use std::collections::MutableMap;
 use std::default::Default;
 use std::mem;
 
@@ -16,6 +18,7 @@ use std::mem;
 
 #[deriving(Clone, Show)]
 pub struct ReactorConfig {
+    // TODO(cgaebel): Replace with a timerfd, and keep track of timers in mio.
     pub io_poll_timeout_ms: uint
 }
 
@@ -29,8 +32,23 @@ impl Default for ReactorConfig {
 
 pub struct Reactor {
     config: ReactorConfig,
-    poll: Poll,
-    run: bool
+    poll:   Poll,
+    run:    bool,
+    // TODO(cgaebel): Remove this, and just have a global reactor.
+    outstanding_handlers: HashMap<Fd, *mut ()>,
+}
+
+impl Drop for Reactor {
+    fn drop(&mut self) {
+        unsafe {
+            let outstanding_handlers =
+                mem::replace(&mut self.outstanding_handlers, HashMap::new());
+
+            for boxed_handler in outstanding_handlers.values() {
+                handler::drop_handler(self, *boxed_handler);
+            }
+        }
+    }
 }
 
 impl Reactor {
@@ -43,7 +61,8 @@ impl Reactor {
         Ok(Reactor {
             config: config,
             poll: try!(Poll::new()),
-            run: true
+            run: true,
+            outstanding_handlers: HashMap::new(),
         })
     }
 
@@ -59,14 +78,41 @@ impl Reactor {
     }
 
     /// Registers an IO handle with the reactor.
-    pub fn register<Fd: IoHandle, H: Handler>(&mut self, fd: &Fd, handler: H) -> MioResult<()> {
-        self.poll.register(fd, handler)
+    pub fn register<H: Handler>(&mut self, fd: Fd, handler: H) -> MioResult<()> {
+        unsafe {
+            let boxed: Box<handler::BoxedHandler<H>> =
+                box handler::BoxedHandler::new(fd, handler);
+            let the_box_as_uint: uint = mem::transmute(boxed);
+            // The box is now conveniently forgotten into an int.
+
+            let the_box_as_ptr: *mut () = mem::transmute(the_box_as_uint);
+
+            self.outstanding_handlers.insert(fd, the_box_as_ptr);
+
+            // Register interests for this socket.
+            match self.poll.register(fd, the_box_as_uint) {
+                Ok(()) => {},
+                Err(e) => {
+                    let boxed: Box<handler::BoxedHandler<H>>
+                        = mem::transmute(the_box_as_uint);
+                    drop(boxed);
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Care must be taken to correctly free the handler. This should only be
     /// called from `handler::handle`.
+    ///
+    /// This will not free the handler, and is therefore unsafe to call from
+    /// anywhere except `handler.rs`.
     pub unsafe fn unregister_fd(&mut self, fd: Fd) -> MioResult<()> {
-        self.poll.unregister_fd(fd)
+        // This might be false if we're dropping.
+        self.outstanding_handlers.remove(&fd);
+        self.poll.unregister(fd)
     }
 
     /// Connects the socket to the specified address. When the operation
@@ -76,8 +122,8 @@ impl Reactor {
     /// notify about the connection, even if the connection happens
     /// immediately. Otherwise, every consumer of the reactor would have
     /// to worry about possibly-immediate connection.
-    pub fn connect<S: Socket, H: Handler>(&mut self, io: &S,
-                              addr: &SockAddr, handler: H) -> MioResult<()> {
+    pub fn connect<S: Socket, H: Handler>(&mut self, io: S,
+                              addr: &SockAddr, handler: |S| -> H) -> MioResult<()> {
 
         debug!("socket connect; addr={}", addr);
 
@@ -90,13 +136,14 @@ impl Reactor {
         }
 
         // Register interest with socket on the reactor
-        try!(self.poll.register(io, handler));
+        let fd = io.desc().fd;
+        try!(self.register(fd, handler(io)));
 
         Ok(())
     }
 
-    pub fn listen<S, A: IoHandle + IoAcceptor<S>, H: Handler>(&mut self, io: &A, backlog: uint,
-                                                  handler: H) -> MioResult<()> {
+    pub fn listen<S, A: IoHandle + IoAcceptor<S>, H: Handler>(&mut self, io: A, backlog: uint,
+                                                  handler: |A| -> H) -> MioResult<()> {
 
         debug!("socket listen");
 
@@ -104,7 +151,9 @@ impl Reactor {
         try!(os::listen(io.desc(), backlog));
 
         // Wait for connections
-        try!(self.poll.register(io, handler));
+        let fd = io.desc().fd;
+
+        try!(self.register(fd, handler(io)));
 
         Ok(())
     }
@@ -177,7 +226,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomics::{AtomicInt, SeqCst};
     use super::Reactor;
-    use io::{IoWriter, IoReader};
+    use io::{IoWriter, IoReader, IoHandle};
     use {io, Handler};
 
     struct Funtimes {
@@ -207,14 +256,14 @@ mod tests {
     fn test_readable() {
         let mut reactor = Reactor::new().ok().expect("Couldn't make reactor");
 
-        let (mut reader, mut writer) = io::pipe().unwrap();
+        let (reader, writer) = io::pipe().unwrap();
 
         let rcount = Arc::new(AtomicInt::new(0));
         let wcount = Arc::new(AtomicInt::new(0));
         let handler = Funtimes::new(rcount.clone(), wcount.clone());
 
         writer.write(&mut ROIobuf::from_str("hello")).unwrap();
-        reactor.register(&reader, handler).unwrap();
+        reactor.register(reader.desc().fd, handler).unwrap();
 
         let _ = reactor.run_once();
         let mut b = RWIobuf::new(16);

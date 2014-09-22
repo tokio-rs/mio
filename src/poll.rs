@@ -1,9 +1,6 @@
 use error::MioResult;
-use handler::{Handler, BoxedHandler};
-use io::IoHandle;
-use nix::fcntl;
+use nix::fcntl::Fd;
 use os;
-use std::mem;
 
 pub struct Poll {
     selector: os::Selector,
@@ -18,32 +15,13 @@ impl Poll {
         })
     }
 
-    pub fn register<Fd: IoHandle, H: Handler>(&mut self, io: &Fd, handler: H) -> MioResult<()> {
+    pub fn register(&mut self, fd: Fd, token: uint) -> MioResult<()> {
         debug!("registering IO with poller");
-
-        unsafe {
-            let boxed: Box<BoxedHandler<H>> = box BoxedHandler::new(io.desc().fd, handler);
-            let the_box_as_uint: uint = mem::transmute(boxed);
-            debug!("box as uint={:x}", the_box_as_uint);
-            // The box is now conveniently forgotten into an int.
-
-            // Register interests for this socket
-            match self.selector.register(io.desc(), the_box_as_uint) {
-                Ok(()) => {},
-                Err(e) => {
-                    let boxed: Box<BoxedHandler<H>> = mem::transmute(the_box_as_uint);
-                    drop(boxed);
-                    debug!("error during registration: {}", e);
-                    return Err(e);
-                }
-            }
-        }
-
-        Ok(())
+        self.selector.register(fd, token)
     }
 
-    pub fn unregister_fd(&mut self, fd: fcntl::Fd) -> MioResult<()> {
-        self.selector.unregister_fd(fd)
+    pub fn unregister(&mut self, fd: Fd) -> MioResult<()> {
+        self.selector.unregister(fd)
     }
 
     pub fn poll(&mut self, timeout_ms: uint) -> MioResult<uint> {

@@ -2,7 +2,6 @@ use std::mem;
 use nix::fcntl::Fd;
 use nix::sys::event::*;
 use error::{MioResult, MioError};
-use os::IoDesc;
 use poll::{IoEvent, IoReadable, IoWritable, IoError};
 
 pub struct Selector {
@@ -29,16 +28,16 @@ impl Selector {
         Ok(())
     }
 
-    pub fn register(&mut self, io: &IoDesc, token: uint) -> MioResult<()> {
+    pub fn register(&mut self, fd: Fd, token: uint) -> MioResult<()> {
         let flag = EV_ADD | EV_CLEAR;
 
-        try!(self.ev_push(io.fd, EVFILT_READ,  flag, FilterFlag::empty(), token));
-        try!(self.ev_push(io.fd, EVFILT_WRITE, flag, FilterFlag::empty(), token));
+        try!(self.ev_push(fd, EVFILT_READ,  flag, FilterFlag::empty(), token));
+        try!(self.ev_push(fd, EVFILT_WRITE, flag, FilterFlag::empty(), token));
 
         Ok(())
     }
 
-    pub fn unregister_fd(&mut self, fd: Fd) -> MioResult<()> {
+    pub fn unregister(&mut self, fd: Fd) -> MioResult<()> {
         let flag = EV_DELETE;
 
         try!(self.ev_push(fd, EVFILT_READ,  flag, FilterFlag::empty(), 0));

@@ -3,7 +3,6 @@ use nix::fcntl::Fd;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 use error::{MioResult, MioError};
-use os::IoDesc;
 use poll::{IoEvent, IoEventKind, IoReadable, IoWritable, IoError};
 
 pub struct Selector {
@@ -28,7 +27,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, io: &IoDesc, token: uint) -> MioResult<()> {
+    pub fn register(&mut self, fd: Fd, token: uint) -> MioResult<()> {
         let interests = EPOLLIN | EPOLLOUT | EPOLLERR;
 
         let info = EpollEvent {
@@ -36,11 +35,11 @@ impl Selector {
             data: token as u64,
         };
 
-        epoll_ctl(self.epfd, EpollCtlAdd, io.fd, &info)
+        epoll_ctl(self.epfd, EpollCtlAdd, fd, &info)
             .map_err(MioError::from_sys_error)
     }
 
-    pub fn unregister_fd(&mut self, fd: Fd) -> MioResult<()> {
+    pub fn unregister(&mut self, fd: Fd) -> MioResult<()> {
         let arbitrary_info = EpollEvent {
             events: 0,
             data:   0,

@@ -12,23 +12,26 @@ pub trait Handler {
 }
 
 #[inline(never)]
-unsafe fn on_error<H: Handler>(when: &'static str, reactor: &mut Reactor, error: &MioError, mut h: Box<BoxedHandler<H>>) {
+fn on_error<H: Handler>(when: &'static str, reactor: &mut Reactor, error: &MioError, h: Box<BoxedHandler<H>>) {
     info!("IO handler died during {}: {}", when, error);
-    match reactor.unregister_fd(h.fd) {
-        Ok(()) => drop(h),
-        Err(_) => { (*h).poison = true; mem::forget(h); }
-    }
+    unsafe { reactor.unregister_fd(h.fd).unwrap(); }
+    drop(h);
 }
 
-unsafe fn handle<H: Handler>(reactor: &mut Reactor, event: &IoEvent, boxed_h: *mut ()) {
+unsafe fn handle<H: Handler>(reactor: &mut Reactor, event: Option<&IoEvent>, boxed_h: *mut ()) {
     let mut h: Box<BoxedHandler<H>> = mem::transmute(boxed_h);
 
-    if h.poison {
-        on_error("poisoned handler", reactor, &MioError::unknown_sys_error(), h);
-        return;
-    }
-
     debug!("evt = {}", event);
+
+    let event = match event {
+        Some(event) => event,
+        None => {
+            let r = reactor.unregister_fd(h.fd);
+            drop(h);
+            r.unwrap();
+            return;
+        },
+    };
 
     if event.is_error() {
         on_error("[generic epoll error]", reactor, &MioError::unknown_sys_error(), h);
@@ -56,10 +59,9 @@ unsafe fn handle<H: Handler>(reactor: &mut Reactor, event: &IoEvent, boxed_h: *m
 }
 
 pub struct BoxedHandler<H> {
-    handle: unsafe fn(reactor: &mut Reactor, event: &IoEvent, h: *mut ()),
+    handle: unsafe fn(reactor: &mut Reactor, event: Option<&IoEvent>, h: *mut ()),
     fd:     fcntl::Fd,
-    poison: bool, // is the current handler even valid?
-    data:   H,
+    data:   H, // MUST BE THE LAST MEMBER!
 }
 
 impl<H: Handler> BoxedHandler<H> {
@@ -67,16 +69,19 @@ impl<H: Handler> BoxedHandler<H> {
         BoxedHandler {
             handle: handle::<H>,
             fd:     fd,
-            poison: false,
             data:   handler,
         }
     }
 }
 
 #[inline(always)]
-#[must_use]
 pub unsafe fn call_handler(reactor: &mut Reactor, event: &IoEvent, boxed_handler: *mut ()) {
-    debug!("in call_handler");
     let untyped_boxed_handler: *mut BoxedHandler<()> = mem::transmute(boxed_handler);
-    ((*untyped_boxed_handler).handle)(reactor, event, boxed_handler)
+    ((*untyped_boxed_handler).handle)(reactor, Some(event), boxed_handler)
+}
+
+#[inline(always)]
+pub unsafe fn drop_handler(reactor: &mut Reactor, boxed_handler: *mut ()) {
+    let untyped_boxed_handler: *mut BoxedHandler<()> = mem::transmute(boxed_handler);
+    ((*untyped_boxed_handler).handle)(reactor, None, boxed_handler);
 }

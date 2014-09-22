@@ -2,6 +2,8 @@
 #![feature(globs)]
 #![feature(phase)]
 #![feature(unsafe_destructor)]
+#![feature(unboxed_closures)]
+#![feature(unboxed_closure_sugar)]
 // While in active dev
 #![allow(dead_code)]
 
@@ -35,7 +37,12 @@ pub use reactor::{
     Reactor,
     ReactorConfig,
 };
-//pub use server::*;
+pub use server::{
+    gen_tcp_server,
+    Global,
+    ConnectionState,
+    PerClient,
+};
 pub use slab::Slab;
 pub use socket::{
     Socket,
@@ -53,7 +60,7 @@ mod io;
 mod os;
 mod poll;
 mod reactor;
-//mod server;
+mod server;
 mod slab;
 mod socket;
 mod timer;

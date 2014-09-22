@@ -28,15 +28,15 @@ pub trait IoHandle {
 }
 
 pub trait IoReader {
-    fn read(&mut self, buf: &mut RWIobuf) -> MioResult<NonBlock<()>>;
+    fn read(&self, buf: &mut RWIobuf) -> MioResult<NonBlock<()>>;
 }
 
 pub trait IoWriter {
-    fn write<B: Iobuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<()>>;
+    fn write<B: Iobuf>(&self, buf: &mut B) -> MioResult<NonBlock<()>>;
 }
 
 pub trait IoAcceptor<T> {
-    fn accept(&mut self) -> MioResult<NonBlock<T>>;
+    fn accept(&self) -> MioResult<NonBlock<T>>;
 }
 
 pub fn pipe() -> MioResult<(PipeReader, PipeWriter)> {
@@ -65,18 +65,18 @@ impl IoHandle for PipeWriter {
 }
 
 impl IoReader for PipeReader {
-    fn read(&mut self, buf: &mut RWIobuf) -> MioResult<NonBlock<()>> {
+    fn read(&self, buf: &mut RWIobuf) -> MioResult<NonBlock<()>> {
         read(self, buf)
     }
 }
 
 impl IoWriter for PipeWriter {
-    fn write<B: Iobuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<()>> {
+    fn write<B: Iobuf>(&self, buf: &mut B) -> MioResult<NonBlock<()>> {
         write(self, buf)
     }
 }
 
-pub fn read<I: IoHandle>(io: &mut I, buf: &mut RWIobuf) -> MioResult<NonBlock<()>> {
+pub fn read<I: IoHandle>(io: &I, buf: &mut RWIobuf) -> MioResult<NonBlock<()>> {
     let mut first_iter = true;
 
     while !buf.is_empty() {
@@ -108,7 +108,7 @@ pub fn read<I: IoHandle>(io: &mut I, buf: &mut RWIobuf) -> MioResult<NonBlock<()
     Ok(Ready(()))
 }
 
-pub fn write<O: IoHandle, B: Iobuf>(io: &mut O, buf: &mut B) -> MioResult<NonBlock<()>> {
+pub fn write<O: IoHandle, B: Iobuf>(io: &O, buf: &mut B) -> MioResult<NonBlock<()>> {
     while !buf.is_empty() {
         match os::write(io.desc(), buf) {
             Ok(()) => {},

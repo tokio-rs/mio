@@ -59,13 +59,13 @@ impl IoHandle for TcpSocket {
 }
 
 impl IoReader for TcpSocket {
-    fn read(&mut self, buf: &mut RWIobuf) -> MioResult<NonBlock<()>> {
+    fn read(&self, buf: &mut RWIobuf) -> MioResult<NonBlock<()>> {
         io::read(self, buf)
     }
 }
 
 impl IoWriter for TcpSocket {
-    fn write<B: Iobuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<()>> {
+    fn write<B: Iobuf>(&self, buf: &mut B) -> MioResult<NonBlock<()>> {
         io::write(self, buf)
     }
 }
@@ -88,7 +88,7 @@ impl Socket for TcpAcceptor {
 }
 
 impl IoAcceptor<TcpSocket> for TcpAcceptor {
-    fn accept(&mut self) -> MioResult<NonBlock<TcpSocket>> {
+    fn accept(&self) -> MioResult<NonBlock<TcpSocket>> {
         match os::accept(self.desc()) {
             Ok(sock) => Ok(Ready(TcpSocket { desc: sock })),
             Err(e) => {
