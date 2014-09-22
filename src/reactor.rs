@@ -7,6 +7,7 @@ use notify::Notify;
 use os;
 use poll::{Poll, IoEvent};
 use socket::{Socket, SockAddr};
+use timer::{Timer, Timeout, TimerResult};
 
 /// A lightweight IO reactor.
 ///
@@ -19,22 +20,31 @@ pub struct ReactorConfig {
 
     // == Notifications ==
     pub notify_capacity: uint,
-    pub messages_per_tick: uint
+    pub messages_per_tick: uint,
+
+    // == Timer ==
+    pub timer_tick_ms: u64,
+    pub timer_wheel_size: uint,
+    pub timer_capacity: uint,
 }
 
 impl Default for ReactorConfig {
     fn default() -> ReactorConfig {
         ReactorConfig {
             io_poll_timeout_ms: 1_000,
-            notify_capacity: 1024,
+            notify_capacity: 1_024,
             messages_per_tick: 64,
+            timer_tick_ms: 100,
+            timer_wheel_size: 1_024,
+            timer_capacity: 65_536,
         }
     }
 }
 
-pub struct Reactor<T, M: Send> {
+pub struct Reactor<T, T2, M: Send> {
     run: bool,
     poll: Poll,
+    timer: Timer<T2>,
     notify: Notify<M>,
     config: ReactorConfig,
 }
@@ -42,21 +52,35 @@ pub struct Reactor<T, M: Send> {
 // Token used to represent notifications
 static NOTIFY: u64 = u64::MAX;
 
-impl<T: Token, M: Send> Reactor<T, M> {
+impl<T: Token, T2, M: Send> Reactor<T, T2, M> {
     /// Initializes a new reactor. The reactor will not be running yet.
-    pub fn new() -> MioResult<Reactor<T, M>> {
+    pub fn new() -> MioResult<Reactor<T, T2, M>> {
         Reactor::configured(Default::default())
     }
 
-    pub fn configured(config: ReactorConfig) -> MioResult<Reactor<T, M>> {
+    pub fn configured(config: ReactorConfig) -> MioResult<Reactor<T, T2, M>> {
+        // Create the IO poller
         let mut poll = try!(Poll::new());
+
+        // Create the timer
+        let mut timer = Timer::new(
+            config.timer_tick_ms,
+            config.timer_wheel_size,
+            config.timer_capacity);
+
+        // Create cross thread notification queue
         let notify = try!(Notify::with_capacity(config.notify_capacity));
 
+        // Register the notification wakeup FD with the IO poller
         try!(poll.register(&notify, NOTIFY));
+
+        // Set the timer's starting time reference point
+        timer.setup();
 
         Ok(Reactor {
             run: true,
             poll: poll,
+            timer: timer,
             notify: notify,
             config: config,
         })
@@ -68,6 +92,17 @@ impl<T: Token, M: Send> Reactor<T, M> {
         ReactorSender::new(self.notify.clone())
     }
 
+    /// After the requested time interval, the handler's `timeout` function
+    /// will be called with the supplied token.
+    pub fn timeout_ms(&mut self, token: T2, delay: u64) -> TimerResult<Timeout> {
+        self.timer.timeout_ms(token, delay)
+    }
+
+    /// If the supplied timeout has not been triggered, cancel it such that it
+    /// will not be triggered in the future.
+    pub fn clear_timeout(&mut self, timeout: Timeout) -> bool {
+        self.timer.clear(timeout)
+    }
 
     /// Tells the reactor to exit after it is done handling all events in the
     /// current iteration.
@@ -127,7 +162,7 @@ impl<T: Token, M: Send> Reactor<T, M> {
 
     /// Keep spinning the reactor indefinitely, and notify the handler whenever
     /// any of the registered handles are ready.
-    pub fn run<H: Handler<T, M>>(&mut self, mut handler: H) -> ReactorResult<H> {
+    pub fn run<H: Handler<T, T2, M>>(&mut self, mut handler: H) -> ReactorResult<H> {
         self.run = true;
 
         while self.run {
@@ -144,7 +179,7 @@ impl<T: Token, M: Send> Reactor<T, M> {
     /// Spin the reactor once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once<H: Handler<T, M>>(&mut self, mut handler: H) -> ReactorResult<H> {
+    pub fn run_once<H: Handler<T, T2, M>>(&mut self, mut handler: H) -> ReactorResult<H> {
         // Execute a single tick
         match self.tick(&mut handler) {
             Err(e) => return Err(ReactorError::new(handler, e)),
@@ -155,7 +190,7 @@ impl<T: Token, M: Send> Reactor<T, M> {
     }
 
     // Executes a single run of the reactor loop
-    fn tick<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
+    fn tick<H: Handler<T, T2, M>>(&mut self, handler: &mut H) -> MioResult<()> {
         let mut messages;
         let mut pending;
 
@@ -181,6 +216,7 @@ impl<T: Token, M: Send> Reactor<T, M> {
 
         self.io_process(handler, events);
         self.notify(handler, messages);
+        self.timer_process(handler);
 
         Ok(())
     }
@@ -190,12 +226,18 @@ impl<T: Token, M: Send> Reactor<T, M> {
         if immediate {
             self.poll.poll(0)
         } else {
-            self.poll.poll(self.config.io_poll_timeout_ms)
+            let mut sleep = self.timer.next_tick_in_ms() as uint;
+
+            if sleep > self.config.io_poll_timeout_ms {
+                sleep = self.config.io_poll_timeout_ms;
+            }
+
+            self.poll.poll(sleep)
         }
     }
 
     // Process IO events that have been previously polled
-    fn io_process<H: Handler<T, M>>(&mut self, handler: &mut H, cnt: uint) {
+    fn io_process<H: Handler<T, T2, M>>(&mut self, handler: &mut H, cnt: uint) {
         let mut i = 0u;
 
         // Iterate over the notifications. Each event provides the token
@@ -216,7 +258,7 @@ impl<T: Token, M: Send> Reactor<T, M> {
         }
     }
 
-    fn io_event<H: Handler<T, M>>(&mut self, handler: &mut H, evt: IoEvent) {
+    fn io_event<H: Handler<T, T2, M>>(&mut self, handler: &mut H, evt: IoEvent) {
         let tok = Token::from_u64(evt.token());
 
         if evt.is_readable() {
@@ -232,13 +274,24 @@ impl<T: Token, M: Send> Reactor<T, M> {
         }
     }
 
-    fn notify<H: Handler<T, M>>(&mut self, handler: &mut H, mut cnt: uint) {
+    fn notify<H: Handler<T, T2, M>>(&mut self, handler: &mut H, mut cnt: uint) {
         while cnt > 0 {
             let msg = self.notify.poll()
                 .expect("[BUG] at this point there should always be a message");
 
             handler.notify(self, msg);
             cnt -= 1;
+        }
+    }
+
+    fn timer_process<H: Handler<T, T2, M>>(&mut self, handler: &mut H) {
+        let now = self.timer.now();
+
+        loop {
+            match self.timer.tick_to(now) {
+                Some(t) => handler.timeout(self, t),
+                _ => return
+            }
         }
     }
 }
@@ -283,7 +336,7 @@ mod tests {
     use io::{IoWriter, IoReader};
     use {io, buf, Buf, Handler};
 
-    type TestReactor = Reactor<u64, ()>;
+    type TestReactor = Reactor<u64, uint, ()>;
 
     struct Funtimes {
         rcount: Arc<AtomicInt>,
@@ -299,7 +352,7 @@ mod tests {
         }
     }
 
-    impl Handler<u64, ()> for Funtimes {
+    impl Handler<u64, uint, ()> for Funtimes {
         fn readable(&mut self, _reactor: &mut TestReactor, token: u64) {
             (*self.rcount).fetch_add(1, SeqCst);
             assert_eq!(token, 10u64);

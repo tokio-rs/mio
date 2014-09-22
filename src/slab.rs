@@ -25,6 +25,7 @@ impl<T> Slab<T> {
     pub fn new(cap: uint) -> Slab<T> {
         assert!(cap <= MAX, "capacity too large");
         // TODO:
+        // - Rename to with_capacity
         // - Use a power of 2 capacity
         // - Ensure that mem size is less than uint::MAX
 
@@ -48,6 +49,11 @@ impl<T> Slab<T> {
     }
 
     #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    #[inline]
     pub fn remaining(&self) -> uint {
         (self.cap - self.len) as uint
     }
@@ -57,14 +63,33 @@ impl<T> Slab<T> {
         self.remaining() > 0
     }
 
-    /// Returns true if the slab contains a value at the given index.
-    pub fn exists(&self, idx: uint) -> bool {
-        if idx > int::MAX as uint {
-            return false;
+    #[inline]
+    pub fn contains(&self, idx: uint) -> bool {
+        if idx <= MAX {
+            let idx = idx as int;
+
+            if idx < self.init {
+                return self.entry(idx).in_use();
+            }
         }
 
-        let idx = idx as int;
-        idx < self.init && self.entry(idx).in_use()
+        false
+    }
+
+    pub fn get(&self, idx: uint) -> Option<&T> {
+        if idx <= MAX {
+            let idx = idx as int;
+
+            if idx < self.init {
+                let entry = self.entry(idx);
+
+                if entry.in_use() {
+                    return Some(&entry.val);
+                }
+            }
+        }
+
+        None
     }
 
     pub fn insert(&mut self, val: T) -> Result<uint, T> {
@@ -107,7 +132,7 @@ impl<T> Slab<T> {
         let idx = idx as int;
 
         // Ensure index is within capacity of slab
-        if idx >= self.cap {
+        if idx >= self.init {
             return None;
         }
 
@@ -138,7 +163,7 @@ impl<T> Slab<T> {
         if idx <= MAX {
             let idx = idx as int;
 
-            if idx < self.cap {
+            if idx < self.init {
                 return idx;
             }
         }
@@ -343,5 +368,12 @@ mod tests {
         assert!(slab.remove(t1).unwrap() == 789u);
 
         assert!(slab.count() == 0);
+    }
+
+    #[test]
+    #[should_fail]
+    fn test_accessing_out_of_bounds() {
+        let slab = Slab::<uint>::new(16);
+        slab[0];
     }
 }

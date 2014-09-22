@@ -2,7 +2,7 @@ use mio::*;
 use mio::buf::{ByteBuf, RingBuf, SliceBuf};
 use super::localhost;
 
-type TestReactor = Reactor<uint, ()>;
+type TestReactor = Reactor<uint, uint, ()>;
 
 struct EchoConn {
     sock: TcpSocket,
@@ -224,7 +224,7 @@ impl EchoHandler {
     }
 }
 
-impl Handler<uint, ()> for EchoHandler {
+impl Handler<uint, uint, ()> for EchoHandler {
     fn readable(&mut self, reactor: &mut TestReactor, token: uint) {
         match token {
             0 => self.server.accept(reactor),

@@ -3,7 +3,7 @@ use std::time::Duration;
 use mio::*;
 use super::localhost;
 
-type TestReactor = Reactor<uint, String>;
+type TestReactor = Reactor<uint, uint, String>;
 
 struct TestHandler {
     sender: ReactorSender<String>,
@@ -19,7 +19,7 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint, String> for TestHandler {
+impl Handler<uint, uint, String> for TestHandler {
     fn notify(&mut self, reactor: &mut TestReactor, msg: String) {
         match self.notify {
             0 => {

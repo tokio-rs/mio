@@ -1,12 +1,11 @@
 use mio::*;
-use mio::buf::ByteBuf;
 use super::localhost;
 
-type TestReactor = Reactor<uint, uint, ()>;
+type TestReactor = Reactor<uint, TcpSocket, ()>;
 
 struct TestHandler {
     srv: TcpAcceptor,
-    cli: TcpSocket
+    cli: TcpSocket,
 }
 
 impl TestHandler {
@@ -18,19 +17,24 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint, uint, ()> for TestHandler {
+impl Handler<uint, TcpSocket, ()> for TestHandler {
     fn readable(&mut self, reactor: &mut TestReactor, tok: uint) {
         match tok {
             0 => {
                 debug!("server connection ready for accept");
-                let _ = self.srv.accept().unwrap().unwrap();
+                let conn = self.srv.accept().unwrap().unwrap();
+                reactor.timeout_ms(conn, 200).unwrap();
             }
             1 => {
                 debug!("client readable");
-                let mut buf = ByteBuf::new(1024);
+                let mut buf = buf::ByteBuf::new(1024);
                 match self.cli.read(&mut buf) {
-                    Err(e) if e.is_eof() => reactor.shutdown(),
-                    _ => fail!("the client socket should not be readable")
+                    Ok(_) => {
+                        buf.flip();
+                        assert!(b"zomg" == buf.bytes());
+                        reactor.shutdown();
+                    }
+                    Err(e) => fail!("client sock failed to read; err={}", e),
                 }
             }
             _ => fail!("received unknown token {}", tok)
@@ -40,11 +44,14 @@ impl Handler<uint, uint, ()> for TestHandler {
     fn writable(&mut self, _reactor: &mut TestReactor, tok: uint) {
         match tok {
             0 => fail!("received writable for token 0"),
-            1 => {
-                debug!("client connected");
-            }
+            1 => debug!("client connected"),
             _ => fail!("received unknown token {}", tok)
         }
+    }
+
+    fn timeout(&mut self, _reactor: &mut TestReactor, mut sock: TcpSocket) {
+        sock.write(&mut buf::wrap(b"zomg"))
+            .unwrap().unwrap();
     }
 }
 

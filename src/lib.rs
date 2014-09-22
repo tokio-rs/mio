@@ -7,17 +7,18 @@
 
 extern crate alloc;
 extern crate nix;
+extern crate time;
 
 #[phase(plugin, link)]
 extern crate log;
 
 pub use buf::{
     Buf,
-    MutBuf
+    MutBuf,
 };
 pub use error::{
     MioResult,
-    MioError
+    MioError,
 };
 pub use handler::Handler;
 pub use io::{
@@ -27,12 +28,12 @@ pub use io::{
     IoWriter,
     IoAcceptor,
     PipeReader,
-    PipeWriter
+    PipeWriter,
 };
 pub use poll::{
     Poll,
     IoEvent,
-    IoEventKind
+    IoEventKind,
 };
 pub use reactor::{
     Reactor,
@@ -47,6 +48,10 @@ pub use socket::{
     TcpSocket,
     TcpAcceptor,
     UnixSocket,
+};
+pub use timer::{
+    Timer,
+    Timeout,
 };
 
 pub mod buf;
