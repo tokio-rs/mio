@@ -6,15 +6,12 @@
 #![allow(dead_code)]
 
 extern crate alloc;
+extern crate iobuf;
 extern crate nix;
 
 #[phase(plugin, link)]
 extern crate log;
 
-pub use buf::{
-    Buf,
-    MutBuf
-};
 pub use error::{
     MioResult,
     MioError
@@ -48,7 +45,8 @@ pub use socket::{
     UnixSocket,
 };
 
-pub mod buf;
+pub use iobuf::{Iobuf, RWIobuf, ROIobuf, IORingbuf};
+
 mod error;
 mod handler;
 mod io;

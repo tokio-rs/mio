@@ -1,4 +1,4 @@
-use buf::{Buf, MutBuf};
+use iobuf::{RWIobuf, Iobuf};
 use os;
 use error::MioResult;
 
@@ -28,11 +28,11 @@ pub trait IoHandle {
 }
 
 pub trait IoReader {
-    fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>>;
+    fn read(&mut self, buf: &mut RWIobuf) -> MioResult<NonBlock<()>>;
 }
 
 pub trait IoWriter {
-    fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>>;
+    fn write<B: Iobuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<()>>;
 }
 
 pub trait IoAcceptor<T> {
@@ -65,25 +65,24 @@ impl IoHandle for PipeWriter {
 }
 
 impl IoReader for PipeReader {
-    fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>> {
+    fn read(&mut self, buf: &mut RWIobuf) -> MioResult<NonBlock<()>> {
         read(self, buf)
     }
 }
 
 impl IoWriter for PipeWriter {
-    fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>> {
+    fn write<B: Iobuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<()>> {
         write(self, buf)
     }
 }
 
-pub fn read<I: IoHandle>(io: &mut I, buf: &mut MutBuf) -> MioResult<NonBlock<()>> {
+pub fn read<I: IoHandle>(io: &mut I, buf: &mut RWIobuf) -> MioResult<NonBlock<()>> {
     let mut first_iter = true;
 
-    while buf.has_remaining() {
-        match os::read(io.desc(), buf.mut_bytes()) {
+    while !buf.is_empty() {
+        match os::read(io.desc(), buf) {
             // Successfully read some bytes, advance the cursor
-            Ok(cnt) => {
-                buf.advance(cnt);
+            Ok(()) => {
                 first_iter = false;
             }
             Err(e) => {
@@ -109,10 +108,10 @@ pub fn read<I: IoHandle>(io: &mut I, buf: &mut MutBuf) -> MioResult<NonBlock<()>
     Ok(Ready(()))
 }
 
-pub fn write<O: IoHandle>(io: &mut O, buf: &mut Buf) -> MioResult<NonBlock<()>> {
-    while buf.has_remaining() {
-        match os::write(io.desc(), buf.bytes()) {
-            Ok(cnt) => buf.advance(cnt),
+pub fn write<O: IoHandle, B: Iobuf>(io: &mut O, buf: &mut B) -> MioResult<NonBlock<()>> {
+    while !buf.is_empty() {
+        match os::write(io.desc(), buf) {
+            Ok(()) => {},
             Err(e) => {
                 if e.is_would_block() {
                     return Ok(WouldBlock);

@@ -1,12 +1,15 @@
 use mio::*;
-use mio::buf::{ByteBuf, RingBuf, SliceBuf};
 use super::localhost;
+
+// reads go into i_buf. If i_buf is full, stop reading for now.
+// writes go into o_buf. If o_buf is empty, swap with i_buf. If still empty, done writing.
+
 
 struct EchoConn {
     sock: TcpSocket,
     readable: bool,
     writable: bool,
-    buf: RingBuf
+    buf: IORingbuf,
 }
 
 impl EchoConn {
@@ -15,7 +18,7 @@ impl EchoConn {
             sock: sock,
             readable: false,
             writable: false,
-            buf: RingBuf::new(1024)
+            buf: IORingbuf::new(1024),
         }
     }
 
@@ -30,8 +33,8 @@ impl EchoConn {
     }
 
     fn can_continue(&self) -> bool {
-        (self.readable && !self.buf.is_full()) ||
-            (self.writable && !self.buf.is_empty())
+        (self.readable && !self.buf.is_full())
+            || (self.writable && !self.buf.is_empty())
     }
 
     fn echo(&mut self) -> MioResult<()> {
@@ -49,7 +52,7 @@ impl EchoConn {
         }
 
         debug!("server filling buf");
-        self.sock.read(&mut self.buf.writer())
+        self.sock.read(self.buf.push_buf())
             .map(|res| {
                 if res.would_block() {
                     debug!("  WOULDBLOCK");
@@ -63,8 +66,7 @@ impl EchoConn {
             return Ok(());
         }
 
-        debug!("server flushing buf");
-        self.sock.write(&mut self.buf.reader())
+        self.sock.write(self.buf.pop_buf())
             .map(|res| {
                 if res.would_block() {
                     debug!("  WOULDBLOCK");
@@ -110,12 +112,11 @@ impl EchoServer {
 struct EchoClient {
     sock: TcpSocket,
     msgs: Vec<&'static str>,
-    tx: SliceBuf<'static>,
-    rx: SliceBuf<'static>,
-    buf: ByteBuf,
+    tx: ROIobuf<'static>,
+    rx: ROIobuf<'static>,
+    buf: RWIobuf<'static>,
     writable: bool
 }
-
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
@@ -125,9 +126,9 @@ impl EchoClient {
         EchoClient {
             sock: sock,
             msgs: msgs,
-            tx: SliceBuf::wrap(curr.as_bytes()),
-            rx: SliceBuf::wrap(curr.as_bytes()),
-            buf: ByteBuf::new(1024),
+            tx: ROIobuf::from_str(curr),
+            rx: ROIobuf::from_str(curr),
+            buf: RWIobuf::new(1024),
             writable: false
         }
     }
@@ -142,18 +143,18 @@ impl EchoClient {
             };
 
             // prepare for reading
-            self.buf.flip();
+            self.buf.flip_lo();
 
-            while self.buf.has_remaining() {
-                let actual = self.buf.read_byte().unwrap();
-                let expect = self.rx.read_byte().unwrap();
+            while !self.buf.is_empty() {
+                let actual: u8 = self.buf.consume_be().unwrap();
+                let expect: u8 = self.rx.consume_be().unwrap();
 
-                assert!(actual == expect);
+                assert_eq!(actual, expect);
             }
 
-            self.buf.clear();
+            self.buf.reset();
 
-            if !self.rx.has_remaining() {
+            if self.rx.is_empty() {
                 self.next_msg(reactor).unwrap();
             }
 
@@ -197,8 +198,8 @@ impl EchoClient {
         };
 
         debug!("client prepping next message");
-        self.tx = SliceBuf::wrap(curr.as_bytes());
-        self.rx = SliceBuf::wrap(curr.as_bytes());
+        self.tx = ROIobuf::from_str(curr);
+        self.rx = ROIobuf::from_str(curr);
 
         self.flush_msg()
     }

@@ -195,12 +195,12 @@ impl<H> ReactorError<H> {
 
 #[cfg(test)]
 mod tests {
-    use std::str;
+    use iobuf::{RWIobuf, ROIobuf, Iobuf};
     use std::sync::Arc;
     use std::sync::atomics::{AtomicInt, SeqCst};
     use super::Reactor;
     use io::{IoWriter, IoReader};
-    use {io, buf, Buf, Handler};
+    use {io, Handler};
 
     struct Funtimes {
         rcount: Arc<AtomicInt>,
@@ -233,17 +233,17 @@ mod tests {
         let wcount = Arc::new(AtomicInt::new(0));
         let handler = Funtimes::new(rcount.clone(), wcount.clone());
 
-        writer.write(&mut buf::wrap("hello".as_bytes())).unwrap();
+        writer.write(&mut ROIobuf::from_str("hello")).unwrap();
         reactor.register(&reader, 10u64).unwrap();
 
         let _ = reactor.run_once(handler);
-        let mut b = buf::ByteBuf::new(16);
+        let mut b = RWIobuf::new(16);
 
         assert_eq!((*rcount).load(SeqCst), 1);
 
         reader.read(&mut b).unwrap();
-        b.flip();
+        b.flip_lo();
 
-        assert_eq!(str::from_utf8(b.bytes()).unwrap(), "hello");
+        unsafe { assert_eq!(b.as_slice(), b"hello"); }
     }
 }
