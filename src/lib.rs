@@ -2,8 +2,6 @@
 #![feature(globs)]
 #![feature(phase)]
 #![feature(unsafe_destructor)]
-#![feature(unboxed_closures)]
-#![feature(unboxed_closure_sugar)]
 // While in active dev
 #![allow(dead_code)]
 

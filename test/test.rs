@@ -1,6 +1,5 @@
 #![feature(globs)]
 #![feature(phase)]
-#![feature(unboxed_closures)]
 
 extern crate mio;
 
