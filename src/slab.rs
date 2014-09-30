@@ -1,5 +1,6 @@
 use std::{mem, ptr, int};
 use alloc::heap;
+use token::Token;
 
 /// A preallocated chunk of memory for storing objects of the same type.
 pub struct Slab<T> {
@@ -9,6 +10,8 @@ pub struct Slab<T> {
     len: int,
     // The total number of elements that the slab can hold
     cap: int,
+    // THe token offset
+    off: uint,
     // Offset of the next available slot in the slab. Set to the slab's
     // capacity when the slab is full.
     nxt: int,
@@ -23,6 +26,10 @@ static IN_USE: int = -1;
 
 impl<T> Slab<T> {
     pub fn new(cap: uint) -> Slab<T> {
+        Slab::new_starting_at(Token(0), cap)
+    }
+
+    pub fn new_starting_at(offset: Token, cap: uint) -> Slab<T> {
         assert!(cap <= MAX, "capacity too large");
         // TODO:
         // - Rename to with_capacity
@@ -38,8 +45,9 @@ impl<T> Slab<T> {
             mem: ptr as *mut Entry<T>,
             cap: cap as int,
             len: 0,
+            off: offset.as_uint(),
             nxt: 0,
-            init: 0
+            init: 0,
         }
     }
 
@@ -76,7 +84,9 @@ impl<T> Slab<T> {
         false
     }
 
-    pub fn get(&self, idx: uint) -> Option<&T> {
+    pub fn get(&self, idx: Token) -> Option<&T> {
+        let idx = self.token_to_idx(idx);
+
         if idx <= MAX {
             let idx = idx as int;
 
@@ -92,7 +102,7 @@ impl<T> Slab<T> {
         None
     }
 
-    pub fn insert(&mut self, val: T) -> Result<uint, T> {
+    pub fn insert(&mut self, val: T) -> Result<Token, T> {
         let idx = self.nxt;
 
         if idx == self.init {
@@ -118,12 +128,15 @@ impl<T> Slab<T> {
             debug!("inserting into reused slot; idx={}", idx);
         }
 
-        Ok(idx as uint)
+        Ok(self.idx_to_token(idx))
     }
 
     /// Releases the given slot
-    pub fn remove(&mut self, idx: uint) -> Option<T> {
+    pub fn remove(&mut self, idx: Token) -> Option<T> {
         debug!("removing value; idx={}", idx);
+
+        // Cast to uint
+        let idx = self.token_to_idx(idx);
 
         if idx > MAX {
             return None;
@@ -170,11 +183,20 @@ impl<T> Slab<T> {
 
         fail!("invalid index {} -- greater than capacity {}", idx, self.cap);
     }
+
+    fn token_to_idx(&self, token: Token) -> uint {
+        token.as_uint() - self.off
+    }
+
+    fn idx_to_token(&self, idx: int) -> Token {
+        Token(idx as uint + self.off)
+    }
 }
 
-impl<T> Index<uint, T> for Slab<T> {
-    fn index<'a>(&'a self, idx: &uint) -> &'a T {
-        let idx = self.validate_idx(*idx);
+impl<T> Index<Token, T> for Slab<T> {
+    fn index<'a>(&'a self, idx: &Token) -> &'a T {
+        let idx = self.token_to_idx(*idx);
+        let idx = self.validate_idx(idx);
 
         let e = self.entry(idx);
 
@@ -186,9 +208,10 @@ impl<T> Index<uint, T> for Slab<T> {
     }
 }
 
-impl<T> IndexMut<uint, T> for Slab<T> {
-    fn index_mut<'a>(&'a mut self, idx: &uint) -> &'a mut T {
-        let idx = self.validate_idx(*idx);
+impl<T> IndexMut<Token, T> for Slab<T> {
+    fn index_mut<'a>(&'a mut self, idx: &Token) -> &'a mut T {
+        let idx = self.token_to_idx(*idx);
+        let idx = self.validate_idx(idx);
 
         let e = self.mut_entry(idx);
 
@@ -257,7 +280,7 @@ impl<T> Entry<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::Slab;
+    use {Slab, Token};
 
     #[test]
     fn test_insertion() {
@@ -374,6 +397,6 @@ mod tests {
     #[should_fail]
     fn test_accessing_out_of_bounds() {
         let slab = Slab::<uint>::new(16);
-        slab[0];
+        slab[Token(0)];
     }
 }

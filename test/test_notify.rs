@@ -3,7 +3,7 @@ use std::time::Duration;
 use mio::*;
 use super::localhost;
 
-type TestReactor = Reactor<uint, uint, String>;
+type TestReactor = Reactor<uint, String>;
 
 struct TestHandler {
     sender: ReactorSender<String>,
@@ -19,7 +19,7 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint, uint, String> for TestHandler {
+impl Handler<uint, String> for TestHandler {
     fn notify(&mut self, reactor: &mut TestReactor, msg: String) {
         match self.notify {
             0 => {
@@ -48,7 +48,7 @@ pub fn test_notify() {
     let srv = TcpSocket::v4().unwrap();
     srv.set_reuseaddr(true).unwrap();
     let srv = srv.bind(&addr).unwrap();
-    reactor.listen(&srv, 256u, 0u).unwrap();
+    reactor.listen(&srv, 256u, Token(0)).unwrap();
 
     let sender = reactor.channel();
 

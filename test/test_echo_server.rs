@@ -2,7 +2,10 @@ use mio::*;
 use mio::buf::{ByteBuf, RingBuf, SliceBuf};
 use super::localhost;
 
-type TestReactor = Reactor<uint, uint, ()>;
+type TestReactor = Reactor<uint, ()>;
+
+static SERVER: Token = TOKEN_0;
+static CLIENT: Token = TOKEN_1;
 
 struct EchoConn {
     sock: TcpSocket,
@@ -90,22 +93,22 @@ impl EchoServer {
             .ok().expect("could not add connectiont o slab");
 
         // Register the connection
-        reactor.register(&self.conns[tok].sock, 2 + tok)
+        reactor.register(&self.conns[tok].sock, tok)
             .ok().expect("could not register socket with reactor");
     }
 
-    fn conn_readable(&mut self, tok: uint) {
+    fn conn_readable(&mut self, tok: Token) {
         debug!("server conn readable; tok={}", tok);
         self.conn(tok).readable().unwrap();
     }
 
-    fn conn_writable(&mut self, tok: uint) {
+    fn conn_writable(&mut self, tok: Token) {
         debug!("server conn writable; tok={}", tok);
         self.conn(tok).writable().unwrap();
     }
 
-    fn conn<'a>(&'a mut self, tok: uint) -> &'a mut EchoConn {
-        &mut self.conns[tok - 2]
+    fn conn<'a>(&'a mut self, tok: Token) -> &'a mut EchoConn {
+        &mut self.conns[tok]
     }
 }
 
@@ -216,7 +219,7 @@ impl EchoHandler {
         EchoHandler {
             server: EchoServer {
                 sock: srv,
-                conns: Slab::new(128)
+                conns: Slab::new_starting_at(Token(2), 128)
             },
 
             client: EchoClient::new(client, msgs)
@@ -224,19 +227,19 @@ impl EchoHandler {
     }
 }
 
-impl Handler<uint, uint, ()> for EchoHandler {
-    fn readable(&mut self, reactor: &mut TestReactor, token: uint) {
+impl Handler<uint, ()> for EchoHandler {
+    fn readable(&mut self, reactor: &mut TestReactor, token: Token) {
         match token {
-            0 => self.server.accept(reactor),
-            1 => self.client.readable(reactor),
+            SERVER => self.server.accept(reactor),
+            CLIENT => self.client.readable(reactor),
             i => self.server.conn_readable(i)
         }
     }
 
-    fn writable(&mut self, _reactor: &mut TestReactor, token: uint) {
+    fn writable(&mut self, _reactor: &mut TestReactor, token: Token) {
         match token {
-            0 => fail!("received writable for token 0"),
-            1 => self.client.writable(),
+            SERVER => fail!("received writable for token 0"),
+            CLIENT => self.client.writable(),
             i => self.server.conn_writable(i)
         }
     }
@@ -257,12 +260,12 @@ pub fn test_echo_server() {
     let srv = srv.bind(&addr).unwrap();
 
     info!("listen for connections");
-    reactor.listen(&srv, 256u, 0u).unwrap();
+    reactor.listen(&srv, 256u, SERVER).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    reactor.connect(&sock, &addr, 1u).unwrap();
+    reactor.connect(&sock, &addr, CLIENT).unwrap();
 
     // Start the reactor
     reactor.run(EchoHandler::new(srv, sock, vec!["foo", "bar"]))

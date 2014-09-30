@@ -29,7 +29,7 @@ impl Selector {
         Ok(())
     }
 
-    pub fn register(&mut self, io: &IoDesc, token: u64) -> MioResult<()> {
+    pub fn register(&mut self, io: &IoDesc, token: uint) -> MioResult<()> {
         let flag = EV_ADD | EV_CLEAR;
 
         try!(self.ev_push(io, EVFILT_READ, flag, FilterFlag::empty(), token));
@@ -45,7 +45,7 @@ impl Selector {
                filter: EventFilter,
                flags: EventFlag,
                fflags: FilterFlag,
-               token: u64) -> MioResult<()> {
+               token: uint) -> MioResult<()> {
 
         // If the change buffer is full, flush it
         try!(self.maybe_flush_changes());
@@ -53,8 +53,7 @@ impl Selector {
         let idx = self.changes.len;
         let ev = &mut self.changes.events[idx];
 
-        // TODO: Don't cast to uint
-        ev_set(ev, io.fd as uint, filter, flags, fflags, token as uint);
+        ev_set(ev, io.fd as uint, filter, flags, fflags, token);
 
         self.changes.len += 1;
 
@@ -121,8 +120,7 @@ impl Events {
             }
         }
 
-        // TODO: Don't cast
-        IoEvent::new(kind, token as u64)
+        IoEvent::new(kind, token)
     }
 
     #[inline]

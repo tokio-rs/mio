@@ -53,6 +53,11 @@ pub use timer::{
     Timer,
     Timeout,
 };
+pub use token::{
+    Token,
+    TOKEN_0,
+    TOKEN_1,
+};
 
 pub mod buf;
 mod error;
@@ -65,3 +70,4 @@ mod reactor;
 mod slab;
 mod socket;
 mod timer;
+mod token;

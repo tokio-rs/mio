@@ -1,6 +1,7 @@
 use error::MioResult;
 use io::IoHandle;
 use os;
+use token::Token;
 
 pub struct Poll {
     selector: os::Selector,
@@ -15,11 +16,11 @@ impl Poll {
         })
     }
 
-    pub fn register<H: IoHandle>(&mut self, io: &H, token: u64) -> MioResult<()> {
+    pub fn register<H: IoHandle>(&mut self, io: &H, token: Token) -> MioResult<()> {
         debug!("registering IO with poller");
 
         // Register interests for this socket
-        try!(self.selector.register(io.desc(), token));
+        try!(self.selector.register(io.desc(), token.as_uint()));
 
         Ok(())
     }
@@ -47,7 +48,7 @@ bitflags!(
 #[deriving(Show)]
 pub struct IoEvent {
     kind: IoEventKind,
-    token: u64
+    token: Token
 }
 
 /// IoEvent represents the raw event that the OS-specific selector
@@ -58,14 +59,14 @@ pub struct IoEvent {
 /// Selector when they have events to report.
 impl IoEvent {
     /// Create a new IoEvent.
-    pub fn new(kind: IoEventKind, token: u64) -> IoEvent {
+    pub fn new(kind: IoEventKind, token: uint) -> IoEvent {
         IoEvent {
             kind: kind,
-            token: token
+            token: Token(token)
         }
     }
 
-    pub fn token(&self) -> u64 {
+    pub fn token(&self) -> Token {
         self.token
     }
 

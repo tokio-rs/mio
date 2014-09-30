@@ -2,7 +2,7 @@ use mio::*;
 use mio::buf::ByteBuf;
 use super::localhost;
 
-type TestReactor = Reactor<uint, uint, ()>;
+type TestReactor = Reactor<uint, ()>;
 
 struct TestHandler {
     srv: TcpAcceptor,
@@ -18,14 +18,14 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint, uint, ()> for TestHandler {
-    fn readable(&mut self, reactor: &mut TestReactor, tok: uint) {
+impl Handler<uint, ()> for TestHandler {
+    fn readable(&mut self, reactor: &mut TestReactor, tok: Token) {
         match tok {
-            0 => {
+            Token(0) => {
                 debug!("server connection ready for accept");
                 let _ = self.srv.accept().unwrap().unwrap();
             }
-            1 => {
+            Token(1) => {
                 debug!("client readable");
                 let mut buf = ByteBuf::new(1024);
                 match self.cli.read(&mut buf) {
@@ -37,10 +37,10 @@ impl Handler<uint, uint, ()> for TestHandler {
         }
     }
 
-    fn writable(&mut self, _reactor: &mut TestReactor, tok: uint) {
+    fn writable(&mut self, _reactor: &mut TestReactor, tok: Token) {
         match tok {
-            0 => fail!("received writable for token 0"),
-            1 => {
+            Token(0) => fail!("received writable for token 0"),
+            Token(1) => {
                 debug!("client connected");
             }
             _ => fail!("received unknown token {}", tok)
@@ -63,12 +63,12 @@ pub fn test_close_on_drop() {
     let srv = srv.bind(&addr).unwrap();
 
     info!("listening for connections");
-    reactor.listen(&srv, 256u, 0u).unwrap();
+    reactor.listen(&srv, 256u, Token(0)).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    reactor.connect(&sock, &addr, 1u).unwrap();
+    reactor.connect(&sock, &addr, Token(1)).unwrap();
 
     // Start the reactor
     reactor.run(TestHandler::new(srv, sock))

@@ -2,8 +2,9 @@ use std::uint;
 use std::num;
 use time::precise_time_ns;
 use slab::Slab;
+use token::Token;
 
-static EMPTY: uint = uint::MAX;
+static EMPTY: Token = Token(uint::MAX);
 static NS_PER_MS: u64 = 1_000_000;
 
 // Implements coarse-grained timeouts using an algorithm based on hashed timing
@@ -20,20 +21,20 @@ pub struct Timer<T> {
     entries: Slab<Entry<T>>,
     // Timeout wheel. Each tick, the timer will look at the next slot for
     // timeouts that match the current tick.
-    wheel: Vec<uint>,
+    wheel: Vec<Token>,
     // Tick 0's time in milliseconds
     start: u64,
     // The current tick
     tick: u64,
     // The next entry to possibly timeout
-    next: uint,
+    next: Token,
     // Masks the target tick to get the slot
     mask: u64,
 }
 
 pub struct Timeout {
     // Reference into the timer entry slab
-    token: uint,
+    token: Token,
     // Tick that it should matchup with
     tick: u64,
 }
@@ -156,7 +157,7 @@ impl<T> Timer<T> {
         })
     }
 
-    fn unlink(&mut self, links: &EntryLinks, token: uint) {
+    fn unlink(&mut self, links: &EntryLinks, token: Token) {
         debug!("unlinking timeout; slot={}; token={}",
                self.slot_for(links.tick), token);
 
@@ -257,7 +258,7 @@ struct Entry<T> {
 }
 
 impl<T> Entry<T> {
-    fn new(token: T, tick: u64, next: uint) -> Entry<T> {
+    fn new(token: T, tick: u64, next: Token) -> Entry<T> {
         Entry {
             token: token,
             links: EntryLinks {
@@ -271,8 +272,8 @@ impl<T> Entry<T> {
 
 struct EntryLinks {
     tick: u64,
-    prev: uint,
-    next: uint
+    prev: Token,
+    next: Token
 }
 
 pub type TimerResult<T> = Result<T, TimerError>;

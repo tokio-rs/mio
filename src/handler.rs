@@ -1,72 +1,17 @@
-use reactor::{Reactor};
+use reactor::Reactor;
+use token::Token;
 
 #[allow(unused_variable)]
-pub trait Handler<T: Token, T2, M: Send> {
-    fn readable(&mut self, reactor: &mut Reactor<T, T2, M>, token: T) {
+pub trait Handler<T, M: Send> {
+    fn readable(&mut self, reactor: &mut Reactor<T, M>, token: Token) {
     }
 
-    fn writable(&mut self, reactor: &mut Reactor<T, T2, M>, token: T) {
+    fn writable(&mut self, reactor: &mut Reactor<T, M>, token: Token) {
     }
 
-    fn notify(&mut self, reactor: &mut Reactor<T, T2, M>, msg: M) {
+    fn notify(&mut self, reactor: &mut Reactor<T, M>, msg: M) {
     }
 
-    fn timeout(&mut self, reactor: &mut Reactor<T, T2, M>, timeout: T2) {
-    }
-}
-
-pub trait Token : Copy {
-    fn from_u64(val: u64) -> Self;
-
-    fn to_u64(self) -> u64;
-}
-
-impl Token for int {
-    fn from_u64(val: u64) -> int {
-        val as int
-    }
-
-    fn to_u64(self) -> u64 {
-        self as u64
-    }
-}
-
-impl Token for uint {
-    fn from_u64(val: u64) -> uint {
-        val as uint
-    }
-
-    fn to_u64(self) -> u64 {
-        self as u64
-    }
-}
-
-impl Token for i64 {
-    fn from_u64(val: u64) -> i64 {
-        val as i64
-    }
-
-    fn to_u64(self) -> u64 {
-        self as u64
-    }
-}
-
-impl Token for u64 {
-    fn from_u64(val: u64) -> u64 {
-        val
-    }
-
-    fn to_u64(self) -> u64 {
-        self
-    }
-}
-
-impl Token for () {
-    fn from_u64(_: u64) -> () {
-        ()
-    }
-
-    fn to_u64(self) -> u64 {
-        0
+    fn timeout(&mut self, reactor: &mut Reactor<T, M>, timeout: T) {
     }
 }
