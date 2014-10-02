@@ -89,6 +89,6 @@ impl Events {
 
         let token = self.events[idx].data;
 
-        IoEvent::new(kind, token)
+        IoEvent::new(kind, token as uint)
     }
 }
