@@ -35,11 +35,11 @@ pub use poll::{
     IoEvent,
     IoEventKind,
 };
-pub use reactor::{
-    Reactor,
-    ReactorConfig,
-    ReactorResult,
-    ReactorSender,
+pub use event_loop::{
+    EventLoop,
+    EventLoopConfig,
+    EventLoopResult,
+    EventLoopSender,
 };
 pub use slab::Slab;
 pub use socket::{
@@ -61,12 +61,12 @@ pub use token::{
 
 pub mod buf;
 mod error;
+mod event_loop;
 mod handler;
 mod io;
 mod notify;
 mod os;
 mod poll;
-mod reactor;
 mod slab;
 mod socket;
 mod timer;

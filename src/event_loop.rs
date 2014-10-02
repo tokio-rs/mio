@@ -10,13 +10,13 @@ use socket::{Socket, SockAddr};
 use timer::{Timer, Timeout, TimerResult};
 use token::Token;
 
-/// A lightweight IO reactor.
+/// A lightweight event loop.
 ///
 /// TODO:
 /// - Enforce private tokens
 
 #[deriving(Clone, Show)]
-pub struct ReactorConfig {
+pub struct EventLoopConfig {
     pub io_poll_timeout_ms: uint,
 
     // == Notifications ==
@@ -29,9 +29,9 @@ pub struct ReactorConfig {
     pub timer_capacity: uint,
 }
 
-impl Default for ReactorConfig {
-    fn default() -> ReactorConfig {
-        ReactorConfig {
+impl Default for EventLoopConfig {
+    fn default() -> EventLoopConfig {
+        EventLoopConfig {
             io_poll_timeout_ms: 1_000,
             notify_capacity: 1_024,
             messages_per_tick: 64,
@@ -42,24 +42,24 @@ impl Default for ReactorConfig {
     }
 }
 
-pub struct Reactor<T, M: Send> {
+pub struct EventLoop<T, M: Send> {
     run: bool,
     poll: Poll,
     timer: Timer<T>,
     notify: Notify<M>,
-    config: ReactorConfig,
+    config: EventLoopConfig,
 }
 
 // Token used to represent notifications
 static NOTIFY: Token = Token(uint::MAX);
 
-impl<T, M: Send> Reactor<T, M> {
-    /// Initializes a new reactor. The reactor will not be running yet.
-    pub fn new() -> MioResult<Reactor<T, M>> {
-        Reactor::configured(Default::default())
+impl<T, M: Send> EventLoop<T, M> {
+    /// Initializes a new event loop. The event loop will not be running yet.
+    pub fn new() -> MioResult<EventLoop<T, M>> {
+        EventLoop::configured(Default::default())
     }
 
-    pub fn configured(config: ReactorConfig) -> MioResult<Reactor<T, M>> {
+    pub fn configured(config: EventLoopConfig) -> MioResult<EventLoop<T, M>> {
         // Create the IO poller
         let mut poll = try!(Poll::new());
 
@@ -78,7 +78,7 @@ impl<T, M: Send> Reactor<T, M> {
         // Set the timer's starting time reference point
         timer.setup();
 
-        Ok(Reactor {
+        Ok(EventLoop {
             run: true,
             poll: poll,
             timer: timer,
@@ -87,10 +87,10 @@ impl<T, M: Send> Reactor<T, M> {
         })
     }
 
-    /// Returns a sender that allows sending messages to the reactor in a
-    /// thread-safe way, waking up the reactor if needed.
-    pub fn channel(&self) -> ReactorSender<M> {
-        ReactorSender::new(self.notify.clone())
+    /// Returns a sender that allows sending messages to the event loop in a
+    /// thread-safe way, waking up the event loop if needed.
+    pub fn channel(&self) -> EventLoopSender<M> {
+        EventLoopSender::new(self.notify.clone())
     }
 
     /// After the requested time interval, the handler's `timeout` function
@@ -105,18 +105,18 @@ impl<T, M: Send> Reactor<T, M> {
         self.timer.clear(timeout)
     }
 
-    /// Tells the reactor to exit after it is done handling all events in the
+    /// Tells the event loop to exit after it is done handling all events in the
     /// current iteration.
     pub fn shutdown(&mut self) {
         self.run = false;
     }
 
-    /// Tells the reactor to exit immidiately. All pending events will be dropped.
+    /// Tells the event loop to exit immidiately. All pending events will be dropped.
     pub fn shutdown_now(&mut self) {
         unimplemented!()
     }
 
-    /// Registers an IO handle with the reactor.
+    /// Registers an IO handle with the event loop.
     pub fn register<H: IoHandle>(&mut self, io: &H, token: Token) -> MioResult<()> {
         self.poll.register(io, token)
     }
@@ -124,9 +124,9 @@ impl<T, M: Send> Reactor<T, M> {
     /// Connects the socket to the specified address. When the operation
     /// completes, the handler will be notified with the supplied token.
     ///
-    /// The goal of this method is to ensure that the reactor will always
+    /// The goal of this method is to ensure that the event loop will always
     /// notify about the connection, even if the connection happens
-    /// immediately. Otherwise, every consumer of the reactor would have
+    /// immediately. Otherwise, every consumer of the event loop would have
     /// to worry about possibly-immediate connection.
     pub fn connect<S: Socket>(&mut self, io: &S, addr: &SockAddr, token: Token) -> MioResult<()> {
         debug!("socket connect; addr={}", addr);
@@ -135,11 +135,11 @@ impl<T, M: Send> Reactor<T, M> {
         if try!(os::connect(io.desc(), addr)) {
             // On some OSs, connecting to localhost succeeds immediately. In
             // this case, queue the writable callback for execution during the
-            // next reactor tick.
+            // next event loop tick.
             debug!("socket connected immediately; addr={}", addr);
         }
 
-        // Register interest with socket on the reactor
+        // Register interest with socket on the event loop
         try!(self.register(io, token));
 
         Ok(())
@@ -159,15 +159,15 @@ impl<T, M: Send> Reactor<T, M> {
         Ok(())
     }
 
-    /// Keep spinning the reactor indefinitely, and notify the handler whenever
+    /// Keep spinning the event loop indefinitely, and notify the handler whenever
     /// any of the registered handles are ready.
-    pub fn run<H: Handler<T, M>>(&mut self, mut handler: H) -> ReactorResult<H> {
+    pub fn run<H: Handler<T, M>>(&mut self, mut handler: H) -> EventLoopResult<H> {
         self.run = true;
 
         while self.run {
-            // Execute ticks as long as the reactor is running
+            // Execute ticks as long as the event loop is running
             match self.tick(&mut handler) {
-                Err(e) => return Err(ReactorError::new(handler, e)),
+                Err(e) => return Err(EventLoopError::new(handler, e)),
                 _ => {}
             }
         }
@@ -175,25 +175,25 @@ impl<T, M: Send> Reactor<T, M> {
         Ok(handler)
     }
 
-    /// Spin the reactor once, with a timeout of one second, and notify the
+    /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once<H: Handler<T, M>>(&mut self, mut handler: H) -> ReactorResult<H> {
+    pub fn run_once<H: Handler<T, M>>(&mut self, mut handler: H) -> EventLoopResult<H> {
         // Execute a single tick
         match self.tick(&mut handler) {
-            Err(e) => return Err(ReactorError::new(handler, e)),
+            Err(e) => return Err(EventLoopError::new(handler, e)),
             _ => {}
         }
 
         Ok(handler)
     }
 
-    // Executes a single run of the reactor loop
+    // Executes a single run of the event loop loop
     fn tick<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
         let mut messages;
         let mut pending;
 
-        debug!("reactor tick");
+        debug!("event loop tick");
 
         // Check the notify channel for any pending messages. If there are any,
         // avoid blocking when polling for IO events. Messages will be
@@ -296,13 +296,13 @@ impl<T, M: Send> Reactor<T, M> {
 }
 
 #[deriving(Clone)]
-pub struct ReactorSender<M: Send> {
+pub struct EventLoopSender<M: Send> {
     notify: Notify<M>
 }
 
-impl<M: Send> ReactorSender<M> {
-    fn new(notify: Notify<M>) -> ReactorSender<M> {
-        ReactorSender { notify: notify }
+impl<M: Send> EventLoopSender<M> {
+    fn new(notify: Notify<M>) -> EventLoopSender<M> {
+        EventLoopSender { notify: notify }
     }
 
     pub fn send(&self, msg: M) -> Result<(), M> {
@@ -310,16 +310,16 @@ impl<M: Send> ReactorSender<M> {
     }
 }
 
-pub type ReactorResult<H> = Result<H, ReactorError<H>>;
+pub type EventLoopResult<H> = Result<H, EventLoopError<H>>;
 
-pub struct ReactorError<H> {
+pub struct EventLoopError<H> {
     pub handler: H,
     pub error: MioError
 }
 
-impl<H> ReactorError<H> {
-    fn new(handler: H, error: MioError) -> ReactorError<H> {
-        ReactorError {
+impl<H> EventLoopError<H> {
+    fn new(handler: H, error: MioError) -> EventLoopError<H> {
+        EventLoopError {
             handler: handler,
             error: error
         }
@@ -331,11 +331,11 @@ mod tests {
     use std::str;
     use std::sync::Arc;
     use std::sync::atomics::{AtomicInt, SeqCst};
-    use super::Reactor;
+    use super::EventLoop;
     use io::{IoWriter, IoReader};
     use {io, buf, Buf, Handler, Token};
 
-    type TestReactor = Reactor<uint, ()>;
+    type TestEventLoop = EventLoop<uint, ()>;
 
     struct Funtimes {
         rcount: Arc<AtomicInt>,
@@ -352,7 +352,7 @@ mod tests {
     }
 
     impl Handler<uint, ()> for Funtimes {
-        fn readable(&mut self, _reactor: &mut TestReactor, token: Token) {
+        fn readable(&mut self, _event_loop: &mut TestEventLoop, token: Token) {
             (*self.rcount).fetch_add(1, SeqCst);
             assert_eq!(token, Token(10));
         }
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn test_readable() {
-        let mut reactor = Reactor::new().ok().expect("Couldn't make reactor");
+        let mut event_loop = EventLoop::new().ok().expect("Couldn't make event loop");
 
         let (mut reader, mut writer) = io::pipe().unwrap();
 
@@ -369,9 +369,9 @@ mod tests {
         let handler = Funtimes::new(rcount.clone(), wcount.clone());
 
         writer.write(&mut buf::wrap("hello".as_bytes())).unwrap();
-        reactor.register(&reader, Token(10)).unwrap();
+        event_loop.register(&reader, Token(10)).unwrap();
 
-        let _ = reactor.run_once(handler);
+        let _ = event_loop.run_once(handler);
         let mut b = buf::ByteBuf::new(16);
 
         assert_eq!((*rcount).load(SeqCst), 1);

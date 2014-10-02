@@ -7,8 +7,8 @@ use os;
 
 static SLEEP: int = -1;
 
-/// Send notifications to the reactor, waking it up if necessary. If the
-/// reactor is not currently sleeping, avoid using an OS wake-up strategy
+/// Send notifications to the event loop, waking it up if necessary. If the
+/// event loop is not currently sleeping, avoid using an OS wake-up strategy
 /// (eventfd, pipe, ...). Backed by a pre-allocated lock free MPMC queue.
 ///
 /// TODO: Use more efficient wake-up strategy if available
@@ -75,7 +75,7 @@ impl<M: Send> NotifyInner<M> {
         let mut val;
 
         loop {
-            // If there are pending messages, then whether or not the reactor
+            // If there are pending messages, then whether or not the event loop
             // was planning to sleep does not matter - it will not sleep.
             if cur > 0 {
                 if max >= cur {
@@ -136,7 +136,7 @@ impl<M: Send> NotifyInner<M> {
         if cur == SLEEP {
             if self.awaken.wakeup().is_err() {
                 // TODO: Don't fail
-                fail!("failed to awaken reactor");
+                fail!("failed to awaken event loop");
             }
         }
 

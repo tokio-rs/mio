@@ -22,7 +22,7 @@ The following are specifically omitted from MIO and are left to the user
 or higher level libraries.
 
 * File operations
-* Thread pools / multi-threaded reactor
+* Thread pools / multi-threaded event loop
 
 ## Platforms
 

@@ -3,15 +3,15 @@ use std::time::Duration;
 use mio::*;
 use super::localhost;
 
-type TestReactor = Reactor<uint, String>;
+type TestEventLoop = EventLoop<uint, String>;
 
 struct TestHandler {
-    sender: ReactorSender<String>,
+    sender: EventLoopSender<String>,
     notify: uint
 }
 
 impl TestHandler {
-    fn new(sender: ReactorSender<String>) -> TestHandler {
+    fn new(sender: EventLoopSender<String>) -> TestHandler {
         TestHandler {
             sender: sender,
             notify: 0
@@ -20,7 +20,7 @@ impl TestHandler {
 }
 
 impl Handler<uint, String> for TestHandler {
-    fn notify(&mut self, reactor: &mut TestReactor, msg: String) {
+    fn notify(&mut self, event_loop: &mut TestEventLoop, msg: String) {
         match self.notify {
             0 => {
                 assert!(msg.as_slice() == "First", "actual={}", msg);
@@ -28,7 +28,7 @@ impl Handler<uint, String> for TestHandler {
             }
             1 => {
                 assert!(msg.as_slice() == "Second", "actual={}", msg);
-                reactor.shutdown();
+                event_loop.shutdown();
             }
             v => fail!("unexpected value for notify; val={}", v)
         }
@@ -39,29 +39,29 @@ impl Handler<uint, String> for TestHandler {
 
 #[test]
 pub fn test_notify() {
-    let mut reactor = Reactor::new().unwrap();
+    let mut event_loop = EventLoop::new().unwrap();
 
     let addr = SockAddr::parse(localhost().as_slice())
         .expect("could not parse InetAddr");
 
-    // Setup a server socket so that the reactor blocks
+    // Setup a server socket so that the event loop blocks
     let srv = TcpSocket::v4().unwrap();
     srv.set_reuseaddr(true).unwrap();
     let srv = srv.bind(&addr).unwrap();
-    reactor.listen(&srv, 256u, Token(0)).unwrap();
+    event_loop.listen(&srv, 256u, Token(0)).unwrap();
 
-    let sender = reactor.channel();
+    let sender = event_loop.channel();
 
     spawn(proc() {
         sleep(Duration::seconds(1));
         sender.send("First".to_string()).unwrap();
     });
 
-    let sender = reactor.channel();
+    let sender = event_loop.channel();
 
-    // Start the reactor
-    let h = reactor.run(TestHandler::new(sender))
-        .ok().expect("failed to execute reactor");
+    // Start the event loop
+    let h = event_loop.run(TestHandler::new(sender))
+        .ok().expect("failed to execute event loop");
 
     assert!(h.notify == 2, "actual={}", h.notify);
 }

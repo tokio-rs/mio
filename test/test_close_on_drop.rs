@@ -2,7 +2,7 @@ use mio::*;
 use mio::buf::ByteBuf;
 use super::localhost;
 
-type TestReactor = Reactor<uint, ()>;
+type TestEventLoop = EventLoop<uint, ()>;
 
 struct TestHandler {
     srv: TcpAcceptor,
@@ -19,7 +19,7 @@ impl TestHandler {
 }
 
 impl Handler<uint, ()> for TestHandler {
-    fn readable(&mut self, reactor: &mut TestReactor, tok: Token) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) {
         match tok {
             Token(0) => {
                 debug!("server connection ready for accept");
@@ -29,7 +29,7 @@ impl Handler<uint, ()> for TestHandler {
                 debug!("client readable");
                 let mut buf = ByteBuf::new(1024);
                 match self.cli.read(&mut buf) {
-                    Err(e) if e.is_eof() => reactor.shutdown(),
+                    Err(e) if e.is_eof() => event_loop.shutdown(),
                     _ => fail!("the client socket should not be readable")
                 }
             }
@@ -37,7 +37,7 @@ impl Handler<uint, ()> for TestHandler {
         }
     }
 
-    fn writable(&mut self, _reactor: &mut TestReactor, tok: Token) {
+    fn writable(&mut self, _event_loop: &mut TestEventLoop, tok: Token) {
         match tok {
             Token(0) => fail!("received writable for token 0"),
             Token(1) => {
@@ -50,7 +50,7 @@ impl Handler<uint, ()> for TestHandler {
 
 #[test]
 pub fn test_close_on_drop() {
-    let mut reactor = Reactor::new().unwrap();
+    let mut event_loop = EventLoop::new().unwrap();
 
     let addr = SockAddr::parse(localhost().as_slice())
         .expect("could not parse InetAddr");
@@ -63,14 +63,14 @@ pub fn test_close_on_drop() {
     let srv = srv.bind(&addr).unwrap();
 
     info!("listening for connections");
-    reactor.listen(&srv, 256u, Token(0)).unwrap();
+    event_loop.listen(&srv, 256u, Token(0)).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    reactor.connect(&sock, &addr, Token(1)).unwrap();
+    event_loop.connect(&sock, &addr, Token(1)).unwrap();
 
-    // Start the reactor
-    reactor.run(TestHandler::new(srv, sock))
-        .ok().expect("failed to execute reactor");
+    // Start the event loop
+    event_loop.run(TestHandler::new(srv, sock))
+        .ok().expect("failed to execute event loop");
 }

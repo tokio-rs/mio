@@ -1,7 +1,7 @@
 use mio::*;
 use super::localhost;
 
-type TestReactor = Reactor<TcpSocket, ()>;
+type TestEventLoop = EventLoop<TcpSocket, ()>;
 
 static SERVER: Token = TOKEN_0;
 static CLIENT: Token = TOKEN_1;
@@ -21,12 +21,12 @@ impl TestHandler {
 }
 
 impl Handler<TcpSocket, ()> for TestHandler {
-    fn readable(&mut self, reactor: &mut TestReactor, tok: Token) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().unwrap();
-                reactor.timeout_ms(conn, 200).unwrap();
+                event_loop.timeout_ms(conn, 200).unwrap();
             }
             CLIENT => {
                 debug!("client readable");
@@ -35,7 +35,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
                     Ok(_) => {
                         buf.flip();
                         assert!(b"zomg" == buf.bytes());
-                        reactor.shutdown();
+                        event_loop.shutdown();
                     }
                     Err(e) => fail!("client sock failed to read; err={}", e),
                 }
@@ -44,7 +44,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
         }
     }
 
-    fn writable(&mut self, _reactor: &mut TestReactor, tok: Token) {
+    fn writable(&mut self, _event_loop: &mut TestEventLoop, tok: Token) {
         match tok {
             SERVER => fail!("received writable for token 0"),
             CLIENT => debug!("client connected"),
@@ -52,7 +52,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
         }
     }
 
-    fn timeout(&mut self, _reactor: &mut TestReactor, mut sock: TcpSocket) {
+    fn timeout(&mut self, _event_loop: &mut TestEventLoop, mut sock: TcpSocket) {
         sock.write(&mut buf::wrap(b"zomg"))
             .unwrap().unwrap();
     }
@@ -60,7 +60,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
 
 #[test]
 pub fn test_close_on_drop() {
-    let mut reactor = Reactor::new().unwrap();
+    let mut event_loop = EventLoop::new().unwrap();
 
     let addr = SockAddr::parse(localhost().as_slice())
         .expect("could not parse InetAddr");
@@ -73,14 +73,14 @@ pub fn test_close_on_drop() {
     let srv = srv.bind(&addr).unwrap();
 
     info!("listening for connections");
-    reactor.listen(&srv, 256u, SERVER).unwrap();
+    event_loop.listen(&srv, 256u, SERVER).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    reactor.connect(&sock, &addr, CLIENT).unwrap();
+    event_loop.connect(&sock, &addr, CLIENT).unwrap();
 
-    // Start the reactor
-    reactor.run(TestHandler::new(srv, sock))
-        .ok().expect("failed to execute reactor");
+    // Start the event loop
+    event_loop.run(TestHandler::new(srv, sock))
+        .ok().expect("failed to execute event loop");
 }

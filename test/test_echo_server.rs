@@ -2,7 +2,7 @@ use mio::*;
 use mio::buf::{ByteBuf, RingBuf, SliceBuf};
 use super::localhost;
 
-type TestReactor = Reactor<uint, ()>;
+type TestEventLoop = EventLoop<uint, ()>;
 
 static SERVER: Token = TOKEN_0;
 static CLIENT: Token = TOKEN_1;
@@ -85,7 +85,7 @@ struct EchoServer {
 }
 
 impl EchoServer {
-    fn accept(&mut self, reactor: &mut TestReactor) {
+    fn accept(&mut self, event_loop: &mut TestEventLoop) {
         debug!("server accepting socket");
         let sock = self.sock.accept().unwrap().unwrap();
         let conn = EchoConn::new(sock);
@@ -93,8 +93,8 @@ impl EchoServer {
             .ok().expect("could not add connectiont o slab");
 
         // Register the connection
-        reactor.register(&self.conns[tok].sock, tok)
-            .ok().expect("could not register socket with reactor");
+        event_loop.register(&self.conns[tok].sock, tok)
+            .ok().expect("could not register socket with event loop");
     }
 
     fn conn_readable(&mut self, tok: Token) {
@@ -137,7 +137,7 @@ impl EchoClient {
         }
     }
 
-    fn readable(&mut self, reactor: &mut TestReactor) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop) {
         debug!("client socket readable");
 
         loop {
@@ -159,7 +159,7 @@ impl EchoClient {
             self.buf.clear();
 
             if !self.rx.has_remaining() {
-                self.next_msg(reactor).unwrap();
+                self.next_msg(event_loop).unwrap();
             }
 
             // Nothing else to do this round
@@ -192,11 +192,11 @@ impl EchoClient {
             })
     }
 
-    fn next_msg(&mut self, reactor: &mut TestReactor) -> MioResult<()> {
+    fn next_msg(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
         let curr = match self.msgs.remove(0) {
             Some(msg) => msg,
             None => {
-                reactor.shutdown();
+                event_loop.shutdown();
                 return Ok(());
             }
         };
@@ -228,15 +228,15 @@ impl EchoHandler {
 }
 
 impl Handler<uint, ()> for EchoHandler {
-    fn readable(&mut self, reactor: &mut TestReactor, token: Token) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token) {
         match token {
-            SERVER => self.server.accept(reactor),
-            CLIENT => self.client.readable(reactor),
+            SERVER => self.server.accept(event_loop),
+            CLIENT => self.client.readable(event_loop),
             i => self.server.conn_readable(i)
         }
     }
 
-    fn writable(&mut self, _reactor: &mut TestReactor, token: Token) {
+    fn writable(&mut self, _event_loop: &mut TestEventLoop, token: Token) {
         match token {
             SERVER => fail!("received writable for token 0"),
             CLIENT => self.client.writable(),
@@ -247,7 +247,7 @@ impl Handler<uint, ()> for EchoHandler {
 
 #[test]
 pub fn test_echo_server() {
-    let mut reactor = Reactor::new().unwrap();
+    let mut event_loop = EventLoop::new().unwrap();
 
     let addr = SockAddr::parse(localhost().as_slice())
         .expect("could not parse InetAddr");
@@ -260,15 +260,15 @@ pub fn test_echo_server() {
     let srv = srv.bind(&addr).unwrap();
 
     info!("listen for connections");
-    reactor.listen(&srv, 256u, SERVER).unwrap();
+    event_loop.listen(&srv, 256u, SERVER).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    reactor.connect(&sock, &addr, CLIENT).unwrap();
+    event_loop.connect(&sock, &addr, CLIENT).unwrap();
 
-    // Start the reactor
-    reactor.run(EchoHandler::new(srv, sock, vec!["foo", "bar"]))
-        .ok().expect("failed to execute reactor");
+    // Start the event loop
+    event_loop.run(EchoHandler::new(srv, sock, vec!["foo", "bar"]))
+        .ok().expect("failed to execute event loop");
 
 }

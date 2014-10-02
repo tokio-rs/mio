@@ -11,12 +11,12 @@ pub struct MioError {
 
 #[deriving(Show, PartialEq, Clone)]
 pub enum MioErrorKind {
-    Eof,               // End of file or socket closed
-    WouldBlock,        // The operation would have blocked
-    BufUnderflow,      // Buf does not contain enough data to perform read op
-    BufOverflow,       // Buf does not contain enough capacity to perform write op
-    ReactorTerminated, // The reactor is not running anymore
-    OtherError,        // System error not covered by other kinds
+    Eof,                    // End of file or socket closed
+    WouldBlock,             // The operation would have blocked
+    BufUnderflow,           // Buf does not contain enough data to perform read op
+    BufOverflow,            // Buf does not contain enough capacity to perform write op
+    EventLoopTerminated,    // The event loop is not running anymore
+    OtherError,             // System error not covered by other kinds
 }
 
 impl MioError {
@@ -91,7 +91,7 @@ impl MioError {
                 Some(err) => io::IoError::from_errno(err.kind as uint, false),
                 None => io::standard_error(io::OtherIoError)
             },
-            ReactorTerminated => io::standard_error(OtherIoError)
+            EventLoopTerminated => io::standard_error(OtherIoError)
         }
     }
 }
