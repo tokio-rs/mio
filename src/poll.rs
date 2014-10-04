@@ -2,6 +2,7 @@ use error::MioResult;
 use io::IoHandle;
 use os;
 use token::Token;
+use handler::{ReadHint, DataHint, HupHint, ErrorHint};
 
 pub struct Poll {
     selector: os::Selector,
@@ -41,7 +42,9 @@ bitflags!(
     flags IoEventKind: uint {
         static IoReadable = 0x001,
         static IoWritable = 0x002,
-        static IoError    = 0x004
+        static IoError    = 0x004,
+        static IoHupHint  = 0x008,
+        static IoHinted   = 0x010
     }
 )
 
@@ -70,9 +73,36 @@ impl IoEvent {
         self.token
     }
 
+    /// Return an optional hint for a readable IO handle. Currently,
+    /// this method supports the HupHint, which indicates that the
+    /// kernel reported that the remote side hung up. This allows a
+    /// consumer to avoid reading in order to discover the hangup.
+    pub fn read_hint(&self) -> ReadHint {
+        let mut hint = ReadHint::empty();
+
+        // The backend doesn't support hinting
+        if !self.kind.contains(IoHinted) {
+            return hint;
+        }
+
+        if self.kind.contains(IoHupHint) {
+            hint = hint | HupHint
+        }
+
+        if self.kind.contains(IoReadable) {
+            hint = hint | DataHint
+        }
+
+        if self.kind.contains(IoError) {
+            hint = hint | ErrorHint
+        }
+
+        hint
+    }
+
     /// This event indicated that the IO handle is now readable
     pub fn is_readable(&self) -> bool {
-        self.kind.contains(IoReadable)
+        self.kind.contains(IoReadable) || self.kind.contains(IoHupHint)
     }
 
     /// This event indicated that the IO handle is now writable
