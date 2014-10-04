@@ -6,22 +6,42 @@ type TestEventLoop = EventLoop<TcpSocket, ()>;
 static SERVER: Token = TOKEN_0;
 static CLIENT: Token = TOKEN_1;
 
+enum TestState {
+    Initial,
+    AfterRead,
+    AfterHup
+}
+
 struct TestHandler {
     srv: TcpAcceptor,
     cli: TcpSocket,
+    state: TestState
 }
 
 impl TestHandler {
     fn new(srv: TcpAcceptor, cli: TcpSocket) -> TestHandler {
         TestHandler {
             srv: srv,
-            cli: cli
+            cli: cli,
+            state: Initial
         }
     }
 }
 
 impl Handler<TcpSocket, ()> for TestHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: ReadHint) {
+        match self.state {
+            Initial => {
+                assert_eq!(hint, handler::DataHint);
+                self.state = AfterRead;
+            },
+            AfterRead => {
+                assert_eq!(hint, handler::DataHint | handler::HupHint);
+                self.state = AfterHup;
+            },
+            AfterHup => fail!("Shouldn't get here")
+        }
+
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");

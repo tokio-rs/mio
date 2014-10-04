@@ -4,22 +4,42 @@ use super::localhost;
 
 type TestEventLoop = EventLoop<uint, ()>;
 
+enum TestState {
+    Initial,
+    AfterRead,
+    AfterHup
+}
+
 struct TestHandler {
     srv: TcpAcceptor,
-    cli: TcpSocket
+    cli: TcpSocket,
+    state: TestState
 }
 
 impl TestHandler {
     fn new(srv: TcpAcceptor, cli: TcpSocket) -> TestHandler {
         TestHandler {
             srv: srv,
-            cli: cli
+            cli: cli,
+            state: Initial
         }
     }
 }
 
 impl Handler<uint, ()> for TestHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: ReadHint) {
+        match self.state {
+            Initial => {
+                assert_eq!(hint, handler::DataHint);
+                self.state = AfterRead;
+            },
+            AfterRead => {
+                assert_eq!(hint, handler::DataHint | handler::HupHint);
+                self.state = AfterHup;
+            },
+            AfterHup => fail!("Shouldn't get here")
+        }
+
         match tok {
             Token(0) => {
                 debug!("server connection ready for accept");

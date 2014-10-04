@@ -3,7 +3,7 @@ use nix::fcntl::Fd;
 use nix::sys::event::*;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use poll::{IoEvent, IoReadable, IoWritable, IoError};
+use poll::{IoEvent, IoReadable, IoWritable, IoError, IoHinted, IoHupHint};
 
 pub struct Selector {
     kq: Fd,
@@ -102,17 +102,19 @@ impl Events {
         // When the read end of the socket is closed, EV_EOF is set on the
         // flags, and fflags contains the error, if any.
 
-        let mut kind;
+        let mut kind = IoHinted;
 
         if ev.filter == EVFILT_READ {
-            kind = IoReadable;
+            kind = kind | IoReadable;
         } else if ev.filter == EVFILT_WRITE {
-            kind = IoWritable;
+            kind = kind | IoWritable;
         } else {
             unimplemented!();
         }
 
         if ev.flags.contains(EV_EOF) {
+            kind = kind | IoHupHint;
+
             // When the read end of the socket is closed, EV_EOF is set on
             // flags, and fflags contains the error if there is one.
             if !ev.fflags.is_empty() {
