@@ -1,11 +1,12 @@
 use std::fmt;
 use std::from_str::FromStr;
-use io::{IoHandle};
+use io::{IoHandle, NonBlock};
 use error::MioResult;
+use buf::{Buf, MutBuf};
 use os;
 
 pub use std::io::net::ip::{IpAddr, Port};
-pub use std::io::net::ip::Ipv4Addr as IpV4Addr;
+pub use std::io::net::ip::Ipv4Addr as IPv4Addr;
 
 pub trait Socket : IoHandle {
     fn linger(&self) -> MioResult<uint> {
@@ -19,6 +20,29 @@ pub trait Socket : IoHandle {
     fn set_reuseaddr(&self, val: bool) -> MioResult<()> {
         os::set_reuseaddr(self.desc(), val)
     }
+
+    fn set_reuseport(&self, val: bool) -> MioResult<()> {
+        os::set_reuseport(self.desc(), val)
+    }
+}
+
+pub trait MulticastSocket : Socket {
+    fn join_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
+        os::join_multicast_group(self.desc(), addr, interface)
+    }
+
+    fn leave_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
+        os::leave_multicast_group(self.desc(), addr, interface)
+    }
+
+    fn set_multicast_ttl(&self, val: u8) -> MioResult<()> {
+        os::set_multicast_ttl(self.desc(), val)
+    }
+}
+
+pub trait UnconnectedSocket {
+    fn send_to(&mut self, buf: &mut Buf, tgt: &SockAddr) -> MioResult<NonBlock<()>>;
+    fn recv_from(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<SockAddr>>;
 }
 
 // Types of sockets
@@ -57,13 +81,18 @@ impl fmt::Show for SockAddr {
     }
 }
 
+pub enum SocketType {
+    Dgram,
+    Stream,
+}
+
 pub mod tcp {
     use os;
     use error::MioResult;
     use buf::{Buf, MutBuf};
     use io;
     use io::{IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock, Ready, WouldBlock};
-    use net::{AddressFamily, Socket, SockAddr, Inet, Inet6};
+    use net::{AddressFamily, Socket, SockAddr, Inet, Inet6, Stream};
 
     #[deriving(Show)]
     pub struct TcpSocket {
@@ -80,7 +109,7 @@ pub mod tcp {
         }
 
         fn new(family: AddressFamily) -> MioResult<TcpSocket> {
-            Ok(TcpSocket { desc: try!(os::socket(family)) })
+            Ok(TcpSocket { desc: try!(os::socket(family, Stream)) })
         }
 
         pub fn bind(self, addr: &SockAddr) -> MioResult<TcpListener> {
@@ -158,6 +187,122 @@ pub mod tcp {
     }
 }
 
+pub mod udp {
+    use os;
+    use error::MioResult;
+    use buf::{Buf, MutBuf};
+    use io::{IoHandle, IoReader, IoWriter, NonBlock, Ready, WouldBlock};
+    use net::{AddressFamily, Socket, MulticastSocket, SockAddr, Inet, Dgram};
+    use super::UnconnectedSocket;
+
+    #[deriving(Show)]
+    pub struct UdpSocket {
+        desc: os::IoDesc
+    }
+
+    impl UdpSocket {
+        pub fn v4() -> MioResult<UdpSocket> {
+            UdpSocket::new(Inet)
+        }
+
+        fn new(family: AddressFamily) -> MioResult<UdpSocket> {
+            Ok(UdpSocket { desc: try!(os::socket(family, Dgram)) })
+        }
+
+        pub fn bind(&self, addr: &SockAddr) -> MioResult<()> {
+            try!(os::bind(&self.desc, addr))
+            Ok(())
+        }
+
+        pub fn connect(&self, addr: &SockAddr) -> MioResult<bool> {
+            os::connect(&self.desc, addr)
+        }
+    }
+
+    impl IoHandle for UdpSocket {
+        fn desc(&self) -> &os::IoDesc {
+            &self.desc
+        }
+    }
+
+    impl Socket for UdpSocket {
+    }
+
+    impl MulticastSocket for UdpSocket {
+    }
+
+    impl IoReader for UdpSocket {
+        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>> {
+            match os::read(&self.desc, buf.mut_bytes()) {
+                Ok(cnt) => {
+                    buf.advance(cnt);
+                    Ok(Ready(()))
+                }
+                Err(e) => {
+                    if e.is_would_block() {
+                        Ok(WouldBlock)
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
+        }
+    }
+
+    impl IoWriter for UdpSocket {
+        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>> {
+            match os::write(&self.desc, buf.bytes()) {
+                Ok(cnt) => {
+                    buf.advance(cnt);
+                    Ok(Ready(()))
+                }
+                Err(e) => {
+                    if e.is_would_block() {
+                        Ok(WouldBlock)
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
+        }
+    }
+
+    // Unconnected socket sender -- trait unique to sockets
+    impl UnconnectedSocket for UdpSocket {
+        fn send_to(&mut self, buf: &mut Buf, tgt: &SockAddr) -> MioResult<NonBlock<()>> {
+            match os::sendto(&self.desc, buf.bytes(), tgt) {
+                Ok(cnt) => {
+                    buf.advance(cnt);
+                    Ok(Ready(()))
+                }
+                Err(e) => {
+                    if e.is_would_block() {
+                        Ok(WouldBlock)
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
+        }
+
+        fn recv_from(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<SockAddr>> {
+            match os::recvfrom(&self.desc, buf.mut_bytes()) {
+                Ok((cnt, saddr)) => {
+                    buf.advance(cnt);
+                    Ok(Ready(saddr))
+                }
+                Err(e) => {
+                    if e.is_would_block() {
+                        Ok(WouldBlock)
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub mod pipe {
     use os;
     use io::{IoHandle};
@@ -177,3 +322,4 @@ pub mod pipe {
     impl Socket for UnixSocket {
     }
 }
+

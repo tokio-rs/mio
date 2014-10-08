@@ -1,6 +1,7 @@
 use std::mem;
 use error::{MioResult, MioError};
-use net::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IpV4Addr};
+use net::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IPv4Addr, SocketType, Dgram, Stream};
+pub use std::io::net::ip::IpAddr;
 
 mod nix {
     pub use nix::c_int;
@@ -85,15 +86,20 @@ pub fn pipe() -> MioResult<(IoDesc, IoDesc)> {
  *
  */
 
-pub fn socket(af: AddressFamily) -> MioResult<IoDesc> {
+pub fn socket(af: AddressFamily, sock_type: SocketType) -> MioResult<IoDesc> {
     let family = match af {
         Inet  => nix::AF_INET,
         Inet6 => nix::AF_INET6,
         _     => unimplemented!()
     };
 
+    let socket_type = match sock_type {
+        Dgram  => nix::SOCK_DGRAM,
+        Stream => nix::SOCK_STREAM
+    };
+
     Ok(IoDesc {
-        fd: try!(nix::socket(family, nix::SOCK_STREAM, nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
+        fd: try!(nix::socket(family, socket_type, nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
                     .map_err(MioError::from_sys_error))
     })
 }
@@ -128,6 +134,20 @@ pub fn accept(io: &IoDesc) -> MioResult<IoDesc> {
 }
 
 #[inline]
+pub fn recvfrom(io: &IoDesc, buf: &mut [u8]) -> MioResult<(uint, SockAddr)> {
+    match nix::recvfrom(io.fd, buf).map_err(MioError::from_sys_error) {
+        Ok((cnt, addr)) => Ok((cnt, to_sockaddr(&addr))),
+        Err(e) => Err(e)
+    }
+}
+
+#[inline]
+pub fn sendto(io: &IoDesc, buf: &[u8], tgt: &SockAddr) -> MioResult<uint> {
+    let res = try!(nix::sendto(io.fd, buf, &from_sockaddr(tgt), nix::MSG_DONTWAIT).map_err(MioError::from_sys_error));
+    Ok(res)
+}
+
+#[inline]
 pub fn read(io: &IoDesc, dst: &mut [u8]) -> MioResult<uint> {
     let res = try!(nix::read(io.fd, dst).map_err(MioError::from_sys_error));
 
@@ -156,6 +176,41 @@ pub fn set_reuseaddr(io: &IoDesc, val: bool) -> MioResult<()> {
         .map_err(MioError::from_sys_error)
 }
 
+pub fn set_reuseport(io: &IoDesc, val: bool) -> MioResult<()> {
+    let v: nix::c_int = if val { 1 } else { 0 };
+
+    nix::setsockopt(io.fd, nix::SOL_SOCKET, nix::SO_REUSEPORT, &v)
+        .map_err(MioError::from_sys_error)
+}
+
+pub fn set_tcp_nodelay(io: &IoDesc, val: bool) -> MioResult<()> {
+    let v: nix::c_int = if val { 1 } else { 0 };
+
+    nix::setsockopt(io.fd, nix::IPPROTO_TCP, nix::TCP_NODELAY, &v)
+        .map_err(MioError::from_sys_error)
+}
+
+pub fn join_multicast_group(io: &IoDesc, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
+    let grp_req = try!(make_ip_mreq(addr, interface));
+
+    nix::setsockopt(io.fd, nix::IPPROTO_IP, nix::IP_ADD_MEMBERSHIP, &grp_req)
+        .map_err(MioError::from_sys_error)
+}
+
+pub fn leave_multicast_group(io: &IoDesc, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
+    let grp_req = try!(make_ip_mreq(addr, interface));
+
+    nix::setsockopt(io.fd, nix::IPPROTO_IP, nix::IP_ADD_MEMBERSHIP, &grp_req)
+        .map_err(MioError::from_sys_error)
+}
+
+pub fn set_multicast_ttl(io: &IoDesc, val: u8) -> MioResult<()> {
+    let v: nix::IpMulticastTtl = val;
+
+    nix::setsockopt(io.fd, nix::IPPROTO_IP, nix::IP_MULTICAST_TTL, &v)
+        .map_err(MioError::from_sys_error)
+}
+
 pub fn linger(io: &IoDesc) -> MioResult<uint> {
     let mut linger: nix::linger = unsafe { mem::uninitialized() };
 
@@ -179,18 +234,46 @@ pub fn set_linger(io: &IoDesc, dur_s: uint) -> MioResult<()> {
         .map_err(MioError::from_sys_error)
 }
 
+fn make_ip_mreq(group_addr: &IpAddr, iface_addr: &Option<IpAddr>) -> MioResult<nix::ip_mreq> {
+    Ok(nix::ip_mreq {
+        imr_multiaddr: from_ip_addr_to_inaddr(&Some(*group_addr)),
+        imr_interface: from_ip_addr_to_inaddr(iface_addr)
+    })
+}
+
+fn from_ip_addr_to_inaddr(addr: &Option<IpAddr>) -> nix::in_addr {
+    match *addr {
+        Some(ip) => {
+            match ip {
+                IPv4Addr(a, b, c, d) => ipv4_to_inaddr(a, b, c, d),
+                _ => unimplemented!()
+            }
+        }
+        None => nix::in_addr { s_addr: nix::INADDR_ANY }
+    }
+}
+
+fn to_sockaddr(addr: &nix::SockAddr) -> SockAddr {
+    match *addr {
+        nix::SockIpV4(sin) => {
+            InetAddr(u32be_to_ipv4(sin.sin_addr.s_addr), Int::from_be(sin.sin_port))
+        }
+        _ => unimplemented!()
+    }
+}
+
 fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {
     use std::mem;
 
     match *addr {
         InetAddr(ip, port) => {
             match ip {
-                IpV4Addr(a, b, c, d) => {
+                IPv4Addr(a, b, c, d) => {
                     let mut addr: nix::sockaddr_in = unsafe { mem::zeroed() };
 
                     addr.sin_family = nix::AF_INET as nix::sa_family_t;
                     addr.sin_port = port.to_be();
-                    addr.sin_addr = ip4_to_inaddr(a, b, c, d);
+                    addr.sin_addr = ipv4_to_inaddr(a, b, c, d);
 
                     nix::SockIpV4(addr)
                 }
@@ -201,13 +284,27 @@ fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {
     }
 }
 
-fn ip4_to_inaddr(a: u8, b: u8, c: u8, d: u8) -> nix::in_addr {
-    let ip = (a as u32 << 24) |
-             (b as u32 << 16) |
-             (c as u32 <<  8) |
-             (d as u32 <<  0);
+fn ipv4_to_u32(a: u8, b: u8, c: u8, d: u8) -> nix::InAddrT {
+    Int::from_be((a as u32 << 24) |
+                 (b as u32 << 16) |
+                 (c as u32 <<  8) |
+                 (d as u32 <<  0))
+}
 
+fn u32be_to_ipv4(net: u32) -> IpAddr {
+    u32_to_ipv4(Int::from_be(net))
+}
+
+fn u32_to_ipv4(net: u32) -> IpAddr {
+    IPv4Addr(((net >> 24) & 0xff) as u8,
+         ((net >> 16) & 0xff) as u8,
+         ((net >> 8) & 0xff) as u8,
+         (net & 0xff) as u8)
+}
+
+fn ipv4_to_inaddr(a: u8, b: u8, c: u8, d: u8) -> nix::in_addr {
     nix::in_addr {
-        s_addr: Int::from_be(ip)
+        s_addr: ipv4_to_u32(a, b, c, d)
     }
 }
+

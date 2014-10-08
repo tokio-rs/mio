@@ -126,3 +126,4 @@ pub fn write<O: IoHandle>(io: &mut O, buf: &mut Buf) -> MioResult<NonBlock<()>> 
 
     Ok(Ready(()))
 }
+
