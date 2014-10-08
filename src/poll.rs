@@ -1,3 +1,4 @@
+use std::fmt;
 use error::MioResult;
 use io::IoHandle;
 use os;
@@ -38,7 +39,6 @@ impl Poll {
 
 
 bitflags!(
-    #[deriving(Show)]
     flags IoEventKind: uint {
         static IoReadable = 0x001,
         static IoWritable = 0x002,
@@ -47,6 +47,29 @@ bitflags!(
         static IoHinted   = 0x010
     }
 )
+
+impl fmt::Show for IoEventKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let mut one = false;
+        let flags = [
+            (IoReadable, "IoReadable"),
+            (IoWritable, "IoWritable"),
+            (IoError, "IoError"),
+            (IoHupHint, "IoHupHint"),
+            (IoHinted, "IoHinted")];
+
+        for &(flag, msg) in flags.iter() {
+            if self.contains(flag) {
+                if one { try!(write!(fmt, " | ")) }
+                try!(write!(fmt, "{}", msg));
+
+                one = true
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[deriving(Show)]
 pub struct IoEvent {

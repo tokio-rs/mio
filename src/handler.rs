@@ -1,14 +1,35 @@
+use std::fmt;
 use event_loop::EventLoop;
 use token::Token;
 
 bitflags!(
-    #[deriving(Show)]
     flags ReadHint: uint {
         static DataHint    = 0x001,
         static HupHint     = 0x002,
         static ErrorHint   = 0x004
     }
 )
+
+impl fmt::Show for ReadHint {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let mut one = false;
+        let flags = [
+            (DataHint, "DataHint"),
+            (HupHint, "HupHint"),
+            (ErrorHint, "ErrorHint")];
+
+        for &(flag, msg) in flags.iter() {
+            if self.contains(flag) {
+                if one { try!(write!(fmt, " | ")) }
+                try!(write!(fmt, "{}", msg));
+
+                one = true
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[allow(unused_variable)]
 pub trait Handler<T, M: Send> {
