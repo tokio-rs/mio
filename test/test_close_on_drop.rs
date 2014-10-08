@@ -4,6 +4,7 @@ use super::localhost;
 
 type TestEventLoop = EventLoop<uint, ()>;
 
+#[deriving(Show, PartialEq)]
 enum TestState {
     Initial,
     AfterRead,
@@ -28,17 +29,7 @@ impl TestHandler {
 
 impl Handler<uint, ()> for TestHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: ReadHint) {
-        match self.state {
-            Initial => {
-                assert_eq!(hint, handler::DataHint);
-                self.state = AfterRead;
-            },
-            AfterRead => {
-                assert_eq!(hint, handler::DataHint | handler::HupHint);
-                self.state = AfterHup;
-            },
-            AfterHup => fail!("Shouldn't get here")
-        }
+        debug!("readable; tok={}; hint={}", tok, hint);
 
         match tok {
             Token(0) => {
@@ -47,7 +38,27 @@ impl Handler<uint, ()> for TestHandler {
             }
             Token(1) => {
                 debug!("client readable");
+
+                match self.state {
+                    Initial => {
+                        assert!(hint.contains(handler::DataHint), "unexpected hint {}", hint);
+
+                        // Whether or not Hup is included with actual data is platform specific
+                        if hint.contains(handler::HupHint) {
+                            self.state = AfterHup;
+                        } else {
+                            self.state = AfterRead;
+                        }
+                    },
+                    AfterRead => {
+                        assert_eq!(hint, handler::DataHint | handler::HupHint);
+                        self.state = AfterHup;
+                    },
+                    AfterHup => fail!("Shouldn't get here")
+                }
+
                 let mut buf = ByteBuf::new(1024);
+
                 match self.cli.read(&mut buf) {
                     Err(e) if e.is_eof() => event_loop.shutdown(),
                     _ => fail!("the client socket should not be readable")
@@ -91,6 +102,8 @@ pub fn test_close_on_drop() {
     event_loop.connect(&sock, &addr, Token(1)).unwrap();
 
     // Start the event loop
-    event_loop.run(TestHandler::new(srv, sock))
+    let handler = event_loop.run(TestHandler::new(srv, sock))
         .ok().expect("failed to execute event loop");
+
+    assert!(handler.state == AfterHup, "actual={}", handler.state);
 }
