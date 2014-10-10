@@ -4,8 +4,8 @@ use time::precise_time_ns;
 use slab::Slab;
 use token::Token;
 
-static EMPTY: Token = Token(uint::MAX);
-static NS_PER_MS: u64 = 1_000_000;
+const EMPTY: Token = Token(uint::MAX);
+const NS_PER_MS: u64 = 1_000_000;
 
 // Implements coarse-grained timeouts using an algorithm based on hashed timing
 // wheels by Varghese & Lauck.
@@ -462,8 +462,8 @@ mod test {
         assert_eq!(0, t.count());
     }
 
-    static TICK: u64 = 100;
-    static SLOTS: uint = 16;
+    const TICK: u64 = 100;
+    const SLOTS: uint = 16;
 
     fn timer() -> Timer<&'static str> {
         Timer::new(TICK, SLOTS, 32)

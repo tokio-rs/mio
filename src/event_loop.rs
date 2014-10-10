@@ -51,7 +51,7 @@ pub struct EventLoop<T, M: Send> {
 }
 
 // Token used to represent notifications
-static NOTIFY: Token = Token(uint::MAX);
+const NOTIFY: Token = Token(uint::MAX);
 
 impl<T, M: Send> EventLoop<T, M> {
     /// Initializes a new event loop. The event loop will not be running yet.

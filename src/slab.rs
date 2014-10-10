@@ -19,10 +19,10 @@ pub struct Slab<T> {
     init: int,
 }
 
-static MAX: uint = int::MAX as uint;
+const MAX: uint = int::MAX as uint;
 
 // When Entry.nxt is set to this, the entry is in use
-static IN_USE: int = -1;
+const IN_USE: int = -1;
 
 impl<T> Slab<T> {
     pub fn new(cap: uint) -> Slab<T> {
