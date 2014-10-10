@@ -4,8 +4,8 @@ use super::localhost;
 
 type TestEventLoop = EventLoop<uint, ()>;
 
-static SERVER: Token = TOKEN_0;
-static CLIENT: Token = TOKEN_1;
+const SERVER: Token = Token(0);
+const CLIENT: Token = Token(1);
 
 struct EchoConn {
     sock: TcpSocket,

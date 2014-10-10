@@ -55,8 +55,6 @@ pub use timer::{
 };
 pub use token::{
     Token,
-    TOKEN_0,
-    TOKEN_1,
 };
 
 pub mod buf;
