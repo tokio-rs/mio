@@ -62,7 +62,7 @@ impl<T> Timer<T> {
     // Number of ms remaining until the next tick
     pub fn next_tick_in_ms(&self) -> u64 {
         let now = self.now_ms();
-        let nxt = self.start + (self.tick + 1) + self.tick_ms;
+        let nxt = self.start + (self.tick + 1) * self.tick_ms;
 
         if nxt <= now {
             return 0;

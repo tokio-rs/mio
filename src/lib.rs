@@ -20,7 +20,10 @@ pub use error::{
     MioResult,
     MioError,
 };
-pub use handler::Handler;
+pub use handler::{
+    Handler,
+    ReadHint
+};
 pub use io::{
     pipe,
     NonBlock,
@@ -60,7 +63,7 @@ pub use token::{
 pub mod buf;
 mod error;
 mod event_loop;
-mod handler;
+pub mod handler;
 mod io;
 mod notify;
 mod os;

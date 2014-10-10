@@ -261,7 +261,7 @@ impl<T, M: Send> EventLoop<T, M> {
         let tok = evt.token();
 
         if evt.is_readable() {
-            handler.readable(self, tok);
+            handler.readable(self, tok, evt.read_hint());
         }
 
         if evt.is_writable() {
@@ -333,7 +333,7 @@ mod tests {
     use std::sync::atomics::{AtomicInt, SeqCst};
     use super::EventLoop;
     use io::{IoWriter, IoReader};
-    use {io, buf, Buf, Handler, Token};
+    use {io, buf, Buf, Handler, Token, ReadHint};
 
     type TestEventLoop = EventLoop<uint, ()>;
 
@@ -352,7 +352,7 @@ mod tests {
     }
 
     impl Handler<uint, ()> for Funtimes {
-        fn readable(&mut self, _event_loop: &mut TestEventLoop, token: Token) {
+        fn readable(&mut self, _event_loop: &mut TestEventLoop, token: Token, hint: ReadHint) {
             (*self.rcount).fetch_add(1, SeqCst);
             assert_eq!(token, Token(10));
         }
