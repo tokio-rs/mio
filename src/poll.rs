@@ -40,11 +40,11 @@ impl Poll {
 
 bitflags!(
     flags IoEventKind: uint {
-        static IoReadable = 0x001,
-        static IoWritable = 0x002,
-        static IoError    = 0x004,
-        static IoHupHint  = 0x008,
-        static IoHinted   = 0x010
+        const IoReadable = 0x001,
+        const IoWritable = 0x002,
+        const IoError    = 0x004,
+        const IoHupHint  = 0x008,
+        const IoHinted   = 0x010
     }
 )
 

@@ -19,7 +19,7 @@ mod ports {
     // Helper for getting a unique port for the task run
     // TODO: Reuse ports to not spam the system
     static mut NEXT_PORT: AtomicUint = INIT_ATOMIC_UINT;
-    static FIRST_PORT: uint = 18080;
+    const FIRST_PORT: uint = 18080;
 
     fn next_port() -> uint {
         unsafe {

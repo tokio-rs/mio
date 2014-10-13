@@ -4,9 +4,9 @@ use token::Token;
 
 bitflags!(
     flags ReadHint: uint {
-        static DataHint    = 0x001,
-        static HupHint     = 0x002,
-        static ErrorHint   = 0x004
+        const DataHint    = 0x001,
+        const HupHint     = 0x002,
+        const ErrorHint   = 0x004
     }
 )
 

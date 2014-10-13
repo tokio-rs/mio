@@ -5,7 +5,7 @@ use error::MioResult;
 use io::IoHandle;
 use os;
 
-static SLEEP: int = -1;
+const SLEEP: int = -1;
 
 /// Send notifications to the event loop, waking it up if necessary. If the
 /// event loop is not currently sleeping, avoid using an OS wake-up strategy
