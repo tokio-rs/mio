@@ -41,17 +41,17 @@ impl Handler<uint, ()> for TestHandler {
 
                 match self.state {
                     Initial => {
-                        assert!(hint.contains(handler::DataHint), "unexpected hint {}", hint);
+                        assert!(hint.contains(handler::DATAHINT), "unexpected hint {}", hint);
 
                         // Whether or not Hup is included with actual data is platform specific
-                        if hint.contains(handler::HupHint) {
+                        if hint.contains(handler::HUPHINT) {
                             self.state = AfterHup;
                         } else {
                             self.state = AfterRead;
                         }
                     },
                     AfterRead => {
-                        assert_eq!(hint, handler::DataHint | handler::HupHint);
+                        assert_eq!(hint, handler::DATAHINT | handler::HUPHINT);
                         self.state = AfterHup;
                     },
                     AfterHup => fail!("Shouldn't get here")

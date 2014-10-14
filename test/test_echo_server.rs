@@ -229,7 +229,7 @@ impl EchoHandler {
 
 impl Handler<uint, ()> for EchoHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: ReadHint) {
-        assert_eq!(hint, handler::DataHint);
+        assert_eq!(hint, handler::DATAHINT);
 
         match token {
             SERVER => self.server.accept(event_loop),

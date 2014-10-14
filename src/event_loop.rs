@@ -352,7 +352,7 @@ mod tests {
     }
 
     impl Handler<uint, ()> for Funtimes {
-        fn readable(&mut self, _event_loop: &mut TestEventLoop, token: Token, hint: ReadHint) {
+        fn readable(&mut self, _event_loop: &mut TestEventLoop, token: Token, _hint: ReadHint) {
             (*self.rcount).fetch_add(1, SeqCst);
             assert_eq!(token, Token(10));
         }

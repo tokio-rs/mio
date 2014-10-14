@@ -4,9 +4,9 @@ use token::Token;
 
 bitflags!(
     flags ReadHint: uint {
-        const DataHint    = 0x001,
-        const HupHint     = 0x002,
-        const ErrorHint   = 0x004
+        const DATAHINT    = 0x001,
+        const HUPHINT     = 0x002,
+        const ERRORHINT   = 0x004
     }
 )
 
@@ -14,9 +14,9 @@ impl fmt::Show for ReadHint {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (DataHint, "DataHint"),
-            (HupHint, "HupHint"),
-            (ErrorHint, "ErrorHint")];
+            (DATAHINT, "DataHint"),
+            (HUPHINT, "HupHint"),
+            (ERRORHINT, "ErrorHint")];
 
         for &(flag, msg) in flags.iter() {
             if self.contains(flag) {

@@ -3,7 +3,7 @@ use error::MioResult;
 use io::IoHandle;
 use os;
 use token::Token;
-use handler::{ReadHint, DataHint, HupHint, ErrorHint};
+use handler::{ReadHint, DATAHINT, HUPHINT, ERRORHINT};
 
 pub struct Poll {
     selector: os::Selector,
@@ -40,11 +40,11 @@ impl Poll {
 
 bitflags!(
     flags IoEventKind: uint {
-        const IoReadable = 0x001,
-        const IoWritable = 0x002,
-        const IoError    = 0x004,
-        const IoHupHint  = 0x008,
-        const IoHinted   = 0x010
+        const IOREADABLE = 0x001,
+        const IOWRITABLE = 0x002,
+        const IOERROR    = 0x004,
+        const IOHUPHINT  = 0x008,
+        const IOHINTED   = 0x010
     }
 )
 
@@ -52,11 +52,11 @@ impl fmt::Show for IoEventKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (IoReadable, "IoReadable"),
-            (IoWritable, "IoWritable"),
-            (IoError, "IoError"),
-            (IoHupHint, "IoHupHint"),
-            (IoHinted, "IoHinted")];
+            (IOREADABLE, "IoReadable"),
+            (IOWRITABLE, "IoWritable"),
+            (IOERROR, "IoError"),
+            (IOHUPHINT, "IoHupHint"),
+            (IOHINTED, "IoHinted")];
 
         for &(flag, msg) in flags.iter() {
             if self.contains(flag) {
@@ -104,20 +104,20 @@ impl IoEvent {
         let mut hint = ReadHint::empty();
 
         // The backend doesn't support hinting
-        if !self.kind.contains(IoHinted) {
+        if !self.kind.contains(IOHINTED) {
             return hint;
         }
 
-        if self.kind.contains(IoHupHint) {
-            hint = hint | HupHint
+        if self.kind.contains(IOHUPHINT) {
+            hint = hint | HUPHINT
         }
 
-        if self.kind.contains(IoReadable) {
-            hint = hint | DataHint
+        if self.kind.contains(IOREADABLE) {
+            hint = hint | DATAHINT
         }
 
-        if self.kind.contains(IoError) {
-            hint = hint | ErrorHint
+        if self.kind.contains(IOERROR) {
+            hint = hint | ERRORHINT
         }
 
         hint
@@ -125,16 +125,16 @@ impl IoEvent {
 
     /// This event indicated that the IO handle is now readable
     pub fn is_readable(&self) -> bool {
-        self.kind.contains(IoReadable) || self.kind.contains(IoHupHint)
+        self.kind.contains(IOREADABLE) || self.kind.contains(IOHUPHINT)
     }
 
     /// This event indicated that the IO handle is now writable
     pub fn is_writable(&self) -> bool {
-        self.kind.contains(IoWritable)
+        self.kind.contains(IOWRITABLE)
     }
 
     /// This event indicated that the IO handle had an error
     pub fn is_error(&self) -> bool {
-        self.kind.contains(IoError)
+        self.kind.contains(IOERROR)
     }
 }

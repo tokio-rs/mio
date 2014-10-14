@@ -4,7 +4,7 @@ use nix::sys::epoll::*;
 use nix::unistd::close;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use poll::{IoEvent, IoEventKind, IoReadable, IoWritable, IoError, IoHinted, IoHupHint};
+use poll::{IoEvent, IoEventKind, IOREADABLE, IOWRITABLE, IOERROR, IOHINTED, IOHUPHINT};
 
 pub struct Selector {
     epfd: Fd
@@ -72,23 +72,23 @@ impl Events {
         }
 
         let epoll = self.events[idx].events;
-        let mut kind = IoEventKind::empty() | IoHinted;
+        let mut kind = IoEventKind::empty() | IOHINTED;
 
         if epoll.contains(EPOLLIN) {
-            kind = kind | IoReadable;
+            kind = kind | IOREADABLE;
         }
 
         if epoll.contains(EPOLLOUT) {
-            kind = kind | IoWritable;
+            kind = kind | IOWRITABLE;
         }
 
         // EPOLLHUP - Usually means a socket error happened
         if epoll.contains(EPOLLERR) {
-            kind = kind | IoError;
+            kind = kind | IOERROR;
         }
 
         if epoll.contains(EPOLLRDHUP) {
-            kind = kind | IoHupHint;
+            kind = kind | IOHUPHINT;
         }
 
         let token = self.events[idx].data;
