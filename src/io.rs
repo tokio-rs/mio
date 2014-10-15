@@ -4,6 +4,7 @@ use error::MioResult;
 use self::NonBlock::{Ready, WouldBlock};
 use error::MioErrorKind as mek;
 
+/// The result of a non-blocking operation.
 #[deriving(Show)]
 pub enum NonBlock<T> {
     Ready(T),

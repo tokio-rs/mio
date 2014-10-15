@@ -1,3 +1,5 @@
+//! Various strategies for non-blocking sequential byte access
+//!
 use std::slice::bytes;
 use std::{cmp, io};
 

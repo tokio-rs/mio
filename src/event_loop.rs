@@ -10,11 +10,7 @@ use poll::{Poll};
 use timer::{Timer, Timeout, TimerResult};
 use os::token::Token;
 
-/// A lightweight event loop.
-///
-/// TODO:
-/// - Enforce private tokens
-
+/// Configure EventLoop runtime details
 #[deriving(Copy, Clone, Show)]
 pub struct EventLoopConfig {
     pub io_poll_timeout_ms: uint,
@@ -42,6 +38,7 @@ impl Default for EventLoopConfig {
     }
 }
 
+/// Single threaded IO event loop.
 pub struct EventLoop<T, M: Send> {
     run: bool,
     poll: Poll,
@@ -54,7 +51,9 @@ pub struct EventLoop<T, M: Send> {
 const NOTIFY: Token = Token(uint::MAX);
 
 impl<T, M: Send> EventLoop<T, M> {
-    /// Initializes a new event loop. The event loop will not be running yet.
+
+    /// Initializes a new event loop using default configuration settings. The
+    /// event loop will not be running yet.
     pub fn new() -> MioResult<EventLoop<T, M>> {
         EventLoop::configured(Default::default())
     }
@@ -89,12 +88,79 @@ impl<T, M: Send> EventLoop<T, M> {
 
     /// Returns a sender that allows sending messages to the event loop in a
     /// thread-safe way, waking up the event loop if needed.
+    ///
+    /// # Example
+    /// ```
+    /// use mio::{EventLoop, Handler};
+    ///
+    /// struct MyHandler;
+    ///
+    /// impl Handler<(), uint> for MyHandler {
+    ///     fn notify(&mut self, event_loop: &mut EventLoop<(), uint>, msg: uint) {
+    ///         assert_eq!(msg, 123);
+    ///         event_loop.shutdown();
+    ///     }
+    /// }
+    ///
+    /// let mut event_loop = EventLoop::new().unwrap();
+    /// let sender = event_loop.channel();
+    ///
+    /// // Send the notification from another thread
+    /// spawn(move || {
+    ///     let _ = sender.send(123);
+    /// });
+    ///
+    /// let _ = event_loop.run(MyHandler);
+    /// ```
+    ///
+    /// # Implementation Details
+    ///
+    /// Each [EventLoop](#) contains a lock-free queue with a pre-allocated
+    /// buffer size. The size can be changed by modifying
+    /// [EventLoopConfig.notify_capacity](struct.EventLoopConfig.html#structfield.notify_capacity).
+    /// When a message is sent to the EventLoop, it is first pushed on to the
+    /// queue. Then, if the EventLoop is currently running, an atomic flag is
+    /// set to indicate that the next loop iteration should be started without
+    /// waiting.
+    ///
+    /// If the loop is blocked waiting for IO events, then it is woken up. The
+    /// strategy for waking up the event loop is platform dependent. For
+    /// example, on a modern Linux OS, eventfd is used. On older OSes, a pipe
+    /// is used.
+    ///
+    /// The strategy of setting an atomic flag if the event loop is not already
+    /// sleeping allows avoiding an expensive wakeup operation if at all possible.
     pub fn channel(&self) -> EventLoopSender<M> {
         EventLoopSender::new(self.notify.clone())
     }
 
-    /// After the requested time interval, the handler's `timeout` function
-    /// will be called with the supplied token.
+    /// Schedules a timeout after the requested time interval. When the
+    /// duration has been reached,
+    /// [Handler::timeout](trait.Handler.html#method.timeout) will be invoked
+    /// passing in the supplied token.
+    ///
+    /// Returns a handle to the timeout that can be used to cancel the timeout
+    /// using [#clear_timeout](#method.clear_timeout).
+    ///
+    /// # Example
+    /// ```
+    /// use mio::{EventLoop, Handler};
+    /// use std::time::Duration;
+    ///
+    /// struct MyHandler;
+    ///
+    /// impl Handler<uint, ()> for MyHandler {
+    ///     fn timeout(&mut self, event_loop: &mut EventLoop<uint, ()>, timeout: uint) {
+    ///         assert_eq!(timeout, 123);
+    ///         event_loop.shutdown();
+    ///     }
+    /// }
+    ///
+    ///
+    /// let mut event_loop = EventLoop::new().unwrap();
+    /// let timeout = event_loop.timeout(123, Duration::milliseconds(300)).unwrap();
+    /// let _ = event_loop.run(MyHandler);
+    /// ```
     pub fn timeout(&mut self, token: T, delay: Duration) -> TimerResult<Timeout> {
         self.timer.timeout(token, delay)
     }
@@ -267,6 +333,7 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 }
 
+/// Sends messages to the EventLoop from other threads.
 #[deriving(Clone)]
 pub struct EventLoopSender<M: Send> {
     notify: Notify<M>

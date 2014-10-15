@@ -1,3 +1,5 @@
+//! Networking primitives
+//!
 use std::fmt;
 use std::str::FromStr;
 use std::io::net::ip::SocketAddr as StdSocketAddr;
@@ -133,6 +135,8 @@ pub enum SocketType {
     Stream,
 }
 
+/// TCP networking primitives
+///
 pub mod tcp {
     use os;
     use error::MioResult;
@@ -384,6 +388,7 @@ pub mod udp {
     }
 }
 
+/// Named pipes
 pub mod pipe {
     use os;
     use error::MioResult;
@@ -513,4 +518,3 @@ pub mod pipe {
         }
     }
 }
-
