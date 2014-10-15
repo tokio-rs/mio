@@ -10,11 +10,6 @@ pub use std::io::net::ip::{IpAddr, Port};
 pub use std::io::net::ip::Ipv4Addr as IpV4Addr;
 
 pub trait Socket : IoHandle {
-    // Various sock opt fns
-    fn is_acceptor(&self) -> bool {
-        unimplemented!();
-    }
-
     fn linger(&self) -> MioResult<uint> {
         os::linger(self.desc())
     }
