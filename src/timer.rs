@@ -1,8 +1,8 @@
 use std::uint;
 use std::num;
 use time::precise_time_ns;
-use slab::Slab;
 use token::Token;
+use util::Slab;
 
 const EMPTY: Token = Token(uint::MAX);
 const NS_PER_MS: u64 = 1_000_000;

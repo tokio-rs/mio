@@ -1,6 +1,8 @@
 use std::io::timer::sleep;
 use std::time::Duration;
 use mio::*;
+use mio::net::*;
+use mio::net::tcp::*;
 use super::localhost;
 
 type TestEventLoop = EventLoop<uint, String>;

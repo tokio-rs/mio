@@ -22,7 +22,10 @@ pub use error::{
 };
 pub use handler::{
     Handler,
-    ReadHint
+    ReadHint,
+    DATAHINT,
+    HUPHINT,
+    ERRORHINT,
 };
 pub use io::{
     pipe,
@@ -44,16 +47,7 @@ pub use event_loop::{
     EventLoopResult,
     EventLoopSender,
 };
-pub use slab::Slab;
-pub use socket::{
-    Socket,
-    SockAddr,
-    TcpSocket,
-    TcpAcceptor,
-    UnixSocket,
-};
 pub use timer::{
-    Timer,
     Timeout,
 };
 pub use token::{
@@ -61,14 +55,15 @@ pub use token::{
 };
 
 pub mod buf;
+pub mod net;
+pub mod util;
+
 mod error;
 mod event_loop;
-pub mod handler;
+mod handler;
 mod io;
 mod notify;
 mod os;
 mod poll;
-mod slab;
-mod socket;
 mod timer;
 mod token;

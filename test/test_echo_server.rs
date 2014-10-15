@@ -1,5 +1,8 @@
 use mio::*;
+use mio::net::*;
+use mio::net::tcp::*;
 use mio::buf::{ByteBuf, RingBuf, SliceBuf};
+use mio::util::Slab;
 use super::localhost;
 
 type TestEventLoop = EventLoop<uint, ()>;
@@ -229,7 +232,7 @@ impl EchoHandler {
 
 impl Handler<uint, ()> for EchoHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: ReadHint) {
-        assert_eq!(hint, handler::DATAHINT);
+        assert_eq!(hint, DATAHINT);
 
         match token {
             SERVER => self.server.accept(event_loop),

@@ -3,10 +3,10 @@ use std::uint;
 use error::{MioResult, MioError};
 use handler::Handler;
 use io::{IoAcceptor, IoHandle};
+use net::{Socket, SockAddr};
 use notify::Notify;
 use os;
 use poll::{Poll, IoEvent};
-use socket::{Socket, SockAddr};
 use timer::{Timer, Timeout, TimerResult};
 use token::Token;
 

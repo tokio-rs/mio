@@ -280,7 +280,8 @@ impl<T> Entry<T> {
 
 #[cfg(test)]
 mod tests {
-    use {Slab, Token};
+    use super::Slab;
+    use {Token};
 
     #[test]
     fn test_insertion() {

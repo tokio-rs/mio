@@ -1,5 +1,7 @@
 use mio::*;
 use mio::buf::ByteBuf;
+use mio::net::*;
+use mio::net::tcp::*;
 use super::localhost;
 
 type TestEventLoop = EventLoop<uint, ()>;
@@ -41,17 +43,17 @@ impl Handler<uint, ()> for TestHandler {
 
                 match self.state {
                     Initial => {
-                        assert!(hint.contains(handler::DATAHINT), "unexpected hint {}", hint);
+                        assert!(hint.contains(DATAHINT), "unexpected hint {}", hint);
 
                         // Whether or not Hup is included with actual data is platform specific
-                        if hint.contains(handler::HUPHINT) {
+                        if hint.contains(HUPHINT) {
                             self.state = AfterHup;
                         } else {
                             self.state = AfterRead;
                         }
                     },
                     AfterRead => {
-                        assert_eq!(hint, handler::DATAHINT | handler::HUPHINT);
+                        assert_eq!(hint, DATAHINT | HUPHINT);
                         self.state = AfterHup;
                     },
                     AfterHup => fail!("Shouldn't get here")

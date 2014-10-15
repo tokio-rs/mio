@@ -1,6 +1,6 @@
 use std::mem;
 use error::{MioResult, MioError};
-use socket::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IpV4Addr};
+use net::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IpV4Addr};
 
 mod nix {
     pub use nix::c_int;
