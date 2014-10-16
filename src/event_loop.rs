@@ -111,11 +111,6 @@ impl<T, M: Send> EventLoop<T, M> {
         self.run = false;
     }
 
-    /// Tells the event loop to exit immidiately. All pending events will be dropped.
-    pub fn shutdown_now(&mut self) {
-        unimplemented!()
-    }
-
     /// Registers an IO handle with the event loop.
     pub fn register<H: IoHandle>(&mut self, io: &H, token: Token) -> MioResult<()> {
         self.poll.register(io, token)
