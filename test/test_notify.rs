@@ -49,8 +49,11 @@ pub fn test_notify() {
     // Setup a server socket so that the event loop blocks
     let srv = TcpSocket::v4().unwrap();
     srv.set_reuseaddr(true).unwrap();
-    let srv = srv.bind(&addr).unwrap();
-    event_loop.listen(&srv, 256u, Token(0)).unwrap();
+
+    let srv = srv.bind(&addr).unwrap()
+        .listen(256u).unwrap();
+
+    event_loop.register(&srv, Token(0)).unwrap();
 
     let sender = event_loop.channel();
 

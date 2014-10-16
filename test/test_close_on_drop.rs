@@ -93,10 +93,11 @@ pub fn test_close_on_drop() {
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
 
-    let srv = srv.bind(&addr).unwrap();
+    let srv = srv.bind(&addr).unwrap()
+        .listen(256).unwrap();
 
-    info!("listening for connections");
-    event_loop.listen(&srv, 256u, Token(0)).unwrap();
+    info!("register server socket");
+    event_loop.register(&srv, Token(0)).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 

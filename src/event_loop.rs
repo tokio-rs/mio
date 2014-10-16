@@ -2,7 +2,7 @@ use std::default::Default;
 use std::uint;
 use error::{MioResult, MioError};
 use handler::Handler;
-use io::{IoAcceptor, IoHandle};
+use io::IoHandle;
 use net::{Socket, SockAddr};
 use notify::Notify;
 use os;
@@ -135,20 +135,6 @@ impl<T, M: Send> EventLoop<T, M> {
         }
 
         // Register interest with socket on the event loop
-        try!(self.register(io, token));
-
-        Ok(())
-    }
-
-    pub fn listen<S, A: IoHandle + IoAcceptor<S>>(
-        &mut self, io: &A, backlog: uint, token: Token) -> MioResult<()> {
-
-        debug!("socket listen");
-
-        // Start listening
-        try!(os::listen(io.desc(), backlog));
-
-        // Wait for connections
         try!(self.register(io, token));
 
         Ok(())

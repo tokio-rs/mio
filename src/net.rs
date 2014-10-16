@@ -83,9 +83,9 @@ pub mod tcp {
             Ok(TcpSocket { desc: try!(os::socket(family)) })
         }
 
-        pub fn bind(self, addr: &SockAddr) -> MioResult<TcpAcceptor> {
+        pub fn bind(self, addr: &SockAddr) -> MioResult<TcpListener> {
             try!(os::bind(&self.desc, addr))
-            Ok(TcpAcceptor { desc: self.desc })
+            Ok(TcpListener { desc: self.desc })
         }
     }
 
@@ -111,8 +111,26 @@ pub mod tcp {
     }
 
     #[deriving(Show)]
+    pub struct TcpListener {
+        desc: os::IoDesc,
+    }
+
+    impl TcpListener {
+        pub fn listen(self, backlog: uint) -> MioResult<TcpAcceptor> {
+            try!(os::listen(self.desc(), backlog));
+            Ok(TcpAcceptor { desc: self.desc })
+        }
+    }
+
+    impl IoHandle for TcpListener {
+        fn desc(&self) -> &os::IoDesc {
+            &self.desc
+        }
+    }
+
+    #[deriving(Show)]
     pub struct TcpAcceptor {
-        desc: os::IoDesc
+        desc: os::IoDesc,
     }
 
     impl IoHandle for TcpAcceptor {

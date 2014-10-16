@@ -262,10 +262,11 @@ pub fn test_echo_server() {
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
 
-    let srv = srv.bind(&addr).unwrap();
+    let srv = srv.bind(&addr).unwrap()
+        .listen(256u).unwrap();
 
     info!("listen for connections");
-    event_loop.listen(&srv, 256u, SERVER).unwrap();
+    event_loop.register(&srv, SERVER).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
