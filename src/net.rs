@@ -7,6 +7,7 @@ use os;
 
 pub use std::io::net::ip::{IpAddr, Port};
 pub use std::io::net::ip::Ipv4Addr as IPv4Addr;
+pub use std::io::net::ip::Ipv6Addr as IPv6Addr;
 
 pub trait Socket : IoHandle {
     fn linger(&self) -> MioResult<uint> {
@@ -63,6 +64,14 @@ impl SockAddr {
 
         let addr: Option<ip::SocketAddr> = FromStr::from_str(s);
         addr.map(|a| InetAddr(a.ip, a.port))
+    }
+
+    pub fn family(&self) -> AddressFamily {
+        match *self {
+            UnixAddr(..) => Unix,
+            InetAddr(IPv4Addr(..), _) => Inet,
+            InetAddr(IPv6Addr(..), _) => Inet6
+        }
     }
 }
 
@@ -162,6 +171,14 @@ pub mod tcp {
         desc: os::IoDesc,
     }
 
+    impl TcpAcceptor {
+        pub fn new(addr: &SockAddr, backlog: uint) -> MioResult<TcpAcceptor> {
+            let sock = try!(TcpSocket::new(addr.family()));
+            let listener = try!(sock.bind(addr));
+            listener.listen(backlog)
+        }
+    }
+
     impl IoHandle for TcpAcceptor {
         fn desc(&self) -> &os::IoDesc {
             &self.desc
@@ -216,6 +233,12 @@ pub mod udp {
 
         pub fn connect(&self, addr: &SockAddr) -> MioResult<bool> {
             os::connect(&self.desc, addr)
+        }
+
+        pub fn bound(addr: &SockAddr) -> MioResult<UdpSocket> {
+            let sock = try!(UdpSocket::new(addr.family()));
+            try!(sock.bind(addr));
+            Ok(sock)
         }
     }
 
