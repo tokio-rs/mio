@@ -181,7 +181,7 @@ impl<T> Slab<T> {
             }
         }
 
-        fail!("invalid index {} -- greater than capacity {}", idx, self.cap);
+        panic!("invalid index {} -- greater than capacity {}", idx, self.cap);
     }
 
     fn token_to_idx(&self, token: Token) -> uint {
@@ -201,7 +201,7 @@ impl<T> Index<Token, T> for Slab<T> {
         let e = self.entry(idx);
 
         if !e.in_use() {
-            fail!("invalid index; idx={}", idx);
+            panic!("invalid index; idx={}", idx);
         }
 
         &e.val
@@ -216,7 +216,7 @@ impl<T> IndexMut<Token, T> for Slab<T> {
         let e = self.mut_entry(idx);
 
         if !e.in_use() {
-            fail!("invalid index; idx={}", idx);
+            panic!("invalid index; idx={}", idx);
         }
 
         &mut e.val

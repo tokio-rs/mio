@@ -57,7 +57,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
                         assert_eq!(hint, DATAHINT | HUPHINT);
                         self.state = AfterHup;
                     },
-                    AfterHup => fail!("Shouldn't get here")
+                    AfterHup => panic!("Shouldn't get here")
                 }
 
                 if self.state == AfterHup {
@@ -72,18 +72,18 @@ impl Handler<TcpSocket, ()> for TestHandler {
                         buf.flip();
                         assert!(b"zomg" == buf.bytes());
                     }
-                    Err(e) => fail!("client sock failed to read; err={}", e),
+                    Err(e) => panic!("client sock failed to read; err={}", e),
                 }
             }
-            _ => fail!("received unknown token {}", tok)
+            _ => panic!("received unknown token {}", tok)
         }
     }
 
     fn writable(&mut self, _event_loop: &mut TestEventLoop, tok: Token) {
         match tok {
-            SERVER => fail!("received writable for token 0"),
+            SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
-            _ => fail!("received unknown token {}", tok)
+            _ => panic!("received unknown token {}", tok)
         }
     }
 

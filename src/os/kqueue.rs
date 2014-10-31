@@ -93,7 +93,7 @@ impl Events {
     #[inline]
     pub fn get(&self, idx: uint) -> IoEvent {
         if idx >= self.len {
-            fail!("invalid index");
+            panic!("invalid index");
         }
 
         let ev = &self.events[idx];

@@ -43,7 +43,7 @@ impl Handler<uint, ()> for UdpHandler {
                             InetAddr(ip, _) => {
                                 assert!(ip == IPv4Addr(127, 0, 0, 1));
                             }
-                            _ => fail!("This should be an IPv4 address")
+                            _ => panic!("This should be an IPv4 address")
                         }
                     }
                     ret => {

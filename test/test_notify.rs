@@ -32,7 +32,7 @@ impl Handler<uint, String> for TestHandler {
                 assert!(msg.as_slice() == "Second", "actual={}", msg);
                 event_loop.shutdown();
             }
-            v => fail!("unexpected value for notify; val={}", v)
+            v => panic!("unexpected value for notify; val={}", v)
         }
 
         self.notify += 1;

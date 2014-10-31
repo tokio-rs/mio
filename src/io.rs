@@ -19,7 +19,7 @@ impl<T> NonBlock<T> {
     pub fn unwrap(self) -> T {
         match self {
             Ready(v) => v,
-            _ => fail!("would have blocked, no result to take")
+            _ => panic!("would have blocked, no result to take")
         }
     }
 }

@@ -56,27 +56,27 @@ impl Handler<uint, ()> for TestHandler {
                         assert_eq!(hint, DATAHINT | HUPHINT);
                         self.state = AfterHup;
                     },
-                    AfterHup => fail!("Shouldn't get here")
+                    AfterHup => panic!("Shouldn't get here")
                 }
 
                 let mut buf = ByteBuf::new(1024);
 
                 match self.cli.read(&mut buf) {
                     Err(e) if e.is_eof() => event_loop.shutdown(),
-                    _ => fail!("the client socket should not be readable")
+                    _ => panic!("the client socket should not be readable")
                 }
             }
-            _ => fail!("received unknown token {}", tok)
+            _ => panic!("received unknown token {}", tok)
         }
     }
 
     fn writable(&mut self, _event_loop: &mut TestEventLoop, tok: Token) {
         match tok {
-            Token(0) => fail!("received writable for token 0"),
+            Token(0) => panic!("received writable for token 0"),
             Token(1) => {
                 debug!("client connected");
             }
-            _ => fail!("received unknown token {}", tok)
+            _ => panic!("received unknown token {}", tok)
         }
     }
 }

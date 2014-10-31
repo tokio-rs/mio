@@ -115,7 +115,7 @@ impl<M: Send> NotifyInner<M> {
         // First, push the message onto the queue
         if !self.queue.push(value) {
             // TODO: Don't fail
-            fail!("queue full");
+            panic!("queue full");
         }
 
         let mut cur = self.state.load(Relaxed);
@@ -136,7 +136,7 @@ impl<M: Send> NotifyInner<M> {
         if cur == SLEEP {
             if self.awaken.wakeup().is_err() {
                 // TODO: Don't fail
-                fail!("failed to awaken event loop");
+                panic!("failed to awaken event loop");
             }
         }
 

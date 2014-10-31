@@ -146,7 +146,7 @@ impl EchoClient {
         loop {
             let res = match self.sock.read(&mut self.buf) {
                 Ok(r) => r,
-                Err(e) => fail!("not implemented; client err={}", e)
+                Err(e) => panic!("not implemented; client err={}", e)
             };
 
             // prepare for reading
@@ -243,7 +243,7 @@ impl Handler<uint, ()> for EchoHandler {
 
     fn writable(&mut self, _event_loop: &mut TestEventLoop, token: Token) {
         match token {
-            SERVER => fail!("received writable for token 0"),
+            SERVER => panic!("received writable for token 0"),
             CLIENT => self.client.writable(),
             i => self.server.conn_writable(i)
         }
