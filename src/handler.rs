@@ -31,7 +31,7 @@ impl fmt::Show for ReadHint {
     }
 }
 
-#[allow(unused_variable)]
+#[allow(unused_variables)]
 pub trait Handler<T, M: Send> {
     fn readable(&mut self, event_loop: &mut EventLoop<T, M>, token: Token, hint: ReadHint) {
     }
