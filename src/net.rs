@@ -1,5 +1,6 @@
 use std::fmt;
 use std::from_str::FromStr;
+use std::io::net::ip::SocketAddr as StdSocketAddr;
 use io::{IoHandle, NonBlock};
 use error::MioResult;
 use buf::{Buf, MutBuf};
@@ -60,9 +61,7 @@ pub enum SockAddr {
 
 impl SockAddr {
     pub fn parse(s: &str) -> Option<SockAddr> {
-        use std::io::net::ip;
-
-        let addr: Option<ip::SocketAddr> = FromStr::from_str(s);
+        let addr: Option<StdSocketAddr> = FromStr::from_str(s);
         addr.map(|a| InetAddr(a.ip, a.port))
     }
 
@@ -71,6 +70,36 @@ impl SockAddr {
             UnixAddr(..) => Unix,
             InetAddr(IPv4Addr(..), _) => Inet,
             InetAddr(IPv6Addr(..), _) => Inet6
+        }
+    }
+
+    #[inline]
+    pub fn consume_std(addr: StdSocketAddr) -> SockAddr {
+        InetAddr(addr.ip, addr.port)
+    }
+
+    #[inline]
+    pub fn from_std(addr: &StdSocketAddr) -> SockAddr {
+        InetAddr(addr.ip.clone(), addr.port)
+    }
+
+    pub fn to_std(&self) -> Option<StdSocketAddr> {
+        match *self {
+            InetAddr(ref addr, port) => Some(StdSocketAddr {
+                ip: addr.clone(),
+                port: port
+            }),
+            _ => None
+        }
+    }
+
+    pub fn into_std(self) -> Option<StdSocketAddr> {
+        match self {
+            InetAddr(addr, port) => Some(StdSocketAddr {
+                ip: addr,
+                port: port
+            }),
+            _ => None
         }
     }
 }
