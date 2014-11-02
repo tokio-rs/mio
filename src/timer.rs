@@ -146,7 +146,7 @@ impl<T> Timer<T> {
         }
 
         // Update the head slot
-        *self.wheel.get_mut(slot) = token;
+        self.wheel[slot] = token;
 
         debug!("inserted timout; slot={}; token={}", slot, token);
 
@@ -163,7 +163,7 @@ impl<T> Timer<T> {
 
         if links.prev == EMPTY {
             let slot = self.slot_for(links.tick);
-            *self.wheel.get_mut(slot) = links.next;
+            self.wheel[slot] = links.next;
         } else {
             self.entries[links.prev].links.next = links.next;
         }
