@@ -52,4 +52,26 @@ impl Poll {
     pub fn event(&self, idx: uint) -> event::IoEvent {
         self.events.get(idx)
     }
+
+    pub fn iter(&self) -> EventsIterator {
+        EventsIterator { events: &self.events, index: 0 }
+    }
+}
+
+pub struct EventsIterator<'a> {
+    events: &'a os::Events,
+    index: uint
+}
+
+impl<'a> Iterator for EventsIterator<'a> {
+    type Item = event::IoEvent;
+
+    fn next(&mut self) -> Option<event::IoEvent> {
+        if self.index == self.events.len() {
+            None
+        } else {
+            self.index += 1;
+            Some(self.events.get(self.index - 1))
+        }
+    }
 }
