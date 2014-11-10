@@ -148,7 +148,7 @@ impl<T> Timer<T> {
         // Update the head slot
         self.wheel[slot] = token;
 
-        debug!("inserted timout; slot={}; token={}", slot, token);
+        debug!("inserted timeout; slot={}; token={}; tick={}", slot, token, tick);
 
         // Return the new timeout
         Ok(Timeout {

@@ -154,6 +154,32 @@ pub mod tcp {
             try!(os::bind(&self.desc, addr))
             Ok(TcpListener { desc: self.desc })
         }
+
+        /// Connects the socket to the specified address. When the operation
+        /// completes, the handler will be notified with the supplied token.
+        ///
+        /// The goal of this method is to ensure that the event loop will always
+        /// notify about the connection, even if the connection happens
+        /// immediately. Otherwise, every consumer of the event loop would have
+        /// to worry about possibly-immediate connection.
+        pub fn connect(&self, addr: &SockAddr) -> MioResult<()> {
+            debug!("socket connect; addr={}", addr);
+
+            // Attempt establishing the context. This may not complete immediately.
+            if try!(os::connect(&self.desc, addr)) {
+                // On some OSs, connecting to localhost succeeds immediately. In
+                // this case, queue the writable callback for execution during the
+                // next event loop tick.
+                debug!("socket connected immediately; addr={}", addr);
+            }
+
+            Ok(())
+        }
+
+        pub fn close(&self) -> MioResult<()> {
+          os::close(&self.desc)
+        }
+
     }
 
     impl IoHandle for TcpSocket {
@@ -163,13 +189,13 @@ pub mod tcp {
     }
 
     impl IoReader for TcpSocket {
-        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>> {
+        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> {
             io::read(self, buf)
         }
     }
 
     impl IoWriter for TcpSocket {
-        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>> {
+        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
             io::write(self, buf)
         }
     }
@@ -284,11 +310,11 @@ pub mod udp {
     }
 
     impl IoReader for UdpSocket {
-        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>> {
+        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> {
             match os::read(&self.desc, buf.mut_bytes()) {
                 Ok(cnt) => {
                     buf.advance(cnt);
-                    Ok(Ready(()))
+                    Ok(Ready(cnt))
                 }
                 Err(e) => {
                     if e.is_would_block() {
@@ -302,11 +328,11 @@ pub mod udp {
     }
 
     impl IoWriter for UdpSocket {
-        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>> {
+        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
             match os::write(&self.desc, buf.bytes()) {
                 Ok(cnt) => {
                     buf.advance(cnt);
-                    Ok(Ready(()))
+                    Ok(Ready(cnt))
                 }
                 Err(e) => {
                     if e.is_would_block() {

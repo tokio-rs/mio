@@ -1,6 +1,7 @@
 use buf::{Buf, MutBuf};
 use os;
 use error::MioResult;
+use error::MioErrorKind as mek;
 
 #[deriving(Show)]
 pub enum NonBlock<T> {
@@ -29,11 +30,11 @@ pub trait IoHandle {
 }
 
 pub trait IoReader {
-    fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>>;
+    fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<uint>>;
 }
 
 pub trait IoWriter {
-    fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>>;
+    fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<uint>>;
 }
 
 pub trait IoAcceptor<T> {
@@ -66,39 +67,54 @@ impl IoHandle for PipeWriter {
 }
 
 impl IoReader for PipeReader {
-    fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>> {
+    fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> {
         read(self, buf)
     }
 }
 
 impl IoWriter for PipeWriter {
-    fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>> {
+    fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
         write(self, buf)
     }
 }
 
-pub fn read<I: IoHandle>(io: &mut I, buf: &mut MutBuf) -> MioResult<NonBlock<()>> {
-    let mut first_iter = true;
+/// Reads the length of the slice supplied by buf.mut_bytes into the buffer
+/// This is not guaranteed to consume an entire datagram or segment. 
+/// If your protocol is msg based (instead of continuous stream) you should
+/// ensure that your buffer is large enough to hold an entire segment (1532 bytes if not jumbo
+/// frames)
+#[inline]
+pub fn read<I: IoHandle>(io: &mut I, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> {
+
+    match os::read(io.desc(), buf.mut_bytes()) {
+        // Successfully read some bytes, advance the cursor
+        Ok(cnt) => { buf.advance(cnt); Ok(Ready(cnt)) }
+        Err(e) => { 
+            match e.kind {
+                mek::WouldBlock => Ok(WouldBlock),
+                _               => Err(e)
+            }
+        }
+    }
+}
+
+/// Reads until all segments or datagrams are consumed from the socket or until we run out of 
+/// space in the buffer
+pub fn read_remaining<I: IoHandle>(io: &mut I, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> {
+    let mut count = 0;
 
     while buf.has_remaining() {
-        match os::read(io.desc(), buf.mut_bytes()) {
-            // Successfully read some bytes, advance the cursor
-            Ok(cnt) => {
-                buf.advance(cnt);
-                first_iter = false;
-            }
+        match read(io, buf) {
+            r@Ok(WouldBlock) => { return r; }
+            Ok(Ready(num)) => { count = count + num  }
             Err(e) => {
-                if e.is_would_block() {
-                    return Ok(WouldBlock);
-                }
-
                 // If the EOF is hit the first time around, then propagate
                 if e.is_eof() {
-                    if first_iter {
+                    if count == 0 {
                         return Err(e);
                     }
 
-                    return Ok(Ready(()));
+                    return Ok(Ready(count));
                 }
 
                 // Indicate that the read was successful
@@ -106,24 +122,34 @@ pub fn read<I: IoHandle>(io: &mut I, buf: &mut MutBuf) -> MioResult<NonBlock<()>
             }
         }
     }
-
-    Ok(Ready(()))
+    Ok(Ready(count))
 }
 
-pub fn write<O: IoHandle>(io: &mut O, buf: &mut Buf) -> MioResult<NonBlock<()>> {
-    while buf.has_remaining() {
-        match os::write(io.desc(), buf.bytes()) {
-            Ok(cnt) => buf.advance(cnt),
-            Err(e) => {
-                if e.is_would_block() {
-                    return Ok(WouldBlock);
-                }
-
-                return Err(e);
+///writes the length of the slice supplied by Buf.bytes into the socket
+#[inline]
+pub fn write<O: IoHandle>(io: &mut O, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
+    match os::write(io.desc(), buf.bytes()) {
+        Ok(cnt) => { buf.advance(cnt); Ok(Ready(cnt)) }
+        Err(e) => { 
+            match e.kind {
+                mek::WouldBlock => Ok(WouldBlock),
+                _               => Err(e)
             }
         }
     }
+}
 
-    Ok(Ready(()))
+
+/// Writes everything is expelled from the buffer or until the socket can no longer write 
+pub fn write_remaining<O: IoHandle>(io: &mut O, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
+    let mut count = 0;
+    while buf.has_remaining() {
+        match write(io, buf) {
+            r@Ok(WouldBlock) => { return r; }
+            Ok(Ready(num)) => { count = count + num }
+            Err(e) => { return Err(e); }
+        }
+    }
+    Ok(Ready(count))
 }
 

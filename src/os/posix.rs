@@ -163,6 +163,11 @@ pub fn write(io: &IoDesc, src: &[u8]) -> MioResult<uint> {
     nix::write(io.fd, src).map_err(MioError::from_sys_error)
 }
 
+#[inline]
+pub fn close(io: &IoDesc) -> MioResult<()> {
+  nix::close(io.fd).map_err(MioError::from_sys_error)
+}
+
 // ===== Socket options =====
 
 pub fn reuseaddr(_io: &IoDesc) -> MioResult<uint> {

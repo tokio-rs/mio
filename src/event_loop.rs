@@ -3,12 +3,12 @@ use std::uint;
 use error::{MioResult, MioError};
 use handler::Handler;
 use io::IoHandle;
-use net::{Socket, SockAddr};
 use notify::Notify;
-use os;
-use poll::{Poll, IoEvent};
+use poll::Poll;
 use timer::{Timer, Timeout, TimerResult};
 use token::Token;
+use event_ctx::IoEventCtx;
+use event_ctx as evt;
 
 /// A lightweight event loop.
 ///
@@ -73,7 +73,8 @@ impl<T, M: Send> EventLoop<T, M> {
         let notify = try!(Notify::with_capacity(config.notify_capacity));
 
         // Register the notification wakeup FD with the IO poller
-        try!(poll.register(&notify, NOTIFY));
+        let ctx = evt::IoEventCtx::new(evt::IOREADABLE, NOTIFY);
+        try!(poll.register(&notify, &ctx));
 
         // Set the timer's starting time reference point
         timer.setup();
@@ -112,32 +113,13 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register<H: IoHandle>(&mut self, io: &H, token: Token) -> MioResult<()> {
-        self.poll.register(io, token)
+    pub fn register<H: IoHandle>(&mut self, io: &H, eventctx: &IoEventCtx) -> MioResult<()> {
+        self.poll.register(io, eventctx)
     }
 
-    /// Connects the socket to the specified address. When the operation
-    /// completes, the handler will be notified with the supplied token.
-    ///
-    /// The goal of this method is to ensure that the event loop will always
-    /// notify about the connection, even if the connection happens
-    /// immediately. Otherwise, every consumer of the event loop would have
-    /// to worry about possibly-immediate connection.
-    pub fn connect<S: Socket>(&mut self, io: &S, addr: &SockAddr, token: Token) -> MioResult<()> {
-        debug!("socket connect; addr={}", addr);
-
-        // Attempt establishing the context. This may not complete immediately.
-        if try!(os::connect(io.desc(), addr)) {
-            // On some OSs, connecting to localhost succeeds immediately. In
-            // this case, queue the writable callback for execution during the
-            // next event loop tick.
-            debug!("socket connected immediately; addr={}", addr);
-        }
-
-        // Register interest with socket on the event loop
-        try!(self.register(io, token));
-
-        Ok(())
+    /// Re-Registers an IO handle with the event to change/update interest
+    pub fn reregister<H: IoHandle>(&mut self, io: &H, eventctx: &IoEventCtx) -> MioResult<()> {
+        self.poll.reregister(io, eventctx)
     }
 
     /// Keep spinning the event loop indefinitely, and notify the handler whenever
@@ -238,7 +220,7 @@ impl<T, M: Send> EventLoop<T, M> {
         }
     }
 
-    fn io_event<H: Handler<T, M>>(&mut self, handler: &mut H, evt: IoEvent) {
+    fn io_event<H: Handler<T, M>>(&mut self, handler: &mut H, evt: IoEventCtx) {
         let tok = evt.token();
 
         if evt.is_readable() {
@@ -269,7 +251,7 @@ impl<T, M: Send> EventLoop<T, M> {
 
         loop {
             match self.timer.tick_to(now) {
-                Some(t) => handler.timeout(self, t),
+                Some(t) => { debug!("received timeout at {}", now); handler.timeout(self, t); }
                 _ => return
             }
         }
@@ -315,6 +297,8 @@ mod tests {
     use super::EventLoop;
     use io::{IoWriter, IoReader};
     use {io, buf, Buf, Handler, Token, ReadHint};
+    use event_ctx::IoEventCtx;
+    use event_ctx as evt;
 
     type TestEventLoop = EventLoop<uint, ()>;
 
@@ -350,7 +334,9 @@ mod tests {
         let handler = Funtimes::new(rcount.clone(), wcount.clone());
 
         writer.write(&mut buf::wrap("hello".as_bytes())).unwrap();
-        event_loop.register(&reader, Token(10)).unwrap();
+
+        let evt = IoEventCtx::new(evt::IOREADABLE, Token(10));
+        event_loop.register(&reader, &evt).unwrap();
 
         let _ = event_loop.run_once(handler);
         let mut b = buf::ByteBuf::new(16);

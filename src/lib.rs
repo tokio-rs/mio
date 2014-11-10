@@ -19,6 +19,7 @@ pub use buf::{
 pub use error::{
     MioResult,
     MioError,
+    MioErrorKind
 };
 pub use handler::{
     Handler,
@@ -35,11 +36,10 @@ pub use io::{
     IoAcceptor,
     PipeReader,
     PipeWriter,
+    Ready
 };
 pub use poll::{
-    Poll,
-    IoEvent,
-    IoEventKind,
+    Poll
 };
 pub use event_loop::{
     EventLoop,
@@ -54,14 +54,19 @@ pub use token::{
     Token,
 };
 
+pub use event_ctx::{ 
+    IoEventCtx 
+};
+
 pub mod buf;
 pub mod net;
 pub mod util;
+pub mod event_ctx;
+pub mod io;
+pub mod error;
 
-mod error;
 mod event_loop;
 mod handler;
-mod io;
 mod notify;
 mod os;
 mod poll;

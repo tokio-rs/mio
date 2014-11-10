@@ -2,6 +2,7 @@ use mio::*;
 use mio::net::*;
 use mio::net::tcp::*;
 use super::localhost;
+use mio::event_ctx as evt;
 
 type TestEventLoop = EventLoop<TcpSocket, ()>;
 
@@ -38,9 +39,13 @@ impl Handler<TcpSocket, ()> for TestHandler {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().unwrap();
                 event_loop.timeout_ms(conn, 200).unwrap();
+
+                let evt = IoEventCtx::new(evt::IOREADABLE | evt::IOEDGE, CLIENT); 
+                event_loop.reregister(&self.srv, &evt).unwrap();
             }
             CLIENT => {
                 debug!("client readable");
+
 
                 match self.state {
                     Initial => {
@@ -64,16 +69,22 @@ impl Handler<TcpSocket, ()> for TestHandler {
                     event_loop.shutdown();
                     return;
                 }
-
-                let mut buf = buf::ByteBuf::new(1024);
+                
+                let mut buf = buf::ByteBuf::new(2048);
 
                 match self.cli.read(&mut buf) {
-                    Ok(_) => {
+                    Ok(n) => {
+                        debug!("read {} bytes", n);
                         buf.flip();
                         assert!(b"zomg" == buf.bytes());
                     }
-                    Err(e) => panic!("client sock failed to read; err={}", e),
+                    Err(e) => match e.kind {
+                      _ => { debug!("client sock failed to read; err={}", e.kind); }
+                    }
                 }
+                
+                let evt = IoEventCtx::new(evt::IOREADABLE | evt::IOHUPHINT | evt::IOEDGE, CLIENT); 
+                event_loop.reregister(&self.cli, &evt).unwrap();
             }
             _ => panic!("received unknown token {}", tok)
         }
@@ -85,16 +96,19 @@ impl Handler<TcpSocket, ()> for TestHandler {
             CLIENT => debug!("client connected"),
             _ => panic!("received unknown token {}", tok)
         }
+        let evt = IoEventCtx::new(evt::IOREADABLE | evt::IOHUPHINT | evt::IOEDGE, tok); 
+        _event_loop.reregister(&self.cli, &evt).unwrap();
     }
 
     fn timeout(&mut self, _event_loop: &mut TestEventLoop, mut sock: TcpSocket) {
-        sock.write(&mut buf::wrap(b"zomg"))
-            .unwrap().unwrap();
+        debug!("timeout handler : writing to socket");
+        sock.write(&mut buf::wrap(b"zomg")).unwrap().unwrap();
     }
 }
 
 #[test]
 pub fn test_timer() {
+    debug!("Starting TEST_TIMER");
     let mut event_loop = EventLoop::new().unwrap();
 
     let addr = SockAddr::parse(localhost().as_slice())
@@ -109,13 +123,15 @@ pub fn test_timer() {
         .listen(256u).unwrap();
 
     info!("listening for connections");
-    event_loop.register(&srv, SERVER).unwrap();
+    let evt = IoEventCtx::new(evt::IOALL | evt::IOEDGE, SERVER);
+    event_loop.register(&srv, &evt).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    event_loop.connect(&sock, &addr, CLIENT).unwrap();
-
+    let evt = IoEventCtx::new(evt::IOALL | evt::IOHUPHINT | evt::IOEDGE, CLIENT); 
+    event_loop.register(&sock, &evt).unwrap();
+    sock.connect(&addr).unwrap();
     // Start the event loop
     let handler = event_loop.run(TestHandler::new(srv, sock))
         .ok().expect("failed to execute event loop");

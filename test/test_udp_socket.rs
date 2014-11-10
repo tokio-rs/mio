@@ -5,6 +5,7 @@ use mio::buf::{RingBuf, SliceBuf};
 use std::str;
 use super::localhost;
 use std::io::net::ip::{Ipv4Addr};
+use mio::event_ctx as evt;
 
 type TestEventLoop = EventLoop<uint, ()>;
 
@@ -56,6 +57,7 @@ impl Handler<uint, ()> for UdpHandler {
 
 #[test]
 pub fn test_udp_socket() {
+    debug!("Starting TEST_UDP_SOCKETS");
     let mut event_loop = EventLoop::new().unwrap();
 
     let send_sock = UdpSocket::v4().unwrap();
@@ -78,10 +80,13 @@ pub fn test_udp_socket() {
     recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 101), &None).unwrap();
 
     info!("Registering LISTENER");
-    event_loop.register(&recv_sock, LISTENER).unwrap();
+   
+    let evt = IoEventCtx::new(evt::IOREADABLE | evt::IOEDGE, LISTENER);
+    event_loop.register(&recv_sock, &evt).unwrap();
 
     info!("Registering SENDER");
-    event_loop.register(&send_sock, SENDER).unwrap();
+    let sevt = IoEventCtx::new(evt::IOWRITABLE | evt::IOEDGE, SENDER);
+    event_loop.register(&send_sock, &sevt).unwrap();
 
     info!("Starting event loop to test with...");
     event_loop.run(UdpHandler::new(send_sock, recv_sock, "hello world")).ok().expect("Failed to run the actual event listener loop");
