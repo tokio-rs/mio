@@ -1,4 +1,6 @@
 use std::uint;
+use std::cmp::max;
+use std::time::duration::Duration;
 use std::num;
 use time::precise_time_ns;
 use token::Token;
@@ -94,8 +96,8 @@ impl<T> Timer<T> {
      *
      */
 
-    pub fn timeout_ms(&mut self, token: T, delay: u64) -> TimerResult<Timeout> {
-        let at = self.now_ms() + delay;
+    pub fn timeout(&mut self, token: T, delay: Duration) -> TimerResult<Timeout> {
+        let at = self.now_ms() + (max(0, delay.num_milliseconds()) as u64);
         self.timeout_at_ms(token, at)
     }
 
