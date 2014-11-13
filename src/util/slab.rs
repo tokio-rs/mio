@@ -72,7 +72,9 @@ impl<T> Slab<T> {
     }
 
     #[inline]
-    pub fn contains(&self, idx: uint) -> bool {
+    pub fn contains(&self, idx: Token) -> bool {
+        let idx = self.token_to_idx(idx);
+
         if idx <= MAX {
             let idx = idx as int;
 
