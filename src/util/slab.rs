@@ -72,7 +72,9 @@ impl<T> Slab<T> {
     }
 
     #[inline]
-    pub fn contains(&self, idx: uint) -> bool {
+    pub fn contains(&self, idx: Token) -> bool {
+        let idx = self.token_to_idx(idx);
+
         if idx <= MAX {
             let idx = idx as int;
 
@@ -399,5 +401,14 @@ mod tests {
     fn test_accessing_out_of_bounds() {
         let slab = Slab::<uint>::new(16);
         slab[Token(0)];
+    }
+
+    #[test]
+    fn test_contains() {
+        let mut slab = Slab::new_starting_at(Token(5),16);
+        assert!(!slab.contains(Token(0)));
+
+        let tok = slab.insert(111u).unwrap();
+        assert!(slab.contains(tok));
     }
 }
