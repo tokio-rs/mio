@@ -402,4 +402,13 @@ mod tests {
         let slab = Slab::<uint>::new(16);
         slab[Token(0)];
     }
+
+    #[test]
+    fn test_contains() {
+        let mut slab = Slab::new_starting_at(Token(5),16);
+        assert!(!slab.contains(Token(0)));
+
+        let tok = slab.insert(111u).unwrap();
+        assert!(slab.contains(tok));
+    }
 }
