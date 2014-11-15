@@ -1,6 +1,6 @@
 use std::mem;
 use error::{MioResult, MioError};
-use net::{AddressFamily, Inet, Inet6, SockAddr, InetAddr, IPv4Addr, SocketType, Dgram, Stream};
+use net::{AddressFamily, Inet, Inet6, Unix, SockAddr, InetAddr, UnixAddr, IPv4Addr, SocketType, Dgram, Stream};
 pub use std::io::net::ip::IpAddr;
 
 mod nix {
@@ -90,7 +90,7 @@ pub fn socket(af: AddressFamily, sock_type: SocketType) -> MioResult<IoDesc> {
     let family = match af {
         Inet  => nix::AF_INET,
         Inet6 => nix::AF_INET6,
-        _     => unimplemented!()
+        Unix  => nix::AF_UNIX
     };
 
     let socket_type = match sock_type {
@@ -258,6 +258,15 @@ fn to_sockaddr(addr: &nix::SockAddr) -> SockAddr {
         nix::SockIpV4(sin) => {
             InetAddr(u32be_to_ipv4(sin.sin_addr.s_addr), Int::from_be(sin.sin_port))
         }
+        nix::SockUnix(addr) => {
+            let mut str_path = String::new();
+            for c in addr.sun_path.iter() {
+                if *c == 0 { break; }
+                str_path.push(*c as u8 as char);
+            }
+
+            UnixAddr(Path::new(str_path))
+        }
         _ => unimplemented!()
     }
 }
@@ -280,7 +289,19 @@ fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {
                 _ => unimplemented!()
             }
         }
-        _ => unimplemented!()
+        UnixAddr(ref path) => {
+            let mut addr: nix::sockaddr_un = unsafe { mem::zeroed() };
+
+            addr.sun_family = nix::AF_UNIX as nix::sa_family_t;
+
+            let c_path_ptr = path.to_c_str();
+            assert!(c_path_ptr.len() < addr.sun_path.len());
+            for (sp_iter, path_iter) in addr.sun_path.iter_mut().zip(c_path_ptr.iter()) {
+                *sp_iter = path_iter as i8;
+            }
+
+            nix::SockUnix(addr)
+        }
     }
 }
 
