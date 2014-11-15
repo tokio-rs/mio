@@ -76,6 +76,10 @@ impl SockAddr {
         }
     }
 
+    pub fn from_path(p: Path) -> SockAddr {
+        UnixAddr(p)
+    }
+
     #[inline]
     pub fn consume_std(addr: StdSocketAddr) -> SockAddr {
         InetAddr(addr.ip, addr.port)
@@ -387,12 +391,47 @@ pub mod udp {
 
 pub mod pipe {
     use os;
-    use io::{IoHandle};
-    use net::Socket;
+    use error::MioResult;
+    use buf::{Buf, MutBuf};
+    use io;
+    use io::{IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
+    use io::NonBlock::{Ready, WouldBlock};
+    use net::{Socket, SockAddr, SocketType};
+    use net::SocketType::Stream;
+    use net::AddressFamily::Unix;
 
     #[deriving(Show)]
     pub struct UnixSocket {
         desc: os::IoDesc
+    }
+
+    impl UnixSocket {
+        pub fn stream() -> MioResult<UnixSocket> {
+            UnixSocket::new(Stream)
+        }
+
+        fn new(socket_type: SocketType) -> MioResult<UnixSocket> {
+            Ok(UnixSocket { desc: try!(os::socket(Unix, socket_type)) })
+        }
+
+        pub fn connect(&self, addr: &SockAddr) -> MioResult<()> {
+            debug!("socket connect; addr={}", addr);
+
+            // Attempt establishing the context. This may not complete immediately.
+            if try!(os::connect(&self.desc, addr)) {
+                // On some OSs, connecting to localhost succeeds immediately. In
+                // this case, queue the writable callback for execution during the
+                // next event loop tick.
+                debug!("socket connected immediately; addr={}", addr);
+            }
+
+            Ok(())
+        }
+
+        pub fn bind(self, addr: &SockAddr) -> MioResult<UnixListener> {
+            try!(os::bind(&self.desc, addr))
+            Ok(UnixListener { desc: self.desc })
+        }
     }
 
     impl IoHandle for UnixSocket {
@@ -401,7 +440,74 @@ pub mod pipe {
         }
     }
 
+    impl IoReader for UnixSocket {
+        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<(uint)>> {
+            io::read(self, buf)
+        }
+    }
+
+    impl IoWriter for UnixSocket {
+        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<(uint)>> {
+            io::write(self, buf)
+        }
+    }
+
     impl Socket for UnixSocket {
+    }
+
+    #[deriving(Show)]
+    pub struct UnixListener {
+        desc: os::IoDesc,
+    }
+
+    impl UnixListener {
+        pub fn listen(self, backlog: uint) -> MioResult<UnixAcceptor> {
+            try!(os::listen(self.desc(), backlog));
+            Ok(UnixAcceptor { desc: self.desc })
+        }
+    }
+
+    impl IoHandle for UnixListener {
+        fn desc(&self) -> &os::IoDesc {
+            &self.desc
+        }
+    }
+
+    #[deriving(Show)]
+    pub struct UnixAcceptor {
+        desc: os::IoDesc,
+    }
+
+    impl UnixAcceptor {
+        pub fn new(addr: &SockAddr, backlog: uint) -> MioResult<UnixAcceptor> {
+            let sock = try!(UnixSocket::stream());
+            let listener = try!(sock.bind(addr));
+            listener.listen(backlog)
+        }
+    }
+
+    impl IoHandle for UnixAcceptor {
+        fn desc(&self) -> &os::IoDesc {
+            &self.desc
+        }
+    }
+
+    impl Socket for UnixAcceptor {
+    }
+
+    impl IoAcceptor<UnixSocket> for UnixAcceptor {
+        fn accept(&mut self) -> MioResult<NonBlock<UnixSocket>> {
+            match os::accept(self.desc()) {
+                Ok(sock) => Ok(Ready(UnixSocket { desc: sock })),
+                Err(e) => {
+                    if e.is_would_block() {
+                        return Ok(WouldBlock);
+                    }
+
+                    return Err(e);
+                }
+            }
+        }
     }
 }
 

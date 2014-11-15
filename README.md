@@ -7,13 +7,12 @@ little overhead as possible over the OS abstractions.
 
 * Event loop backed by epoll, kqueue.
 * Zero allocations at runtime
-* Non-blocking TCP sockets
+* Non-blocking TCP, UDP and Unix domain sockets
 * High performance timer system
 * Thread safe message channel for cross thread communication
 
 __Coming soon__
 
-* UDP and Unix domain sockets
 * Signal handling
 
 ## Non goals
