@@ -1,7 +1,7 @@
 use std::uint;
+use std::num::UnsignedInt;
 use std::cmp::max;
 use std::time::duration::Duration;
-use std::num;
 use time::precise_time_ns;
 use token::Token;
 use util::Slab;
@@ -43,8 +43,8 @@ pub struct Timeout {
 
 impl<T> Timer<T> {
     pub fn new(tick_ms: u64, mut slots: uint, mut capacity: uint) -> Timer<T> {
-        slots = num::next_power_of_two(slots);
-        capacity = num::next_power_of_two(capacity);
+        slots = UnsignedInt::next_power_of_two(slots);
+        capacity = UnsignedInt::next_power_of_two(capacity);
 
         Timer {
             tick_ms: tick_ms,
