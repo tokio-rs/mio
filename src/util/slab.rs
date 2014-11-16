@@ -1,4 +1,5 @@
 use std::{mem, ptr, int};
+use std::num::Int;
 use alloc::heap;
 use token::Token;
 
@@ -36,7 +37,7 @@ impl<T> Slab<T> {
         // - Use a power of 2 capacity
         // - Ensure that mem size is less than uint::MAX
 
-        let size = cap.checked_mul(&mem::size_of::<Entry<T>>())
+        let size = cap.checked_mul(mem::size_of::<Entry<T>>())
             .expect("capacity overflow");
 
         let ptr = unsafe { heap::allocate(size, mem::min_align_of::<Entry<T>>()) };

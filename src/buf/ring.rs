@@ -1,4 +1,5 @@
-use std::{cmp, fmt, mem, num, ptr};
+use std::{cmp, fmt, mem, ptr};
+use std::num::UnsignedInt;
 use std::io::IoResult;
 use std::raw::Slice as RawSlice;
 use alloc::heap;
@@ -28,7 +29,7 @@ impl RingBuf {
         }
 
         // Round to the next power of 2 for better alignment
-        capacity = num::next_power_of_two(capacity);
+        capacity = UnsignedInt::next_power_of_two(capacity);
 
         // Allocate the memory
         let ptr = unsafe { heap::allocate(capacity, mem::min_align_of::<u8>()) };
