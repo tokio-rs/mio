@@ -8,6 +8,10 @@ authors = ["Carl Lerche <me@carllerche.com>"]
 
 git = "https://github.com/carllerche/nix-rust"
 
+[dependencies.time]
+
+git = "https://github.com/rust-lang/time"
+
 [[test]]
 
 name = "test"
