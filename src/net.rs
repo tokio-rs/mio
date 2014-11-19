@@ -369,8 +369,6 @@ pub mod udp {
 }
 
 pub mod pipe {
-    use std::io::fs::PathExtensions;
-    use std::io::fs;
     use os;
     use error::MioResult;
     use buf::{Buf, MutBuf};
@@ -378,7 +376,6 @@ pub mod pipe {
     use io::{IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
     use io::NonBlock::{Ready, WouldBlock};
     use net::{Socket, SockAddr, SocketType};
-    use net::SockAddr::UnixAddr;
     use net::SocketType::Stream;
     use net::AddressFamily::Unix;
 
@@ -397,14 +394,6 @@ pub mod pipe {
         }
 
         pub fn bind(self, addr: &SockAddr) -> MioResult<UnixListener> {
-            match *addr {
-                UnixAddr(ref path) => {
-                    if path.exists() {
-                        fs::unlink(path).unwrap();
-                    }
-                }
-                _ => error!("SockAddr must be UnixAddr"),
-            }
             try!(os::bind(&self.desc, addr))
             Ok(UnixListener { desc: self.desc })
         }
