@@ -1,4 +1,5 @@
 use std::mem;
+use std::num::Int;
 use error::{MioResult, MioError};
 use net::{AddressFamily, SockAddr, IPv4Addr, SocketType};
 use net::SocketType::{Dgram, Stream};
