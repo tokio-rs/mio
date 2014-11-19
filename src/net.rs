@@ -1,5 +1,5 @@
 use std::fmt;
-use std::from_str::FromStr;
+use std::str::FromStr;
 use std::io::net::ip::SocketAddr as StdSocketAddr;
 use io::{IoHandle, NonBlock};
 use error::MioResult;
