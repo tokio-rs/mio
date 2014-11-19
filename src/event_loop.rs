@@ -1,4 +1,5 @@
 use std::default::Default;
+use std::time::duration::Duration;
 use std::uint;
 use error::{MioResult, MioError};
 use handler::Handler;
@@ -95,8 +96,8 @@ impl<T, M: Send> EventLoop<T, M> {
 
     /// After the requested time interval, the handler's `timeout` function
     /// will be called with the supplied token.
-    pub fn timeout_ms(&mut self, token: T, delay: u64) -> TimerResult<Timeout> {
-        self.timer.timeout_ms(token, delay)
+    pub fn timeout(&mut self, token: T, delay: Duration) -> TimerResult<Timeout> {
+        self.timer.timeout(token, delay)
     }
 
     /// If the supplied timeout has not been triggered, cancel it such that it

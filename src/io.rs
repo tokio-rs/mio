@@ -2,6 +2,8 @@ use buf::{Buf, MutBuf};
 use os;
 use error::MioResult;
 
+use self::NonBlock::{Ready, WouldBlock};
+
 #[deriving(Show)]
 pub enum NonBlock<T> {
     Ready(T),

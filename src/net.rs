@@ -1,5 +1,5 @@
 use std::fmt;
-use std::from_str::FromStr;
+use std::str::FromStr;
 use std::io::net::ip::SocketAddr as StdSocketAddr;
 use io::{IoHandle, NonBlock};
 use error::MioResult;
@@ -9,6 +9,9 @@ use os;
 pub use std::io::net::ip::{IpAddr, Port};
 pub use std::io::net::ip::Ipv4Addr as IPv4Addr;
 pub use std::io::net::ip::Ipv6Addr as IPv6Addr;
+
+use self::SockAddr::{InetAddr,UnixAddr};
+use self::AddressFamily::{Unix,Inet,Inet6};
 
 pub trait Socket : IoHandle {
     fn linger(&self) -> MioResult<uint> {
@@ -133,8 +136,11 @@ pub mod tcp {
     use error::MioResult;
     use buf::{Buf, MutBuf};
     use io;
-    use io::{IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock, Ready, WouldBlock};
-    use net::{AddressFamily, Socket, SockAddr, Inet, Inet6, Stream};
+    use io::{IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
+    use io::NonBlock::{Ready, WouldBlock};
+    use net::{AddressFamily, Socket, SockAddr};
+    use net::SocketType::Stream;
+    use net::AddressFamily::{Inet, Inet6};
 
     #[deriving(Show)]
     pub struct TcpSocket {
@@ -241,8 +247,11 @@ pub mod udp {
     use os;
     use error::MioResult;
     use buf::{Buf, MutBuf};
-    use io::{IoHandle, IoReader, IoWriter, NonBlock, Ready, WouldBlock};
-    use net::{AddressFamily, Socket, MulticastSocket, SockAddr, Inet, Dgram};
+    use io::{IoHandle, IoReader, IoWriter, NonBlock};
+    use io::NonBlock::{Ready, WouldBlock};
+    use net::{AddressFamily, Socket, MulticastSocket, SockAddr};
+    use net::SocketType::Dgram;
+    use net::AddressFamily::Inet;
     use super::UnconnectedSocket;
 
     #[deriving(Show)]
@@ -366,8 +375,12 @@ pub mod pipe {
     use error::MioResult;
     use buf::{Buf, MutBuf};
     use io;
-    use io::{IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock, Ready, WouldBlock};
-    use net::{Socket, Unix, SockAddr, UnixAddr, SocketType, Stream};
+    use io::{IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
+    use io::NonBlock::{Ready, WouldBlock};
+    use net::{Socket, SockAddr, SocketType};
+    use net::SockAddr::UnixAddr;
+    use net::SocketType::Stream;
+    use net::AddressFamily::Unix;
 
     #[deriving(Show)]
     pub struct UnixSocket {

@@ -1,6 +1,15 @@
 use std::io;
 use nix::errno::{SysError, EAGAIN};
 
+use self::MioErrorKind::{
+    Eof,
+    BufUnderflow,
+    BufOverflow,
+    WouldBlock,
+    EventLoopTerminated,
+    OtherError
+};
+
 pub type MioResult<T> = Result<T, MioError>;
 
 #[deriving(Show, PartialEq, Clone)]

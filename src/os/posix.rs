@@ -1,6 +1,10 @@
 use std::mem;
+use std::num::Int;
 use error::{MioResult, MioError};
-use net::{AddressFamily, Inet, Inet6, Unix, SockAddr, InetAddr, UnixAddr, IPv4Addr, SocketType, Dgram, Stream};
+use net::{AddressFamily, SockAddr, IPv4Addr, SocketType};
+use net::SocketType::{Dgram, Stream};
+use net::SockAddr::{InetAddr, UnixAddr};
+use net::AddressFamily::{Inet, Inet6, Unix};
 pub use std::io::net::ip::IpAddr;
 
 mod nix {

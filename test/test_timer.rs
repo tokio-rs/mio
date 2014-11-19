@@ -1,7 +1,10 @@
+use std::time::duration::Duration;
 use mio::*;
 use mio::net::*;
 use mio::net::tcp::*;
 use super::localhost;
+
+use self::TestState::{Initial, AfterHup, AfterRead};
 
 type TestEventLoop = EventLoop<TcpSocket, ()>;
 
@@ -37,7 +40,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
             SERVER => {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().unwrap();
-                event_loop.timeout_ms(conn, 200).unwrap();
+                event_loop.timeout(conn, Duration::milliseconds(200)).unwrap();
             }
             CLIENT => {
                 debug!("client readable");

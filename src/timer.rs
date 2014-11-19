@@ -1,8 +1,12 @@
 use std::uint;
-use std::num;
+use std::cmp::max;
+use std::time::duration::Duration;
+use std::num::UnsignedInt;
 use time::precise_time_ns;
 use token::Token;
 use util::Slab;
+
+use self::TimerErrorKind::TimerOverflow;
 
 const EMPTY: Token = Token(uint::MAX);
 const NS_PER_MS: u64 = 1_000_000;
@@ -41,8 +45,8 @@ pub struct Timeout {
 
 impl<T> Timer<T> {
     pub fn new(tick_ms: u64, mut slots: uint, mut capacity: uint) -> Timer<T> {
-        slots = num::next_power_of_two(slots);
-        capacity = num::next_power_of_two(capacity);
+        slots = UnsignedInt::next_power_of_two(slots);
+        capacity = UnsignedInt::next_power_of_two(capacity);
 
         Timer {
             tick_ms: tick_ms,
@@ -94,8 +98,8 @@ impl<T> Timer<T> {
      *
      */
 
-    pub fn timeout_ms(&mut self, token: T, delay: u64) -> TimerResult<Timeout> {
-        let at = self.now_ms() + delay;
+    pub fn timeout(&mut self, token: T, delay: Duration) -> TimerResult<Timeout> {
+        let at = self.now_ms() + (max(0, delay.num_milliseconds()) as u64);
         self.timeout_at_ms(token, at)
     }
 
@@ -359,7 +363,7 @@ mod test {
         assert_eq!(None, t.tick_to(tick));
 
         rcv.sort();
-        assert!(rcv.as_slice() == ["a", "b"], "actual={}", rcv.as_slice());
+        assert!(rcv.as_slice() == &["a", "b"], "actual={}", rcv.as_slice());
 
         tick = t.ms_to_tick(200);
         assert_eq!(None, t.tick_to(tick));

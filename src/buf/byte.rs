@@ -1,4 +1,5 @@
-use std::{cmp, mem, num, ptr};
+use std::{cmp, mem, ptr};
+use std::num::UnsignedInt;
 use std::io::IoResult;
 use std::raw;
 use alloc::heap;
@@ -23,7 +24,7 @@ impl ByteBuf {
             }
         }
 
-        capacity = num::next_power_of_two(capacity);
+        capacity = UnsignedInt::next_power_of_two(capacity);
 
         let ptr = unsafe { heap::allocate(capacity, mem::min_align_of::<u8>()) };
 
