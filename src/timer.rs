@@ -6,6 +6,8 @@ use time::precise_time_ns;
 use token::Token;
 use util::Slab;
 
+use self::TimerErrorKind::TimerOverflow;
+
 const EMPTY: Token = Token(uint::MAX);
 const NS_PER_MS: u64 = 1_000_000;
 

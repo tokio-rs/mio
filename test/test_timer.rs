@@ -4,6 +4,8 @@ use mio::net::*;
 use mio::net::tcp::*;
 use super::localhost;
 
+use self::TestState::{Initial, AfterHup, AfterRead};
+
 type TestEventLoop = EventLoop<TcpSocket, ()>;
 
 const SERVER: Token = Token(0);

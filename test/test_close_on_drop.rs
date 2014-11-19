@@ -4,6 +4,8 @@ use mio::net::*;
 use mio::net::tcp::*;
 use super::localhost;
 
+use self::TestState::{Initial, AfterRead, AfterHup};
+
 type TestEventLoop = EventLoop<uint, ()>;
 
 #[deriving(Show, PartialEq)]
