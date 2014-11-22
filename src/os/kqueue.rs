@@ -3,7 +3,7 @@ use nix::fcntl::Fd;
 use nix::sys::event::*;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use poll::{IoEvent, IOREADABLE, IOWRITABLE, IOERROR, IOHINTED, IOHUPHINT};
+use poll::{IoEvent, IoEventKind, IOREADABLE, IOWRITABLE, IOERROR, IOHINTED, IOHUPHINT};
 
 pub struct Selector {
     kq: Fd,
@@ -34,6 +34,20 @@ impl Selector {
 
         try!(self.ev_push(io, EVFILT_READ, flag, FilterFlag::empty(), token));
         try!(self.ev_push(io, EVFILT_WRITE, flag, FilterFlag::empty(), token));
+
+        Ok(())
+    }
+
+    pub fn register_events(&mut self, io: &IoDesc, token: uint, events: IoEventKind) -> MioResult<()> {
+        let flag = EV_ADD | EV_CLEAR;
+
+        if events.contains(IOREADABLE) {
+            try!(self.ev_push(io, EVFILT_READ, flag, FilterFlag::empty(), token));
+        }
+
+        if events.contains(IOWRITABLE) {
+            try!(self.ev_push(io, EVFILT_WRITE, flag, FilterFlag::empty(), token));
+        }
 
         Ok(())
     }

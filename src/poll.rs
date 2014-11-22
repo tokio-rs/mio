@@ -27,6 +27,15 @@ impl Poll {
         Ok(())
     }
 
+    pub fn register_events<H: IoHandle>(&mut self, io: &H, token: Token, events: IoEventKind) -> MioResult<()> {
+        debug!("registering IO events with poller");
+
+        // Register interests for this socket
+        try!(self.selector.register_events(io.desc(), token.as_uint(), events));
+
+        Ok(())
+    }
+
     pub fn poll(&mut self, timeout_ms: uint) -> MioResult<uint> {
         try!(self.selector.select(&mut self.events, timeout_ms));
         Ok(self.events.len())

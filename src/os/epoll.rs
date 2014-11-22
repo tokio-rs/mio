@@ -39,6 +39,28 @@ impl Selector {
         epoll_ctl(self.epfd, EpollCtlAdd, io.fd, &info)
             .map_err(MioError::from_sys_error)
     }
+
+    /// Register specific event interests for the given IO handle with the OS
+    pub fn register_events(&mut self, io: &IoDesc, token: uint, events: IoEventKind) -> MioResult<()> {
+        // Always process errors
+        let mut interests = EPOLLERR | EPOLLRDHUP;
+
+        if events.contains(IOREADABLE) {
+            interests = interests | EPOLLIN;
+        }
+
+        if events.contains(IOWRITABLE) {
+            interests = interests | EPOLLOUT;
+        }
+
+        let info = EpollEvent {
+            events: interests | EPOLLET,
+            data: token as u64
+        };
+
+        epoll_ctl(self.epfd, EpollCtlAdd, io.fd, &info)
+            .map_err(MioError::from_sys_error)
+    }
 }
 
 impl Drop for Selector {

@@ -7,7 +7,7 @@ use io::IoHandle;
 use net::{Socket, SockAddr};
 use notify::Notify;
 use os;
-use poll::{Poll, IoEvent};
+use poll::{Poll, IoEvent, IoEventKind};
 use timer::{Timer, Timeout, TimerResult};
 use token::Token;
 
@@ -115,6 +115,11 @@ impl<T, M: Send> EventLoop<T, M> {
     /// Registers an IO handle with the event loop.
     pub fn register<H: IoHandle>(&mut self, io: &H, token: Token) -> MioResult<()> {
         self.poll.register(io, token)
+    }
+
+    /// Registers an IO handle for specific events with the event loop.
+    pub fn register_events<H: IoHandle>(&mut self, io: &H, token: Token, events: IoEventKind) -> MioResult<()> {
+        self.poll.register_events(io, token, events)
     }
 
     /// Connects the socket to the specified address. When the operation
