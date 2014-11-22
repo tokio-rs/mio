@@ -266,7 +266,7 @@ pub fn test_echo_server() {
         .listen(256u).unwrap();
 
     info!("listen for connections");
-    event_loop.register(&srv, SERVER).unwrap();
+    event_loop.register_events(&srv, SERVER, IOREADABLE).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 

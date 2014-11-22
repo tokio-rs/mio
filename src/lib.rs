@@ -40,6 +40,11 @@ pub use poll::{
     Poll,
     IoEvent,
     IoEventKind,
+    IOREADABLE,
+    IOWRITABLE,
+    IOERROR,
+    IOHUPHINT,
+    IOHINTED,
 };
 pub use event_loop::{
     EventLoop,
