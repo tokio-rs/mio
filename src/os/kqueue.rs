@@ -38,6 +38,15 @@ impl Selector {
         Ok(())
     }
 
+    pub fn deregister(&mut self, io: &IoDesc) -> MioResult<()> {
+        let flag = EV_DELETE;
+
+        try!(self.ev_push(io, EVFILT_READ, flag, FilterFlag::empty(), 0));
+        try!(self.ev_push(io, EVFILT_WRITE, flag, FilterFlag::empty(), 0));
+
+        Ok(())
+    }
+
     // Queues an event change. Events will get submitted to the OS on the next
     // call to select or when the change buffer fills up.
     fn ev_push(&mut self,
