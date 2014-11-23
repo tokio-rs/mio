@@ -39,6 +39,21 @@ impl Selector {
         epoll_ctl(self.epfd, EpollCtlAdd, io.fd, &info)
             .map_err(MioError::from_sys_error)
     }
+
+    /// Deregister event interests for the given IO handle with the OS
+    pub fn deregister(&mut self, io: &IoDesc) -> MioResult<()> {
+
+        // The &info argument should be ignored by the system,
+        // but linux < 2.6.9 required it to be not null.
+        // For compatibility, we provide a dummy EpollEvent.
+        let info = EpollEvent {
+            events: EpollEventKind::empty(),
+            data: 0
+        };
+
+        epoll_ctl(self.epfd, EpollCtlDel, io.fd, &info)
+            .map_err(MioError::from_sys_error)
+    }
 }
 
 impl Drop for Selector {

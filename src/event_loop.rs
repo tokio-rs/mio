@@ -117,6 +117,11 @@ impl<T, M: Send> EventLoop<T, M> {
         self.poll.register(io, token)
     }
 
+    /// Deregisters an IO handle with the event loop.
+    pub fn deregister<H: IoHandle>(&mut self, io: &H) -> MioResult<()> {
+        self.poll.deregister(io)
+    }
+
     /// Connects the socket to the specified address. When the operation
     /// completes, the handler will be notified with the supplied token.
     ///

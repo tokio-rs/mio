@@ -27,6 +27,15 @@ impl Poll {
         Ok(())
     }
 
+    pub fn deregister<H: IoHandle>(&mut self, io: &H) -> MioResult<()> {
+        debug!("deregistering IO with poller");
+
+        // Deregister interests for this socket
+        try!(self.selector.deregister(io.desc()));
+
+        Ok(())
+    }
+
     pub fn poll(&mut self, timeout_ms: uint) -> MioResult<uint> {
         try!(self.selector.select(&mut self.events, timeout_ms));
         Ok(self.events.len())
