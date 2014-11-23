@@ -32,11 +32,11 @@ impl Selector {
 
     pub fn register(&mut self, io: &IoDesc, token: uint, interests: Interest, opts: PollOpt) -> MioResult<()> {
         if interests.contains(event::READABLE) {
-            try!(self.ev_push(io, EVFILT_READ, token, opts));
+            try!(self.ev_register(io, token, EVFILT_READ, opts));
         }
 
         if interests.contains(event::WRITABLE) {
-            try!(self.ev_push(io, EVFILT_WRITE, token, opts));
+            try!(self.ev_register(io, token, EVFILT_WRITE, opts));
         }
 
         Ok(())
@@ -48,19 +48,16 @@ impl Selector {
         self.register(io, token, interests, opts)
     }
 
-    // Queues an event change. Events will get submitted to the OS on the next
-    // call to select or when the change buffer fills up.
-    //
-    // EV_ADD       Add a filter or modify
-    // EV_DELETE    remove a filter
-    // EV_ONESHOT   one shot behavior
-    // EV_CLEAR     clear event after returning
-    fn ev_push(&mut self, io: &IoDesc, filter: EventFilter, token: uint, opts: PollOpt) -> MioResult<()> {
-        try!(self.maybe_flush_changes());
+    pub fn deregister(&mut self, io: &IoDesc) -> MioResult<()> {
+        let flag = EV_DELETE;
 
-        let idx = self.changes.len;
-        let ev = &mut self.changes.events[idx];
+        try!(self.ev_push(io, 0, EVFILT_READ, flag));
+        try!(self.ev_push(io, 0, EVFILT_WRITE, flag));
 
+        Ok(())
+    }
+
+    fn ev_register(&mut self, io: &IoDesc, token: uint, filter: EventFilter, opts: PollOpt) -> MioResult<()> {
         let mut flags = EV_ADD;
 
         if opts.contains(event::EDGE) {
@@ -70,6 +67,15 @@ impl Selector {
         if opts.contains(event::ONESHOT) {
             flags = flags | EV_ONESHOT;
         }
+
+        self.ev_push(io, token, filter, flags)
+    }
+
+    fn ev_push(&mut self, io: &IoDesc, token: uint, filter: EventFilter, flags: EventFlag) -> MioResult<()> {
+        try!(self.maybe_flush_changes());
+
+        let idx = self.changes.len;
+        let ev = &mut self.changes.events[idx];
 
         ev_set(ev, io.fd as uint, filter, flags, FilterFlag::empty(), token);
 

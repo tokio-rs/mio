@@ -142,6 +142,11 @@ impl<T, M: Send> EventLoop<T, M> {
         Ok(handler)
     }
 
+    /// Deregisters an IO handle with the event loop.
+    pub fn deregister<H: IoHandle>(&mut self, io: &H) -> MioResult<()> {
+        self.poll.deregister(io)
+    }
+
     /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
