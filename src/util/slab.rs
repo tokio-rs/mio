@@ -1,7 +1,7 @@
 use std::{mem, ptr, int};
 use std::num::Int;
 use alloc::heap;
-use token::Token;
+use os::token::Token;
 
 /// A preallocated chunk of memory for storing objects of the same type.
 pub struct Slab<T> {

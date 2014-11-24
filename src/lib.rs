@@ -19,13 +19,10 @@ pub use buf::{
 pub use error::{
     MioResult,
     MioError,
+    MioErrorKind
 };
 pub use handler::{
     Handler,
-    ReadHint,
-    DATAHINT,
-    HUPHINT,
-    ERRORHINT,
 };
 pub use io::{
     pipe,
@@ -37,9 +34,7 @@ pub use io::{
     PipeWriter,
 };
 pub use poll::{
-    Poll,
-    IoEvent,
-    IoEventKind,
+    Poll
 };
 pub use event_loop::{
     EventLoop,
@@ -50,9 +45,11 @@ pub use event_loop::{
 pub use timer::{
     Timeout,
 };
-pub use token::{
+pub use os::token::{
     Token,
 };
+
+pub use os::event;
 
 pub mod buf;
 pub mod net;
@@ -66,4 +63,3 @@ mod notify;
 mod os;
 mod poll;
 mod timer;
-mod token;
