@@ -67,6 +67,16 @@ impl ByteBuf {
     }
 }
 
+impl Drop for ByteBuf {
+    fn drop(&mut self) {
+        if self.cap > 0 {            
+            unsafe {
+                heap::deallocate(self.ptr, self.cap, mem::min_align_of::<u8>())
+            }
+        }
+    }
+}
+
 impl Buf for ByteBuf {
     fn remaining(&self) -> uint {
         self.lim - self.pos
