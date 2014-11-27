@@ -1,9 +1,10 @@
 use mio::*;
 use mio::net::*;
 use mio::net::tcp::*;
-use mio::buf::{ByteBuf, RingBuf, SliceBuf};
+use mio::buf::{ByteBuf, SliceBuf};
 use mio::util::Slab;
 use super::localhost;
+use mio::event as evt;
 
 type TestEventLoop = EventLoop<uint, ()>;
 
@@ -12,73 +13,65 @@ const CLIENT: Token = Token(1);
 
 struct EchoConn {
     sock: TcpSocket,
-    readable: bool,
-    writable: bool,
-    buf: RingBuf
+    buf: ByteBuf,
+    token: Token,
+    interest: evt::Interest
 }
 
 impl EchoConn {
     fn new(sock: TcpSocket) -> EchoConn {
         EchoConn {
             sock: sock,
-            readable: false,
-            writable: false,
-            buf: RingBuf::new(1024)
+            buf: ByteBuf::new(2048),
+            token: Token(-1),
+            interest: evt::HUP
         }
     }
 
-    fn readable(&mut self) -> MioResult<()> {
-        self.readable = true;
-        self.echo()
-    }
+    fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+        debug!("CON : writing buf = {}", self.buf.bytes());
 
-    fn writable(&mut self) -> MioResult<()> {
-        self.writable = true;
-        self.echo()
-    }
+        match self.sock.write(&mut self.buf) {
+            Ok(NonBlock::WouldBlock) => {
+                debug!("client flushing buf; WOULDBLOCK");
+                self.interest.insert(evt::WRITABLE);
+            }
+            Ok(NonBlock::Ready(r)) => {
+                debug!("CONN : we wrote {} bytes!", r);
 
-    fn can_continue(&self) -> bool {
-        (self.readable && !self.buf.is_full()) ||
-            (self.writable && !self.buf.is_empty())
-    }
-
-    fn echo(&mut self) -> MioResult<()> {
-        while self.can_continue() {
-            try!(self.fill_buf());
-            try!(self.flush_buf());
+                self.buf.clear();
+                self.interest.insert(evt::READABLE);
+                self.interest.remove(evt::WRITABLE);
+            }
+            Err(e) => debug!("not implemented; client err={}", e),
         }
 
-        Ok(())
+        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
     }
 
-    fn fill_buf(&mut self) -> MioResult<()> {
-        if !self.readable {
-            return Ok(());
-        }
+    fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+        match self.sock.read(&mut self.buf) {
+            Ok(NonBlock::WouldBlock) => {
+                panic!("We just got readable, but were unable to read from the socket?");
+            }
+            Ok(NonBlock::Ready(r)) => {
+                debug!("CONN : we read {} bytes!", r);
+                self.interest.remove(evt::READABLE);
+                self.interest.insert(evt::WRITABLE);
+            }
+            Err(e) => {
+                debug!("not implemented; client err={}", e);
+                self.interest.remove(evt::READABLE);
+            }
 
-        debug!("server filling buf");
-        self.sock.read(&mut self.buf.writer())
-            .map(|res| {
-                if res.would_block() {
-                    debug!("  WOULDBLOCK");
-                    self.readable = false;
-                }
-            })
-    }
+        };
 
-    fn flush_buf(&mut self) -> MioResult<()> {
-        if !self.writable {
-            return Ok(());
-        }
+        // prepare to provide this to writable
+        self.buf.flip();
 
-        debug!("server flushing buf");
-        self.sock.write(&mut self.buf.reader())
-            .map(|res| {
-                if res.would_block() {
-                    debug!("  WOULDBLOCK");
-                    self.writable = false;
-                }
-            })
+        debug!("CON : read buf = {}", self.buf.bytes());
+
+        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
     }
 }
 
@@ -88,26 +81,30 @@ struct EchoServer {
 }
 
 impl EchoServer {
-    fn accept(&mut self, event_loop: &mut TestEventLoop) {
+    fn accept(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
         debug!("server accepting socket");
+
         let sock = self.sock.accept().unwrap().unwrap();
-        let conn = EchoConn::new(sock);
+        let conn = EchoConn::new(sock,);
         let tok = self.conns.insert(conn)
             .ok().expect("could not add connectiont o slab");
 
         // Register the connection
-        event_loop.register(&self.conns[tok].sock, tok)
+        self.conns[tok].token = tok;
+        event_loop.register_opt(&self.conns[tok].sock, tok, evt::READABLE, evt::PollOpt::edge())
             .ok().expect("could not register socket with event loop");
+
+        Ok(())
     }
 
-    fn conn_readable(&mut self, tok: Token) {
+    fn conn_readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
         debug!("server conn readable; tok={}", tok);
-        self.conn(tok).readable().unwrap();
+        self.conn(tok).readable(event_loop)
     }
 
-    fn conn_writable(&mut self, tok: Token) {
+    fn conn_writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
         debug!("server conn writable; tok={}", tok);
-        self.conn(tok).writable().unwrap();
+        self.conn(tok).writable(event_loop)
     }
 
     fn conn<'a>(&'a mut self, tok: Token) -> &'a mut EchoConn {
@@ -121,13 +118,14 @@ struct EchoClient {
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
     buf: ByteBuf,
-    writable: bool
+    token: Token,
+    interest: evt::Interest
 }
 
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: TcpSocket, mut msgs: Vec<&'static str>) -> EchoClient {
+    fn new(sock: TcpSocket, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
         let curr = msgs.remove(0).expect("At least one message is required");
 
         EchoClient {
@@ -135,64 +133,66 @@ impl EchoClient {
             msgs: msgs,
             tx: SliceBuf::wrap(curr.as_bytes()),
             rx: SliceBuf::wrap(curr.as_bytes()),
-            buf: ByteBuf::new(1024),
-            writable: false
+            buf: ByteBuf::new(2048),
+            token: tok,
+            interest: evt::Interest::empty()
         }
     }
 
-    fn readable(&mut self, event_loop: &mut TestEventLoop) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
         debug!("client socket readable");
 
-        loop {
-            let res = match self.sock.read(&mut self.buf) {
-                Ok(r) => r,
-                Err(e) => panic!("not implemented; client err={}", e)
-            };
-
-            // prepare for reading
-            self.buf.flip();
-
-            while self.buf.has_remaining() {
-                let actual = self.buf.read_byte().unwrap();
-                let expect = self.rx.read_byte().unwrap();
-
-                assert!(actual == expect);
+        match self.sock.read(&mut self.buf) {
+            Ok(NonBlock::WouldBlock) => {
+                panic!("We just got readable, but were unable to read from the socket?");
             }
-
-            self.buf.clear();
-
-            if !self.rx.has_remaining() {
-                self.next_msg(event_loop).unwrap();
+            Ok(NonBlock::Ready(r)) => {
+                debug!("CLIENT : We read {} bytes!", r);
             }
-
-            // Nothing else to do this round
-            if res.would_block() {
-                return;
+            Err(e) => {
+                panic!("not implemented; client err={}", e);
             }
+        };
+
+        // prepare for reading
+        self.buf.flip();
+
+        debug!("CLIENT : buf = {} -- rx = {}", self.buf.bytes(), self.rx.bytes());
+        while self.buf.has_remaining() {
+            let actual = self.buf.read_byte().unwrap();
+            let expect = self.rx.read_byte().unwrap();
+
+            assert!(actual == expect, "actual={}; expect={}", actual, expect);
         }
+
+        self.buf.clear();
+
+        self.interest.remove(evt::READABLE);
+
+        if !self.rx.has_remaining() {
+            self.next_msg(event_loop).unwrap();
+        }
+
+        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
     }
 
-    fn writable(&mut self) {
+    fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
         debug!("client socket writable");
 
-        self.writable = true;
-        self.flush_msg().unwrap();
-    }
-
-    fn flush_msg(&mut self) -> MioResult<()> {
-        if !self.writable {
-            return Ok(());
+        match self.sock.write(&mut self.tx) {
+            Ok(NonBlock::WouldBlock) => {
+                debug!("client flushing buf; WOULDBLOCK");
+                self.interest.insert(evt::WRITABLE);
+            }
+            Ok(NonBlock::Ready(r)) => {
+                debug!("CLIENT : we wrote {} bytes!", r);
+                self.interest.insert(evt::READABLE);
+                self.interest.remove(evt::WRITABLE);
+            }
+            Err(e) => debug!("not implemented; client err={}", e)
         }
 
-        self.sock.write(&mut self.tx)
-            .map(|res| {
-                if res.would_block() {
-                    debug!("client flushing buf; WOULDBLOCK");
-                    self.writable = false
-                } else {
-                    debug!("client flushed buf");
-                }
-            })
+        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
     }
 
     fn next_msg(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
@@ -208,7 +208,8 @@ impl EchoClient {
         self.tx = SliceBuf::wrap(curr.as_bytes());
         self.rx = SliceBuf::wrap(curr.as_bytes());
 
-        self.flush_msg()
+        self.interest.insert(evt::WRITABLE);
+        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
     }
 }
 
@@ -224,34 +225,34 @@ impl EchoHandler {
                 sock: srv,
                 conns: Slab::new_starting_at(Token(2), 128)
             },
-
-            client: EchoClient::new(client, msgs)
+            client: EchoClient::new(client, CLIENT, msgs)
         }
     }
 }
 
 impl Handler<uint, ()> for EchoHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: ReadHint) {
-        assert_eq!(hint, DATAHINT);
+    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: evt::ReadHint) {
+        assert_eq!(hint, evt::DATAHINT);
 
         match token {
-            SERVER => self.server.accept(event_loop),
-            CLIENT => self.client.readable(event_loop),
-            i => self.server.conn_readable(i)
-        }
+            SERVER => self.server.accept(event_loop).unwrap(),
+            CLIENT => self.client.readable(event_loop).unwrap(),
+            i => self.server.conn_readable(event_loop, i).unwrap()
+        };
     }
 
-    fn writable(&mut self, _event_loop: &mut TestEventLoop, token: Token) {
+    fn writable(&mut self, event_loop: &mut TestEventLoop, token: Token) {
         match token {
             SERVER => panic!("received writable for token 0"),
-            CLIENT => self.client.writable(),
-            i => self.server.conn_writable(i)
-        }
+            CLIENT => self.client.writable(event_loop).unwrap(),
+            _ => self.server.conn_writable(event_loop, token).unwrap()
+        };
     }
 }
 
 #[test]
 pub fn test_echo_server() {
+    debug!("Starting TEST_ECHO_SERVER");
     let mut event_loop = EventLoop::new().unwrap();
 
     let addr = SockAddr::parse(localhost().as_slice())
@@ -266,12 +267,13 @@ pub fn test_echo_server() {
         .listen(256u).unwrap();
 
     info!("listen for connections");
-    event_loop.register(&srv, SERVER).unwrap();
+    event_loop.register_opt(&srv, SERVER, evt::READABLE, evt::PollOpt::edge()).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    event_loop.connect(&sock, &addr, CLIENT).unwrap();
+    event_loop.register_opt(&sock, CLIENT, evt::WRITABLE, evt::PollOpt::edge()).unwrap();
+    sock.connect(&addr).unwrap();
 
     // Start the event loop
     event_loop.run(EchoHandler::new(srv, sock, vec!["foo", "bar"]))

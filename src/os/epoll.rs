@@ -4,7 +4,7 @@ use nix::sys::epoll::*;
 use nix::unistd::close;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use poll::{IoEvent, IoEventKind, IOREADABLE, IOWRITABLE, IOERROR, IOHINTED, IOHUPHINT};
+use os::event;
 
 pub struct Selector {
     epfd: Fd
@@ -28,17 +28,70 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, io: &IoDesc, token: uint) -> MioResult<()> {
-        let interests = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLRDHUP;
-
+    pub fn register(&mut self, io: &IoDesc, token: uint, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
         let info = EpollEvent {
-            events: interests | EPOLLET,
+            events: ioevent_to_epoll(interests, opts),
             data: token as u64
         };
 
         epoll_ctl(self.epfd, EpollCtlAdd, io.fd, &info)
             .map_err(MioError::from_sys_error)
     }
+
+    /// Register event interests for the given IO handle with the OS
+    pub fn reregister(&mut self, io: &IoDesc, token: uint, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+        let info = EpollEvent {
+            events: ioevent_to_epoll(interests, opts),
+            data: token as u64
+        };
+
+        epoll_ctl(self.epfd, EpollCtlMod, io.fd, &info)
+            .map_err(MioError::from_sys_error)
+    }
+
+    /// Deregister event interests for the given IO handle with the OS
+    pub fn deregister(&mut self, io: &IoDesc) -> MioResult<()> {
+        // The &info argument should be ignored by the system,
+        // but linux < 2.6.9 required it to be not null.
+        // For compatibility, we provide a dummy EpollEvent.
+        let info = EpollEvent {
+            events: EpollEventKind::empty(),
+            data: 0
+        };
+
+        epoll_ctl(self.epfd, EpollCtlDel, io.fd, &info)
+            .map_err(MioError::from_sys_error)
+    }
+}
+
+fn ioevent_to_epoll(interest: event::Interest, opts: event::PollOpt) -> EpollEventKind {
+    let mut kind = EpollEventKind::empty();
+
+    if interest.contains(event::READABLE) {
+        kind.insert(EPOLLIN);
+    }
+
+    if interest.contains(event::WRITABLE) {
+        kind.insert(EPOLLOUT);
+    }
+
+    if interest.contains(event::HUP) {
+        kind.insert(EPOLLRDHUP);
+    }
+
+    if opts.contains(event::EDGE) {
+        kind.insert(EPOLLET);
+    }
+
+    if opts.contains(event::ONESHOT) {
+        kind.insert(EPOLLONESHOT);
+    }
+
+    if opts.contains(event::LEVEL) {
+        kind.remove(EPOLLET);
+    }
+
+    kind
 }
 
 impl Drop for Selector {
@@ -66,33 +119,33 @@ impl Events {
     }
 
     #[inline]
-    pub fn get(&self, idx: uint) -> IoEvent {
+    pub fn get(&self, idx: uint) -> event::IoEvent {
         if idx >= self.len {
             panic!("invalid index");
         }
 
         let epoll = self.events[idx].events;
-        let mut kind = IoEventKind::empty() | IOHINTED;
+        let mut kind = event::Interest::empty() | event::HINTED;
 
         if epoll.contains(EPOLLIN) {
-            kind = kind | IOREADABLE;
+            kind = kind | event::READABLE;
         }
 
         if epoll.contains(EPOLLOUT) {
-            kind = kind | IOWRITABLE;
+            kind = kind | event::WRITABLE;
         }
 
         // EPOLLHUP - Usually means a socket error happened
         if epoll.contains(EPOLLERR) {
-            kind = kind | IOERROR;
+            kind = kind | event::ERROR;
         }
 
-        if epoll.contains(EPOLLRDHUP) {
-            kind = kind | IOHUPHINT;
+        if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
+            kind = kind | event::HUP;
         }
 
         let token = self.events[idx].data;
 
-        IoEvent::new(kind, token as uint)
+        event::IoEvent::new(kind, token as uint)
     }
 }

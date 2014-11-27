@@ -15,7 +15,7 @@ pub type MioResult<T> = Result<T, MioError>;
 
 #[deriving(Show, PartialEq, Clone)]
 pub struct MioError {
-    kind: MioErrorKind,
+    pub kind: MioErrorKind,
     sys: Option<SysError>
 }
 

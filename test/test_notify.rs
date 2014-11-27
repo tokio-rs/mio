@@ -4,6 +4,7 @@ use mio::*;
 use mio::net::*;
 use mio::net::tcp::*;
 use super::localhost;
+use mio::event as evt;
 
 type TestEventLoop = EventLoop<uint, String>;
 
@@ -41,6 +42,7 @@ impl Handler<uint, String> for TestHandler {
 
 #[test]
 pub fn test_notify() {
+    debug!("Starting TEST_NOTIFY");
     let mut event_loop = EventLoop::new().unwrap();
 
     let addr = SockAddr::parse(localhost().as_slice())
@@ -53,7 +55,7 @@ pub fn test_notify() {
     let srv = srv.bind(&addr).unwrap()
         .listen(256u).unwrap();
 
-    event_loop.register(&srv, Token(0)).unwrap();
+    event_loop.register_opt(&srv, Token(0), evt::ALL, evt::EDGE).unwrap();
 
     let sender = event_loop.channel();
 

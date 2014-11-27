@@ -3,7 +3,8 @@ use nix::fcntl::Fd;
 use nix::sys::event::*;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use poll::{IoEvent, IOREADABLE, IOWRITABLE, IOERROR, IOHINTED, IOHUPHINT};
+use os::event;
+use os::event::{IoEvent, Interest, PollOpt};
 
 pub struct Selector {
     kq: Fd,
@@ -29,34 +30,56 @@ impl Selector {
         Ok(())
     }
 
-    pub fn register(&mut self, io: &IoDesc, token: uint) -> MioResult<()> {
-        let flag = EV_ADD | EV_CLEAR;
+    pub fn register(&mut self, io: &IoDesc, token: uint, interests: Interest, opts: PollOpt) -> MioResult<()> {
+        if interests.contains(event::READABLE) {
+            try!(self.ev_register(io, token, EVFILT_READ, opts));
+        }
 
-        try!(self.ev_push(io, EVFILT_READ, flag, FilterFlag::empty(), token));
-        try!(self.ev_push(io, EVFILT_WRITE, flag, FilterFlag::empty(), token));
+        if interests.contains(event::WRITABLE) {
+            try!(self.ev_register(io, token, EVFILT_WRITE, opts));
+        }
 
         Ok(())
     }
 
-    // Queues an event change. Events will get submitted to the OS on the next
-    // call to select or when the change buffer fills up.
-    fn ev_push(&mut self,
-               io: &IoDesc,
-               filter: EventFilter,
-               flags: EventFlag,
-               fflags: FilterFlag,
-               token: uint) -> MioResult<()> {
+    pub fn reregister(&mut self, io: &IoDesc, token: uint, interests: Interest, opts: PollOpt) -> MioResult<()> {
+        // Just need to call register here since EV_ADD is a mod if already
+        // registered
+        self.register(io, token, interests, opts)
+    }
 
-        // If the change buffer is full, flush it
+    pub fn deregister(&mut self, io: &IoDesc) -> MioResult<()> {
+        let flag = EV_DELETE;
+
+        try!(self.ev_push(io, 0, EVFILT_READ, flag));
+        try!(self.ev_push(io, 0, EVFILT_WRITE, flag));
+
+        Ok(())
+    }
+
+    fn ev_register(&mut self, io: &IoDesc, token: uint, filter: EventFilter, opts: PollOpt) -> MioResult<()> {
+        let mut flags = EV_ADD;
+
+        if opts.contains(event::EDGE) {
+            flags = flags | EV_CLEAR;
+        }
+
+        if opts.contains(event::ONESHOT) {
+            flags = flags | EV_ONESHOT;
+        }
+
+        self.ev_push(io, token, filter, flags)
+    }
+
+    fn ev_push(&mut self, io: &IoDesc, token: uint, filter: EventFilter, flags: EventFlag) -> MioResult<()> {
         try!(self.maybe_flush_changes());
 
         let idx = self.changes.len;
         let ev = &mut self.changes.events[idx];
 
-        ev_set(ev, io.fd as uint, filter, flags, fflags, token);
+        ev_set(ev, io.fd as uint, filter, flags, FilterFlag::empty(), token);
 
         self.changes.len += 1;
-
         Ok(())
     }
 
@@ -102,23 +125,23 @@ impl Events {
         // When the read end of the socket is closed, EV_EOF is set on the
         // flags, and fflags contains the error, if any.
 
-        let mut kind = IOHINTED;
+        let mut kind = event::HINTED;
 
         if ev.filter == EVFILT_READ {
-            kind = kind | IOREADABLE;
+            kind = kind | event::READABLE;
         } else if ev.filter == EVFILT_WRITE {
-            kind = kind | IOWRITABLE;
+            kind = kind | event::WRITABLE;
         } else {
             unimplemented!();
         }
 
         if ev.flags.contains(EV_EOF) {
-            kind = kind | IOHUPHINT;
+            kind = kind | event::HUP;
 
             // When the read end of the socket is closed, EV_EOF is set on
             // flags, and fflags contains the error if there is one.
             if !ev.fflags.is_empty() {
-                kind = kind | IOERROR;
+                kind = kind | event::ERROR;
             }
         }
 

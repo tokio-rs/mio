@@ -1,7 +1,7 @@
 use std::{mem, ptr, int};
 use std::num::Int;
 use alloc::heap;
-use token::Token;
+use os::token::Token;
 
 /// A preallocated chunk of memory for storing objects of the same type.
 pub struct Slab<T> {
@@ -236,6 +236,10 @@ impl<T> Drop for Slab<T> {
             self.mut_entry(i).release();
             i += 1;
         }
+
+        let cap = self.cap as uint;
+        let size = cap.checked_mul(mem::size_of::<Entry<T>>()).unwrap();
+        unsafe { heap::deallocate(self.mem as *mut u8, size, mem::min_align_of::<Entry<T>>()) };
     }
 }
 
