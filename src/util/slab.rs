@@ -236,6 +236,10 @@ impl<T> Drop for Slab<T> {
             self.mut_entry(i).release();
             i += 1;
         }
+
+        let cap = self.cap as uint;
+        let size = cap.checked_mul(mem::size_of::<Entry<T>>()).unwrap();
+        unsafe { heap::deallocate(self.mem as *mut u8, size, mem::min_align_of::<Entry<T>>()) };
     }
 }
 
