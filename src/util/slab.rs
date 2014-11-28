@@ -105,6 +105,24 @@ impl<T> Slab<T> {
         None
     }
 
+    pub fn get_mut(&mut self, idx: Token) -> Option<&mut T> {
+        let idx = self.token_to_idx(idx);
+
+        if idx <= MAX {
+            let idx = idx as int;
+
+            if idx < self.init {
+                let mut entry = self.mut_entry(idx);
+
+                if entry.in_use() {
+                    return Some(&mut entry.val);
+                }
+            }
+        }
+
+        None
+    }
+
     pub fn insert(&mut self, val: T) -> Result<Token, T> {
         let idx = self.nxt;
 
