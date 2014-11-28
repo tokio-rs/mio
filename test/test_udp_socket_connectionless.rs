@@ -41,7 +41,7 @@ impl Handler<uint, ()> for UdpHandler {
                 match self.listen_sock.recv_from(&mut self.rx_buf.writer()) {
                     Ok(wouldblock) => {
                         match wouldblock.unwrap() {
-                            InetAddr(ip, _) => {
+                            SockAddr::InetAddr(ip, _) => {
                                 assert!(ip == IPv4Addr(127, 0, 0, 1));
                             }
                             _ => panic!("This should be an IPv4 address")
