@@ -34,7 +34,7 @@ impl Selector {
             data: token as u64
         };
 
-        epoll_ctl(self.epfd, EpollCtlAdd, io.fd, &info)
+        epoll_ctl(self.epfd, EpollOp::EpollCtlAdd, io.fd, &info)
             .map_err(MioError::from_sys_error)
     }
 
@@ -45,7 +45,7 @@ impl Selector {
             data: token as u64
         };
 
-        epoll_ctl(self.epfd, EpollCtlMod, io.fd, &info)
+        epoll_ctl(self.epfd, EpollOp::EpollCtlMod, io.fd, &info)
             .map_err(MioError::from_sys_error)
     }
 
@@ -59,7 +59,7 @@ impl Selector {
             data: 0
         };
 
-        epoll_ctl(self.epfd, EpollCtlDel, io.fd, &info)
+        epoll_ctl(self.epfd, EpollOp::EpollCtlDel, io.fd, &info)
             .map_err(MioError::from_sys_error)
     }
 }

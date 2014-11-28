@@ -1,6 +1,7 @@
 use std::mem;
 use nix::fcntl::Fd;
 use nix::sys::event::*;
+use nix::sys::event::EventFilter::*;
 use error::{MioResult, MioError};
 use os::IoDesc;
 use os::event;
