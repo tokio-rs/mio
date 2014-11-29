@@ -31,13 +31,10 @@ impl Selector {
     }
 
     pub fn register(&mut self, io: &IoDesc, token: uint, interests: Interest, opts: PollOpt) -> MioResult<()> {
-        if interests.contains(event::READABLE) {
-            try!(self.ev_register(io, token, EVFILT_READ, opts));
-        }
+        debug!("registering; token={}; interests={}", token, interests);
 
-        if interests.contains(event::WRITABLE) {
-            try!(self.ev_register(io, token, EVFILT_WRITE, opts));
-        }
+        try!(self.ev_register(io, token, EVFILT_READ, interests.contains(event::READABLE), opts));
+        try!(self.ev_register(io, token, EVFILT_WRITE, interests.contains(event::WRITABLE), opts));
 
         Ok(())
     }
@@ -49,16 +46,20 @@ impl Selector {
     }
 
     pub fn deregister(&mut self, io: &IoDesc) -> MioResult<()> {
-        let flag = EV_DELETE;
-
-        try!(self.ev_push(io, 0, EVFILT_READ, flag));
-        try!(self.ev_push(io, 0, EVFILT_WRITE, flag));
+        try!(self.ev_push(io, 0, EVFILT_READ, EV_DELETE));
+        try!(self.ev_push(io, 0, EVFILT_WRITE, EV_DELETE));
 
         Ok(())
     }
 
-    fn ev_register(&mut self, io: &IoDesc, token: uint, filter: EventFilter, opts: PollOpt) -> MioResult<()> {
+    fn ev_register(&mut self, io: &IoDesc, token: uint, filter: EventFilter, enable: bool, opts: PollOpt) -> MioResult<()> {
         let mut flags = EV_ADD;
+
+        if enable {
+            flags = flags | EV_ENABLE;
+        } else {
+            flags = flags | EV_DISABLE;
+        }
 
         if opts.contains(event::EDGE) {
             flags = flags | EV_CLEAR;
@@ -121,6 +122,8 @@ impl Events {
 
         let ev = &self.events[idx];
         let token = ev.udata;
+
+        debug!("get event; token={}; ev.filter={}; ev.flags={}", token, ev.filter, ev.flags);
 
         // When the read end of the socket is closed, EV_EOF is set on the
         // flags, and fflags contains the error, if any.
