@@ -414,6 +414,20 @@ pub mod pipe {
             Ok(UnixSocket { desc: try!(os::socket(Unix, socket_type)) })
         }
 
+        pub fn connect(&self, addr: &SockAddr) -> MioResult<()> {
+            debug!("socket connect; addr={}", addr);
+
+            // Attempt establishing the context. This may not complete immediately.
+            if try!(os::connect(&self.desc, addr)) {
+                // On some OSs, connecting to localhost succeeds immediately. In
+                // this case, queue the writable callback for execution during the
+                // next event loop tick.
+                debug!("socket connected immediately; addr={}", addr);
+            }
+
+            Ok(())
+        }
+
         pub fn bind(self, addr: &SockAddr) -> MioResult<UnixListener> {
             try!(os::bind(&self.desc, addr))
             Ok(UnixListener { desc: self.desc })
@@ -427,13 +441,13 @@ pub mod pipe {
     }
 
     impl IoReader for UnixSocket {
-        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<()>> {
+        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<(uint)>> {
             io::read(self, buf)
         }
     }
 
     impl IoWriter for UnixSocket {
-        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<()>> {
+        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<(uint)>> {
             io::write(self, buf)
         }
     }
