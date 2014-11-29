@@ -15,6 +15,7 @@ mod test_timer;
 mod test_udp_socket;
 mod test_udp_socket_connectionless;
 mod test_unix_echo_server;
+mod test_register_deregister;
 
 mod ports {
     use std::sync::atomic::{AtomicUint, SeqCst, INIT_ATOMIC_UINT};
