@@ -14,6 +14,7 @@ mod test_notify;
 mod test_timer;
 mod test_udp_socket;
 mod test_udp_socket_connectionless;
+mod test_unix_echo_server;
 mod test_register_deregister;
 
 mod ports {
