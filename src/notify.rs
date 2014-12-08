@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicInt, Relaxed};
-use std::sync::mpmc_bounded_queue::Queue;
 use error::MioResult;
 use io::IoHandle;
 use os;
+use util::BoundedQueue;
 
 const SLEEP: int = -1;
 
@@ -55,7 +55,7 @@ impl<M: Send> Clone for Notify<M> {
 
 struct NotifyInner<M> {
     state: AtomicInt,
-    queue: Queue<M>,
+    queue: BoundedQueue<M>,
     awaken: os::Awakener
 }
 
@@ -63,7 +63,7 @@ impl<M: Send> NotifyInner<M> {
     fn with_capacity(capacity: uint) -> MioResult<NotifyInner<M>> {
         Ok(NotifyInner {
             state: AtomicInt::new(0),
-            queue: Queue::with_capacity(capacity),
+            queue: BoundedQueue::with_capacity(capacity),
             awaken: try!(os::Awakener::new())
         })
     }
