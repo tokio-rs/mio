@@ -363,7 +363,7 @@ mod test {
         assert_eq!(None, t.tick_to(tick));
 
         rcv.sort();
-        assert!(rcv.as_slice() == &["a", "b"], "actual={}", rcv.as_slice());
+        assert!(rcv.as_slice() == ["a", "b"], "actual={}", rcv.as_slice());
 
         tick = t.ms_to_tick(200);
         assert_eq!(None, t.tick_to(tick));
