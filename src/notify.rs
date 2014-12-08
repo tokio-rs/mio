@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicInt, Relaxed};
-use std::sync::mpmc_bounded_queue::Queue;
+use mpmc_bounded_queue::Queue;
 use error::MioResult;
 use io::IoHandle;
 use os;
