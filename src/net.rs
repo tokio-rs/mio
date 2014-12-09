@@ -194,14 +194,22 @@ pub mod tcp {
     }
 
     impl IoReader for TcpSocket {
-        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<(uint)>> {
+        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<(uint)>> {
             io::read(self, buf)
+        }
+
+        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<uint>> {
+            io::read_slice(self, buf)
         }
     }
 
     impl IoWriter for TcpSocket {
-        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<(uint)>> {
+        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<(uint)>> {
             io::write(self, buf)
+        }
+
+        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<uint>> {
+            io::write_slice(self, buf)
         }
     }
 
@@ -270,6 +278,7 @@ pub mod udp {
     use buf::{Buf, MutBuf};
     use io::{IoHandle, IoReader, IoWriter, NonBlock};
     use io::NonBlock::{Ready, WouldBlock};
+    use io;
     use net::{AddressFamily, Socket, MulticastSocket, SockAddr};
     use net::SocketType::Dgram;
     use net::AddressFamily::Inet;
@@ -318,38 +327,22 @@ pub mod udp {
     }
 
     impl IoReader for UdpSocket {
-        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<(uint)>> {
-            match os::read(&self.desc, buf.mut_bytes()) {
-                Ok(cnt) => {
-                    buf.advance(cnt);
-                    Ok(Ready((cnt)))
-                }
-                Err(e) => {
-                    if e.is_would_block() {
-                        Ok(WouldBlock)
-                    } else {
-                        Err(e)
-                    }
-                }
-            }
+        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<(uint)>> {
+            io::read(self, buf)
+        }
+
+        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<uint>> {
+            io::read_slice(self, buf)
         }
     }
 
     impl IoWriter for UdpSocket {
-        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<(uint)>> {
-            match os::write(&self.desc, buf.bytes()) {
-                Ok(cnt) => {
-                    buf.advance(cnt);
-                    Ok(Ready((cnt)))
-                }
-                Err(e) => {
-                    if e.is_would_block() {
-                        Ok(WouldBlock)
-                    } else {
-                        Err(e)
-                    }
-                }
-            }
+        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<(uint)>> {
+            io::write(self, buf)
+        }
+
+        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<uint>> {
+            io::write_slice(self, buf)
         }
     }
 
@@ -441,14 +434,22 @@ pub mod pipe {
     }
 
     impl IoReader for UnixSocket {
-        fn read(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<(uint)>> {
+        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> {
             io::read(self, buf)
+        }
+
+        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<uint>> {
+            io::read_slice(self, buf)
         }
     }
 
     impl IoWriter for UnixSocket {
-        fn write(&mut self, buf: &mut Buf) -> MioResult<NonBlock<(uint)>> {
+        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
             io::write(self, buf)
+        }
+
+        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<uint>> {
+            io::write_slice(self, buf)
         }
     }
 
