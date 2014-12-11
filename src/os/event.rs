@@ -1,7 +1,7 @@
 use std::{fmt};
 use os::token::Token;
 
-#[deriving(PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[deriving(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct PollOpt(uint);
 
 pub const EDGE: PollOpt    = PollOpt(0x020);
@@ -93,6 +93,7 @@ impl fmt::Show for PollOpt {
 }
 
 bitflags!(
+    #[deriving(Copy)]
     flags Interest: uint {
         const READABLE = 0x001,
         const WRITABLE = 0x002,
@@ -128,6 +129,7 @@ impl fmt::Show for Interest {
 }
 
 bitflags!(
+    #[deriving(Copy)]
     flags ReadHint: uint {
         const DATAHINT    = 0x001,
         const HUPHINT     = 0x002,
@@ -157,7 +159,7 @@ impl fmt::Show for ReadHint {
 }
 
 
-#[deriving(Show)]
+#[deriving(Copy, Show)]
 pub struct IoEvent {
     kind: Interest,
     token: Token

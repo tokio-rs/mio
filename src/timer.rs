@@ -36,6 +36,7 @@ pub struct Timer<T> {
     mask: u64,
 }
 
+#[deriving(Copy)]
 pub struct Timeout {
     // Reference into the timer entry slab
     token: Token,
@@ -274,6 +275,7 @@ impl<T> Entry<T> {
     }
 }
 
+#[deriving(Copy)]
 struct EntryLinks {
     tick: u64,
     prev: Token,

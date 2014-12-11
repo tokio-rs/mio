@@ -51,6 +51,7 @@ pub trait UnconnectedSocket {
 }
 
 // Types of sockets
+#[deriving(Copy)]
 pub enum AddressFamily {
     Inet,
     Inet6,
@@ -126,6 +127,7 @@ impl fmt::Show for SockAddr {
     }
 }
 
+#[deriving(Copy)]
 pub enum SocketType {
     Dgram,
     Stream,

@@ -15,7 +15,7 @@ use os::token::Token;
 /// TODO:
 /// - Enforce private tokens
 
-#[deriving(Clone, Show)]
+#[deriving(Copy, Clone, Show)]
 pub struct EventLoopConfig {
     pub io_poll_timeout_ms: uint,
 
