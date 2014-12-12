@@ -335,7 +335,7 @@ mod tests {
     fn test_readable() {
         let mut event_loop = EventLoop::new().ok().expect("Couldn't make event loop");
 
-        let (mut reader, mut writer) = io::pipe().unwrap();
+        let (reader, writer) = io::pipe().unwrap();
 
         let rcount = Arc::new(AtomicInt::new(0));
         let wcount = Arc::new(AtomicInt::new(0));

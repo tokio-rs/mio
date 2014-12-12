@@ -100,7 +100,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
         event_loop.reregister(&self.cli, CLIENT, evt::READABLE, evt::EDGE).unwrap();
     }
 
-    fn timeout(&mut self, _event_loop: &mut TestEventLoop, mut sock: TcpSocket) {
+    fn timeout(&mut self, _event_loop: &mut TestEventLoop, sock: TcpSocket) {
         debug!("timeout handler : writing to socket");
         sock.write(&mut buf::wrap(b"zomg")).unwrap().unwrap();
     }
