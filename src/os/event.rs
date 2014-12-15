@@ -93,7 +93,6 @@ impl fmt::Show for PollOpt {
 }
 
 bitflags!(
-    #[deriving(Copy)]
     flags Interest: uint {
         const READABLE = 0x001,
         const WRITABLE = 0x002,
@@ -129,7 +128,6 @@ impl fmt::Show for Interest {
 }
 
 bitflags!(
-    #[deriving(Copy)]
     flags ReadHint: uint {
         const DATAHINT    = 0x001,
         const HUPHINT     = 0x002,

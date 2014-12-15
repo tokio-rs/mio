@@ -176,7 +176,7 @@ mod tests {
         for _ in range(0, nthreads) {
             let q = q.clone();
             let tx = tx.clone();
-            spawn(proc() {
+            spawn(move || {
                 let q = q;
                 for i in range(0, nmsgs) {
                     assert!(q.push(i));
@@ -190,7 +190,7 @@ mod tests {
             let (tx, rx) = channel();
             completion_rxs.push(rx);
             let q = q.clone();
-            spawn(proc() {
+            spawn(move || {
                 let q = q;
                 let mut i = 0u;
                 loop {
