@@ -38,28 +38,28 @@ impl PollOpt {
 
 impl BitOr<PollOpt, PollOpt> for PollOpt {
     #[inline]
-    fn bitor(&self, other: &PollOpt) -> PollOpt {
+    fn bitor(self, other: PollOpt) -> PollOpt {
         PollOpt(self.bits() | other.bits())
     }
 }
 
 impl BitXor<PollOpt, PollOpt> for PollOpt {
     #[inline]
-    fn bitxor(&self, other: &PollOpt) -> PollOpt {
+    fn bitxor(self, other: PollOpt) -> PollOpt {
         PollOpt(self.bits() ^ other.bits())
     }
 }
 
 impl BitAnd<PollOpt, PollOpt> for PollOpt {
     #[inline]
-    fn bitand(&self, other: &PollOpt) -> PollOpt {
+    fn bitand(self, other: PollOpt) -> PollOpt {
         PollOpt(self.bits() & other.bits())
     }
 }
 
 impl Sub<PollOpt, PollOpt> for PollOpt {
     #[inline]
-    fn sub(&self, other: &PollOpt) -> PollOpt {
+    fn sub(self, other: PollOpt) -> PollOpt {
         PollOpt(self.bits() & !other.bits())
     }
 }
