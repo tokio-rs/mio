@@ -59,7 +59,7 @@ pub fn test_notify() {
 
     let sender = event_loop.channel();
 
-    spawn(proc() {
+    spawn(move || {
         sleep(Duration::seconds(1));
         sender.send("First".to_string()).unwrap();
     });
