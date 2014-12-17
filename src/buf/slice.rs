@@ -18,7 +18,7 @@ impl<'a> Buf for SliceBuf<'a> {
         self.bytes.len() - self.pos
     }
 
-    fn bytes<'a>(&'a self) -> &'a [u8] {
+    fn bytes<'b>(&'b self) -> &'b [u8] {
         self.bytes.slice_from(self.pos)
     }
 
@@ -53,7 +53,7 @@ impl<'a> Buf for MutSliceBuf<'a> {
         self.bytes.len() - self.pos
     }
 
-    fn bytes<'a>(&'a self) -> &'a [u8] {
+    fn bytes<'b>(&'b self) -> &'b [u8] {
         self.bytes.slice_from(self.pos)
     }
 
@@ -64,7 +64,7 @@ impl<'a> Buf for MutSliceBuf<'a> {
 }
 
 impl<'a> MutBuf for MutSliceBuf<'a> {
-    fn mut_bytes<'a>(&'a mut self) -> &'a mut [u8] {
+    fn mut_bytes<'b>(&'b mut self) -> &'b mut [u8] {
         self.bytes.slice_from_mut(self.pos)
     }
 }
