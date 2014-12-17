@@ -4,13 +4,12 @@ name = "mio"
 version = "0.0.1"
 authors = ["Carl Lerche <me@carllerche.com>"]
 
+[dependencies]
+time = "*"
+
 [dependencies.nix]
 
 git = "https://github.com/carllerche/nix-rust"
-
-[dependencies.time]
-
-git = "https://github.com/rust-lang/time"
 
 [[test]]
 
