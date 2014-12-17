@@ -163,7 +163,7 @@ impl<'a> Buf for RingBufReader<'a> {
         self.ring.read_remaining()
     }
 
-    fn bytes<'a>(&'a self) -> &'a [u8] {
+    fn bytes<'b>(&'b self) -> &'b [u8] {
         let mut to = self.ring.pos + self.ring.len;
 
         if to > self.ring.cap {
@@ -194,7 +194,7 @@ impl<'a> Buf for RingBufWriter<'a> {
         self.ring.write_remaining()
     }
 
-    fn bytes<'a>(&'a self) -> &'a [u8] {
+    fn bytes<'b>(&'b self) -> &'b [u8] {
         let mut from;
         let mut to;
 
@@ -216,7 +216,7 @@ impl<'a> Buf for RingBufWriter<'a> {
 }
 
 impl<'a> MutBuf for RingBufWriter<'a> {
-    fn mut_bytes<'a>(&'a mut self) -> &'a mut [u8] {
+    fn mut_bytes<'b>(&'b mut self) -> &'b mut [u8] {
         unsafe { mem::transmute(self.bytes()) }
     }
 }
