@@ -3,6 +3,10 @@
 MIO is a lightweight IO library for Rust with a focus on adding as
 little overhead as possible over the OS abstractions.
 
+[![Build Status](https://travis-ci.org/carllerche/mio.svg?branch=master)](https://travis-ci.org/carllerche/mio)
+
+- [API documentation](http://carllerche.github.io/mio/mio/index.html)
+
 ## Features
 
 * Event loop backed by epoll, kqueue.
