@@ -3,6 +3,23 @@
 MIO is a lightweight IO library for Rust with a focus on adding as
 little overhead as possible over the OS abstractions.
 
+## Usage
+
+To use `mio`, first add this to your `Cargo.toml`:
+
+```toml
+[dependencies.mio]
+git = "https://github.com/carllerche/mio"
+```
+
+`mio` is on [Crates.io](http://crates.io/crates/mio), but is not often updated.
+
+Then, add this to your crate root:
+
+```rust
+extern crate mio;
+```
+
 ## Features
 
 * Event loop backed by epoll, kqueue.
