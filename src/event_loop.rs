@@ -91,6 +91,7 @@ impl<T, M: Send> EventLoop<T, M> {
     ///
     /// # Example
     /// ```
+    /// use std::thread::Thread;
     /// use mio::{EventLoop, Handler};
     ///
     /// struct MyHandler;
@@ -106,9 +107,9 @@ impl<T, M: Send> EventLoop<T, M> {
     /// let sender = event_loop.channel();
     ///
     /// // Send the notification from another thread
-    /// spawn(move || {
+    /// Thread::spawn(move || {
     ///     let _ = sender.send(123);
-    /// });
+    /// }).detach();
     ///
     /// let _ = event_loop.run(MyHandler);
     /// ```

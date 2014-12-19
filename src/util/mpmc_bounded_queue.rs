@@ -163,6 +163,7 @@ impl<T: Send> Clone for Queue<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::thread::Thread;
     use super::Queue;
 
     #[test]
@@ -176,13 +177,13 @@ mod tests {
         for _ in range(0, nthreads) {
             let q = q.clone();
             let tx = tx.clone();
-            spawn(move || {
+            Thread::spawn(move || {
                 let q = q;
                 for i in range(0, nmsgs) {
                     assert!(q.push(i));
                 }
                 tx.send(());
-            });
+            }).detach();
         }
 
         let mut completion_rxs = vec![];
@@ -190,7 +191,7 @@ mod tests {
             let (tx, rx) = channel();
             completion_rxs.push(rx);
             let q = q.clone();
-            spawn(move || {
+            Thread::spawn(move || {
                 let q = q;
                 let mut i = 0u;
                 loop {
@@ -203,7 +204,7 @@ mod tests {
                     }
                 }
                 tx.send(i);
-            });
+            }).detach();
         }
 
         for rx in completion_rxs.iter_mut() {

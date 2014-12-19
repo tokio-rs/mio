@@ -66,7 +66,7 @@ impl Sub<PollOpt, PollOpt> for PollOpt {
 
 impl Not<PollOpt> for PollOpt {
     #[inline]
-    fn not(&self) -> PollOpt {
+    fn not(self) -> PollOpt {
         PollOpt(!self.bits() & PollOpt::all().bits())
     }
 }
@@ -101,7 +101,7 @@ bitflags!(
         const HINTED   = 0x010,
         const ALL      = 0x001 | 0x002 | 0x008  //epoll checks for ERROR no matter what
     }
-)
+);
 
 
 impl fmt::Show for Interest {
@@ -133,7 +133,7 @@ bitflags!(
         const HUPHINT     = 0x002,
         const ERRORHINT   = 0x004
     }
-)
+);
 
 impl fmt::Show for ReadHint {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
