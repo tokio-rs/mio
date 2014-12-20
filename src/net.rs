@@ -188,7 +188,7 @@ pub mod tcp {
         }
 
         pub fn bind(self, addr: &SockAddr) -> MioResult<TcpListener> {
-            try!(os::bind(&self.desc, addr))
+            try!(os::bind(&self.desc, addr));
             Ok(TcpListener { desc: self.desc })
         }
     }
@@ -305,7 +305,7 @@ pub mod udp {
         }
 
         pub fn bind(&self, addr: &SockAddr) -> MioResult<()> {
-            try!(os::bind(&self.desc, addr))
+            try!(os::bind(&self.desc, addr));
             Ok(())
         }
 
@@ -429,7 +429,7 @@ pub mod pipe {
         }
 
         pub fn bind(self, addr: &SockAddr) -> MioResult<UnixListener> {
-            try!(os::bind(&self.desc, addr))
+            try!(os::bind(&self.desc, addr));
             Ok(UnixListener { desc: self.desc })
         }
     }
