@@ -127,6 +127,7 @@ pub use event_loop::{
     EventLoopConfig,
     EventLoopResult,
     EventLoopSender,
+    EventLoopError
 };
 pub use timer::{
     Timeout,
