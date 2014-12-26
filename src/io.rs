@@ -1,8 +1,10 @@
 use buf::{Buf, MutBuf};
-use os;
 use error::MioResult;
 use self::NonBlock::{Ready, WouldBlock};
 use error::MioErrorKind as mek;
+use os;
+
+pub use os::IoDesc;
 
 /// The result of a non-blocking operation.
 #[deriving(Show)]
@@ -28,7 +30,7 @@ impl<T> NonBlock<T> {
 }
 
 pub trait IoHandle {
-    fn desc(&self) -> &os::IoDesc;
+    fn desc(&self) -> &IoDesc;
 }
 
 pub trait IoReader {

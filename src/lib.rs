@@ -117,6 +117,7 @@ pub use io::{
     IoWriter,
     IoAcceptor,
     IoHandle,
+    IoDesc,
     PipeReader,
     PipeWriter,
 };
