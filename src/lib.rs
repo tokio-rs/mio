@@ -143,12 +143,12 @@ pub use os::event;
 pub mod buf;
 pub mod net;
 pub mod util;
+pub mod io;
+pub mod os;
 
 mod error;
 mod event_loop;
 mod handler;
-mod io;
 mod notify;
-mod os;
 mod poll;
 mod timer;
