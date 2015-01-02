@@ -133,6 +133,8 @@ pub use event_loop::{
 };
 pub use timer::{
     Timeout,
+    TimerError,
+    TimerResult
 };
 pub use os::token::{
     Token,
