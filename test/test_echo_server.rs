@@ -126,7 +126,7 @@ struct EchoClient {
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
     fn new(sock: TcpSocket, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
-        let curr = msgs.remove(0).expect("At least one message is required");
+        let curr = msgs.remove(0);
 
         EchoClient {
             sock: sock,
@@ -196,13 +196,12 @@ impl EchoClient {
     }
 
     fn next_msg(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
-        let curr = match self.msgs.remove(0) {
-            Some(msg) => msg,
-            None => {
-                event_loop.shutdown();
-                return Ok(());
-            }
-        };
+        if self.msgs.is_empty() {
+            event_loop.shutdown();
+            return Ok(());
+        }
+
+        let curr = self.msgs.remove(0);
 
         debug!("client prepping next message");
         self.tx = SliceBuf::wrap(curr.as_bytes());
