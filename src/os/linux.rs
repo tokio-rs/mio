@@ -27,7 +27,7 @@ impl Awakener {
     }
 
     pub fn cleanup(&self) {
-        let mut buf: [u8, ..8] = unsafe { mem::uninitialized() };
+        let mut buf: [u8; 8] = unsafe { mem::uninitialized() };
 
         loop {
             // Consume data until all bytes are purged

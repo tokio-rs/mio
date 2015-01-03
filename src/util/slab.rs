@@ -1,4 +1,4 @@
-use std::{mem, ptr, int};
+use std::{mem, ptr, int, ops};
 use std::num::Int;
 use alloc::heap;
 use os::token::Token;
@@ -214,7 +214,7 @@ impl<T> Slab<T> {
     }
 }
 
-impl<T> Index<Token, T> for Slab<T> {
+impl<T> ops::Index<Token, T> for Slab<T> {
     fn index<'a>(&'a self, idx: &Token) -> &'a T {
         let idx = self.token_to_idx(*idx);
         let idx = self.validate_idx(idx);
@@ -229,7 +229,7 @@ impl<T> Index<Token, T> for Slab<T> {
     }
 }
 
-impl<T> IndexMut<Token, T> for Slab<T> {
+impl<T> ops::IndexMut<Token, T> for Slab<T> {
     fn index_mut<'a>(&'a mut self, idx: &Token) -> &'a mut T {
         let idx = self.token_to_idx(*idx);
         let idx = self.validate_idx(idx);
