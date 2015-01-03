@@ -1,3 +1,4 @@
+use std::c_str::ToCStr;
 use std::mem;
 use std::num::Int;
 use error::{MioResult, MioError};
@@ -46,7 +47,7 @@ impl PipeAwakener {
     }
 
     pub fn cleanup(&self) {
-        let mut buf: [u8, ..128] = unsafe { mem::uninitialized() };
+        let mut buf: [u8; 128] = unsafe { mem::uninitialized() };
 
         loop {
             // Consume data until all bytes are purged
@@ -60,7 +61,7 @@ impl PipeAwakener {
 
 /// Represents the OS's handle to the IO instance. In this case, it is the file
 /// descriptor.
-#[deriving(Show)]
+#[derive(Show)]
 pub struct IoDesc {
     pub fd: nix::Fd
 }
@@ -310,10 +311,10 @@ fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {
 }
 
 fn ipv4_to_u32(a: u8, b: u8, c: u8, d: u8) -> nix::InAddrT {
-    Int::from_be((a as u32 << 24) |
-                 (b as u32 << 16) |
-                 (c as u32 <<  8) |
-                 (d as u32 <<  0))
+    Int::from_be(((a as u32) << 24) |
+                 ((b as u32) << 16) |
+                 ((c as u32) <<  8) |
+                 ((d as u32) <<  0))
 }
 
 fn u32be_to_ipv4(net: u32) -> IpAddr {
@@ -332,4 +333,3 @@ fn ipv4_to_inaddr(a: u8, b: u8, c: u8, d: u8) -> nix::in_addr {
         s_addr: ipv4_to_u32(a, b, c, d)
     }
 }
-

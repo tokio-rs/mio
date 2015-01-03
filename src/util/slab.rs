@@ -1,4 +1,5 @@
 use std::{mem, ptr, int};
+use std::ops::{Index, IndexMut};
 use std::num::Int;
 use alloc::heap;
 use os::token::Token;

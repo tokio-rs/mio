@@ -53,7 +53,7 @@ pub trait UnconnectedSocket {
 }
 
 // Types of sockets
-#[deriving(Copy)]
+#[derive(Copy)]
 pub enum AddressFamily {
     Inet,
     Inet6,
@@ -129,7 +129,7 @@ impl fmt::Show for SockAddr {
     }
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub enum SocketType {
     Dgram,
     Stream,
@@ -148,7 +148,7 @@ pub mod tcp {
     use net::SocketType::Stream;
     use net::AddressFamily::{Inet, Inet6};
 
-    #[deriving(Show)]
+    #[derive(Show)]
     pub struct TcpSocket {
         desc: os::IoDesc
     }
@@ -222,7 +222,7 @@ pub mod tcp {
     impl Socket for TcpSocket {
     }
 
-    #[deriving(Show)]
+    #[derive(Show)]
     pub struct TcpListener {
         desc: os::IoDesc,
     }
@@ -240,7 +240,7 @@ pub mod tcp {
         }
     }
 
-    #[deriving(Show)]
+    #[derive(Show)]
     pub struct TcpAcceptor {
         desc: os::IoDesc,
     }
@@ -290,7 +290,7 @@ pub mod udp {
     use net::AddressFamily::Inet;
     use super::UnconnectedSocket;
 
-    #[deriving(Show)]
+    #[derive(Show)]
     pub struct UdpSocket {
         desc: os::IoDesc
     }
@@ -400,7 +400,7 @@ pub mod pipe {
     use net::SocketType::Stream;
     use net::AddressFamily::Unix;
 
-    #[deriving(Show)]
+    #[derive(Show)]
     pub struct UnixSocket {
         desc: os::IoDesc
     }
@@ -463,7 +463,7 @@ pub mod pipe {
     impl Socket for UnixSocket {
     }
 
-    #[deriving(Show)]
+    #[derive(Show)]
     pub struct UnixListener {
         desc: os::IoDesc,
     }
@@ -481,7 +481,7 @@ pub mod pipe {
         }
     }
 
-    #[deriving(Show)]
+    #[derive(Show)]
     pub struct UnixAcceptor {
         desc: os::IoDesc,
     }

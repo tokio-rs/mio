@@ -1,4 +1,4 @@
-#[deriving(Copy, Show, PartialEq, Eq, Hash)]
+#[derive(Copy, Show, PartialEq, Eq, Hash)]
 pub struct Token(pub uint);
 
 impl Token {

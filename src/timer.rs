@@ -36,7 +36,7 @@ pub struct Timer<T> {
     mask: u64,
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub struct Timeout {
     // Reference into the timer entry slab
     token: Token,
@@ -52,7 +52,7 @@ impl<T> Timer<T> {
         Timer {
             tick_ms: tick_ms,
             entries: Slab::new(capacity),
-            wheel: Vec::from_fn(slots, |_| EMPTY),
+            wheel: range(0, slots).map(|_| EMPTY).take(slots).collect(),
             start: 0,
             tick: 0,
             next: EMPTY,
@@ -275,7 +275,7 @@ impl<T> Entry<T> {
     }
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 struct EntryLinks {
     tick: u64,
     prev: Token,
@@ -284,7 +284,7 @@ struct EntryLinks {
 
 pub type TimerResult<T> = Result<T, TimerError>;
 
-#[deriving(Show)]
+#[derive(Show)]
 pub struct TimerError {
     kind: TimerErrorKind,
     desc: &'static str,
@@ -299,7 +299,7 @@ impl TimerError {
     }
 }
 
-#[deriving(Show)]
+#[derive(Show)]
 pub enum TimerErrorKind {
     TimerOverflow,
 }

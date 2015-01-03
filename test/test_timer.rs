@@ -12,7 +12,7 @@ type TestEventLoop = EventLoop<TcpSocket, ()>;
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
-#[deriving(Show, PartialEq)]
+#[derive(Show, PartialEq)]
 enum TestState {
     Initial,
     AfterRead,
