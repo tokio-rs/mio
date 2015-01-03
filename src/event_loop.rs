@@ -11,7 +11,7 @@ use timer::{Timer, Timeout, TimerResult};
 use os::token::Token;
 
 /// Configure EventLoop runtime details
-#[deriving(Copy, Clone, Show)]
+#[derive(Copy, Clone, Show)]
 pub struct EventLoopConfig {
     pub io_poll_timeout_ms: uint,
 
@@ -335,7 +335,7 @@ impl<T, M: Send> EventLoop<T, M> {
 }
 
 /// Sends messages to the EventLoop from other threads.
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct EventLoopSender<M: Send> {
     notify: Notify<M>
 }

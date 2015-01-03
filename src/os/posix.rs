@@ -1,5 +1,6 @@
 use std::mem;
 use std::num::Int;
+use std::c_str::ToCStr;
 use error::{MioResult, MioError};
 use net::{AddressFamily, SockAddr, IPv4Addr, SocketType};
 use net::SocketType::{Dgram, Stream};
@@ -46,7 +47,7 @@ impl PipeAwakener {
     }
 
     pub fn cleanup(&self) {
-        let mut buf: [u8, ..128] = unsafe { mem::uninitialized() };
+        let mut buf: [u8; 128] = unsafe { mem::uninitialized() };
 
         loop {
             // Consume data until all bytes are purged
@@ -60,7 +61,7 @@ impl PipeAwakener {
 
 /// Represents the OS's handle to the IO instance. In this case, it is the file
 /// descriptor.
-#[deriving(Show)]
+#[derive(Show)]
 pub struct IoDesc {
     pub fd: nix::Fd
 }
