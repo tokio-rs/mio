@@ -98,7 +98,7 @@ impl Selector {
 
 pub struct Events {
     len: uint,
-    events: [KEvent, ..1024]
+    events: [KEvent; 1024]
 }
 
 impl Events {

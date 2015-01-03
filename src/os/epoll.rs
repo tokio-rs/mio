@@ -102,7 +102,7 @@ impl Drop for Selector {
 
 pub struct Events {
     len: uint,
-    events: [EpollEvent, ..1024]
+    events: [EpollEvent; 1024]
 }
 
 impl Events {

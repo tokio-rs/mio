@@ -30,7 +30,6 @@
 // http://www.1024cores.net/home/lock-free-algorithms/queues/bounded-mpmc-queue
 
 // This queue is copy pasted from old rust stdlib.
-
 use std::sync::Arc;
 use std::num::UnsignedInt;
 use std::cell::UnsafeCell;
@@ -46,14 +45,14 @@ unsafe impl<T: Send> Send for Node<T> {}
 unsafe impl<T: Sync> Sync for Node<T> {}
 
 struct State<T> {
-    pad0: [u8, ..64],
+    pad0: [u8; 64],
     buffer: Vec<UnsafeCell<Node<T>>>,
     mask: uint,
-    pad1: [u8, ..64],
+    pad1: [u8; 64],
     enqueue_pos: AtomicUint,
-    pad2: [u8, ..64],
+    pad2: [u8; 64],
     dequeue_pos: AtomicUint,
-    pad3: [u8, ..64],
+    pad3: [u8; 64],
 }
 
 unsafe impl<T: Send> Send for State<T> {}
@@ -75,18 +74,18 @@ impl<T: Send> State<T> {
         } else {
             capacity
         };
-        let buffer = Vec::from_fn(capacity, |i| {
+        let buffer: Vec<_> = range(0, capacity).map(|i| {
             UnsafeCell::new(Node { sequence:AtomicUint::new(i), value: None })
-        });
+        }).collect();
         State{
-            pad0: [0, ..64],
+            pad0: [0; 64],
             buffer: buffer,
             mask: capacity-1,
-            pad1: [0, ..64],
+            pad1: [0; 64],
             enqueue_pos: AtomicUint::new(0),
-            pad2: [0, ..64],
+            pad2: [0; 64],
             dequeue_pos: AtomicUint::new(0),
-            pad3: [0, ..64],
+            pad3: [0; 64],
         }
     }
 
@@ -169,6 +168,7 @@ impl<T: Send> Clone for Queue<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::mpsc::channel;
     use std::thread::Thread;
     use super::Queue;
 
@@ -214,7 +214,7 @@ mod tests {
         }
 
         for rx in completion_rxs.iter_mut() {
-            assert_eq!(nmsgs, rx.recv());
+            assert_eq!(nmsgs, rx.recv().unwrap());
         }
         for _ in range(0, nthreads) {
             rx.recv();
