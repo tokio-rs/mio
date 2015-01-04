@@ -86,6 +86,7 @@
 // Enable extra features
 #![feature(globs)]
 #![feature(phase)]
+#![feature(associated_types)]
 #![feature(unsafe_destructor)]
 
 // Disable dead code warnings

@@ -1,7 +1,8 @@
-use std::{fmt};
+use std::fmt;
+use std::ops::*;
 use os::token::Token;
 
-#[deriving(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct PollOpt(uint);
 
 pub const EDGE: PollOpt    = PollOpt(0x020);
@@ -36,35 +37,45 @@ impl PollOpt {
     }
 }
 
-impl BitOr<PollOpt, PollOpt> for PollOpt {
+impl BitOr for PollOpt {
+    type Output = PollOpt;
+
     #[inline]
     fn bitor(self, other: PollOpt) -> PollOpt {
         PollOpt(self.bits() | other.bits())
     }
 }
 
-impl BitXor<PollOpt, PollOpt> for PollOpt {
+impl BitXor for PollOpt {
+    type Output = PollOpt;
+
     #[inline]
     fn bitxor(self, other: PollOpt) -> PollOpt {
         PollOpt(self.bits() ^ other.bits())
     }
 }
 
-impl BitAnd<PollOpt, PollOpt> for PollOpt {
+impl BitAnd for PollOpt {
+    type Output = PollOpt;
+
     #[inline]
     fn bitand(self, other: PollOpt) -> PollOpt {
         PollOpt(self.bits() & other.bits())
     }
 }
 
-impl Sub<PollOpt, PollOpt> for PollOpt {
+impl Sub for PollOpt {
+    type Output = PollOpt;
+
     #[inline]
     fn sub(self, other: PollOpt) -> PollOpt {
         PollOpt(self.bits() & !other.bits())
     }
 }
 
-impl Not<PollOpt> for PollOpt {
+impl Not for PollOpt {
+    type Output = PollOpt;
+
     #[inline]
     fn not(self) -> PollOpt {
         PollOpt(!self.bits() & PollOpt::all().bits())
@@ -157,7 +168,7 @@ impl fmt::Show for ReadHint {
 }
 
 
-#[deriving(Copy, Show)]
+#[derive(Copy, Show)]
 pub struct IoEvent {
     kind: Interest,
     token: Token
