@@ -35,7 +35,8 @@ use std::sync::Arc;
 use std::num::UnsignedInt;
 use std::cell::UnsafeCell;
 
-use std::sync::atomic::{AtomicUint,Relaxed,Release,Acquire};
+use std::sync::atomic::AtomicUint;
+use std::sync::atomic::Ordering::{Relaxed,Release,Acquire};
 
 struct Node<T> {
     sequence: AtomicUint,
