@@ -370,7 +370,8 @@ impl<H> EventLoopError<H> {
 mod tests {
     use std::str;
     use std::sync::Arc;
-    use std::sync::atomic::{AtomicInt, SeqCst};
+    use std::sync::atomic::AtomicInt;
+    use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
     use io::{IoWriter, IoReader};
     use {io, buf, Buf, Handler, Token};
