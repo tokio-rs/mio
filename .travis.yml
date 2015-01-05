@@ -1,5 +1,7 @@
 ---
 language: rust
+sudo: false
+
 script:
   - cargo test
   - cargo doc
