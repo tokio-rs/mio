@@ -1,5 +1,6 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicInt, Relaxed};
+use std::sync::atomic::AtomicInt;
+use std::sync::atomic::Ordering::Relaxed;
 use error::MioResult;
 use io::IoHandle;
 use os;

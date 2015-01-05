@@ -18,11 +18,12 @@ mod test_register_deregister;
 mod test_unix_echo_server;
 
 mod ports {
-    use std::sync::atomic::{AtomicUint, SeqCst, INIT_ATOMIC_UINT};
+    use std::sync::atomic::{AtomicUint, ATOMIC_UINT_INIT};
+    use std::sync::atomic::Ordering::SeqCst;
 
     // Helper for getting a unique port for the task run
     // TODO: Reuse ports to not spam the system
-    static mut NEXT_PORT: AtomicUint = INIT_ATOMIC_UINT;
+    static mut NEXT_PORT: AtomicUint = ATOMIC_UINT_INIT;
     const FIRST_PORT: uint = 18080;
 
     fn next_port() -> uint {
