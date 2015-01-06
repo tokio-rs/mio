@@ -191,9 +191,13 @@ pub mod tcp {
             try!(os::bind(&self.desc, addr));
             Ok(TcpListener { desc: self.desc })
         }
-        
-        pub fn getpeername(self) -> MioResult<SockAddr> {
+
+        pub fn getpeername(&self) -> MioResult<SockAddr> {
             os::getpeername(&self.desc)
+        }
+
+        pub fn getsockname(&self) -> MioResult<SockAddr> {
+            os::getsockname(&self.desc)
         }
     }
 

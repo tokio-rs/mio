@@ -232,8 +232,17 @@ pub fn linger(io: &IoDesc) -> MioResult<uint> {
 pub fn getpeername(io: &IoDesc) -> MioResult<SockAddr> {
     let sa : nix::sockaddr_in = unsafe { mem::zeroed() };
     let mut a = nix::SockAddr::SockIpV4(sa);
-    
+
     try!(nix::getpeername(io.fd, &mut a).map_err(MioError::from_sys_error));
+
+    Ok(to_sockaddr(&a))
+}
+
+pub fn getsockname(io: &IoDesc) -> MioResult<SockAddr> {
+    let sa : nix::sockaddr_in = unsafe { mem::zeroed() };
+    let mut a = nix::SockAddr::SockIpV4(sa);
+
+    try!(nix::getsockname(io.fd, &mut a).map_err(MioError::from_sys_error));
 
     Ok(to_sockaddr(&a))
 }
