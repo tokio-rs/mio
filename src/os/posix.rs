@@ -1,12 +1,13 @@
 use std::mem;
 use std::num::Int;
-use std::c_str::ToCStr;
 use error::{MioResult, MioError};
 use net::{AddressFamily, SockAddr, IPv4Addr, SocketType};
 use net::SocketType::{Dgram, Stream};
 use net::SockAddr::{InetAddr, UnixAddr};
 use net::AddressFamily::{Inet, Inet6, Unix};
 pub use std::io::net::ip::IpAddr;
+use std::ffi::CString;
+use std::path::posix::Path;
 
 mod nix {
     pub use nix::c_int;
@@ -308,10 +309,10 @@ fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {
 
             addr.sun_family = nix::AF_UNIX as nix::sa_family_t;
 
-            let c_path_ptr = path.to_c_str();
+            let c_path_ptr = CString::from_slice(path.as_vec());
             assert!(c_path_ptr.len() < addr.sun_path.len());
             for (sp_iter, path_iter) in addr.sun_path.iter_mut().zip(c_path_ptr.iter()) {
-                *sp_iter = path_iter as i8;
+                *sp_iter = *path_iter as i8;
             }
 
             nix::SockAddr::SockUnix(addr)

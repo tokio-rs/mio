@@ -96,7 +96,7 @@ extern crate alloc;
 extern crate nix;
 extern crate time;
 
-#[phase(plugin, link)]
+#[macro_use]
 extern crate log;
 
 pub use buf::{
