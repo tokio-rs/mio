@@ -63,7 +63,7 @@ pub fn test_notify() {
     Thread::spawn(move || {
         sleep(Duration::seconds(1));
         sender.send("First".to_string()).unwrap();
-    }).detach();
+    });
 
     let sender = event_loop.channel();
 

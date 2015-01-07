@@ -109,7 +109,7 @@ impl<T, M: Send> EventLoop<T, M> {
     /// // Send the notification from another thread
     /// Thread::spawn(move || {
     ///     let _ = sender.send(123);
-    /// }).detach();
+    /// });
     ///
     /// let _ = event_loop.run(MyHandler);
     /// ```
@@ -285,7 +285,7 @@ impl<T, M: Send> EventLoop<T, M> {
         while i < cnt {
             let evt = self.poll.event(i);
 
-            debug!("event={}", evt);
+            debug!("event={:?}", evt);
 
             match evt.token() {
                 NOTIFY => self.notify.cleanup(),

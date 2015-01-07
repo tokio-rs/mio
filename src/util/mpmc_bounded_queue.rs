@@ -191,7 +191,7 @@ mod tests {
                     assert!(q.push(i));
                 }
                 tx.send(()).unwrap();
-            }).detach();
+            });
         }
 
         let mut completion_rxs = vec![];
@@ -212,7 +212,7 @@ mod tests {
                     }
                 }
                 tx.send(i).unwrap();
-            }).detach();
+            });
         }
 
         for rx in completion_rxs.iter_mut() {
