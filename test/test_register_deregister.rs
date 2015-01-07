@@ -43,8 +43,8 @@ impl Handler<uint, ()> for TestHandler {
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop, token: Token) {
-        assert!(token == CLIENT, "unexpected token {}", token);
-        assert!(self.state == 1, "unexpected state {}", self.state);
+        assert!(token == CLIENT, "unexpected token {:?}", token);
+        assert!(self.state == 1, "unexpected state {:?}", self.state);
 
         self.state = 2;
         event_loop.deregister(&self.client).unwrap();
@@ -86,5 +86,5 @@ pub fn test_register_deregister() {
     let handler = event_loop.run(TestHandler::new(server, client))
         .ok().expect("failed to execute event loop");
 
-    assert!(handler.state == 2, "unexpected final state {}", handler.state);
+    assert!(handler.state == 2, "unexpected final state {:?}", handler.state);
 }

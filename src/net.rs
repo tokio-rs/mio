@@ -174,14 +174,14 @@ pub mod tcp {
         /// immediately. Otherwise, every consumer of the event loop would have
         /// to worry about possibly-immediate connection.
         pub fn connect(&self, addr: &SockAddr) -> MioResult<()> {
-            debug!("socket connect; addr={}", addr);
+            debug!("socket connect; addr={:?}", addr);
 
             // Attempt establishing the context. This may not complete immediately.
             if try!(os::connect(&self.desc, addr)) {
                 // On some OSs, connecting to localhost succeeds immediately. In
                 // this case, queue the writable callback for execution during the
                 // next event loop tick.
-                debug!("socket connected immediately; addr={}", addr);
+                debug!("socket connected immediately; addr={:?}", addr);
             }
 
             Ok(())
@@ -191,7 +191,7 @@ pub mod tcp {
             try!(os::bind(&self.desc, addr));
             Ok(TcpListener { desc: self.desc })
         }
-        
+
         pub fn getpeername(self) -> MioResult<SockAddr> {
             os::getpeername(&self.desc)
         }
@@ -419,14 +419,14 @@ pub mod pipe {
         }
 
         pub fn connect(&self, addr: &SockAddr) -> MioResult<()> {
-            debug!("socket connect; addr={}", addr);
+            debug!("socket connect; addr={:?}", addr);
 
             // Attempt establishing the context. This may not complete immediately.
             if try!(os::connect(&self.desc, addr)) {
                 // On some OSs, connecting to localhost succeeds immediately. In
                 // this case, queue the writable callback for execution during the
                 // next event loop tick.
-                debug!("socket connected immediately; addr={}", addr);
+                debug!("socket connected immediately; addr={:?}", addr);
             }
 
             Ok(())

@@ -50,7 +50,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
 
                 match self.state {
                     Initial => {
-                        assert!(hint.contains(evt::DATAHINT), "unexpected hint {}", hint);
+                        assert!(hint.contains(evt::DATAHINT), "unexpected hint {:?}", hint);
 
                         // Whether or not Hup is included with actual data is platform specific
                         if hint.contains(evt::HUPHINT) {
@@ -75,18 +75,18 @@ impl Handler<TcpSocket, ()> for TestHandler {
 
                 match self.cli.read(&mut buf) {
                     Ok(n) => {
-                        debug!("read {} bytes", n);
+                        debug!("read {:?} bytes", n);
                         buf.flip();
                         assert!(b"zomg" == buf.bytes());
                     }
                     Err(e) => {
-                        debug!("client sock failed to read; err={}", e.kind);
+                        debug!("client sock failed to read; err={:?}", e.kind);
                     }
                 }
 
                 event_loop.reregister(&self.cli, CLIENT, evt::READABLE | evt::HUP, evt::EDGE).unwrap();
             }
-            _ => panic!("received unknown token {}", tok),
+            _ => panic!("received unknown token {:?}", tok),
         }
     }
 
@@ -94,7 +94,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
-            _ => panic!("received unknown token {}", tok),
+            _ => panic!("received unknown token {:?}", tok),
         }
 
         event_loop.reregister(&self.cli, CLIENT, evt::READABLE, evt::EDGE).unwrap();
@@ -134,5 +134,5 @@ pub fn test_timer() {
     let handler = event_loop.run(TestHandler::new(srv, sock))
         .ok().expect("failed to execute event loop");
 
-    assert!(handler.state == AfterHup, "actual={}", handler.state);
+    assert!(handler.state == AfterHup, "actual={:?}", handler.state);
 }

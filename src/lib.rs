@@ -84,9 +84,6 @@
 #![unstable]
 
 // Enable extra features
-#![feature(globs)]
-#![feature(phase)]
-#![feature(associated_types)]
 #![feature(unsafe_destructor)]
 
 // Disable dead code warnings
@@ -96,7 +93,7 @@ extern crate alloc;
 extern crate nix;
 extern crate time;
 
-#[phase(plugin, link)]
+#[macro_use]
 extern crate log;
 
 pub use buf::{
