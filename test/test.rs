@@ -1,9 +1,6 @@
-#![feature(globs)]
-#![feature(phase)]
-
 extern crate mio;
 
-#[phase(plugin, link)]
+#[macro_use]
 extern crate log;
 
 pub use ports::localhost;

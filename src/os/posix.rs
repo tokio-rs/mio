@@ -1,6 +1,5 @@
 use std::mem;
 use std::num::Int;
-use std::c_str::ToCStr;
 use error::{MioResult, MioError};
 use net::{AddressFamily, SockAddr, IPv4Addr, SocketType};
 use net::SocketType::{Dgram, Stream};
@@ -232,7 +231,7 @@ pub fn linger(io: &IoDesc) -> MioResult<uint> {
 pub fn getpeername(io: &IoDesc) -> MioResult<SockAddr> {
     let sa : nix::sockaddr_in = unsafe { mem::zeroed() };
     let mut a = nix::SockAddr::SockIpV4(sa);
-    
+
     try!(nix::getpeername(io.fd, &mut a).map_err(MioError::from_sys_error));
 
     Ok(to_sockaddr(&a))
@@ -308,10 +307,10 @@ fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {
 
             addr.sun_family = nix::AF_UNIX as nix::sa_family_t;
 
-            let c_path_ptr = path.to_c_str();
+            let c_path_ptr = path.as_vec();
             assert!(c_path_ptr.len() < addr.sun_path.len());
             for (sp_iter, path_iter) in addr.sun_path.iter_mut().zip(c_path_ptr.iter()) {
-                *sp_iter = path_iter as i8;
+                *sp_iter = *path_iter as i8;
             }
 
             nix::SockAddr::SockUnix(addr)
