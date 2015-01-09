@@ -18,7 +18,7 @@ impl Selector {
     }
 
     /// Wait for events from the OS
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: uint) -> MioResult<()> {
+    pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> MioResult<()> {
         // Wait for epoll events for at most timeout_ms milliseconds
         let cnt = try!(epoll_wait(self.epfd, evts.events.as_mut_slice(), timeout_ms)
                            .map_err(MioError::from_sys_error));
@@ -27,10 +27,10 @@ impl Selector {
         Ok(())
     }
 
-    /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, io: &IoDesc, token: uint, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    /// Register event isizeerests for the given IO handle with the OS
+    pub fn register(&mut self, io: &IoDesc, token: usize, isizeerests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
         let info = EpollEvent {
-            events: ioevent_to_epoll(interests, opts),
+            events: ioevent_to_epoll(isizeerests, opts),
             data: token as u64
         };
 
@@ -38,10 +38,10 @@ impl Selector {
             .map_err(MioError::from_sys_error)
     }
 
-    /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&mut self, io: &IoDesc, token: uint, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    /// Register event isizeerests for the given IO handle with the OS
+    pub fn reregister(&mut self, io: &IoDesc, token: usize, isizeerests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
         let info = EpollEvent {
-            events: ioevent_to_epoll(interests, opts),
+            events: ioevent_to_epoll(isizeerests, opts),
             data: token as u64
         };
 
@@ -49,7 +49,7 @@ impl Selector {
             .map_err(MioError::from_sys_error)
     }
 
-    /// Deregister event interests for the given IO handle with the OS
+    /// Deregister event isizeerests for the given IO handle with the OS
     pub fn deregister(&mut self, io: &IoDesc) -> MioResult<()> {
         // The &info argument should be ignored by the system,
         // but linux < 2.6.9 required it to be not null.
@@ -64,18 +64,18 @@ impl Selector {
     }
 }
 
-fn ioevent_to_epoll(interest: event::Interest, opts: event::PollOpt) -> EpollEventKind {
+fn ioevent_to_epoll(isizeerest: event::Interest, opts: event::PollOpt) -> EpollEventKind {
     let mut kind = EpollEventKind::empty();
 
-    if interest.contains(event::READABLE) {
+    if isizeerest.contains(event::READABLE) {
         kind.insert(EPOLLIN);
     }
 
-    if interest.contains(event::WRITABLE) {
+    if isizeerest.contains(event::WRITABLE) {
         kind.insert(EPOLLOUT);
     }
 
-    if interest.contains(event::HUP) {
+    if isizeerest.contains(event::HUP) {
         kind.insert(EPOLLRDHUP);
     }
 
@@ -101,7 +101,7 @@ impl Drop for Selector {
 }
 
 pub struct Events {
-    len: uint,
+    len: usize,
     events: [EpollEvent; 1024]
 }
 
@@ -114,12 +114,12 @@ impl Events {
     }
 
     #[inline]
-    pub fn len(&self) -> uint {
+    pub fn len(&self) -> usize {
         self.len
     }
 
     #[inline]
-    pub fn get(&self, idx: uint) -> event::IoEvent {
+    pub fn get(&self, idx: usize) -> event::IoEvent {
         if idx >= self.len {
             panic!("invalid index");
         }
@@ -146,6 +146,6 @@ impl Events {
 
         let token = self.events[idx].data;
 
-        event::IoEvent::new(kind, token as uint)
+        event::IoEvent::new(kind, token as usize)
     }
 }

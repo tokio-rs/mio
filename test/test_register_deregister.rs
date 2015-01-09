@@ -8,12 +8,12 @@ use std::time::Duration;
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
-type TestEventLoop = EventLoop<uint, ()>;
+type TestEventLoop = EventLoop<usize, ()>;
 
 struct TestHandler {
     server: TcpAcceptor,
     client: TcpSocket,
-    state: uint,
+    state: usize,
 }
 
 impl TestHandler {
@@ -26,15 +26,15 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint, ()> for TestHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: ReadHint) {
+impl Handler<usize, ()> for TestHandler {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: ReadHisize) {
         match token {
             SERVER => {
                 let sock = self.server.accept().unwrap().unwrap();
                 sock.write(&mut buf::wrap("foobar".as_bytes())).unwrap();
             }
             CLIENT => {
-                assert!(self.state == 0, "unexpected state {}", self.state);
+                assert!(self.state == 0, "unexpected state {:?}", self.state);
                 self.state = 1;
                 event_loop.reregister(&self.client, CLIENT, WRITABLE, LEVEL).unwrap();
             }
@@ -43,15 +43,15 @@ impl Handler<uint, ()> for TestHandler {
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop, token: Token) {
-        assert!(token == CLIENT, "unexpected token {}", token);
-        assert!(self.state == 1, "unexpected state {}", self.state);
+        assert!(token == CLIENT, "unexpected token {:?}", token);
+        assert!(self.state == 1, "unexpected state {:?}", self.state);
 
         self.state = 2;
         event_loop.deregister(&self.client).unwrap();
-        event_loop.timeout(1u, Duration::milliseconds(200)).unwrap();
+        event_loop.timeout(1us, Duration::milliseconds(200)).unwrap();
     }
 
-    fn timeout(&mut self, event_loop: &mut TestEventLoop, _: uint) {
+    fn timeout(&mut self, event_loop: &mut TestEventLoop, _: usize) {
         event_loop.shutdown();
     }
 }
@@ -86,5 +86,5 @@ pub fn test_register_deregister() {
     let handler = event_loop.run(TestHandler::new(server, client))
         .ok().expect("failed to execute event loop");
 
-    assert!(handler.state == 2, "unexpected final state {}", handler.state);
+    assert!(handler.state == 2, "unexpected final state {:?}", handler.state);
 }

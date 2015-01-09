@@ -17,20 +17,20 @@ impl Poll {
         })
     }
 
-    pub fn register<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn register<H: IoHandle>(&mut self, io: &H, token: Token, isizeerest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
         debug!("registering  with poller");
 
-        // Register interests for this socket
-        try!(self.selector.register(io.desc(), token.as_uint(), interest, opts));
+        // Register isizeerests for this socket
+        try!(self.selector.register(io.desc(), token.as_usize(), isizeerest, opts));
 
         Ok(())
     }
 
-    pub fn reregister<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn reregister<H: IoHandle>(&mut self, io: &H, token: Token, isizeerest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
         debug!("registering  with poller");
 
-        // Register interests for this socket
-        try!(self.selector.reregister(io.desc(), token.as_uint(), interest, opts));
+        // Register isizeerests for this socket
+        try!(self.selector.reregister(io.desc(), token.as_usize(), isizeerest, opts));
 
         Ok(())
     }
@@ -38,18 +38,18 @@ impl Poll {
     pub fn deregister<H: IoHandle>(&mut self, io: &H) -> MioResult<()> {
         debug!("deregistering IO with poller");
 
-        // Deregister interests for this socket
+        // Deregister isizeerests for this socket
         try!(self.selector.deregister(io.desc()));
 
         Ok(())
     }
 
-    pub fn poll(&mut self, timeout_ms: uint) -> MioResult<uint> {
+    pub fn poll(&mut self, timeout_ms: usize) -> MioResult<usize> {
         try!(self.selector.select(&mut self.events, timeout_ms));
         Ok(self.events.len())
     }
 
-    pub fn event(&self, idx: uint) -> event::IoEvent {
+    pub fn event(&self, idx: usize) -> event::IoEvent {
         self.events.get(idx)
     }
 
@@ -60,7 +60,7 @@ impl Poll {
 
 pub struct EventsIterator<'a> {
     events: &'a os::Events,
-    index: uint
+    index: usize
 }
 
 impl<'a> Iterator for EventsIterator<'a> {

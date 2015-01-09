@@ -7,7 +7,7 @@ use super::localhost;
 use std::io::net::ip::{Ipv4Addr};
 use mio::event as evt;
 
-type TestEventLoop = EventLoop<uint, ()>;
+type TestEventLoop = EventLoop<usize, ()>;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
@@ -32,8 +32,8 @@ impl UdpHandler {
     }
 }
 
-impl Handler<uint, ()> for UdpHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: evt::ReadHint) {
+impl Handler<usize, ()> for UdpHandler {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: evt::ReadHisize) {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");

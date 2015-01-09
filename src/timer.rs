@@ -1,4 +1,4 @@
-use std::{uint, iter};
+use std::{usize, iter};
 use std::cmp::max;
 use std::time::duration::Duration;
 use std::num::UnsignedInt;
@@ -8,7 +8,7 @@ use util::Slab;
 
 use self::TimerErrorKind::TimerOverflow;
 
-const EMPTY: Token = Token(uint::MAX);
+const EMPTY: Token = Token(usize::MAX);
 const NS_PER_MS: u64 = 1_000_000;
 
 // Implements coarse-grained timeouts using an algorithm based on hashed timing
@@ -16,7 +16,7 @@ const NS_PER_MS: u64 = 1_000_000;
 //
 // TODO:
 // * Handle the case when the timer falls more than an entire wheel behind. There
-//   is no point to loop multiple times around the wheel in one go.
+//   is no poisize to loop multiple times around the wheel in one go.
 // * New type for tick, now() -> Tick
 pub struct Timer<T> {
     // Size of each tick in milliseconds
@@ -38,14 +38,14 @@ pub struct Timer<T> {
 
 #[derive(Copy)]
 pub struct Timeout {
-    // Reference into the timer entry slab
+    // Reference isizeo the timer entry slab
     token: Token,
     // Tick that it should matchup with
     tick: u64,
 }
 
 impl<T> Timer<T> {
-    pub fn new(tick_ms: u64, mut slots: uint, mut capacity: uint) -> Timer<T> {
+    pub fn new(tick_ms: u64, mut slots: usize, mut capacity: usize) -> Timer<T> {
         slots = UnsignedInt::next_power_of_two(slots);
         capacity = UnsignedInt::next_power_of_two(capacity);
 
@@ -60,7 +60,7 @@ impl<T> Timer<T> {
         }
     }
 
-    pub fn count(&self) -> uint {
+    pub fn count(&self) -> usize {
         self.entries.count()
     }
 
@@ -136,7 +136,7 @@ impl<T> Timer<T> {
 
     fn insert(&mut self, token: T, tick: u64) -> TimerResult<Timeout> {
         // Get the slot for the requested tick
-        let slot = (tick & self.mask) as uint;
+        let slot = (tick & self.mask) as usize;
         let curr = self.wheel[slot];
 
         // Insert the new entry
@@ -145,7 +145,7 @@ impl<T> Timer<T> {
             .map_err(|_| TimerError::overflow()));
 
         if curr != EMPTY {
-            // If there was a previous entry, set its prev pointer to the new
+            // If there was a previous entry, set its prev poisizeer to the new
             // entry
             self.entries[curr].links.prev = token;
         }
@@ -153,7 +153,7 @@ impl<T> Timer<T> {
         // Update the head slot
         self.wheel[slot] = token;
 
-        debug!("inserted timout; slot={}; token={}", slot, token);
+        debug!("inserted timout; slot={:?}; token={:?}", slot, token);
 
         // Return the new timeout
         Ok(Timeout {
@@ -163,7 +163,7 @@ impl<T> Timer<T> {
     }
 
     fn unlink(&mut self, links: &EntryLinks, token: Token) {
-        debug!("unlinking timeout; slot={}; token={}",
+        debug!("unlinking timeout; slot={:?}; token={:?}",
                self.slot_for(links.tick), token);
 
         if links.prev == EMPTY {
@@ -195,12 +195,12 @@ impl<T> Timer<T> {
     }
 
     pub fn tick_to(&mut self, now: u64) -> Option<T> {
-        debug!("tick_to; now={}; tick={}", now, self.tick);
+        debug!("tick_to; now={:?}; tick={:?}", now, self.tick);
 
         while self.tick <= now {
             let curr = self.next;
 
-            debug!("ticking; curr={}", curr);
+            debug!("ticking; curr={:?}", curr);
 
             if curr == EMPTY {
                 self.tick += 1;
@@ -209,7 +209,7 @@ impl<T> Timer<T> {
                 let links = self.entries[curr].links;
 
                 if links.tick <= self.tick {
-                    debug!("triggering; token={}", curr);
+                    debug!("triggering; token={:?}", curr);
 
                     // Unlink will also advance self.next
                     self.unlink(&links, curr);
@@ -239,11 +239,11 @@ impl<T> Timer<T> {
     }
 
     #[inline]
-    fn slot_for(&self, tick: u64) -> uint {
-        (self.mask & tick) as uint
+    fn slot_for(&self, tick: u64) -> usize {
+        (self.mask & tick) as usize
     }
 
-    // Convert a ms duration into a number of ticks, rounds up
+    // Convert a ms duration isizeo a number of ticks, rounds up
     #[inline]
     fn ms_to_tick(&self, ms: u64) -> u64 {
         (ms - self.start) / self.tick_ms
@@ -365,7 +365,7 @@ mod test {
         assert_eq!(None, t.tick_to(tick));
 
         rcv.sort();
-        assert!(rcv.as_slice() == ["a", "b"].as_slice(), "actual={}", rcv.as_slice());
+        assert!(rcv.as_slice() == ["a", "b"].as_slice(), "actual={:?}", rcv.as_slice());
 
         tick = t.ms_to_tick(200);
         assert_eq!(None, t.tick_to(tick));
@@ -469,7 +469,7 @@ mod test {
     }
 
     const TICK: u64 = 100;
-    const SLOTS: uint = 16;
+    const SLOTS: usize = 16;
 
     fn timer() -> Timer<&'static str> {
         Timer::new(TICK, SLOTS, 32)

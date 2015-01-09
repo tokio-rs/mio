@@ -3,7 +3,7 @@ use std::ops::*;
 use os::token::Token;
 
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct PollOpt(uint);
+pub struct PollOpt(usize);
 
 pub const EDGE: PollOpt    = PollOpt(0x020);
 pub const LEVEL: PollOpt   = PollOpt(0x040);
@@ -26,7 +26,7 @@ impl PollOpt {
     }
 
     #[inline]
-    pub fn bits(&self) -> uint {
+    pub fn bits(&self) -> usize {
         let PollOpt(bits) = *self;
         bits
     }
@@ -104,7 +104,7 @@ impl fmt::Show for PollOpt {
 }
 
 bitflags!(
-    flags Interest: uint {
+    flags Interest: usize {
         const READABLE = 0x001,
         const WRITABLE = 0x002,
         const ERROR    = 0x004,
@@ -122,8 +122,8 @@ impl fmt::Show for Interest {
             (READABLE, "Readable"),
             (WRITABLE, "Writable"),
             (ERROR,    "Error"),
-            (HUP,      "HupHint"),
-            (HINTED,   "Hinted")];
+            (HUP,      "HupHisize"),
+            (HINTED,   "Hisizeed")];
 
         for &(flag, msg) in flags.iter() {
             if self.contains(flag) {
@@ -139,20 +139,20 @@ impl fmt::Show for Interest {
 }
 
 bitflags!(
-    flags ReadHint: uint {
+    flags ReadHisize: usize {
         const DATAHINT    = 0x001,
         const HUPHINT     = 0x002,
         const ERRORHINT   = 0x004
     }
 );
 
-impl fmt::Show for ReadHint {
+impl fmt::Show for ReadHisize {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (DATAHINT, "DataHint"),
-            (HUPHINT, "HupHint"),
-            (ERRORHINT, "ErrorHint")];
+            (DATAHINT, "DataHisize"),
+            (HUPHINT, "HupHisize"),
+            (ERRORHINT, "ErrorHisize")];
 
         for &(flag, msg) in flags.iter() {
             if self.contains(flag) {
@@ -182,7 +182,7 @@ pub struct IoEvent {
 /// Selector when they have events to report.
 impl IoEvent {
     /// Create a new IoEvent.
-    pub fn new(kind: Interest, token: uint) -> IoEvent {
+    pub fn new(kind: Interest, token: usize) -> IoEvent {
         IoEvent {
             kind: kind,
             token: Token(token)
@@ -193,31 +193,31 @@ impl IoEvent {
         self.token
     }
 
-    /// Return an optional hint for a readable  handle. Currently,
-    /// this method supports the HupHint, which indicates that the
+    /// Return an optional hisize for a readable  handle. Currently,
+    /// this method supports the HupHisize, which indicates that the
     /// kernel reported that the remote side hung up. This allows a
     /// consumer to avoid reading in order to discover the hangup.
-    pub fn read_hint(&self) -> ReadHint {
-        let mut hint = ReadHint::empty();
+    pub fn read_hisize(&self) -> ReadHisize {
+        let mut hisize = ReadHisize::empty();
 
-        // The backend doesn't support hinting
+        // The backend doesn't support hisizeing
         if !self.kind.contains(HINTED) {
-            return hint;
+            return hisize;
         }
 
         if self.kind.contains(HUP) {
-            hint = hint | HUPHINT
+            hisize = hisize | HUPHINT
         }
 
         if self.kind.contains(READABLE) {
-            hint = hint | DATAHINT
+            hisize = hisize | DATAHINT
         }
 
         if self.kind.contains(ERROR) {
-            hint = hint | ERRORHINT
+            hisize = hisize | ERRORHINT
         }
 
-        hint
+        hisize
     }
 
     /// This event indicated that the  handle is now readable

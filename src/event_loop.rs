@@ -1,6 +1,6 @@
 use std::default::Default;
 use std::time::duration::Duration;
-use std::uint;
+use std::usize;
 use error::{MioResult, MioError};
 use handler::Handler;
 use io::IoHandle;
@@ -13,16 +13,16 @@ use os::token::Token;
 /// Configure EventLoop runtime details
 #[derive(Copy, Clone, Show)]
 pub struct EventLoopConfig {
-    pub io_poll_timeout_ms: uint,
+    pub io_poll_timeout_ms: usize,
 
     // == Notifications ==
-    pub notify_capacity: uint,
-    pub messages_per_tick: uint,
+    pub notify_capacity: usize,
+    pub messages_per_tick: usize,
 
     // == Timer ==
     pub timer_tick_ms: u64,
-    pub timer_wheel_size: uint,
-    pub timer_capacity: uint,
+    pub timer_wheel_size: usize,
+    pub timer_capacity: usize,
 }
 
 impl Default for EventLoopConfig {
@@ -48,7 +48,7 @@ pub struct EventLoop<T, M: Send> {
 }
 
 // Token used to represent notifications
-const NOTIFY: Token = Token(uint::MAX);
+const NOTIFY: Token = Token(usize::MAX);
 
 impl<T, M: Send> EventLoop<T, M> {
 
@@ -74,7 +74,7 @@ impl<T, M: Send> EventLoop<T, M> {
         // Register the notification wakeup FD with the IO poller
         try!(poll.register(&notify, NOTIFY, event::READABLE | event::WRITABLE, event::EDGE));
 
-        // Set the timer's starting time reference point
+        // Set the timer's starting time reference poisize
         timer.setup();
 
         Ok(EventLoop {
@@ -96,8 +96,8 @@ impl<T, M: Send> EventLoop<T, M> {
     ///
     /// struct MyHandler;
     ///
-    /// impl Handler<(), uint> for MyHandler {
-    ///     fn notify(&mut self, event_loop: &mut EventLoop<(), uint>, msg: uint) {
+    /// impl Handler<(), usize> for MyHandler {
+    ///     fn notify(&mut self, event_loop: &mut EventLoop<(), usize>, msg: usize) {
     ///         assert_eq!(msg, 123);
     ///         event_loop.shutdown();
     ///     }
@@ -135,7 +135,7 @@ impl<T, M: Send> EventLoop<T, M> {
         EventLoopSender::new(self.notify.clone())
     }
 
-    /// Schedules a timeout after the requested time interval. When the
+    /// Schedules a timeout after the requested time isizeerval. When the
     /// duration has been reached,
     /// [Handler::timeout](trait.Handler.html#method.timeout) will be invoked
     /// passing in the supplied token.
@@ -150,8 +150,8 @@ impl<T, M: Send> EventLoop<T, M> {
     ///
     /// struct MyHandler;
     ///
-    /// impl Handler<uint, ()> for MyHandler {
-    ///     fn timeout(&mut self, event_loop: &mut EventLoop<uint, ()>, timeout: uint) {
+    /// impl Handler<usize, ()> for MyHandler {
+    ///     fn timeout(&mut self, event_loop: &mut EventLoop<usize, ()>, timeout: usize) {
     ///         assert_eq!(timeout, 123);
     ///         event_loop.shutdown();
     ///     }
@@ -184,13 +184,13 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register_opt<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opt: event::PollOpt) -> MioResult<()> {
-        self.poll.register(io, token, interest, opt)
+    pub fn register_opt<H: IoHandle>(&mut self, io: &H, token: Token, isizeerest: event::Interest, opt: event::PollOpt) -> MioResult<()> {
+        self.poll.register(io, token, isizeerest, opt)
     }
 
     /// Re-Registers an IO handle with the event loop.
-    pub fn reregister<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opt: event::PollOpt) -> MioResult<()> {
-        self.poll.reregister(io, token, interest, opt)
+    pub fn reregister<H: IoHandle>(&mut self, io: &H, token: Token, isizeerest: event::Interest, opt: event::PollOpt) -> MioResult<()> {
+        self.poll.reregister(io, token, isizeerest, opt)
     }
 
     /// Keep spinning the event loop indefinitely, and notify the handler whenever
@@ -260,11 +260,11 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     #[inline]
-    fn io_poll(&mut self, immediate: bool) -> MioResult<uint> {
+    fn io_poll(&mut self, immediate: bool) -> MioResult<usize> {
         if immediate {
             self.poll.poll(0)
         } else {
-            let mut sleep = self.timer.next_tick_in_ms() as uint;
+            let mut sleep = self.timer.next_tick_in_ms() as usize;
 
             if sleep > self.config.io_poll_timeout_ms {
                 sleep = self.config.io_poll_timeout_ms;
@@ -275,8 +275,8 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     // Process IO events that have been previously polled
-    fn io_process<H: Handler<T, M>>(&mut self, handler: &mut H, cnt: uint) {
-        let mut i = 0u;
+    fn io_process<H: Handler<T, M>>(&mut self, handler: &mut H, cnt: usize) {
+        let mut i = 0us;
 
         // Iterate over the notifications. Each event provides the token
         // it was registered with (which usually represents, at least, the
@@ -285,7 +285,7 @@ impl<T, M: Send> EventLoop<T, M> {
         while i < cnt {
             let evt = self.poll.event(i);
 
-            debug!("event={}", evt);
+            debug!("event={:?}", evt);
 
             match evt.token() {
                 NOTIFY => self.notify.cleanup(),
@@ -300,7 +300,7 @@ impl<T, M: Send> EventLoop<T, M> {
         let tok = evt.token();
 
         if evt.is_readable() {
-            handler.readable(self, tok, evt.read_hint());
+            handler.readable(self, tok, evt.read_hisize());
         }
 
         if evt.is_writable() {
@@ -312,10 +312,10 @@ impl<T, M: Send> EventLoop<T, M> {
         }
     }
 
-    fn notify<H: Handler<T, M>>(&mut self, handler: &mut H, mut cnt: uint) {
+    fn notify<H: Handler<T, M>>(&mut self, handler: &mut H, mut cnt: usize) {
         while cnt > 0 {
             let msg = self.notify.poll()
-                .expect("[BUG] at this point there should always be a message");
+                .expect("[BUG] at this poisize there should always be a message");
 
             handler.notify(self, msg);
             cnt -= 1;
@@ -377,7 +377,7 @@ mod tests {
     use {io, buf, Buf, Handler, Token};
     use os::event;
 
-    type TestEventLoop = EventLoop<uint, ()>;
+    type TestEventLoop = EventLoop<usize, ()>;
 
     struct Funtimes {
         rcount: Arc<AtomicInt>,
@@ -393,8 +393,8 @@ mod tests {
         }
     }
 
-    impl Handler<uint, ()> for Funtimes {
-        fn readable(&mut self, _event_loop: &mut TestEventLoop, token: Token, _hint: event::ReadHint) {
+    impl Handler<usize, ()> for Funtimes {
+        fn readable(&mut self, _event_loop: &mut TestEventLoop, token: Token, _hisize: event::ReadHisize) {
             (*self.rcount).fetch_add(1, SeqCst);
             assert_eq!(token, Token(10));
         }
