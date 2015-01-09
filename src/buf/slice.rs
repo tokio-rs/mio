@@ -4,7 +4,7 @@ use super::{Buf, MutBuf};
 
 pub struct SliceBuf<'a> {
     bytes: &'a [u8],
-    pos: uint
+    pos: usize
 }
 
 impl<'a> SliceBuf<'a> {
@@ -14,7 +14,7 @@ impl<'a> SliceBuf<'a> {
 }
 
 impl<'a> Buf for SliceBuf<'a> {
-    fn remaining(&self) -> uint {
+    fn remaining(&self) -> usize {
         self.bytes.len() - self.pos
     }
 
@@ -22,21 +22,21 @@ impl<'a> Buf for SliceBuf<'a> {
         self.bytes.slice_from(self.pos)
     }
 
-    fn advance(&mut self, mut cnt: uint) {
+    fn advance(&mut self, mut cnt: usize) {
         cnt = cmp::min(cnt, self.remaining());
         self.pos += cnt;
     }
 }
 
 impl<'a> Reader for SliceBuf<'a> {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         super::read(self, buf)
     }
 }
 
 pub struct MutSliceBuf<'a> {
     bytes: &'a mut [u8],
-    pos: uint
+    pos: usize
 }
 
 impl<'a> MutSliceBuf<'a> {
@@ -49,7 +49,7 @@ impl<'a> MutSliceBuf<'a> {
 }
 
 impl<'a> Buf for MutSliceBuf<'a> {
-    fn remaining(&self) -> uint {
+    fn remaining(&self) -> usize {
         self.bytes.len() - self.pos
     }
 
@@ -57,7 +57,7 @@ impl<'a> Buf for MutSliceBuf<'a> {
         self.bytes.slice_from(self.pos)
     }
 
-    fn advance(&mut self, mut cnt: uint) {
+    fn advance(&mut self, mut cnt: usize) {
         cnt = cmp::min(cnt, self.remaining());
         self.pos += cnt;
     }
@@ -70,7 +70,7 @@ impl<'a> MutBuf for MutSliceBuf<'a> {
 }
 
 impl<'a> Reader for MutSliceBuf<'a> {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         super::read(self, buf)
     }
 }

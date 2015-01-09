@@ -6,7 +6,7 @@ use mio::util::Slab;
 use super::localhost;
 use mio::event as evt;
 
-type TestEventLoop = EventLoop<uint, ()>;
+type TestEventLoop = EventLoop<usize, ()>;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -15,7 +15,7 @@ struct EchoConn {
     sock: TcpSocket,
     buf: ByteBuf,
     token: Token,
-    interest: evt::Interest
+    isizeerest: evt::Interest
 }
 
 impl EchoConn {
@@ -24,29 +24,29 @@ impl EchoConn {
             sock: sock,
             buf: ByteBuf::new(2048),
             token: Token(-1),
-            interest: evt::HUP
+            isizeerest: evt::HUP
         }
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
-        debug!("CON : writing buf = {}", self.buf.bytes());
+        debug!("CON : writing buf = {:?}", self.buf.bytes());
 
         match self.sock.write(&mut self.buf) {
             Ok(NonBlock::WouldBlock) => {
                 debug!("client flushing buf; WOULDBLOCK");
-                self.interest.insert(evt::WRITABLE);
+                self.isizeerest.insert(evt::WRITABLE);
             }
             Ok(NonBlock::Ready(r)) => {
-                debug!("CONN : we wrote {} bytes!", r);
+                debug!("CONN : we wrote {:?} bytes!", r);
 
                 self.buf.clear();
-                self.interest.insert(evt::READABLE);
-                self.interest.remove(evt::WRITABLE);
+                self.isizeerest.insert(evt::READABLE);
+                self.isizeerest.remove(evt::WRITABLE);
             }
-            Err(e) => debug!("not implemented; client err={}", e),
+            Err(e) => debug!("not implemented; client err={:?}", e),
         }
 
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, self.isizeerest, evt::PollOpt::edge())
     }
 
     fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
@@ -55,13 +55,13 @@ impl EchoConn {
                 panic!("We just got readable, but were unable to read from the socket?");
             }
             Ok(NonBlock::Ready(r)) => {
-                debug!("CONN : we read {} bytes!", r);
-                self.interest.remove(evt::READABLE);
-                self.interest.insert(evt::WRITABLE);
+                debug!("CONN : we read {:?} bytes!", r);
+                self.isizeerest.remove(evt::READABLE);
+                self.isizeerest.insert(evt::WRITABLE);
             }
             Err(e) => {
-                debug!("not implemented; client err={}", e);
-                self.interest.remove(evt::READABLE);
+                debug!("not implemented; client err={:?}", e);
+                self.isizeerest.remove(evt::READABLE);
             }
 
         };
@@ -69,9 +69,9 @@ impl EchoConn {
         // prepare to provide this to writable
         self.buf.flip();
 
-        debug!("CON : read buf = {}", self.buf.bytes());
+        debug!("CON : read buf = {:?}", self.buf.bytes());
 
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, self.isizeerest, evt::PollOpt::edge())
     }
 }
 
@@ -98,12 +98,12 @@ impl EchoServer {
     }
 
     fn conn_readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
-        debug!("server conn readable; tok={}", tok);
+        debug!("server conn readable; tok={:?}", tok);
         self.conn(tok).readable(event_loop)
     }
 
     fn conn_writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
-        debug!("server conn writable; tok={}", tok);
+        debug!("server conn writable; tok={:?}", tok);
         self.conn(tok).writable(event_loop)
     }
 
@@ -119,7 +119,7 @@ struct EchoClient {
     rx: SliceBuf<'static>,
     buf: ByteBuf,
     token: Token,
-    interest: evt::Interest
+    isizeerest: evt::Interest
 }
 
 
@@ -135,7 +135,7 @@ impl EchoClient {
             rx: SliceBuf::wrap(curr.as_bytes()),
             buf: ByteBuf::new(2048),
             token: tok,
-            interest: evt::Interest::empty()
+            isizeerest: evt::Interest::empty()
         }
     }
 
@@ -147,33 +147,33 @@ impl EchoClient {
                 panic!("We just got readable, but were unable to read from the socket?");
             }
             Ok(NonBlock::Ready(r)) => {
-                debug!("CLIENT : We read {} bytes!", r);
+                debug!("CLIENT : We read {:?} bytes!", r);
             }
             Err(e) => {
-                panic!("not implemented; client err={}", e);
+                panic!("not implemented; client err={:?}", e);
             }
         };
 
         // prepare for reading
         self.buf.flip();
 
-        debug!("CLIENT : buf = {} -- rx = {}", self.buf.bytes(), self.rx.bytes());
+        debug!("CLIENT : buf = {:?} -- rx = {:?}", self.buf.bytes(), self.rx.bytes());
         while self.buf.has_remaining() {
             let actual = self.buf.read_byte().unwrap();
             let expect = self.rx.read_byte().unwrap();
 
-            assert!(actual == expect, "actual={}; expect={}", actual, expect);
+            assert!(actual == expect, "actual={:?}; expect={:?}", actual, expect);
         }
 
         self.buf.clear();
 
-        self.interest.remove(evt::READABLE);
+        self.isizeerest.remove(evt::READABLE);
 
         if !self.rx.has_remaining() {
             self.next_msg(event_loop).unwrap();
         }
 
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, self.isizeerest, evt::PollOpt::edge())
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
@@ -182,17 +182,17 @@ impl EchoClient {
         match self.sock.write(&mut self.tx) {
             Ok(NonBlock::WouldBlock) => {
                 debug!("client flushing buf; WOULDBLOCK");
-                self.interest.insert(evt::WRITABLE);
+                self.isizeerest.insert(evt::WRITABLE);
             }
             Ok(NonBlock::Ready(r)) => {
-                debug!("CLIENT : we wrote {} bytes!", r);
-                self.interest.insert(evt::READABLE);
-                self.interest.remove(evt::WRITABLE);
+                debug!("CLIENT : we wrote {:?} bytes!", r);
+                self.isizeerest.insert(evt::READABLE);
+                self.isizeerest.remove(evt::WRITABLE);
             }
-            Err(e) => debug!("not implemented; client err={}", e)
+            Err(e) => debug!("not implemented; client err={:?}", e)
         }
 
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, self.isizeerest, evt::PollOpt::edge())
     }
 
     fn next_msg(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
@@ -207,8 +207,8 @@ impl EchoClient {
         self.tx = SliceBuf::wrap(curr.as_bytes());
         self.rx = SliceBuf::wrap(curr.as_bytes());
 
-        self.interest.insert(evt::WRITABLE);
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        self.isizeerest.insert(evt::WRITABLE);
+        event_loop.reregister(&self.sock, self.token, self.isizeerest, evt::PollOpt::edge())
     }
 }
 
@@ -229,9 +229,9 @@ impl EchoHandler {
     }
 }
 
-impl Handler<uint, ()> for EchoHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: evt::ReadHint) {
-        assert_eq!(hint, evt::DATAHINT);
+impl Handler<usize, ()> for EchoHandler {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hisize: evt::ReadHisize) {
+        assert_eq!(hisize, evt::DATAHINT);
 
         match token {
             SERVER => self.server.accept(event_loop).unwrap(),
@@ -263,7 +263,7 @@ pub fn test_echo_server() {
     srv.set_reuseaddr(true).unwrap();
 
     let srv = srv.bind(&addr).unwrap()
-        .listen(256u).unwrap();
+        .listen(256us).unwrap();
 
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, evt::READABLE, evt::PollOpt::edge()).unwrap();

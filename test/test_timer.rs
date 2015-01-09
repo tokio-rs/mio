@@ -36,7 +36,7 @@ impl TestHandler {
 }
 
 impl Handler<TcpSocket, ()> for TestHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: evt::ReadHint) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hisize: evt::ReadHisize) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
@@ -50,17 +50,17 @@ impl Handler<TcpSocket, ()> for TestHandler {
 
                 match self.state {
                     Initial => {
-                        assert!(hint.contains(evt::DATAHINT), "unexpected hint {}", hint);
+                        assert!(hisize.contains(evt::DATAHINT), "unexpected hisize {:?}", hisize);
 
                         // Whether or not Hup is included with actual data is platform specific
-                        if hint.contains(evt::HUPHINT) {
+                        if hisize.contains(evt::HUPHINT) {
                             self.state = AfterHup;
                         } else {
                             self.state = AfterRead;
                         }
                     }
                     AfterRead => {
-                        assert_eq!(hint, evt::DATAHINT | evt::HUPHINT);
+                        assert_eq!(hisize, evt::DATAHINT | evt::HUPHINT);
                         self.state = AfterHup;
                     }
                     AfterHup => panic!("Shouldn't get here"),
@@ -75,18 +75,18 @@ impl Handler<TcpSocket, ()> for TestHandler {
 
                 match self.cli.read(&mut buf) {
                     Ok(n) => {
-                        debug!("read {} bytes", n);
+                        debug!("read {:?} bytes", n);
                         buf.flip();
                         assert!(b"zomg" == buf.bytes());
                     }
                     Err(e) => {
-                        debug!("client sock failed to read; err={}", e.kind);
+                        debug!("client sock failed to read; err={:?}", e.kind);
                     }
                 }
 
                 event_loop.reregister(&self.cli, CLIENT, evt::READABLE | evt::HUP, evt::EDGE).unwrap();
             }
-            _ => panic!("received unknown token {}", tok),
+            _ => panic!("received unknown token {:?}", tok),
         }
     }
 
@@ -94,7 +94,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
-            _ => panic!("received unknown token {}", tok),
+            _ => panic!("received unknown token {:?}", tok),
         }
 
         event_loop.reregister(&self.cli, CLIENT, evt::READABLE, evt::EDGE).unwrap();
@@ -119,7 +119,7 @@ pub fn test_timer() {
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
 
-    let srv = srv.bind(&addr).unwrap().listen(256u).unwrap();
+    let srv = srv.bind(&addr).unwrap().listen(256us).unwrap();
 
     info!("listening for connections");
 
@@ -134,5 +134,5 @@ pub fn test_timer() {
     let handler = event_loop.run(TestHandler::new(srv, sock))
         .ok().expect("failed to execute event loop");
 
-    assert!(handler.state == AfterHup, "actual={}", handler.state);
+    assert!(handler.state == AfterHup, "actual={:?}", handler.state);
 }

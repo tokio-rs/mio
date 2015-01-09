@@ -34,7 +34,7 @@
 //! // Setup the server socket
 //! let server = TcpSocket::v4().unwrap()
 //!     .bind(&addr).unwrap()
-//!     .listen(256u).unwrap();
+//!     .listen(256us).unwrap();
 //!
 //! // Create an event loop
 //! let mut event_loop = EventLoop::<(), ()>::new().unwrap();
@@ -55,7 +55,7 @@
 //! struct MyHandler(TcpAcceptor);
 //!
 //! impl Handler<(), ()> for MyHandler {
-//!     fn readable(&mut self, event_loop: &mut EventLoop<(), ()>, token: Token, _: event::ReadHint) {
+//!     fn readable(&mut self, event_loop: &mut EventLoop<(), ()>, token: Token, _: event::ReadHisize) {
 //!         match token {
 //!             SERVER => {
 //!                 let MyHandler(ref mut server) = *self;
@@ -83,6 +83,7 @@
 // mio is still in rapid development
 #![unstable]
 
+#![allow(unstable)]
 #![feature(unsafe_destructor)]
 
 // Disable dead code warnings

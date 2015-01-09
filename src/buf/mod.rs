@@ -16,9 +16,9 @@ mod slice;
  */
 
 pub trait Buf {
-    fn remaining(&self) -> uint;
+    fn remaining(&self) -> usize;
     fn bytes<'a>(&'a self) -> &'a [u8];
-    fn advance(&mut self, cnt: uint);
+    fn advance(&mut self, cnt: usize);
 
     fn has_remaining(&self) -> bool {
         self.remaining() > 0
@@ -45,7 +45,7 @@ pub fn wrap_mut<'a>(bytes: &'a mut [u8]) -> MutSliceBuf<'a> {
 //
 // Also, the default implementation for Reader / Writer fns is currently
 // broken. If there are IO errors during execution, any data that has been read
-// up to that point is lost.
+// up to that poisize is lost.
 //
 // impl<B: Buf> Reader for B {
 //
@@ -57,7 +57,7 @@ pub fn wrap_mut<'a>(bytes: &'a mut [u8]) -> MutSliceBuf<'a> {
 //
 // Instead, we provide these two fns we call in all the concrete implementations
 
-fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> io::IoResult<uint> {
+fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> io::IoResult<usize> {
     let nread = cmp::min(buf.remaining(), dst.len());
 
     if nread == 0 {
@@ -68,7 +68,7 @@ fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> io::IoResult<uint> {
         return Err(io::standard_error(io::EndOfFile));
     }
 
-    let mut curr = 0u;
+    let mut curr = 0us;
 
     while curr < nread {
         let cnt = {
@@ -96,7 +96,7 @@ fn write<B: MutBuf>(buf: &mut B, src: &[u8]) -> io::IoResult<()> {
         return Err(io::standard_error(io::EndOfFile));
     }
 
-    let mut curr = 0u;
+    let mut curr = 0us;
 
     while curr < src.len() {
         let cnt = {

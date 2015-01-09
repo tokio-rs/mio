@@ -6,7 +6,7 @@ use io::IoHandle;
 use os;
 use util::BoundedQueue;
 
-const SLEEP: int = -1;
+const SLEEP: isize = -1;
 
 /// Send notifications to the event loop, waking it up if necessary. If the
 /// event loop is not currently sleeping, avoid using an OS wake-up strategy
@@ -19,14 +19,14 @@ pub struct Notify<M: Send> {
 
 impl<M: Send> Notify<M> {
     #[inline]
-    pub fn with_capacity(capacity: uint) -> MioResult<Notify<M>> {
+    pub fn with_capacity(capacity: usize) -> MioResult<Notify<M>> {
         Ok(Notify {
             inner: Arc::new(try!(NotifyInner::with_capacity(capacity)))
         })
     }
 
     #[inline]
-    pub fn check(&self, max: uint, will_sleep: bool) -> uint {
+    pub fn check(&self, max: usize, will_sleep: bool) -> usize {
         self.inner.check(max, will_sleep)
     }
 
@@ -61,7 +61,7 @@ struct NotifyInner<M> {
 }
 
 impl<M: Send> NotifyInner<M> {
-    fn with_capacity(capacity: uint) -> MioResult<NotifyInner<M>> {
+    fn with_capacity(capacity: usize) -> MioResult<NotifyInner<M>> {
         Ok(NotifyInner {
             state: AtomicInt::new(0),
             queue: BoundedQueue::with_capacity(capacity),
@@ -69,8 +69,8 @@ impl<M: Send> NotifyInner<M> {
         })
     }
 
-    fn check(&self, max: uint, will_sleep: bool) -> uint {
-        let max = max as int;
+    fn check(&self, max: usize, will_sleep: bool) -> usize {
+        let max = max as isize;
         let mut cur = self.state.load(Relaxed);
         let mut nxt;
         let mut val;
@@ -104,7 +104,7 @@ impl<M: Send> NotifyInner<M> {
         if cur < 0 {
             0
         } else {
-            cur as uint
+            cur as usize
         }
     }
 

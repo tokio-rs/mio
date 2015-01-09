@@ -7,11 +7,11 @@ use mio::net::tcp::*;
 use super::localhost;
 use mio::event as evt;
 
-type TestEventLoop = EventLoop<uint, String>;
+type TestEventLoop = EventLoop<usize, String>;
 
 struct TestHandler {
     sender: EventLoopSender<String>,
-    notify: uint
+    notify: usize
 }
 
 impl TestHandler {
@@ -23,18 +23,18 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint, String> for TestHandler {
+impl Handler<usize, String> for TestHandler {
     fn notify(&mut self, event_loop: &mut TestEventLoop, msg: String) {
         match self.notify {
             0 => {
-                assert!(msg.as_slice() == "First", "actual={}", msg);
+                assert!(msg.as_slice() == "First", "actual={:?}", msg);
                 self.sender.send("Second".to_string()).unwrap();
             }
             1 => {
-                assert!(msg.as_slice() == "Second", "actual={}", msg);
+                assert!(msg.as_slice() == "Second", "actual={:?}", msg);
                 event_loop.shutdown();
             }
-            v => panic!("unexpected value for notify; val={}", v)
+            v => panic!("unexpected value for notify; val={:?}", v)
         }
 
         self.notify += 1;
@@ -54,7 +54,7 @@ pub fn test_notify() {
     srv.set_reuseaddr(true).unwrap();
 
     let srv = srv.bind(&addr).unwrap()
-        .listen(256u).unwrap();
+        .listen(256us).unwrap();
 
     event_loop.register_opt(&srv, Token(0), evt::ALL, evt::EDGE).unwrap();
 
@@ -63,7 +63,7 @@ pub fn test_notify() {
     Thread::spawn(move || {
         sleep(Duration::seconds(1));
         sender.send("First".to_string()).unwrap();
-    }).detach();
+    });
 
     let sender = event_loop.channel();
 
@@ -71,5 +71,5 @@ pub fn test_notify() {
     let h = event_loop.run(TestHandler::new(sender))
         .ok().expect("failed to execute event loop");
 
-    assert!(h.notify == 2, "actual={}", h.notify);
+    assert!(h.notify == 2, "actual={:?}", h.notify);
 }

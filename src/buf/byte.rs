@@ -7,13 +7,13 @@ use super::{Buf, MutBuf};
 
 pub struct ByteBuf {
     ptr: *mut u8,
-    cap: uint,
-    pos: uint,
-    lim: uint
+    cap: usize,
+    pos: usize,
+    lim: usize
 }
 
 impl ByteBuf {
-    pub fn new(mut capacity: uint) -> ByteBuf {
+    pub fn new(mut capacity: usize) -> ByteBuf {
         // Handle 0 capacity case
         if capacity == 0 {
             return ByteBuf {
@@ -36,7 +36,7 @@ impl ByteBuf {
         }
     }
 
-    pub fn capacity(&self) -> uint {
+    pub fn capacity(&self) -> usize {
         self.cap
     }
 
@@ -78,7 +78,7 @@ impl Drop for ByteBuf {
 }
 
 impl Buf for ByteBuf {
-    fn remaining(&self) -> uint {
+    fn remaining(&self) -> usize {
         self.lim - self.pos
     }
 
@@ -86,7 +86,7 @@ impl Buf for ByteBuf {
         self.as_slice().slice(self.pos, self.lim)
     }
 
-    fn advance(&mut self, mut cnt: uint) {
+    fn advance(&mut self, mut cnt: usize) {
         cnt = cmp::min(cnt, self.remaining());
         self.pos += cnt;
     }
@@ -101,7 +101,7 @@ impl MutBuf for ByteBuf {
 }
 
 impl Reader for ByteBuf {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         super::read(self, buf)
     }
 }

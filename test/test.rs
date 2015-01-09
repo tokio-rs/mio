@@ -1,3 +1,4 @@
+#![allow(unstable)]
 extern crate mio;
 
 #[macro_use]
@@ -21,9 +22,9 @@ mod ports {
     // Helper for getting a unique port for the task run
     // TODO: Reuse ports to not spam the system
     static mut NEXT_PORT: AtomicUint = ATOMIC_UINT_INIT;
-    const FIRST_PORT: uint = 18080;
+    const FIRST_PORT: usize = 18080;
 
-    fn next_port() -> uint {
+    fn next_port() -> usize {
         unsafe {
             // If the atomic was never used, set it to the initial port
             NEXT_PORT.compare_and_swap(0, FIRST_PORT, SeqCst);

@@ -16,11 +16,11 @@ use self::SockAddr::{InetAddr,UnixAddr};
 use self::AddressFamily::{Unix,Inet,Inet6};
 
 pub trait Socket : IoHandle {
-    fn linger(&self) -> MioResult<uint> {
+    fn linger(&self) -> MioResult<usize> {
         os::linger(self.desc())
     }
 
-    fn set_linger(&self, dur_s: uint) -> MioResult<()> {
+    fn set_linger(&self, dur_s: usize) -> MioResult<()> {
         os::set_linger(self.desc(), dur_s)
     }
 
@@ -34,12 +34,12 @@ pub trait Socket : IoHandle {
 }
 
 pub trait MulticastSocket : Socket {
-    fn join_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
-        os::join_multicast_group(self.desc(), addr, interface)
+    fn join_multicast_group(&self, addr: &IpAddr, isizeerface: &Option<IpAddr>) -> MioResult<()> {
+        os::join_multicast_group(self.desc(), addr, isizeerface)
     }
 
-    fn leave_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
-        os::leave_multicast_group(self.desc(), addr, interface)
+    fn leave_multicast_group(&self, addr: &IpAddr, isizeerface: &Option<IpAddr>) -> MioResult<()> {
+        os::leave_multicast_group(self.desc(), addr, isizeerface)
     }
 
     fn set_multicast_ttl(&self, val: u8) -> MioResult<()> {
@@ -103,7 +103,7 @@ impl SockAddr {
         }
     }
 
-    pub fn into_std(self) -> Option<StdSocketAddr> {
+    pub fn isizeo_std(self) -> Option<StdSocketAddr> {
         match self {
             InetAddr(addr, port) => Some(StdSocketAddr {
                 ip: addr,
@@ -120,7 +120,7 @@ impl FromStr for SockAddr {
     }
 }
 
-impl fmt::Show for SockAddr {
+impl fmt::String for SockAddr {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             InetAddr(ip, port) => write!(fmt, "{}:{}", ip, port),
@@ -208,21 +208,21 @@ pub mod tcp {
     }
 
     impl IoReader for TcpSocket {
-        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<(uint)>> {
+        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<(usize)>> {
             io::read(self, buf)
         }
 
-        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<uint>> {
+        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
             io::read_slice(self, buf)
         }
     }
 
     impl IoWriter for TcpSocket {
-        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<(uint)>> {
+        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<(usize)>> {
             io::write(self, buf)
         }
 
-        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<uint>> {
+        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
             io::write_slice(self, buf)
         }
     }
@@ -236,7 +236,7 @@ pub mod tcp {
     }
 
     impl TcpListener {
-        pub fn listen(self, backlog: uint) -> MioResult<TcpAcceptor> {
+        pub fn listen(self, backlog: usize) -> MioResult<TcpAcceptor> {
             try!(os::listen(self.desc(), backlog));
             Ok(TcpAcceptor { desc: self.desc })
         }
@@ -254,7 +254,7 @@ pub mod tcp {
     }
 
     impl TcpAcceptor {
-        pub fn new(addr: &SockAddr, backlog: uint) -> MioResult<TcpAcceptor> {
+        pub fn new(addr: &SockAddr, backlog: usize) -> MioResult<TcpAcceptor> {
             let sock = try!(TcpSocket::new(addr.family()));
             let listener = try!(sock.bind(addr));
             listener.listen(backlog)
@@ -341,21 +341,21 @@ pub mod udp {
     }
 
     impl IoReader for UdpSocket {
-        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<(uint)>> {
+        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<(usize)>> {
             io::read(self, buf)
         }
 
-        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<uint>> {
+        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
             io::read_slice(self, buf)
         }
     }
 
     impl IoWriter for UdpSocket {
-        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<(uint)>> {
+        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<(usize)>> {
             io::write(self, buf)
         }
 
-        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<uint>> {
+        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
             io::write_slice(self, buf)
         }
     }
@@ -449,21 +449,21 @@ pub mod pipe {
     }
 
     impl IoReader for UnixSocket {
-        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> {
+        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<usize>> {
             io::read(self, buf)
         }
 
-        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<uint>> {
+        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
             io::read_slice(self, buf)
         }
     }
 
     impl IoWriter for UnixSocket {
-        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
+        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<usize>> {
             io::write(self, buf)
         }
 
-        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<uint>> {
+        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
             io::write_slice(self, buf)
         }
     }
@@ -477,7 +477,7 @@ pub mod pipe {
     }
 
     impl UnixListener {
-        pub fn listen(self, backlog: uint) -> MioResult<UnixAcceptor> {
+        pub fn listen(self, backlog: usize) -> MioResult<UnixAcceptor> {
             try!(os::listen(self.desc(), backlog));
             Ok(UnixAcceptor { desc: self.desc })
         }
@@ -495,7 +495,7 @@ pub mod pipe {
     }
 
     impl UnixAcceptor {
-        pub fn new(addr: &SockAddr, backlog: uint) -> MioResult<UnixAcceptor> {
+        pub fn new(addr: &SockAddr, backlog: usize) -> MioResult<UnixAcceptor> {
             let sock = try!(UnixSocket::stream());
             let listener = try!(sock.bind(addr));
             listener.listen(backlog)
