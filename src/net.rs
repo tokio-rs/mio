@@ -270,7 +270,9 @@ pub mod tcp {
     impl Socket for TcpAcceptor {
     }
 
-    impl IoAcceptor<TcpSocket> for TcpAcceptor {
+    impl IoAcceptor for TcpAcceptor {
+        type Output = TcpSocket;
+
         fn accept(&mut self) -> MioResult<NonBlock<TcpSocket>> {
             match os::accept(self.desc()) {
                 Ok(sock) => Ok(Ready(TcpSocket { desc: sock })),
@@ -511,7 +513,9 @@ pub mod pipe {
     impl Socket for UnixAcceptor {
     }
 
-    impl IoAcceptor<UnixSocket> for UnixAcceptor {
+    impl IoAcceptor for UnixAcceptor {
+        type Output = UnixSocket;
+
         fn accept(&mut self) -> MioResult<NonBlock<UnixSocket>> {
             match os::accept(self.desc()) {
                 Ok(sock) => Ok(Ready(UnixSocket { desc: sock })),

@@ -43,8 +43,9 @@ pub trait IoWriter {
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<uint>>;
 }
 
-pub trait IoAcceptor<T> {
-    fn accept(&mut self) -> MioResult<NonBlock<T>>;
+pub trait IoAcceptor {
+    type Output;
+    fn accept(&mut self) -> MioResult<NonBlock<Self::Output>>;
 }
 
 pub fn pipe() -> MioResult<(PipeReader, PipeWriter)> {
