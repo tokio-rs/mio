@@ -8,12 +8,12 @@ use std::time::Duration;
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
-type TestEventLoop = EventLoop<uint, ()>;
+type TestEventLoop = EventLoop<usize, ()>;
 
 struct TestHandler {
     server: TcpAcceptor,
     client: TcpSocket,
-    state: uint,
+    state: usize,
 }
 
 impl TestHandler {
@@ -26,7 +26,7 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint, ()> for TestHandler {
+impl Handler<usize, ()> for TestHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: ReadHint) {
         match token {
             SERVER => {
@@ -51,7 +51,7 @@ impl Handler<uint, ()> for TestHandler {
         event_loop.timeout(1u, Duration::milliseconds(200)).unwrap();
     }
 
-    fn timeout(&mut self, event_loop: &mut TestEventLoop, _: uint) {
+    fn timeout(&mut self, event_loop: &mut TestEventLoop, _: usize) {
         event_loop.shutdown();
     }
 }

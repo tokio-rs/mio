@@ -1,4 +1,4 @@
-use std::{uint, iter};
+use std::{usize, iter};
 use std::cmp::max;
 use std::time::duration::Duration;
 use std::num::UnsignedInt;
@@ -8,7 +8,7 @@ use util::Slab;
 
 use self::TimerErrorKind::TimerOverflow;
 
-const EMPTY: Token = Token(uint::MAX);
+const EMPTY: Token = Token(usize::MAX);
 const NS_PER_MS: u64 = 1_000_000;
 
 // Implements coarse-grained timeouts using an algorithm based on hashed timing
@@ -45,7 +45,7 @@ pub struct Timeout {
 }
 
 impl<T> Timer<T> {
-    pub fn new(tick_ms: u64, mut slots: uint, mut capacity: uint) -> Timer<T> {
+    pub fn new(tick_ms: u64, mut slots: usize, mut capacity: usize) -> Timer<T> {
         slots = UnsignedInt::next_power_of_two(slots);
         capacity = UnsignedInt::next_power_of_two(capacity);
 
@@ -60,7 +60,7 @@ impl<T> Timer<T> {
         }
     }
 
-    pub fn count(&self) -> uint {
+    pub fn count(&self) -> usize {
         self.entries.count()
     }
 
@@ -136,7 +136,7 @@ impl<T> Timer<T> {
 
     fn insert(&mut self, token: T, tick: u64) -> TimerResult<Timeout> {
         // Get the slot for the requested tick
-        let slot = (tick & self.mask) as uint;
+        let slot = (tick & self.mask) as usize;
         let curr = self.wheel[slot];
 
         // Insert the new entry
@@ -239,8 +239,8 @@ impl<T> Timer<T> {
     }
 
     #[inline]
-    fn slot_for(&self, tick: u64) -> uint {
-        (self.mask & tick) as uint
+    fn slot_for(&self, tick: u64) -> usize {
+        (self.mask & tick) as usize
     }
 
     // Convert a ms duration into a number of ticks, rounds up
@@ -469,7 +469,7 @@ mod test {
     }
 
     const TICK: u64 = 100;
-    const SLOTS: uint = 16;
+    const SLOTS: usize = 16;
 
     fn timer() -> Timer<&'static str> {
         Timer::new(TICK, SLOTS, 32)

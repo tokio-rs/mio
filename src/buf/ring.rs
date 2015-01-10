@@ -10,14 +10,14 @@ use super::{Buf, MutBuf};
 /// wraps around to the start.
 pub struct RingBuf {
     ptr: *mut u8,  // Pointer to the memory
-    cap: uint,     // Capacity of the buffer
-    pos: uint,     // Offset of read cursor
-    len: uint      // Number of bytes to read
+    cap: usize,     // Capacity of the buffer
+    pos: usize,     // Offset of read cursor
+    len: usize      // Number of bytes to read
 }
 
 // TODO: There are most likely many optimizations that can be made
 impl RingBuf {
-    pub fn new(mut capacity: uint) -> RingBuf {
+    pub fn new(mut capacity: usize) -> RingBuf {
         // Handle the 0 length buffer case
         if capacity == 0 {
             return RingBuf {
@@ -51,7 +51,7 @@ impl RingBuf {
     }
 
     #[inline]
-    pub fn capacity(&self) -> uint {
+    pub fn capacity(&self) -> usize {
         self.cap
     }
 
@@ -68,16 +68,16 @@ impl RingBuf {
     }
 
     #[inline]
-    fn read_remaining(&self) -> uint {
+    fn read_remaining(&self) -> usize {
         self.len
     }
 
     #[inline]
-    fn write_remaining(&self) -> uint {
+    fn write_remaining(&self) -> usize {
         self.cap - self.len
     }
 
-    fn advance_reader(&mut self, mut cnt: uint) {
+    fn advance_reader(&mut self, mut cnt: usize) {
         cnt = cmp::min(cnt, self.read_remaining());
 
         self.pos += cnt;
@@ -86,7 +86,7 @@ impl RingBuf {
     }
 
     #[inline]
-    fn advance_writer(&mut self, mut cnt: uint) {
+    fn advance_writer(&mut self, mut cnt: usize) {
         cnt = cmp::min(cnt, self.write_remaining());
         self.len += cnt;
     }
@@ -125,8 +125,8 @@ impl Clone for RingBuf {
             }
 
             ptr::copy_memory(
-                ret.ptr.offset(self.pos as int),
-                self.ptr.offset(self.pos as int) as *const u8,
+                ret.ptr.offset(self.pos as isize),
+                self.ptr.offset(self.pos as isize) as *const u8,
                 cmp::min(self.len, self.cap - self.pos));
         }
 
@@ -159,7 +159,7 @@ pub struct RingBufReader<'a> {
 
 impl<'a> Buf for RingBufReader<'a> {
     #[inline]
-    fn remaining(&self) -> uint {
+    fn remaining(&self) -> usize {
         self.ring.read_remaining()
     }
 
@@ -173,13 +173,13 @@ impl<'a> Buf for RingBufReader<'a> {
         self.ring.as_slice().slice(self.ring.pos, to)
     }
 
-    fn advance(&mut self, cnt: uint) {
+    fn advance(&mut self, cnt: usize) {
         self.ring.advance_reader(cnt)
     }
 }
 
 impl<'a> Reader for RingBufReader<'a> {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         super::read(self, buf)
     }
 }
@@ -190,7 +190,7 @@ pub struct RingBufWriter<'a> {
 
 impl<'a> Buf for RingBufWriter<'a> {
     #[inline]
-    fn remaining(&self) -> uint {
+    fn remaining(&self) -> usize {
         self.ring.write_remaining()
     }
 
@@ -210,7 +210,7 @@ impl<'a> Buf for RingBufWriter<'a> {
         self.ring.as_slice().slice(from, to)
     }
 
-    fn advance(&mut self, cnt: uint) {
+    fn advance(&mut self, cnt: usize) {
         self.ring.advance_writer(cnt)
     }
 }

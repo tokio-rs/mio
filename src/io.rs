@@ -34,13 +34,13 @@ pub trait IoHandle {
 }
 
 pub trait IoReader {
-    fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<uint>>;
-    fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<uint>>;
+    fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<usize>>;
+    fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>>;
 }
 
 pub trait IoWriter {
-    fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<uint>>;
-    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<uint>>;
+    fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<usize>>;
+    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>>;
 }
 
 pub trait IoAcceptor<T> {
@@ -73,21 +73,21 @@ impl IoHandle for PipeWriter {
 }
 
 impl IoReader for PipeReader {
-    fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> {
+    fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<usize>> {
         read(self, buf)
     }
 
-    fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<uint>> {
+    fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>> {
         read_slice(self, buf)
     }
 }
 
 impl IoWriter for PipeWriter {
-    fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
+    fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<usize>> {
         write(self, buf)
     }
 
-    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<uint>> {
+    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
         write_slice(self, buf)
     }
 }
@@ -98,7 +98,7 @@ impl IoWriter for PipeWriter {
 /// ensure that your buffer is large enough to hold an entire segment (1532 bytes if not jumbo
 /// frames)
 #[inline]
-pub fn read<I: IoHandle>(io: &I, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> {
+pub fn read<I: IoHandle>(io: &I, buf: &mut MutBuf) -> MioResult<NonBlock<usize>> {
 
     let res = read_slice(io, buf.mut_bytes());
     match res {
@@ -112,7 +112,7 @@ pub fn read<I: IoHandle>(io: &I, buf: &mut MutBuf) -> MioResult<NonBlock<uint>> 
 ///writes the length of the slice supplied by Buf.bytes into the socket
 ///then advances the buffer that many bytes
 #[inline]
-pub fn write<O: IoHandle>(io: &O, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
+pub fn write<O: IoHandle>(io: &O, buf: &mut Buf) -> MioResult<NonBlock<usize>> {
     let res = write_slice(io, buf.bytes());
     match res {
         Ok(Ready(cnt)) => buf.advance(cnt),
@@ -123,7 +123,7 @@ pub fn write<O: IoHandle>(io: &O, buf: &mut Buf) -> MioResult<NonBlock<uint>> {
 
 ///reads the length of the supplied slice from the socket into the slice
 #[inline]
-pub fn read_slice<I: IoHandle>(io: & I, buf: &mut [u8]) -> MioResult<NonBlock<uint>> {
+pub fn read_slice<I: IoHandle>(io: & I, buf: &mut [u8]) -> MioResult<NonBlock<usize>> {
     match os::read(io.desc(), buf) {
         Ok(cnt) => {
             Ok(Ready(cnt))
@@ -139,7 +139,7 @@ pub fn read_slice<I: IoHandle>(io: & I, buf: &mut [u8]) -> MioResult<NonBlock<ui
 
 ///writes the length of the supplied slice into the socket from the slice
 #[inline]
-pub fn write_slice<I: IoHandle>(io: & I, buf: & [u8]) -> MioResult<NonBlock<uint>> {
+pub fn write_slice<I: IoHandle>(io: & I, buf: & [u8]) -> MioResult<NonBlock<usize>> {
     match os::write(io.desc(), buf) {
         Ok(cnt) => { Ok(Ready(cnt)) }
         Err(e) => {

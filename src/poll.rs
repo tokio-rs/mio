@@ -21,7 +21,7 @@ impl Poll {
         debug!("registering  with poller");
 
         // Register interests for this socket
-        try!(self.selector.register(io.desc(), token.as_uint(), interest, opts));
+        try!(self.selector.register(io.desc(), token.as_usize(), interest, opts));
 
         Ok(())
     }
@@ -30,7 +30,7 @@ impl Poll {
         debug!("registering  with poller");
 
         // Register interests for this socket
-        try!(self.selector.reregister(io.desc(), token.as_uint(), interest, opts));
+        try!(self.selector.reregister(io.desc(), token.as_usize(), interest, opts));
 
         Ok(())
     }
@@ -44,12 +44,12 @@ impl Poll {
         Ok(())
     }
 
-    pub fn poll(&mut self, timeout_ms: uint) -> MioResult<uint> {
+    pub fn poll(&mut self, timeout_ms: usize) -> MioResult<usize> {
         try!(self.selector.select(&mut self.events, timeout_ms));
         Ok(self.events.len())
     }
 
-    pub fn event(&self, idx: uint) -> event::IoEvent {
+    pub fn event(&self, idx: usize) -> event::IoEvent {
         self.events.get(idx)
     }
 
@@ -60,7 +60,7 @@ impl Poll {
 
 pub struct EventsIterator<'a> {
     events: &'a os::Events,
-    index: uint
+    index: usize
 }
 
 impl<'a> Iterator for EventsIterator<'a> {

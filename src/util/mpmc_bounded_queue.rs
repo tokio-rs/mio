@@ -49,7 +49,7 @@ unsafe impl<T: Sync> Sync for Node<T> {}
 struct State<T> {
     pad0: [u8; 64],
     buffer: Vec<UnsafeCell<Node<T>>>,
-    mask: uint,
+    mask: usize,
     pad1: [u8; 64],
     enqueue_pos: AtomicUint,
     pad2: [u8; 64],
@@ -65,7 +65,7 @@ pub struct Queue<T> {
 }
 
 impl<T: Send> State<T> {
-    fn with_capacity(capacity: uint) -> State<T> {
+    fn with_capacity(capacity: usize) -> State<T> {
         let capacity = if capacity < 2 || (capacity & (capacity - 1)) != 0 {
             if capacity < 2 {
                 2u
@@ -97,7 +97,7 @@ impl<T: Send> State<T> {
         loop {
             let node = &self.buffer[pos & mask];
             let seq = unsafe { (*node.get()).sequence.load(Acquire) };
-            let diff: int = seq as int - pos as int;
+            let diff: isize = seq as isize - pos as isize;
 
             if diff == 0 {
                 let enqueue_pos = self.enqueue_pos.compare_and_swap(pos, pos+1, Relaxed);
@@ -125,7 +125,7 @@ impl<T: Send> State<T> {
         loop {
             let node = &self.buffer[pos & mask];
             let seq = unsafe { (*node.get()).sequence.load(Acquire) };
-            let diff: int = seq as int - (pos + 1) as int;
+            let diff: isize = seq as isize - (pos + 1) as isize;
             if diff == 0 {
                 let dequeue_pos = self.dequeue_pos.compare_and_swap(pos, pos+1, Relaxed);
                 if dequeue_pos == pos {
@@ -147,7 +147,7 @@ impl<T: Send> State<T> {
 }
 
 impl<T: Send> Queue<T> {
-    pub fn with_capacity(capacity: uint) -> Queue<T> {
+    pub fn with_capacity(capacity: usize) -> Queue<T> {
         Queue{
             state: Arc::new(State::with_capacity(capacity))
         }

@@ -18,7 +18,7 @@ impl Selector {
     }
 
     /// Wait for events from the OS
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: uint) -> MioResult<()> {
+    pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> MioResult<()> {
         // Wait for epoll events for at most timeout_ms milliseconds
         let cnt = try!(epoll_wait(self.epfd, evts.events.as_mut_slice(), timeout_ms)
                            .map_err(MioError::from_sys_error));
@@ -28,7 +28,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, io: &IoDesc, token: uint, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn register(&mut self, io: &IoDesc, token: usize, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token as u64
@@ -39,7 +39,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&mut self, io: &IoDesc, token: uint, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn reregister(&mut self, io: &IoDesc, token: usize, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token as u64
@@ -101,7 +101,7 @@ impl Drop for Selector {
 }
 
 pub struct Events {
-    len: uint,
+    len: usize,
     events: [EpollEvent; 1024]
 }
 
@@ -114,12 +114,12 @@ impl Events {
     }
 
     #[inline]
-    pub fn len(&self) -> uint {
+    pub fn len(&self) -> usize {
         self.len
     }
 
     #[inline]
-    pub fn get(&self, idx: uint) -> event::IoEvent {
+    pub fn get(&self, idx: usize) -> event::IoEvent {
         if idx >= self.len {
             panic!("invalid index");
         }
@@ -146,6 +146,6 @@ impl Events {
 
         let token = self.events[idx].data;
 
-        event::IoEvent::new(kind, token as uint)
+        event::IoEvent::new(kind, token as usize)
     }
 }

@@ -7,11 +7,11 @@ use mio::net::tcp::*;
 use super::localhost;
 use mio::event as evt;
 
-type TestEventLoop = EventLoop<uint, String>;
+type TestEventLoop = EventLoop<usize, String>;
 
 struct TestHandler {
     sender: EventLoopSender<String>,
-    notify: uint
+    notify: usize
 }
 
 impl TestHandler {
@@ -23,7 +23,7 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint, String> for TestHandler {
+impl Handler<usize, String> for TestHandler {
     fn notify(&mut self, event_loop: &mut TestEventLoop, msg: String) {
         match self.notify {
             0 => {

@@ -7,7 +7,7 @@ use mio::event as evt;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 
-type TestEventLoop = EventLoop<uint, ()>;
+type TestEventLoop = EventLoop<usize, ()>;
 
 
 #[derive(Show, PartialEq)]
@@ -33,7 +33,7 @@ impl TestHandler {
     }
 }
 
-impl Handler<uint, ()> for TestHandler {
+impl Handler<usize, ()> for TestHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: evt::ReadHint) {
         debug!("readable; tok={:?}; hint={:?}", tok, hint);
 

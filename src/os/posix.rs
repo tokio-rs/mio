@@ -125,7 +125,7 @@ pub fn bind(io: &IoDesc, addr: &SockAddr) -> MioResult<()> {
         .map_err(MioError::from_sys_error)
 }
 
-pub fn listen(io: &IoDesc, backlog: uint) -> MioResult<()> {
+pub fn listen(io: &IoDesc, backlog: usize) -> MioResult<()> {
     nix::listen(io.fd, backlog)
         .map_err(MioError::from_sys_error)
 }
@@ -138,7 +138,7 @@ pub fn accept(io: &IoDesc) -> MioResult<IoDesc> {
 }
 
 #[inline]
-pub fn recvfrom(io: &IoDesc, buf: &mut [u8]) -> MioResult<(uint, SockAddr)> {
+pub fn recvfrom(io: &IoDesc, buf: &mut [u8]) -> MioResult<(usize, SockAddr)> {
     match nix::recvfrom(io.fd, buf).map_err(MioError::from_sys_error) {
         Ok((cnt, addr)) => Ok((cnt, to_sockaddr(&addr))),
         Err(e) => Err(e)
@@ -146,13 +146,13 @@ pub fn recvfrom(io: &IoDesc, buf: &mut [u8]) -> MioResult<(uint, SockAddr)> {
 }
 
 #[inline]
-pub fn sendto(io: &IoDesc, buf: &[u8], tgt: &SockAddr) -> MioResult<uint> {
+pub fn sendto(io: &IoDesc, buf: &[u8], tgt: &SockAddr) -> MioResult<usize> {
     let res = try!(nix::sendto(io.fd, buf, &from_sockaddr(tgt), nix::MSG_DONTWAIT).map_err(MioError::from_sys_error));
     Ok(res)
 }
 
 #[inline]
-pub fn read(io: &IoDesc, dst: &mut [u8]) -> MioResult<uint> {
+pub fn read(io: &IoDesc, dst: &mut [u8]) -> MioResult<usize> {
     let res = try!(nix::read(io.fd, dst).map_err(MioError::from_sys_error));
 
     if res == 0 {
@@ -163,13 +163,13 @@ pub fn read(io: &IoDesc, dst: &mut [u8]) -> MioResult<uint> {
 }
 
 #[inline]
-pub fn write(io: &IoDesc, src: &[u8]) -> MioResult<uint> {
+pub fn write(io: &IoDesc, src: &[u8]) -> MioResult<usize> {
     nix::write(io.fd, src).map_err(MioError::from_sys_error)
 }
 
 // ===== Socket options =====
 
-pub fn reuseaddr(_io: &IoDesc) -> MioResult<uint> {
+pub fn reuseaddr(_io: &IoDesc) -> MioResult<usize> {
     unimplemented!()
 }
 
@@ -215,14 +215,14 @@ pub fn set_multicast_ttl(io: &IoDesc, val: u8) -> MioResult<()> {
         .map_err(MioError::from_sys_error)
 }
 
-pub fn linger(io: &IoDesc) -> MioResult<uint> {
+pub fn linger(io: &IoDesc) -> MioResult<usize> {
     let mut linger: nix::linger = unsafe { mem::uninitialized() };
 
     try!(nix::getsockopt(io.fd, nix::SOL_SOCKET, nix::SO_LINGER, &mut linger)
             .map_err(MioError::from_sys_error));
 
     if linger.l_onoff > 0 {
-        Ok(linger.l_linger as uint)
+        Ok(linger.l_linger as usize)
     } else {
         Ok(0)
     }
@@ -246,7 +246,7 @@ pub fn getsockname(io: &IoDesc) -> MioResult<SockAddr> {
     Ok(to_sockaddr(&a))
 }
 
-pub fn set_linger(io: &IoDesc, dur_s: uint) -> MioResult<()> {
+pub fn set_linger(io: &IoDesc, dur_s: usize) -> MioResult<()> {
     let linger = nix::linger {
         l_onoff: (if dur_s > 0 { 1i } else { 0i }) as nix::c_int,
         l_linger: dur_s as nix::c_int

@@ -1,6 +1,6 @@
 use std::default::Default;
 use std::time::duration::Duration;
-use std::uint;
+use std::usize;
 use error::{MioResult, MioError};
 use handler::Handler;
 use io::IoHandle;
@@ -13,16 +13,16 @@ use os::token::Token;
 /// Configure EventLoop runtime details
 #[derive(Copy, Clone, Show)]
 pub struct EventLoopConfig {
-    pub io_poll_timeout_ms: uint,
+    pub io_poll_timeout_ms: usize,
 
     // == Notifications ==
-    pub notify_capacity: uint,
-    pub messages_per_tick: uint,
+    pub notify_capacity: usize,
+    pub messages_per_tick: usize,
 
     // == Timer ==
     pub timer_tick_ms: u64,
-    pub timer_wheel_size: uint,
-    pub timer_capacity: uint,
+    pub timer_wheel_size: usize,
+    pub timer_capacity: usize,
 }
 
 impl Default for EventLoopConfig {
@@ -48,7 +48,7 @@ pub struct EventLoop<T, M: Send> {
 }
 
 // Token used to represent notifications
-const NOTIFY: Token = Token(uint::MAX);
+const NOTIFY: Token = Token(usize::MAX);
 
 impl<T, M: Send> EventLoop<T, M> {
 
@@ -264,11 +264,11 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     #[inline]
-    fn io_poll(&mut self, immediate: bool) -> MioResult<uint> {
+    fn io_poll(&mut self, immediate: bool) -> MioResult<usize> {
         if immediate {
             self.poll.poll(0)
         } else {
-            let mut sleep = self.timer.next_tick_in_ms() as uint;
+            let mut sleep = self.timer.next_tick_in_ms() as usize;
 
             if sleep > self.config.io_poll_timeout_ms {
                 sleep = self.config.io_poll_timeout_ms;
@@ -279,7 +279,7 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     // Process IO events that have been previously polled
-    fn io_process<H: Handler<T, M>>(&mut self, handler: &mut H, cnt: uint) {
+    fn io_process<H: Handler<T, M>>(&mut self, handler: &mut H, cnt: usize) {
         let mut i = 0u;
 
         // Iterate over the notifications. Each event provides the token
@@ -316,7 +316,7 @@ impl<T, M: Send> EventLoop<T, M> {
         }
     }
 
-    fn notify<H: Handler<T, M>>(&mut self, handler: &mut H, mut cnt: uint) {
+    fn notify<H: Handler<T, M>>(&mut self, handler: &mut H, mut cnt: usize) {
         while cnt > 0 {
             let msg = self.notify.poll()
                 .expect("[BUG] at this point there should always be a message");
@@ -381,7 +381,7 @@ mod tests {
     use {io, buf, Buf, Handler, Token};
     use os::event;
 
-    type TestEventLoop = EventLoop<uint, ()>;
+    type TestEventLoop = EventLoop<usize, ()>;
 
     struct Funtimes {
         rcount: Arc<AtomicInt>,
@@ -397,7 +397,7 @@ mod tests {
         }
     }
 
-    impl Handler<uint, ()> for Funtimes {
+    impl Handler<usize, ()> for Funtimes {
         fn readable(&mut self, _event_loop: &mut TestEventLoop, token: Token, _hint: event::ReadHint) {
             (*self.rcount).fetch_add(1, SeqCst);
             assert_eq!(token, Token(10));

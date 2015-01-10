@@ -6,7 +6,7 @@ use mio::util::Slab;
 use std::io::TempDir;
 use mio::event as evt;
 
-type TestEventLoop = EventLoop<uint, ()>;
+type TestEventLoop = EventLoop<usize, ()>;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -229,7 +229,7 @@ impl EchoHandler {
     }
 }
 
-impl Handler<uint, ()> for EchoHandler {
+impl Handler<usize, ()> for EchoHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: evt::ReadHint) {
         assert_eq!(hint, evt::DATAHINT);
 

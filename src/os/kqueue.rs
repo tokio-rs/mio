@@ -20,7 +20,7 @@ impl Selector {
         })
     }
 
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: uint) -> MioResult<()> {
+    pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> MioResult<()> {
         let cnt = try!(kevent(self.kq, self.changes.as_slice(),
                               evts.as_mut_slice(), timeout_ms)
                                   .map_err(MioError::from_sys_error));
@@ -31,7 +31,7 @@ impl Selector {
         Ok(())
     }
 
-    pub fn register(&mut self, io: &IoDesc, token: uint, interests: Interest, opts: PollOpt) -> MioResult<()> {
+    pub fn register(&mut self, io: &IoDesc, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
         debug!("registering; token={}; interests={:?}", token, interests);
 
         try!(self.ev_register(io, token, EVFILT_READ, interests.contains(event::READABLE), opts));
@@ -40,7 +40,7 @@ impl Selector {
         Ok(())
     }
 
-    pub fn reregister(&mut self, io: &IoDesc, token: uint, interests: Interest, opts: PollOpt) -> MioResult<()> {
+    pub fn reregister(&mut self, io: &IoDesc, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
         // Just need to call register here since EV_ADD is a mod if already
         // registered
         self.register(io, token, interests, opts)
@@ -53,7 +53,7 @@ impl Selector {
         Ok(())
     }
 
-    fn ev_register(&mut self, io: &IoDesc, token: uint, filter: EventFilter, enable: bool, opts: PollOpt) -> MioResult<()> {
+    fn ev_register(&mut self, io: &IoDesc, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) -> MioResult<()> {
         let mut flags = EV_ADD;
 
         if enable {
@@ -73,13 +73,13 @@ impl Selector {
         self.ev_push(io, token, filter, flags)
     }
 
-    fn ev_push(&mut self, io: &IoDesc, token: uint, filter: EventFilter, flags: EventFlag) -> MioResult<()> {
+    fn ev_push(&mut self, io: &IoDesc, token: usize, filter: EventFilter, flags: EventFlag) -> MioResult<()> {
         try!(self.maybe_flush_changes());
 
         let idx = self.changes.len;
         let ev = &mut self.changes.events[idx];
 
-        ev_set(ev, io.fd as uint, filter, flags, FilterFlag::empty(), token);
+        ev_set(ev, io.fd as usize, filter, flags, FilterFlag::empty(), token);
 
         self.changes.len += 1;
         Ok(())
@@ -97,7 +97,7 @@ impl Selector {
 }
 
 pub struct Events {
-    len: uint,
+    len: usize,
     events: [KEvent; 1024]
 }
 
@@ -110,13 +110,13 @@ impl Events {
     }
 
     #[inline]
-    pub fn len(&self) -> uint {
+    pub fn len(&self) -> usize {
         self.len
     }
 
     // TODO: We will get rid of this eventually in favor of an iterator
     #[inline]
-    pub fn get(&self, idx: uint) -> IoEvent {
+    pub fn get(&self, idx: usize) -> IoEvent {
         if idx >= self.len {
             panic!("invalid index");
         }

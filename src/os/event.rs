@@ -3,7 +3,7 @@ use std::ops::*;
 use os::token::Token;
 
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct PollOpt(uint);
+pub struct PollOpt(usize);
 
 pub const EDGE: PollOpt    = PollOpt(0x020);
 pub const LEVEL: PollOpt   = PollOpt(0x040);
@@ -26,7 +26,7 @@ impl PollOpt {
     }
 
     #[inline]
-    pub fn bits(&self) -> uint {
+    pub fn bits(&self) -> usize {
         let PollOpt(bits) = *self;
         bits
     }
@@ -104,7 +104,7 @@ impl fmt::Show for PollOpt {
 }
 
 bitflags!(
-    flags Interest: uint {
+    flags Interest: usize {
         const READABLE = 0x001,
         const WRITABLE = 0x002,
         const ERROR    = 0x004,
@@ -139,7 +139,7 @@ impl fmt::Show for Interest {
 }
 
 bitflags!(
-    flags ReadHint: uint {
+    flags ReadHint: usize {
         const DATAHINT    = 0x001,
         const HUPHINT     = 0x002,
         const ERRORHINT   = 0x004
@@ -182,7 +182,7 @@ pub struct IoEvent {
 /// Selector when they have events to report.
 impl IoEvent {
     /// Create a new IoEvent.
-    pub fn new(kind: Interest, token: uint) -> IoEvent {
+    pub fn new(kind: Interest, token: usize) -> IoEvent {
         IoEvent {
             kind: kind,
             token: Token(token)

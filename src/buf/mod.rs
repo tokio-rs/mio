@@ -16,9 +16,9 @@ mod slice;
  */
 
 pub trait Buf {
-    fn remaining(&self) -> uint;
+    fn remaining(&self) -> usize;
     fn bytes<'a>(&'a self) -> &'a [u8];
-    fn advance(&mut self, cnt: uint);
+    fn advance(&mut self, cnt: usize);
 
     fn has_remaining(&self) -> bool {
         self.remaining() > 0
@@ -57,7 +57,7 @@ pub fn wrap_mut<'a>(bytes: &'a mut [u8]) -> MutSliceBuf<'a> {
 //
 // Instead, we provide these two fns we call in all the concrete implementations
 
-fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> io::IoResult<uint> {
+fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> io::IoResult<usize> {
     let nread = cmp::min(buf.remaining(), dst.len());
 
     if nread == 0 {
