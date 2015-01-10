@@ -34,7 +34,7 @@
 //! // Setup the server socket
 //! let server = TcpSocket::v4().unwrap()
 //!     .bind(&addr).unwrap()
-//!     .listen(256u).unwrap();
+//!     .listen(256).unwrap();
 //!
 //! // Create an event loop
 //! let mut event_loop = EventLoop::<(), ()>::new().unwrap();
@@ -83,9 +83,10 @@
 // mio is still in rapid development
 #![unstable]
 
+#![feature(int_uint)]
 #![feature(unsafe_destructor)]
 
-// Disable dead code warnings
+#![allow(unstable)]
 #![allow(dead_code)]
 
 extern crate alloc;

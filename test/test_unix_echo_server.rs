@@ -29,7 +29,7 @@ impl EchoConn {
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
-        debug!("CON : writing buf = {}", self.buf.bytes());
+        debug!("CON : writing buf = {:?}", self.buf.bytes());
 
         match self.sock.write(&mut self.buf) {
             Ok(NonBlock::WouldBlock) => {
@@ -43,7 +43,7 @@ impl EchoConn {
                 self.interest.insert(evt::READABLE);
                 self.interest.remove(evt::WRITABLE);
             }
-            Err(e) => debug!("not implemented; client err={}", e),
+            Err(e) => debug!("not implemented; client err={:?}", e),
         }
 
         event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
@@ -60,7 +60,7 @@ impl EchoConn {
                 self.interest.insert(evt::WRITABLE);
             }
             Err(e) => {
-                debug!("not implemented; client err={}", e);
+                debug!("not implemented; client err={:?}", e);
                 self.interest.remove(evt::READABLE);
             }
 
@@ -69,7 +69,7 @@ impl EchoConn {
         // prepare to provide this to writable
         self.buf.flip();
 
-        debug!("CON : read buf = {}", self.buf.bytes());
+        debug!("CON : read buf = {:?}", self.buf.bytes());
 
         event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
     }
@@ -98,12 +98,12 @@ impl EchoServer {
     }
 
     fn conn_readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
-        debug!("server conn readable; tok={}", tok);
+        debug!("server conn readable; tok={:?}", tok);
         self.conn(tok).readable(event_loop)
     }
 
     fn conn_writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
-        debug!("server conn writable; tok={}", tok);
+        debug!("server conn writable; tok={:?}", tok);
         self.conn(tok).writable(event_loop)
     }
 
@@ -150,14 +150,14 @@ impl EchoClient {
                 debug!("CLIENT : We read {} bytes!", r);
             }
             Err(e) => {
-                panic!("not implemented; client err={}", e);
+                panic!("not implemented; client err={:?}", e);
             }
         };
 
         // prepare for reading
         self.buf.flip();
 
-        debug!("CLIENT : buf = {} -- rx = {}", self.buf.bytes(), self.rx.bytes());
+        debug!("CLIENT : buf = {:?} -- rx = {:?}", self.buf.bytes(), self.rx.bytes());
         while self.buf.has_remaining() {
             let actual = self.buf.read_byte().unwrap();
             let expect = self.rx.read_byte().unwrap();
@@ -189,7 +189,7 @@ impl EchoClient {
                 self.interest.insert(evt::READABLE);
                 self.interest.remove(evt::WRITABLE);
             }
-            Err(e) => debug!("not implemented; client err={}", e)
+            Err(e) => debug!("not implemented; client err={:?}", e)
         }
 
         event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())

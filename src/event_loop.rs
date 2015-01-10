@@ -91,13 +91,15 @@ impl<T, M: Send> EventLoop<T, M> {
     ///
     /// # Example
     /// ```
+    /// #![allow(unstable)]
+    ///
     /// use std::thread::Thread;
     /// use mio::{EventLoop, Handler};
     ///
     /// struct MyHandler;
     ///
-    /// impl Handler<(), uint> for MyHandler {
-    ///     fn notify(&mut self, event_loop: &mut EventLoop<(), uint>, msg: uint) {
+    /// impl Handler<(), u32> for MyHandler {
+    ///     fn notify(&mut self, event_loop: &mut EventLoop<(), u32>, msg: u32) {
     ///         assert_eq!(msg, 123);
     ///         event_loop.shutdown();
     ///     }
@@ -109,7 +111,7 @@ impl<T, M: Send> EventLoop<T, M> {
     /// // Send the notification from another thread
     /// Thread::spawn(move || {
     ///     let _ = sender.send(123);
-    /// }).detach();
+    /// });
     ///
     /// let _ = event_loop.run(MyHandler);
     /// ```
@@ -145,13 +147,15 @@ impl<T, M: Send> EventLoop<T, M> {
     ///
     /// # Example
     /// ```
+    /// #![allow(unstable)]
+    ///
     /// use mio::{EventLoop, Handler};
     /// use std::time::Duration;
     ///
     /// struct MyHandler;
     ///
-    /// impl Handler<uint, ()> for MyHandler {
-    ///     fn timeout(&mut self, event_loop: &mut EventLoop<uint, ()>, timeout: uint) {
+    /// impl Handler<u32, ()> for MyHandler {
+    ///     fn timeout(&mut self, event_loop: &mut EventLoop<u32, ()>, timeout: u32) {
     ///         assert_eq!(timeout, 123);
     ///         event_loop.shutdown();
     ///     }
@@ -285,7 +289,7 @@ impl<T, M: Send> EventLoop<T, M> {
         while i < cnt {
             let evt = self.poll.event(i);
 
-            debug!("event={}", evt);
+            debug!("event={:?}", evt);
 
             match evt.token() {
                 NOTIFY => self.notify.cleanup(),

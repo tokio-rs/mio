@@ -43,7 +43,7 @@ impl Handler<uint, ()> for TestHandler {
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop, token: Token) {
-        assert!(token == CLIENT, "unexpected token {}", token);
+        assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
         self.state = 2;

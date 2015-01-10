@@ -1,3 +1,6 @@
+#![allow(unstable)]
+#![feature(int_uint)]
+
 extern crate mio;
 
 #[macro_use]

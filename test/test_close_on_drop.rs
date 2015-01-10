@@ -35,7 +35,7 @@ impl TestHandler {
 
 impl Handler<uint, ()> for TestHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: evt::ReadHint) {
-        debug!("readable; tok={}; hint={}", tok, hint);
+        debug!("readable; tok={:?}; hint={:?}", tok, hint);
 
         match tok {
             Token(0) => {
@@ -47,7 +47,7 @@ impl Handler<uint, ()> for TestHandler {
 
                 match self.state {
                     Initial => {
-                        assert!(hint.contains(evt::DATAHINT), "unexpected hint {}", hint);
+                        assert!(hint.contains(evt::DATAHINT), "unexpected hint {:?}", hint);
 
                         // Whether or not Hup is included with actual data is platform specific
                         if hint.contains(evt::HUPHINT) {
@@ -70,7 +70,7 @@ impl Handler<uint, ()> for TestHandler {
                     _ => panic!("the client socket should not be readable")
                 }
             }
-            _ => panic!("received unknown token {}", tok)
+            _ => panic!("received unknown token {:?}", tok)
         }
         event_loop.reregister(&self.cli, Token(1), evt::READABLE | evt::HUP, evt::EDGE).unwrap();
     }
@@ -82,7 +82,7 @@ impl Handler<uint, ()> for TestHandler {
                 debug!("client connected");
                 _event_loop.reregister(&self.cli, Token(1), evt::READABLE | evt::HUP, evt::EDGE).unwrap();
             }
-            _ => panic!("received unknown token {}", tok)
+            _ => panic!("received unknown token {:?}", tok)
         }
     }
 }
@@ -113,5 +113,5 @@ pub fn test_close_on_drop() {
     // Start the event loop
     let handler = event_loop.run(TestHandler::new(srv, sock)).ok().expect("failed to execute event loop");
 
-    assert!(handler.state == AfterHup, "actual={}", handler.state);
+    assert!(handler.state == AfterHup, "actual={:?}", handler.state);
 }

@@ -155,7 +155,7 @@ impl<T> Slab<T> {
 
     /// Releases the given slot
     pub fn remove(&mut self, idx: Token) -> Option<T> {
-        debug!("removing value; idx={}", idx);
+        debug!("removing value; idx={:?}", idx);
 
         // Cast to uint
         let idx = self.token_to_idx(idx);
