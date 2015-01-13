@@ -68,7 +68,7 @@ fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> io::IoResult<usize> {
         return Err(io::standard_error(io::EndOfFile));
     }
 
-    let mut curr = 0u;
+    let mut curr = 0us;
 
     while curr < nread {
         let cnt = {
@@ -96,7 +96,7 @@ fn write<B: MutBuf>(buf: &mut B, src: &[u8]) -> io::IoResult<()> {
         return Err(io::standard_error(io::EndOfFile));
     }
 
-    let mut curr = 0u;
+    let mut curr = 0us;
 
     while curr < src.len() {
         let cnt = {

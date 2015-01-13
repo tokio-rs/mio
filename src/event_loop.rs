@@ -280,7 +280,7 @@ impl<T, M: Send> EventLoop<T, M> {
 
     // Process IO events that have been previously polled
     fn io_process<H: Handler<T, M>>(&mut self, handler: &mut H, cnt: usize) {
-        let mut i = 0u;
+        let mut i = 0us;
 
         // Iterate over the notifications. Each event provides the token
         // it was registered with (which usually represents, at least, the

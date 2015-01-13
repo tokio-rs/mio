@@ -263,7 +263,7 @@ pub fn test_echo_server() {
     srv.set_reuseaddr(true).unwrap();
 
     let srv = srv.bind(&addr).unwrap()
-        .listen(256u).unwrap();
+        .listen(256).unwrap();
 
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, evt::READABLE, evt::PollOpt::edge()).unwrap();

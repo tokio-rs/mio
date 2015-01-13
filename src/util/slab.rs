@@ -316,17 +316,17 @@ mod tests {
     #[test]
     fn test_insertion() {
         let mut slab = Slab::new(1);
-        let token = slab.insert(10u).ok().expect("Failed to insert");
-        assert_eq!(slab[token], 10u);
+        let token = slab.insert(10).ok().expect("Failed to insert");
+        assert_eq!(slab[token], 10);
     }
 
     #[test]
     fn test_repeated_insertion() {
         let mut slab = Slab::new(10);
 
-        for i in range(0u, 10u) {
-            let token = slab.insert(i + 10u).ok().expect("Failed to insert");
-            assert_eq!(slab[token], i + 10u);
+        for i in range(0, 10) {
+            let token = slab.insert(i + 10).ok().expect("Failed to insert");
+            assert_eq!(slab[token], i + 10);
         }
 
         slab.insert(20).err().expect("Inserted when full");
@@ -337,10 +337,10 @@ mod tests {
         let mut slab = Slab::new(10);
         let mut tokens = vec![];
 
-        for i in range(0u, 10u) {
-            let token = slab.insert(i + 10u).ok().expect("Failed to insert");
+        for i in range(0, 10) {
+            let token = slab.insert(i + 10).ok().expect("Failed to insert");
             tokens.push(token);
-            assert_eq!(slab[token], i + 10u);
+            assert_eq!(slab[token], i + 10);
         }
 
         for &i in tokens.iter() {
@@ -353,17 +353,17 @@ mod tests {
     #[test]
     fn test_insertion_when_full() {
         let mut slab = Slab::new(1);
-        slab.insert(10u).ok().expect("Failed to insert");
-        slab.insert(10u).err().expect("Inserted into a full slab");
+        slab.insert(10).ok().expect("Failed to insert");
+        slab.insert(10).err().expect("Inserted into a full slab");
     }
 
     #[test]
     fn test_removal_is_successful() {
         let mut slab = Slab::new(1);
-        let t1 = slab.insert(10u).ok().expect("Failed to insert");
+        let t1 = slab.insert(10).ok().expect("Failed to insert");
         slab.remove(t1);
-        let t2 = slab.insert(20u).ok().expect("Failed to insert");
-        assert_eq!(slab[t2], 20u);
+        let t2 = slab.insert(20).ok().expect("Failed to insert");
+        assert_eq!(slab[t2], 20);
     }
 
     #[test]
@@ -381,8 +381,8 @@ mod tests {
     fn test_reusing_slots_1() {
         let mut slab = Slab::new(16);
 
-        let t0 = slab.insert(123u).unwrap();
-        let t1 = slab.insert(456u).unwrap();
+        let t0 = slab.insert(123).unwrap();
+        let t1 = slab.insert(456).unwrap();
 
         assert!(slab.count() == 2);
         assert!(slab.remaining() == 14);
@@ -404,22 +404,22 @@ mod tests {
     fn test_reusing_slots_2() {
         let mut slab = Slab::new(16);
 
-        let t0 = slab.insert(123u).unwrap();
+        let t0 = slab.insert(123).unwrap();
 
-        assert!(slab[t0] == 123u);
-        assert!(slab.remove(t0) == Some(123u));
+        assert!(slab[t0] == 123);
+        assert!(slab.remove(t0) == Some(123));
 
-        let t0 = slab.insert(456u).unwrap();
+        let t0 = slab.insert(456).unwrap();
 
-        assert!(slab[t0] == 456u);
+        assert!(slab[t0] == 456);
 
-        let t1 = slab.insert(789u).unwrap();
+        let t1 = slab.insert(789).unwrap();
 
-        assert!(slab[t0] == 456u);
-        assert!(slab[t1] == 789u);
+        assert!(slab[t0] == 456);
+        assert!(slab[t1] == 789);
 
-        assert!(slab.remove(t0).unwrap() == 456u);
-        assert!(slab.remove(t1).unwrap() == 789u);
+        assert!(slab.remove(t0).unwrap() == 456);
+        assert!(slab.remove(t1).unwrap() == 789);
 
         assert!(slab.count() == 0);
     }
@@ -436,7 +436,7 @@ mod tests {
         let mut slab = Slab::new_starting_at(Token(5),16);
         assert!(!slab.contains(Token(0)));
 
-        let tok = slab.insert(111u).unwrap();
+        let tok = slab.insert(111).unwrap();
         assert!(slab.contains(tok));
     }
 }

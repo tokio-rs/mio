@@ -83,7 +83,6 @@
 // mio is still in rapid development
 #![unstable]
 
-#![feature(int_uint)]
 #![feature(unsafe_destructor)]
 
 #![allow(unstable)]

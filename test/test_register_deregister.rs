@@ -48,7 +48,7 @@ impl Handler<usize, ()> for TestHandler {
 
         self.state = 2;
         event_loop.deregister(&self.client).unwrap();
-        event_loop.timeout(1u, Duration::milliseconds(200)).unwrap();
+        event_loop.timeout(1, Duration::milliseconds(200)).unwrap();
     }
 
     fn timeout(&mut self, event_loop: &mut TestEventLoop, _: usize) {

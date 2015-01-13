@@ -54,7 +54,7 @@ pub fn test_notify() {
     srv.set_reuseaddr(true).unwrap();
 
     let srv = srv.bind(&addr).unwrap()
-        .listen(256u).unwrap();
+        .listen(256).unwrap();
 
     event_loop.register_opt(&srv, Token(0), evt::ALL, evt::EDGE).unwrap();
 

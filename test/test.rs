@@ -1,5 +1,4 @@
 #![allow(unstable)]
-#![feature(int_uint)]
 
 extern crate mio;
 
@@ -18,12 +17,12 @@ mod test_register_deregister;
 mod test_unix_echo_server;
 
 mod ports {
-    use std::sync::atomic::{AtomicUint, ATOMIC_UINT_INIT};
+    use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
     use std::sync::atomic::Ordering::SeqCst;
 
     // Helper for getting a unique port for the task run
     // TODO: Reuse ports to not spam the system
-    static mut NEXT_PORT: AtomicUint = ATOMIC_UINT_INIT;
+    static mut NEXT_PORT: AtomicUsize = ATOMIC_USIZE_INIT;
     const FIRST_PORT: usize = 18080;
 
     fn next_port() -> usize {

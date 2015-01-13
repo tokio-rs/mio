@@ -68,7 +68,7 @@ impl<T: Send> State<T> {
     fn with_capacity(capacity: usize) -> State<T> {
         let capacity = if capacity < 2 || (capacity & (capacity - 1)) != 0 {
             if capacity < 2 {
-                2u
+                2us
             } else {
                 // use next power of 2 as capacity
                 capacity.next_power_of_two()
@@ -176,8 +176,8 @@ mod tests {
 
     #[test]
     fn test() {
-        let nthreads = 8u;
-        let nmsgs = 1000u;
+        let nthreads = 8us;
+        let nmsgs = 1000us;
         let q = Queue::with_capacity(nthreads*nmsgs);
         assert_eq!(None, q.pop());
         let (tx, rx) = channel();
@@ -201,7 +201,7 @@ mod tests {
             let q = q.clone();
             Thread::spawn(move || {
                 let q = q;
-                let mut i = 0u;
+                let mut i = 0us;
                 loop {
                     match q.pop() {
                         None => {},

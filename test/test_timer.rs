@@ -119,7 +119,7 @@ pub fn test_timer() {
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
 
-    let srv = srv.bind(&addr).unwrap().listen(256u).unwrap();
+    let srv = srv.bind(&addr).unwrap().listen(256).unwrap();
 
     info!("listening for connections");
 
