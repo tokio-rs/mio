@@ -318,11 +318,12 @@ impl<T, M: Send> EventLoop<T, M> {
 
     fn notify<H: Handler<T, M>>(&mut self, handler: &mut H, mut cnt: usize) {
         while cnt > 0 {
-            let msg = self.notify.poll()
-                .expect("[BUG] at this point there should always be a message");
-
-            handler.notify(self, msg);
-            cnt -= 1;
+            if let Some(msg) = self.notify.poll() {
+                handler.notify(self, msg);
+                cnt -= 1;
+            } else {
+                error!("notify handler called, but the notification queue was empty"); 
+            }
         }
     }
 
