@@ -114,9 +114,9 @@ impl<M: Send> NotifyInner<M> {
 
     fn notify(&self, value: M) -> Result<(), M> {
         // First, push the message onto the queue
-        if !self.queue.push(value) {
-            // TODO: Don't fail
-            panic!("queue full");
+        let res = self.queue.push(value);
+        if res.is_err(){
+            return res
         }
 
         let mut cur = self.state.load(Relaxed);
