@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicInt;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::mpsc::{SyncSender, Receiver, SendError, sync_channel};
 use error::MioResult;
 use io::IoHandle;
 use os;
@@ -31,7 +32,7 @@ impl<M: Send> Notify<M> {
     }
 
     #[inline]
-    pub fn notify(&self, value: M) -> Result<(), M> {
+    pub fn notify(&self, value: M) -> Result<(), SendError<M>> {
         self.inner.notify(value)
     }
 
@@ -56,15 +57,21 @@ impl<M: Send> Clone for Notify<M> {
 
 struct NotifyInner<M> {
     state: AtomicInt,
-    queue: BoundedQueue<M>,
+    queue: Receiver<M>,
+    queue_tx: SyncSender<M>,
+    //queue: BoundedQueue<M>,
     awaken: os::Awakener
 }
 
+unsafe impl<M> Sync for NotifyInner<M> {}
+
 impl<M: Send> NotifyInner<M> {
     fn with_capacity(capacity: usize) -> MioResult<NotifyInner<M>> {
+        let (tx, rx) = sync_channel(capacity);
         Ok(NotifyInner {
             state: AtomicInt::new(0),
-            queue: BoundedQueue::with_capacity(capacity),
+            queue: rx, //BoundedQueue::with_capacity(capacity),
+            queue_tx: tx, 
             awaken: try!(os::Awakener::new())
         })
     }
@@ -109,12 +116,14 @@ impl<M: Send> NotifyInner<M> {
     }
 
     fn poll(&self) -> Option<M> {
-        self.queue.pop()
+        //self.queue.pop()
+        self.queue.try_recv().ok()
     }
 
-    fn notify(&self, value: M) -> Result<(), M> {
+    fn notify(&self, value: M) -> Result<(), SendError<M>> {
         // First, push the message onto the queue
-        let res = self.queue.push(value);
+        //let res = self.queue.push(value);
+        let res = self.queue_tx.send(value); 
         if res.is_err(){
             return res
         }

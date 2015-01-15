@@ -1,5 +1,6 @@
 use std::default::Default;
 use std::time::duration::Duration;
+use std::sync::mpsc::SendError;
 use std::usize;
 use error::{MioResult, MioError};
 use handler::Handler;
@@ -322,7 +323,7 @@ impl<T, M: Send> EventLoop<T, M> {
                 handler.notify(self, msg);
                 cnt -= 1;
             } else {
-                error!("notify handler called, but the notification queue was empty"); 
+                info!("notify handler called, but the notification queue was empty"); 
             }
         }
     }
@@ -350,7 +351,7 @@ impl<M: Send> EventLoopSender<M> {
         EventLoopSender { notify: notify }
     }
 
-    pub fn send(&self, msg: M) -> Result<(), M> {
+    pub fn send(&self, msg: M) -> Result<(), SendError<M>> {
         self.notify.notify(msg)
     }
 }
