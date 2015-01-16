@@ -12,6 +12,9 @@ log = "*"
 
 git = "https://github.com/carllerche/nix-rust"
 
+[dependencies]
+bitflags = "0.1"
+
 [[test]]
 
 name = "test"
