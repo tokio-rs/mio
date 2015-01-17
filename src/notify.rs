@@ -1,11 +1,13 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicInt;
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::mpsc::{SyncSender, Receiver, SendError, sync_channel};
+use std::sync::mpsc::{SyncSender,
+                      Receiver,
+                      SendError,
+                      TryRecvError,
+                      sync_channel};
 use error::MioResult;
 use io::IoHandle;
 use os;
-use util::BoundedQueue;
 
 const SLEEP: isize = -1;
 
@@ -27,17 +29,12 @@ impl<M: Send> Notify<M> {
     }
 
     #[inline]
-    pub fn check(&self, max: usize, will_sleep: bool) -> usize {
-        self.inner.check(max, will_sleep)
-    }
-
-    #[inline]
     pub fn notify(&self, value: M) -> Result<(), SendError<M>> {
         self.inner.notify(value)
     }
 
     #[inline]
-    pub fn poll(&self) -> Option<M> {
+    pub fn poll(&self) -> Result<M, TryRecvError> {
         self.inner.poll()
     }
 
@@ -71,86 +68,20 @@ impl<M: Send> NotifyInner<M> {
         Ok(NotifyInner {
             state: AtomicInt::new(0),
             queue: rx, //BoundedQueue::with_capacity(capacity),
-            queue_tx: tx, 
+            queue_tx: tx,
             awaken: try!(os::Awakener::new())
         })
     }
 
-    fn check(&self, max: usize, will_sleep: bool) -> usize {
-        let max = max as isize;
-        let mut cur = self.state.load(Relaxed);
-        let mut nxt;
-        let mut val;
-
-        loop {
-            // If there are pending messages, then whether or not the event loop
-            // was planning to sleep does not matter - it will not sleep.
-            if cur > 0 {
-                if max >= cur {
-                    nxt = 0;
-                } else {
-                    nxt = cur - max;
-                }
-            } else {
-                if will_sleep {
-                    nxt = SLEEP;
-                } else {
-                    nxt = 0;
-                }
-            }
-
-            val = self.state.compare_and_swap(cur, nxt, Relaxed);
-
-            if val == cur {
-                break;
-            }
-
-            cur = val;
-        }
-
-        if cur < 0 {
-            0
-        } else {
-            cur as usize
-        }
-    }
-
-    fn poll(&self) -> Option<M> {
+    fn poll(&self) -> Result<M, TryRecvError> {
         //self.queue.pop()
-        self.queue.try_recv().ok()
+        self.queue.try_recv()
     }
 
     fn notify(&self, value: M) -> Result<(), SendError<M>> {
         // First, push the message onto the queue
         //let res = self.queue.push(value);
-        let res = self.queue_tx.send(value); 
-        if res.is_err(){
-            return res
-        }
-
-        let mut cur = self.state.load(Relaxed);
-        let mut nxt;
-        let mut val;
-
-        loop {
-            nxt = if cur == SLEEP { 1 } else { cur + 1 };
-            val = self.state.compare_and_swap(cur, nxt, Relaxed);
-
-            if val == cur {
-                break;
-            }
-
-            cur = val;
-        }
-
-        if cur == SLEEP {
-            if self.awaken.wakeup().is_err() {
-                // TODO: Don't fail
-                panic!("failed to awaken event loop");
-            }
-        }
-
-        Ok(())
+        self.queue_tx.send(value)
     }
 
     fn cleanup(&self) {
