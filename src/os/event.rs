@@ -21,6 +21,16 @@ impl PollOpt {
     }
 
     #[inline]
+    pub fn level() -> PollOpt {
+        LEVEL
+    }
+
+    #[inline]
+    pub fn oneshot() -> PollOpt {
+        ONESHOT
+    }
+
+    #[inline]
     pub fn all() -> PollOpt {
         EDGE | LEVEL | ONESHOT
     }
@@ -113,6 +123,33 @@ bitflags!(
         const ALL      = 0x001 | 0x002 | 0x008  //epoll checks for ERROR no matter what
     }
 );
+
+impl Interest {
+    #[inline]
+    pub fn readable() -> Interest {
+        READABLE
+    }
+
+    #[inline]
+    pub fn writable() -> Interest {
+        WRITABLE
+    }
+
+    #[inline]
+    pub fn error() -> Interest {
+        ERROR
+    }
+
+    #[inline]
+    pub fn hup() -> Interest {
+        HUP
+    }
+
+    #[inline]
+    pub fn hinted() -> Interest {
+        HINTED
+    }
+}
 
 
 impl fmt::Show for Interest {
