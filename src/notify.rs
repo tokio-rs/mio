@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::AtomicInt;
+use std::sync::atomic::{ AtomicBool, Ordering };
 use std::sync::mpsc::{SyncSender,
                       Receiver,
                       SendError,
@@ -8,8 +8,6 @@ use std::sync::mpsc::{SyncSender,
 use error::MioResult;
 use io::IoHandle;
 use os;
-
-const SLEEP: isize = -1;
 
 /// Send notifications to the event loop, waking it up if necessary. If the
 /// event loop is not currently sleeping, avoid using an OS wake-up strategy
@@ -53,7 +51,7 @@ impl<M: Send> Clone for Notify<M> {
 }
 
 struct NotifyInner<M> {
-    state: AtomicInt,
+    state: AtomicBool,
     queue: Receiver<M>,
     queue_tx: SyncSender<M>,
     //queue: BoundedQueue<M>,
@@ -66,7 +64,7 @@ impl<M: Send> NotifyInner<M> {
     fn with_capacity(capacity: usize) -> MioResult<NotifyInner<M>> {
         let (tx, rx) = sync_channel(capacity);
         Ok(NotifyInner {
-            state: AtomicInt::new(0),
+            state: AtomicBool::new(false),
             queue: rx, //BoundedQueue::with_capacity(capacity),
             queue_tx: tx,
             awaken: try!(os::Awakener::new())
@@ -75,17 +73,26 @@ impl<M: Send> NotifyInner<M> {
 
     fn poll(&self) -> Result<M, TryRecvError> {
         //self.queue.pop()
-        self.queue.try_recv()
+        let res = self.queue.try_recv();
+        if res.is_err() {
+            self.state.store(false, Ordering::Relaxed);
+        }
+        res
     }
 
     fn notify(&self, value: M) -> Result<(), SendError<M>> {
         // First, push the message onto the queue
-        //let res = self.queue.push(value);
-        self.queue_tx.send(value)
+        let res = self.queue_tx.send(value);
+        if res.is_ok() && !self.state.load(Ordering::Relaxed) {
+            self.state.store(true, Ordering::Relaxed);
+            self.awaken.wakeup().ok().expect("WAAAGH BEES");
+        }
+        res
     }
 
     fn cleanup(&self) {
         self.awaken.cleanup();
+        self.state.store(false, Ordering::Relaxed);
     }
 }
 
