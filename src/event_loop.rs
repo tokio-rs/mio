@@ -296,7 +296,7 @@ impl<T, M: Send> EventLoop<T, M> {
         }
 
         if evt.is_error() {
-            println!(" + ERROR");
+            error!(" + ERROR");
         }
     }
 

@@ -74,8 +74,11 @@ impl<M: Send> NotifyInner<M> {
     fn poll(&self) -> Result<M, TryRecvError> {
         //self.queue.pop()
         let res = self.queue.try_recv();
-        if res.is_err() {
-            self.state.store(false, Ordering::Relaxed);
+        match res {
+            Ok(_) => {},
+            Err(TryRecvError::Empty) =>
+                self.state.store(false, Ordering::Relaxed),
+            Err(TryRecvError::Disconnected) => error!("Notify Queue is broken")
         }
         res
     }
@@ -85,7 +88,7 @@ impl<M: Send> NotifyInner<M> {
         let res = self.queue_tx.send(value);
         if res.is_ok() && !self.state.load(Ordering::Relaxed) {
             self.state.store(true, Ordering::Relaxed);
-            self.awaken.wakeup().ok().expect("WAAAGH BEES");
+            self.awaken.wakeup().ok().expect("Failed to kick the poller awake");
         }
         res
     }
