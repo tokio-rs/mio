@@ -1,3 +1,4 @@
+use std::cmp;
 use std::sync::Arc;
 use std::sync::atomic::AtomicInt;
 use std::sync::atomic::Ordering::Relaxed;
@@ -104,7 +105,7 @@ impl<M: Send> NotifyInner<M> {
         if cur < 0 {
             0
         } else {
-            cur as usize
+            cmp::min(cur, max) as usize
         }
     }
 

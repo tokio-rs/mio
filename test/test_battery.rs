@@ -1,11 +1,10 @@
 use mio::*;
 use mio::net::*;
 use mio::net::tcp::*;
-use mio::buf::{ByteBuf, SliceBuf};
 use mio::util::Slab;
 use super::localhost;
 use mio::event as evt;
-use collections::DList;
+use std::collections::DList;
 use std::thread::Thread;
 use std::io::timer::Timer;
 use std::time::duration::Duration;
@@ -46,16 +45,16 @@ impl EchoConn {
                 Ok(NonBlock::WouldBlock) => {
                     break;
                 }
-                Ok(NonBlock::Ready(r)) => {
+                Ok(NonBlock::Ready(_)) => {
                     self.count += 1;
                     if self.count % 10000 == 0 {
-                        println!("Received {} messages", self.count);
+                        debug!("Received {} messages", self.count);
                     }
                     if self.count == 1_000_000 {
                         event_loop.shutdown();
                     }
                 }
-                Err(e) => {
+                Err(_) => {
                     break;
                 }
 
@@ -123,7 +122,7 @@ impl EchoClient {
         }
     }
 
-    fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn readable(&mut self, _event_loop: &mut TestEventLoop) -> MioResult<()> {
         Ok(())
     }
 
@@ -135,18 +134,18 @@ impl EchoClient {
                 Ok(NonBlock::WouldBlock) => {
                     break;
                 }
-                Ok(NonBlock::Ready(r)) => {
+                Ok(NonBlock::Ready(_r)) => {
                     self.backlog.pop_front();
                     self.count += 1;
                     if self.count % 10000 == 0 {
-                        println!("Sent {} messages", self.count);
+                        debug!("Sent {} messages", self.count);
                     }
                 }
                 Err(e) => { debug!("not implemented; client err={:?}", e); break; }
             }
         }
         if self.backlog.len() > 0 {
-            event_loop.reregister(&self.sock, self.token, evt::WRITABLE, evt::PollOpt::edge());
+            event_loop.reregister(&self.sock, self.token, evt::WRITABLE, evt::PollOpt::edge()).unwrap();
         }
 
         Ok(())
@@ -156,7 +155,6 @@ impl EchoClient {
 struct EchoHandler {
     server: EchoServer,
     client: EchoClient,
-    count: u32
 }
 
 impl EchoHandler {
@@ -167,7 +165,6 @@ impl EchoHandler {
                 conns: Slab::new_starting_at(Token(2), 128),
             },
             client: EchoClient::new(client, CLIENT),
-            count: 0
         }
     }
 }
@@ -196,13 +193,17 @@ impl Handler<usize, String> for EchoHandler {
             Ok(NonBlock::Ready(n)) => {
                 self.client.count += 1;
                 if self.client.count % 10000 == 0 {
-                    println!("Sent {} bytes:   count {}", n, self.client.count);
+                    debug!("Sent {} bytes:   count {}", n, self.client.count);
                 }
             },
 
             _ => {
                 self.client.backlog.push_back(msg);
-                event_loop.reregister(&self.client.sock, self.client.token, evt::WRITABLE, evt::PollOpt::edge());
+                event_loop.reregister(
+                    &self.client.sock,
+                    self.client.token,
+                    evt::WRITABLE,
+                    evt::PollOpt::edge()).unwrap();
             }
         }
     }
@@ -251,16 +252,15 @@ pub fn test_echo_server() {
 
         let message = String::from_str("THIS IS A TEST MESSAGE");
         while i > 0 {
-            chan.send(message.clone());
+            chan.send(message.clone()).unwrap();
             i -= 1;
             if i % 10000 == 0 {
-                println!("Enqueued {} messages", 1_000_000 - i);
+                debug!("Enqueued {} messages", 1_000_000 - i);
             }
         }
     };
 
-    let guard = Thread::spawn(go);
-
+    let _t = Thread::scoped(go);
 
     // Start the event loop
     event_loop.run(EchoHandler::new(srv, sock))

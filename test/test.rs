@@ -7,6 +7,7 @@ extern crate log;
 
 pub use ports::localhost;
 
+mod test_battery;
 mod test_close_on_drop;
 mod test_echo_server;
 mod test_notify;
