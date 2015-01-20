@@ -7,6 +7,8 @@ use super::localhost;
 use mio::event as evt;
 use collections::DList;
 use std::thread::Thread;
+use std::io::timer::Timer;
+use std::time::duration::Duration;
 
 type TestEventLoop = EventLoop<usize, String>;
 
@@ -17,17 +19,20 @@ struct EchoConn {
     sock: TcpSocket,
     token: Token,
     count: u32,
-    buf: ByteBuf
+    buf: Vec<u8>
 }
 
 impl EchoConn {
     fn new(sock: TcpSocket) -> EchoConn {
+        let mut ec =
         EchoConn {
             sock: sock,
             token: Token(-1),
-            buf: ByteBuf::new(10000),
+            buf: Vec::with_capacity(22),
             count: 0
-        }
+        };
+        unsafe { ec.buf.set_len(22) };
+        ec
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
@@ -36,23 +41,26 @@ impl EchoConn {
     }
 
     fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
-        match self.sock.read(&mut self.buf) {
-            Ok(NonBlock::WouldBlock) => {
-                panic!("We just got readable, but were unable to read from the socket?");
-            }
-            Ok(NonBlock::Ready(r)) => {
-                debug!("CONN : we read {} bytes!", r);
-                self.buf.clear();
-                self.count += 1;
-                if self.count % 10000 == 0 {
-                    println!("Received {} messages", self.count);
+        loop {
+            match self.sock.read_slice(self.buf.as_mut_slice()) {
+                Ok(NonBlock::WouldBlock) => {
+                    break;
                 }
-            }
-            Err(e) => {
-                debug!("not implemented; client err={:?}", e);
-            }
+                Ok(NonBlock::Ready(r)) => {
+                    self.count += 1;
+                    if self.count % 10000 == 0 {
+                        println!("Received {} messages", self.count);
+                    }
+                    if self.count == 1_000_000 {
+                        event_loop.shutdown();
+                    }
+                }
+                Err(e) => {
+                    break;
+                }
 
-        };
+            };
+        }
 
         event_loop.reregister(&self.sock, self.token, evt::READABLE, evt::PollOpt::edge())
     }
@@ -130,6 +138,9 @@ impl EchoClient {
                 Ok(NonBlock::Ready(r)) => {
                     self.backlog.pop_front();
                     self.count += 1;
+                    if self.count % 10000 == 0 {
+                        println!("Sent {} messages", self.count);
+                    }
                 }
                 Err(e) => { debug!("not implemented; client err={:?}", e); break; }
             }
@@ -182,8 +193,14 @@ impl Handler<usize, String> for EchoHandler {
 
     fn notify(&mut self, event_loop: &mut TestEventLoop, msg: String) {
         match self.client.sock.write_slice(msg.as_bytes()) {
-            Ok(n) => self.count += 1,
-            Err(_) => {
+            Ok(NonBlock::Ready(n)) => {
+                self.client.count += 1;
+                if self.client.count % 10000 == 0 {
+                    println!("Sent {} bytes:   count {}", n, self.client.count);
+                }
+            },
+
+            _ => {
                 self.client.backlog.push_back(msg);
                 event_loop.reregister(&self.client.sock, self.client.token, evt::WRITABLE, evt::PollOpt::edge());
             }
@@ -229,12 +246,15 @@ pub fn test_echo_server() {
     let go = move|:| {
         let mut i = 1_000_000;
 
+        let mut timer = Timer::new().unwrap();
+        timer.sleep(Duration::seconds(1));
+
         let message = String::from_str("THIS IS A TEST MESSAGE");
         while i > 0 {
             chan.send(message.clone());
             i -= 1;
             if i % 10000 == 0 {
-                println!("Sent {} messages", 1_000_000 - i);
+                println!("Enqueued {} messages", 1_000_000 - i);
             }
         }
     };
