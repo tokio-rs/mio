@@ -5,8 +5,11 @@ extern crate mio;
 #[macro_use]
 extern crate log;
 
+extern crate collections;
+
 pub use ports::localhost;
 
+mod test_battery;
 mod test_close_on_drop;
 mod test_echo_server;
 mod test_notify;

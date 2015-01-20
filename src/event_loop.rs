@@ -1,5 +1,6 @@
 use std::default::Default;
 use std::time::duration::Duration;
+use std::sync::mpsc::{SendError, TryRecvError};
 use std::usize;
 use error::{MioResult, MioError};
 use handler::Handler;
@@ -233,31 +234,14 @@ impl<T, M: Send> EventLoop<T, M> {
 
     // Executes a single run of the event loop loop
     fn tick<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
-        let mut messages;
-        let mut pending;
 
         debug!("event loop tick");
 
-        // Check the notify channel for any pending messages. If there are any,
-        // avoid blocking when polling for IO events. Messages will be
-        // processed after IO events.
-        messages = self.notify.check(self.config.messages_per_tick, true);
-        pending = messages > 0;
-
-        // Check the registered IO handles for any new events. Each poll
-        // is for one second, so a shutdown request can last as long as
-        // one second before it takes effect.
-        let events = try!(self.io_poll(pending));
-
-        if !pending {
-            // Indicate that the sleep period is over, also grab any additional
-            // messages
-            let remaining = self.config.messages_per_tick - messages;
-            messages += self.notify.check(remaining, false);
-        }
+        let events = try!(self.io_poll(false));
+        let max_msgs = self.config.messages_per_tick;
 
         self.io_process(handler, events);
-        self.notify(handler, messages);
+        self.notify(handler, max_msgs);
         self.timer_process(handler);
 
         Ok(())
@@ -312,17 +296,20 @@ impl<T, M: Send> EventLoop<T, M> {
         }
 
         if evt.is_error() {
-            println!(" + ERROR");
+            error!(" + ERROR");
         }
     }
 
     fn notify<H: Handler<T, M>>(&mut self, handler: &mut H, mut cnt: usize) {
         while cnt > 0 {
-            let msg = self.notify.poll()
-                .expect("[BUG] at this point there should always be a message");
-
-            handler.notify(self, msg);
-            cnt -= 1;
+            match self.notify.poll() {
+                Ok(msg) => {
+                    handler.notify(self, msg);
+                    cnt -= 1;
+                },
+                Err(TryRecvError::Empty) => {break;},
+                Err(TryRecvError::Disconnected) =>  {error!("notify handler called, but the notification writer has disconnected"); break}
+            }
         }
     }
 
@@ -349,7 +336,7 @@ impl<M: Send> EventLoopSender<M> {
         EventLoopSender { notify: notify }
     }
 
-    pub fn send(&self, msg: M) -> Result<(), M> {
+    pub fn send(&self, msg: M) -> Result<(), SendError<M>> {
         self.notify.notify(msg)
     }
 }
