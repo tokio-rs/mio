@@ -34,12 +34,12 @@ pub trait IoHandle {
 }
 
 pub trait IoReader {
-    fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<usize>>;
+    fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>>;
     fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>>;
 }
 
 pub trait IoWriter {
-    fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<usize>>;
+    fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>>;
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>>;
 }
 
@@ -74,7 +74,7 @@ impl IoHandle for PipeWriter {
 }
 
 impl IoReader for PipeReader {
-    fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<usize>> {
+    fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
         read(self, buf)
     }
 
@@ -84,7 +84,7 @@ impl IoReader for PipeReader {
 }
 
 impl IoWriter for PipeWriter {
-    fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<usize>> {
+    fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
         write(self, buf)
     }
 
@@ -99,7 +99,7 @@ impl IoWriter for PipeWriter {
 /// ensure that your buffer is large enough to hold an entire segment (1532 bytes if not jumbo
 /// frames)
 #[inline]
-pub fn read<I: IoHandle>(io: &I, buf: &mut MutBuf) -> MioResult<NonBlock<usize>> {
+pub fn read<I: IoHandle, B: MutBuf>(io: &I, buf: &mut B) -> MioResult<NonBlock<usize>> {
 
     let res = read_slice(io, buf.mut_bytes());
     match res {
@@ -113,7 +113,7 @@ pub fn read<I: IoHandle>(io: &I, buf: &mut MutBuf) -> MioResult<NonBlock<usize>>
 ///writes the length of the slice supplied by Buf.bytes into the socket
 ///then advances the buffer that many bytes
 #[inline]
-pub fn write<O: IoHandle>(io: &O, buf: &mut Buf) -> MioResult<NonBlock<usize>> {
+pub fn write<O: IoHandle, B: Buf>(io: &O, buf: &mut B) -> MioResult<NonBlock<usize>> {
     let res = write_slice(io, buf.bytes());
     match res {
         Ok(Ready(cnt)) => buf.advance(cnt),

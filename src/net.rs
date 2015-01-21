@@ -208,7 +208,7 @@ pub mod tcp {
     }
 
     impl IoReader for TcpSocket {
-        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<(usize)>> {
+        fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
             io::read(self, buf)
         }
 
@@ -218,7 +218,7 @@ pub mod tcp {
     }
 
     impl IoWriter for TcpSocket {
-        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<(usize)>> {
+        fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
             io::write(self, buf)
         }
 
@@ -343,7 +343,7 @@ pub mod udp {
     }
 
     impl IoReader for UdpSocket {
-        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<(usize)>> {
+        fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
             io::read(self, buf)
         }
 
@@ -353,7 +353,7 @@ pub mod udp {
     }
 
     impl IoWriter for UdpSocket {
-        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<(usize)>> {
+        fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
             io::write(self, buf)
         }
 
@@ -451,7 +451,7 @@ pub mod pipe {
     }
 
     impl IoReader for UnixSocket {
-        fn read(&self, buf: &mut MutBuf) -> MioResult<NonBlock<usize>> {
+        fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
             io::read(self, buf)
         }
 
@@ -461,7 +461,7 @@ pub mod pipe {
     }
 
     impl IoWriter for UnixSocket {
-        fn write(&self, buf: &mut Buf) -> MioResult<NonBlock<usize>> {
+        fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
             io::write(self, buf)
         }
 
