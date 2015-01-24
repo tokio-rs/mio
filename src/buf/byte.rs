@@ -112,6 +112,9 @@ impl Writer for ByteBuf {
     }
 }
 
+unsafe impl Send for ByteBuf { }
+unsafe impl Sync for ByteBuf { }
+
 #[cfg(test)]
 mod test {
     use buf::*;
