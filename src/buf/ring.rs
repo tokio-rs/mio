@@ -227,6 +227,8 @@ impl<'a> Writer for RingBufWriter<'a> {
     }
 }
 
+unsafe impl Send for RingBuf { }
+
 #[cfg(test)]
 mod test {
     use std::io::EndOfFile;
