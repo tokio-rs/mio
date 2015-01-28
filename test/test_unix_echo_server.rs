@@ -3,7 +3,7 @@ use mio::net::*;
 use mio::net::pipe::*;
 use mio::buf::{ByteBuf, SliceBuf};
 use mio::util::Slab;
-use std::io::TempDir;
+use std::old_io::TempDir;
 use mio::event as evt;
 
 type TestEventLoop = EventLoop<usize, ()>;

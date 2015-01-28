@@ -1,5 +1,5 @@
 use std::cmp;
-use std::io::IoResult;
+use std::old_io::IoResult;
 use super::{Buf, MutBuf};
 
 pub struct SliceBuf<'a> {
@@ -76,7 +76,7 @@ impl<'a> Reader for MutSliceBuf<'a> {
 }
 
 impl<'a> Writer for MutSliceBuf<'a> {
-    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+    fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
         super::write(self, buf)
     }
 }

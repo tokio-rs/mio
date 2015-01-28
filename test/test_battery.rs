@@ -6,7 +6,7 @@ use super::localhost;
 use mio::event as evt;
 use std::collections::DList;
 use std::thread::Thread;
-use std::io::timer::Timer;
+use std::old_io::timer::Timer;
 use std::time::duration::Duration;
 
 type TestEventLoop = EventLoop<usize, String>;

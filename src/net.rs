@@ -2,15 +2,15 @@
 //!
 use std::fmt;
 use std::str::FromStr;
-use std::io::net::ip::SocketAddr as StdSocketAddr;
+use std::old_io::net::ip::SocketAddr as StdSocketAddr;
 use io::{IoHandle, NonBlock};
 use error::MioResult;
 use buf::{Buf, MutBuf};
 use os;
 
-pub use std::io::net::ip::{IpAddr, Port};
-pub use std::io::net::ip::Ipv4Addr as IPv4Addr;
-pub use std::io::net::ip::Ipv6Addr as IPv6Addr;
+pub use std::old_io::net::ip::{IpAddr, Port};
+pub use std::old_io::net::ip::Ipv4Addr as IPv4Addr;
+pub use std::old_io::net::ip::Ipv6Addr as IPv6Addr;
 
 use self::SockAddr::{InetAddr,UnixAddr};
 use self::AddressFamily::{Unix,Inet,Inet6};

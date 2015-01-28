@@ -1,6 +1,6 @@
 use std::{cmp, mem, ptr};
 use std::num::UnsignedInt;
-use std::io::IoResult;
+use std::old_io::IoResult;
 use std::raw;
 use alloc::heap;
 use super::{Buf, MutBuf};
@@ -107,7 +107,7 @@ impl Reader for ByteBuf {
 }
 
 impl Writer for ByteBuf {
-    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+    fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
         super::write(self, buf)
     }
 }

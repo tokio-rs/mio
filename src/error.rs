@@ -1,4 +1,4 @@
-use std::io;
+use std::old_io;
 use nix::errno::{SysError, EAGAIN, EADDRINUSE};
 
 use self::MioErrorKind::{
@@ -93,18 +93,18 @@ impl MioError {
         }
     }
 
-    pub fn as_io_error(&self) -> io::IoError {
-        use std::io::OtherIoError;
+    pub fn as_io_error(&self) -> old_io::IoError {
+        use std::old_io::OtherIoError;
 
         match self.kind {
-            Eof | BufUnderflow | BufOverflow => io::standard_error(io::EndOfFile),
-            WouldBlock => io::standard_error(io::ResourceUnavailable),
-            AddrInUse => io::standard_error(io::PathAlreadyExists),
+            Eof | BufUnderflow | BufOverflow => old_io::standard_error(old_io::EndOfFile),
+            WouldBlock => old_io::standard_error(old_io::ResourceUnavailable),
+            AddrInUse => old_io::standard_error(old_io::PathAlreadyExists),
             OtherError => match self.sys {
-                Some(err) => io::IoError::from_errno(err.kind as usize, false),
-                None => io::standard_error(io::OtherIoError)
+                Some(err) => old_io::IoError::from_errno(err.kind as usize, false),
+                None => old_io::standard_error(old_io::OtherIoError)
             },
-            EventLoopTerminated => io::standard_error(OtherIoError)
+            EventLoopTerminated => old_io::standard_error(OtherIoError)
         }
     }
 }

@@ -1,7 +1,7 @@
 //! Various strategies for non-blocking sequential byte access
 //!
 use std::slice::bytes;
-use std::{cmp, io};
+use std::{cmp, old_io};
 
 pub use self::byte::ByteBuf;
 pub use self::ring::{RingBuf, RingBufReader, RingBufWriter};
@@ -57,7 +57,7 @@ pub fn wrap_mut<'a>(bytes: &'a mut [u8]) -> MutSliceBuf<'a> {
 //
 // Instead, we provide these two fns we call in all the concrete implementations
 
-fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> io::IoResult<usize> {
+fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> old_io::IoResult<usize> {
     let nread = cmp::min(buf.remaining(), dst.len());
 
     if nread == 0 {
@@ -65,7 +65,7 @@ fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> io::IoResult<usize> {
             return Ok(0);
         }
 
-        return Err(io::standard_error(io::EndOfFile));
+        return Err(old_io::standard_error(old_io::EndOfFile));
     }
 
     let mut curr = 0us;
@@ -89,11 +89,11 @@ fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> io::IoResult<usize> {
     Ok(nread)
 }
 
-fn write<B: MutBuf>(buf: &mut B, src: &[u8]) -> io::IoResult<()> {
+fn write<B: MutBuf>(buf: &mut B, src: &[u8]) -> old_io::IoResult<()> {
     debug!("buf::write; buf={}; src={}", buf.remaining(), src.len());
 
     if src.len() > buf.remaining() {
-        return Err(io::standard_error(io::EndOfFile));
+        return Err(old_io::standard_error(old_io::EndOfFile));
     }
 
     let mut curr = 0us;

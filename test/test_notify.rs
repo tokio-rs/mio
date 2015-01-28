@@ -1,4 +1,4 @@
-use std::io::timer::sleep;
+use std::old_io::timer::sleep;
 use std::thread::Thread;
 use std::time::Duration;
 use mio::*;

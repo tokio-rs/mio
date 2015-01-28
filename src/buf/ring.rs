@@ -1,6 +1,6 @@
 use std::{cmp, fmt, mem, ptr};
 use std::num::UnsignedInt;
-use std::io::IoResult;
+use std::old_io::IoResult;
 use std::raw::Slice as RawSlice;
 use alloc::heap;
 use super::{Buf, MutBuf};
@@ -222,7 +222,7 @@ impl<'a> MutBuf for RingBufWriter<'a> {
 }
 
 impl<'a> Writer for RingBufWriter<'a> {
-    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+    fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
         super::write(self, buf)
     }
 }
@@ -231,7 +231,7 @@ unsafe impl Send for RingBuf { }
 
 #[cfg(test)]
 mod test {
-    use std::io::EndOfFile;
+    use std::old_io::EndOfFile;
     use buf::{Buf, RingBuf};
 
     #[test]

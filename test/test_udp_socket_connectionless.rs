@@ -3,7 +3,7 @@ use mio::net::*;
 use mio::net::udp::*;
 use mio::buf::{RingBuf, SliceBuf};
 use std::str;
-use std::io::net::ip::{Ipv4Addr};
+use std::old_io::net::ip::{Ipv4Addr};
 use mio::event as evt;
 
 type TestEventLoop = EventLoop<usize, ()>;
