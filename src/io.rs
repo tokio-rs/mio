@@ -7,7 +7,7 @@ use os;
 pub use os::IoDesc;
 
 /// The result of a non-blocking operation.
-#[derive(Show)]
+#[derive(Debug)]
 pub enum NonBlock<T> {
     Ready(T),
     WouldBlock

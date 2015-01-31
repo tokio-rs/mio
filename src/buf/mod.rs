@@ -76,7 +76,7 @@ fn read<B: Buf>(buf: &mut B, dst: &mut [u8]) -> old_io::IoResult<usize> {
             let cnt = cmp::min(src.len(), dst.len() - curr);
 
             // copy the bytes
-            bytes::copy_memory(dst.slice_from_mut(curr), src.slice_to(cnt));
+            bytes::copy_memory(&mut dst[curr..], &src[..cnt]);
 
             // advance cursors
             cnt
@@ -103,7 +103,7 @@ fn write<B: MutBuf>(buf: &mut B, src: &[u8]) -> old_io::IoResult<()> {
             let dst = buf.mut_bytes();
             let cnt = cmp::min(dst.len(), src.len() - curr);
 
-            bytes::copy_memory(dst, src.slice(curr, cnt));
+            bytes::copy_memory(dst, &src[curr..cnt]);
             cnt
         };
 

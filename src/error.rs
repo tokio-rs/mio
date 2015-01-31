@@ -13,13 +13,13 @@ use self::MioErrorKind::{
 
 pub type MioResult<T> = Result<T, MioError>;
 
-#[derive(Copy, Show, PartialEq, Clone)]
+#[derive(Copy, Debug, PartialEq, Clone)]
 pub struct MioError {
     pub kind: MioErrorKind,
     sys: Option<SysError>
 }
 
-#[derive(Copy, Show, PartialEq, Clone)]
+#[derive(Copy, Debug, PartialEq, Clone)]
 pub enum MioErrorKind {
     Eof,                    // End of file or socket closed
     WouldBlock,             // The operation would have blocked

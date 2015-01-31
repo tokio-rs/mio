@@ -137,7 +137,7 @@ impl Clone for RingBuf {
     // re-uses the buffer
 }
 
-impl fmt::Show for RingBuf {
+impl fmt::Debug for RingBuf {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "RingBuf[.. {}]", self.len)
     }
@@ -170,7 +170,7 @@ impl<'a> Buf for RingBufReader<'a> {
             to = self.ring.cap
         }
 
-        self.ring.as_slice().slice(self.ring.pos, to)
+        &self.ring.as_slice()[self.ring.pos..to]
     }
 
     fn advance(&mut self, cnt: usize) {
@@ -207,7 +207,7 @@ impl<'a> Buf for RingBufWriter<'a> {
             to = self.ring.cap;
         }
 
-        self.ring.as_slice().slice(from, to)
+        &self.ring.as_slice()[from..to]
     }
 
     fn advance(&mut self, cnt: usize) {

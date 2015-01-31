@@ -60,7 +60,7 @@ impl PipeAwakener {
 
 /// Represents the OS's handle to the IO instance. In this case, it is the file
 /// descriptor.
-#[derive(Show)]
+#[derive(Debug)]
 pub struct IoDesc {
     pub fd: nix::Fd
 }

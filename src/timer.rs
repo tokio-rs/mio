@@ -284,7 +284,7 @@ struct EntryLinks {
 
 pub type TimerResult<T> = Result<T, TimerError>;
 
-#[derive(Show)]
+#[derive(Debug)]
 pub struct TimerError {
     kind: TimerErrorKind,
     desc: &'static str,
@@ -299,7 +299,7 @@ impl TimerError {
     }
 }
 
-#[derive(Show)]
+#[derive(Debug)]
 pub enum TimerErrorKind {
     TimerOverflow,
 }

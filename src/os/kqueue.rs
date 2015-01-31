@@ -158,7 +158,7 @@ impl Events {
     }
 
     fn as_slice(&self) -> &[KEvent] {
-        self.events.slice_to(self.len)
+        &self.events[..self.len]
     }
 
     fn as_mut_slice(&mut self) -> &mut [KEvent] {

@@ -83,7 +83,7 @@ impl Buf for ByteBuf {
     }
 
     fn bytes<'a>(&'a self) -> &'a [u8] {
-        self.as_slice().slice(self.pos, self.lim)
+        &self.as_slice()[self.pos..self.lim]
     }
 
     fn advance(&mut self, mut cnt: usize) {
@@ -96,7 +96,7 @@ impl MutBuf for ByteBuf {
     fn mut_bytes<'a>(&'a mut self) -> &'a mut [u8] {
         let pos = self.pos;
         let lim = self.lim;
-        self.as_mut_slice().slice_mut(pos, lim)
+        &mut self.as_mut_slice()[pos..lim]
     }
 }
 

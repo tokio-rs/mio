@@ -11,7 +11,7 @@ use timer::{Timer, Timeout, TimerResult};
 use os::token::Token;
 
 /// Configure EventLoop runtime details
-#[derive(Copy, Clone, Show)]
+#[derive(Copy, Clone, Debug)]
 pub struct EventLoopConfig {
     pub io_poll_timeout_ms: usize,
 

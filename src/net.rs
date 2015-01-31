@@ -120,7 +120,7 @@ impl FromStr for SockAddr {
     }
 }
 
-impl fmt::Show for SockAddr {
+impl fmt::Debug for SockAddr {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             InetAddr(ip, port) => write!(fmt, "{}:{}", ip, port),
@@ -148,7 +148,7 @@ pub mod tcp {
     use net::SocketType::Stream;
     use net::AddressFamily::{self, Inet, Inet6};
 
-    #[derive(Show)]
+    #[derive(Debug)]
     pub struct TcpSocket {
         desc: os::IoDesc
     }
@@ -230,7 +230,7 @@ pub mod tcp {
     impl Socket for TcpSocket {
     }
 
-    #[derive(Show)]
+    #[derive(Debug)]
     pub struct TcpListener {
         desc: os::IoDesc,
     }
@@ -248,7 +248,7 @@ pub mod tcp {
         }
     }
 
-    #[derive(Show)]
+    #[derive(Debug)]
     pub struct TcpAcceptor {
         desc: os::IoDesc,
     }
@@ -300,7 +300,7 @@ pub mod udp {
     use net::AddressFamily::Inet;
     use super::UnconnectedSocket;
 
-    #[derive(Show)]
+    #[derive(Debug)]
     pub struct UdpSocket {
         desc: os::IoDesc
     }
@@ -410,7 +410,7 @@ pub mod pipe {
     use net::SocketType::Stream;
     use net::AddressFamily::Unix;
 
-    #[derive(Show)]
+    #[derive(Debug)]
     pub struct UnixSocket {
         desc: os::IoDesc
     }
@@ -473,7 +473,7 @@ pub mod pipe {
     impl Socket for UnixSocket {
     }
 
-    #[derive(Show)]
+    #[derive(Debug)]
     pub struct UnixListener {
         desc: os::IoDesc,
     }
@@ -491,7 +491,7 @@ pub mod pipe {
         }
     }
 
-    #[derive(Show)]
+    #[derive(Debug)]
     pub struct UnixAcceptor {
         desc: os::IoDesc,
     }

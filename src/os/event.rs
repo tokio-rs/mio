@@ -92,7 +92,7 @@ impl Not for PollOpt {
     }
 }
 
-impl fmt::Show for PollOpt {
+impl fmt::Debug for PollOpt {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
@@ -152,7 +152,7 @@ impl Interest {
 }
 
 
-impl fmt::Show for Interest {
+impl fmt::Debug for Interest {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
@@ -183,7 +183,7 @@ bitflags!(
     }
 );
 
-impl fmt::Show for ReadHint {
+impl fmt::Debug for ReadHint {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
@@ -205,7 +205,7 @@ impl fmt::Show for ReadHint {
 }
 
 
-#[derive(Copy, Show)]
+#[derive(Copy, Debug)]
 pub struct IoEvent {
     kind: Interest,
     token: Token
