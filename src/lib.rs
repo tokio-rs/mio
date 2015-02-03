@@ -28,8 +28,7 @@
 //! const SERVER: Token = Token(0);
 //! const CLIENT: Token = Token(1);
 //!
-//! let addr = SockAddr::parse("127.0.0.1:13265")
-//!     .expect("could not parse InetAddr");
+//! let addr = SockAddr::parse("127.0.0.1:13265").unwrap();
 //!
 //! // Setup the server socket
 //! let server = TcpSocket::v4().unwrap()

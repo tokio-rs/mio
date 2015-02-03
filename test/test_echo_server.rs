@@ -254,8 +254,7 @@ pub fn test_echo_server() {
     debug!("Starting TEST_ECHO_SERVER");
     let mut event_loop = EventLoop::new().unwrap();
 
-    let addr = SockAddr::parse(localhost().as_slice())
-        .expect("could not parse InetAddr");
+    let addr = SockAddr::parse(localhost().as_slice()).unwrap();
 
     let srv = TcpSocket::v4().unwrap();
 

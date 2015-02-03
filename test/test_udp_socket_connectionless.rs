@@ -25,7 +25,7 @@ impl UdpHandler {
         UdpHandler {
             listen_sock: listen_sock,
             send_sock: send_sock,
-            sock_addr: SockAddr::parse("127.0.0.1:24601".as_slice()).expect("could not parse localhost address"),
+            sock_addr: SockAddr::parse("127.0.0.1:24601".as_slice()).unwrap(),
             msg: msg,
             message_buf: SliceBuf::wrap(msg.as_bytes()),
             rx_buf: RingBuf::new(1024)
@@ -75,8 +75,7 @@ pub fn test_udp_socket_connectionless() {
 
     let send_sock = UdpSocket::v4().unwrap();
     let recv_sock = UdpSocket::v4().unwrap();
-    let addr = SockAddr::parse("127.0.0.1:24601".as_slice())
-        .expect("could not parse InetAddr for localhost");
+    let addr = SockAddr::parse("127.0.0.1:24601".as_slice()).unwrap();
 
     info!("Binding the listener socket");
     recv_sock.bind(&addr).unwrap();

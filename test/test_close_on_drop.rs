@@ -92,8 +92,7 @@ pub fn test_close_on_drop() {
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut event_loop = EventLoop::new().unwrap();
 
-    let addr = SockAddr::parse(localhost().as_slice())
-        .expect("could not parse InetAddr");
+    let addr = SockAddr::parse(localhost().as_slice()).unwrap();
 
     let srv = TcpSocket::v4().unwrap();
 

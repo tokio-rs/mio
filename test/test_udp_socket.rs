@@ -62,8 +62,7 @@ pub fn test_udp_socket() {
 
     let send_sock = UdpSocket::v4().unwrap();
     let recv_sock = UdpSocket::v4().unwrap();
-    let addr = SockAddr::parse(localhost().as_slice())
-        .expect("could not parse InetAddr for localhost");
+    let addr = SockAddr::parse(localhost().as_slice()).unwrap();
 
     info!("Binding both listener and sender to localhost...");
     send_sock.connect(&addr).unwrap();

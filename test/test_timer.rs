@@ -111,8 +111,7 @@ pub fn test_timer() {
     debug!("Starting TEST_TIMER");
     let mut event_loop = EventLoop::new().unwrap();
 
-    let addr = SockAddr::parse(localhost().as_slice())
-        .expect("could not parse InetAddr");
+    let addr = SockAddr::parse(localhost().as_slice()).unwrap();
 
     let srv = TcpSocket::v4().unwrap();
 

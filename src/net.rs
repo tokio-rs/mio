@@ -3,6 +3,7 @@
 use std::fmt;
 use std::str::FromStr;
 use std::old_io::net::ip::SocketAddr as StdSocketAddr;
+use std::old_io::net::ip::ParseError;
 use io::{IoHandle, NonBlock};
 use error::MioResult;
 use buf::{Buf, MutBuf};
@@ -66,9 +67,9 @@ pub enum SockAddr {
 }
 
 impl SockAddr {
-    pub fn parse(s: &str) -> Option<SockAddr> {
-        let addr: Option<StdSocketAddr> = FromStr::from_str(s);
-        addr.map(|a| InetAddr(a.ip, a.port))
+    pub fn parse(s: &str) -> Result<SockAddr, ParseError> {
+        let addr = FromStr::from_str(s);
+        addr.map(|a : StdSocketAddr| InetAddr(a.ip, a.port))
     }
 
     pub fn family(&self) -> AddressFamily {
@@ -115,7 +116,8 @@ impl SockAddr {
 }
 
 impl FromStr for SockAddr {
-    fn from_str(s: &str) -> Option<SockAddr> {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<SockAddr, ParseError> {
         SockAddr::parse(s)
     }
 }
