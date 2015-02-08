@@ -243,7 +243,7 @@ pub fn test_echo_server() {
     sock.connect(&addr).unwrap();
     let chan = event_loop.channel();
 
-    let go = move|:| {
+    let go = move || {
         let mut i = 1_000_000;
 
         let mut timer = Timer::new().unwrap();

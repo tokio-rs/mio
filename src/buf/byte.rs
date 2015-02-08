@@ -138,7 +138,7 @@ mod test {
     pub fn test_writing_bytes() {
         let mut buf = ByteBuf::new(8);
 
-        buf.write(b"hello").unwrap();
+        buf.write_all(b"hello").unwrap();
         assert!(buf.remaining() == 3);
 
         buf.flip();

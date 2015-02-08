@@ -1,4 +1,4 @@
-#![allow(unstable)]
+#![feature(path, io, std_misc, core, collections)]
 
 extern crate mio;
 

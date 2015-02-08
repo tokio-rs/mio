@@ -10,7 +10,7 @@ use self::TestState::{Initial, AfterRead, AfterHup};
 type TestEventLoop = EventLoop<usize, ()>;
 
 
-#[derive(Show, PartialEq)]
+#[derive(Debug, PartialEq)]
 enum TestState {
     Initial,
     AfterRead,

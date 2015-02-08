@@ -246,7 +246,7 @@ mod test {
     pub fn test_using_ring_buffer() {
         let mut buf = RingBuf::new(128);
 
-        buf.writer().write(b"hello").unwrap();
+        buf.writer().write_all(b"hello").unwrap();
         assert!(buf.writer().remaining() == 123);
 
         let read = buf.reader().read_exact(5).unwrap();
@@ -257,7 +257,7 @@ mod test {
     pub fn test_restarting_ring_buffer() {
         let mut buf = RingBuf::new(8);
 
-        buf.writer().write(b"hello").unwrap();
+        buf.writer().write_all(b"hello").unwrap();
         assert!(buf.writer().remaining() == 3);
 
         let read = buf.reader().read_exact(5).unwrap();
@@ -269,7 +269,7 @@ mod test {
     pub fn test_overflowing_ring_buffer() {
         let mut buf = RingBuf::new(8);
 
-        buf.writer().write(b"hello").unwrap();
+        buf.writer().write_all(b"hello").unwrap();
         assert!(buf.writer().write(b"world").unwrap_err().kind == EndOfFile);
     }
 }
