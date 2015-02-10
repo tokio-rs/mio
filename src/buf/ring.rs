@@ -270,6 +270,6 @@ mod test {
         let mut buf = RingBuf::new(8);
 
         buf.writer().write_all(b"hello").unwrap();
-        assert!(buf.writer().write(b"world").unwrap_err().kind == EndOfFile);
+        assert!(buf.writer().write_all(b"world").unwrap_err().kind == EndOfFile);
     }
 }
