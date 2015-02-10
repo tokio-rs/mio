@@ -4,9 +4,11 @@ sudo: false
 
 script:
   - cargo test
-  - cargo doc
+  - cargo doc --no-deps
+
 after_success:
   - test $TRAVIS_PULL_REQUEST == "false" && test $TRAVIS_BRANCH == "master" && bash deploy.sh
+
 env:
   global:
     secure: "btdSFScOk10KxYrlwXWcJVeUxVlWXV5YEsNvRWk1T+ysobKu/5uMznwB8zgxi7YtR+ICljXfJ+DhtalCYntFvGbhQ6HrKYoe7lCh0TH1GZX5sqvIdXbmoVZbeHsRV/uRshk1BBkY85cFm3afTHuh5pgGPwV+PVEcwYRrSn2JTQs="
