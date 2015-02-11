@@ -49,8 +49,9 @@ pub trait MulticastSocket : Socket {
 }
 
 pub trait UnconnectedSocket {
-    fn send_to(&mut self, buf: &mut Buf, tgt: &SockAddr) -> MioResult<NonBlock<()>>;
-    fn recv_from(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<SockAddr>>;
+    fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &SockAddr) -> MioResult<NonBlock<()>>;
+
+    fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SockAddr>>;
 }
 
 // Types of sockets
@@ -366,7 +367,7 @@ pub mod udp {
 
     // Unconnected socket sender -- trait unique to sockets
     impl UnconnectedSocket for UdpSocket {
-        fn send_to(&mut self, buf: &mut Buf, tgt: &SockAddr) -> MioResult<NonBlock<()>> {
+        fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &SockAddr) -> MioResult<NonBlock<()>> {
             match os::sendto(&self.desc, buf.bytes(), tgt) {
                 Ok(cnt) => {
                     buf.advance(cnt);
@@ -382,7 +383,7 @@ pub mod udp {
             }
         }
 
-        fn recv_from(&mut self, buf: &mut MutBuf) -> MioResult<NonBlock<SockAddr>> {
+        fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SockAddr>> {
             match os::recvfrom(&self.desc, buf.mut_bytes()) {
                 Ok((cnt, saddr)) => {
                     buf.advance(cnt);
