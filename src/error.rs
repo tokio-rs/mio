@@ -1,5 +1,6 @@
 use std::old_io;
-use nix::errno::{SysError, EAGAIN, EADDRINUSE};
+use nix::NixError;
+use nix::errno::{EAGAIN, EADDRINUSE};
 
 use self::MioErrorKind::{
     Eof,
@@ -16,7 +17,7 @@ pub type MioResult<T> = Result<T, MioError>;
 #[derive(Copy, Debug, PartialEq, Clone)]
 pub struct MioError {
     pub kind: MioErrorKind,
-    sys: Option<SysError>
+    sys: Option<NixError>
 }
 
 #[derive(Copy, Debug, PartialEq, Clone)]
@@ -52,11 +53,11 @@ impl MioError {
         }
     }
 
-    pub fn from_sys_error(err: SysError) -> MioError {
-        let kind = match err.kind {
-            EAGAIN => WouldBlock,
-            EADDRINUSE => AddrInUse,
-            _ => OtherError
+    pub fn from_nix_error(err: NixError) -> MioError {
+        let kind = match err {
+            NixError::Sys(EAGAIN) => WouldBlock,
+            NixError::Sys(EADDRINUSE) => AddrInUse,
+            _ => OtherError,
         };
 
         MioError {
@@ -101,8 +102,8 @@ impl MioError {
             WouldBlock => old_io::standard_error(old_io::ResourceUnavailable),
             AddrInUse => old_io::standard_error(old_io::PathAlreadyExists),
             OtherError => match self.sys {
-                Some(err) => old_io::IoError::from_errno(err.kind as usize, false),
-                None => old_io::standard_error(old_io::OtherIoError)
+                Some(NixError::Sys(err)) => old_io::IoError::from_errno(err as usize, false),
+                _ => old_io::standard_error(old_io::OtherIoError)
             },
             EventLoopTerminated => old_io::standard_error(OtherIoError)
         }

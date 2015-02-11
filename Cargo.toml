@@ -5,7 +5,7 @@ version = "0.0.1"
 authors = ["Carl Lerche <me@carllerche.com>"]
 
 [dependencies]
-nix = "0.1.2"
+nix = "0.2.0"
 log = "0.2.3"
 time = "0.1.16"
 bytes = "0.1.1"

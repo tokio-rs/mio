@@ -15,7 +15,7 @@ pub struct Selector {
 impl Selector {
     pub fn new() -> MioResult<Selector> {
         Ok(Selector {
-            kq: try!(kqueue().map_err(MioError::from_sys_error)),
+            kq: try!(kqueue().map_err(MioError::from_nix_error)),
             changes: Events::new()
         })
     }
@@ -23,7 +23,7 @@ impl Selector {
     pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> MioResult<()> {
         let cnt = try!(kevent(self.kq, self.changes.as_slice(),
                               evts.as_mut_slice(), timeout_ms)
-                                  .map_err(MioError::from_sys_error));
+                                  .map_err(MioError::from_nix_error));
 
         self.changes.len = 0;
 
@@ -88,7 +88,7 @@ impl Selector {
     fn maybe_flush_changes(&mut self) -> MioResult<()> {
         if self.changes.is_full() {
             try!(kevent(self.kq, self.changes.as_slice(), &mut [], 0)
-                    .map_err(MioError::from_sys_error));
+                    .map_err(MioError::from_nix_error));
             self.changes.len = 0;
         }
 

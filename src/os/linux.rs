@@ -41,7 +41,7 @@ impl Awakener {
 
 fn eventfd() -> MioResult<IoDesc> {
     let fd = try!(nix::eventfd(0, nix::EFD_CLOEXEC | nix::EFD_NONBLOCK)
-                    .map_err(MioError::from_sys_error));
+                    .map_err(MioError::from_nix_error));
 
     Ok(IoDesc { fd: fd })
 }

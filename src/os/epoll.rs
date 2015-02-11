@@ -12,7 +12,7 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> MioResult<Selector> {
-        let epfd = try!(epoll_create().map_err(MioError::from_sys_error));
+        let epfd = try!(epoll_create().map_err(MioError::from_nix_error));
 
         Ok(Selector { epfd: epfd })
     }
@@ -21,7 +21,7 @@ impl Selector {
     pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> MioResult<()> {
         // Wait for epoll events for at most timeout_ms milliseconds
         let cnt = try!(epoll_wait(self.epfd, evts.events.as_mut_slice(), timeout_ms)
-                           .map_err(MioError::from_sys_error));
+                           .map_err(MioError::from_nix_error));
 
         evts.len = cnt;
         Ok(())
@@ -35,7 +35,7 @@ impl Selector {
         };
 
         epoll_ctl(self.epfd, EpollOp::EpollCtlAdd, io.fd, &info)
-            .map_err(MioError::from_sys_error)
+            .map_err(MioError::from_nix_error)
     }
 
     /// Register event interests for the given IO handle with the OS
@@ -46,7 +46,7 @@ impl Selector {
         };
 
         epoll_ctl(self.epfd, EpollOp::EpollCtlMod, io.fd, &info)
-            .map_err(MioError::from_sys_error)
+            .map_err(MioError::from_nix_error)
     }
 
     /// Deregister event interests for the given IO handle with the OS
@@ -60,7 +60,7 @@ impl Selector {
         };
 
         epoll_ctl(self.epfd, EpollOp::EpollCtlDel, io.fd, &info)
-            .map_err(MioError::from_sys_error)
+            .map_err(MioError::from_nix_error)
     }
 }
 
