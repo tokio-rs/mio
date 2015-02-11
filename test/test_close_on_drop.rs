@@ -63,7 +63,7 @@ impl Handler<usize, ()> for TestHandler {
                     AfterHup => panic!("Shouldn't get here")
                 }
 
-                let mut buf = ByteBuf::new(1024);
+                let mut buf = ByteBuf::mut_with_capacity(1024);
 
                 match self.cli.read(&mut buf) {
                     Err(e) if e.is_eof() => event_loop.shutdown(),

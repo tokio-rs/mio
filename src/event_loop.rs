@@ -414,17 +414,16 @@ mod tests {
         let wcount = Arc::new(AtomicInt::new(0));
         let handler = Funtimes::new(rcount.clone(), wcount.clone());
 
-        writer.write(&mut buf::wrap("hello".as_bytes())).unwrap();
+        writer.write(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();
         event_loop.register(&reader, Token(10)).unwrap();
 
         let _ = event_loop.run_once(handler);
-        let mut b = buf::ByteBuf::new(16);
+        let mut b = buf::ByteBuf::mut_with_capacity(16);
 
         assert_eq!((*rcount).load(SeqCst), 1);
 
         reader.read(&mut b).unwrap();
-        b.flip();
 
-        assert_eq!(str::from_utf8(b.bytes()).unwrap(), "hello");
+        assert_eq!(str::from_utf8(b.flip().bytes()).unwrap(), "hello");
     }
 }

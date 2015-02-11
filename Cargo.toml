@@ -5,15 +5,14 @@ version = "0.0.1"
 authors = ["Carl Lerche <me@carllerche.com>"]
 
 [dependencies]
-time = "*"
-log = "*"
-
-[dependencies.nix]
-
-git = "https://github.com/carllerche/nix-rust"
-
-[dependencies]
+nix = "0.1.2"
+log = "0.2.3"
+time = "0.1.16"
+bytes = "0.1.1"
 bitflags = "0.1"
+
+[dev-dependencies]
+env_logger = "0.2.2"
 
 [[test]]
 

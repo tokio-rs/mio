@@ -71,13 +71,12 @@ impl Handler<TcpSocket, ()> for TestHandler {
                     return;
                 }
 
-                let mut buf = buf::ByteBuf::new(2048);
+                let mut buf = buf::ByteBuf::mut_with_capacity(2048);
 
                 match self.cli.read(&mut buf) {
                     Ok(n) => {
                         debug!("read {:?} bytes", n);
-                        buf.flip();
-                        assert!(b"zomg" == buf.bytes());
+                        assert!(b"zomg" == buf.flip().bytes());
                     }
                     Err(e) => {
                         debug!("client sock failed to read; err={:?}", e.kind);
@@ -102,7 +101,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
 
     fn timeout(&mut self, _event_loop: &mut TestEventLoop, sock: TcpSocket) {
         debug!("timeout handler : writing to socket");
-        sock.write(&mut buf::wrap(b"zomg")).unwrap().unwrap();
+        sock.write(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
     }
 }
 

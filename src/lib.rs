@@ -87,6 +87,7 @@
 #![allow(dead_code)]
 
 extern crate alloc;
+extern crate bytes;
 extern crate nix;
 extern crate time;
 
@@ -139,7 +140,6 @@ pub use os::token::{
 
 pub use os::event;
 
-pub mod buf;
 pub mod net;
 pub mod util;
 
@@ -151,3 +151,18 @@ mod notify;
 mod os;
 mod poll;
 mod timer;
+
+// Re-export bytes
+pub mod buf {
+    pub use bytes::{
+        Buf,
+        MutBuf,
+        ByteBuf,
+        MutByteBuf,
+        RingBuf,
+        RingBufReader,
+        RingBufWriter,
+        SliceBuf,
+        MutSliceBuf,
+    };
+}

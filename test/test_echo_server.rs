@@ -1,7 +1,7 @@
 use mio::*;
 use mio::net::*;
 use mio::net::tcp::*;
-use mio::buf::{ByteBuf, SliceBuf};
+use mio::buf::{ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
 use super::localhost;
 use mio::event as evt;
@@ -13,7 +13,8 @@ const CLIENT: Token = Token(1);
 
 struct EchoConn {
     sock: TcpSocket,
-    buf: ByteBuf,
+    buf: Option<ByteBuf>,
+    mut_buf: Option<MutByteBuf>,
     token: Token,
     interest: evt::Interest
 }
@@ -22,24 +23,28 @@ impl EchoConn {
     fn new(sock: TcpSocket) -> EchoConn {
         EchoConn {
             sock: sock,
-            buf: ByteBuf::new(2048),
+            buf: None,
+            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: Token(-1),
             interest: evt::HUP
         }
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
-        debug!("CON : writing buf = {:?}", self.buf.bytes());
+        let mut buf = self.buf.take().unwrap();
 
-        match self.sock.write(&mut self.buf) {
+        match self.sock.write(&mut buf) {
             Ok(NonBlock::WouldBlock) => {
                 debug!("client flushing buf; WOULDBLOCK");
+
+                self.buf = Some(buf);
                 self.interest.insert(evt::WRITABLE);
             }
             Ok(NonBlock::Ready(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
-                self.buf.clear();
+                self.mut_buf = Some(buf.flip());
+
                 self.interest.insert(evt::READABLE);
                 self.interest.remove(evt::WRITABLE);
             }
@@ -50,7 +55,9 @@ impl EchoConn {
     }
 
     fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
-        match self.sock.read(&mut self.buf) {
+        let mut buf = self.mut_buf.take().unwrap();
+
+        match self.sock.read(&mut buf) {
             Ok(NonBlock::WouldBlock) => {
                 panic!("We just got readable, but were unable to read from the socket?");
             }
@@ -67,10 +74,7 @@ impl EchoConn {
         };
 
         // prepare to provide this to writable
-        self.buf.flip();
-
-        debug!("CON : read buf = {:?}", self.buf.bytes());
-
+        self.buf = Some(buf.flip());
         event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
     }
 }
@@ -117,7 +121,7 @@ struct EchoClient {
     msgs: Vec<&'static str>,
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
-    buf: ByteBuf,
+    mut_buf: Option<MutByteBuf>,
     token: Token,
     interest: evt::Interest
 }
@@ -133,7 +137,7 @@ impl EchoClient {
             msgs: msgs,
             tx: SliceBuf::wrap(curr.as_bytes()),
             rx: SliceBuf::wrap(curr.as_bytes()),
-            buf: ByteBuf::new(2048),
+            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: tok,
             interest: evt::Interest::empty()
         }
@@ -142,7 +146,9 @@ impl EchoClient {
     fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
         debug!("client socket readable");
 
-        match self.sock.read(&mut self.buf) {
+        let mut buf = self.mut_buf.take().unwrap();
+
+        match self.sock.read(&mut buf) {
             Ok(NonBlock::WouldBlock) => {
                 panic!("We just got readable, but were unable to read from the socket?");
             }
@@ -155,17 +161,16 @@ impl EchoClient {
         };
 
         // prepare for reading
-        self.buf.flip();
+        let mut buf = buf.flip();
 
-        debug!("CLIENT : buf = {:?} -- rx = {:?}", self.buf.bytes(), self.rx.bytes());
-        while self.buf.has_remaining() {
-            let actual = self.buf.read_byte().unwrap();
+        while buf.has_remaining() {
+            let actual = buf.read_byte().unwrap();
             let expect = self.rx.read_byte().unwrap();
 
             assert!(actual == expect, "actual={}; expect={}", actual, expect);
         }
 
-        self.buf.clear();
+        self.mut_buf = Some(buf.flip());
 
         self.interest.remove(evt::READABLE);
 
