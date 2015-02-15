@@ -49,6 +49,7 @@ pub trait MulticastSocket : Socket {
 }
 
 pub trait UnconnectedSocket {
+
     fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &SockAddr) -> MioResult<NonBlock<()>>;
 
     fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SockAddr>>;

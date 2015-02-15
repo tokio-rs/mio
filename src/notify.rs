@@ -1,6 +1,6 @@
 use std::cmp;
 use std::sync::Arc;
-use std::sync::atomic::AtomicInt;
+use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
 use error::MioResult;
 use io::IoHandle;
@@ -55,8 +55,11 @@ impl<M: Send> Clone for Notify<M> {
     }
 }
 
+unsafe impl<M: Send> Sync for Notify<M> { }
+unsafe impl<M: Send> Send for Notify<M> { }
+
 struct NotifyInner<M> {
-    state: AtomicInt,
+    state: AtomicIsize,
     queue: BoundedQueue<M>,
     awaken: os::Awakener
 }
@@ -64,7 +67,7 @@ struct NotifyInner<M> {
 impl<M: Send> NotifyInner<M> {
     fn with_capacity(capacity: usize) -> MioResult<NotifyInner<M>> {
         Ok(NotifyInner {
-            state: AtomicInt::new(0),
+            state: AtomicIsize::new(0),
             queue: BoundedQueue::with_capacity(capacity),
             awaken: try!(os::Awakener::new())
         })

@@ -1,6 +1,6 @@
 use std::default::Default;
 use std::time::duration::Duration;
-use std::usize;
+use std::{fmt, usize};
 use error::{MioResult, MioError};
 use handler::Handler;
 use io::IoHandle;
@@ -338,11 +338,21 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 }
 
+unsafe impl<T, M: Send> Sync for EventLoop<T, M> { }
+
 /// Sends messages to the EventLoop from other threads.
 #[derive(Clone)]
 pub struct EventLoopSender<M: Send> {
     notify: Notify<M>
 }
+
+impl<M: Send> fmt::Debug for EventLoopSender<M> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "EventLoopSender<?> {{ ... }}")
+    }
+}
+
+unsafe impl<M: Send> Sync for EventLoopSender<M> { }
 
 impl<M: Send> EventLoopSender<M> {
     fn new(notify: Notify<M>) -> EventLoopSender<M> {
@@ -374,7 +384,7 @@ impl<H> EventLoopError<H> {
 mod tests {
     use std::str;
     use std::sync::Arc;
-    use std::sync::atomic::AtomicInt;
+    use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
     use io::{IoWriter, IoReader};
@@ -384,12 +394,12 @@ mod tests {
     type TestEventLoop = EventLoop<usize, ()>;
 
     struct Funtimes {
-        rcount: Arc<AtomicInt>,
-        wcount: Arc<AtomicInt>
+        rcount: Arc<AtomicIsize>,
+        wcount: Arc<AtomicIsize>
     }
 
     impl Funtimes {
-        fn new(rcount: Arc<AtomicInt>, wcount: Arc<AtomicInt>) -> Funtimes {
+        fn new(rcount: Arc<AtomicIsize>, wcount: Arc<AtomicIsize>) -> Funtimes {
             Funtimes {
                 rcount: rcount,
                 wcount: wcount
@@ -410,8 +420,8 @@ mod tests {
 
         let (reader, writer) = io::pipe().unwrap();
 
-        let rcount = Arc::new(AtomicInt::new(0));
-        let wcount = Arc::new(AtomicInt::new(0));
+        let rcount = Arc::new(AtomicIsize::new(0));
+        let wcount = Arc::new(AtomicIsize::new(0));
         let handler = Funtimes::new(rcount.clone(), wcount.clone());
 
         writer.write(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();
