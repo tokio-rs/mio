@@ -374,7 +374,7 @@ impl<H> EventLoopError<H> {
 mod tests {
     use std::str;
     use std::sync::Arc;
-    use std::sync::atomic::AtomicInt;
+    use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
     use io::{IoWriter, IoReader};
@@ -384,12 +384,12 @@ mod tests {
     type TestEventLoop = EventLoop<usize, ()>;
 
     struct Funtimes {
-        rcount: Arc<AtomicInt>,
-        wcount: Arc<AtomicInt>
+        rcount: Arc<AtomicIsize>,
+        wcount: Arc<AtomicIsize>
     }
 
     impl Funtimes {
-        fn new(rcount: Arc<AtomicInt>, wcount: Arc<AtomicInt>) -> Funtimes {
+        fn new(rcount: Arc<AtomicIsize>, wcount: Arc<AtomicIsize>) -> Funtimes {
             Funtimes {
                 rcount: rcount,
                 wcount: wcount
@@ -410,8 +410,8 @@ mod tests {
 
         let (reader, writer) = io::pipe().unwrap();
 
-        let rcount = Arc::new(AtomicInt::new(0));
-        let wcount = Arc::new(AtomicInt::new(0));
+        let rcount = Arc::new(AtomicIsize::new(0));
+        let wcount = Arc::new(AtomicIsize::new(0));
         let handler = Funtimes::new(rcount.clone(), wcount.clone());
 
         writer.write(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();

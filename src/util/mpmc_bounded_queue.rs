@@ -35,11 +35,11 @@ use std::sync::Arc;
 use std::num::UnsignedInt;
 use std::cell::UnsafeCell;
 
-use std::sync::atomic::AtomicUint;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Relaxed, Release, Acquire};
 
 struct Node<T> {
-    sequence: AtomicUint,
+    sequence: AtomicUsize,
     value: Option<T>,
 }
 
@@ -51,9 +51,9 @@ struct State<T> {
     buffer: Vec<UnsafeCell<Node<T>>>,
     mask: usize,
     pad1: [u8; 64],
-    enqueue_pos: AtomicUint,
+    enqueue_pos: AtomicUsize,
     pad2: [u8; 64],
-    dequeue_pos: AtomicUint,
+    dequeue_pos: AtomicUsize,
     pad3: [u8; 64],
 }
 
@@ -77,16 +77,16 @@ impl<T: Send> State<T> {
             capacity
         };
         let buffer = range(0, capacity).map(|i| {
-            UnsafeCell::new(Node { sequence:AtomicUint::new(i), value: None })
+            UnsafeCell::new(Node { sequence:AtomicUsize::new(i), value: None })
         }).collect::<Vec<_>>();
         State{
             pad0: [0; 64],
             buffer: buffer,
             mask: capacity-1,
             pad1: [0; 64],
-            enqueue_pos: AtomicUint::new(0),
+            enqueue_pos: AtomicUsize::new(0),
             pad2: [0; 64],
-            dequeue_pos: AtomicUint::new(0),
+            dequeue_pos: AtomicUsize::new(0),
             pad3: [0; 64],
         }
     }
