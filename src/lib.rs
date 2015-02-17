@@ -109,6 +109,7 @@ pub use handler::{
 pub use io::{
     pipe,
     NonBlock,
+    FromIoDesc,
     IoReader,
     IoWriter,
     IoAcceptor,

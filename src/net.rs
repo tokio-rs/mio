@@ -146,7 +146,7 @@ pub mod tcp {
     use error::MioResult;
     use buf::{Buf, MutBuf};
     use io;
-    use io::{IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
+    use io::{FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
     use io::NonBlock::{Ready, WouldBlock};
     use net::{Socket, SockAddr};
     use net::SocketType::Stream;
@@ -211,6 +211,12 @@ pub mod tcp {
         }
     }
 
+    impl FromIoDesc for TcpSocket {
+        fn from_desc(desc: os::IoDesc) -> Self {
+            TcpSocket { desc: desc }
+        }
+    }
+
     impl IoReader for TcpSocket {
         fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
             io::read(self, buf)
@@ -252,6 +258,12 @@ pub mod tcp {
         }
     }
 
+    impl FromIoDesc for TcpListener {
+        fn from_desc(desc: os::IoDesc) -> Self {
+            TcpListener { desc: desc }
+        }
+    }
+
     #[derive(Debug)]
     pub struct TcpAcceptor {
         desc: os::IoDesc,
@@ -268,6 +280,12 @@ pub mod tcp {
     impl IoHandle for TcpAcceptor {
         fn desc(&self) -> &os::IoDesc {
             &self.desc
+        }
+    }
+
+    impl FromIoDesc for TcpAcceptor {
+        fn from_desc(desc: os::IoDesc) -> Self {
+            TcpAcceptor { desc: desc }
         }
     }
 
@@ -296,7 +314,7 @@ pub mod udp {
     use os;
     use error::MioResult;
     use buf::{Buf, MutBuf};
-    use io::{IoHandle, IoReader, IoWriter, NonBlock};
+    use io::{FromIoDesc, IoHandle, IoReader, IoWriter, NonBlock};
     use io::NonBlock::{Ready, WouldBlock};
     use io;
     use net::{AddressFamily, Socket, MulticastSocket, SockAddr};
@@ -337,6 +355,12 @@ pub mod udp {
     impl IoHandle for UdpSocket {
         fn desc(&self) -> &os::IoDesc {
             &self.desc
+        }
+    }
+
+    impl FromIoDesc for UdpSocket {
+        fn from_desc(desc: os::IoDesc) -> Self {
+            UdpSocket { desc: desc }
         }
     }
 
@@ -408,7 +432,7 @@ pub mod pipe {
     use error::MioResult;
     use buf::{Buf, MutBuf};
     use io;
-    use io::{IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
+    use io::{FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
     use io::NonBlock::{Ready, WouldBlock};
     use net::{Socket, SockAddr, SocketType};
     use net::SocketType::Stream;
@@ -453,6 +477,12 @@ pub mod pipe {
             &self.desc
         }
     }
+  
+    impl FromIoDesc for UnixSocket {
+        fn from_desc(desc: os::IoDesc) -> Self {
+            UnixSocket { desc: desc }
+        }
+    }
 
     impl IoReader for UnixSocket {
         fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
@@ -495,6 +525,12 @@ pub mod pipe {
         }
     }
 
+    impl FromIoDesc for UnixListener {
+        fn from_desc(desc: os::IoDesc) -> Self {
+            UnixListener { desc: desc }
+        }
+    }
+
     #[derive(Debug)]
     pub struct UnixAcceptor {
         desc: os::IoDesc,
@@ -511,6 +547,12 @@ pub mod pipe {
     impl IoHandle for UnixAcceptor {
         fn desc(&self) -> &os::IoDesc {
             &self.desc
+        }
+    }
+
+    impl FromIoDesc for UnixAcceptor {
+        fn from_desc(desc: os::IoDesc) -> Self {
+            UnixAcceptor { desc: desc }
         }
     }
 
