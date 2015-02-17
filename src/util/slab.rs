@@ -1,4 +1,4 @@
-use std::{mem, ptr, isize};
+use std::{fmt, mem, ptr, isize};
 use std::num::Int;
 use std::ops::{Index, IndexMut};
 use alloc::heap;
@@ -246,6 +246,12 @@ impl<T> IndexMut<Token> for Slab<T> {
         }
 
         &mut e.val
+    }
+}
+
+impl<T> fmt::Debug for Slab<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Slab {{ len: {}, cap: {} }}", self.len, self.cap)
     }
 }
 

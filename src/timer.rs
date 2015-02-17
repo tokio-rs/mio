@@ -18,6 +18,7 @@ const NS_PER_MS: u64 = 1_000_000;
 // * Handle the case when the timer falls more than an entire wheel behind. There
 //   is no point to loop multiple times around the wheel in one go.
 // * New type for tick, now() -> Tick
+#[derive(Debug)]
 pub struct Timer<T> {
     // Size of each tick in milliseconds
     tick_ms: u64,

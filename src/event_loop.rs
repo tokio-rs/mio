@@ -39,6 +39,7 @@ impl Default for EventLoopConfig {
 }
 
 /// Single threaded IO event loop.
+#[derive(Debug)]
 pub struct EventLoop<T, M: Send> {
     run: bool,
     poll: Poll,
@@ -371,6 +372,7 @@ impl<M: Send> EventLoopSender<M> {
 
 pub type EventLoopResult<H> = Result<H, EventLoopError<H>>;
 
+#[derive(Debug)]
 pub struct EventLoopError<H> {
     pub handler: H,
     pub error: MioError

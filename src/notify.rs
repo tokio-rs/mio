@@ -1,4 +1,4 @@
-use std::cmp;
+use std::{fmt, cmp};
 use std::sync::Arc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -52,6 +52,12 @@ impl<M: Send> Clone for Notify<M> {
         Notify {
             inner: self.inner.clone()
         }
+    }
+}
+
+impl<M> fmt::Debug for Notify<M> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Notify<?>")
     }
 }
 

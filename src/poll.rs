@@ -1,3 +1,4 @@
+use std::fmt;
 use error::MioResult;
 use io::IoHandle;
 use os;
@@ -55,6 +56,12 @@ impl Poll {
 
     pub fn iter(&self) -> EventsIterator {
         EventsIterator { events: &self.events, index: 0 }
+    }
+}
+
+impl fmt::Debug for Poll {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Poll")
     }
 }
 
