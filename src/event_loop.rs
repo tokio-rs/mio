@@ -341,9 +341,14 @@ impl<T, M: Send> EventLoop<T, M> {
 unsafe impl<T, M: Send> Sync for EventLoop<T, M> { }
 
 /// Sends messages to the EventLoop from other threads.
-#[derive(Clone)]
 pub struct EventLoopSender<M: Send> {
     notify: Notify<M>
+}
+
+impl<M: Send> Clone for EventLoopSender<M> {
+    fn clone(&self) -> EventLoopSender<M> {
+        EventLoopSender { notify: self.notify.clone() }
+    }
 }
 
 impl<M: Send> fmt::Debug for EventLoopSender<M> {
