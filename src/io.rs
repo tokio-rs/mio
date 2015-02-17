@@ -33,6 +33,10 @@ pub trait IoHandle {
     fn desc(&self) -> &IoDesc;
 }
 
+pub trait FromIoDesc {
+    fn from_desc(desc: IoDesc) -> Self;
+}
+
 pub trait IoReader {
     fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>>;
     fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>>;
@@ -63,6 +67,12 @@ impl IoHandle for PipeReader {
     }
 }
 
+impl FromIoDesc for PipeReader {
+    fn from_desc(desc: IoDesc) -> Self {
+        PipeReader { desc: desc }
+    }
+}
+
 pub struct PipeWriter {
     desc: os::IoDesc
 }
@@ -70,6 +80,12 @@ pub struct PipeWriter {
 impl IoHandle for PipeWriter {
     fn desc(&self) -> &os::IoDesc {
         &self.desc
+    }
+}
+
+impl FromIoDesc for PipeWriter {
+    fn from_desc(desc: IoDesc) -> Self {
+        PipeWriter { desc: desc }
     }
 }
 
