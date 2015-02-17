@@ -1,6 +1,7 @@
 use std::mem;
 use std::num::Int;
 use error::{MioResult, MioError};
+use io::IoHandle;
 use net::{AddressFamily, SockAddr, IPv4Addr, SocketType};
 use net::SocketType::{Dgram, Stream};
 use net::SockAddr::{InetAddr, UnixAddr};
@@ -63,6 +64,12 @@ impl PipeAwakener {
 #[derive(Debug)]
 pub struct IoDesc {
     pub fd: nix::Fd
+}
+
+impl IoHandle for IoDesc {
+    fn desc(&self) -> &IoDesc {
+        self
+    }
 }
 
 impl Drop for IoDesc {
