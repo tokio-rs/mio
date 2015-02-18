@@ -4,7 +4,6 @@ use nix::sys::event::*;
 use nix::sys::event::EventFilter::*;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use os::event;
 use os::event::{IoEvent, Interest, PollOpt};
 
 pub struct Selector {
@@ -34,8 +33,8 @@ impl Selector {
     pub fn register(&mut self, io: &IoDesc, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
         debug!("registering; token={}; interests={:?}", token, interests);
 
-        try!(self.ev_register(io, token, EVFILT_READ, interests.contains(event::READABLE), opts));
-        try!(self.ev_register(io, token, EVFILT_WRITE, interests.contains(event::WRITABLE), opts));
+        try!(self.ev_register(io, token, EVFILT_READ, interests.contains(Interest::readable()), opts));
+        try!(self.ev_register(io, token, EVFILT_WRITE, interests.contains(Interest::writable()), opts));
 
         Ok(())
     }
@@ -62,11 +61,11 @@ impl Selector {
             flags = flags | EV_DISABLE;
         }
 
-        if opts.contains(event::EDGE) {
+        if opts.contains(PollOpt::edge()) {
             flags = flags | EV_CLEAR;
         }
 
-        if opts.contains(event::ONESHOT) {
+        if opts.contains(PollOpt::oneshot()) {
             flags = flags | EV_ONESHOT;
         }
 
@@ -129,23 +128,23 @@ impl Events {
         // When the read end of the socket is closed, EV_EOF is set on the
         // flags, and fflags contains the error, if any.
 
-        let mut kind = event::HINTED;
+        let mut kind = Interest::hinted();
 
         if ev.filter == EVFILT_READ {
-            kind = kind | event::READABLE;
+            kind = kind | Interest::readable();
         } else if ev.filter == EVFILT_WRITE {
-            kind = kind | event::WRITABLE;
+            kind = kind | Interest::writable();
         } else {
             unimplemented!();
         }
 
         if ev.flags.contains(EV_EOF) {
-            kind = kind | event::HUP;
+            kind = kind | Interest::hup();
 
             // When the read end of the socket is closed, EV_EOF is set on
             // flags, and fflags contains the error if there is one.
             if !ev.fflags.is_empty() {
-                kind = kind | event::ERROR;
+                kind = kind | Interest::error();
             }
         }
 

@@ -1,18 +1,13 @@
-use std::fmt;
-use std::ops::*;
 use os::token::Token;
+use std::{fmt, ops};
 
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct PollOpt(usize);
 
-pub const EDGE: PollOpt    = PollOpt(0x020);
-pub const LEVEL: PollOpt   = PollOpt(0x040);
-pub const ONESHOT: PollOpt = PollOpt(0x080);
-
 impl PollOpt {
     #[inline]
     pub fn edge() -> PollOpt {
-        EDGE | ONESHOT
+        PollOpt(0x020)
     }
 
     #[inline]
@@ -22,32 +17,56 @@ impl PollOpt {
 
     #[inline]
     pub fn level() -> PollOpt {
-        LEVEL
+        PollOpt(0x040)
     }
 
     #[inline]
     pub fn oneshot() -> PollOpt {
-        ONESHOT
+        PollOpt(0x080)
     }
 
     #[inline]
     pub fn all() -> PollOpt {
-        EDGE | LEVEL | ONESHOT
+        PollOpt::edge() | PollOpt::level() | PollOpt::oneshot()
+    }
+
+    #[inline]
+    pub fn is_edge(&self) -> bool {
+        self.contains(PollOpt::edge())
+    }
+
+    #[inline]
+    pub fn is_level(&self) -> bool {
+        self.contains(PollOpt::level())
+    }
+
+    #[inline]
+    pub fn is_oneshot(&self) -> bool {
+        self.contains(PollOpt::oneshot())
     }
 
     #[inline]
     pub fn bits(&self) -> usize {
-        let PollOpt(bits) = *self;
-        bits
+        self.0
     }
 
     #[inline]
     pub fn contains(&self, other: PollOpt) -> bool {
         (*self & other) == other
     }
+
+    #[inline]
+    pub fn insert(&mut self, other: PollOpt) {
+        self.0 |= other.0;
+    }
+
+    #[inline]
+    pub fn remove(&mut self, other: PollOpt) {
+        self.0 &= !other.0;
+    }
 }
 
-impl BitOr for PollOpt {
+impl ops::BitOr for PollOpt {
     type Output = PollOpt;
 
     #[inline]
@@ -56,7 +75,7 @@ impl BitOr for PollOpt {
     }
 }
 
-impl BitXor for PollOpt {
+impl ops::BitXor for PollOpt {
     type Output = PollOpt;
 
     #[inline]
@@ -65,7 +84,7 @@ impl BitXor for PollOpt {
     }
 }
 
-impl BitAnd for PollOpt {
+impl ops::BitAnd for PollOpt {
     type Output = PollOpt;
 
     #[inline]
@@ -74,7 +93,7 @@ impl BitAnd for PollOpt {
     }
 }
 
-impl Sub for PollOpt {
+impl ops::Sub for PollOpt {
     type Output = PollOpt;
 
     #[inline]
@@ -83,7 +102,7 @@ impl Sub for PollOpt {
     }
 }
 
-impl Not for PollOpt {
+impl ops::Not for PollOpt {
     type Output = PollOpt;
 
     #[inline]
@@ -96,9 +115,9 @@ impl fmt::Debug for PollOpt {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (EDGE, "Edge-Triggered"),
-            (LEVEL, "Level-Triggered"),
-            (ONESHOT, "OneShot")];
+            (PollOpt::edge(), "Edge-Triggered"),
+            (PollOpt::level(), "Level-Triggered"),
+            (PollOpt::oneshot(), "OneShot")];
 
         for &(flag, msg) in flags.iter() {
             if self.contains(flag) {
@@ -113,54 +132,147 @@ impl fmt::Debug for PollOpt {
     }
 }
 
-bitflags!(
-    flags Interest: usize {
-        const READABLE = 0x001,
-        const WRITABLE = 0x002,
-        const ERROR    = 0x004,
-        const HUP      = 0x008,
-        const HINTED   = 0x010,
-        const ALL      = 0x001 | 0x002 | 0x008  //epoll checks for ERROR no matter what
-    }
-);
+#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
+pub struct Interest(usize);
 
 impl Interest {
+    pub fn none() -> Interest {
+        Interest(0)
+    }
+
     #[inline]
     pub fn readable() -> Interest {
-        READABLE
+        Interest(0x001)
     }
 
     #[inline]
     pub fn writable() -> Interest {
-        WRITABLE
+        Interest(0x002)
     }
 
     #[inline]
     pub fn error() -> Interest {
-        ERROR
+        Interest(0x004)
     }
 
     #[inline]
     pub fn hup() -> Interest {
-        HUP
+        Interest(0x008)
     }
 
     #[inline]
     pub fn hinted() -> Interest {
-        HINTED
+        Interest(0x010)
+    }
+
+    #[inline]
+    pub fn all() -> Interest {
+        Interest::readable() |
+            Interest::writable() |
+            Interest::hup() |
+            Interest::error()
+    }
+
+    #[inline]
+    pub fn is_readable(&self) -> bool {
+        self.contains(Interest::readable())
+    }
+
+    #[inline]
+    pub fn is_writable(&self) -> bool {
+        self.contains(Interest::writable())
+    }
+
+    #[inline]
+    pub fn is_error(&self) -> bool {
+        self.contains(Interest::error())
+    }
+
+    #[inline]
+    pub fn is_hup(&self) -> bool {
+        self.contains(Interest::hup())
+    }
+
+    #[inline]
+    pub fn is_hinted(&self) -> bool {
+        self.contains(Interest::hinted())
+    }
+
+    #[inline]
+    pub fn insert(&mut self, other: Interest) {
+        self.0 |= other.0;
+    }
+
+    #[inline]
+    pub fn remove(&mut self, other: Interest) {
+        self.0 &= !other.0;
+    }
+
+    #[inline]
+    pub fn bits(&self) -> usize {
+        self.0
+    }
+
+    #[inline]
+    pub fn contains(&self, other: Interest) -> bool {
+        (*self & other) == other
     }
 }
 
+impl ops::BitOr for Interest {
+    type Output = Interest;
+
+    #[inline]
+    fn bitor(self, other: Interest) -> Interest {
+        Interest(self.bits() | other.bits())
+    }
+}
+
+impl ops::BitXor for Interest {
+    type Output = Interest;
+
+    #[inline]
+    fn bitxor(self, other: Interest) -> Interest {
+        Interest(self.bits() ^ other.bits())
+    }
+}
+
+impl ops::BitAnd for Interest {
+    type Output = Interest;
+
+    #[inline]
+    fn bitand(self, other: Interest) -> Interest {
+        Interest(self.bits() & other.bits())
+    }
+}
+
+impl ops::Sub for Interest {
+    type Output = Interest;
+
+    #[inline]
+    fn sub(self, other: Interest) -> Interest {
+        Interest(self.bits() & !other.bits())
+    }
+}
+
+impl ops::Not for Interest {
+    type Output = Interest;
+
+    #[inline]
+    fn not(self) -> Interest {
+        Interest(!self.bits() & Interest::all().bits())
+    }
+}
 
 impl fmt::Debug for Interest {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (READABLE, "Readable"),
-            (WRITABLE, "Writable"),
-            (ERROR,    "Error"),
-            (HUP,      "HupHint"),
-            (HINTED,   "Hinted")];
+            (Interest::readable(), "Readable"),
+            (Interest::writable(), "Writable"),
+            (Interest::error(),    "Error"),
+            (Interest::hup(),      "HupHint"),
+            (Interest::hinted(),   "Hinted")];
 
         for &(flag, msg) in flags.iter() {
             if self.contains(flag) {
@@ -175,21 +287,123 @@ impl fmt::Debug for Interest {
     }
 }
 
-bitflags!(
-    flags ReadHint: usize {
-        const DATAHINT    = 0x001,
-        const HUPHINT     = 0x002,
-        const ERRORHINT   = 0x004
+#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
+pub struct ReadHint(usize);
+
+impl ReadHint {
+    #[inline]
+    pub fn none() -> ReadHint {
+        ReadHint(0)
     }
-);
+
+    #[inline]
+    pub fn all() -> ReadHint {
+        ReadHint::data() | ReadHint::hup() | ReadHint::error()
+    }
+
+    #[inline]
+    pub fn data() -> ReadHint {
+        ReadHint(0x001)
+    }
+
+    #[inline]
+    pub fn hup() -> ReadHint {
+        ReadHint(0x002)
+    }
+
+    #[inline]
+    pub fn error() -> ReadHint {
+        ReadHint(0x004)
+    }
+
+    #[inline]
+    pub fn is_data(&self) -> bool {
+        self.contains(ReadHint::data())
+    }
+
+    #[inline]
+    pub fn is_hup(&self) -> bool {
+        self.contains(ReadHint::hup())
+    }
+
+    #[inline]
+    pub fn is_error(&self) -> bool {
+        self.contains(ReadHint::error())
+    }
+
+    #[inline]
+    pub fn insert(&mut self, other: ReadHint) {
+        self.0 |= other.0;
+    }
+
+    #[inline]
+    pub fn remove(&mut self, other: ReadHint) {
+        self.0 &= !other.0;
+    }
+
+    #[inline]
+    pub fn contains(&self, other: ReadHint) -> bool {
+        (*self & other) == other
+    }
+
+    #[inline]
+    pub fn bits(&self) -> usize {
+        self.0
+    }
+}
+
+impl ops::BitOr for ReadHint {
+    type Output = ReadHint;
+
+    #[inline]
+    fn bitor(self, other: ReadHint) -> ReadHint {
+        ReadHint(self.bits() | other.bits())
+    }
+}
+
+impl ops::BitXor for ReadHint {
+    type Output = ReadHint;
+
+    #[inline]
+    fn bitxor(self, other: ReadHint) -> ReadHint {
+        ReadHint(self.bits() ^ other.bits())
+    }
+}
+
+impl ops::BitAnd for ReadHint {
+    type Output = ReadHint;
+
+    #[inline]
+    fn bitand(self, other: ReadHint) -> ReadHint {
+        ReadHint(self.bits() & other.bits())
+    }
+}
+
+impl ops::Sub for ReadHint {
+    type Output = ReadHint;
+
+    #[inline]
+    fn sub(self, other: ReadHint) -> ReadHint {
+        ReadHint(self.bits() & !other.bits())
+    }
+}
+
+impl ops::Not for ReadHint {
+    type Output = ReadHint;
+
+    #[inline]
+    fn not(self) -> ReadHint {
+        ReadHint(!self.bits() & ReadHint::all().bits())
+    }
+}
 
 impl fmt::Debug for ReadHint {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (DATAHINT, "DataHint"),
-            (HUPHINT, "HupHint"),
-            (ERRORHINT, "ErrorHint")];
+            (ReadHint::data(),  "DataHint"),
+            (ReadHint::hup(),   "HupHint"),
+            (ReadHint::error(), "ErrorHint")];
 
         for &(flag, msg) in flags.iter() {
             if self.contains(flag) {
@@ -235,23 +449,23 @@ impl IoEvent {
     /// kernel reported that the remote side hung up. This allows a
     /// consumer to avoid reading in order to discover the hangup.
     pub fn read_hint(&self) -> ReadHint {
-        let mut hint = ReadHint::empty();
+        let mut hint = ReadHint::none();
 
         // The backend doesn't support hinting
-        if !self.kind.contains(HINTED) {
+        if !self.kind.is_hinted() {
             return hint;
         }
 
-        if self.kind.contains(HUP) {
-            hint = hint | HUPHINT
+        if self.kind.is_hup() {
+            hint = hint | ReadHint::hup();
         }
 
-        if self.kind.contains(READABLE) {
-            hint = hint | DATAHINT
+        if self.kind.is_readable() {
+            hint = hint | ReadHint::data();
         }
 
-        if self.kind.contains(ERROR) {
-            hint = hint | ERRORHINT
+        if self.kind.is_error() {
+            hint = hint | ReadHint::error();
         }
 
         hint
@@ -259,16 +473,16 @@ impl IoEvent {
 
     /// This event indicated that the  handle is now readable
     pub fn is_readable(&self) -> bool {
-        self.kind.contains(READABLE) || self.kind.contains(HUP)
+        self.kind.is_readable() || self.kind.is_hup()
     }
 
     /// This event indicated that the  handle is now writable
     pub fn is_writable(&self) -> bool {
-        self.kind.contains(WRITABLE)
+        self.kind.is_writable()
     }
 
     /// This event indicated that the  handle had an error
     pub fn is_error(&self) -> bool {
-        self.kind.contains(ERROR)
+        self.kind.is_error()
     }
 }

@@ -19,7 +19,7 @@
 //! # Example
 //!
 //! ```
-//! use mio::{event, EventLoop, IoAcceptor, Handler, Token};
+//! use mio::*;
 //! use mio::net::{SockAddr};
 //! use mio::net::tcp::{TcpSocket, TcpAcceptor};
 //!
@@ -54,7 +54,7 @@
 //! struct MyHandler(TcpAcceptor);
 //!
 //! impl Handler<(), ()> for MyHandler {
-//!     fn readable(&mut self, event_loop: &mut EventLoop<(), ()>, token: Token, _: event::ReadHint) {
+//!     fn readable(&mut self, event_loop: &mut EventLoop<(), ()>, token: Token, _: ReadHint) {
 //!         match token {
 //!             SERVER => {
 //!                 let MyHandler(ref mut server) = *self;
@@ -93,8 +93,6 @@ extern crate time;
 
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate bitflags;
 
 pub use buf::{
     Buf,
@@ -137,8 +135,11 @@ pub use timer::{
 pub use os::token::{
     Token,
 };
-
-pub use os::event;
+pub use os::event::{
+    PollOpt,
+    Interest,
+    ReadHint,
+};
 
 pub mod net;
 pub mod util;

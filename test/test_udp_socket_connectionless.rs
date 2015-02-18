@@ -4,7 +4,6 @@ use mio::net::udp::*;
 use mio::buf::{RingBuf, SliceBuf};
 use std::str;
 use std::old_io::net::ip::{Ipv4Addr};
-use mio::event as evt;
 
 type TestEventLoop = EventLoop<usize, ()>;
 
@@ -34,7 +33,7 @@ impl UdpHandler {
 }
 
 impl Handler<usize, ()> for UdpHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: evt::ReadHint) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: ReadHint) {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
@@ -91,10 +90,10 @@ pub fn test_udp_socket_connectionless() {
     recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 101), &None).unwrap();
 
     info!("Registering LISTENER");
-    event_loop.register_opt(&recv_sock, LISTENER ,evt::READABLE, evt::EDGE).unwrap();
+    event_loop.register_opt(&recv_sock, LISTENER, Interest::readable(), PollOpt::edge()).unwrap();
 
     info!("Registering SENDER");
-    event_loop.register_opt(&send_sock, SENDER, evt::WRITABLE, evt::EDGE).unwrap();
+    event_loop.register_opt(&send_sock, SENDER, Interest::writable(), PollOpt::edge()).unwrap();
 
     info!("Starting event loop to test with...");
     event_loop.run(UdpHandler::new(send_sock, recv_sock, "hello world")).ok().expect("Failed to run the actual event listener loop");

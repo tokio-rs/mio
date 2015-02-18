@@ -5,7 +5,7 @@ use error::{MioResult, MioError};
 use handler::Handler;
 use io::IoHandle;
 use notify::Notify;
-use os::event;
+use os::event::{IoEvent, Interest, PollOpt};
 use poll::{Poll};
 use timer::{Timer, Timeout, TimerResult};
 use os::token::Token;
@@ -73,7 +73,7 @@ impl<T, M: Send> EventLoop<T, M> {
         let notify = try!(Notify::with_capacity(config.notify_capacity));
 
         // Register the notification wakeup FD with the IO poller
-        try!(poll.register(&notify, NOTIFY, event::READABLE | event::WRITABLE, event::EDGE));
+        try!(poll.register(&notify, NOTIFY, Interest::readable() | Interest::writable() , PollOpt::edge()));
 
         // Set the timer's starting time reference point
         timer.setup();
@@ -185,16 +185,16 @@ impl<T, M: Send> EventLoop<T, M> {
 
     /// Registers an IO handle with the event loop.
     pub fn register<H: IoHandle>(&mut self, io: &H, token: Token) -> MioResult<()> {
-        self.poll.register(io, token, event::READABLE, event::LEVEL)
+        self.poll.register(io, token, Interest::readable(), PollOpt::level())
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register_opt<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opt: event::PollOpt) -> MioResult<()> {
+    pub fn register_opt<H: IoHandle>(&mut self, io: &H, token: Token, interest: Interest, opt: PollOpt) -> MioResult<()> {
         self.poll.register(io, token, interest, opt)
     }
 
     /// Re-Registers an IO handle with the event loop.
-    pub fn reregister<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opt: event::PollOpt) -> MioResult<()> {
+    pub fn reregister<H: IoHandle>(&mut self, io: &H, token: Token, interest: Interest, opt: PollOpt) -> MioResult<()> {
         self.poll.reregister(io, token, interest, opt)
     }
 
@@ -301,7 +301,7 @@ impl<T, M: Send> EventLoop<T, M> {
         }
     }
 
-    fn io_event<H: Handler<T, M>>(&mut self, handler: &mut H, evt: event::IoEvent) {
+    fn io_event<H: Handler<T, M>>(&mut self, handler: &mut H, evt: IoEvent) {
         let tok = evt.token();
 
         if evt.is_readable() {

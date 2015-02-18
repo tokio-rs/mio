@@ -3,7 +3,6 @@ use mio::net::*;
 use mio::net::tcp::*;
 use mio::util::Slab;
 use super::localhost;
-use mio::event as evt;
 use std::collections::DList;
 use std::thread::Thread;
 use std::old_io::timer::Timer;
@@ -35,8 +34,7 @@ impl EchoConn {
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
-
-        event_loop.reregister(&self.sock, self.token, evt::READABLE, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
     }
 
     fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
@@ -61,7 +59,7 @@ impl EchoConn {
             };
         }
 
-        event_loop.reregister(&self.sock, self.token, evt::READABLE, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
     }
 }
 
@@ -81,7 +79,7 @@ impl EchoServer {
 
         // Register the connection
         self.conns[tok].token = tok;
-        event_loop.register_opt(&self.conns[tok].sock, tok, evt::READABLE, evt::PollOpt::edge())
+        event_loop.register_opt(&self.conns[tok].sock, tok, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
         Ok(())
@@ -145,7 +143,7 @@ impl EchoClient {
             }
         }
         if self.backlog.len() > 0 {
-            event_loop.reregister(&self.sock, self.token, evt::WRITABLE, evt::PollOpt::edge()).unwrap();
+            event_loop.reregister(&self.sock, self.token, Interest::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
         }
 
         Ok(())
@@ -170,8 +168,8 @@ impl EchoHandler {
 }
 
 impl Handler<usize, String> for EchoHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: evt::ReadHint) {
-        assert_eq!(hint, evt::DATAHINT);
+    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: ReadHint) {
+        assert_eq!(hint, ReadHint::data());
 
         match token {
             SERVER => self.server.accept(event_loop).unwrap(),
@@ -202,8 +200,8 @@ impl Handler<usize, String> for EchoHandler {
                 event_loop.reregister(
                     &self.client.sock,
                     self.client.token,
-                    evt::WRITABLE,
-                    evt::PollOpt::edge()).unwrap();
+                    Interest::writable(),
+                    PollOpt::edge() | PollOpt::oneshot()).unwrap();
             }
         }
     }
@@ -234,12 +232,12 @@ pub fn test_echo_server() {
         .listen(256).unwrap();
 
     info!("listen for connections");
-    event_loop.register_opt(&srv, SERVER, evt::READABLE, evt::PollOpt::edge()).unwrap();
+    event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    event_loop.register_opt(&sock, CLIENT, evt::WRITABLE, evt::PollOpt::edge()).unwrap();
+    event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
     sock.connect(&addr).unwrap();
     let chan = event_loop.channel();
 

@@ -2,7 +2,6 @@ use mio::*;
 use mio::net::*;
 use mio::net::tcp::*;
 use super::localhost;
-use mio::event as evt;
 use std::time::Duration;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
@@ -36,31 +35,31 @@ impl TestHandler {
 }
 
 impl Handler<TcpSocket, ()> for TestHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: evt::ReadHint) {
+    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: ReadHint) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().unwrap();
                 event_loop.timeout(conn, Duration::milliseconds(200)).unwrap();
 
-                event_loop.reregister(&self.srv, SERVER, evt::READABLE, evt::EDGE).unwrap();
+                event_loop.reregister(&self.srv, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
             }
             CLIENT => {
                 debug!("client readable");
 
                 match self.state {
                     Initial => {
-                        assert!(hint.contains(evt::DATAHINT), "unexpected hint {:?}", hint);
+                        assert!(hint.is_data(), "unexpected hint {:?}", hint);
 
                         // Whether or not Hup is included with actual data is platform specific
-                        if hint.contains(evt::HUPHINT) {
+                        if hint.is_hup() {
                             self.state = AfterHup;
                         } else {
                             self.state = AfterRead;
                         }
                     }
                     AfterRead => {
-                        assert_eq!(hint, evt::DATAHINT | evt::HUPHINT);
+                        assert_eq!(hint, ReadHint::data() | ReadHint::hup());
                         self.state = AfterHup;
                     }
                     AfterHup => panic!("Shouldn't get here"),
@@ -83,7 +82,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
                     }
                 }
 
-                event_loop.reregister(&self.cli, CLIENT, evt::READABLE | evt::HUP, evt::EDGE).unwrap();
+                event_loop.reregister(&self.cli, CLIENT, Interest::readable() | Interest::hup(), PollOpt::edge()).unwrap();
             }
             _ => panic!("received unknown token {:?}", tok),
         }
@@ -96,7 +95,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
             _ => panic!("received unknown token {:?}", tok),
         }
 
-        event_loop.reregister(&self.cli, CLIENT, evt::READABLE, evt::EDGE).unwrap();
+        event_loop.reregister(&self.cli, CLIENT, Interest::readable(), PollOpt::edge()).unwrap();
     }
 
     fn timeout(&mut self, _event_loop: &mut TestEventLoop, sock: TcpSocket) {
@@ -121,12 +120,12 @@ pub fn test_timer() {
 
     info!("listening for connections");
 
-    event_loop.register_opt(&srv, SERVER, evt::ALL, evt::EDGE).unwrap();
+    event_loop.register_opt(&srv, SERVER, Interest::all(), PollOpt::edge()).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    event_loop.register_opt(&sock, CLIENT, evt::ALL, evt::EDGE).unwrap();
+    event_loop.register_opt(&sock, CLIENT, Interest::all(), PollOpt::edge()).unwrap();
     sock.connect(&addr).unwrap();
     // Start the event loop
     let handler = event_loop.run(TestHandler::new(srv, sock))

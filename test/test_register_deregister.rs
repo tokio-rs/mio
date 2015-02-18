@@ -1,7 +1,6 @@
 use mio::*;
 use mio::net::*;
 use mio::net::tcp::*;
-use mio::event::*;
 use super::localhost;
 use std::time::Duration;
 
@@ -36,7 +35,7 @@ impl Handler<usize, ()> for TestHandler {
             CLIENT => {
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                event_loop.reregister(&self.client, CLIENT, WRITABLE, LEVEL).unwrap();
+                event_loop.reregister(&self.client, CLIENT, Interest::writable(), PollOpt::level()).unwrap();
             }
             _ => panic!("unexpected token"),
         }
@@ -71,12 +70,12 @@ pub fn test_register_deregister() {
     let client = TcpSocket::v4().unwrap();
 
     // Register client socket only as writable
-    event_loop.register_opt(&client, CLIENT, READABLE, LEVEL).unwrap();
+    event_loop.register_opt(&client, CLIENT, Interest::readable(), PollOpt::level()).unwrap();
 
     let server = server.bind(&addr).unwrap().listen(256).unwrap();
 
     info!("register server socket");
-    event_loop.register_opt(&server, SERVER, READABLE, EDGE).unwrap();
+    event_loop.register_opt(&server, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
 
     // Connect to the server
     client.connect(&addr).unwrap();

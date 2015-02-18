@@ -4,7 +4,7 @@ use nix::sys::epoll::*;
 use nix::unistd::close;
 use error::{MioResult, MioError};
 use os::IoDesc;
-use os::event;
+use os::event::{IoEvent, Interest, PollOpt};
 
 pub struct Selector {
     epfd: Fd
@@ -28,7 +28,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, io: &IoDesc, token: usize, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn register(&mut self, io: &IoDesc, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token as u64
@@ -39,7 +39,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&mut self, io: &IoDesc, token: usize, interests: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn reregister(&mut self, io: &IoDesc, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token as u64
@@ -64,30 +64,30 @@ impl Selector {
     }
 }
 
-fn ioevent_to_epoll(interest: event::Interest, opts: event::PollOpt) -> EpollEventKind {
+fn ioevent_to_epoll(interest: Interest, opts: PollOpt) -> EpollEventKind {
     let mut kind = EpollEventKind::empty();
 
-    if interest.contains(event::READABLE) {
+    if interest.is_readable() {
         kind.insert(EPOLLIN);
     }
 
-    if interest.contains(event::WRITABLE) {
+    if interest.is_writable() {
         kind.insert(EPOLLOUT);
     }
 
-    if interest.contains(event::HUP) {
+    if interest.is_hup() {
         kind.insert(EPOLLRDHUP);
     }
 
-    if opts.contains(event::EDGE) {
+    if opts.is_edge() {
         kind.insert(EPOLLET);
     }
 
-    if opts.contains(event::ONESHOT) {
+    if opts.is_oneshot() {
         kind.insert(EPOLLONESHOT);
     }
 
-    if opts.contains(event::LEVEL) {
+    if opts.is_level() {
         kind.remove(EPOLLET);
     }
 
@@ -119,33 +119,33 @@ impl Events {
     }
 
     #[inline]
-    pub fn get(&self, idx: usize) -> event::IoEvent {
+    pub fn get(&self, idx: usize) -> IoEvent {
         if idx >= self.len {
             panic!("invalid index");
         }
 
         let epoll = self.events[idx].events;
-        let mut kind = event::Interest::empty() | event::HINTED;
+        let mut kind = Interest::hinted();
 
         if epoll.contains(EPOLLIN) {
-            kind = kind | event::READABLE;
+            kind = kind | Interest::readable();
         }
 
         if epoll.contains(EPOLLOUT) {
-            kind = kind | event::WRITABLE;
+            kind = kind | Interest::writable();
         }
 
         // EPOLLHUP - Usually means a socket error happened
         if epoll.contains(EPOLLERR) {
-            kind = kind | event::ERROR;
+            kind = kind | Interest::error();
         }
 
         if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
-            kind = kind | event::HUP;
+            kind = kind | Interest::hup();
         }
 
         let token = self.events[idx].data;
 
-        event::IoEvent::new(kind, token as usize)
+        IoEvent::new(kind, token as usize)
     }
 }

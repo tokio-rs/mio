@@ -4,7 +4,6 @@ use mio::net::tcp::*;
 use mio::buf::{ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
 use super::localhost;
-use mio::event as evt;
 
 type TestEventLoop = EventLoop<usize, ()>;
 
@@ -16,7 +15,7 @@ struct EchoConn {
     buf: Option<ByteBuf>,
     mut_buf: Option<MutByteBuf>,
     token: Token,
-    interest: evt::Interest
+    interest: Interest
 }
 
 impl EchoConn {
@@ -26,7 +25,7 @@ impl EchoConn {
             buf: None,
             mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: Token(-1),
-            interest: evt::HUP
+            interest: Interest::hup()
         }
     }
 
@@ -38,20 +37,20 @@ impl EchoConn {
                 debug!("client flushing buf; WOULDBLOCK");
 
                 self.buf = Some(buf);
-                self.interest.insert(evt::WRITABLE);
+                self.interest.insert(Interest::writable());
             }
             Ok(NonBlock::Ready(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
                 self.mut_buf = Some(buf.flip());
 
-                self.interest.insert(evt::READABLE);
-                self.interest.remove(evt::WRITABLE);
+                self.interest.insert(Interest::readable());
+                self.interest.remove(Interest::writable());
             }
             Err(e) => debug!("not implemented; client err={:?}", e),
         }
 
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
     fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
@@ -63,19 +62,19 @@ impl EchoConn {
             }
             Ok(NonBlock::Ready(r)) => {
                 debug!("CONN : we read {} bytes!", r);
-                self.interest.remove(evt::READABLE);
-                self.interest.insert(evt::WRITABLE);
+                self.interest.remove(Interest::readable());
+                self.interest.insert(Interest::writable());
             }
             Err(e) => {
                 debug!("not implemented; client err={:?}", e);
-                self.interest.remove(evt::READABLE);
+                self.interest.remove(Interest::readable());
             }
 
         };
 
         // prepare to provide this to writable
         self.buf = Some(buf.flip());
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge())
     }
 }
 
@@ -95,7 +94,7 @@ impl EchoServer {
 
         // Register the connection
         self.conns[tok].token = tok;
-        event_loop.register_opt(&self.conns[tok].sock, tok, evt::READABLE, evt::PollOpt::edge())
+        event_loop.register_opt(&self.conns[tok].sock, tok, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
         Ok(())
@@ -123,7 +122,7 @@ struct EchoClient {
     rx: SliceBuf<'static>,
     mut_buf: Option<MutByteBuf>,
     token: Token,
-    interest: evt::Interest
+    interest: Interest
 }
 
 
@@ -139,7 +138,7 @@ impl EchoClient {
             rx: SliceBuf::wrap(curr.as_bytes()),
             mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: tok,
-            interest: evt::Interest::empty()
+            interest: Interest::none()
         }
     }
 
@@ -172,13 +171,13 @@ impl EchoClient {
 
         self.mut_buf = Some(buf.flip());
 
-        self.interest.remove(evt::READABLE);
+        self.interest.remove(Interest::readable());
 
         if !self.rx.has_remaining() {
             self.next_msg(event_loop).unwrap();
         }
 
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
     fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
@@ -187,17 +186,17 @@ impl EchoClient {
         match self.sock.write(&mut self.tx) {
             Ok(NonBlock::WouldBlock) => {
                 debug!("client flushing buf; WOULDBLOCK");
-                self.interest.insert(evt::WRITABLE);
+                self.interest.insert(Interest::writable());
             }
             Ok(NonBlock::Ready(r)) => {
                 debug!("CLIENT : we wrote {} bytes!", r);
-                self.interest.insert(evt::READABLE);
-                self.interest.remove(evt::WRITABLE);
+                self.interest.insert(Interest::readable());
+                self.interest.remove(Interest::writable());
             }
             Err(e) => debug!("not implemented; client err={:?}", e)
         }
 
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
     fn next_msg(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
@@ -212,8 +211,8 @@ impl EchoClient {
         self.tx = SliceBuf::wrap(curr.as_bytes());
         self.rx = SliceBuf::wrap(curr.as_bytes());
 
-        self.interest.insert(evt::WRITABLE);
-        event_loop.reregister(&self.sock, self.token, self.interest, evt::PollOpt::edge())
+        self.interest.insert(Interest::writable());
+        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 }
 
@@ -235,8 +234,8 @@ impl EchoHandler {
 }
 
 impl Handler<usize, ()> for EchoHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: evt::ReadHint) {
-        assert_eq!(hint, evt::DATAHINT);
+    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: ReadHint) {
+        assert!(hint.is_data());
 
         match token {
             SERVER => self.server.accept(event_loop).unwrap(),
@@ -270,12 +269,12 @@ pub fn test_echo_server() {
         .listen(256).unwrap();
 
     info!("listen for connections");
-    event_loop.register_opt(&srv, SERVER, evt::READABLE, evt::PollOpt::edge()).unwrap();
+    event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     let sock = TcpSocket::v4().unwrap();
 
     // Connect to the server
-    event_loop.register_opt(&sock, CLIENT, evt::WRITABLE, evt::PollOpt::edge()).unwrap();
+    event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
     sock.connect(&addr).unwrap();
 
     // Start the event loop
