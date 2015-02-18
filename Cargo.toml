@@ -1,13 +1,26 @@
 [package]
 
-name = "mio"
-version = "0.2.1"
-authors = ["Carl Lerche <me@carllerche.com>"]
+name          = "mio"
+version       = "0.2.1"
+license       = "MIT"
+authors       = ["Carl Lerche <me@carllerche.com>"]
+description   = "Lightweight non-blocking IO"
+documentation = "https://carllerche.github.io/mio/mio"
+homepage      = "https://github.com/carllerche/mio"
+repository    = "https://github.com/carllerche/mio"
+readme        = "README.md"
+keywords      = ["io", "async", "non-blocking"]
+exclude       = [
+  ".gitignore",
+  ".travis.yml",
+  "deploy.sh",
+  "test/**/*",
+]
 
 [dependencies]
-nix = "0.2.0"
-log = "0.2.3"
-time = "0.1.16"
+nix   = "0.2.0"
+log   = "0.2.3"
+time  = "0.1.16"
 bytes = "0.1.2"
 
 [dev-dependencies]
