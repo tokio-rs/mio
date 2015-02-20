@@ -80,9 +80,10 @@ pub fn test_register_deregister() {
     // Connect to the server
     client.connect(&addr).unwrap();
 
+    let mut handler = TestHandler::new(server, client);
+
     // Start the event loop
-    let handler = event_loop.run(TestHandler::new(server, client))
-        .ok().expect("failed to execute event loop");
+    event_loop.run(&mut handler).unwrap();
 
     assert!(handler.state == 2, "unexpected final state {}", handler.state);
 }

@@ -1,7 +1,7 @@
 use std::default::Default;
 use std::time::duration::Duration;
 use std::{fmt, usize};
-use error::{MioResult, MioError};
+use error::MioResult;
 use handler::Handler;
 use io::IoHandle;
 use notify::Notify;
@@ -114,7 +114,7 @@ impl<T, M: Send> EventLoop<T, M> {
     ///     let _ = sender.send(123);
     /// });
     ///
-    /// let _ = event_loop.run(MyHandler);
+    /// let _ = event_loop.run(&mut MyHandler);
     /// ```
     ///
     /// # Implementation Details
@@ -165,7 +165,7 @@ impl<T, M: Send> EventLoop<T, M> {
     ///
     /// let mut event_loop = EventLoop::new().unwrap();
     /// let timeout = event_loop.timeout(123, Duration::milliseconds(300)).unwrap();
-    /// let _ = event_loop.run(MyHandler);
+    /// let _ = event_loop.run(&mut MyHandler);
     /// ```
     pub fn timeout(&mut self, token: T, delay: Duration) -> TimerResult<Timeout> {
         self.timer.timeout(token, delay)
@@ -200,18 +200,15 @@ impl<T, M: Send> EventLoop<T, M> {
 
     /// Keep spinning the event loop indefinitely, and notify the handler whenever
     /// any of the registered handles are ready.
-    pub fn run<H: Handler<T, M>>(&mut self, mut handler: H) -> EventLoopResult<H> {
+    pub fn run<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
         self.run = true;
 
         while self.run {
             // Execute ticks as long as the event loop is running
-            match self.tick(&mut handler) {
-                Err(e) => return Err(EventLoopError::new(handler, e)),
-                _ => {}
-            }
+            try!(self.run_once(handler));
         }
 
-        Ok(handler)
+        Ok(())
     }
 
     /// Deregisters an IO handle with the event loop.
@@ -222,18 +219,7 @@ impl<T, M: Send> EventLoop<T, M> {
     /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once<H: Handler<T, M>>(&mut self, mut handler: H) -> EventLoopResult<H> {
-        // Execute a single tick
-        match self.tick(&mut handler) {
-            Err(e) => return Err(EventLoopError::new(handler, e)),
-            _ => {}
-        }
-
-        Ok(handler)
-    }
-
-    // Executes a single run of the event loop loop
-    fn tick<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
+    pub fn run_once<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
         let mut messages;
         let mut pending;
 
@@ -370,23 +356,6 @@ impl<M: Send> EventLoopSender<M> {
     }
 }
 
-pub type EventLoopResult<H> = Result<H, EventLoopError<H>>;
-
-#[derive(Debug)]
-pub struct EventLoopError<H> {
-    pub handler: H,
-    pub error: MioError
-}
-
-impl<H> EventLoopError<H> {
-    fn new(handler: H, error: MioError) -> EventLoopError<H> {
-        EventLoopError {
-            handler: handler,
-            error: error
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::str;
@@ -429,12 +398,12 @@ mod tests {
 
         let rcount = Arc::new(AtomicIsize::new(0));
         let wcount = Arc::new(AtomicIsize::new(0));
-        let handler = Funtimes::new(rcount.clone(), wcount.clone());
+        let mut handler = Funtimes::new(rcount.clone(), wcount.clone());
 
         writer.write(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();
         event_loop.register(&reader, Token(10)).unwrap();
 
-        let _ = event_loop.run_once(handler);
+        let _ = event_loop.run_once(&mut handler);
         let mut b = buf::ByteBuf::mut_with_capacity(16);
 
         assert_eq!((*rcount).load(SeqCst), 1);

@@ -260,7 +260,5 @@ pub fn test_echo_server() {
     let _t = Thread::scoped(go);
 
     // Start the event loop
-    event_loop.run(EchoHandler::new(srv, sock))
-        .ok().expect("failed to execute event loop");
-
+    event_loop.run(&mut EchoHandler::new(srv, sock)).unwrap();
 }

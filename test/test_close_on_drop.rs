@@ -108,8 +108,11 @@ pub fn test_close_on_drop() {
     event_loop.register_opt(&srv, Token(0), Interest::readable(), PollOpt::edge()).unwrap();
     // Connect to the server
     sock.connect(&addr).unwrap();
+
+    let mut handler = TestHandler::new(srv, sock);
+
     // Start the event loop
-    let handler = event_loop.run(TestHandler::new(srv, sock)).ok().expect("failed to execute event loop");
+    event_loop.run(&mut handler).unwrap();
 
     assert!(handler.state == AfterHup, "actual={:?}", handler.state);
 }

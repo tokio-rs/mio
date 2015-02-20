@@ -84,6 +84,6 @@ pub fn test_udp_socket() {
     event_loop.register_opt(&send_sock, SENDER, Interest::writable(), PollOpt::edge()).unwrap();
 
     info!("Starting event loop to test with...");
-    event_loop.run(UdpHandler::new(send_sock, recv_sock, "hello world")).ok().expect("Failed to run the actual event listener loop");
+    event_loop.run(&mut UdpHandler::new(send_sock, recv_sock, "hello world")).unwrap();
 }
 

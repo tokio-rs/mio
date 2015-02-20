@@ -127,9 +127,11 @@ pub fn test_timer() {
     // Connect to the server
     event_loop.register_opt(&sock, CLIENT, Interest::all(), PollOpt::edge()).unwrap();
     sock.connect(&addr).unwrap();
+
+    // Init the handler
+    let mut handler = TestHandler::new(srv, sock);
     // Start the event loop
-    let handler = event_loop.run(TestHandler::new(srv, sock))
-        .ok().expect("failed to execute event loop");
+    event_loop.run(&mut handler).unwrap();
 
     assert!(handler.state == AfterHup, "actual={:?}", handler.state);
 }

@@ -73,7 +73,7 @@
 //! }
 //!
 //! // Start handling events
-//! let _ = event_loop.run(MyHandler(server));
+//! event_loop.run(&mut MyHandler(server)).unwrap();
 //!
 //! ```
 
@@ -124,9 +124,7 @@ pub use poll::{
 pub use event_loop::{
     EventLoop,
     EventLoopConfig,
-    EventLoopResult,
     EventLoopSender,
-    EventLoopError
 };
 pub use timer::{
     Timeout,

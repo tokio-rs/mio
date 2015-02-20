@@ -63,10 +63,10 @@ pub fn test_notify() {
     });
 
     let sender = event_loop.channel();
+    let mut handler = TestHandler::new(sender);
 
     // Start the event loop
-    let h = event_loop.run(TestHandler::new(sender))
-        .ok().expect("failed to execute event loop");
+    event_loop.run(&mut handler).unwrap();
 
-    assert!(h.notify == 2, "actual={}", h.notify);
+    assert!(handler.notify == 2, "actual={}", handler.notify);
 }

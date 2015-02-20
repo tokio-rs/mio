@@ -278,7 +278,5 @@ pub fn test_unix_echo_server() {
     sock.connect(&addr).unwrap();
 
     // Start the event loop
-    event_loop.run(EchoHandler::new(srv, sock, vec!["foo", "bar"]))
-        .ok().expect("failed to execute event loop");
-
+    event_loop.run(&mut EchoHandler::new(srv, sock, vec!["foo", "bar"])).unwrap();
 }
