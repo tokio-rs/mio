@@ -102,7 +102,7 @@ impl MioError {
             WouldBlock => old_io::standard_error(old_io::ResourceUnavailable),
             AddrInUse => old_io::standard_error(old_io::PathAlreadyExists),
             OtherError => match self.sys {
-                Some(NixError::Sys(err)) => old_io::IoError::from_errno(err as usize, false),
+                Some(NixError::Sys(err)) => old_io::IoError::from_errno(err as i32, false),
                 _ => old_io::standard_error(old_io::OtherIoError)
             },
             EventLoopTerminated => old_io::standard_error(OtherIoError)
