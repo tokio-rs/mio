@@ -1,7 +1,7 @@
 use std::mem;
 use std::num::Int;
 use error::{MioResult, MioError};
-use net::{AddressFamily, SockAddr, IPv4Addr, SocketType};
+use net::{AddressFamily, SockAddr, IPv4Addr, IPv6Addr, SocketType};
 use net::SocketType::{Dgram, Stream};
 use net::SockAddr::{InetAddr, UnixAddr};
 use net::AddressFamily::{Inet, Inet6, Unix};
@@ -280,6 +280,9 @@ fn to_sockaddr(addr: &nix::SockAddr) -> SockAddr {
         nix::SockAddr::SockIpV4(sin) => {
             InetAddr(u32be_to_ipv4(sin.sin_addr.s_addr), Int::from_be(sin.sin_port))
         }
+        nix::SockAddr::SockIpV6(sin6) => {
+            InetAddr(in6_addr_to_ipv6(&sin6.sin6_addr), Int::from_be(sin6.sin6_port))
+        }
         nix::SockAddr::SockUnix(addr) => {
             let mut str_path = String::new();
             for c in addr.sun_path.iter() {
@@ -288,8 +291,7 @@ fn to_sockaddr(addr: &nix::SockAddr) -> SockAddr {
             }
 
             UnixAddr(Path::new(str_path))
-        }
-        _ => unimplemented!()
+        },
     }
 }
 
@@ -308,7 +310,14 @@ fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {
 
                     nix::SockAddr::SockIpV4(addr)
                 }
-                _ => unimplemented!()
+                IPv6Addr(a, b, c, d, e, f, g, h) => {
+                    let mut addr: nix::sockaddr_in6 = unsafe { mem::zeroed() };
+
+                    addr.sin6_family = nix::AF_INET6 as nix::sa_family_t;
+                    addr.sin6_port = port.to_be();
+                    addr.sin6_addr = ipv6_to_inaddr(a, b, c, d, e, f, g, h);
+                    nix::SockAddr::SockIpV6(addr)
+                }
             }
         }
         UnixAddr(ref path) => {
@@ -345,9 +354,27 @@ fn u32_to_ipv4(net: u32) -> IpAddr {
          (net & 0xff) as u8)
 }
 
+fn in6_addr_to_ipv6(addr: &nix::in6_addr) -> IpAddr {
+    let addr = addr.s6_addr;
+    IPv6Addr(Int::from_be(addr[0]),
+             Int::from_be(addr[1]),
+             Int::from_be(addr[2]),
+             Int::from_be(addr[3]),
+             Int::from_be(addr[4]),
+             Int::from_be(addr[5]),
+             Int::from_be(addr[6]),
+             Int::from_be(addr[7]))
+}
+
 fn ipv4_to_inaddr(a: u8, b: u8, c: u8, d: u8) -> nix::in_addr {
     nix::in_addr {
         s_addr: ipv4_to_u32(a, b, c, d)
     }
 }
 
+fn ipv6_to_inaddr(a: u16, b: u16, c: u16, d: u16, e: u16, f: u16, g: u16, h: u16) -> nix::in6_addr {
+    nix::in6_addr {
+        s6_addr: [a.to_be(), b.to_be(), c.to_be(), d.to_be(),
+                  e.to_be(), f.to_be(), g.to_be(), h.to_be()]
+    }
+}

@@ -300,7 +300,7 @@ pub mod udp {
     use io;
     use net::{AddressFamily, Socket, MulticastSocket, SockAddr};
     use net::SocketType::Dgram;
-    use net::AddressFamily::Inet;
+    use net::AddressFamily::{Inet, Inet6};
     use super::UnconnectedSocket;
 
     #[derive(Debug)]
@@ -311,6 +311,10 @@ pub mod udp {
     impl UdpSocket {
         pub fn v4() -> MioResult<UdpSocket> {
             UdpSocket::new(Inet)
+        }
+
+        pub fn v6() -> MioResult<UdpSocket> {
+            UdpSocket::new(Inet6)
         }
 
         fn new(family: AddressFamily) -> MioResult<UdpSocket> {
