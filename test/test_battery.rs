@@ -3,7 +3,7 @@ use mio::net::*;
 use mio::net::tcp::*;
 use mio::util::Slab;
 use super::localhost;
-use std::collections::DList;
+use std::collections::LinkedList;
 use std::thread::Thread;
 use std::old_io::timer::Timer;
 use std::time::duration::Duration;
@@ -102,7 +102,7 @@ impl EchoServer {
 
 struct EchoClient {
     sock: TcpSocket,
-    backlog: DList<String>,
+    backlog: LinkedList<String>,
     token: Token,
     count: u32
 }
@@ -114,7 +114,7 @@ impl EchoClient {
 
         EchoClient {
             sock: sock,
-            backlog: DList::new(),
+            backlog: LinkedList::new(),
             token: tok,
             count: 0
         }
