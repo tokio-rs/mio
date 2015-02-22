@@ -1,366 +1,145 @@
 //! Networking primitives
 //!
-use std::fmt;
-use std::str::FromStr;
-use std::old_io::net::ip::SocketAddr as StdSocketAddr;
-use std::old_io::net::ip::ParseError;
-use io::{IoHandle, NonBlock};
-use error::MioResult;
-use buf::{Buf, MutBuf};
 use os;
+use io::{Listenable, NonBlock};
+use buf::{Buf, MutBuf};
+use std::fmt;
+use std::io::Result;
+use std::str::FromStr;
+use std::os::unix::Fd;
 
-pub use std::old_io::net::ip::{IpAddr, Port};
-pub use std::old_io::net::ip::Ipv4Addr as IPv4Addr;
-pub use std::old_io::net::ip::Ipv6Addr as IPv6Addr;
+pub use os::{InetAddr, IpAddr, SocketType};
+pub use std::net::{Ipv4Addr, Ipv6Addr};
 
-use self::SockAddr::{InetAddr,UnixAddr};
-use self::AddressFamily::{Unix,Inet,Inet6};
+pub trait Socket : Listenable {
 
-pub trait Socket : IoHandle {
-    fn linger(&self) -> MioResult<usize> {
-        os::linger(self.desc())
+    fn linger(&self) -> Result<usize> {
+        os::linger(self.as_fd())
     }
 
-    fn set_linger(&self, dur_s: usize) -> MioResult<()> {
-        os::set_linger(self.desc(), dur_s)
+    fn set_linger(&self, dur_s: usize) -> Result<()> {
+        os::set_linger(self.as_fd(), dur_s)
     }
 
-    fn set_reuseaddr(&self, val: bool) -> MioResult<()> {
-        os::set_reuseaddr(self.desc(), val)
+    fn set_reuseaddr(&self, val: bool) -> Result<()> {
+        os::set_reuseaddr(self.as_fd(), val)
     }
 
-    fn set_reuseport(&self, val: bool) -> MioResult<()> {
-        os::set_reuseport(self.desc(), val)
+    fn set_reuseport(&self, val: bool) -> Result<()> {
+        os::set_reuseport(self.as_fd(), val)
     }
 }
 
 pub trait MulticastSocket : Socket {
-    fn join_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
-        os::join_multicast_group(self.desc(), addr, interface)
+
+    fn join_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> Result<()> {
+        os::join_multicast_group(self.as_fd(), addr, interface)
     }
 
-    fn leave_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
-        os::leave_multicast_group(self.desc(), addr, interface)
+    fn leave_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> Result<()> {
+        os::leave_multicast_group(self.as_fd(), addr, interface)
     }
 
-    fn set_multicast_ttl(&self, val: u8) -> MioResult<()> {
-        os::set_multicast_ttl(self.desc(), val)
+    fn set_multicast_ttl(&self, val: u8) -> Result<()> {
+        os::set_multicast_ttl(self.as_fd(), val)
     }
 }
 
 pub trait UnconnectedSocket {
 
-    fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &SockAddr) -> MioResult<NonBlock<()>>;
+    fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &InetAddr) -> Result<NonBlock<()>>;
 
-    fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SockAddr>>;
-}
-
-// Types of sockets
-#[derive(Copy)]
-pub enum AddressFamily {
-    Inet,
-    Inet6,
-    Unix,
-}
-
-pub enum SockAddr {
-    UnixAddr(Path),
-    InetAddr(IpAddr, Port)
-}
-
-impl SockAddr {
-    pub fn parse(s: &str) -> Result<SockAddr, ParseError> {
-        let addr = FromStr::from_str(s);
-        addr.map(|a : StdSocketAddr| InetAddr(a.ip, a.port))
-    }
-
-    pub fn family(&self) -> AddressFamily {
-        match *self {
-            UnixAddr(..) => Unix,
-            InetAddr(IPv4Addr(..), _) => Inet,
-            InetAddr(IPv6Addr(..), _) => Inet6
-        }
-    }
-
-    pub fn from_path(p: Path) -> SockAddr {
-        UnixAddr(p)
-    }
-
-    #[inline]
-    pub fn consume_std(addr: StdSocketAddr) -> SockAddr {
-        InetAddr(addr.ip, addr.port)
-    }
-
-    #[inline]
-    pub fn from_std(addr: &StdSocketAddr) -> SockAddr {
-        InetAddr(addr.ip.clone(), addr.port)
-    }
-
-    pub fn to_std(&self) -> Option<StdSocketAddr> {
-        match *self {
-            InetAddr(ref addr, port) => Some(StdSocketAddr {
-                ip: addr.clone(),
-                port: port
-            }),
-            _ => None
-        }
-    }
-
-    pub fn into_std(self) -> Option<StdSocketAddr> {
-        match self {
-            InetAddr(addr, port) => Some(StdSocketAddr {
-                ip: addr,
-                port: port
-            }),
-            _ => None
-        }
-    }
-}
-
-impl FromStr for SockAddr {
-    type Err = ParseError;
-    fn from_str(s: &str) -> Result<SockAddr, ParseError> {
-        SockAddr::parse(s)
-    }
-}
-
-impl fmt::Debug for SockAddr {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            InetAddr(ip, port) => write!(fmt, "{}:{}", ip, port),
-            _ => write!(fmt, "not implemented")
-        }
-    }
-}
-
-#[derive(Copy)]
-pub enum SocketType {
-    Dgram,
-    Stream,
+    fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> Result<NonBlock<InetAddr>>;
 }
 
 /// TCP networking primitives
 ///
 pub mod tcp {
-    use os;
-    use error::MioResult;
     use buf::{Buf, MutBuf};
-    use io;
-    use io::{FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
-    use io::NonBlock::{Ready, WouldBlock};
-    use net::{Socket, SockAddr};
+    use io::{self, NonBlock};
+    use os::{self, AddressFamily};
+    use net::{Socket, InetAddr};
     use net::SocketType::Stream;
-    use net::AddressFamily::{self, Inet, Inet6};
+    use std::io::Result;
+    use std::os::unix::Fd;
 
     #[derive(Debug)]
     pub struct TcpSocket {
-        desc: os::IoDesc
+        fd: Fd,
     }
 
     impl TcpSocket {
-        pub fn v4() -> MioResult<TcpSocket> {
-            TcpSocket::new(Inet)
+        pub fn v4() -> Result<TcpSocket> {
+            TcpSocket::new(AddressFamily::Inet)
         }
 
-        pub fn v6() -> MioResult<TcpSocket> {
-            TcpSocket::new(Inet6)
+        pub fn v6() -> Result<TcpSocket> {
+            TcpSocket::new(AddressFamily::Inet6)
         }
 
-        fn new(family: AddressFamily) -> MioResult<TcpSocket> {
-            Ok(TcpSocket { desc: try!(os::socket(family, Stream)) })
+        fn new(family: AddressFamily) -> Result<TcpSocket> {
+            os::socket(family, Stream)
+                .map(|fd| TcpSocket { fd: fd })
         }
 
-        /// Connects the socket to the specified address. When the operation
-        /// completes, the handler will be notified with the supplied token.
-        ///
-        /// The goal of this method is to ensure that the event loop will always
-        /// notify about the connection, even if the connection happens
-        /// immediately. Otherwise, every consumer of the event loop would have
-        /// to worry about possibly-immediate connection.
-        pub fn connect(&self, addr: &SockAddr) -> MioResult<()> {
-            debug!("socket connect; addr={:?}", addr);
-
-            // Attempt establishing the context. This may not complete immediately.
-            if try!(os::connect(&self.desc, addr)) {
-                // On some OSs, connecting to localhost succeeds immediately. In
-                // this case, queue the writable callback for execution during the
-                // next event loop tick.
-                debug!("socket connected immediately; addr={:?}", addr);
+        /// Open a TCP connection to a remote host.
+        pub fn connect(&self, addr: &InetAddr) -> Result<NonBlock<()>> {
+            // TODO: return a TcpListner and signal the blocking-ness
+            //
+            if try!(os::connect(self.fd, addr)) {
+                Ok(NonBlock::Ready(()))
+            } else {
+                Ok(NonBlock::WouldBlock)
             }
-
-            Ok(())
         }
 
-        pub fn bind(self, addr: &SockAddr) -> MioResult<TcpListener> {
-            try!(os::bind(&self.desc, addr));
-            Ok(TcpListener { desc: self.desc })
-        }
-
-        pub fn getpeername(&self) -> MioResult<SockAddr> {
-            os::getpeername(&self.desc)
-        }
-
-        pub fn getsockname(&self) -> MioResult<SockAddr> {
-            os::getsockname(&self.desc)
-        }
-    }
-
-    impl IoHandle for TcpSocket {
-        fn desc(&self) -> &os::IoDesc {
-            &self.desc
-        }
-    }
-
-    impl FromIoDesc for TcpSocket {
-        fn from_desc(desc: os::IoDesc) -> Self {
-            TcpSocket { desc: desc }
-        }
-    }
-
-    impl IoReader for TcpSocket {
-        fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
-            io::read(self, buf)
-        }
-
-        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
-            io::read_slice(self, buf)
-        }
-    }
-
-    impl IoWriter for TcpSocket {
-        fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
-            io::write(self, buf)
-        }
-
-        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
-            io::write_slice(self, buf)
+        /// Assign the specified address to the socket
+        ///
+        /// [Further reading](http://man7.org/linux/man-pages/man2/bind.2.html)
+        pub fn bind(&self, addr: &InetAddr) -> Result<()> {
+            os::bind(self.fd, addr)
         }
     }
 
     impl Socket for TcpSocket {
     }
-
-    #[derive(Debug)]
-    pub struct TcpListener {
-        desc: os::IoDesc,
-    }
-
-    impl TcpListener {
-        pub fn listen(self, backlog: usize) -> MioResult<TcpAcceptor> {
-            try!(os::listen(self.desc(), backlog));
-            Ok(TcpAcceptor { desc: self.desc })
-        }
-    }
-
-    impl IoHandle for TcpListener {
-        fn desc(&self) -> &os::IoDesc {
-            &self.desc
-        }
-    }
-
-    impl FromIoDesc for TcpListener {
-        fn from_desc(desc: os::IoDesc) -> Self {
-            TcpListener { desc: desc }
-        }
-    }
-
-    #[derive(Debug)]
-    pub struct TcpAcceptor {
-        desc: os::IoDesc,
-    }
-
-    impl TcpAcceptor {
-        pub fn new(addr: &SockAddr, backlog: usize) -> MioResult<TcpAcceptor> {
-            let sock = try!(TcpSocket::new(addr.family()));
-            let listener = try!(sock.bind(addr));
-            listener.listen(backlog)
-        }
-    }
-
-    impl IoHandle for TcpAcceptor {
-        fn desc(&self) -> &os::IoDesc {
-            &self.desc
-        }
-    }
-
-    impl FromIoDesc for TcpAcceptor {
-        fn from_desc(desc: os::IoDesc) -> Self {
-            TcpAcceptor { desc: desc }
-        }
-    }
-
-    impl Socket for TcpAcceptor {
-    }
-
-    impl IoAcceptor for TcpAcceptor {
-        type Output = TcpSocket;
-
-        fn accept(&mut self) -> MioResult<NonBlock<TcpSocket>> {
-            match os::accept(self.desc()) {
-                Ok(sock) => Ok(Ready(TcpSocket { desc: sock })),
-                Err(e) => {
-                    if e.is_would_block() {
-                        return Ok(WouldBlock);
-                    }
-
-                    return Err(e);
-                }
-            }
-        }
-    }
 }
 
 pub mod udp {
-    use os;
-    use error::MioResult;
-    use buf::{Buf, MutBuf};
-    use io::{FromIoDesc, IoHandle, IoReader, IoWriter, NonBlock};
-    use io::NonBlock::{Ready, WouldBlock};
-    use io;
-    use net::{AddressFamily, Socket, MulticastSocket, SockAddr};
+    use {io, TryRead, TryWrite, NonBlock};
+    use os::{self, AddressFamily, SocketType};
+    use bytes::{Buf, MutBuf};
+    use net::{Socket, MulticastSocket, InetAddr, UnconnectedSocket};
     use net::SocketType::Dgram;
-    use net::AddressFamily::Inet;
-    use super::UnconnectedSocket;
+    use std::os::unix::Fd;
 
     #[derive(Debug)]
     pub struct UdpSocket {
-        desc: os::IoDesc
+        fd: Fd,
     }
 
     impl UdpSocket {
-        pub fn v4() -> MioResult<UdpSocket> {
-            UdpSocket::new(Inet)
+        pub fn v4() -> Result<UdpSocket> {
+            UdpSocket::new(AddressFamily::Inet)
         }
 
-        fn new(family: AddressFamily) -> MioResult<UdpSocket> {
-            Ok(UdpSocket { desc: try!(os::socket(family, Dgram)) })
+        fn new(family: AddressFamily) -> Result<UdpSocket> {
+            os::socket(family, SocketType::Dgram)
+                .map(|fd| UdpSocket { fd: fd })
         }
 
-        pub fn bind(&self, addr: &SockAddr) -> MioResult<()> {
-            try!(os::bind(&self.desc, addr));
-            Ok(())
+        pub fn bind(&self, addr: &InetAddr) -> Result<()> {
+            os::bind(self.fd, addr)
         }
 
-        pub fn connect(&self, addr: &SockAddr) -> MioResult<bool> {
-            os::connect(&self.desc, addr)
+        pub fn connect(&self, addr: &InetAddr) -> Result<bool> {
+            os::connect(self.fd, addr)
         }
 
-        pub fn bound(addr: &SockAddr) -> MioResult<UdpSocket> {
+        pub fn bound(addr: &InetAddr) -> Result<UdpSocket> {
             let sock = try!(UdpSocket::new(addr.family()));
             try!(sock.bind(addr));
             Ok(sock)
-        }
-    }
-
-    impl IoHandle for UdpSocket {
-        fn desc(&self) -> &os::IoDesc {
-            &self.desc
-        }
-    }
-
-    impl FromIoDesc for UdpSocket {
-        fn from_desc(desc: os::IoDesc) -> Self {
-            UdpSocket { desc: desc }
         }
     }
 
@@ -370,37 +149,17 @@ pub mod udp {
     impl MulticastSocket for UdpSocket {
     }
 
-    impl IoReader for UdpSocket {
-        fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
-            io::read(self, buf)
-        }
-
-        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
-            io::read_slice(self, buf)
-        }
-    }
-
-    impl IoWriter for UdpSocket {
-        fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
-            io::write(self, buf)
-        }
-
-        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
-            io::write_slice(self, buf)
-        }
-    }
-
     // Unconnected socket sender -- trait unique to sockets
     impl UnconnectedSocket for UdpSocket {
-        fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &SockAddr) -> MioResult<NonBlock<()>> {
+        fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &InetAddr) -> Result<NonBlock<()>> {
             match os::sendto(&self.desc, buf.bytes(), tgt) {
                 Ok(cnt) => {
                     buf.advance(cnt);
-                    Ok(Ready(()))
+                    Ok(NonBlock::Ready(()))
                 }
                 Err(e) => {
                     if e.is_would_block() {
-                        Ok(WouldBlock)
+                        Ok(NonBlock::WouldBlock)
                     } else {
                         Err(e)
                     }
@@ -408,15 +167,15 @@ pub mod udp {
             }
         }
 
-        fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SockAddr>> {
+        fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> Result<NonBlock<InetAddr>> {
             match os::recvfrom(&self.desc, buf.mut_bytes()) {
                 Ok((cnt, saddr)) => {
                     buf.advance(cnt);
-                    Ok(Ready(saddr))
+                    Ok(NonBlock::Ready(saddr))
                 }
                 Err(e) => {
                     if e.is_would_block() {
-                        Ok(WouldBlock)
+                        Ok(NonBlock::WouldBlock)
                     } else {
                         Err(e)
                     }
@@ -426,81 +185,46 @@ pub mod udp {
     }
 }
 
-/// Named pipes
-pub mod pipe {
-    use os;
-    use error::MioResult;
+/// Unix domain sockets
+pub mod unix {
+    use {io, TryRead, TryWrite, NonBlock};
+    use os::{self, AddressFamily};
     use buf::{Buf, MutBuf};
-    use io;
-    use io::{FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
-    use io::NonBlock::{Ready, WouldBlock};
-    use net::{Socket, SockAddr, SocketType};
-    use net::SocketType::Stream;
-    use net::AddressFamily::Unix;
+    use net::{Socket, SocketType};
+    use std::os::unix::Fd;
 
     #[derive(Debug)]
     pub struct UnixSocket {
-        desc: os::IoDesc
+        fd: Fd,
     }
 
     impl UnixSocket {
-        pub fn stream() -> MioResult<UnixSocket> {
-            UnixSocket::new(Stream)
+        pub fn stream() -> Result<UnixSocket> {
+            UnixSocket::new(SocketType::Stream)
         }
 
-        fn new(socket_type: SocketType) -> MioResult<UnixSocket> {
-            Ok(UnixSocket { desc: try!(os::socket(Unix, socket_type)) })
+        pub fn datagram() -> Result<UnixSocket> {
+            UnixSocket::new(SocketType::Dgram)
         }
 
-        pub fn connect(&self, addr: &SockAddr) -> MioResult<()> {
-            debug!("socket connect; addr={:?}", addr);
+        fn new(socktype: SocketType) -> Result<UnixSocket> {
+            os::socket(AddressFamily::Unix, socktype)
+                .map(|fd| UnixSocket { fd: fd })
+        }
 
-            // Attempt establishing the context. This may not complete immediately.
-            if try!(os::connect(&self.desc, addr)) {
-                // On some OSs, connecting to localhost succeeds immediately. In
-                // this case, queue the writable callback for execution during the
-                // next event loop tick.
-                debug!("socket connected immediately; addr={:?}", addr);
+        pub fn connect(&self, path: &Path) -> Result<()> {
+            // TODO: return a UnixListener and signal the blocking-ness
+            //
+            if try!(os::connect(self.fd, path)) {
+                Ok(NonBlock::Ready(()))
+            } else {
+                Ok(NonBlock::WouldBlock)
             }
-
-            Ok(())
         }
 
-        pub fn bind(self, addr: &SockAddr) -> MioResult<UnixListener> {
-            try!(os::bind(&self.desc, addr));
+        pub fn bind(self, path: &Path) -> Result<UnixListener> {
+            try!(os::bind(&self.desc, path));
             Ok(UnixListener { desc: self.desc })
-        }
-    }
-
-    impl IoHandle for UnixSocket {
-        fn desc(&self) -> &os::IoDesc {
-            &self.desc
-        }
-    }
-  
-    impl FromIoDesc for UnixSocket {
-        fn from_desc(desc: os::IoDesc) -> Self {
-            UnixSocket { desc: desc }
-        }
-    }
-
-    impl IoReader for UnixSocket {
-        fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
-            io::read(self, buf)
-        }
-
-        fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
-            io::read_slice(self, buf)
-        }
-    }
-
-    impl IoWriter for UnixSocket {
-        fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
-            io::write(self, buf)
-        }
-
-        fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
-            io::write_slice(self, buf)
         }
     }
 
@@ -509,70 +233,35 @@ pub mod pipe {
 
     #[derive(Debug)]
     pub struct UnixListener {
-        desc: os::IoDesc,
+        fd: Fd,
     }
 
     impl UnixListener {
-        pub fn listen(self, backlog: usize) -> MioResult<UnixAcceptor> {
+        pub fn listen(self, backlog: usize) -> Result<UnixAcceptor> {
             try!(os::listen(self.desc(), backlog));
             Ok(UnixAcceptor { desc: self.desc })
         }
     }
 
-    impl IoHandle for UnixListener {
-        fn desc(&self) -> &os::IoDesc {
-            &self.desc
-        }
-    }
-
-    impl FromIoDesc for UnixListener {
-        fn from_desc(desc: os::IoDesc) -> Self {
-            UnixListener { desc: desc }
-        }
-    }
-
     #[derive(Debug)]
     pub struct UnixAcceptor {
-        desc: os::IoDesc,
+        fd: Fd,
     }
 
     impl UnixAcceptor {
-        pub fn new(addr: &SockAddr, backlog: usize) -> MioResult<UnixAcceptor> {
+        pub fn new(path: &Path, backlog: usize) -> Result<UnixAcceptor> {
             let sock = try!(UnixSocket::stream());
-            let listener = try!(sock.bind(addr));
+            let listener = try!(sock.bind(path));
             listener.listen(backlog)
         }
-    }
 
-    impl IoHandle for UnixAcceptor {
-        fn desc(&self) -> &os::IoDesc {
-            &self.desc
-        }
-    }
-
-    impl FromIoDesc for UnixAcceptor {
-        fn from_desc(desc: os::IoDesc) -> Self {
-            UnixAcceptor { desc: desc }
+        pub fn accept(&mut self) -> Result<NonBlock<UnixSocket>> {
+            os::accept(self.fd)
+                .map(|fd| Ok(NonBlock::Ready(UnixSocket { fd: fd })))
+                .or_else(io::to_non_block_res)
         }
     }
 
     impl Socket for UnixAcceptor {
-    }
-
-    impl IoAcceptor for UnixAcceptor {
-        type Output = UnixSocket;
-
-        fn accept(&mut self) -> MioResult<NonBlock<UnixSocket>> {
-            match os::accept(self.desc()) {
-                Ok(sock) => Ok(Ready(UnixSocket { desc: sock })),
-                Err(e) => {
-                    if e.is_would_block() {
-                        return Ok(WouldBlock);
-                    }
-
-                    return Err(e);
-                }
-            }
-        }
     }
 }

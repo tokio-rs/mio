@@ -1,11 +1,11 @@
 use std::mem;
-use super::posix::*;
+// use super::posix::*;
 use error::{MioResult, MioError};
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";
 
 mod nix {
-    pub use nix::sys::eventfd::*;
+    // pub use nix::sys::eventfd::*;
 }
 
 pub struct Awakener {

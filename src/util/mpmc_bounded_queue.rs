@@ -68,7 +68,7 @@ impl<T: Send> State<T> {
     fn with_capacity(capacity: usize) -> State<T> {
         let capacity = if capacity < 2 || (capacity & (capacity - 1)) != 0 {
             if capacity < 2 {
-                2us
+                2
             } else {
                 // use next power of 2 as capacity
                 capacity.next_power_of_two()

@@ -1,13 +1,18 @@
-use std::{fmt, cmp};
-use std::sync::Arc;
-use std::sync::atomic::AtomicIsize;
-use std::sync::atomic::Ordering::Relaxed;
-use error::MioResult;
-use io::IoHandle;
-use os;
+use {os, Listenable};
 use util::BoundedQueue;
+use std::{fmt, cmp};
+use std::io::Result;
+use std::os::unix::Fd;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicIsize, Ordering};
 
 const SLEEP: isize = -1;
+
+pub type NotifyResult<T> = ::std::result::Result<(), NotifyError<T>>;
+
+pub enum NotifyError<T> {
+    QueueFull(T),
+}
 
 /// Send notifications to the event loop, waking it up if necessary. If the
 /// event loop is not currently sleeping, avoid using an OS wake-up strategy
@@ -20,7 +25,7 @@ pub struct Notify<M: Send> {
 
 impl<M: Send> Notify<M> {
     #[inline]
-    pub fn with_capacity(capacity: usize) -> MioResult<Notify<M>> {
+    pub fn with_capacity(capacity: usize) -> Result<Notify<M>> {
         Ok(Notify {
             inner: Arc::new(try!(NotifyInner::with_capacity(capacity)))
         })
@@ -32,7 +37,7 @@ impl<M: Send> Notify<M> {
     }
 
     #[inline]
-    pub fn notify(&self, value: M) -> Result<(), M> {
+    pub fn notify(&self, value: M) -> NotifyResult<M> {
         self.inner.notify(value)
     }
 
@@ -71,7 +76,7 @@ struct NotifyInner<M> {
 }
 
 impl<M: Send> NotifyInner<M> {
-    fn with_capacity(capacity: usize) -> MioResult<NotifyInner<M>> {
+    fn with_capacity(capacity: usize) -> Result<NotifyInner<M>> {
         Ok(NotifyInner {
             state: AtomicIsize::new(0),
             queue: BoundedQueue::with_capacity(capacity),
@@ -81,7 +86,7 @@ impl<M: Send> NotifyInner<M> {
 
     fn check(&self, max: usize, will_sleep: bool) -> usize {
         let max = max as isize;
-        let mut cur = self.state.load(Relaxed);
+        let mut cur = self.state.load(Ordering::Relaxed);
         let mut nxt;
         let mut val;
 
@@ -102,7 +107,7 @@ impl<M: Send> NotifyInner<M> {
                 }
             }
 
-            val = self.state.compare_and_swap(cur, nxt, Relaxed);
+            val = self.state.compare_and_swap(cur, nxt, Ordering::Relaxed);
 
             if val == cur {
                 break;
@@ -129,13 +134,13 @@ impl<M: Send> NotifyInner<M> {
             panic!("queue full");
         }
 
-        let mut cur = self.state.load(Relaxed);
+        let mut cur = self.state.load(Ordering::Relaxed);
         let mut nxt;
         let mut val;
 
         loop {
             nxt = if cur == SLEEP { 1 } else { cur + 1 };
-            val = self.state.compare_and_swap(cur, nxt, Relaxed);
+            val = self.state.compare_and_swap(cur, nxt, Ordering::Relaxed);
 
             if val == cur {
                 break;
@@ -159,8 +164,8 @@ impl<M: Send> NotifyInner<M> {
     }
 }
 
-impl<M: Send> IoHandle for Notify<M> {
-    fn desc(&self) -> &os::IoDesc {
+impl<M: Send> Listenable for Notify<M> {
+    fn as_fd(&self) -> Fd {
         self.inner.awaken.desc()
     }
 }

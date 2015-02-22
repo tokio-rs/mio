@@ -1,10 +1,12 @@
+use os::{self, FromFd};
 use buf::{Buf, MutBuf};
-use error::MioResult;
-use self::NonBlock::{Ready, WouldBlock};
-use error::MioErrorKind as mek;
-use os;
+use nix::NixError;
+use std::io::{Read, Write, Result, Error, ErrorKind};
+use std::os::unix::Fd;
 
-pub use os::IoDesc;
+pub trait Listenable {
+    fn as_fd(&self) -> Fd;
+}
 
 /// The result of a non-blocking operation.
 #[derive(Debug)]
@@ -23,147 +25,159 @@ impl<T> NonBlock<T> {
 
     pub fn unwrap(self) -> T {
         match self {
-            Ready(v) => v,
+            NonBlock::Ready(v) => v,
             _ => panic!("would have blocked, no result to take")
         }
     }
 }
 
-pub trait IoHandle {
-    fn desc(&self) -> &IoDesc;
+/// A trait for values which are byte-oriented non-blocking sources. Reads will
+/// not block the calling thread. If the resource is ready, the read will
+/// succeed. Otherwise, WouldBlock is returned.
+pub trait TryRead : Read {
+
+    /// Read into the given buffer
+    fn read_buf<B: MutBuf>(&self, buf: &mut B) -> Result<NonBlock<usize>>;
+
+    /// Read into the given byte slice
+    fn read_slice(&self, buf: &mut [u8]) -> Result<NonBlock<usize>>;
 }
 
-pub trait FromIoDesc {
-    fn from_desc(desc: IoDesc) -> Self;
+impl<R: Read> TryRead for R {
+    fn read_buf<B: MutBuf>(&self, buf: &mut B) -> Result<NonBlock<usize>> {
+        let res = self.read_slice(buf.mut_bytes());
+
+        if let Ok(NonBlock::Ready(cnt)) = res {
+            buf.advance(cnt);
+        }
+
+        res
+    }
+
+    fn read_slice(&self, buf: &mut [u8]) -> Result<NonBlock<usize>> {
+        self.read(buf)
+            .map(|cnt| NonBlock::Ready(cnt))
+            .or_else(to_non_block_res)
+    }
 }
 
-pub trait IoReader {
-    fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>>;
-    fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>>;
+/// A trait for values which are byte-oriented non-blocking sinks. Writes will
+/// not block the calling thread. If the resources is ready, the write will
+/// succeed. Otherwise, WouldBlock is returned.
+pub trait TryWrite : Write {
+
+    /// Write into the given buffer
+    fn write_buf<B: Buf>(&self, buf: &mut B) -> Result<NonBlock<usize>>;
+
+    /// Write into the given byte slice
+    fn write_slice(&self, buf: &[u8]) -> Result<NonBlock<usize>>;
+
 }
 
-pub trait IoWriter {
-    fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>>;
-    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>>;
+impl<W: Write> TryWrite for W {
+    fn write_buf<B: Buf>(&self, buf: &mut B) -> Result<NonBlock<usize>> {
+        let res = self.write_slice(buf.bytes());
+
+        if let Ok(NonBlock::Ready(cnt)) = res {
+            buf.advance(cnt);
+        }
+
+        res
+    }
+
+    fn write_slice(&self, buf: &[u8]) -> Result<NonBlock<usize>> {
+        self.write(buf)
+            .map(|cnt| Ok(NonBlock::Ready(cnt)))
+            .or_else(to_non_block_res)
+    }
 }
 
-pub trait IoAcceptor {
-    type Output;
-    fn accept(&mut self) -> MioResult<NonBlock<Self::Output>>;
-}
-
-pub fn pipe() -> MioResult<(PipeReader, PipeWriter)> {
+/// Creates a new pipe, a pair of unidirectional channels that can be used for
+/// in-process or inter-process communication.
+///
+/// [Further reading](http://man7.org/linux/man-pages/man7/pipe.7.html)
+pub fn pipe() -> Result<(PipeWriter, PipeReader)> {
     let (rd, wr) = try!(os::pipe());
-    Ok((PipeReader { desc: rd }, PipeWriter { desc: wr }))
+    Ok((FromFd::from_fd(wr), FromFd::from_fd(rd)))
 }
 
+/*
+ *
+ * ===== PipeReader =====
+ *
+ */
+
+/// The read half of a pipe
 pub struct PipeReader {
-    desc: os::IoDesc
+    fd: Fd,
 }
 
-impl IoHandle for PipeReader {
-    fn desc(&self) -> &os::IoDesc {
-        &self.desc
+impl PipeReader {
+}
+
+impl FromFd for PipeReader {
+    fn from_fd(fd: Fd) -> Self {
+        PipeReader { fd: fd }
     }
 }
 
-impl FromIoDesc for PipeReader {
-    fn from_desc(desc: IoDesc) -> Self {
-        PipeReader { desc: desc }
+impl Read for PipeReader {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        unimplemented!();
     }
 }
 
+impl Drop for PipeReader {
+    fn drop(&mut self) {
+        os::close(self.fd)
+    }
+}
+
+/*
+ *
+ * ===== PipeWriter =====
+ *
+ */
+
+/// The write half of a pipe
 pub struct PipeWriter {
-    desc: os::IoDesc
+    fd: Fd,
 }
 
-impl IoHandle for PipeWriter {
-    fn desc(&self) -> &os::IoDesc {
-        &self.desc
-    }
+impl PipeWriter {
 }
 
-impl FromIoDesc for PipeWriter {
-    fn from_desc(desc: IoDesc) -> Self {
-        PipeWriter { desc: desc }
+impl FromFd for PipeWriter {
+    fn from_fd(fd: Fd) -> Self {
+        PipeWriter { fd: fd }
     }
 }
 
-impl IoReader for PipeReader {
-    fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
-        read(self, buf)
-    }
-
-    fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>> {
-        read_slice(self, buf)
+impl Write for PipeWriter {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        os::write(self.fd, buf)
     }
 }
 
-impl IoWriter for PipeWriter {
-    fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
-        write(self, buf)
-    }
-
-    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
-        write_slice(self, buf)
+impl Drop for PipeWriter {
+    fn drop(&mut self) {
+        os::close(self.fd)
     }
 }
 
-/// Reads the length of the slice supplied by buf.mut_bytes into the buffer
-/// This is not guaranteed to consume an entire datagram or segment.
-/// If your protocol is msg based (instead of continuous stream) you should
-/// ensure that your buffer is large enough to hold an entire segment (1532 bytes if not jumbo
-/// frames)
-#[inline]
-pub fn read<I: IoHandle, B: MutBuf>(io: &I, buf: &mut B) -> MioResult<NonBlock<usize>> {
+/*
+ *
+ * ===== Errors =====
+ *
+ */
 
-    let res = read_slice(io, buf.mut_bytes());
-    match res {
-        // Successfully read some bytes, advance the cursor
-        Ok(Ready(cnt)) => { buf.advance(cnt); },
-        _              => {}
-    }
-    res
+fn to_io_error(err: NixError) -> Error {
+    unimplemented!();
 }
 
-///writes the length of the slice supplied by Buf.bytes into the socket
-///then advances the buffer that many bytes
-#[inline]
-pub fn write<O: IoHandle, B: Buf>(io: &O, buf: &mut B) -> MioResult<NonBlock<usize>> {
-    let res = write_slice(io, buf.bytes());
-    match res {
-        Ok(Ready(cnt)) => buf.advance(cnt),
-        _              => {}
-    }
-    res
-}
-
-///reads the length of the supplied slice from the socket into the slice
-#[inline]
-pub fn read_slice<I: IoHandle>(io: & I, buf: &mut [u8]) -> MioResult<NonBlock<usize>> {
-    match os::read(io.desc(), buf) {
-        Ok(cnt) => {
-            Ok(Ready(cnt))
-        }
-        Err(e) => {
-            match e.kind {
-                mek::WouldBlock => Ok(WouldBlock),
-                _ => Err(e)
-            }
-        }
-    }
-}
-
-///writes the length of the supplied slice into the socket from the slice
-#[inline]
-pub fn write_slice<I: IoHandle>(io: & I, buf: & [u8]) -> MioResult<NonBlock<usize>> {
-    match os::write(io.desc(), buf) {
-        Ok(cnt) => { Ok(Ready(cnt)) }
-        Err(e) => {
-            match e.kind {
-                mek::WouldBlock => Ok(WouldBlock),
-                _               => Err(e)
-            }
-        }
+fn to_non_block_res<T>(err: Error) -> Result<T> {
+    match err.kind() {
+        ErrorKind::ResourceUnavailable => Ok(NonBlock::WouldBlock),
+        _ => Err(err),
     }
 }

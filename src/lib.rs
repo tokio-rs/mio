@@ -98,25 +98,17 @@ pub use buf::{
     Buf,
     MutBuf,
 };
-pub use error::{
-    MioResult,
-    MioError,
-    MioErrorKind
-};
 pub use handler::{
     Handler,
 };
 pub use io::{
-    pipe,
+    Listenable,
     NonBlock,
-    FromIoDesc,
-    IoReader,
-    IoWriter,
-    IoAcceptor,
-    IoHandle,
-    IoDesc,
+    TryRead,
+    TryWrite,
     PipeReader,
     PipeWriter,
+    pipe,
 };
 pub use poll::{
     Poll
@@ -131,10 +123,13 @@ pub use timer::{
     TimerError,
     TimerResult
 };
-pub use os::token::{
+pub use os::{
+    FromFd,
+};
+pub use token::{
     Token,
 };
-pub use os::event::{
+pub use event::{
     PollOpt,
     Interest,
     ReadHint,
@@ -143,7 +138,7 @@ pub use os::event::{
 pub mod net;
 pub mod util;
 
-mod error;
+mod event;
 mod event_loop;
 mod handler;
 mod io;
@@ -151,6 +146,7 @@ mod notify;
 mod os;
 mod poll;
 mod timer;
+mod token;
 
 // Re-export bytes
 pub mod buf {

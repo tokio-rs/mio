@@ -1,8 +1,8 @@
+use {Token};
+use alloc::heap;
 use std::{fmt, mem, ptr, isize};
 use std::num::Int;
 use std::ops::{Index, IndexMut};
-use alloc::heap;
-use os::token::Token;
 
 /// A preallocated chunk of memory for storing objects of the same type.
 pub struct Slab<T> {
