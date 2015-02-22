@@ -255,7 +255,7 @@ pub fn getsockname(io: &IoDesc) -> MioResult<SockAddr> {
 
 pub fn set_linger(io: &IoDesc, dur_s: usize) -> MioResult<()> {
     let linger = nix::linger {
-        l_onoff: (if dur_s > 0 { 1is } else { 0is }) as nix::c_int,
+        l_onoff: (if dur_s > 0 { 1 } else { 0 }) as nix::c_int,
         l_linger: dur_s as nix::c_int
     };
 

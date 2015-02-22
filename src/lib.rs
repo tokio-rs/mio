@@ -82,7 +82,7 @@
 // mio is still in rapid development
 #![unstable]
 
-#![feature(unsafe_destructor, alloc, core, io, libc, path, hash, std_misc)]
+#![feature(unsafe_destructor, alloc, core, old_io, libc, old_path, std_misc)]
 
 #![allow(dead_code)]
 

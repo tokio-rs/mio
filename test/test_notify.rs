@@ -1,5 +1,5 @@
 use std::old_io::timer::sleep;
-use std::thread::Thread;
+use std::thread;
 use std::time::Duration;
 use mio::*;
 use mio::net::*;
@@ -57,7 +57,7 @@ pub fn test_notify() {
 
     let sender = event_loop.channel();
 
-    Thread::spawn(move || {
+    thread::spawn(move || {
         sleep(Duration::seconds(1));
         sender.send("First".to_string()).unwrap();
     });

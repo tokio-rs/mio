@@ -4,7 +4,7 @@ use mio::net::tcp::*;
 use mio::util::Slab;
 use super::localhost;
 use std::collections::LinkedList;
-use std::thread::Thread;
+use std::thread;
 use std::old_io::timer::Timer;
 use std::time::duration::Duration;
 
@@ -257,7 +257,7 @@ pub fn test_echo_server() {
         }
     };
 
-    let _t = Thread::scoped(go);
+    let _t = thread::scoped(go);
 
     // Start the event loop
     event_loop.run(&mut EchoHandler::new(srv, sock)).unwrap();
