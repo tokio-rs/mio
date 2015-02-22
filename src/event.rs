@@ -1,4 +1,4 @@
-use os::token::Token;
+use {Token};
 use std::{fmt, ops};
 
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
@@ -420,21 +420,21 @@ impl fmt::Debug for ReadHint {
 
 
 #[derive(Copy, Debug)]
-pub struct IoEvent {
+pub struct Event {
     kind: Interest,
     token: Token
 }
 
-/// IoEvent represents the raw event that the OS-specific selector
+/// Event represents the raw event that the OS-specific selector
 /// returned. An event can represent more than one kind (such as
 /// readable or writable) at a time.
 ///
-/// These IoEvent objects are created by the OS-specific concrete
+/// These Event values are created by the OS-specific concrete
 /// Selector when they have events to report.
-impl IoEvent {
-    /// Create a new IoEvent.
-    pub fn new(kind: Interest, token: usize) -> IoEvent {
-        IoEvent {
+impl Event {
+    /// Create a new Event.
+    pub fn new(kind: Interest, token: usize) -> Event {
+        Event {
             kind: kind,
             token: Token(token)
         }

@@ -1,24 +1,23 @@
+use {Listenable, Interest, PollOpt, Token};
+use event::Event;
+use os::{Selector, Events};
 use std::fmt;
-use error::MioResult;
-use io::IoHandle;
-use os;
-use os::token::Token;
-use os::event;
+use std::io::Result;
 
 pub struct Poll {
-    selector: os::Selector,
-    events: os::Events
+    selector: Selector,
+    events: Events
 }
 
 impl Poll {
-    pub fn new() -> MioResult<Poll> {
+    pub fn new() -> Result<Poll> {
         Ok(Poll {
-            selector: try!(os::Selector::new()),
-            events: os::Events::new()
+            selector: try!(Selector::new()),
+            events: Events::new()
         })
     }
 
-    pub fn register<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn register<L: Listenable>(&mut self, io: &L, token: Token, interest: Interest, opts: PollOpt) -> Result<()> {
         debug!("registering  with poller");
 
         // Register interests for this socket
@@ -27,7 +26,7 @@ impl Poll {
         Ok(())
     }
 
-    pub fn reregister<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn reregister<L: Listenable>(&mut self, io: &L, token: Token, interest: Interest, opts: PollOpt) -> Result<()> {
         debug!("registering  with poller");
 
         // Register interests for this socket
@@ -36,7 +35,7 @@ impl Poll {
         Ok(())
     }
 
-    pub fn deregister<H: IoHandle>(&mut self, io: &H) -> MioResult<()> {
+    pub fn deregister<L: Listenable>(&mut self, io: &L) -> Result<()> {
         debug!("deregistering IO with poller");
 
         // Deregister interests for this socket
@@ -45,12 +44,12 @@ impl Poll {
         Ok(())
     }
 
-    pub fn poll(&mut self, timeout_ms: usize) -> MioResult<usize> {
+    pub fn poll(&mut self, timeout_ms: usize) -> Result<usize> {
         try!(self.selector.select(&mut self.events, timeout_ms));
         Ok(self.events.len())
     }
 
-    pub fn event(&self, idx: usize) -> event::IoEvent {
+    pub fn event(&self, idx: usize) -> Event {
         self.events.get(idx)
     }
 
@@ -66,14 +65,14 @@ impl fmt::Debug for Poll {
 }
 
 pub struct EventsIterator<'a> {
-    events: &'a os::Events,
+    events: &'a Events,
     index: usize
 }
 
 impl<'a> Iterator for EventsIterator<'a> {
-    type Item = event::IoEvent;
+    type Item = Event;
 
-    fn next(&mut self) -> Option<event::IoEvent> {
+    fn next(&mut self) -> Option<Event> {
         if self.index == self.events.len() {
             None
         } else {

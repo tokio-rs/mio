@@ -1,6 +1,6 @@
 use std::mem;
 use nix::fcntl::Fd;
-use nix::sys::epoll::*;
+// use nix::sys::epoll::*;
 use nix::unistd::close;
 use error::{MioResult, MioError};
 use os::IoDesc;

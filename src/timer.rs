@@ -1,10 +1,10 @@
+use {Token};
+use util::Slab;
+use time::precise_time_ns;
 use std::{usize, iter};
 use std::cmp::max;
 use std::time::duration::Duration;
 use std::num::UnsignedInt;
-use time::precise_time_ns;
-use os::token::Token;
-use util::Slab;
 
 use self::TimerErrorKind::TimerOverflow;
 

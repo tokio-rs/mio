@@ -1,14 +1,10 @@
+use {Handler, Listenable, Interest, Poll, PollOpt, Token};
+use event::Event;
+use notify::Notify;
+use timer::{Timer, Timeout, TimerResult};
+use std::{fmt, usize};
 use std::default::Default;
 use std::time::duration::Duration;
-use std::{fmt, usize};
-use error::MioResult;
-use handler::Handler;
-use io::IoHandle;
-use notify::Notify;
-use os::event::{IoEvent, Interest, PollOpt};
-use poll::{Poll};
-use timer::{Timer, Timeout, TimerResult};
-use os::token::Token;
 
 /// Configure EventLoop runtime details
 #[derive(Copy, Clone, Debug)]
@@ -55,11 +51,11 @@ impl<T, M: Send> EventLoop<T, M> {
 
     /// Initializes a new event loop using default configuration settings. The
     /// event loop will not be running yet.
-    pub fn new() -> MioResult<EventLoop<T, M>> {
+    pub fn new() -> Result<EventLoop<T, M>> {
         EventLoop::configured(Default::default())
     }
 
-    pub fn configured(config: EventLoopConfig) -> MioResult<EventLoop<T, M>> {
+    pub fn configured(config: EventLoopConfig) -> Result<EventLoop<T, M>> {
         // Create the IO poller
         let mut poll = try!(Poll::new());
 
@@ -183,24 +179,24 @@ impl<T, M: Send> EventLoop<T, M> {
         self.run = false;
     }
 
-    /// Registers an IO handle with the event loop.
-    pub fn register<H: IoHandle>(&mut self, io: &H, token: Token) -> MioResult<()> {
+    /// Registers a listenable value with the event loop.
+    pub fn register<L: Listenable>(&mut self, io: &L, token: Token) -> Result<()> {
         self.poll.register(io, token, Interest::readable(), PollOpt::level())
     }
 
-    /// Registers an IO handle with the event loop.
-    pub fn register_opt<H: IoHandle>(&mut self, io: &H, token: Token, interest: Interest, opt: PollOpt) -> MioResult<()> {
+    /// Registers a listenable value with the event loop.
+    pub fn register_opt<L: Listenable>(&mut self, io: &L, token: Token, interest: Interest, opt: PollOpt) -> Result<()> {
         self.poll.register(io, token, interest, opt)
     }
 
     /// Re-Registers an IO handle with the event loop.
-    pub fn reregister<H: IoHandle>(&mut self, io: &H, token: Token, interest: Interest, opt: PollOpt) -> MioResult<()> {
+    pub fn reregister<L: Listenable>(&mut self, io: &L, token: Token, interest: Interest, opt: PollOpt) -> Result<()> {
         self.poll.reregister(io, token, interest, opt)
     }
 
     /// Keep spinning the event loop indefinitely, and notify the handler whenever
     /// any of the registered handles are ready.
-    pub fn run<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
+    pub fn run<H: Handler<T, M>>(&mut self, handler: &mut H) -> Result<()> {
         self.run = true;
 
         while self.run {
@@ -212,14 +208,14 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     /// Deregisters an IO handle with the event loop.
-    pub fn deregister<H: IoHandle>(&mut self, io: &H) -> MioResult<()> {
+    pub fn deregister<L: Listenable>(&mut self, io: &L) -> Result<()> {
         self.poll.deregister(io)
     }
 
     /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
+    pub fn run_once<H: Handler<T, M>>(&mut self, handler: &mut H) -> Result<()> {
         let mut messages;
         let mut pending;
 
@@ -251,7 +247,7 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     #[inline]
-    fn io_poll(&mut self, immediate: bool) -> MioResult<usize> {
+    fn io_poll(&mut self, immediate: bool) -> Result<usize> {
         if immediate {
             self.poll.poll(0)
         } else {
@@ -267,7 +263,7 @@ impl<T, M: Send> EventLoop<T, M> {
 
     // Process IO events that have been previously polled
     fn io_process<H: Handler<T, M>>(&mut self, handler: &mut H, cnt: usize) {
-        let mut i = 0us;
+        let mut i = 0;
 
         // Iterate over the notifications. Each event provides the token
         // it was registered with (which usually represents, at least, the
@@ -287,7 +283,7 @@ impl<T, M: Send> EventLoop<T, M> {
         }
     }
 
-    fn io_event<H: Handler<T, M>>(&mut self, handler: &mut H, evt: IoEvent) {
+    fn io_event<H: Handler<T, M>>(&mut self, handler: &mut H, evt: Event) {
         let tok = evt.token();
 
         if evt.is_readable() {
