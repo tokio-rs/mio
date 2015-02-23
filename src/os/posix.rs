@@ -197,14 +197,14 @@ pub fn set_tcp_nodelay(io: &IoDesc, val: bool) -> MioResult<()> {
         .map_err(MioError::from_nix_error)
 }
 
-pub fn join_multicast_group(io: &IoDesc, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
+pub fn join_multicast_group(io: &IoDesc, addr: &IpAddr, interface: Option<&IpAddr>) -> MioResult<()> {
     let req = try!(make_ip_mreq(addr, interface));
 
     nix::setsockopt(io.fd, SockLevel::Ip, sockopt::IpAddMembership, &req)
         .map_err(MioError::from_nix_error)
 }
 
-pub fn leave_multicast_group(io: &IoDesc, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
+pub fn leave_multicast_group(io: &IoDesc, addr: &IpAddr, interface: Option<&IpAddr>) -> MioResult<()> {
     let grp_req = try!(make_ip_mreq(addr, interface));
 
     nix::setsockopt(io.fd, SockLevel::Ip, sockopt::IpAddMembership, &grp_req)
@@ -255,17 +255,17 @@ pub fn set_linger(io: &IoDesc, dur_s: usize) -> MioResult<()> {
         .map_err(MioError::from_nix_error)
 }
 
-fn make_ip_mreq(group_addr: &IpAddr, iface_addr: &Option<IpAddr>) -> MioResult<nix::ip_mreq> {
+fn make_ip_mreq(group_addr: &IpAddr, iface_addr: Option<&IpAddr>) -> MioResult<nix::ip_mreq> {
     Ok(nix::ip_mreq {
-        imr_multiaddr: from_ip_addr_to_inaddr(&Some(*group_addr)),
+        imr_multiaddr: from_ip_addr_to_inaddr(Some(group_addr)),
         imr_interface: from_ip_addr_to_inaddr(iface_addr)
     })
 }
 
-fn from_ip_addr_to_inaddr(addr: &Option<IpAddr>) -> nix::in_addr {
-    match *addr {
+fn from_ip_addr_to_inaddr(addr: Option<&IpAddr>) -> nix::in_addr {
+    match addr {
         Some(ip) => {
-            match ip {
+            match *ip {
                 IPv4Addr(a, b, c, d) => ipv4_to_inaddr(a, b, c, d),
                 _ => unimplemented!()
             }

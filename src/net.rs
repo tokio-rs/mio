@@ -35,11 +35,11 @@ pub trait Socket : IoHandle {
 }
 
 pub trait MulticastSocket : Socket {
-    fn join_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
+    fn join_multicast_group(&self, addr: &IpAddr, interface: Option<&IpAddr>) -> MioResult<()> {
         os::join_multicast_group(self.desc(), addr, interface)
     }
 
-    fn leave_multicast_group(&self, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
+    fn leave_multicast_group(&self, addr: &IpAddr, interface: Option<&IpAddr>) -> MioResult<()> {
         os::leave_multicast_group(self.desc(), addr, interface)
     }
 

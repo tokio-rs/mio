@@ -84,10 +84,10 @@ pub fn test_udp_socket_connectionless() {
     recv_sock.set_reuseaddr(true).unwrap();
 
     info!("Joining group 227.1.1.100");
-    recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 100), &None).unwrap();
+    recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 100), None).unwrap();
 
     info!("Joining group 227.1.1.101");
-    recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 101), &None).unwrap();
+    recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 101), None).unwrap();
 
     info!("Registering LISTENER");
     event_loop.register_opt(&recv_sock, LISTENER, Interest::readable(), PollOpt::edge()).unwrap();
