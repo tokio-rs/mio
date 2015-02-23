@@ -8,6 +8,8 @@ use net::SockAddr::{InetAddr, UnixAddr};
 use net::AddressFamily::{Inet, Inet6, Unix};
 pub use std::old_io::net::ip::IpAddr;
 
+use nix::sys::socket::{sockopt, SockLevel};
+
 mod nix {
     pub use nix::{c_int, NixError};
     pub use nix::fcntl::{Fd, O_NONBLOCK, O_CLOEXEC};
@@ -181,55 +183,45 @@ pub fn reuseaddr(_io: &IoDesc) -> MioResult<usize> {
 }
 
 pub fn set_reuseaddr(io: &IoDesc, val: bool) -> MioResult<()> {
-    let v: nix::c_int = if val { 1 } else { 0 };
-
-    nix::setsockopt(io.fd, nix::SOL_SOCKET, nix::SO_REUSEADDR, &v)
+    nix::setsockopt(io.fd, SockLevel::Socket, sockopt::ReuseAddr, val)
         .map_err(MioError::from_nix_error)
 }
 
 pub fn set_reuseport(io: &IoDesc, val: bool) -> MioResult<()> {
-    let v: nix::c_int = if val { 1 } else { 0 };
-
-    nix::setsockopt(io.fd, nix::SOL_SOCKET, nix::SO_REUSEPORT, &v)
+    nix::setsockopt(io.fd, SockLevel::Socket, sockopt::ReusePort, val)
         .map_err(MioError::from_nix_error)
 }
 
 pub fn set_tcp_nodelay(io: &IoDesc, val: bool) -> MioResult<()> {
-    let v: nix::c_int = if val { 1 } else { 0 };
-
-    nix::setsockopt(io.fd, nix::IPPROTO_TCP, nix::TCP_NODELAY, &v)
+    nix::setsockopt(io.fd, SockLevel::Tcp, sockopt::TcpNoDelay, val)
         .map_err(MioError::from_nix_error)
 }
 
 pub fn join_multicast_group(io: &IoDesc, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
-    let grp_req = try!(make_ip_mreq(addr, interface));
+    let req = try!(make_ip_mreq(addr, interface));
 
-    nix::setsockopt(io.fd, nix::IPPROTO_IP, nix::IP_ADD_MEMBERSHIP, &grp_req)
+    nix::setsockopt(io.fd, SockLevel::Ip, sockopt::IpAddMembership, &req)
         .map_err(MioError::from_nix_error)
 }
 
 pub fn leave_multicast_group(io: &IoDesc, addr: &IpAddr, interface: &Option<IpAddr>) -> MioResult<()> {
     let grp_req = try!(make_ip_mreq(addr, interface));
 
-    nix::setsockopt(io.fd, nix::IPPROTO_IP, nix::IP_ADD_MEMBERSHIP, &grp_req)
+    nix::setsockopt(io.fd, SockLevel::Ip, sockopt::IpAddMembership, &grp_req)
         .map_err(MioError::from_nix_error)
 }
 
 pub fn set_multicast_ttl(io: &IoDesc, val: u8) -> MioResult<()> {
-    let v: nix::IpMulticastTtl = val;
-
-    nix::setsockopt(io.fd, nix::IPPROTO_IP, nix::IP_MULTICAST_TTL, &v)
+    nix::setsockopt(io.fd, SockLevel::Ip, sockopt::IpMulticastTtl, val)
         .map_err(MioError::from_nix_error)
 }
 
 pub fn linger(io: &IoDesc) -> MioResult<usize> {
-    let mut linger: nix::linger = unsafe { mem::uninitialized() };
-
-    try!(nix::getsockopt(io.fd, nix::SOL_SOCKET, nix::SO_LINGER, &mut linger)
-            .map_err(MioError::from_nix_error));
+    let linger = try!(nix::getsockopt(io.fd, SockLevel::Socket, sockopt::Linger)
+        .map_err(MioError::from_nix_error));
 
     if linger.l_onoff > 0 {
-        Ok(linger.l_linger as usize)
+        Ok(linger.l_onoff as usize)
     } else {
         Ok(0)
     }
@@ -259,7 +251,7 @@ pub fn set_linger(io: &IoDesc, dur_s: usize) -> MioResult<()> {
         l_linger: dur_s as nix::c_int
     };
 
-    nix::setsockopt(io.fd, nix::SOL_SOCKET, nix::SO_LINGER, &linger)
+    nix::setsockopt(io.fd, SockLevel::Socket, sockopt::Linger, &linger)
         .map_err(MioError::from_nix_error)
 }
 
@@ -357,4 +349,3 @@ fn ipv4_to_inaddr(a: u8, b: u8, c: u8, d: u8) -> nix::in_addr {
         s_addr: ipv4_to_u32(a, b, c, d)
     }
 }
-
