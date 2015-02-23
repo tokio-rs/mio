@@ -237,7 +237,7 @@ pub fn linger(io: &IoDesc) -> MioResult<usize> {
 
 pub fn getpeername(io: &IoDesc) -> MioResult<SockAddr> {
     let sa : nix::sockaddr_in = unsafe { mem::zeroed() };
-    let mut a = nix::SockAddr::SockIpV4(sa);
+    let mut a = nix::SockAddr::IpV4(sa);
 
     try!(nix::getpeername(io.fd, &mut a).map_err(MioError::from_nix_error));
 
@@ -246,7 +246,7 @@ pub fn getpeername(io: &IoDesc) -> MioResult<SockAddr> {
 
 pub fn getsockname(io: &IoDesc) -> MioResult<SockAddr> {
     let sa : nix::sockaddr_in = unsafe { mem::zeroed() };
-    let mut a = nix::SockAddr::SockIpV4(sa);
+    let mut a = nix::SockAddr::IpV4(sa);
 
     try!(nix::getsockname(io.fd, &mut a).map_err(MioError::from_nix_error));
 
@@ -284,10 +284,10 @@ fn from_ip_addr_to_inaddr(addr: &Option<IpAddr>) -> nix::in_addr {
 
 fn to_sockaddr(addr: &nix::SockAddr) -> SockAddr {
     match *addr {
-        nix::SockAddr::SockIpV4(sin) => {
+        nix::SockAddr::IpV4(sin) => {
             InetAddr(u32be_to_ipv4(sin.sin_addr.s_addr), Int::from_be(sin.sin_port))
         }
-        nix::SockAddr::SockUnix(addr) => {
+        nix::SockAddr::Unix(addr) => {
             let mut str_path = String::new();
             for c in addr.sun_path.iter() {
                 if *c == 0 { break; }
@@ -313,7 +313,7 @@ fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {
                     addr.sin_port = port.to_be();
                     addr.sin_addr = ipv4_to_inaddr(a, b, c, d);
 
-                    nix::SockAddr::SockIpV4(addr)
+                    nix::SockAddr::IpV4(addr)
                 }
                 _ => unimplemented!()
             }
@@ -329,7 +329,7 @@ fn from_sockaddr(addr: &SockAddr) -> nix::SockAddr {
                 *sp_iter = *path_iter as i8;
             }
 
-            nix::SockAddr::SockUnix(addr)
+            nix::SockAddr::Unix(addr)
         }
     }
 }
