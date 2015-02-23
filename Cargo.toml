@@ -23,7 +23,7 @@ time  = "0.1.16"
 bytes = "0.1.2"
 
 [dependencies.nix]
-nix = "https://github.com/carllerche/nix-rust"
+git = "https://github.com/carllerche/nix-rust"
 
 [dev-dependencies]
 env_logger = "0.2.2"
