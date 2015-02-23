@@ -13,9 +13,6 @@ pub use self::linux::Awakener;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub use self::posix::PipeAwakener as Awakener;
 
-#[cfg(windows)]
-pub use self::windows::*;
-
 #[cfg(target_os = "linux")]
 mod epoll;
 
