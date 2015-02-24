@@ -48,6 +48,12 @@ pub trait MulticastSocket : Socket {
     }
 }
 
+pub trait BroadcastSocket: Socket {
+    fn set_broadcast(&self, val: bool) -> MioResult<()> {
+        os::set_broadcast(self.desc(), val)
+    }
+}
+
 pub trait UnconnectedSocket {
 
     fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &SockAddr) -> MioResult<NonBlock<()>>;
@@ -317,7 +323,7 @@ pub mod udp {
     use io::{FromIoDesc, IoHandle, IoReader, IoWriter, NonBlock};
     use io::NonBlock::{Ready, WouldBlock};
     use io;
-    use net::{AddressFamily, Socket, MulticastSocket, SockAddr};
+    use net::{AddressFamily, Socket, BroadcastSocket, MulticastSocket, SockAddr};
     use net::SocketType::Dgram;
     use net::AddressFamily::Inet;
     use super::UnconnectedSocket;
@@ -368,6 +374,10 @@ pub mod udp {
     }
 
     impl MulticastSocket for UdpSocket {
+    }
+
+    impl BroadcastSocket for UdpSocket {
+
     }
 
     impl IoReader for UdpSocket {

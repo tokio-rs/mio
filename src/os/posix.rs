@@ -216,6 +216,13 @@ pub fn set_multicast_ttl(io: &IoDesc, val: u8) -> MioResult<()> {
         .map_err(MioError::from_nix_error)
 }
 
+pub fn set_broadcast(io: &IoDesc, val: bool) -> MioResult<()> {
+    let v: nix::c_int = if val { 1 } else { 0 };
+
+    nix::setsockopt(io.fd, nix::SOL_SOCKET, nix::SO_BROADCAST, &v)
+        .map_err(MioError::from_nix_error)
+}
+
 pub fn linger(io: &IoDesc) -> MioResult<usize> {
     let linger = try!(nix::getsockopt(io.fd, SockLevel::Socket, sockopt::Linger)
         .map_err(MioError::from_nix_error));
