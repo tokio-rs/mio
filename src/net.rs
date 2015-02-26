@@ -2,19 +2,16 @@
 //!
 use std::fmt;
 use std::str::FromStr;
-use std::old_io::net::ip::SocketAddr as StdSocketAddr;
-use std::old_io::net::ip::ParseError;
+use std::net::SocketAddr as StdSocketAddr;
+use std::path::PathBuf;
 use io::{IoHandle, NonBlock};
 use error::MioResult;
 use buf::{Buf, MutBuf};
 use os;
 
-pub use std::old_io::net::ip::{IpAddr, Port};
-pub use std::old_io::net::ip::Ipv4Addr as IPv4Addr;
-pub use std::old_io::net::ip::Ipv6Addr as IPv6Addr;
-
-use self::SockAddr::{InetAddr,UnixAddr};
-use self::AddressFamily::{Unix,Inet,Inet6};
+pub use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+pub use std::net::SocketAddr as InetAddr;
+pub use nix::sys::socket::{AddressFamily, SockType, ToInAddr};
 
 pub trait Socket : IoHandle {
     fn linger(&self) -> MioResult<usize> {
@@ -55,88 +52,105 @@ pub trait UnconnectedSocket {
     fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SockAddr>>;
 }
 
-// Types of sockets
-#[derive(Copy)]
-pub enum AddressFamily {
-    Inet,
-    Inet6,
-    Unix,
-}
-
+// TODO: Get rid of this type
 pub enum SockAddr {
-    UnixAddr(Path),
-    InetAddr(IpAddr, Port)
+    UnixAddr(PathBuf),
+    InetAddr(InetAddr)
 }
 
 impl SockAddr {
-    pub fn parse(s: &str) -> Result<SockAddr, ParseError> {
-        let addr = FromStr::from_str(s);
-        addr.map(|a : StdSocketAddr| InetAddr(a.ip, a.port))
+    pub fn parse(s: &str) -> Option<SockAddr> {
+        FromStr::from_str(s).ok()
+            .map(|addr: InetAddr| SockAddr::InetAddr(addr))
     }
 
     pub fn family(&self) -> AddressFamily {
         match *self {
-            UnixAddr(..) => Unix,
-            InetAddr(IPv4Addr(..), _) => Inet,
-            InetAddr(IPv6Addr(..), _) => Inet6
+            SockAddr::UnixAddr(..) => AddressFamily::Unix,
+            SockAddr::InetAddr(addr) => {
+                match addr.ip() {
+                    IpAddr::V4(..) => AddressFamily::Inet,
+                    IpAddr::V6(..) => AddressFamily::Inet6,
+                }
+            }
         }
     }
 
-    pub fn from_path(p: Path) -> SockAddr {
-        UnixAddr(p)
+    pub fn from_path(p: PathBuf) -> SockAddr {
+        SockAddr::UnixAddr(p)
     }
 
     #[inline]
-    pub fn consume_std(addr: StdSocketAddr) -> SockAddr {
-        InetAddr(addr.ip, addr.port)
+    pub fn consume_std(addr: InetAddr) -> SockAddr {
+        SockAddr::InetAddr(addr)
     }
 
     #[inline]
-    pub fn from_std(addr: &StdSocketAddr) -> SockAddr {
-        InetAddr(addr.ip.clone(), addr.port)
+    pub fn from_std(addr: &InetAddr) -> SockAddr {
+        SockAddr::InetAddr(addr.clone())
     }
 
-    pub fn to_std(&self) -> Option<StdSocketAddr> {
+    pub fn to_std(&self) -> Option<InetAddr> {
         match *self {
-            InetAddr(ref addr, port) => Some(StdSocketAddr {
-                ip: addr.clone(),
-                port: port
-            }),
+            SockAddr::InetAddr(ref addr) => {
+                Some(addr.clone())
+            }
             _ => None
         }
     }
 
     pub fn into_std(self) -> Option<StdSocketAddr> {
         match self {
-            InetAddr(addr, port) => Some(StdSocketAddr {
-                ip: addr,
-                port: port
-            }),
+            SockAddr::InetAddr(addr) => {
+                Some(addr)
+            }
             _ => None
         }
-    }
-}
-
-impl FromStr for SockAddr {
-    type Err = ParseError;
-    fn from_str(s: &str) -> Result<SockAddr, ParseError> {
-        SockAddr::parse(s)
     }
 }
 
 impl fmt::Debug for SockAddr {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            InetAddr(ip, port) => write!(fmt, "{}:{}", ip, port),
+            SockAddr::InetAddr(addr) => write!(fmt, "{}", addr),
             _ => write!(fmt, "not implemented")
         }
     }
 }
 
-#[derive(Copy)]
-pub enum SocketType {
-    Dgram,
-    Stream,
+
+// TODO: Get rid of all this
+use nix::sys::socket::{ToSockAddr, FromSockAddr};
+use nix::sys::socket::SockAddr as NixSockAddr;
+use nix::{NixResult};
+
+impl ToSockAddr for SockAddr {
+    fn to_sock_addr(&self) -> NixResult<NixSockAddr> {
+        match *self {
+            SockAddr::InetAddr(addr) => {
+                addr.to_sock_addr()
+            }
+            SockAddr::UnixAddr(ref path) => {
+                path.to_sock_addr()
+            }
+        }
+    }
+}
+
+impl FromSockAddr for SockAddr {
+    fn from_sock_addr(addr: &NixSockAddr) -> Option<SockAddr> {
+        match *addr {
+            NixSockAddr::IpV4(..) |
+            NixSockAddr::IpV6(..) => {
+                FromSockAddr::from_sock_addr(addr)
+                    .map(|a: InetAddr| SockAddr::InetAddr(a))
+            }
+            NixSockAddr::Unix(..) => {
+                FromSockAddr::from_sock_addr(addr)
+                    .map(|a: PathBuf| SockAddr::UnixAddr(a))
+            }
+        }
+    }
 }
 
 /// TCP networking primitives
@@ -148,9 +162,7 @@ pub mod tcp {
     use io;
     use io::{FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
     use io::NonBlock::{Ready, WouldBlock};
-    use net::{Socket, SockAddr};
-    use net::SocketType::Stream;
-    use net::AddressFamily::{self, Inet, Inet6};
+    use net::{AddressFamily, Socket, SockAddr, SockType};
 
     #[derive(Debug)]
     pub struct TcpSocket {
@@ -159,15 +171,15 @@ pub mod tcp {
 
     impl TcpSocket {
         pub fn v4() -> MioResult<TcpSocket> {
-            TcpSocket::new(Inet)
+            TcpSocket::new(AddressFamily::Inet)
         }
 
         pub fn v6() -> MioResult<TcpSocket> {
-            TcpSocket::new(Inet6)
+            TcpSocket::new(AddressFamily::Inet6)
         }
 
         fn new(family: AddressFamily) -> MioResult<TcpSocket> {
-            Ok(TcpSocket { desc: try!(os::socket(family, Stream)) })
+            Ok(TcpSocket { desc: try!(os::socket(family, SockType::Stream)) })
         }
 
         /// Connects the socket to the specified address. When the operation
@@ -317,9 +329,7 @@ pub mod udp {
     use io::{FromIoDesc, IoHandle, IoReader, IoWriter, NonBlock};
     use io::NonBlock::{Ready, WouldBlock};
     use io;
-    use net::{AddressFamily, Socket, MulticastSocket, SockAddr};
-    use net::SocketType::Dgram;
-    use net::AddressFamily::Inet;
+    use net::{AddressFamily, Socket, MulticastSocket, SockAddr, SockType};
     use super::UnconnectedSocket;
 
     #[derive(Debug)]
@@ -329,11 +339,11 @@ pub mod udp {
 
     impl UdpSocket {
         pub fn v4() -> MioResult<UdpSocket> {
-            UdpSocket::new(Inet)
+            UdpSocket::new(AddressFamily::Inet)
         }
 
         fn new(family: AddressFamily) -> MioResult<UdpSocket> {
-            Ok(UdpSocket { desc: try!(os::socket(family, Dgram)) })
+            Ok(UdpSocket { desc: try!(os::socket(family, SockType::Datagram)) })
         }
 
         pub fn bind(&self, addr: &SockAddr) -> MioResult<()> {
@@ -434,9 +444,7 @@ pub mod pipe {
     use io;
     use io::{FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
     use io::NonBlock::{Ready, WouldBlock};
-    use net::{Socket, SockAddr, SocketType};
-    use net::SocketType::Stream;
-    use net::AddressFamily::Unix;
+    use net::{AddressFamily, Socket, SockAddr, SockType};
 
     #[derive(Debug)]
     pub struct UnixSocket {
@@ -445,11 +453,11 @@ pub mod pipe {
 
     impl UnixSocket {
         pub fn stream() -> MioResult<UnixSocket> {
-            UnixSocket::new(Stream)
+            UnixSocket::new(SockType::Stream)
         }
 
-        fn new(socket_type: SocketType) -> MioResult<UnixSocket> {
-            Ok(UnixSocket { desc: try!(os::socket(Unix, socket_type)) })
+        fn new(socket_type: SockType) -> MioResult<UnixSocket> {
+            Ok(UnixSocket { desc: try!(os::socket(AddressFamily::Unix, socket_type)) })
         }
 
         pub fn connect(&self, addr: &SockAddr) -> MioResult<()> {

@@ -4,7 +4,6 @@ use mio::net::udp::*;
 use mio::buf::{RingBuf, SliceBuf};
 use std::str;
 use super::localhost;
-use std::old_io::net::ip::{Ipv4Addr};
 
 type TestEventLoop = EventLoop<usize, ()>;
 
@@ -72,10 +71,10 @@ pub fn test_udp_socket() {
     recv_sock.set_reuseaddr(true).unwrap();
 
     info!("Joining group 227.1.1.100");
-    recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 100), None).unwrap();
+    recv_sock.join_multicast_group(&IpAddr::new_v4(227, 1, 1, 100), None).unwrap();
 
     info!("Joining group 227.1.1.101");
-    recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 101), None).unwrap();
+    recv_sock.join_multicast_group(&IpAddr::new_v4(227, 1, 1, 101), None).unwrap();
 
     info!("Registering LISTENER");
     event_loop.register_opt(&recv_sock, LISTENER, Interest::readable(), PollOpt::edge()).unwrap();

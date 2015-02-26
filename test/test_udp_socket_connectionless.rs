@@ -3,7 +3,6 @@ use mio::net::*;
 use mio::net::udp::*;
 use mio::buf::{RingBuf, SliceBuf};
 use std::str;
-use std::old_io::net::ip::{Ipv4Addr};
 
 type TestEventLoop = EventLoop<usize, ()>;
 
@@ -40,8 +39,8 @@ impl Handler<usize, ()> for UdpHandler {
                 match self.listen_sock.recv_from(&mut self.rx_buf.writer()) {
                     Ok(wouldblock) => {
                         match wouldblock.unwrap() {
-                            SockAddr::InetAddr(ip, _) => {
-                                assert!(ip == IPv4Addr(127, 0, 0, 1));
+                            SockAddr::InetAddr(inet) => {
+                                assert_eq!(inet.ip(), IpAddr::new_v4(127, 0, 0, 1));
                             }
                             _ => panic!("This should be an IPv4 address")
                         }
@@ -69,7 +68,7 @@ impl Handler<usize, ()> for UdpHandler {
 
 #[test]
 pub fn test_udp_socket_connectionless() {
-    debug!("Starting TEST_UDP_CONNECTNLESS");
+    debug!("Starting TEST_UDP_CONNECTIONLESS");
     let mut event_loop = EventLoop::new().unwrap();
 
     let send_sock = UdpSocket::v4().unwrap();
@@ -84,10 +83,10 @@ pub fn test_udp_socket_connectionless() {
     recv_sock.set_reuseaddr(true).unwrap();
 
     info!("Joining group 227.1.1.100");
-    recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 100), None).unwrap();
+    recv_sock.join_multicast_group(&IpAddr::new_v4(227, 1, 1, 100), None).unwrap();
 
     info!("Joining group 227.1.1.101");
-    recv_sock.join_multicast_group(&Ipv4Addr(227, 1, 1, 101), None).unwrap();
+    recv_sock.join_multicast_group(&IpAddr::new_v4(227, 1, 1, 101), None).unwrap();
 
     info!("Registering LISTENER");
     event_loop.register_opt(&recv_sock, LISTENER, Interest::readable(), PollOpt::edge()).unwrap();
@@ -98,4 +97,3 @@ pub fn test_udp_socket_connectionless() {
     info!("Starting event loop to test with...");
     event_loop.run(&mut UdpHandler::new(send_sock, recv_sock, "hello world")).unwrap();
 }
-

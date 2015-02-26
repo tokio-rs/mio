@@ -1,4 +1,4 @@
-#![feature(old_path, old_io, std_misc, core, collections)]
+#![feature(core, collections, net, old_path, old_io, path, std_misc)]
 
 extern crate mio;
 
