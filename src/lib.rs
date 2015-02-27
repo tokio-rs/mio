@@ -20,15 +20,16 @@
 //!
 //! ```
 //! use mio::*;
-//! use mio::net::{SockAddr};
 //! use mio::net::tcp::{TcpSocket, TcpAcceptor};
+//! use std::net::SocketAddr;
+//! use std::str::FromStr;
 //!
 //! // Setup some tokens to allow us to identify which event is
 //! // for which socket.
 //! const SERVER: Token = Token(0);
 //! const CLIENT: Token = Token(1);
 //!
-//! let addr = SockAddr::parse("127.0.0.1:13265").unwrap();
+//! let addr = FromStr::from_str("127.0.0.1:13265").unwrap();
 //!
 //! // Setup the server socket
 //! let server = TcpSocket::v4().unwrap()

@@ -2,8 +2,9 @@ use mio::*;
 use mio::net::*;
 use mio::net::udp::*;
 use mio::buf::{RingBuf, SliceBuf};
-use std::str;
 use super::localhost;
+use std::str;
+use std::net::IpAddr;
 
 type TestEventLoop = EventLoop<usize, ()>;
 
@@ -60,7 +61,7 @@ pub fn test_udp_socket() {
 
     let send_sock = UdpSocket::v4().unwrap();
     let recv_sock = UdpSocket::v4().unwrap();
-    let addr = SockAddr::parse(localhost().as_slice()).unwrap();
+    let addr = localhost();
 
     info!("Binding both listener and sender to localhost...");
     send_sock.connect(&addr).unwrap();

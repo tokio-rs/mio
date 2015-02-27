@@ -60,7 +60,7 @@ pub fn test_register_deregister() {
     debug!("Starting TEST_REGISTER_DEREGISTER");
     let mut event_loop = EventLoop::new().unwrap();
 
-    let addr = SockAddr::parse(localhost().as_slice()).unwrap();
+    let addr = localhost();
 
     let server = TcpSocket::v4().unwrap();
 

@@ -221,7 +221,7 @@ pub fn test_echo_server() {
         };
     let mut event_loop = EventLoop::configured(config).unwrap();
 
-    let addr = SockAddr::parse(localhost().as_slice()).unwrap();
+    let addr = localhost();
 
     let srv = TcpSocket::v4().unwrap();
 

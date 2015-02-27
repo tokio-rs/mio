@@ -91,7 +91,7 @@ pub fn test_close_on_drop() {
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut event_loop = EventLoop::new().unwrap();
 
-    let addr = SockAddr::parse(localhost().as_slice()).unwrap();
+    let addr = localhost();
 
     let srv = TcpSocket::v4().unwrap();
 

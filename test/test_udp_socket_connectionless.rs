@@ -2,7 +2,8 @@ use mio::*;
 use mio::net::*;
 use mio::net::udp::*;
 use mio::buf::{RingBuf, SliceBuf};
-use std::str;
+use std::str::{self, FromStr};
+use std::net::{SocketAddr, IpAddr};
 
 type TestEventLoop = EventLoop<usize, ()>;
 
@@ -12,7 +13,7 @@ const SENDER: Token = Token(1);
 pub struct UdpHandler {
     listen_sock: UdpSocket,
     send_sock: UdpSocket,
-    sock_addr: SockAddr,
+    sock_addr: SocketAddr,
     msg: &'static str,
     message_buf: SliceBuf<'static>,
     rx_buf: RingBuf
@@ -23,7 +24,7 @@ impl UdpHandler {
         UdpHandler {
             listen_sock: listen_sock,
             send_sock: send_sock,
-            sock_addr: SockAddr::parse("127.0.0.1:24601".as_slice()).unwrap(),
+            sock_addr: FromStr::from_str("127.0.0.1:24601").unwrap(),
             msg: msg,
             message_buf: SliceBuf::wrap(msg.as_bytes()),
             rx_buf: RingBuf::new(1024)
@@ -37,13 +38,8 @@ impl Handler<usize, ()> for UdpHandler {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
                 match self.listen_sock.recv_from(&mut self.rx_buf.writer()) {
-                    Ok(wouldblock) => {
-                        match wouldblock.unwrap() {
-                            SockAddr::InetAddr(inet) => {
-                                assert_eq!(inet.ip(), IpAddr::new_v4(127, 0, 0, 1));
-                            }
-                            _ => panic!("This should be an IPv4 address")
-                        }
+                    Ok(res) => {
+                        assert_eq!(res.unwrap().ip(), IpAddr::new_v4(127, 0, 0, 1));
                     }
                     ret => {
                         ret.unwrap();
@@ -73,7 +69,7 @@ pub fn test_udp_socket_connectionless() {
 
     let send_sock = UdpSocket::v4().unwrap();
     let recv_sock = UdpSocket::v4().unwrap();
-    let addr = SockAddr::parse("127.0.0.1:24601".as_slice()).unwrap();
+    let addr = FromStr::from_str("127.0.0.1:24601").unwrap();
 
     info!("Binding the listener socket");
     recv_sock.bind(&addr).unwrap();

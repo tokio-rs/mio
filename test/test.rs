@@ -18,6 +18,8 @@ mod test_register_deregister;
 mod test_unix_echo_server;
 
 mod ports {
+    use std::net::SocketAddr;
+    use std::str::FromStr;
     use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
     use std::sync::atomic::Ordering::SeqCst;
 
@@ -36,7 +38,8 @@ mod ports {
         }
     }
 
-    pub fn localhost() -> String {
-        format!("127.0.0.1:{}", next_port())
+    pub fn localhost() -> SocketAddr {
+        let s = format!("127.0.0.1:{}", next_port());
+        FromStr::from_str(s.as_slice()).unwrap()
     }
 }

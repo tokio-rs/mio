@@ -45,7 +45,7 @@ pub fn test_notify() {
     debug!("Starting TEST_NOTIFY");
     let mut event_loop = EventLoop::new().unwrap();
 
-    let addr = SockAddr::parse(localhost().as_slice()).unwrap();
+    let addr = localhost();
 
     // Setup a server socket so that the event loop blocks
     let srv = TcpSocket::v4().unwrap();

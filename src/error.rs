@@ -53,6 +53,13 @@ impl MioError {
         }
     }
 
+    pub fn other() -> MioError {
+        MioError {
+            kind: OtherError,
+            sys: None,
+        }
+    }
+
     pub fn from_nix_error(err: NixError) -> MioError {
         let kind = match err {
             NixError::Sys(EAGAIN) => WouldBlock,
