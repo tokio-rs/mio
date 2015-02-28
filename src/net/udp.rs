@@ -20,16 +20,16 @@ impl UdpSocket {
     }
 
     fn new(family: nix::AddressFamily) -> MioResult<UdpSocket> {
-        Ok(UdpSocket { desc: try!(os::socket(family, nix::SockType::Datagram)) })
+        Ok(UdpSocket { desc: try!(net::socket(family, nix::SockType::Datagram)) })
     }
 
     pub fn bind(&self, addr: &SocketAddr) -> MioResult<()> {
-        try!(os::bind(&self.desc, &net::to_nix_addr(addr)));
+        try!(net::bind(&self.desc, &net::to_nix_addr(addr)));
         Ok(())
     }
 
     pub fn connect(&self, addr: &SocketAddr) -> MioResult<bool> {
-        os::connect(&self.desc, &net::to_nix_addr(addr))
+        net::connect(&self.desc, &net::to_nix_addr(addr))
     }
 
     pub fn bound(addr: &SocketAddr) -> MioResult<UdpSocket> {
@@ -88,34 +88,20 @@ impl IoWriter for UdpSocket {
 // Unconnected socket sender -- trait unique to sockets
 impl UnconnectedSocket for UdpSocket {
     fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &SocketAddr) -> MioResult<NonBlock<()>> {
-        match os::sendto(&self.desc, buf.bytes(), &net::to_nix_addr(tgt)) {
-            Ok(cnt) => {
+        net::sendto(&self.desc, buf.bytes(), &net::to_nix_addr(tgt))
+            .map(|cnt| {
                 buf.advance(cnt);
-                Ok(NonBlock::Ready(()))
-            }
-            Err(e) => {
-                if e.is_would_block() {
-                    Ok(NonBlock::WouldBlock)
-                } else {
-                    Err(e)
-                }
-            }
-        }
+                NonBlock::Ready(())
+            })
+            .or_else(io::to_non_block)
     }
 
     fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SocketAddr>> {
-        match os::recvfrom(&self.desc, buf.mut_bytes()) {
-            Ok((cnt, addr)) => {
+        net::recvfrom(&self.desc, buf.mut_bytes())
+            .map(|(cnt, addr)| {
                 buf.advance(cnt);
-                Ok(NonBlock::Ready(net::to_std_addr(addr)))
-            }
-            Err(e) => {
-                if e.is_would_block() {
-                    Ok(NonBlock::WouldBlock)
-                } else {
-                    Err(e)
-                }
-            }
-        }
+                NonBlock::Ready(net::to_std_addr(addr))
+            })
+            .or_else(io::to_non_block)
     }
 }

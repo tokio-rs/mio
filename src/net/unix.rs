@@ -1,7 +1,7 @@
 use {MioResult, MioError};
 use buf::{Buf, MutBuf};
 use io::{self, FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
-use net::{nix, Socket};
+use net::{self, nix, Socket};
 use os;
 use std::path::Path;
 
@@ -17,17 +17,17 @@ impl UnixSocket {
 
     fn new(ty: nix::SockType) -> MioResult<UnixSocket> {
         Ok(UnixSocket {
-            desc: try!(os::socket(nix::AddressFamily::Unix, ty))
+            desc: try!(net::socket(nix::AddressFamily::Unix, ty))
         })
     }
 
     pub fn connect(&self, addr: &Path) -> MioResult<bool> {
         // Attempt establishing the context. This may not complete immediately.
-        os::connect(&self.desc, &try!(to_nix_addr(addr)))
+        net::connect(&self.desc, &try!(to_nix_addr(addr)))
     }
 
     pub fn bind(self, addr: &Path) -> MioResult<UnixListener> {
-        try!(os::bind(&self.desc, &try!(to_nix_addr(addr))));
+        try!(net::bind(&self.desc, &try!(to_nix_addr(addr))));
         Ok(UnixListener { desc: self.desc })
     }
 }
@@ -74,7 +74,7 @@ pub struct UnixListener {
 
 impl UnixListener {
     pub fn listen(self, backlog: usize) -> MioResult<UnixAcceptor> {
-        try!(os::listen(self.desc(), backlog));
+        try!(net::listen(self.desc(), backlog));
         Ok(UnixAcceptor { desc: self.desc })
     }
 }
@@ -123,7 +123,7 @@ impl IoAcceptor for UnixAcceptor {
     type Output = UnixSocket;
 
     fn accept(&mut self) -> MioResult<NonBlock<UnixSocket>> {
-        match os::accept(self.desc()) {
+        match net::accept(self.desc()) {
             Ok(sock) => Ok(NonBlock::Ready(UnixSocket { desc: sock })),
             Err(e) => {
                 if e.is_would_block() {

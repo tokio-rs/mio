@@ -3,7 +3,6 @@ use error::MioResult;
 use buf::{Buf, MutBuf};
 use io;
 use io::{FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
-use io::NonBlock::{Ready, WouldBlock};
 use net::{self, nix, Socket};
 use std::net::{SocketAddr, IpAddr};
 
@@ -22,7 +21,7 @@ impl TcpSocket {
     }
 
     fn new(family: nix::AddressFamily) -> MioResult<TcpSocket> {
-        Ok(TcpSocket { desc: try!(os::socket(family, nix::SockType::Stream)) })
+        Ok(TcpSocket { desc: try!(net::socket(family, nix::SockType::Stream)) })
     }
 
     /// Connects the socket to the specified address. When the operation
@@ -34,21 +33,21 @@ impl TcpSocket {
     /// to worry about possibly-immediate connection.
     pub fn connect(&self, addr: &SocketAddr) -> MioResult<bool> {
         // Attempt establishing the context. This may not complete immediately.
-        os::connect(&self.desc, &net::to_nix_addr(addr))
+        net::connect(&self.desc, &net::to_nix_addr(addr))
     }
 
     pub fn bind(self, addr: &SocketAddr) -> MioResult<TcpListener> {
-        try!(os::bind(&self.desc, &net::to_nix_addr(addr)));
+        try!(net::bind(&self.desc, &net::to_nix_addr(addr)));
         Ok(TcpListener { desc: self.desc })
     }
 
     pub fn getpeername(&self) -> MioResult<SocketAddr> {
-        os::getpeername(&self.desc)
+        net::getpeername(&self.desc)
             .map(net::to_std_addr)
     }
 
     pub fn getsockname(&self) -> MioResult<SocketAddr> {
-        os::getsockname(&self.desc)
+        net::getsockname(&self.desc)
             .map(net::to_std_addr)
     }
 }
@@ -95,7 +94,7 @@ pub struct TcpListener {
 
 impl TcpListener {
     pub fn listen(self, backlog: usize) -> MioResult<TcpAcceptor> {
-        try!(os::listen(self.desc(), backlog));
+        try!(net::listen(self.desc(), backlog));
         Ok(TcpAcceptor { desc: self.desc })
     }
 }
@@ -152,15 +151,8 @@ impl IoAcceptor for TcpAcceptor {
     type Output = TcpSocket;
 
     fn accept(&mut self) -> MioResult<NonBlock<TcpSocket>> {
-        match os::accept(self.desc()) {
-            Ok(sock) => Ok(Ready(TcpSocket { desc: sock })),
-            Err(e) => {
-                if e.is_would_block() {
-                    return Ok(WouldBlock);
-                }
-
-                return Err(e);
-            }
-        }
+        net::accept(self.desc())
+            .map(|fd| NonBlock::Ready(TcpSocket { desc: fd }))
+            .or_else(io::to_non_block)
     }
 }
