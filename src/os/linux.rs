@@ -1,6 +1,7 @@
 use std::mem;
 use super::posix::*;
 use error::{MioResult, MioError};
+use net;
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";
 
@@ -18,7 +19,7 @@ impl Awakener {
     }
 
     pub fn wakeup(&self) -> MioResult<()> {
-        write(&self.eventfd, MARK)
+        net::write(&self.eventfd, MARK)
             .map(|_| ())
     }
 
@@ -31,7 +32,7 @@ impl Awakener {
 
         loop {
             // Consume data until all bytes are purged
-            match read(&self.eventfd, buf.as_mut_slice()) {
+            match net::read(&self.eventfd, buf.as_mut_slice()) {
                 Ok(_) => {}
                 Err(_) => return
             }
