@@ -32,7 +32,7 @@ extern crate mio;
 * High performance timer system
 * Thread safe message channel for cross thread communication
 
-__Coming soon__
+__Eventually__
 
 * Signal handling
 
@@ -43,9 +43,9 @@ or higher level libraries.
 
 * File operations
 * Thread pools / multi-threaded event loop
+* Windows support
 
 ## Platforms
 
-Currently, MIO only supports Linux and Darwin. However, Windows support
-will be coming soon. The goal is to support all platforms that Rust
-supports.
+Currently, MIO only supports Linux and Darwin. The goal is to support
+all platforms that support Rust and the readiness IO model.
