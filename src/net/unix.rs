@@ -1,6 +1,6 @@
-use {MioResult, MioError};
+use {TryRead, TryWrite, NonBlock, MioResult, MioError};
 use buf::{Buf, MutBuf};
-use io::{Io, FromFd, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
+use io::{Io, FromFd, IoHandle, IoAcceptor};
 use net::{self, nix, Socket};
 use std::path::Path;
 use std::os::unix::Fd;
@@ -43,13 +43,13 @@ impl FromFd for UnixSocket {
     }
 }
 
-impl IoReader for UnixSocket {
+impl TryRead for UnixSocket {
     fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
         self.io.read_slice(buf)
     }
 }
 
-impl IoWriter for UnixSocket {
+impl TryWrite for UnixSocket {
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
         self.io.write_slice(buf)
     }

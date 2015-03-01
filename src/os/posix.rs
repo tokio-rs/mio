@@ -1,4 +1,4 @@
-use {IoHandle, IoReader, IoWriter, NonBlock, MioResult};
+use {IoHandle, TryRead, TryWrite, NonBlock, MioResult};
 use io::{self, PipeReader, PipeWriter};
 use std::os::unix::Fd;
 

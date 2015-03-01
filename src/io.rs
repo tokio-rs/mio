@@ -33,7 +33,7 @@ pub trait FromFd {
     fn from_fd(fd: Fd) -> Self;
 }
 
-pub trait IoReader {
+pub trait TryRead {
     fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
         // Reads the length of the slice supplied by buf.mut_bytes into the buffer
         // This is not guaranteed to consume an entire datagram or segment.
@@ -52,7 +52,7 @@ pub trait IoReader {
     fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>>;
 }
 
-pub trait IoWriter {
+pub trait TryWrite {
     fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
         let res = self.write_slice(buf.bytes());
 
@@ -95,7 +95,7 @@ impl IoHandle for Io {
     }
 }
 
-impl IoReader for Io {
+impl TryRead for Io {
     fn read_slice(&self, dst: &mut [u8]) -> MioResult<NonBlock<usize>> {
         use nix::unistd::read;
 
@@ -112,7 +112,7 @@ impl IoReader for Io {
     }
 }
 
-impl IoWriter for Io {
+impl TryWrite for Io {
     fn write_slice(&self, src: &[u8]) -> MioResult<NonBlock<usize>> {
         use nix::unistd::write;
 
@@ -166,7 +166,7 @@ impl IoHandle for PipeReader {
     }
 }
 
-impl IoReader for PipeReader {
+impl TryRead for PipeReader {
     fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>> {
         self.io.read_slice(buf)
     }
@@ -187,7 +187,7 @@ impl IoHandle for PipeWriter {
     }
 }
 
-impl IoWriter for PipeWriter {
+impl TryWrite for PipeWriter {
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
         self.io.write_slice(buf)
     }

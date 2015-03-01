@@ -363,8 +363,7 @@ mod tests {
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
-    use io::{IoWriter, IoReader};
-    use {io, buf, Buf, Handler, Token};
+    use {io, buf, Buf, Handler, Token, TryRead, TryWrite};
     use os::event;
 
     type TestEventLoop = EventLoop<usize, ()>;

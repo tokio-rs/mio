@@ -1,6 +1,6 @@
+use {TryRead, TryWrite, NonBlock, MioResult};
 use buf::{Buf, MutBuf};
-use error::MioResult;
-use io::{self, Io, FromFd, IoHandle, IoReader, IoWriter, NonBlock};
+use io::{self, Io, FromFd, IoHandle};
 use net::{self, nix, Socket, MulticastSocket, UnconnectedSocket};
 use std::net::{SocketAddr, IpAddr};
 use std::os::unix::Fd;
@@ -66,13 +66,13 @@ impl Socket for UdpSocket {
 impl MulticastSocket for UdpSocket {
 }
 
-impl IoReader for UdpSocket {
+impl TryRead for UdpSocket {
     fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
         self.io.read_slice(buf)
     }
 }
 
-impl IoWriter for UdpSocket {
+impl TryWrite for UdpSocket {
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
         self.io.write_slice(buf)
     }

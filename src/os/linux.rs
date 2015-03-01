@@ -1,4 +1,4 @@
-use {Io, NonBlock, IoReader, IoWriter, IoHandle, MioResult, MioError};
+use {Io, NonBlock, TryRead, TryWrite, IoHandle, MioResult, MioError};
 use std::os::unix::Fd;
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";

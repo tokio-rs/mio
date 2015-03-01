@@ -1,6 +1,6 @@
-use error::MioResult;
+use {TryRead, TryWrite, NonBlock, MioResult};
 use buf::{Buf, MutBuf};
-use io::{self, FromFd, Io, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
+use io::{self, FromFd, Io, IoHandle, IoAcceptor};
 use net::{self, nix, Socket};
 use std::net::{SocketAddr, IpAddr};
 use std::os::unix::Fd;
@@ -64,13 +64,13 @@ impl FromFd for TcpSocket {
     }
 }
 
-impl IoReader for TcpSocket {
+impl TryRead for TcpSocket {
     fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
         self.io.read_slice(buf)
     }
 }
 
-impl IoWriter for TcpSocket {
+impl TryWrite for TcpSocket {
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
         self.io.write_slice(buf)
     }
