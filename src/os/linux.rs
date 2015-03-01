@@ -1,7 +1,5 @@
-use std::mem;
+use {Io, NonBlock, IoReader, IoWriter, IoHandle, MioResult, MioError};
 use super::posix::*;
-use error::{MioResult, MioError};
-use net;
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";
 
@@ -10,31 +8,33 @@ mod nix {
 }
 
 pub struct Awakener {
-    eventfd: IoDesc
+    eventfd: Io,
 }
 
 impl Awakener {
     pub fn new() -> MioResult<Awakener> {
-        Ok(Awakener { eventfd: try!(eventfd()) })
+        Ok(Awakener {
+            eventfd: Io::new(try!(eventfd())),
+        })
     }
 
     pub fn wakeup(&self) -> MioResult<()> {
-        net::write(&self.eventfd, MARK)
+        self.eventfd.write_slice(MARK)
             .map(|_| ())
     }
 
     pub fn desc(&self) -> &IoDesc {
-        &self.eventfd
+        self.eventfd.desc()
     }
 
     pub fn cleanup(&self) {
-        let mut buf: [u8; 8] = unsafe { mem::uninitialized() };
+        let mut buf = [0; 8];
 
         loop {
             // Consume data until all bytes are purged
-            match net::read(&self.eventfd, buf.as_mut_slice()) {
-                Ok(_) => {}
-                Err(_) => return
+            match self.eventfd.read_slice(&mut buf) {
+                Ok(NonBlock::Ready(i)) if i > 0 => {},
+                _ => return,
             }
         }
     }

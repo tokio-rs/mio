@@ -1,5 +1,5 @@
-use {net, IoHandle, MioResult, MioError};
-use std::mem;
+use {IoHandle, IoReader, IoWriter, NonBlock, MioResult};
+use io::{self, PipeReader, PipeWriter};
 
 mod nix {
     pub use nix::{c_int, NixError};
@@ -16,13 +16,13 @@ mod nix {
  */
 
 pub struct PipeAwakener {
-    reader: IoDesc,
-    writer: IoDesc
+    reader: PipeReader,
+    writer: PipeWriter,
 }
 
 impl PipeAwakener {
     pub fn new() -> MioResult<PipeAwakener> {
-        let (rd, wr) = try!(pipe());
+        let (rd, wr) = try!(io::pipe());
 
         Ok(PipeAwakener {
             reader: rd,
@@ -30,23 +30,22 @@ impl PipeAwakener {
         })
     }
 
-    pub fn wakeup(&self) -> MioResult<()> {
-        net::write(&self.writer, b"0x01")
-            .map(|_| ())
+    pub fn desc(&self) -> &IoDesc {
+        self.reader.desc()
     }
 
-    pub fn desc(&self) -> &IoDesc {
-        &self.reader
+    pub fn wakeup(&self) -> MioResult<()> {
+        self.writer.write_slice(b"0x01").map(|_| ())
     }
 
     pub fn cleanup(&self) {
-        let mut buf: [u8; 128] = unsafe { mem::uninitialized() };
+        let mut buf = [0; 128];
 
         loop {
             // Consume data until all bytes are purged
-            match net::read(&self.reader, buf.as_mut_slice()) {
-                Ok(_) => {}
-                Err(_) => return
+            match self.reader.read_slice(&mut buf) {
+                Ok(NonBlock::Ready(i)) if i > 0 => {},
+                _ => return,
             }
         }
     }
@@ -69,17 +68,4 @@ impl Drop for IoDesc {
     fn drop(&mut self) {
         let _ = nix::close(self.fd);
     }
-}
-
-/*
- *
- * ===== Pipes =====
- *
- */
-
-pub fn pipe() -> MioResult<(IoDesc, IoDesc)> {
-    let (rd, wr) = try!(nix::pipe2(nix::O_NONBLOCK | nix::O_CLOEXEC)
-                        .map_err(MioError::from_nix_error));
-
-    Ok((IoDesc { fd: rd }, IoDesc { fd: wr }))
 }

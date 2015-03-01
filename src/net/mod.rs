@@ -169,13 +169,13 @@ mod nix {
     };
 }
 
-pub fn socket(family: nix::AddressFamily, ty: nix::SockType) -> MioResult<IoDesc> {
+fn socket(family: nix::AddressFamily, ty: nix::SockType) -> MioResult<IoDesc> {
     nix::socket(family, ty, nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
         .map(|fd| IoDesc { fd: fd })
         .map_err(MioError::from_nix_error)
 }
 
-pub fn connect(io: &IoDesc, addr: &nix::SockAddr) -> MioResult<bool> {
+fn connect(io: &IoDesc, addr: &nix::SockAddr) -> MioResult<bool> {
     match nix::connect(io.fd, addr) {
         Ok(_) => Ok(true),
         Err(e) => {
@@ -187,17 +187,17 @@ pub fn connect(io: &IoDesc, addr: &nix::SockAddr) -> MioResult<bool> {
     }
 }
 
-pub fn bind(io: &IoDesc, addr: &nix::SockAddr) -> MioResult<()> {
+fn bind(io: &IoDesc, addr: &nix::SockAddr) -> MioResult<()> {
     nix::bind(io.fd, addr)
         .map_err(MioError::from_nix_error)
 }
 
-pub fn listen(io: &IoDesc, backlog: usize) -> MioResult<()> {
+fn listen(io: &IoDesc, backlog: usize) -> MioResult<()> {
     nix::listen(io.fd, backlog)
         .map_err(MioError::from_nix_error)
 }
 
-pub fn accept(io: &IoDesc) -> MioResult<IoDesc> {
+fn accept(io: &IoDesc) -> MioResult<IoDesc> {
     Ok(IoDesc {
         fd: try!(nix::accept4(io.fd, nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
                      .map_err(MioError::from_nix_error))
@@ -206,45 +206,23 @@ pub fn accept(io: &IoDesc) -> MioResult<IoDesc> {
 
 // UDP & UDS
 #[inline]
-pub fn recvfrom(io: &IoDesc, buf: &mut [u8]) -> MioResult<(usize, nix::SockAddr)> {
+fn recvfrom(io: &IoDesc, buf: &mut [u8]) -> MioResult<(usize, nix::SockAddr)> {
     nix::recvfrom(io.fd, buf).map_err(MioError::from_nix_error)
 }
 
 // UDP & UDS
 #[inline]
-pub fn sendto(io: &IoDesc, buf: &[u8], target: &nix::SockAddr) -> MioResult<usize> {
+fn sendto(io: &IoDesc, buf: &[u8], target: &nix::SockAddr) -> MioResult<usize> {
     nix::sendto(io.fd, buf, target, nix::MSG_DONTWAIT)
         .map_err(MioError::from_nix_error)
 }
 
-/*
- *
- * ===== Read / Write =====
- *
- */
-
-#[inline]
-pub fn read(io: &IoDesc, dst: &mut [u8]) -> MioResult<usize> {
-    let res = try!(nix::read(io.fd, dst).map_err(MioError::from_nix_error));
-
-    if res == 0 {
-        return Err(MioError::eof());
-    }
-
-    Ok(res)
-}
-
-#[inline]
-pub fn write(io: &IoDesc, src: &[u8]) -> MioResult<usize> {
-    nix::write(io.fd, src).map_err(MioError::from_nix_error)
-}
-
-pub fn getpeername(io: &IoDesc) -> MioResult<nix::SockAddr> {
+fn getpeername(io: &IoDesc) -> MioResult<nix::SockAddr> {
     nix::getpeername(io.fd)
         .map_err(MioError::from_nix_error)
 }
 
-pub fn getsockname(io: &IoDesc) -> MioResult<nix::SockAddr> {
+fn getsockname(io: &IoDesc) -> MioResult<nix::SockAddr> {
     nix::getsockname(io.fd)
         .map_err(MioError::from_nix_error)
 }

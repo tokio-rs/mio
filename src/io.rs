@@ -1,4 +1,4 @@
-use {os, net, MioResult, MioError};
+use {os, MioResult, MioError};
 use buf::{Buf, MutBuf};
 
 pub use os::IoDesc;
@@ -48,6 +48,54 @@ pub trait IoAcceptor {
     type Output;
     fn accept(&mut self) -> MioResult<NonBlock<Self::Output>>;
 }
+
+/*
+ *
+ * ===== Basic IO type =====
+ *
+ */
+
+pub struct Io {
+    desc: IoDesc,
+}
+
+impl Io {
+    pub fn new(desc: IoDesc) -> Io {
+        Io { desc: desc }
+    }
+}
+
+impl IoHandle for Io {
+    fn desc(&self) -> &os::IoDesc {
+        &self.desc
+    }
+}
+
+impl IoReader for Io {
+    fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
+        read(self, buf)
+    }
+
+    fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>> {
+        read_slice(self, buf)
+    }
+}
+
+impl IoWriter for Io {
+    fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
+        write(self, buf)
+    }
+
+    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
+        write_slice(self, buf)
+    }
+}
+
+/*
+ *
+ * ===== Pipe =====
+ *
+ */
 
 pub fn pipe() -> MioResult<(PipeReader, PipeWriter)> {
     use nix::fcntl::{O_NONBLOCK, O_CLOEXEC};
@@ -114,6 +162,12 @@ impl IoWriter for PipeWriter {
     }
 }
 
+/*
+ *
+ * ===== Read / Write =====
+ *
+ */
+
 /// Reads the length of the slice supplied by buf.mut_bytes into the buffer
 /// This is not guaranteed to consume an entire datagram or segment.
 /// If your protocol is msg based (instead of continuous stream) you should
@@ -145,19 +199,37 @@ pub fn write<O: IoHandle, B: Buf>(io: &O, buf: &mut B) -> MioResult<NonBlock<usi
 
 ///reads the length of the supplied slice from the socket into the slice
 #[inline]
-pub fn read_slice<I: IoHandle>(io: & I, buf: &mut [u8]) -> MioResult<NonBlock<usize>> {
-    net::read(io.desc(), buf)
-        .map(|cnt| NonBlock::Ready(cnt))
+pub fn read_slice<I: IoHandle>(io: & I, dst: &mut [u8]) -> MioResult<NonBlock<usize>> {
+    use nix::unistd::read;
+
+    read(io.desc().fd, dst)
+        .map_err(MioError::from_nix_error)
+        .and_then(|cnt| {
+            if cnt > 0 {
+                Ok(NonBlock::Ready(cnt))
+            } else {
+                Err(MioError::eof())
+            }
+        })
         .or_else(to_non_block)
 }
 
 ///writes the length of the supplied slice into the socket from the slice
 #[inline]
-pub fn write_slice<I: IoHandle>(io: & I, buf: & [u8]) -> MioResult<NonBlock<usize>> {
-    net::write(io.desc(), buf)
+pub fn write_slice<I: IoHandle>(io: & I, src: &[u8]) -> MioResult<NonBlock<usize>> {
+    use nix::unistd::write;
+
+    write(io.desc().fd, src)
+        .map_err(MioError::from_nix_error)
         .map(|cnt| NonBlock::Ready(cnt))
         .or_else(to_non_block)
 }
+
+/*
+ *
+ * ===== Helpers =====
+ *
+ */
 
 pub fn to_non_block<T>(err: MioError) -> MioResult<NonBlock<T>> {
     if err.is_would_block() {
