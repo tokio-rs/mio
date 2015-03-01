@@ -1,6 +1,6 @@
 use {TryRead, TryWrite, NonBlock, MioResult};
 use buf::{Buf, MutBuf};
-use io::{self, FromFd, Io, IoHandle, IoAcceptor};
+use io::{self, FromFd, Io, IoHandle};
 use net::{self, nix, Socket};
 use std::net::{SocketAddr, IpAddr};
 use std::os::unix::Fd;
@@ -122,6 +122,12 @@ impl TcpAcceptor {
         // Start listening
         listener.listen(backlog)
     }
+
+    pub fn accept(&mut self) -> MioResult<NonBlock<TcpSocket>> {
+        net::accept(&self.io)
+            .map(|fd| NonBlock::Ready(FromFd::from_fd(fd)))
+            .or_else(io::to_non_block)
+    }
 }
 
 impl IoHandle for TcpAcceptor {
@@ -137,14 +143,4 @@ impl FromFd for TcpAcceptor {
 }
 
 impl Socket for TcpAcceptor {
-}
-
-impl IoAcceptor for TcpAcceptor {
-    type Output = TcpSocket;
-
-    fn accept(&mut self) -> MioResult<NonBlock<TcpSocket>> {
-        net::accept(&self.io)
-            .map(|fd| NonBlock::Ready(FromFd::from_fd(fd)))
-            .or_else(io::to_non_block)
-    }
 }

@@ -19,8 +19,6 @@
 //! # Example
 //!
 //! ```
-//! #[feature(net)]
-//!
 //! use mio::*;
 //! use mio::net::tcp::{TcpSocket, TcpAcceptor};
 //! use std::net::SocketAddr;
@@ -116,7 +114,6 @@ pub use io::{
     Io,
     TryRead,
     TryWrite,
-    IoAcceptor,
     IoHandle,
     PipeReader,
     PipeWriter,

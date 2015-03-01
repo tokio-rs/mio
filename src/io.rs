@@ -66,12 +66,6 @@ pub trait TryWrite {
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>>;
 }
 
-pub trait IoAcceptor {
-    type Output;
-
-    fn accept(&mut self) -> MioResult<NonBlock<Self::Output>>;
-}
-
 /*
  *
  * ===== Basic IO type =====

@@ -1,6 +1,6 @@
 use {TryRead, TryWrite, NonBlock, MioResult, MioError};
 use buf::{Buf, MutBuf};
-use io::{Io, FromFd, IoHandle, IoAcceptor};
+use io::{Io, FromFd, IoHandle};
 use net::{self, nix, Socket};
 use std::path::Path;
 use std::os::unix::Fd;
@@ -93,6 +93,19 @@ impl UnixAcceptor {
         let listener = try!(sock.bind(addr));
         listener.listen(backlog)
     }
+
+    pub fn accept(&mut self) -> MioResult<NonBlock<UnixSocket>> {
+        match net::accept(&self.io) {
+            Ok(fd) => Ok(NonBlock::Ready(FromFd::from_fd(fd))),
+            Err(e) => {
+                if e.is_would_block() {
+                    return Ok(NonBlock::WouldBlock);
+                }
+
+                return Err(e);
+            }
+        }
+    }
 }
 
 impl IoHandle for UnixAcceptor {
@@ -108,23 +121,6 @@ impl FromFd for UnixAcceptor {
 }
 
 impl Socket for UnixAcceptor {
-}
-
-impl IoAcceptor for UnixAcceptor {
-    type Output = UnixSocket;
-
-    fn accept(&mut self) -> MioResult<NonBlock<UnixSocket>> {
-        match net::accept(&self.io) {
-            Ok(fd) => Ok(NonBlock::Ready(FromFd::from_fd(fd))),
-            Err(e) => {
-                if e.is_would_block() {
-                    return Ok(NonBlock::WouldBlock);
-                }
-
-                return Err(e);
-            }
-        }
-    }
 }
 
 fn to_nix_addr(path: &Path) -> MioResult<nix::SockAddr> {
