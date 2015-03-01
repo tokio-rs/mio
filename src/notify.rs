@@ -1,11 +1,12 @@
-use std::{fmt, cmp};
-use std::sync::Arc;
-use std::sync::atomic::AtomicIsize;
-use std::sync::atomic::Ordering::Relaxed;
 use error::MioResult;
 use io::IoHandle;
 use os;
 use util::BoundedQueue;
+use std::{fmt, cmp};
+use std::sync::Arc;
+use std::sync::atomic::AtomicIsize;
+use std::sync::atomic::Ordering::Relaxed;
+use std::os::unix::Fd;
 
 const SLEEP: isize = -1;
 
@@ -160,7 +161,7 @@ impl<M: Send> NotifyInner<M> {
 }
 
 impl<M: Send> IoHandle for Notify<M> {
-    fn desc(&self) -> &os::IoDesc {
-        self.inner.awaken.desc()
+    fn fd(&self) -> Fd {
+        self.inner.awaken.fd()
     }
 }

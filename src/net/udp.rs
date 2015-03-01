@@ -1,13 +1,13 @@
 use buf::{Buf, MutBuf};
 use error::MioResult;
-use io::{self, FromIoDesc, IoHandle, IoReader, IoWriter, NonBlock};
+use io::{self, Io, FromFd, IoHandle, IoReader, IoWriter, NonBlock};
 use net::{self, nix, Socket, MulticastSocket, UnconnectedSocket};
-use os;
 use std::net::{SocketAddr, IpAddr};
+use std::os::unix::Fd;
 
 #[derive(Debug)]
 pub struct UdpSocket {
-    desc: os::IoDesc
+    io: Io,
 }
 
 impl UdpSocket {
@@ -20,16 +20,17 @@ impl UdpSocket {
     }
 
     fn new(family: nix::AddressFamily) -> MioResult<UdpSocket> {
-        Ok(UdpSocket { desc: try!(net::socket(family, nix::SockType::Datagram)) })
+        let fd = try!(net::socket(family, nix::SockType::Datagram));
+        Ok(FromFd::from_fd(fd))
     }
 
     pub fn bind(&self, addr: &SocketAddr) -> MioResult<()> {
-        try!(net::bind(&self.desc, &net::to_nix_addr(addr)));
+        try!(net::bind(&self.io, &net::to_nix_addr(addr)));
         Ok(())
     }
 
     pub fn connect(&self, addr: &SocketAddr) -> MioResult<bool> {
-        net::connect(&self.desc, &net::to_nix_addr(addr))
+        net::connect(&self.io, &net::to_nix_addr(addr))
     }
 
     pub fn bound(addr: &SocketAddr) -> MioResult<UdpSocket> {
@@ -48,14 +49,14 @@ impl UdpSocket {
 }
 
 impl IoHandle for UdpSocket {
-    fn desc(&self) -> &os::IoDesc {
-        &self.desc
+    fn fd(&self) -> Fd {
+        self.io.fd()
     }
 }
 
-impl FromIoDesc for UdpSocket {
-    fn from_desc(desc: os::IoDesc) -> Self {
-        UdpSocket { desc: desc }
+impl FromFd for UdpSocket {
+    fn from_fd(fd: Fd) -> UdpSocket {
+        UdpSocket { io: Io::new(fd) }
     }
 }
 
@@ -66,29 +67,21 @@ impl MulticastSocket for UdpSocket {
 }
 
 impl IoReader for UdpSocket {
-    fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
-        io::read(self, buf)
-    }
-
     fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
-        io::read_slice(self, buf)
+        self.io.read_slice(buf)
     }
 }
 
 impl IoWriter for UdpSocket {
-    fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
-        io::write(self, buf)
-    }
-
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
-        io::write_slice(self, buf)
+        self.io.write_slice(buf)
     }
 }
 
 // Unconnected socket sender -- trait unique to sockets
 impl UnconnectedSocket for UdpSocket {
     fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &SocketAddr) -> MioResult<NonBlock<()>> {
-        net::sendto(&self.desc, buf.bytes(), &net::to_nix_addr(tgt))
+        net::sendto(&self.io, buf.bytes(), &net::to_nix_addr(tgt))
             .map(|cnt| {
                 buf.advance(cnt);
                 NonBlock::Ready(())
@@ -97,7 +90,7 @@ impl UnconnectedSocket for UdpSocket {
     }
 
     fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SocketAddr>> {
-        net::recvfrom(&self.desc, buf.mut_bytes())
+        net::recvfrom(&self.io, buf.mut_bytes())
             .map(|(cnt, addr)| {
                 buf.advance(cnt);
                 NonBlock::Ready(net::to_std_addr(addr))

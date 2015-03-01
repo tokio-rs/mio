@@ -22,7 +22,7 @@ impl Poll {
         debug!("registering  with poller");
 
         // Register interests for this socket
-        try!(self.selector.register(io.desc(), token.as_usize(), interest, opts));
+        try!(self.selector.register(io.fd(), token.as_usize(), interest, opts));
 
         Ok(())
     }
@@ -31,7 +31,7 @@ impl Poll {
         debug!("registering  with poller");
 
         // Register interests for this socket
-        try!(self.selector.reregister(io.desc(), token.as_usize(), interest, opts));
+        try!(self.selector.reregister(io.fd(), token.as_usize(), interest, opts));
 
         Ok(())
     }
@@ -40,7 +40,7 @@ impl Poll {
         debug!("deregistering IO with poller");
 
         // Deregister interests for this socket
-        try!(self.selector.deregister(io.desc()));
+        try!(self.selector.deregister(io.fd()));
 
         Ok(())
     }

@@ -1,10 +1,9 @@
-use std::mem;
+use error::{MioResult, MioError};
 use nix::fcntl::Fd;
 use nix::sys::event::*;
 use nix::sys::event::EventFilter::*;
-use error::{MioResult, MioError};
-use os::IoDesc;
 use os::event::{IoEvent, Interest, PollOpt};
+use std::mem;
 
 pub struct Selector {
     kq: Fd,
@@ -30,29 +29,29 @@ impl Selector {
         Ok(())
     }
 
-    pub fn register(&mut self, io: &IoDesc, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
+    pub fn register(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
         debug!("registering; token={}; interests={:?}", token, interests);
 
-        try!(self.ev_register(io, token, EVFILT_READ, interests.contains(Interest::readable()), opts));
-        try!(self.ev_register(io, token, EVFILT_WRITE, interests.contains(Interest::writable()), opts));
+        try!(self.ev_register(fd, token, EVFILT_READ, interests.contains(Interest::readable()), opts));
+        try!(self.ev_register(fd, token, EVFILT_WRITE, interests.contains(Interest::writable()), opts));
 
         Ok(())
     }
 
-    pub fn reregister(&mut self, io: &IoDesc, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
+    pub fn reregister(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
         // Just need to call register here since EV_ADD is a mod if already
         // registered
-        self.register(io, token, interests, opts)
+        self.register(fd, token, interests, opts)
     }
 
-    pub fn deregister(&mut self, io: &IoDesc) -> MioResult<()> {
-        try!(self.ev_push(io, 0, EVFILT_READ, EV_DELETE));
-        try!(self.ev_push(io, 0, EVFILT_WRITE, EV_DELETE));
+    pub fn deregister(&mut self, fd: Fd) -> MioResult<()> {
+        try!(self.ev_push(fd, 0, EVFILT_READ, EV_DELETE));
+        try!(self.ev_push(fd, 0, EVFILT_WRITE, EV_DELETE));
 
         Ok(())
     }
 
-    fn ev_register(&mut self, io: &IoDesc, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) -> MioResult<()> {
+    fn ev_register(&mut self, fd: Fd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) -> MioResult<()> {
         let mut flags = EV_ADD;
 
         if enable {
@@ -69,16 +68,16 @@ impl Selector {
             flags = flags | EV_ONESHOT;
         }
 
-        self.ev_push(io, token, filter, flags)
+        self.ev_push(fd, token, filter, flags)
     }
 
-    fn ev_push(&mut self, io: &IoDesc, token: usize, filter: EventFilter, flags: EventFlag) -> MioResult<()> {
+    fn ev_push(&mut self, fd: Fd, token: usize, filter: EventFilter, flags: EventFlag) -> MioResult<()> {
         try!(self.maybe_flush_changes());
 
         let idx = self.changes.len;
         let ev = &mut self.changes.events[idx];
 
-        ev_set(ev, io.fd as usize, filter, flags, FilterFlag::empty(), token);
+        ev_set(ev, fd as usize, filter, flags, FilterFlag::empty(), token);
 
         self.changes.len += 1;
         Ok(())

@@ -1,13 +1,13 @@
 use {MioResult, MioError};
 use buf::{Buf, MutBuf};
-use io::{self, FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
+use io::{Io, FromFd, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
 use net::{self, nix, Socket};
-use os;
 use std::path::Path;
+use std::os::unix::Fd;
 
 #[derive(Debug)]
 pub struct UnixSocket {
-    desc: os::IoDesc
+    io: Io,
 }
 
 impl UnixSocket {
@@ -16,51 +16,42 @@ impl UnixSocket {
     }
 
     fn new(ty: nix::SockType) -> MioResult<UnixSocket> {
-        Ok(UnixSocket {
-            desc: try!(net::socket(nix::AddressFamily::Unix, ty))
-        })
+        let fd = try!(net::socket(nix::AddressFamily::Unix, ty));
+        Ok(FromFd::from_fd(fd))
     }
 
     pub fn connect(&self, addr: &Path) -> MioResult<bool> {
         // Attempt establishing the context. This may not complete immediately.
-        net::connect(&self.desc, &try!(to_nix_addr(addr)))
+        net::connect(&self.io, &try!(to_nix_addr(addr)))
     }
 
     pub fn bind(self, addr: &Path) -> MioResult<UnixListener> {
-        try!(net::bind(&self.desc, &try!(to_nix_addr(addr))));
-        Ok(UnixListener { desc: self.desc })
+        try!(net::bind(&self.io, &try!(to_nix_addr(addr))));
+        Ok(UnixListener { io: self.io })
     }
 }
 
 impl IoHandle for UnixSocket {
-    fn desc(&self) -> &os::IoDesc {
-        &self.desc
+    fn fd(&self) -> Fd {
+        self.io.fd()
     }
 }
 
-impl FromIoDesc for UnixSocket {
-    fn from_desc(desc: os::IoDesc) -> Self {
-        UnixSocket { desc: desc }
+impl FromFd for UnixSocket {
+    fn from_fd(fd: Fd) -> UnixSocket {
+        UnixSocket { io: Io::new(fd) }
     }
 }
 
 impl IoReader for UnixSocket {
-    fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
-        io::read(self, buf)
-    }
-
     fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
-        io::read_slice(self, buf)
+        self.io.read_slice(buf)
     }
 }
 
 impl IoWriter for UnixSocket {
-    fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
-        io::write(self, buf)
-    }
-
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
-        io::write_slice(self, buf)
+        self.io.write_slice(buf)
     }
 }
 
@@ -69,31 +60,31 @@ impl Socket for UnixSocket {
 
 #[derive(Debug)]
 pub struct UnixListener {
-    desc: os::IoDesc,
+    io: Io,
 }
 
 impl UnixListener {
     pub fn listen(self, backlog: usize) -> MioResult<UnixAcceptor> {
-        try!(net::listen(self.desc(), backlog));
-        Ok(UnixAcceptor { desc: self.desc })
+        try!(net::listen(&self.io, backlog));
+        Ok(UnixAcceptor { io: self.io })
     }
 }
 
 impl IoHandle for UnixListener {
-    fn desc(&self) -> &os::IoDesc {
-        &self.desc
+    fn fd(&self) -> Fd {
+        self.io.fd()
     }
 }
 
-impl FromIoDesc for UnixListener {
-    fn from_desc(desc: os::IoDesc) -> Self {
-        UnixListener { desc: desc }
+impl FromFd for UnixListener {
+    fn from_fd(fd: Fd) -> UnixListener {
+        UnixListener { io: Io::new(fd) }
     }
 }
 
 #[derive(Debug)]
 pub struct UnixAcceptor {
-    desc: os::IoDesc,
+    io: Io,
 }
 
 impl UnixAcceptor {
@@ -105,14 +96,14 @@ impl UnixAcceptor {
 }
 
 impl IoHandle for UnixAcceptor {
-    fn desc(&self) -> &os::IoDesc {
-        &self.desc
+    fn fd(&self) -> Fd {
+        self.io.fd()
     }
 }
 
-impl FromIoDesc for UnixAcceptor {
-    fn from_desc(desc: os::IoDesc) -> Self {
-        UnixAcceptor { desc: desc }
+impl FromFd for UnixAcceptor {
+    fn from_fd(fd: Fd) -> UnixAcceptor {
+        UnixAcceptor { io: Io::new(fd) }
     }
 }
 
@@ -123,8 +114,8 @@ impl IoAcceptor for UnixAcceptor {
     type Output = UnixSocket;
 
     fn accept(&mut self) -> MioResult<NonBlock<UnixSocket>> {
-        match net::accept(self.desc()) {
-            Ok(sock) => Ok(NonBlock::Ready(UnixSocket { desc: sock })),
+        match net::accept(&self.io) {
+            Ok(fd) => Ok(NonBlock::Ready(FromFd::from_fd(fd))),
             Err(e) => {
                 if e.is_would_block() {
                     return Ok(NonBlock::WouldBlock);

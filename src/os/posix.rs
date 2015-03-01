@@ -1,5 +1,6 @@
 use {IoHandle, IoReader, IoWriter, NonBlock, MioResult};
 use io::{self, PipeReader, PipeWriter};
+use std::os::unix::Fd;
 
 mod nix {
     pub use nix::{c_int, NixError};
@@ -30,8 +31,8 @@ impl PipeAwakener {
         })
     }
 
-    pub fn desc(&self) -> &IoDesc {
-        self.reader.desc()
+    pub fn fd(&self) -> Fd {
+        self.reader.fd()
     }
 
     pub fn wakeup(&self) -> MioResult<()> {
@@ -48,24 +49,5 @@ impl PipeAwakener {
                 _ => return,
             }
         }
-    }
-}
-
-/// Represents the OS's handle to the IO instance. In this case, it is the file
-/// descriptor.
-#[derive(Debug)]
-pub struct IoDesc {
-    pub fd: nix::Fd
-}
-
-impl IoHandle for IoDesc {
-    fn desc(&self) -> &IoDesc {
-        self
-    }
-}
-
-impl Drop for IoDesc {
-    fn drop(&mut self) {
-        let _ = nix::close(self.fd);
     }
 }

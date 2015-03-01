@@ -112,13 +112,12 @@ pub use handler::{
 pub use io::{
     pipe,
     NonBlock,
-    FromIoDesc,
+    FromFd,
     Io,
     IoReader,
     IoWriter,
     IoAcceptor,
     IoHandle,
-    IoDesc,
     PipeReader,
     PipeWriter,
 };

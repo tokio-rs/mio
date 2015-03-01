@@ -1,5 +1,5 @@
 use {Io, NonBlock, IoReader, IoWriter, IoHandle, MioResult, MioError};
-use super::posix::*;
+use std::os::unix::Fd;
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";
 
@@ -8,23 +8,23 @@ mod nix {
 }
 
 pub struct Awakener {
-    eventfd: Io,
+    io: Io,
 }
 
 impl Awakener {
     pub fn new() -> MioResult<Awakener> {
         Ok(Awakener {
-            eventfd: Io::new(try!(eventfd())),
+            io: Io::new(try!(eventfd())),
         })
     }
 
     pub fn wakeup(&self) -> MioResult<()> {
-        self.eventfd.write_slice(MARK)
+        self.io.write_slice(MARK)
             .map(|_| ())
     }
 
-    pub fn desc(&self) -> &IoDesc {
-        self.eventfd.desc()
+    pub fn fd(&self) -> Fd {
+        self.io.fd()
     }
 
     pub fn cleanup(&self) {
@@ -32,7 +32,7 @@ impl Awakener {
 
         loop {
             // Consume data until all bytes are purged
-            match self.eventfd.read_slice(&mut buf) {
+            match self.io.read_slice(&mut buf) {
                 Ok(NonBlock::Ready(i)) if i > 0 => {},
                 _ => return,
             }
@@ -40,9 +40,7 @@ impl Awakener {
     }
 }
 
-fn eventfd() -> MioResult<IoDesc> {
-    let fd = try!(nix::eventfd(0, nix::EFD_CLOEXEC | nix::EFD_NONBLOCK)
-                    .map_err(MioError::from_nix_error));
-
-    Ok(IoDesc { fd: fd })
+fn eventfd() -> MioResult<Fd> {
+    nix::eventfd(0, nix::EFD_CLOEXEC | nix::EFD_NONBLOCK)
+        .map_err(MioError::from_nix_error)
 }

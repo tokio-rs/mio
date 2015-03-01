@@ -1,10 +1,9 @@
-use std::mem;
 use nix::fcntl::Fd;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 use error::{MioResult, MioError};
-use os::IoDesc;
 use os::event::{IoEvent, Interest, PollOpt};
+use std::mem;
 
 pub struct Selector {
     epfd: Fd
@@ -28,29 +27,29 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, io: &IoDesc, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
+    pub fn register(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token as u64
         };
 
-        epoll_ctl(self.epfd, EpollOp::EpollCtlAdd, io.fd, &info)
+        epoll_ctl(self.epfd, EpollOp::EpollCtlAdd, fd, &info)
             .map_err(MioError::from_nix_error)
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&mut self, io: &IoDesc, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
+    pub fn reregister(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> MioResult<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token as u64
         };
 
-        epoll_ctl(self.epfd, EpollOp::EpollCtlMod, io.fd, &info)
+        epoll_ctl(self.epfd, EpollOp::EpollCtlMod, fd, &info)
             .map_err(MioError::from_nix_error)
     }
 
     /// Deregister event interests for the given IO handle with the OS
-    pub fn deregister(&mut self, io: &IoDesc) -> MioResult<()> {
+    pub fn deregister(&mut self, fd: Fd) -> MioResult<()> {
         // The &info argument should be ignored by the system,
         // but linux < 2.6.9 required it to be not null.
         // For compatibility, we provide a dummy EpollEvent.
@@ -59,7 +58,7 @@ impl Selector {
             data: 0
         };
 
-        epoll_ctl(self.epfd, EpollOp::EpollCtlDel, io.fd, &info)
+        epoll_ctl(self.epfd, EpollOp::EpollCtlDel, fd, &info)
             .map_err(MioError::from_nix_error)
     }
 }

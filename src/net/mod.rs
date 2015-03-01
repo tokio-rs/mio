@@ -1,9 +1,10 @@
 //! Networking primitives
 //!
 use {MioResult, MioError};
-use io::{IoHandle, NonBlock};
+use io::{Io, IoHandle, NonBlock};
 use buf::{Buf, MutBuf};
 use std::net::{SocketAddr, IpAddr};
+use std::os::unix::Fd;
 
 pub mod tcp;
 pub mod udp;
@@ -18,7 +19,7 @@ pub mod unix;
 
 pub trait Socket : IoHandle {
     fn linger(&self) -> MioResult<usize> {
-        let linger = try!(nix::getsockopt(self.desc().fd, nix::SockLevel::Socket, nix::sockopt::Linger)
+        let linger = try!(nix::getsockopt(self.fd(), nix::SockLevel::Socket, nix::sockopt::Linger)
             .map_err(MioError::from_nix_error));
 
         if linger.l_onoff > 0 {
@@ -34,22 +35,22 @@ pub trait Socket : IoHandle {
             l_linger: dur_s as nix::c_int
         };
 
-        nix::setsockopt(self.desc().fd, nix::SockLevel::Socket, nix::sockopt::Linger, &linger)
+        nix::setsockopt(self.fd(), nix::SockLevel::Socket, nix::sockopt::Linger, &linger)
             .map_err(MioError::from_nix_error)
     }
 
     fn set_reuseaddr(&self, val: bool) -> MioResult<()> {
-        nix::setsockopt(self.desc().fd, nix::SockLevel::Socket, nix::sockopt::ReuseAddr, val)
+        nix::setsockopt(self.fd(), nix::SockLevel::Socket, nix::sockopt::ReuseAddr, val)
             .map_err(MioError::from_nix_error)
     }
 
     fn set_reuseport(&self, val: bool) -> MioResult<()> {
-        nix::setsockopt(self.desc().fd, nix::SockLevel::Socket, nix::sockopt::ReusePort, val)
+        nix::setsockopt(self.fd(), nix::SockLevel::Socket, nix::sockopt::ReusePort, val)
             .map_err(MioError::from_nix_error)
     }
 
     fn set_tcp_nodelay(&self, val: bool) -> MioResult<()> {
-        nix::setsockopt(self.desc().fd, nix::SockLevel::Tcp, nix::sockopt::TcpNoDelay, val)
+        nix::setsockopt(self.fd(), nix::SockLevel::Tcp, nix::sockopt::TcpNoDelay, val)
             .map_err(MioError::from_nix_error)
     }
 }
@@ -71,7 +72,7 @@ pub trait MulticastSocket : Socket {
                 let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), interface);
 
                 // Set the socket option
-                nix::setsockopt(self.desc().fd, nix::SockLevel::Ip, nix::sockopt::IpAddMembership, &req)
+                nix::setsockopt(self.fd(), nix::SockLevel::Ip, nix::sockopt::IpAddMembership, &req)
                     .map_err(MioError::from_nix_error)
             }
             _ => unimplemented!(),
@@ -93,7 +94,7 @@ pub trait MulticastSocket : Socket {
                 let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), interface);
 
                 // Set the socket option
-                nix::setsockopt(self.desc().fd, nix::SockLevel::Ip, nix::sockopt::IpDropMembership, &req)
+                nix::setsockopt(self.fd(), nix::SockLevel::Ip, nix::sockopt::IpDropMembership, &req)
                     .map_err(MioError::from_nix_error)
             }
             _ => unimplemented!(),
@@ -102,7 +103,7 @@ pub trait MulticastSocket : Socket {
 
     // TODO: Rename -> set_ttl
     fn set_multicast_ttl(&self, val: u8) -> MioResult<()> {
-        nix::setsockopt(self.desc().fd, nix::SockLevel::Ip, nix::sockopt::IpMulticastTtl, val)
+        nix::setsockopt(self.fd(), nix::SockLevel::Ip, nix::sockopt::IpMulticastTtl, val)
             .map_err(MioError::from_nix_error)
     }
 }
@@ -116,14 +117,6 @@ pub trait UnconnectedSocket {
 
     fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SocketAddr>>;
 }
-
-/*
- *
- * ===== Implementation =====
- *
- */
-
-use os::IoDesc;
 
 /*
  *
@@ -169,14 +162,13 @@ mod nix {
     };
 }
 
-fn socket(family: nix::AddressFamily, ty: nix::SockType) -> MioResult<IoDesc> {
+fn socket(family: nix::AddressFamily, ty: nix::SockType) -> MioResult<Fd> {
     nix::socket(family, ty, nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
-        .map(|fd| IoDesc { fd: fd })
         .map_err(MioError::from_nix_error)
 }
 
-fn connect(io: &IoDesc, addr: &nix::SockAddr) -> MioResult<bool> {
-    match nix::connect(io.fd, addr) {
+fn connect(io: &Io, addr: &nix::SockAddr) -> MioResult<bool> {
+    match nix::connect(io.fd(), addr) {
         Ok(_) => Ok(true),
         Err(e) => {
             match e {
@@ -187,43 +179,42 @@ fn connect(io: &IoDesc, addr: &nix::SockAddr) -> MioResult<bool> {
     }
 }
 
-fn bind(io: &IoDesc, addr: &nix::SockAddr) -> MioResult<()> {
-    nix::bind(io.fd, addr)
+fn bind(io: &Io, addr: &nix::SockAddr) -> MioResult<()> {
+    nix::bind(io.fd(), addr)
         .map_err(MioError::from_nix_error)
 }
 
-fn listen(io: &IoDesc, backlog: usize) -> MioResult<()> {
-    nix::listen(io.fd, backlog)
+fn listen(io: &Io, backlog: usize) -> MioResult<()> {
+    nix::listen(io.fd(), backlog)
         .map_err(MioError::from_nix_error)
 }
 
-fn accept(io: &IoDesc) -> MioResult<IoDesc> {
-    Ok(IoDesc {
-        fd: try!(nix::accept4(io.fd, nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
-                     .map_err(MioError::from_nix_error))
-    })
+fn accept(io: &Io) -> MioResult<Fd> {
+    nix::accept4(io.fd(), nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
+        .map_err(MioError::from_nix_error)
 }
 
 // UDP & UDS
 #[inline]
-fn recvfrom(io: &IoDesc, buf: &mut [u8]) -> MioResult<(usize, nix::SockAddr)> {
-    nix::recvfrom(io.fd, buf).map_err(MioError::from_nix_error)
+fn recvfrom(io: &Io, buf: &mut [u8]) -> MioResult<(usize, nix::SockAddr)> {
+    nix::recvfrom(io.fd(), buf)
+        .map_err(MioError::from_nix_error)
 }
 
 // UDP & UDS
 #[inline]
-fn sendto(io: &IoDesc, buf: &[u8], target: &nix::SockAddr) -> MioResult<usize> {
-    nix::sendto(io.fd, buf, target, nix::MSG_DONTWAIT)
+fn sendto(io: &Io, buf: &[u8], target: &nix::SockAddr) -> MioResult<usize> {
+    nix::sendto(io.fd(), buf, target, nix::MSG_DONTWAIT)
         .map_err(MioError::from_nix_error)
 }
 
-fn getpeername(io: &IoDesc) -> MioResult<nix::SockAddr> {
-    nix::getpeername(io.fd)
+fn getpeername(io: &Io) -> MioResult<nix::SockAddr> {
+    nix::getpeername(io.fd())
         .map_err(MioError::from_nix_error)
 }
 
-fn getsockname(io: &IoDesc) -> MioResult<nix::SockAddr> {
-    nix::getsockname(io.fd)
+fn getsockname(io: &Io) -> MioResult<nix::SockAddr> {
+    nix::getsockname(io.fd())
         .map_err(MioError::from_nix_error)
 }
 

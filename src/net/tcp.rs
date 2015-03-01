@@ -1,14 +1,13 @@
-use os;
 use error::MioResult;
 use buf::{Buf, MutBuf};
-use io;
-use io::{FromIoDesc, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
+use io::{self, FromFd, Io, IoHandle, IoAcceptor, IoReader, IoWriter, NonBlock};
 use net::{self, nix, Socket};
 use std::net::{SocketAddr, IpAddr};
+use std::os::unix::Fd;
 
 #[derive(Debug)]
 pub struct TcpSocket {
-    desc: os::IoDesc
+    io: Io,
 }
 
 impl TcpSocket {
@@ -21,7 +20,8 @@ impl TcpSocket {
     }
 
     fn new(family: nix::AddressFamily) -> MioResult<TcpSocket> {
-        Ok(TcpSocket { desc: try!(net::socket(family, nix::SockType::Stream)) })
+        let fd = try!(net::socket(family, nix::SockType::Stream));
+        Ok(FromFd::from_fd(fd))
     }
 
     /// Connects the socket to the specified address. When the operation
@@ -33,54 +33,46 @@ impl TcpSocket {
     /// to worry about possibly-immediate connection.
     pub fn connect(&self, addr: &SocketAddr) -> MioResult<bool> {
         // Attempt establishing the context. This may not complete immediately.
-        net::connect(&self.desc, &net::to_nix_addr(addr))
+        net::connect(&self.io, &net::to_nix_addr(addr))
     }
 
     pub fn bind(self, addr: &SocketAddr) -> MioResult<TcpListener> {
-        try!(net::bind(&self.desc, &net::to_nix_addr(addr)));
-        Ok(TcpListener { desc: self.desc })
+        try!(net::bind(&self.io, &net::to_nix_addr(addr)));
+        Ok(TcpListener { io: self.io })
     }
 
     pub fn getpeername(&self) -> MioResult<SocketAddr> {
-        net::getpeername(&self.desc)
+        net::getpeername(&self.io)
             .map(net::to_std_addr)
     }
 
     pub fn getsockname(&self) -> MioResult<SocketAddr> {
-        net::getsockname(&self.desc)
+        net::getsockname(&self.io)
             .map(net::to_std_addr)
     }
 }
 
 impl IoHandle for TcpSocket {
-    fn desc(&self) -> &os::IoDesc {
-        &self.desc
+    fn fd(&self) -> Fd {
+        self.io.fd()
     }
 }
 
-impl FromIoDesc for TcpSocket {
-    fn from_desc(desc: os::IoDesc) -> Self {
-        TcpSocket { desc: desc }
+impl FromFd for TcpSocket {
+    fn from_fd(fd: Fd) -> TcpSocket {
+        TcpSocket { io: Io::new(fd) }
     }
 }
 
 impl IoReader for TcpSocket {
-    fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
-        io::read(self, buf)
-    }
-
     fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
-        io::read_slice(self, buf)
+        self.io.read_slice(buf)
     }
 }
 
 impl IoWriter for TcpSocket {
-    fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<(usize)>> {
-        io::write(self, buf)
-    }
-
     fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
-        io::write_slice(self, buf)
+        self.io.write_slice(buf)
     }
 }
 
@@ -89,31 +81,31 @@ impl Socket for TcpSocket {
 
 #[derive(Debug)]
 pub struct TcpListener {
-    desc: os::IoDesc,
+    io: Io,
 }
 
 impl TcpListener {
     pub fn listen(self, backlog: usize) -> MioResult<TcpAcceptor> {
-        try!(net::listen(self.desc(), backlog));
-        Ok(TcpAcceptor { desc: self.desc })
+        try!(net::listen(&self.io, backlog));
+        Ok(TcpAcceptor { io: self.io })
     }
 }
 
 impl IoHandle for TcpListener {
-    fn desc(&self) -> &os::IoDesc {
-        &self.desc
+    fn fd(&self) -> Fd {
+        self.io.fd()
     }
 }
 
-impl FromIoDesc for TcpListener {
-    fn from_desc(desc: os::IoDesc) -> Self {
-        TcpListener { desc: desc }
+impl FromFd for TcpListener {
+    fn from_fd(fd: Fd) -> TcpListener {
+        TcpListener { io: Io::new(fd) }
     }
 }
 
 #[derive(Debug)]
 pub struct TcpAcceptor {
-    desc: os::IoDesc,
+    io: Io,
 }
 
 impl TcpAcceptor {
@@ -133,14 +125,14 @@ impl TcpAcceptor {
 }
 
 impl IoHandle for TcpAcceptor {
-    fn desc(&self) -> &os::IoDesc {
-        &self.desc
+    fn fd(&self) -> Fd {
+        self.io.fd()
     }
 }
 
-impl FromIoDesc for TcpAcceptor {
-    fn from_desc(desc: os::IoDesc) -> Self {
-        TcpAcceptor { desc: desc }
+impl FromFd for TcpAcceptor {
+    fn from_fd(fd: Fd) -> TcpAcceptor {
+        TcpAcceptor { io: Io::new(fd) }
     }
 }
 
@@ -151,8 +143,8 @@ impl IoAcceptor for TcpAcceptor {
     type Output = TcpSocket;
 
     fn accept(&mut self) -> MioResult<NonBlock<TcpSocket>> {
-        net::accept(self.desc())
-            .map(|fd| NonBlock::Ready(TcpSocket { desc: fd }))
+        net::accept(&self.io)
+            .map(|fd| NonBlock::Ready(FromFd::from_fd(fd)))
             .or_else(io::to_non_block)
     }
 }
