@@ -1,7 +1,7 @@
-use {TryRead, TryWrite, TryAccept, NonBlock, MioResult};
+use {TryRead, TryWrite, NonBlock, MioResult};
 use buf::{Buf, MutBuf};
 use io::{self, FromFd, Io, IoHandle};
-use net::{self, nix, Socket};
+use net::{self, nix, TryAccept, Socket};
 use std::mem;
 use std::net::SocketAddr;
 use std::os::unix::{Fd, AsRawFd};

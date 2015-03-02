@@ -112,7 +112,6 @@ pub use io::{
     Io,
     TryRead,
     TryWrite,
-    TryAccept,
     IoHandle,
     PipeReader,
     PipeWriter,

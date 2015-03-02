@@ -3,12 +3,26 @@
 use {MioResult, MioError};
 use io::{Io, IoHandle, NonBlock};
 use buf::{Buf, MutBuf};
-use std::net::{SocketAddr, IpAddr};
+use std::net::SocketAddr;
 use std::os::unix::Fd;
 
 pub mod tcp;
 pub mod udp;
 pub mod unix;
+
+pub trait TrySend {
+    fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> MioResult<NonBlock<()>>;
+}
+
+pub trait TryRecv {
+    fn recv_from<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<SocketAddr>>;
+}
+
+pub trait TryAccept {
+    type Sock;
+
+    fn try_accept(&self) -> MioResult<NonBlock<Self::Sock>>;
+}
 
 /*
  *
@@ -52,69 +66,6 @@ pub trait Socket : IoHandle {
         nix::setsockopt(self.fd(), nix::SockLevel::Tcp, nix::sockopt::TcpNoDelay, val)
             .map_err(MioError::from_nix_error)
     }
-}
-
-// TODO: Rename -> Multicast
-pub trait MulticastSocket : Socket {
-    // TODO: Rename -> join_group
-    fn join_multicast_group(&self, addr: &IpAddr, interface: Option<&IpAddr>) -> MioResult<()> {
-        match *addr {
-            IpAddr::V4(ref addr) => {
-                // Ensure interface is the correct family
-                let interface = match interface {
-                    Some(&IpAddr::V4(ref addr)) => Some(nix::Ipv4Addr::from_std(addr)),
-                    Some(_) => return Err(MioError::other()),
-                    None => None,
-                };
-
-                // Create the request
-                let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), interface);
-
-                // Set the socket option
-                nix::setsockopt(self.fd(), nix::SockLevel::Ip, nix::sockopt::IpAddMembership, &req)
-                    .map_err(MioError::from_nix_error)
-            }
-            _ => unimplemented!(),
-        }
-    }
-
-    // TODO: Rename -> leave_group
-    fn leave_multicast_group(&self, addr: &IpAddr, interface: Option<&IpAddr>) -> MioResult<()> {
-        match *addr {
-            IpAddr::V4(ref addr) => {
-                // Ensure interface is the correct family
-                let interface = match interface {
-                    Some(&IpAddr::V4(ref addr)) => Some(nix::Ipv4Addr::from_std(addr)),
-                    Some(_) => return Err(MioError::other()),
-                    None => None,
-                };
-
-                // Create the request
-                let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), interface);
-
-                // Set the socket option
-                nix::setsockopt(self.fd(), nix::SockLevel::Ip, nix::sockopt::IpDropMembership, &req)
-                    .map_err(MioError::from_nix_error)
-            }
-            _ => unimplemented!(),
-        }
-    }
-
-    // TODO: Rename -> set_ttl
-    fn set_multicast_ttl(&self, val: u8) -> MioResult<()> {
-        nix::setsockopt(self.fd(), nix::SockLevel::Ip, nix::sockopt::IpMulticastTtl, val)
-            .map_err(MioError::from_nix_error)
-    }
-}
-
-// TODO:
-//  - Break up into TrySend and TryRecv.
-//  - Return the amount read / writen
-pub trait UnconnectedSocket {
-
-    fn send_to<B: Buf>(&mut self, buf: &mut B, tgt: &SocketAddr) -> MioResult<NonBlock<()>>;
-
-    fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SocketAddr>>;
 }
 
 /*

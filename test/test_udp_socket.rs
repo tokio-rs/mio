@@ -4,7 +4,7 @@ use mio::net::udp::*;
 use mio::buf::{RingBuf, SliceBuf};
 use super::localhost;
 use std::str;
-use std::net::IpAddr;
+use std::net::{SocketAddr, IpAddr};
 
 type TestEventLoop = EventLoop<usize, ()>;
 
@@ -12,20 +12,20 @@ const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
 
 pub struct UdpHandler {
-    listen_sock: UdpSocket,
-    send_sock: UdpSocket,
+    tx: UdpSocket,
+    rx: UdpSocket,
     msg: &'static str,
-    message_buf: SliceBuf<'static>,
+    buf: SliceBuf<'static>,
     rx_buf: RingBuf
 }
 
 impl UdpHandler {
-    fn new(send_sock: UdpSocket, listen_sock: UdpSocket, msg : &'static str) -> UdpHandler {
+    fn new(tx: UdpSocket, rx: UdpSocket, msg : &'static str) -> UdpHandler {
         UdpHandler {
-            listen_sock: listen_sock,
-            send_sock: send_sock,
+            tx: tx,
+            rx: rx,
             msg: msg,
-            message_buf: SliceBuf::wrap(msg.as_bytes()),
+            buf: SliceBuf::wrap(msg.as_bytes()),
             rx_buf: RingBuf::new(1024)
         }
     }
@@ -36,7 +36,7 @@ impl Handler<usize, ()> for UdpHandler {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
-                self.listen_sock.read(&mut self.rx_buf.writer()).unwrap();
+                TryRecv::recv_from(&self.rx, &mut self.rx_buf.writer()).unwrap();
                 assert!(str::from_utf8(self.rx_buf.reader().bytes()).unwrap() == self.msg);
                 event_loop.shutdown();
             },
@@ -47,9 +47,9 @@ impl Handler<usize, ()> for UdpHandler {
     fn writable(&mut self, _: &mut TestEventLoop, token: Token) {
         match token {
             SENDER => {
-                self.send_sock.write(&mut self.message_buf).unwrap();
+                TrySend::send_to(&self.tx, &mut self.buf, &self.rx.socket_addr().unwrap()).unwrap();
             },
-            _ => ()
+            _ => {}
         }
     }
 }
@@ -59,31 +59,18 @@ pub fn test_udp_socket() {
     debug!("Starting TEST_UDP_SOCKETS");
     let mut event_loop = EventLoop::new().unwrap();
 
-    let send_sock = UdpSocket::v4().unwrap();
-    let recv_sock = UdpSocket::v4().unwrap();
     let addr = localhost();
+    let any = SocketAddr::new(IpAddr::new_v4(0, 0, 0, 0), 0);
 
-    info!("Binding both listener and sender to localhost...");
-    send_sock.connect(&addr).unwrap();
-    recv_sock.bind(&addr).unwrap();
-
-    info!("Setting SO_REUSEADDR");
-    send_sock.set_reuseaddr(true).unwrap();
-    recv_sock.set_reuseaddr(true).unwrap();
-
-    info!("Joining group 227.1.1.100");
-    recv_sock.join_multicast_group(&IpAddr::new_v4(227, 1, 1, 100), None).unwrap();
-
-    info!("Joining group 227.1.1.101");
-    recv_sock.join_multicast_group(&IpAddr::new_v4(227, 1, 1, 101), None).unwrap();
-
-    info!("Registering LISTENER");
-    event_loop.register_opt(&recv_sock, LISTENER, Interest::readable(), PollOpt::edge()).unwrap();
+    let tx = UdpSocket::bind(&any).unwrap();
+    let rx = UdpSocket::bind(&addr).unwrap();
 
     info!("Registering SENDER");
-    event_loop.register_opt(&send_sock, SENDER, Interest::writable(), PollOpt::edge()).unwrap();
+    event_loop.register_opt(&tx, SENDER, Interest::writable(), PollOpt::edge()).unwrap();
+
+    info!("Registering LISTENER");
+    event_loop.register_opt(&rx, LISTENER, Interest::readable(), PollOpt::edge()).unwrap();
 
     info!("Starting event loop to test with...");
-    event_loop.run(&mut UdpHandler::new(send_sock, recv_sock, "hello world")).unwrap();
+    event_loop.run(&mut UdpHandler::new(tx, rx, "hello world")).unwrap();
 }
-
