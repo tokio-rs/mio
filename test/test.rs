@@ -4,6 +4,7 @@ extern crate mio;
 
 #[macro_use]
 extern crate log;
+extern crate env_logger;
 
 pub use ports::localhost;
 

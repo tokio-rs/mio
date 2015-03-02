@@ -14,14 +14,14 @@ const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
 struct EchoConn {
-    sock: TcpSocket,
+    sock: TcpStream,
     token: Token,
     count: u32,
     buf: Vec<u8>
 }
 
 impl EchoConn {
-    fn new(sock: TcpSocket) -> EchoConn {
+    fn new(sock: TcpStream) -> EchoConn {
         let mut ec =
         EchoConn {
             sock: sock,
@@ -101,7 +101,7 @@ impl EchoServer {
 }
 
 struct EchoClient {
-    sock: TcpSocket,
+    sock: TcpStream,
     backlog: LinkedList<String>,
     token: Token,
     count: u32
@@ -110,7 +110,7 @@ struct EchoClient {
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: TcpSocket, tok: Token) -> EchoClient {
+    fn new(sock: TcpStream, tok: Token) -> EchoClient {
 
         EchoClient {
             sock: sock,
@@ -156,7 +156,7 @@ struct EchoHandler {
 }
 
 impl EchoHandler {
-    fn new(srv: TcpAcceptor, client: TcpSocket) -> EchoHandler {
+    fn new(srv: TcpAcceptor, client: TcpStream) -> EchoHandler {
         EchoHandler {
             server: EchoServer {
                 sock: srv,
@@ -234,11 +234,10 @@ pub fn test_echo_server() {
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let sock = TcpSocket::v4().unwrap();
+    let (sock, _) = TcpSocket::v4().unwrap().connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
-    sock.connect(&addr).unwrap();
     let chan = event_loop.channel();
 
     let go = move || {

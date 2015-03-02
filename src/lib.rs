@@ -43,10 +43,8 @@
 //! event_loop.register(&server, SERVER).unwrap();
 //!
 //! // Setup the client socket
-//! let sock = TcpSocket::v4().unwrap();
-//!
-//! // Connect to the server
-//! sock.connect(&addr).unwrap();
+//! let (sock, _) = TcpSocket::v4().unwrap()
+//!     .connect(&addr).unwrap();
 //!
 //! // Register the socket
 //! event_loop.register(&sock, CLIENT).unwrap();

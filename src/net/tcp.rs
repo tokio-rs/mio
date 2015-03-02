@@ -2,8 +2,17 @@ use {TryRead, TryWrite, NonBlock, MioResult};
 use buf::{Buf, MutBuf};
 use io::{self, FromFd, Io, IoHandle};
 use net::{self, nix, Socket};
+use std::mem;
 use std::net::{SocketAddr, IpAddr};
-use std::os::unix::Fd;
+use std::os::unix::{Fd, AsRawFd};
+
+pub use std::net::TcpStream;
+
+/*
+ *
+ * ===== TcpSocket =====
+ *
+ */
 
 #[derive(Debug)]
 pub struct TcpSocket {
@@ -24,16 +33,11 @@ impl TcpSocket {
         Ok(FromFd::from_fd(fd))
     }
 
-    /// Connects the socket to the specified address. When the operation
-    /// completes, the handler will be notified with the supplied token.
-    ///
-    /// The goal of this method is to ensure that the event loop will always
-    /// notify about the connection, even if the connection happens
-    /// immediately. Otherwise, every consumer of the event loop would have
-    /// to worry about possibly-immediate connection.
-    pub fn connect(&self, addr: &SocketAddr) -> MioResult<bool> {
+    pub fn connect(self, addr: &SocketAddr) -> MioResult<(TcpStream, bool)> {
+        let io = self.io;
         // Attempt establishing the context. This may not complete immediately.
-        net::connect(&self.io, &net::to_nix_addr(addr))
+        net::connect(&io, &net::to_nix_addr(addr))
+            .map(|complete| (to_tcp_stream(io), complete))
     }
 
     pub fn bind(self, addr: &SocketAddr) -> MioResult<TcpListener> {
@@ -64,20 +68,55 @@ impl FromFd for TcpSocket {
     }
 }
 
-impl TryRead for TcpSocket {
-    fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
-        self.io.read_slice(buf)
-    }
-}
-
-impl TryWrite for TcpSocket {
-    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
-        self.io.write_slice(buf)
-    }
-}
-
 impl Socket for TcpSocket {
 }
+
+/*
+ *
+ * ===== TcpStream =====
+ *
+ */
+
+impl FromFd for TcpStream {
+    fn from_fd(fd: Fd) -> TcpStream {
+        to_tcp_stream(Io::new(fd))
+    }
+}
+
+impl IoHandle for TcpStream {
+    fn fd(&self) -> Fd {
+        self.as_raw_fd()
+    }
+}
+
+impl Socket for TcpStream {
+}
+
+impl TryRead for TcpStream {
+    fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
+        as_io(self).read_slice(buf)
+    }
+}
+
+impl TryWrite for TcpStream {
+    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
+        as_io(self).write_slice(buf)
+    }
+}
+
+fn to_tcp_stream(io: Io) -> TcpStream {
+    unsafe { mem::transmute(io) }
+}
+
+fn as_io<'a>(tcp: &'a TcpStream) -> &'a Io {
+    unsafe { mem::transmute(tcp) }
+}
+
+/*
+ *
+ * ===== TcpListener =====
+ *
+ */
 
 #[derive(Debug)]
 pub struct TcpListener {
@@ -123,7 +162,7 @@ impl TcpAcceptor {
         listener.listen(backlog)
     }
 
-    pub fn accept(&mut self) -> MioResult<NonBlock<TcpSocket>> {
+    pub fn accept(&mut self) -> MioResult<NonBlock<TcpStream>> {
         net::accept(&self.io)
             .map(|fd| NonBlock::Ready(FromFd::from_fd(fd)))
             .or_else(io::to_non_block)
@@ -143,4 +182,11 @@ impl FromFd for TcpAcceptor {
 }
 
 impl Socket for TcpAcceptor {
+}
+
+#[test]
+pub fn test_tcp_stream_size() {
+    use std::mem;
+
+    assert_eq!(mem::size_of::<Io>(), mem::size_of::<TcpStream>());
 }

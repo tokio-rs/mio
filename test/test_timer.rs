@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 
-type TestEventLoop = EventLoop<TcpSocket, ()>;
+type TestEventLoop = EventLoop<TcpStream, ()>;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -20,12 +20,12 @@ enum TestState {
 
 struct TestHandler {
     srv: TcpAcceptor,
-    cli: TcpSocket,
+    cli: TcpStream,
     state: TestState
 }
 
 impl TestHandler {
-    fn new(srv: TcpAcceptor, cli: TcpSocket) -> TestHandler {
+    fn new(srv: TcpAcceptor, cli: TcpStream) -> TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
@@ -34,7 +34,7 @@ impl TestHandler {
     }
 }
 
-impl Handler<TcpSocket, ()> for TestHandler {
+impl Handler<TcpStream, ()> for TestHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: ReadHint) {
         match tok {
             SERVER => {
@@ -98,7 +98,7 @@ impl Handler<TcpSocket, ()> for TestHandler {
         event_loop.reregister(&self.cli, CLIENT, Interest::readable(), PollOpt::edge()).unwrap();
     }
 
-    fn timeout(&mut self, _event_loop: &mut TestEventLoop, sock: TcpSocket) {
+    fn timeout(&mut self, _event_loop: &mut TestEventLoop, sock: TcpStream) {
         debug!("timeout handler : writing to socket");
         sock.write(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
     }
@@ -122,11 +122,11 @@ pub fn test_timer() {
 
     event_loop.register_opt(&srv, SERVER, Interest::all(), PollOpt::edge()).unwrap();
 
-    let sock = TcpSocket::v4().unwrap();
+    let (sock, _) = TcpSocket::v4().unwrap()
+        .connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register_opt(&sock, CLIENT, Interest::all(), PollOpt::edge()).unwrap();
-    sock.connect(&addr).unwrap();
 
     // Init the handler
     let mut handler = TestHandler::new(srv, sock);

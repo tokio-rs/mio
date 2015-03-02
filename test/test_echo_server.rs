@@ -11,7 +11,7 @@ const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
 struct EchoConn {
-    sock: TcpSocket,
+    sock: TcpStream,
     buf: Option<ByteBuf>,
     mut_buf: Option<MutByteBuf>,
     token: Token,
@@ -19,7 +19,7 @@ struct EchoConn {
 }
 
 impl EchoConn {
-    fn new(sock: TcpSocket) -> EchoConn {
+    fn new(sock: TcpStream) -> EchoConn {
         EchoConn {
             sock: sock,
             buf: None,
@@ -116,7 +116,7 @@ impl EchoServer {
 }
 
 struct EchoClient {
-    sock: TcpSocket,
+    sock: TcpStream,
     msgs: Vec<&'static str>,
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
@@ -128,7 +128,7 @@ struct EchoClient {
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: TcpSocket, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
+    fn new(sock: TcpStream, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
         let curr = msgs.remove(0);
 
         EchoClient {
@@ -222,7 +222,7 @@ struct EchoHandler {
 }
 
 impl EchoHandler {
-    fn new(srv: TcpAcceptor, client: TcpSocket, msgs: Vec<&'static str>) -> EchoHandler {
+    fn new(srv: TcpAcceptor, client: TcpStream, msgs: Vec<&'static str>) -> EchoHandler {
         EchoHandler {
             server: EchoServer {
                 sock: srv,
@@ -270,11 +270,11 @@ pub fn test_echo_server() {
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let sock = TcpSocket::v4().unwrap();
+    let (sock, _) = TcpSocket::v4().unwrap()
+        .connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
-    sock.connect(&addr).unwrap();
 
     // Start the event loop
     event_loop.run(&mut EchoHandler::new(srv, sock, vec!["foo", "bar"])).unwrap();

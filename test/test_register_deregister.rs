@@ -11,12 +11,12 @@ type TestEventLoop = EventLoop<usize, ()>;
 
 struct TestHandler {
     server: TcpAcceptor,
-    client: TcpSocket,
+    client: TcpStream,
     state: usize,
 }
 
 impl TestHandler {
-    fn new(srv: TcpAcceptor, cli: TcpSocket) -> TestHandler {
+    fn new(srv: TcpAcceptor, cli: TcpStream) -> TestHandler {
         TestHandler {
             server: srv,
             client: cli,
@@ -67,18 +67,16 @@ pub fn test_register_deregister() {
     info!("setting re-use addr");
     server.set_reuseaddr(true).unwrap();
 
-    let client = TcpSocket::v4().unwrap();
-
-    // Register client socket only as writable
-    event_loop.register_opt(&client, CLIENT, Interest::readable(), PollOpt::level()).unwrap();
-
     let server = server.bind(&addr).unwrap().listen(256).unwrap();
 
     info!("register server socket");
     event_loop.register_opt(&server, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
 
-    // Connect to the server
-    client.connect(&addr).unwrap();
+    let (client, _) = TcpSocket::v4().unwrap()
+        .connect(&addr).unwrap();
+
+    // Register client socket only as writable
+    event_loop.register_opt(&client, CLIENT, Interest::readable(), PollOpt::level()).unwrap();
 
     let mut handler = TestHandler::new(server, client);
 

@@ -8,6 +8,8 @@ use self::TestState::{Initial, AfterRead, AfterHup};
 
 type TestEventLoop = EventLoop<usize, ()>;
 
+const SERVER: Token = Token(0);
+const CLIENT: Token = Token(1);
 
 #[derive(Debug, PartialEq)]
 enum TestState {
@@ -18,12 +20,12 @@ enum TestState {
 
 struct TestHandler {
     srv: TcpAcceptor,
-    cli: TcpSocket,
+    cli: TcpStream,
     state: TestState
 }
 
 impl TestHandler {
-    fn new(srv: TcpAcceptor, cli: TcpSocket) -> TestHandler {
+    fn new(srv: TcpAcceptor, cli: TcpStream) -> TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
@@ -37,15 +39,17 @@ impl Handler<usize, ()> for TestHandler {
         debug!("readable; tok={:?}; hint={:?}", tok, hint);
 
         match tok {
-            Token(0) => {
+            SERVER => {
                 debug!("server connection ready for accept");
                 let _ = self.srv.accept().unwrap().unwrap();
             }
-            Token(1) => {
+            CLIENT => {
                 debug!("client readable");
 
                 match self.state {
                     Initial => {
+                        let mut buf = [0; 4096];
+                        debug!("GOT={:?}", self.cli.read_slice(buf.as_mut_slice()));
                         assert!(hint.is_data(), "unexpected hint {:?}", hint);
 
                         // Whether or not Hup is included with actual data is platform specific
@@ -71,15 +75,15 @@ impl Handler<usize, ()> for TestHandler {
             }
             _ => panic!("received unknown token {:?}", tok)
         }
-        event_loop.reregister(&self.cli, Token(1), Interest::readable() | Interest::hup(), PollOpt::edge()).unwrap();
+        event_loop.reregister(&self.cli, CLIENT, Interest::readable() | Interest::hup(), PollOpt::edge()).unwrap();
     }
 
-    fn writable(&mut self, _event_loop: &mut TestEventLoop, tok: Token) {
+    fn writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) {
         match tok {
-            Token(0) => panic!("received writable for token 0"),
-            Token(1) => {
+            SERVER => panic!("received writable for token 0"),
+            CLIENT => {
                 debug!("client connected");
-                _event_loop.reregister(&self.cli, Token(1), Interest::readable() | Interest::hup(), PollOpt::edge()).unwrap();
+                event_loop.reregister(&self.cli, CLIENT, Interest::readable() | Interest::hup(), PollOpt::edge()).unwrap();
             }
             _ => panic!("received unknown token {:?}", tok)
         }
@@ -88,31 +92,33 @@ impl Handler<usize, ()> for TestHandler {
 
 #[test]
 pub fn test_close_on_drop() {
+    ::env_logger::init().unwrap();
+
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut event_loop = EventLoop::new().unwrap();
 
+    // The address to connect to - localhost + a unique port
     let addr = localhost();
 
+    // == Create & setup server socket
     let srv = TcpSocket::v4().unwrap();
-
-    info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
 
-    let sock = TcpSocket::v4().unwrap();
+    let srv = srv.bind(&addr).unwrap()
+        .listen(256).unwrap();
 
-    event_loop.register_opt(&sock, Token(1), Interest::writable(), PollOpt::edge()).unwrap();
+    event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
 
-    let srv = srv.bind(&addr).unwrap().listen(256).unwrap();
+    // == Create & setup client socket
+    let (sock, _) = TcpSocket::v4().unwrap()
+        .connect(&addr).unwrap();
 
-    info!("register server socket");
-    event_loop.register_opt(&srv, Token(0), Interest::readable(), PollOpt::edge()).unwrap();
-    // Connect to the server
-    sock.connect(&addr).unwrap();
+    event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge()).unwrap();
 
+    // == Setup test handler
     let mut handler = TestHandler::new(srv, sock);
 
-    // Start the event loop
+    // == Run test
     event_loop.run(&mut handler).unwrap();
-
     assert!(handler.state == AfterHup, "actual={:?}", handler.state);
 }
