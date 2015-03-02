@@ -79,7 +79,7 @@ impl EchoConn {
 }
 
 struct EchoServer {
-    sock: TcpAcceptor,
+    sock: TcpListener,
     conns: Slab<EchoConn>
 }
 
@@ -87,7 +87,7 @@ impl EchoServer {
     fn accept(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
         debug!("server accepting socket");
 
-        let sock = self.sock.accept().unwrap().unwrap();
+        let sock = self.sock.try_accept().unwrap().unwrap();
         let conn = EchoConn::new(sock,);
         let tok = self.conns.insert(conn)
             .ok().expect("could not add connectiont o slab");
@@ -222,7 +222,7 @@ struct EchoHandler {
 }
 
 impl EchoHandler {
-    fn new(srv: TcpAcceptor, client: TcpStream, msgs: Vec<&'static str>) -> EchoHandler {
+    fn new(srv: TcpListener, client: TcpStream, msgs: Vec<&'static str>) -> EchoHandler {
         EchoHandler {
             server: EchoServer {
                 sock: srv,
@@ -263,9 +263,9 @@ pub fn test_echo_server() {
 
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
+    srv.bind(&addr).unwrap();
 
-    let srv = srv.bind(&addr).unwrap()
-        .listen(256).unwrap();
+    let srv = srv.listen(256).unwrap();
 
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();

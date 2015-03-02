@@ -19,13 +19,13 @@ enum TestState {
 }
 
 struct TestHandler {
-    srv: TcpAcceptor,
+    srv: TcpListener,
     cli: TcpStream,
     state: TestState
 }
 
 impl TestHandler {
-    fn new(srv: TcpAcceptor, cli: TcpStream) -> TestHandler {
+    fn new(srv: TcpListener, cli: TcpStream) -> TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
@@ -39,7 +39,7 @@ impl Handler<TcpStream, ()> for TestHandler {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
-                let conn = self.srv.accept().unwrap().unwrap();
+                let conn = self.srv.try_accept().unwrap().unwrap();
                 event_loop.timeout(conn, Duration::milliseconds(200)).unwrap();
 
                 event_loop.reregister(&self.srv, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
@@ -115,8 +115,9 @@ pub fn test_timer() {
 
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
+    srv.bind(&addr).unwrap();
 
-    let srv = srv.bind(&addr).unwrap().listen(256).unwrap();
+    let srv = srv.listen(256).unwrap();
 
     info!("listening for connections");
 

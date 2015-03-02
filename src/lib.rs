@@ -20,7 +20,7 @@
 //!
 //! ```
 //! use mio::*;
-//! use mio::net::tcp::{TcpSocket, TcpAcceptor};
+//! use mio::net::tcp::{TcpSocket, TcpListener};
 //! use std::net::SocketAddr;
 //! use std::str::FromStr;
 //!
@@ -32,9 +32,9 @@
 //! let addr = FromStr::from_str("127.0.0.1:13265").unwrap();
 //!
 //! // Setup the server socket
-//! let server = TcpSocket::v4().unwrap()
-//!     .bind(&addr).unwrap()
-//!     .listen(256).unwrap();
+//! let sock = TcpSocket::v4().unwrap();
+//! sock.bind(&addr).unwrap();
+//! let server = sock.listen(256).unwrap();
 //!
 //! // Create an event loop
 //! let mut event_loop = EventLoop::<(), ()>::new().unwrap();
@@ -50,7 +50,7 @@
 //! event_loop.register(&sock, CLIENT).unwrap();
 //!
 //! // Define a handler to process the events
-//! struct MyHandler(TcpAcceptor);
+//! struct MyHandler(TcpListener);
 //!
 //! impl Handler<(), ()> for MyHandler {
 //!     fn readable(&mut self, event_loop: &mut EventLoop<(), ()>, token: Token, _: ReadHint) {
@@ -112,6 +112,7 @@ pub use io::{
     Io,
     TryRead,
     TryWrite,
+    TryAccept,
     IoHandle,
     PipeReader,
     PipeWriter,
@@ -149,6 +150,14 @@ mod notify;
 mod os;
 mod poll;
 mod timer;
+
+pub mod prelude {
+    pub use super::{
+        EventLoop,
+        TryRead,
+        TryWrite,
+    };
+}
 
 // Re-export bytes
 pub mod buf {

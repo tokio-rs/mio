@@ -19,13 +19,13 @@ enum TestState {
 }
 
 struct TestHandler {
-    srv: TcpAcceptor,
+    srv: TcpListener,
     cli: TcpStream,
     state: TestState
 }
 
 impl TestHandler {
-    fn new(srv: TcpAcceptor, cli: TcpStream) -> TestHandler {
+    fn new(srv: TcpListener, cli: TcpStream) -> TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
@@ -41,7 +41,7 @@ impl Handler<usize, ()> for TestHandler {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
-                let _ = self.srv.accept().unwrap().unwrap();
+                let _ = self.srv.try_accept().unwrap().unwrap();
             }
             CLIENT => {
                 debug!("client readable");
@@ -103,9 +103,9 @@ pub fn test_close_on_drop() {
     // == Create & setup server socket
     let srv = TcpSocket::v4().unwrap();
     srv.set_reuseaddr(true).unwrap();
+    srv.bind(&addr).unwrap();
 
-    let srv = srv.bind(&addr).unwrap()
-        .listen(256).unwrap();
+    let srv = srv.listen(256).unwrap();
 
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
 
