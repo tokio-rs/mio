@@ -1,7 +1,7 @@
 use buf::{Buf, MutBuf};
 use error::MioResult;
 use io::{self, FromIoDesc, IoHandle, IoReader, IoWriter, NonBlock};
-use net::{self, nix, Socket, MulticastSocket, UnconnectedSocket};
+use net::{self, nix, Socket, MulticastSocket, UnconnectedSocket, BroadcastSocket};
 use os;
 use std::net::{SocketAddr, IpAddr};
 
@@ -104,4 +104,8 @@ impl UnconnectedSocket for UdpSocket {
             })
             .or_else(io::to_non_block)
     }
+}
+
+impl BroadcastSocket for UdpSocket {
+
 }

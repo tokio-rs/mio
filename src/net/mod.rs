@@ -117,6 +117,14 @@ pub trait UnconnectedSocket {
     fn recv_from<B: MutBuf>(&mut self, buf: &mut B) -> MioResult<NonBlock<SocketAddr>>;
 }
 
+pub trait BroadcastSocket: Socket {
+    fn set_broadcast(&self, val: bool) -> MioResult<()> {
+        nix::setsockopt(self.desc().fd, nix::SockLevel::Socket, nix::sockopt::Broadcast, val)
+            .map_err(MioError::from_nix_error)
+    }
+}
+
+
 /*
  *
  * ===== Implementation =====
