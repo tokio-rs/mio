@@ -19,8 +19,11 @@ impl Selector {
     /// Wait for events from the OS
     pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
         // Wait for epoll events for at most timeout_ms milliseconds
-        let cnt = try!(epoll_wait(self.epfd, evts.events.as_mut_slice(), timeout_ms)
-                           .map_err(io::from_nix_error));
+        let cnt = match epoll_wait(self.epfd, evts.events.as_mut_slice(), timeout_ms) {
+            Ok(c) => c,
+            Err(::nix::NixError::Sys(::nix::errno::EINTR)) => 0,
+            Err(err) => return Err(io::from_nix_error(err))
+        };
 
         evts.len = cnt;
         Ok(())
