@@ -12,7 +12,7 @@ pub struct Slab<T> {
     len: isize,
     // The total number of elements that the slab can hold
     cap: isize,
-    // THe token offset
+    // The token offset
     off: usize,
     // Offset of the next available slot in the slab. Set to the slab's
     // capacity when the slab is full.
@@ -191,6 +191,23 @@ impl<T> Slab<T> {
         }
     }
 
+    pub fn iter(&self) -> SlabIter<T> {
+        SlabIter {
+            slab: self,
+            cur_idx: 0,
+            yielded: 0
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> SlabMutIter<T> {
+        SlabMutIter {
+            slab: self,
+            cur_idx: 0,
+            yielded: 0
+        }
+    }
+
+
     #[inline]
     fn entry(&self, idx: isize) -> &Entry<T> {
         unsafe { &*self.mem.offset(idx) }
@@ -319,6 +336,51 @@ impl<T> Entry<T> {
         self.nxt == IN_USE
     }
 }
+
+pub struct SlabIter<'a, T: 'a> {
+    slab: &'a Slab<T>,
+    cur_idx: isize,
+    yielded: isize
+}
+
+impl <'a, T> Iterator for SlabIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<&'a T> {
+        while self.yielded < self.slab.len {
+            let entry = self.slab.entry(self.cur_idx);
+            self.cur_idx += 1;
+            if entry.in_use() {
+                self.yielded += 1;
+                return Some(&entry.val);
+            }
+        }
+        None
+    }
+}
+
+pub struct SlabMutIter<'a, T: 'a> {
+    slab: &'a mut Slab<T>,
+    cur_idx: isize,
+    yielded: isize
+}
+
+impl <'a, T> Iterator for SlabMutIter<'a, T> {
+    type Item = &'a mut T;
+
+    fn next(&mut self) -> Option<&'a mut T> {
+        while self.yielded < self.slab.len {
+            let entry = unsafe { &mut *self.slab.mem.offset(self.cur_idx) };
+            self.cur_idx += 1;
+            if entry.in_use() {
+                self.yielded += 1;
+                return Some(&mut entry.val);
+            }
+        }
+        None
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -450,5 +512,34 @@ mod tests {
 
         let tok = slab.insert(111).unwrap();
         assert!(slab.contains(tok));
+    }
+
+    #[test]
+    fn test_iter() {
+        let mut slab: Slab<u32> = Slab::new_starting_at(Token(0), 4);
+        for i in range(0, 4) {
+            slab.insert(i).unwrap();
+        }
+        assert_eq!(slab.iter().map(|r| *r).collect(), vec![0, 1, 2, 3]);
+        slab.remove(Token(1));
+        assert_eq!(slab.iter().map(|r| *r).collect(), vec![0, 2, 3]);
+    }
+
+    #[test]
+    fn test_iter_mut() {
+        let mut slab: Slab<u32> = Slab::new_starting_at(Token(0), 4);
+        for i in range(0, 4) {
+            slab.insert(i).unwrap();
+        }
+        for e in slab.iter_mut() {
+            *e = *e + 1;
+        }
+
+        assert_eq!(slab.iter().map(|r| *r).collect(), vec![1, 2, 3, 4]);
+        slab.remove(Token(2));
+        for e in slab.iter_mut() {
+            *e = *e + 1;
+        }
+        assert_eq!(slab.iter().map(|r| *r).collect(), vec![2, 3, 5]);
     }
 }
