@@ -1,7 +1,7 @@
 use {TryRead, TryWrite, NonBlock, MioResult, MioError};
 use buf::{Buf, MutBuf};
-use io::{Io, FromFd, IoHandle};
-use net::{self, nix, Socket};
+use io::{self, Io, FromFd, IoHandle};
+use net::{self, nix, TryAccept, Socket};
 use std::path::Path;
 use std::os::unix::Fd;
 
@@ -20,14 +20,22 @@ impl UnixSocket {
         Ok(FromFd::from_fd(fd))
     }
 
-    pub fn connect(&self, addr: &Path) -> MioResult<bool> {
+    pub fn connect(self, addr: &Path) -> MioResult<(UnixStream, bool)> {
+        let io = self.io;
         // Attempt establishing the context. This may not complete immediately.
-        net::connect(&self.io, &try!(to_nix_addr(addr)))
+        net::connect(&io, &try!(to_nix_addr(addr)))
+            .map(|complete| (UnixStream { io: io }, complete))
     }
 
-    pub fn bind(self, addr: &Path) -> MioResult<UnixListener> {
-        try!(net::bind(&self.io, &try!(to_nix_addr(addr))));
-        Ok(UnixListener { io: self.io })
+    pub fn listen(self, backlog: usize) -> MioResult<UnixListener> {
+        let io = self.io;
+
+        net::listen(&io, backlog)
+            .map(|_| UnixListener { io: io })
+    }
+
+    pub fn bind(&self, addr: &Path) -> MioResult<()> {
+        net::bind(&self.io, &try!(to_nix_addr(addr)))
     }
 }
 
@@ -43,31 +51,12 @@ impl FromFd for UnixSocket {
     }
 }
 
-impl TryRead for UnixSocket {
-    fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
-        self.io.read_slice(buf)
-    }
-}
-
-impl TryWrite for UnixSocket {
-    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
-        self.io.write_slice(buf)
-    }
-}
-
 impl Socket for UnixSocket {
 }
 
 #[derive(Debug)]
 pub struct UnixListener {
     io: Io,
-}
-
-impl UnixListener {
-    pub fn listen(self, backlog: usize) -> MioResult<UnixAcceptor> {
-        try!(net::listen(&self.io, backlog));
-        Ok(UnixAcceptor { io: self.io })
-    }
 }
 
 impl IoHandle for UnixListener {
@@ -82,45 +71,49 @@ impl FromFd for UnixListener {
     }
 }
 
+impl Socket for UnixListener {
+}
+
+impl TryAccept for UnixListener {
+    type Sock = UnixStream;
+
+    fn try_accept(&self) -> MioResult<NonBlock<UnixStream>> {
+        net::accept(&self.io)
+            .map(|fd| NonBlock::Ready(FromFd::from_fd(fd)))
+            .or_else(io::to_non_block)
+    }
+}
+
 #[derive(Debug)]
-pub struct UnixAcceptor {
+pub struct UnixStream {
     io: Io,
 }
 
-impl UnixAcceptor {
-    pub fn new(addr: &Path, backlog: usize) -> MioResult<UnixAcceptor> {
-        let sock = try!(UnixSocket::stream());
-        let listener = try!(sock.bind(addr));
-        listener.listen(backlog)
-    }
-
-    pub fn accept(&mut self) -> MioResult<NonBlock<UnixSocket>> {
-        match net::accept(&self.io) {
-            Ok(fd) => Ok(NonBlock::Ready(FromFd::from_fd(fd))),
-            Err(e) => {
-                if e.is_would_block() {
-                    return Ok(NonBlock::WouldBlock);
-                }
-
-                return Err(e);
-            }
-        }
-    }
-}
-
-impl IoHandle for UnixAcceptor {
+impl IoHandle for UnixStream {
     fn fd(&self) -> Fd {
         self.io.fd()
     }
 }
 
-impl FromFd for UnixAcceptor {
-    fn from_fd(fd: Fd) -> UnixAcceptor {
-        UnixAcceptor { io: Io::new(fd) }
+impl FromFd for UnixStream {
+    fn from_fd(fd: Fd) -> UnixStream {
+        UnixStream { io: Io::new(fd) }
     }
 }
 
-impl Socket for UnixAcceptor {
+impl Socket for UnixStream {
+}
+
+impl TryRead for UnixStream {
+    fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
+        self.io.read_slice(buf)
+    }
+}
+
+impl TryWrite for UnixStream {
+    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
+        self.io.write_slice(buf)
+    }
 }
 
 fn to_nix_addr(path: &Path) -> MioResult<nix::SockAddr> {

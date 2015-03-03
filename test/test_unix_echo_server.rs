@@ -1,4 +1,5 @@
 use mio::*;
+use mio::net::*;
 use mio::net::unix::*;
 use mio::buf::{ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
@@ -11,7 +12,7 @@ const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
 struct EchoConn {
-    sock: UnixSocket,
+    sock: UnixStream,
     buf: Option<ByteBuf>,
     mut_buf: Option<MutByteBuf>,
     token: Token,
@@ -19,7 +20,7 @@ struct EchoConn {
 }
 
 impl EchoConn {
-    fn new(sock: UnixSocket) -> EchoConn {
+    fn new(sock: UnixStream) -> EchoConn {
         EchoConn {
             sock: sock,
             buf: None,
@@ -79,7 +80,7 @@ impl EchoConn {
 }
 
 struct EchoServer {
-    sock: UnixAcceptor,
+    sock: UnixListener,
     conns: Slab<EchoConn>
 }
 
@@ -87,8 +88,8 @@ impl EchoServer {
     fn accept(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
         debug!("server accepting socket");
 
-        let sock = self.sock.accept().unwrap().unwrap();
-        let conn = EchoConn::new(sock,);
+        let sock = self.sock.try_accept().unwrap().unwrap();
+        let conn = EchoConn::new(sock);
         let tok = self.conns.insert(conn)
             .ok().expect("could not add connectiont o slab");
 
@@ -116,7 +117,7 @@ impl EchoServer {
 }
 
 struct EchoClient {
-    sock: UnixSocket,
+    sock: UnixStream,
     msgs: Vec<&'static str>,
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
@@ -128,7 +129,7 @@ struct EchoClient {
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: UnixSocket, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
+    fn new(sock: UnixStream, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
         let curr = msgs.remove(0);
 
         EchoClient {
@@ -223,7 +224,7 @@ struct EchoHandler {
 }
 
 impl EchoHandler {
-    fn new(srv: UnixAcceptor, client: UnixSocket, msgs: Vec<&'static str>) -> EchoHandler {
+    fn new(srv: UnixListener, client: UnixStream, msgs: Vec<&'static str>) -> EchoHandler {
         EchoHandler {
             server: EchoServer {
                 sock: srv,
@@ -264,18 +265,18 @@ pub fn test_unix_echo_server() {
     let addr = PathBuf::new(tmp_sock_path.as_str().unwrap());
 
     let srv = UnixSocket::stream().unwrap();
+    srv.bind(&addr).unwrap();
 
-    let srv = srv.bind(&addr).unwrap()
-        .listen(256).unwrap();
+    let srv = srv.listen(256).unwrap();
 
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let sock = UnixSocket::stream().unwrap();
+    let (sock, _) = UnixSocket::stream().unwrap()
+        .connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
-    sock.connect(&addr).unwrap();
 
     // Start the event loop
     event_loop.run(&mut EchoHandler::new(srv, sock, vec!["foo", "bar"])).unwrap();
