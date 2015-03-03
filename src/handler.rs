@@ -13,4 +13,7 @@ pub trait Handler<T, M: Send> {
 
     fn timeout(&mut self, event_loop: &mut EventLoop<T, M>, timeout: T) {
     }
+
+    fn interrupted(&mut self, event_loop: &mut EventLoop<T, M>) {
+    }
 }
