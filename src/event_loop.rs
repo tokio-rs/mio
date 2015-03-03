@@ -230,7 +230,17 @@ impl<T, M: Send> EventLoop<T, M> {
         // Check the registered IO handles for any new events. Each poll
         // is for one second, so a shutdown request can last as long as
         // one second before it takes effect.
-        let events = try!(self.io_poll(pending));
+        let events = match self.io_poll(pending) {
+            Ok(e) => e,
+            Err(err) => {
+                if err.kind() == io::ErrorKind::Interrupted {
+                    handler.interrupted(self);
+                    0
+                } else {
+                    return Err(err);
+                }
+            }
+        };
 
         if !pending {
             // Indicate that the sleep period is over, also grab any additional
