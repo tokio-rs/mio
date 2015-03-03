@@ -1,10 +1,10 @@
-use {Handler, Evented, Poll, Token, MioResult};
+use {Handler, Evented, Poll, Token};
 use os::event::{IoEvent, Interest, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
 use std::default::Default;
 use std::time::duration::Duration;
-use std::{fmt, usize};
+use std::{io, fmt, usize};
 
 /// Configure EventLoop runtime details
 #[derive(Copy, Clone, Debug)]
@@ -51,11 +51,11 @@ impl<T, M: Send> EventLoop<T, M> {
 
     /// Initializes a new event loop using default configuration settings. The
     /// event loop will not be running yet.
-    pub fn new() -> MioResult<EventLoop<T, M>> {
+    pub fn new() -> io::Result<EventLoop<T, M>> {
         EventLoop::configured(Default::default())
     }
 
-    pub fn configured(config: EventLoopConfig) -> MioResult<EventLoop<T, M>> {
+    pub fn configured(config: EventLoopConfig) -> io::Result<EventLoop<T, M>> {
         // Create the IO poller
         let mut poll = try!(Poll::new());
 
@@ -180,23 +180,23 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register<E: Evented>(&mut self, io: &E, token: Token) -> MioResult<()> {
+    pub fn register<E: Evented>(&mut self, io: &E, token: Token) -> io::Result<()> {
         self.poll.register(io, token, Interest::readable(), PollOpt::level())
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register_opt<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> MioResult<()> {
+    pub fn register_opt<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()> {
         self.poll.register(io, token, interest, opt)
     }
 
     /// Re-Registers an IO handle with the event loop.
-    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> MioResult<()> {
+    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()> {
         self.poll.reregister(io, token, interest, opt)
     }
 
     /// Keep spinning the event loop indefinitely, and notify the handler whenever
     /// any of the registered handles are ready.
-    pub fn run<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
+    pub fn run<H: Handler<T, M>>(&mut self, handler: &mut H) -> io::Result<()> {
         self.run = true;
 
         while self.run {
@@ -208,14 +208,14 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     /// Deregisters an IO handle with the event loop.
-    pub fn deregister<E: Evented>(&mut self, io: &E) -> MioResult<()> {
+    pub fn deregister<E: Evented>(&mut self, io: &E) -> io::Result<()> {
         self.poll.deregister(io)
     }
 
     /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once<H: Handler<T, M>>(&mut self, handler: &mut H) -> MioResult<()> {
+    pub fn run_once<H: Handler<T, M>>(&mut self, handler: &mut H) -> io::Result<()> {
         let mut messages;
         let mut pending;
 
@@ -247,7 +247,7 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     #[inline]
-    fn io_poll(&mut self, immediate: bool) -> MioResult<usize> {
+    fn io_poll(&mut self, immediate: bool) -> io::Result<usize> {
         if immediate {
             self.poll.poll(0)
         } else {

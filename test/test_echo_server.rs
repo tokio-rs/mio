@@ -3,6 +3,7 @@ use mio::net::*;
 use mio::net::tcp::*;
 use mio::buf::{ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
+use std::io;
 use super::localhost;
 
 type TestEventLoop = EventLoop<usize, ()>;
@@ -29,7 +30,7 @@ impl EchoConn {
         }
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn writable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         let mut buf = self.buf.take().unwrap();
 
         match self.sock.write(&mut buf) {
@@ -53,7 +54,7 @@ impl EchoConn {
         event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
-    fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn readable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         let mut buf = self.mut_buf.take().unwrap();
 
         match self.sock.read(&mut buf) {
@@ -84,7 +85,7 @@ struct EchoServer {
 }
 
 impl EchoServer {
-    fn accept(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn accept(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         debug!("server accepting socket");
 
         let sock = self.sock.try_accept().unwrap().unwrap();
@@ -100,12 +101,12 @@ impl EchoServer {
         Ok(())
     }
 
-    fn conn_readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
+    fn conn_readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> io::Result<()> {
         debug!("server conn readable; tok={:?}", tok);
         self.conn(tok).readable(event_loop)
     }
 
-    fn conn_writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
+    fn conn_writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> io::Result<()> {
         debug!("server conn writable; tok={:?}", tok);
         self.conn(tok).writable(event_loop)
     }
@@ -142,7 +143,7 @@ impl EchoClient {
         }
     }
 
-    fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn readable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         debug!("client socket readable");
 
         let mut buf = self.mut_buf.take().unwrap();
@@ -180,7 +181,7 @@ impl EchoClient {
         event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn writable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         debug!("client socket writable");
 
         match self.sock.write(&mut self.tx) {
@@ -199,7 +200,7 @@ impl EchoClient {
         event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
-    fn next_msg(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn next_msg(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         if self.msgs.is_empty() {
             event_loop.shutdown();
             return Ok(());

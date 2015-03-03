@@ -1,8 +1,8 @@
-use {TryRead, TryWrite, NonBlock, MioResult};
+use {TryRead, TryWrite, NonBlock};
 use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd, Io};
 use net::{self, nix, TryAccept, Socket};
-use std::mem;
+use std::{mem};
 use std::net::SocketAddr;
 use std::os::unix::{Fd, AsRawFd};
 
@@ -20,41 +20,41 @@ pub struct TcpSocket {
 }
 
 impl TcpSocket {
-    pub fn v4() -> MioResult<TcpSocket> {
+    pub fn v4() -> io::Result<TcpSocket> {
         TcpSocket::new(nix::AddressFamily::Inet)
     }
 
-    pub fn v6() -> MioResult<TcpSocket> {
+    pub fn v6() -> io::Result<TcpSocket> {
         TcpSocket::new(nix::AddressFamily::Inet6)
     }
 
-    fn new(family: nix::AddressFamily) -> MioResult<TcpSocket> {
+    fn new(family: nix::AddressFamily) -> io::Result<TcpSocket> {
         let fd = try!(net::socket(family, nix::SockType::Stream));
         Ok(FromFd::from_fd(fd))
     }
 
-    pub fn connect(self, addr: &SocketAddr) -> MioResult<(TcpStream, bool)> {
+    pub fn connect(self, addr: &SocketAddr) -> io::Result<(TcpStream, bool)> {
         let io = self.io;
         // Attempt establishing the context. This may not complete immediately.
         net::connect(&io, &net::to_nix_addr(addr))
             .map(|complete| (to_tcp_stream(io), complete))
     }
 
-    pub fn bind(&self, addr: &SocketAddr) -> MioResult<()> {
+    pub fn bind(&self, addr: &SocketAddr) -> io::Result<()> {
         net::bind(&self.io, &net::to_nix_addr(addr))
     }
 
-    pub fn listen(self, backlog: usize) -> MioResult<TcpListener> {
+    pub fn listen(self, backlog: usize) -> io::Result<TcpListener> {
         try!(net::listen(&self.io, backlog));
         Ok(to_tcp_listener(self.io))
     }
 
-    pub fn getpeername(&self) -> MioResult<SocketAddr> {
+    pub fn getpeername(&self) -> io::Result<SocketAddr> {
         net::getpeername(&self.io)
             .map(net::to_std_addr)
     }
 
-    pub fn getsockname(&self) -> MioResult<SocketAddr> {
+    pub fn getsockname(&self) -> io::Result<SocketAddr> {
         net::getsockname(&self.io)
             .map(net::to_std_addr)
     }
@@ -97,13 +97,13 @@ impl Socket for TcpStream {
 }
 
 impl TryRead for TcpStream {
-    fn read_slice(&self, buf: &mut[u8]) -> MioResult<NonBlock<usize>> {
+    fn read_slice(&self, buf: &mut[u8]) -> io::Result<NonBlock<usize>> {
         as_io(self).read_slice(buf)
     }
 }
 
 impl TryWrite for TcpStream {
-    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
+    fn write_slice(&self, buf: &[u8]) -> io::Result<NonBlock<usize>> {
         as_io(self).write_slice(buf)
     }
 }
@@ -129,7 +129,7 @@ impl Socket for TcpListener {
 impl TryAccept for TcpListener {
     type Sock = TcpStream;
 
-    fn try_accept(&self) -> MioResult<NonBlock<TcpStream>> {
+    fn try_accept(&self) -> io::Result<NonBlock<TcpStream>> {
         net::accept(as_io(self))
             .map(|fd| NonBlock::Ready(FromFd::from_fd(fd)))
             .or_else(io::to_non_block)

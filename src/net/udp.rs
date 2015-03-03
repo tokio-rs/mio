@@ -1,4 +1,4 @@
-use {Io, NonBlock, MioResult};
+use {Io, NonBlock};
 use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd};
 use net::{self, TrySend, TryRecv, Socket};
@@ -21,7 +21,7 @@ impl Socket for UdpSocket {
 }
 
 impl TrySend for UdpSocket {
-    fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> MioResult<NonBlock<()>> {
+    fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<NonBlock<()>> {
         net::sendto(as_io(self), buf.bytes(), &net::to_nix_addr(target))
             .map(|cnt| {
                 buf.advance(cnt);
@@ -32,7 +32,7 @@ impl TrySend for UdpSocket {
 }
 
 impl TryRecv for UdpSocket {
-    fn recv_from<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<SocketAddr>> {
+    fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<NonBlock<SocketAddr>> {
         net::recvfrom(as_io(self), buf.mut_bytes())
             .map(|(cnt, addr)| {
                 buf.advance(cnt);

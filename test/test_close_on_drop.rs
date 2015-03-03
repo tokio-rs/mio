@@ -69,7 +69,7 @@ impl Handler<usize, ()> for TestHandler {
                 let mut buf = ByteBuf::mut_with_capacity(1024);
 
                 match self.cli.read(&mut buf) {
-                    Err(e) if e.is_eof() => event_loop.shutdown(),
+                    Ok(NonBlock::Ready(0)) => event_loop.shutdown(),
                     _ => panic!("the client socket should not be readable")
                 }
             }

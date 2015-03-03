@@ -81,7 +81,7 @@
 // mio is still in rapid development
 #![unstable]
 
-#![feature(alloc, core, old_io, libc, net, path, std_misc, unsafe_destructor)]
+#![feature(alloc, core, io, libc, net, path, std_misc, unsafe_destructor)]
 
 #![allow(dead_code)]
 
@@ -96,11 +96,6 @@ extern crate log;
 pub use buf::{
     Buf,
     MutBuf,
-};
-pub use error::{
-    MioResult,
-    MioError,
-    MioErrorKind
 };
 pub use handler::{
     Handler,
@@ -141,7 +136,6 @@ pub use os::event::{
 pub mod net;
 pub mod util;
 
-mod error;
 mod event_loop;
 mod handler;
 mod io;

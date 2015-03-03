@@ -1,6 +1,7 @@
-use {MioResult, MioError};
 use buf::{Buf, MutBuf};
 use std::os::unix::{Fd, AsRawFd};
+
+pub use std::io::{Result, Error};
 
 /// The result of a non-blocking operation.
 #[derive(Debug)]
@@ -33,7 +34,7 @@ pub trait FromFd {
 }
 
 pub trait TryRead {
-    fn read<B: MutBuf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
+    fn read<B: MutBuf>(&self, buf: &mut B) -> Result<NonBlock<usize>> {
         // Reads the length of the slice supplied by buf.mut_bytes into the buffer
         // This is not guaranteed to consume an entire datagram or segment.
         // If your protocol is msg based (instead of continuous stream) you should
@@ -48,11 +49,11 @@ pub trait TryRead {
         res
     }
 
-    fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>>;
+    fn read_slice(&self, buf: &mut [u8]) -> Result<NonBlock<usize>>;
 }
 
 pub trait TryWrite {
-    fn write<B: Buf>(&self, buf: &mut B) -> MioResult<NonBlock<usize>> {
+    fn write<B: Buf>(&self, buf: &mut B) -> Result<NonBlock<usize>> {
         let res = self.write_slice(buf.bytes());
 
         if let Ok(NonBlock::Ready(cnt)) = res {
@@ -62,7 +63,7 @@ pub trait TryWrite {
         res
     }
 
-    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>>;
+    fn write_slice(&self, buf: &[u8]) -> Result<NonBlock<usize>>;
 }
 
 /*
@@ -92,28 +93,22 @@ impl Evented for Io {
 }
 
 impl TryRead for Io {
-    fn read_slice(&self, dst: &mut [u8]) -> MioResult<NonBlock<usize>> {
+    fn read_slice(&self, dst: &mut [u8]) -> Result<NonBlock<usize>> {
         use nix::unistd::read;
 
         read(self.as_raw_fd(), dst)
-            .map_err(MioError::from_nix_error)
-            .and_then(|cnt| {
-                if cnt > 0 {
-                    Ok(NonBlock::Ready(cnt))
-                } else {
-                    Err(MioError::eof())
-                }
-            })
+            .map(|cnt| NonBlock::Ready(cnt))
+            .map_err(from_nix_error)
             .or_else(to_non_block)
     }
 }
 
 impl TryWrite for Io {
-    fn write_slice(&self, src: &[u8]) -> MioResult<NonBlock<usize>> {
+    fn write_slice(&self, src: &[u8]) -> Result<NonBlock<usize>> {
         use nix::unistd::write;
 
         write(self.as_raw_fd(), src)
-            .map_err(MioError::from_nix_error)
+            .map_err(from_nix_error)
             .map(|cnt| NonBlock::Ready(cnt))
             .or_else(to_non_block)
     }
@@ -132,12 +127,12 @@ impl Drop for Io {
  *
  */
 
-pub fn pipe() -> MioResult<(PipeReader, PipeWriter)> {
+pub fn pipe() -> Result<(PipeReader, PipeWriter)> {
     use nix::fcntl::{O_NONBLOCK, O_CLOEXEC};
     use nix::unistd::pipe2;
 
     let (rd, wr) = try!(pipe2(O_NONBLOCK | O_CLOEXEC)
-        .map_err(MioError::from_nix_error));
+        .map_err(from_nix_error));
 
     let rd = FromFd::from_fd(rd);
     let wr = FromFd::from_fd(wr);
@@ -165,7 +160,7 @@ impl Evented for PipeReader {
 }
 
 impl TryRead for PipeReader {
-    fn read_slice(&self, buf: &mut [u8]) -> MioResult<NonBlock<usize>> {
+    fn read_slice(&self, buf: &mut [u8]) -> Result<NonBlock<usize>> {
         self.io.read_slice(buf)
     }
 }
@@ -189,7 +184,7 @@ impl Evented for PipeWriter {
 }
 
 impl TryWrite for PipeWriter {
-    fn write_slice(&self, buf: &[u8]) -> MioResult<NonBlock<usize>> {
+    fn write_slice(&self, buf: &[u8]) -> Result<NonBlock<usize>> {
         self.io.write_slice(buf)
     }
 }
@@ -200,10 +195,21 @@ impl TryWrite for PipeWriter {
  *
  */
 
-pub fn to_non_block<T>(err: MioError) -> MioResult<NonBlock<T>> {
-    if err.is_would_block() {
-        Ok(NonBlock::WouldBlock)
-    } else {
-        Err(err)
+pub fn from_nix_error(err: ::nix::NixError) -> Error {
+    use nix::{errno, NixError};
+
+    match err {
+        NixError::Sys(errno) => Error::from_os_error(errno as i32),
+        _ => Error::from_os_error(errno::EINVAL as i32)
     }
+}
+
+pub fn to_non_block<T>(err: Error) -> Result<NonBlock<T>> {
+    use std::io::ErrorKind::ResourceUnavailable;
+
+    if let ResourceUnavailable = err.kind() {
+        return Ok(NonBlock::WouldBlock);
+    }
+
+    Err(err)
 }

@@ -78,7 +78,7 @@ impl Handler<TcpStream, ()> for TestHandler {
                         assert!(b"zomg" == buf.flip().bytes());
                     }
                     Err(e) => {
-                        debug!("client sock failed to read; err={:?}", e.kind);
+                        debug!("client sock failed to read; err={:?}", e.kind());
                     }
                 }
 

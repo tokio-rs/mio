@@ -1,4 +1,4 @@
-use {TryRead, TryWrite, NonBlock, MioResult};
+use {TryRead, TryWrite, NonBlock};
 use io::{self, PipeReader, PipeWriter};
 use std::os::unix::{Fd, AsRawFd};
 
@@ -22,7 +22,7 @@ pub struct PipeAwakener {
 }
 
 impl PipeAwakener {
-    pub fn new() -> MioResult<PipeAwakener> {
+    pub fn new() -> io::Result<PipeAwakener> {
         let (rd, wr) = try!(io::pipe());
 
         Ok(PipeAwakener {
@@ -35,7 +35,7 @@ impl PipeAwakener {
         self.reader.as_raw_fd()
     }
 
-    pub fn wakeup(&self) -> MioResult<()> {
+    pub fn wakeup(&self) -> io::Result<()> {
         self.writer.write_slice(b"0x01").map(|_| ())
     }
 

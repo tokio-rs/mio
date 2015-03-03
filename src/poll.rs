@@ -1,6 +1,6 @@
-use {Evented, Token, MioResult};
+use {Evented, Token};
 use os::{self, event};
-use std::fmt;
+use std::{fmt, io};
 
 pub struct Poll {
     selector: os::Selector,
@@ -8,14 +8,14 @@ pub struct Poll {
 }
 
 impl Poll {
-    pub fn new() -> MioResult<Poll> {
+    pub fn new() -> io::Result<Poll> {
         Ok(Poll {
             selector: try!(os::Selector::new()),
             events: os::Events::new()
         })
     }
 
-    pub fn register<E: Evented>(&mut self, io: &E, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn register<E: Evented>(&mut self, io: &E, token: Token, interest: event::Interest, opts: event::PollOpt) -> io::Result<()> {
         debug!("registering  with poller");
 
         // Register interests for this socket
@@ -24,7 +24,7 @@ impl Poll {
         Ok(())
     }
 
-    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: event::Interest, opts: event::PollOpt) -> io::Result<()> {
         debug!("registering  with poller");
 
         // Register interests for this socket
@@ -33,7 +33,7 @@ impl Poll {
         Ok(())
     }
 
-    pub fn deregister<E: Evented>(&mut self, io: &E) -> MioResult<()> {
+    pub fn deregister<E: Evented>(&mut self, io: &E) -> io::Result<()> {
         debug!("deregistering IO with poller");
 
         // Deregister interests for this socket
@@ -42,7 +42,7 @@ impl Poll {
         Ok(())
     }
 
-    pub fn poll(&mut self, timeout_ms: usize) -> MioResult<usize> {
+    pub fn poll(&mut self, timeout_ms: usize) -> io::Result<usize> {
         try!(self.selector.select(&mut self.events, timeout_ms));
         Ok(self.events.len())
     }

@@ -1,7 +1,6 @@
-use {Evented, MioResult};
-use os;
+use {os, Evented};
 use util::BoundedQueue;
-use std::{fmt, cmp};
+use std::{fmt, cmp, io};
 use std::sync::Arc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -20,7 +19,7 @@ pub struct Notify<M: Send> {
 
 impl<M: Send> Notify<M> {
     #[inline]
-    pub fn with_capacity(capacity: usize) -> MioResult<Notify<M>> {
+    pub fn with_capacity(capacity: usize) -> io::Result<Notify<M>> {
         Ok(Notify {
             inner: Arc::new(try!(NotifyInner::with_capacity(capacity)))
         })
@@ -71,7 +70,7 @@ struct NotifyInner<M> {
 }
 
 impl<M: Send> NotifyInner<M> {
-    fn with_capacity(capacity: usize) -> MioResult<NotifyInner<M>> {
+    fn with_capacity(capacity: usize) -> io::Result<NotifyInner<M>> {
         Ok(NotifyInner {
             state: AtomicIsize::new(0),
             queue: BoundedQueue::with_capacity(capacity),

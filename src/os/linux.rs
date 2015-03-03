@@ -1,4 +1,4 @@
-use {Io, NonBlock, TryRead, TryWrite, MioResult, MioError};
+use {io, Io, NonBlock, TryRead, TryWrite};
 use std::os::unix::{Fd, AsRawFd};
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";
@@ -12,13 +12,13 @@ pub struct Awakener {
 }
 
 impl Awakener {
-    pub fn new() -> MioResult<Awakener> {
+    pub fn new() -> io::Result<Awakener> {
         Ok(Awakener {
             io: Io::new(try!(eventfd())),
         })
     }
 
-    pub fn wakeup(&self) -> MioResult<()> {
+    pub fn wakeup(&self) -> io::Result<()> {
         self.io.write_slice(MARK)
             .map(|_| ())
     }
@@ -40,7 +40,7 @@ impl Awakener {
     }
 }
 
-fn eventfd() -> MioResult<Fd> {
+fn eventfd() -> io::Result<Fd> {
     nix::eventfd(0, nix::EFD_CLOEXEC | nix::EFD_NONBLOCK)
-        .map_err(MioError::from_nix_error)
+        .map_err(io::from_nix_error)
 }

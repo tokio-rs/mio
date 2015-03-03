@@ -4,7 +4,7 @@ use mio::net::tcp::*;
 use mio::util::Slab;
 use super::localhost;
 use std::collections::LinkedList;
-use std::thread;
+use std::{io, thread};
 use std::old_io::timer::Timer;
 use std::time::duration::Duration;
 
@@ -33,11 +33,11 @@ impl EchoConn {
         ec
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn writable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         event_loop.reregister(&self.sock, self.token, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
     }
 
-    fn readable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn readable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         loop {
             match self.sock.read_slice(self.buf.as_mut_slice()) {
                 Ok(NonBlock::WouldBlock) => {
@@ -69,7 +69,7 @@ struct EchoServer {
 }
 
 impl EchoServer {
-    fn accept(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn accept(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         debug!("server accepting socket");
 
         let sock = self.sock.try_accept().unwrap().unwrap();
@@ -85,12 +85,12 @@ impl EchoServer {
         Ok(())
     }
 
-    fn conn_readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
+    fn conn_readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> io::Result<()> {
         debug!("server conn readable; tok={:?}", tok);
         self.conn(tok).readable(event_loop)
     }
 
-    fn conn_writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> MioResult<()> {
+    fn conn_writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> io::Result<()> {
         debug!("server conn writable; tok={:?}", tok);
         self.conn(tok).writable(event_loop)
     }
@@ -120,11 +120,11 @@ impl EchoClient {
         }
     }
 
-    fn readable(&mut self, _event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn readable(&mut self, _event_loop: &mut TestEventLoop) -> io::Result<()> {
         Ok(())
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop) -> MioResult<()> {
+    fn writable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         debug!("client socket writable");
 
         while self.backlog.len() > 0 {
