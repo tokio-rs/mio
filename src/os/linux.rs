@@ -1,5 +1,5 @@
-use {Io, NonBlock, TryRead, TryWrite, IoHandle, MioResult, MioError};
-use std::os::unix::Fd;
+use {Io, NonBlock, TryRead, TryWrite, MioResult, MioError};
+use std::os::unix::{Fd, AsRawFd};
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";
 
@@ -23,8 +23,8 @@ impl Awakener {
             .map(|_| ())
     }
 
-    pub fn fd(&self) -> Fd {
-        self.io.fd()
+    pub fn as_raw_fd(&self) -> Fd {
+        self.io.as_raw_fd()
     }
 
     pub fn cleanup(&self) {

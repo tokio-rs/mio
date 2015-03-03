@@ -1,9 +1,6 @@
+use {Evented, Token, MioResult};
+use os::{self, event};
 use std::fmt;
-use error::MioResult;
-use io::IoHandle;
-use os;
-use os::token::Token;
-use os::event;
 
 pub struct Poll {
     selector: os::Selector,
@@ -18,29 +15,29 @@ impl Poll {
         })
     }
 
-    pub fn register<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn register<E: Evented>(&mut self, io: &E, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
         debug!("registering  with poller");
 
         // Register interests for this socket
-        try!(self.selector.register(io.fd(), token.as_usize(), interest, opts));
+        try!(self.selector.register(io.as_raw_fd(), token.as_usize(), interest, opts));
 
         Ok(())
     }
 
-    pub fn reregister<H: IoHandle>(&mut self, io: &H, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
+    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: event::Interest, opts: event::PollOpt) -> MioResult<()> {
         debug!("registering  with poller");
 
         // Register interests for this socket
-        try!(self.selector.reregister(io.fd(), token.as_usize(), interest, opts));
+        try!(self.selector.reregister(io.as_raw_fd(), token.as_usize(), interest, opts));
 
         Ok(())
     }
 
-    pub fn deregister<H: IoHandle>(&mut self, io: &H) -> MioResult<()> {
+    pub fn deregister<E: Evented>(&mut self, io: &E) -> MioResult<()> {
         debug!("deregistering IO with poller");
 
         // Deregister interests for this socket
-        try!(self.selector.deregister(io.fd()));
+        try!(self.selector.deregister(io.as_raw_fd()));
 
         Ok(())
     }

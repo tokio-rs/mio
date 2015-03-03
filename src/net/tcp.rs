@@ -1,6 +1,6 @@
 use {TryRead, TryWrite, NonBlock, MioResult};
 use buf::{Buf, MutBuf};
-use io::{self, FromFd, Io, IoHandle};
+use io::{self, Evented, FromFd, Io};
 use net::{self, nix, TryAccept, Socket};
 use std::mem;
 use std::net::SocketAddr;
@@ -60,9 +60,12 @@ impl TcpSocket {
     }
 }
 
-impl IoHandle for TcpSocket {
-    fn fd(&self) -> Fd {
-        self.io.fd()
+impl Evented for TcpSocket {
+}
+
+impl AsRawFd for TcpSocket {
+    fn as_raw_fd(&self) -> Fd {
+        self.io.as_raw_fd()
     }
 }
 
@@ -87,10 +90,7 @@ impl FromFd for TcpStream {
     }
 }
 
-impl IoHandle for TcpStream {
-    fn fd(&self) -> Fd {
-        self.as_raw_fd()
-    }
+impl Evented for TcpStream {
 }
 
 impl Socket for TcpStream {
@@ -120,10 +120,7 @@ impl FromFd for TcpListener {
     }
 }
 
-impl IoHandle for TcpListener {
-    fn fd(&self) -> Fd {
-        self.as_raw_fd()
-    }
+impl Evented for TcpListener {
 }
 
 impl Socket for TcpListener {

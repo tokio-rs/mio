@@ -1,9 +1,9 @@
 use {TryRead, TryWrite, NonBlock, MioResult, MioError};
 use buf::{Buf, MutBuf};
-use io::{self, Io, FromFd, IoHandle};
+use io::{self, Evented, FromFd, Io};
 use net::{self, nix, TryAccept, Socket};
 use std::path::Path;
-use std::os::unix::Fd;
+use std::os::unix::{Fd, AsRawFd};
 
 #[derive(Debug)]
 pub struct UnixSocket {
@@ -39,10 +39,13 @@ impl UnixSocket {
     }
 }
 
-impl IoHandle for UnixSocket {
-    fn fd(&self) -> Fd {
-        self.io.fd()
+impl AsRawFd for UnixSocket {
+    fn as_raw_fd(&self) -> Fd {
+        self.io.as_raw_fd()
     }
+}
+
+impl Evented for UnixSocket {
 }
 
 impl FromFd for UnixSocket {
@@ -59,10 +62,13 @@ pub struct UnixListener {
     io: Io,
 }
 
-impl IoHandle for UnixListener {
-    fn fd(&self) -> Fd {
-        self.io.fd()
+impl AsRawFd for UnixListener {
+    fn as_raw_fd(&self) -> Fd {
+        self.io.as_raw_fd()
     }
+}
+
+impl Evented for UnixListener {
 }
 
 impl FromFd for UnixListener {
@@ -89,10 +95,13 @@ pub struct UnixStream {
     io: Io,
 }
 
-impl IoHandle for UnixStream {
-    fn fd(&self) -> Fd {
-        self.io.fd()
+impl AsRawFd for UnixStream {
+    fn as_raw_fd(&self) -> Fd {
+        self.io.as_raw_fd()
     }
+}
+
+impl Evented for UnixStream {
 }
 
 impl FromFd for UnixStream {

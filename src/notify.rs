@@ -1,12 +1,11 @@
-use error::MioResult;
-use io::IoHandle;
+use {Evented, MioResult};
 use os;
 use util::BoundedQueue;
 use std::{fmt, cmp};
 use std::sync::Arc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
-use std::os::unix::Fd;
+use std::os::unix::{Fd, AsRawFd};
 
 const SLEEP: isize = -1;
 
@@ -160,8 +159,11 @@ impl<M: Send> NotifyInner<M> {
     }
 }
 
-impl<M: Send> IoHandle for Notify<M> {
-    fn fd(&self) -> Fd {
-        self.inner.awaken.fd()
+impl<M: Send> AsRawFd for Notify<M> {
+    fn as_raw_fd(&self) -> Fd {
+        self.inner.awaken.as_raw_fd()
     }
+}
+
+impl<M: Send> Evented for Notify<M> {
 }

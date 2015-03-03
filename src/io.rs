@@ -1,6 +1,6 @@
 use {MioResult, MioError};
 use buf::{Buf, MutBuf};
-use std::os::unix::Fd;
+use std::os::unix::{Fd, AsRawFd};
 
 /// The result of a non-blocking operation.
 #[derive(Debug)]
@@ -25,8 +25,7 @@ impl<T> NonBlock<T> {
     }
 }
 
-pub trait IoHandle {
-    fn fd(&self) -> Fd;
+pub trait Evented : AsRawFd {
 }
 
 pub trait FromFd {
@@ -83,17 +82,20 @@ impl Io {
     }
 }
 
-impl IoHandle for Io {
-    fn fd(&self) -> Fd {
+impl AsRawFd for Io {
+    fn as_raw_fd(&self) -> Fd {
         self.fd
     }
+}
+
+impl Evented for Io {
 }
 
 impl TryRead for Io {
     fn read_slice(&self, dst: &mut [u8]) -> MioResult<NonBlock<usize>> {
         use nix::unistd::read;
 
-        read(self.fd(), dst)
+        read(self.as_raw_fd(), dst)
             .map_err(MioError::from_nix_error)
             .and_then(|cnt| {
                 if cnt > 0 {
@@ -110,7 +112,7 @@ impl TryWrite for Io {
     fn write_slice(&self, src: &[u8]) -> MioResult<NonBlock<usize>> {
         use nix::unistd::write;
 
-        write(self.fd(), src)
+        write(self.as_raw_fd(), src)
             .map_err(MioError::from_nix_error)
             .map(|cnt| NonBlock::Ready(cnt))
             .or_else(to_non_block)
@@ -120,7 +122,7 @@ impl TryWrite for Io {
 impl Drop for Io {
     fn drop(&mut self) {
         use nix::unistd::close;
-        let _ = close(self.fd());
+        let _ = close(self.as_raw_fd());
     }
 }
 
@@ -153,11 +155,13 @@ impl FromFd for PipeReader {
     }
 }
 
-
-impl IoHandle for PipeReader {
-    fn fd(&self) -> Fd {
-        self.io.fd()
+impl AsRawFd for PipeReader {
+    fn as_raw_fd(&self) -> Fd {
+        self.io.as_raw_fd()
     }
+}
+
+impl Evented for PipeReader {
 }
 
 impl TryRead for PipeReader {
@@ -175,10 +179,13 @@ impl FromFd for PipeWriter {
     }
 }
 
-impl IoHandle for PipeWriter {
-    fn fd(&self) -> Fd {
+impl AsRawFd for PipeWriter {
+    fn as_raw_fd(&self) -> Fd {
         self.io.fd
     }
+}
+
+impl Evented for PipeWriter {
 }
 
 impl TryWrite for PipeWriter {

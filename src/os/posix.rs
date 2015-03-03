@@ -1,6 +1,6 @@
-use {IoHandle, TryRead, TryWrite, NonBlock, MioResult};
+use {TryRead, TryWrite, NonBlock, MioResult};
 use io::{self, PipeReader, PipeWriter};
-use std::os::unix::Fd;
+use std::os::unix::{Fd, AsRawFd};
 
 mod nix {
     pub use nix::{c_int, NixError};
@@ -31,8 +31,8 @@ impl PipeAwakener {
         })
     }
 
-    pub fn fd(&self) -> Fd {
-        self.reader.fd()
+    pub fn as_raw_fd(&self) -> Fd {
+        self.reader.as_raw_fd()
     }
 
     pub fn wakeup(&self) -> MioResult<()> {

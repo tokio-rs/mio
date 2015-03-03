@@ -1,17 +1,14 @@
 use {Io, NonBlock, MioResult};
 use buf::{Buf, MutBuf};
-use io::{self, FromFd, IoHandle};
+use io::{self, Evented, FromFd};
 use net::{self, TrySend, TryRecv, Socket};
 use std::mem;
 use std::net::SocketAddr;
-use std::os::unix::{Fd, AsRawFd};
+use std::os::unix::Fd;
 
 pub use std::net::UdpSocket;
 
-impl IoHandle for UdpSocket {
-    fn fd(&self) -> Fd {
-        self.as_raw_fd()
-    }
+impl Evented for UdpSocket {
 }
 
 impl FromFd for UdpSocket {
