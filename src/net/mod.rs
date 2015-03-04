@@ -1,6 +1,6 @@
 //! Networking primitives
 //!
-use io::{self, Io, NonBlock};
+use io::{self, Io};
 use buf::{Buf, MutBuf};
 use std::net::SocketAddr;
 use std::os::unix::{Fd, AsRawFd};
@@ -10,17 +10,17 @@ pub mod udp;
 pub mod unix;
 
 pub trait TrySend {
-    fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<NonBlock<()>>;
+    fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<Option<()>>;
 }
 
 pub trait TryRecv {
-    fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<NonBlock<SocketAddr>>;
+    fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<Option<SocketAddr>>;
 }
 
 pub trait TryAccept {
     type Sock;
 
-    fn try_accept(&self) -> io::Result<NonBlock<Self::Sock>>;
+    fn try_accept(&self) -> io::Result<Option<Self::Sock>>;
 }
 
 /*

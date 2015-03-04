@@ -1,4 +1,4 @@
-use {io, Io, NonBlock, TryRead, TryWrite};
+use {io, Io, TryRead, TryWrite};
 use std::os::unix::{Fd, AsRawFd};
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";
@@ -33,7 +33,7 @@ impl Awakener {
         loop {
             // Consume data until all bytes are purged
             match self.io.read_slice(&mut buf) {
-                Ok(NonBlock::Ready(i)) if i > 0 => {},
+                Ok(Some(i)) if i > 0 => {},
                 _ => return,
             }
         }

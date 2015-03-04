@@ -1,4 +1,4 @@
-use {Io, NonBlock};
+use {Io};
 use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd};
 use net::{self, TrySend, TryRecv, Socket};
@@ -21,22 +21,22 @@ impl Socket for UdpSocket {
 }
 
 impl TrySend for UdpSocket {
-    fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<NonBlock<()>> {
+    fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<Option<()>> {
         net::sendto(as_io(self), buf.bytes(), &net::to_nix_addr(target))
             .map(|cnt| {
                 buf.advance(cnt);
-                NonBlock::Ready(())
+                Some(())
             })
             .or_else(io::to_non_block)
     }
 }
 
 impl TryRecv for UdpSocket {
-    fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<NonBlock<SocketAddr>> {
+    fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<Option<SocketAddr>> {
         net::recvfrom(as_io(self), buf.mut_bytes())
             .map(|(cnt, addr)| {
                 buf.advance(cnt);
-                NonBlock::Ready(net::to_std_addr(addr))
+                Some(net::to_std_addr(addr))
             })
             .or_else(io::to_non_block)
     }

@@ -40,10 +40,10 @@ impl EchoConn {
     fn readable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         loop {
             match self.sock.read_slice(self.buf.as_mut_slice()) {
-                Ok(NonBlock::WouldBlock) => {
+                Ok(None) => {
                     break;
                 }
-                Ok(NonBlock::Ready(_)) => {
+                Ok(Some(_)) => {
                     self.count += 1;
                     if self.count % 10000 == 0 {
                         debug!("Received {} messages", self.count);
@@ -129,10 +129,10 @@ impl EchoClient {
 
         while self.backlog.len() > 0 {
             match self.sock.write_slice(self.backlog.front().unwrap().as_bytes()) {
-                Ok(NonBlock::WouldBlock) => {
+                Ok(None) => {
                     break;
                 }
-                Ok(NonBlock::Ready(_r)) => {
+                Ok(Some(_)) => {
                     self.backlog.pop_front();
                     self.count += 1;
                     if self.count % 10000 == 0 {
@@ -188,7 +188,7 @@ impl Handler<usize, String> for EchoHandler {
 
     fn notify(&mut self, event_loop: &mut TestEventLoop, msg: String) {
         match self.client.sock.write_slice(msg.as_bytes()) {
-            Ok(NonBlock::Ready(n)) => {
+            Ok(Some(n)) => {
                 self.client.count += 1;
                 if self.client.count % 10000 == 0 {
                     debug!("Sent {} bytes:   count {}", n, self.client.count);

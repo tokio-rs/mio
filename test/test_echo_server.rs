@@ -34,13 +34,13 @@ impl EchoConn {
         let mut buf = self.buf.take().unwrap();
 
         match self.sock.write(&mut buf) {
-            Ok(NonBlock::WouldBlock) => {
+            Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
 
                 self.buf = Some(buf);
                 self.interest.insert(Interest::writable());
             }
-            Ok(NonBlock::Ready(r)) => {
+            Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
                 self.mut_buf = Some(buf.flip());
@@ -58,10 +58,10 @@ impl EchoConn {
         let mut buf = self.mut_buf.take().unwrap();
 
         match self.sock.read(&mut buf) {
-            Ok(NonBlock::WouldBlock) => {
+            Ok(None) => {
                 panic!("We just got readable, but were unable to read from the socket?");
             }
-            Ok(NonBlock::Ready(r)) => {
+            Ok(Some(r)) => {
                 debug!("CONN : we read {} bytes!", r);
                 self.interest.remove(Interest::readable());
                 self.interest.insert(Interest::writable());
@@ -149,10 +149,10 @@ impl EchoClient {
         let mut buf = self.mut_buf.take().unwrap();
 
         match self.sock.read(&mut buf) {
-            Ok(NonBlock::WouldBlock) => {
+            Ok(None) => {
                 panic!("We just got readable, but were unable to read from the socket?");
             }
-            Ok(NonBlock::Ready(r)) => {
+            Ok(Some(r)) => {
                 debug!("CLIENT : We read {} bytes!", r);
             }
             Err(e) => {
@@ -185,11 +185,11 @@ impl EchoClient {
         debug!("client socket writable");
 
         match self.sock.write(&mut self.tx) {
-            Ok(NonBlock::WouldBlock) => {
+            Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
                 self.interest.insert(Interest::writable());
             }
-            Ok(NonBlock::Ready(r)) => {
+            Ok(Some(r)) => {
                 debug!("CLIENT : we wrote {} bytes!", r);
                 self.interest.insert(Interest::readable());
                 self.interest.remove(Interest::writable());

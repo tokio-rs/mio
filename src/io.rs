@@ -3,38 +3,17 @@ use std::os::unix::{Fd, AsRawFd};
 
 pub use std::io::{Result, Error};
 
-/// The result of a non-blocking operation.
-#[derive(Debug)]
-pub enum NonBlock<T> {
-    Ready(T),
-    WouldBlock
-}
-
-impl<T> NonBlock<T> {
-    pub fn would_block(&self) -> bool {
-        match *self {
-            NonBlock::WouldBlock => true,
-            _ => false
-        }
-    }
-
-    pub fn unwrap(self) -> T {
-        match self {
-            NonBlock::Ready(v) => v,
-            _ => panic!("would have blocked, no result to take")
-        }
-    }
-}
-
+/// A value that may be registered with an `EventLoop`
 pub trait Evented : AsRawFd {
 }
 
+/// Create a value with a FD
 pub trait FromFd {
     fn from_fd(fd: Fd) -> Self;
 }
 
 pub trait TryRead {
-    fn read<B: MutBuf>(&self, buf: &mut B) -> Result<NonBlock<usize>> {
+    fn read<B: MutBuf>(&self, buf: &mut B) -> Result<Option<usize>> {
         // Reads the length of the slice supplied by buf.mut_bytes into the buffer
         // This is not guaranteed to consume an entire datagram or segment.
         // If your protocol is msg based (instead of continuous stream) you should
@@ -42,28 +21,28 @@ pub trait TryRead {
         // frames)
         let res = self.read_slice(buf.mut_bytes());
 
-        if let Ok(NonBlock::Ready(cnt)) = res {
+        if let Ok(Some(cnt)) = res {
             buf.advance(cnt);
         }
 
         res
     }
 
-    fn read_slice(&self, buf: &mut [u8]) -> Result<NonBlock<usize>>;
+    fn read_slice(&self, buf: &mut [u8]) -> Result<Option<usize>>;
 }
 
 pub trait TryWrite {
-    fn write<B: Buf>(&self, buf: &mut B) -> Result<NonBlock<usize>> {
+    fn write<B: Buf>(&self, buf: &mut B) -> Result<Option<usize>> {
         let res = self.write_slice(buf.bytes());
 
-        if let Ok(NonBlock::Ready(cnt)) = res {
+        if let Ok(Some(cnt)) = res {
             buf.advance(cnt);
         }
 
         res
     }
 
-    fn write_slice(&self, buf: &[u8]) -> Result<NonBlock<usize>>;
+    fn write_slice(&self, buf: &[u8]) -> Result<Option<usize>>;
 }
 
 /*
@@ -93,23 +72,23 @@ impl Evented for Io {
 }
 
 impl TryRead for Io {
-    fn read_slice(&self, dst: &mut [u8]) -> Result<NonBlock<usize>> {
+    fn read_slice(&self, dst: &mut [u8]) -> Result<Option<usize>> {
         use nix::unistd::read;
 
         read(self.as_raw_fd(), dst)
-            .map(|cnt| NonBlock::Ready(cnt))
+            .map(|cnt| Some(cnt))
             .map_err(from_nix_error)
             .or_else(to_non_block)
     }
 }
 
 impl TryWrite for Io {
-    fn write_slice(&self, src: &[u8]) -> Result<NonBlock<usize>> {
+    fn write_slice(&self, src: &[u8]) -> Result<Option<usize>> {
         use nix::unistd::write;
 
         write(self.as_raw_fd(), src)
             .map_err(from_nix_error)
-            .map(|cnt| NonBlock::Ready(cnt))
+            .map(|cnt| Some(cnt))
             .or_else(to_non_block)
     }
 }
@@ -160,7 +139,7 @@ impl Evented for PipeReader {
 }
 
 impl TryRead for PipeReader {
-    fn read_slice(&self, buf: &mut [u8]) -> Result<NonBlock<usize>> {
+    fn read_slice(&self, buf: &mut [u8]) -> Result<Option<usize>> {
         self.io.read_slice(buf)
     }
 }
@@ -184,7 +163,7 @@ impl Evented for PipeWriter {
 }
 
 impl TryWrite for PipeWriter {
-    fn write_slice(&self, buf: &[u8]) -> Result<NonBlock<usize>> {
+    fn write_slice(&self, buf: &[u8]) -> Result<Option<usize>> {
         self.io.write_slice(buf)
     }
 }
@@ -204,11 +183,11 @@ pub fn from_nix_error(err: ::nix::NixError) -> Error {
     }
 }
 
-pub fn to_non_block<T>(err: Error) -> Result<NonBlock<T>> {
+pub fn to_non_block<T>(err: Error) -> Result<Option<T>> {
     use std::io::ErrorKind::ResourceUnavailable;
 
     if let ResourceUnavailable = err.kind() {
-        return Ok(NonBlock::WouldBlock);
+        return Ok(None);
     }
 
     Err(err)

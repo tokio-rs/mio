@@ -1,4 +1,4 @@
-use {TryRead, TryWrite, NonBlock};
+use {TryRead, TryWrite};
 use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd, Io};
 use net::{self, nix, TryAccept, Socket};
@@ -97,13 +97,13 @@ impl Socket for TcpStream {
 }
 
 impl TryRead for TcpStream {
-    fn read_slice(&self, buf: &mut[u8]) -> io::Result<NonBlock<usize>> {
+    fn read_slice(&self, buf: &mut[u8]) -> io::Result<Option<usize>> {
         as_io(self).read_slice(buf)
     }
 }
 
 impl TryWrite for TcpStream {
-    fn write_slice(&self, buf: &[u8]) -> io::Result<NonBlock<usize>> {
+    fn write_slice(&self, buf: &[u8]) -> io::Result<Option<usize>> {
         as_io(self).write_slice(buf)
     }
 }
@@ -129,9 +129,9 @@ impl Socket for TcpListener {
 impl TryAccept for TcpListener {
     type Sock = TcpStream;
 
-    fn try_accept(&self) -> io::Result<NonBlock<TcpStream>> {
+    fn try_accept(&self) -> io::Result<Option<TcpStream>> {
         net::accept(as_io(self))
-            .map(|fd| NonBlock::Ready(FromFd::from_fd(fd)))
+            .map(|fd| Some(FromFd::from_fd(fd)))
             .or_else(io::to_non_block)
     }
 }

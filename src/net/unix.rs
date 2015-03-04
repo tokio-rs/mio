@@ -1,4 +1,4 @@
-use {TryRead, TryWrite, NonBlock};
+use {TryRead, TryWrite};
 use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd, Io};
 use net::{self, nix, TryAccept, Socket};
@@ -83,9 +83,9 @@ impl Socket for UnixListener {
 impl TryAccept for UnixListener {
     type Sock = UnixStream;
 
-    fn try_accept(&self) -> io::Result<NonBlock<UnixStream>> {
+    fn try_accept(&self) -> io::Result<Option<UnixStream>> {
         net::accept(&self.io)
-            .map(|fd| NonBlock::Ready(FromFd::from_fd(fd)))
+            .map(|fd| Some(FromFd::from_fd(fd)))
             .or_else(io::to_non_block)
     }
 }
@@ -114,13 +114,13 @@ impl Socket for UnixStream {
 }
 
 impl TryRead for UnixStream {
-    fn read_slice(&self, buf: &mut[u8]) -> io::Result<NonBlock<usize>> {
+    fn read_slice(&self, buf: &mut[u8]) -> io::Result<Option<usize>> {
         self.io.read_slice(buf)
     }
 }
 
 impl TryWrite for UnixStream {
-    fn write_slice(&self, buf: &[u8]) -> io::Result<NonBlock<usize>> {
+    fn write_slice(&self, buf: &[u8]) -> io::Result<Option<usize>> {
         self.io.write_slice(buf)
     }
 }

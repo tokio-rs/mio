@@ -1,4 +1,4 @@
-use {TryRead, TryWrite, NonBlock};
+use {TryRead, TryWrite};
 use io::{self, PipeReader, PipeWriter};
 use std::os::unix::{Fd, AsRawFd};
 
@@ -45,7 +45,7 @@ impl PipeAwakener {
         loop {
             // Consume data until all bytes are purged
             match self.reader.read_slice(&mut buf) {
-                Ok(NonBlock::Ready(i)) if i > 0 => {},
+                Ok(Some(i)) if i > 0 => {},
                 _ => return,
             }
         }

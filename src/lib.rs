@@ -102,7 +102,6 @@ pub use handler::{
 };
 pub use io::{
     pipe,
-    NonBlock,
     FromFd,
     Io,
     TryRead,
