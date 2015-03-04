@@ -29,7 +29,7 @@ impl Handler<usize, ()> for TestHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: ReadHint) {
         match token {
             SERVER => {
-                let sock = self.server.try_accept().unwrap().unwrap();
+                let mut sock = self.server.try_accept().unwrap().unwrap();
                 sock.write(&mut buf::SliceBuf::wrap("foobar".as_bytes())).unwrap();
             }
             CLIENT => {

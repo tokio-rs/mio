@@ -114,13 +114,13 @@ impl Socket for UnixStream {
 }
 
 impl TryRead for UnixStream {
-    fn read_slice(&self, buf: &mut[u8]) -> io::Result<Option<usize>> {
+    fn read_slice(&mut self, buf: &mut[u8]) -> io::Result<Option<usize>> {
         self.io.read_slice(buf)
     }
 }
 
 impl TryWrite for UnixStream {
-    fn write_slice(&self, buf: &[u8]) -> io::Result<Option<usize>> {
+    fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
         self.io.write_slice(buf)
     }
 }

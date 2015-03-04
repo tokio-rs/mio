@@ -1,7 +1,7 @@
 use mio::*;
 use mio::net::*;
 use mio::net::udp::*;
-use mio::buf::{RingBuf, SliceBuf};
+use mio::buf::{RingBuf, SliceBuf, MutSliceBuf};
 use super::localhost;
 use std::str;
 use std::net::{SocketAddr, IpAddr};
@@ -12,15 +12,15 @@ const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
 
 pub struct UdpHandler {
-    tx: UdpSocket,
-    rx: UdpSocket,
+    tx: NonBlock<UdpSocket>,
+    rx: NonBlock<UdpSocket>,
     msg: &'static str,
     buf: SliceBuf<'static>,
     rx_buf: RingBuf
 }
 
 impl UdpHandler {
-    fn new(tx: UdpSocket, rx: UdpSocket, msg : &'static str) -> UdpHandler {
+    fn new(tx: NonBlock<UdpSocket>, rx: NonBlock<UdpSocket>, msg : &'static str) -> UdpHandler {
         UdpHandler {
             tx: tx,
             rx: rx,
@@ -36,7 +36,7 @@ impl Handler<usize, ()> for UdpHandler {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
-                TryRecv::recv_from(&self.rx, &mut self.rx_buf.writer()).unwrap();
+                self.rx.recv_from(&mut self.rx_buf.writer()).unwrap();
                 assert!(str::from_utf8(self.rx_buf.reader().bytes()).unwrap() == self.msg);
                 event_loop.shutdown();
             },
@@ -47,7 +47,7 @@ impl Handler<usize, ()> for UdpHandler {
     fn writable(&mut self, _: &mut TestEventLoop, token: Token) {
         match token {
             SENDER => {
-                TrySend::send_to(&self.tx, &mut self.buf, &self.rx.socket_addr().unwrap()).unwrap();
+                self.tx.send_to(&mut self.buf, &self.rx.socket_addr().unwrap()).unwrap();
             },
             _ => {}
         }
@@ -62,8 +62,12 @@ pub fn test_udp_socket() {
     let addr = localhost();
     let any = SocketAddr::new(IpAddr::new_v4(0, 0, 0, 0), 0);
 
-    let tx = UdpSocket::bind(&any).unwrap();
-    let rx = UdpSocket::bind(&addr).unwrap();
+    let tx = udp::bind(&any).unwrap();
+    let rx = udp::bind(&addr).unwrap();
+
+    // ensure that the sockets are non-blocking
+    let mut buf = [0; 128];
+    assert!(rx.recv_from(&mut MutSliceBuf::wrap(&mut buf)).unwrap().is_none());
 
     info!("Registering SENDER");
     event_loop.register_opt(&tx, SENDER, Interest::writable(), PollOpt::edge()).unwrap();

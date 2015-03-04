@@ -1,21 +1,13 @@
 //! Networking primitives
 //!
+use {NonBlock};
 use io::{self, Io};
-use buf::{Buf, MutBuf};
 use std::net::SocketAddr;
 use std::os::unix::{Fd, AsRawFd};
 
 pub mod tcp;
 pub mod udp;
 pub mod unix;
-
-pub trait TrySend {
-    fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<Option<()>>;
-}
-
-pub trait TryRecv {
-    fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<Option<SocketAddr>>;
-}
 
 pub trait TryAccept {
     type Sock;
@@ -67,6 +59,9 @@ pub trait Socket : AsRawFd {
     }
 }
 
+impl<S: Socket> Socket for NonBlock<S> {
+}
+
 /*
  *
  * ====== Re-exporting needed nix types ======
@@ -79,6 +74,7 @@ mod nix {
         NixError,
     };
     pub use nix::errno::EINPROGRESS;
+    pub use nix::fcntl::{fcntl, FcntlArg, O_NONBLOCK};
     pub use nix::sys::socket::{
         sockopt,
         AddressFamily,
@@ -164,6 +160,11 @@ fn getpeername(io: &Io) -> io::Result<nix::SockAddr> {
 
 fn getsockname(io: &Io) -> io::Result<nix::SockAddr> {
     nix::getsockname(io.as_raw_fd())
+        .map_err(io::from_nix_error)
+}
+
+fn set_non_block(io: &Io) -> io::Result<()> {
+    nix::fcntl(io.as_raw_fd(), nix::FcntlArg::F_SETFL(nix::O_NONBLOCK))
         .map_err(io::from_nix_error)
 }
 

@@ -93,9 +93,26 @@ extern crate time;
 #[macro_use]
 extern crate log;
 
+pub mod net;
+pub mod util;
+
+mod event_loop;
+mod handler;
+mod io;
+mod nonblock;
+mod notify;
+mod os;
+mod poll;
+mod timer;
+
 pub use buf::{
     Buf,
     MutBuf,
+};
+pub use event_loop::{
+    EventLoop,
+    EventLoopConfig,
+    EventLoopSender,
 };
 pub use handler::{
     Handler,
@@ -110,18 +127,9 @@ pub use io::{
     PipeReader,
     PipeWriter,
 };
-pub use poll::{
-    Poll
-};
-pub use event_loop::{
-    EventLoop,
-    EventLoopConfig,
-    EventLoopSender,
-};
-pub use timer::{
-    Timeout,
-    TimerError,
-    TimerResult
+pub use nonblock::{
+    AsNonBlock,
+    NonBlock,
 };
 pub use os::token::{
     Token,
@@ -131,17 +139,14 @@ pub use os::event::{
     Interest,
     ReadHint,
 };
-
-pub mod net;
-pub mod util;
-
-mod event_loop;
-mod handler;
-mod io;
-mod notify;
-mod os;
-mod poll;
-mod timer;
+pub use poll::{
+    Poll
+};
+pub use timer::{
+    Timeout,
+    TimerError,
+    TimerResult
+};
 
 pub mod prelude {
     pub use super::{

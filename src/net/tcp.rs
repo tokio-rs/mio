@@ -1,4 +1,4 @@
-use {TryRead, TryWrite};
+use {NonBlock, TryRead, TryWrite};
 use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd, Io};
 use net::{self, nix, TryAccept, Socket};
@@ -60,6 +60,18 @@ impl TcpSocket {
     }
 }
 
+impl NonBlock<TcpSocket> {
+    pub fn listen(self, backlog: usize) -> io::Result<NonBlock<TcpListener>> {
+        self.unwrap().listen(backlog)
+            .map(|listener| NonBlock::new(listener))
+    }
+
+    pub fn connect(self, addr: &SocketAddr) -> io::Result<(NonBlock<TcpStream>, bool)> {
+        self.unwrap().connect(addr)
+            .map(|(stream, complete)| (NonBlock::new(stream), complete))
+    }
+}
+
 impl Evented for TcpSocket {
 }
 
@@ -97,14 +109,14 @@ impl Socket for TcpStream {
 }
 
 impl TryRead for TcpStream {
-    fn read_slice(&self, buf: &mut[u8]) -> io::Result<Option<usize>> {
-        as_io(self).read_slice(buf)
+    fn read_slice(&mut self, buf: &mut[u8]) -> io::Result<Option<usize>> {
+        as_io_mut(self).read_slice(buf)
     }
 }
 
 impl TryWrite for TcpStream {
-    fn write_slice(&self, buf: &[u8]) -> io::Result<Option<usize>> {
-        as_io(self).write_slice(buf)
+    fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
+        as_io_mut(self).write_slice(buf)
     }
 }
 
@@ -152,5 +164,9 @@ fn to_tcp_listener(io: Io) -> TcpListener {
 }
 
 fn as_io<'a, T>(tcp: &'a T) -> &'a Io {
+    unsafe { mem::transmute(tcp) }
+}
+
+fn as_io_mut<'a, T>(tcp: &'a mut T) -> &'a mut Io {
     unsafe { mem::transmute(tcp) }
 }

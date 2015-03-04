@@ -1,6 +1,7 @@
 use buf::{Buf, MutBuf};
 use std::os::unix::{Fd, AsRawFd};
 
+// Re-export the io::Result / Error types for convenience
 pub use std::io::{Result, Error};
 
 /// A value that may be registered with an `EventLoop`
@@ -13,7 +14,7 @@ pub trait FromFd {
 }
 
 pub trait TryRead {
-    fn read<B: MutBuf>(&self, buf: &mut B) -> Result<Option<usize>> {
+    fn read<B: MutBuf>(&mut self, buf: &mut B) -> Result<Option<usize>> {
         // Reads the length of the slice supplied by buf.mut_bytes into the buffer
         // This is not guaranteed to consume an entire datagram or segment.
         // If your protocol is msg based (instead of continuous stream) you should
@@ -28,11 +29,11 @@ pub trait TryRead {
         res
     }
 
-    fn read_slice(&self, buf: &mut [u8]) -> Result<Option<usize>>;
+    fn read_slice(&mut self, buf: &mut [u8]) -> Result<Option<usize>>;
 }
 
 pub trait TryWrite {
-    fn write<B: Buf>(&self, buf: &mut B) -> Result<Option<usize>> {
+    fn write<B: Buf>(&mut self, buf: &mut B) -> Result<Option<usize>> {
         let res = self.write_slice(buf.bytes());
 
         if let Ok(Some(cnt)) = res {
@@ -42,7 +43,7 @@ pub trait TryWrite {
         res
     }
 
-    fn write_slice(&self, buf: &[u8]) -> Result<Option<usize>>;
+    fn write_slice(&mut self, buf: &[u8]) -> Result<Option<usize>>;
 }
 
 /*
@@ -72,7 +73,7 @@ impl Evented for Io {
 }
 
 impl TryRead for Io {
-    fn read_slice(&self, dst: &mut [u8]) -> Result<Option<usize>> {
+    fn read_slice(&mut self, dst: &mut [u8]) -> Result<Option<usize>> {
         use nix::unistd::read;
 
         read(self.as_raw_fd(), dst)
@@ -83,7 +84,7 @@ impl TryRead for Io {
 }
 
 impl TryWrite for Io {
-    fn write_slice(&self, src: &[u8]) -> Result<Option<usize>> {
+    fn write_slice(&mut self, src: &[u8]) -> Result<Option<usize>> {
         use nix::unistd::write;
 
         write(self.as_raw_fd(), src)
@@ -139,7 +140,7 @@ impl Evented for PipeReader {
 }
 
 impl TryRead for PipeReader {
-    fn read_slice(&self, buf: &mut [u8]) -> Result<Option<usize>> {
+    fn read_slice(&mut self, buf: &mut [u8]) -> Result<Option<usize>> {
         self.io.read_slice(buf)
     }
 }
@@ -163,7 +164,7 @@ impl Evented for PipeWriter {
 }
 
 impl TryWrite for PipeWriter {
-    fn write_slice(&self, buf: &[u8]) -> Result<Option<usize>> {
+    fn write_slice(&mut self, buf: &[u8]) -> Result<Option<usize>> {
         self.io.write_slice(buf)
     }
 }

@@ -98,7 +98,7 @@ impl Handler<TcpStream, ()> for TestHandler {
         event_loop.reregister(&self.cli, CLIENT, Interest::readable(), PollOpt::edge()).unwrap();
     }
 
-    fn timeout(&mut self, _event_loop: &mut TestEventLoop, sock: TcpStream) {
+    fn timeout(&mut self, _event_loop: &mut TestEventLoop, mut sock: TcpStream) {
         debug!("timeout handler : writing to socket");
         sock.write(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
     }
