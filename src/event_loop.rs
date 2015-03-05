@@ -372,6 +372,12 @@ mod tests {
     use {io, buf, Buf, Handler, Token, TryRead, TryWrite};
     use os::event;
 
+    #[test]
+    pub fn test_event_loop_size() {
+        use std::mem;
+        assert!(512 >= mem::size_of::<EventLoop<u32, u32>>());
+    }
+
     type TestEventLoop = EventLoop<usize, ()>;
 
     struct Funtimes {
@@ -396,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn test_readable() {
+    pub fn test_readable() {
         let mut event_loop = EventLoop::new().ok().expect("Couldn't make event loop");
 
         let (mut reader, mut writer) = io::pipe().unwrap();

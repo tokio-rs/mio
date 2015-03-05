@@ -3,7 +3,6 @@ use nix::sys::epoll::*;
 use nix::unistd::close;
 use io;
 use os::event::{IoEvent, Interest, PollOpt};
-use std::mem;
 
 pub struct Selector {
     epfd: Fd
@@ -18,11 +17,20 @@ impl Selector {
 
     /// Wait for events from the OS
     pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
+        use std::slice;
+
+        let dst = unsafe {
+            slice::from_raw_parts_mut(
+                evts.events.as_mut_slice().as_mut_ptr(),
+                evts.events.capacity())
+        };
+
         // Wait for epoll events for at most timeout_ms milliseconds
-        let cnt = try!(epoll_wait(self.epfd, evts.events.as_mut_slice(), timeout_ms)
+        let cnt = try!(epoll_wait(self.epfd, dst, timeout_ms)
                            .map_err(io::from_nix_error));
 
-        evts.len = cnt;
+        unsafe { evts.events.set_len(cnt); }
+
         Ok(())
     }
 
@@ -100,26 +108,22 @@ impl Drop for Selector {
 }
 
 pub struct Events {
-    len: usize,
-    events: [EpollEvent; 1024]
+    events: Vec<EpollEvent>,
 }
 
 impl Events {
     pub fn new() -> Events {
-        Events {
-            len: 0,
-            events: unsafe { mem::uninitialized() }
-        }
+        Events { events: Vec::with_capacity(1024) }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.len
+        self.events.len()
     }
 
     #[inline]
     pub fn get(&self, idx: usize) -> IoEvent {
-        if idx >= self.len {
+        if idx >= self.len() {
             panic!("invalid index");
         }
 

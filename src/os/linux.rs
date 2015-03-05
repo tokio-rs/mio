@@ -1,4 +1,5 @@
 use {io, Io, TryRead, TryWrite};
+use std::mem;
 use std::os::unix::{Fd, AsRawFd};
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";
@@ -19,8 +20,12 @@ impl Awakener {
     }
 
     pub fn wakeup(&self) -> io::Result<()> {
-        self.io.write_slice(MARK)
-            .map(|_| ())
+        unsafe {
+            let io: &mut Io = mem::transmute(&self.io);
+
+            io.write_slice(MARK)
+                .map(|_| ())
+        }
     }
 
     pub fn as_raw_fd(&self) -> Fd {
@@ -31,10 +36,14 @@ impl Awakener {
         let mut buf = [0; 8];
 
         loop {
-            // Consume data until all bytes are purged
-            match self.io.read_slice(&mut buf) {
-                Ok(Some(i)) if i > 0 => {},
-                _ => return,
+            unsafe {
+                let io: &mut Io = mem::transmute(&self.io);
+
+                // Consume data until all bytes are purged
+                match io.read_slice(&mut buf) {
+                    Ok(Some(i)) if i > 0 => {},
+                    _ => return,
+                }
             }
         }
     }

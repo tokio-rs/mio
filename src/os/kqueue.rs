@@ -2,7 +2,7 @@ use nix::sys::event::*;
 use nix::sys::event::EventFilter::*;
 use io;
 use os::event::{IoEvent, Interest, PollOpt};
-use std::mem;
+use std::slice;
 use std::os::unix::Fd;
 
 pub struct Selector {
@@ -23,9 +23,12 @@ impl Selector {
                               evts.as_mut_slice(), timeout_ms)
                                   .map_err(io::from_nix_error));
 
-        self.changes.len = 0;
+        self.changes.events.clear();
 
-        evts.len = cnt;
+        unsafe {
+            evts.events.set_len(cnt);
+        }
+
         Ok(())
     }
 
@@ -74,12 +77,15 @@ impl Selector {
     fn ev_push(&mut self, fd: Fd, token: usize, filter: EventFilter, flags: EventFlag) -> io::Result<()> {
         try!(self.maybe_flush_changes());
 
-        let idx = self.changes.len;
+        let idx = self.changes.len();
+
+        // Increase the vec size
+        unsafe { self.changes.events.set_len(idx + 1) };
+
         let ev = &mut self.changes.events[idx];
 
         ev_set(ev, fd as usize, filter, flags, FilterFlag::empty(), token);
 
-        self.changes.len += 1;
         Ok(())
     }
 
@@ -87,7 +93,8 @@ impl Selector {
         if self.changes.is_full() {
             try!(kevent(self.kq, self.changes.as_slice(), &mut [], 0)
                     .map_err(io::from_nix_error));
-            self.changes.len = 0;
+
+            self.changes.events.clear();
         }
 
         Ok(())
@@ -95,27 +102,23 @@ impl Selector {
 }
 
 pub struct Events {
-    len: usize,
-    events: [KEvent; 1024]
+    events: Vec<KEvent>,
 }
 
 impl Events {
     pub fn new() -> Events {
-        Events {
-            len: 0,
-            events: unsafe { mem::uninitialized() }
-        }
+        Events { events: Vec::with_capacity(1024) }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.len
+        self.events.len()
     }
 
     // TODO: We will get rid of this eventually in favor of an iterator
     #[inline]
     pub fn get(&self, idx: usize) -> IoEvent {
-        if idx >= self.len {
+        if idx >= self.len() {
             panic!("invalid index");
         }
 
@@ -134,7 +137,7 @@ impl Events {
         } else if ev.filter == EVFILT_WRITE {
             kind = kind | Interest::writable();
         } else {
-            unimplemented!();
+            panic!("GOT: {:?}", ev.filter);
         }
 
         if ev.flags.contains(EV_EOF) {
@@ -152,14 +155,20 @@ impl Events {
 
     #[inline]
     fn is_full(&self) -> bool {
-        self.len == self.events.len()
+        self.len() == self.events.capacity()
     }
 
     fn as_slice(&self) -> &[KEvent] {
-        &self.events[..self.len]
+        unsafe {
+            let ptr = self.events.as_slice().as_ptr();
+            slice::from_raw_parts(ptr, self.events.len())
+        }
     }
 
     fn as_mut_slice(&mut self) -> &mut [KEvent] {
-        self.events.as_mut_slice()
+        unsafe {
+            let ptr = self.events.as_mut_slice().as_mut_ptr();
+            slice::from_raw_parts_mut(ptr, self.events.capacity())
+        }
     }
 }
