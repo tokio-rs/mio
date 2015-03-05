@@ -176,7 +176,3 @@ fn to_tcp_listener(io: Io) -> TcpListener {
 fn as_io<'a, T>(tcp: &'a T) -> &'a Io {
     unsafe { mem::transmute(tcp) }
 }
-
-fn as_io_mut<'a, T>(tcp: &'a mut T) -> &'a mut Io {
-    unsafe { mem::transmute(tcp) }
-}

@@ -9,16 +9,16 @@ use std::os::unix::{Fd, AsRawFd};
  *
  */
 
-pub struct PipeAwakener {
+pub struct Awakener {
     reader: PipeReader,
     writer: PipeWriter,
 }
 
-impl PipeAwakener {
-    pub fn new() -> io::Result<PipeAwakener> {
+impl Awakener {
+    pub fn new() -> io::Result<Awakener> {
         let (rd, wr) = try!(io::pipe());
 
-        Ok(PipeAwakener {
+        Ok(Awakener {
             reader: rd,
             writer: wr
         })

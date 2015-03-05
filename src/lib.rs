@@ -80,8 +80,6 @@
 
 #![feature(alloc, core, io, libc, net, path, std_misc, unsafe_destructor)]
 
-#![allow(dead_code)]
-
 extern crate alloc;
 extern crate bytes;
 extern crate nix;

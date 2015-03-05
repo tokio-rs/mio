@@ -4,14 +4,11 @@ pub use self::epoll::{Events, Selector};
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub use self::kqueue::{Events, Selector};
 
-#[cfg(unix)]
-pub use self::posix::*;
+#[cfg(not(target_os = "linux"))]
+pub use self::posix::Awakener;
 
 #[cfg(target_os = "linux")]
 pub use self::linux::Awakener;
-
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-pub use self::posix::PipeAwakener as Awakener;
 
 #[cfg(target_os = "linux")]
 mod epoll;
@@ -22,7 +19,7 @@ mod kqueue;
 #[cfg(target_os = "linux")]
 mod linux;
 
-#[cfg(unix)]
+#[cfg(not(target_os = "linux"))]
 mod posix;
 
 pub mod event;

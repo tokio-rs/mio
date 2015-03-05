@@ -61,6 +61,7 @@ impl<T> Timer<T> {
         }
     }
 
+    #[test]
     pub fn count(&self) -> usize {
         self.entries.count()
     }
