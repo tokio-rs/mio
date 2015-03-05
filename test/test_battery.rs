@@ -8,8 +8,6 @@ use std::{io, thread};
 use std::old_io::timer::Timer;
 use std::time::duration::Duration;
 
-type TestEventLoop = EventLoop<usize, String>;
-
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
@@ -33,11 +31,11 @@ impl EchoConn {
         ec
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         event_loop.reregister(&self.sock, self.token, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
     }
 
-    fn readable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         loop {
             match self.sock.read_slice(self.buf.as_mut_slice()) {
                 Ok(None) => {
@@ -69,7 +67,7 @@ struct EchoServer {
 }
 
 impl EchoServer {
-    fn accept(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn accept(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("server accepting socket");
 
         let sock = self.sock.accept().unwrap().unwrap();
@@ -85,12 +83,12 @@ impl EchoServer {
         Ok(())
     }
 
-    fn conn_readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> io::Result<()> {
+    fn conn_readable(&mut self, event_loop: &mut EventLoop<Echo>, tok: Token) -> io::Result<()> {
         debug!("server conn readable; tok={:?}", tok);
         self.conn(tok).readable(event_loop)
     }
 
-    fn conn_writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> io::Result<()> {
+    fn conn_writable(&mut self, event_loop: &mut EventLoop<Echo>, tok: Token) -> io::Result<()> {
         debug!("server conn writable; tok={:?}", tok);
         self.conn(tok).writable(event_loop)
     }
@@ -120,11 +118,11 @@ impl EchoClient {
         }
     }
 
-    fn readable(&mut self, _event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn readable(&mut self, _event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         Ok(())
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("client socket writable");
 
         while self.backlog.len() > 0 {
@@ -150,14 +148,14 @@ impl EchoClient {
     }
 }
 
-struct EchoHandler {
+struct Echo {
     server: EchoServer,
     client: EchoClient,
 }
 
-impl EchoHandler {
-    fn new(srv: NonBlock<TcpListener>, client: NonBlock<TcpStream>) -> EchoHandler {
-        EchoHandler {
+impl Echo {
+    fn new(srv: NonBlock<TcpListener>, client: NonBlock<TcpStream>) -> Echo {
+        Echo {
             server: EchoServer {
                 sock: srv,
                 conns: Slab::new_starting_at(Token(2), 128),
@@ -167,8 +165,11 @@ impl EchoHandler {
     }
 }
 
-impl Handler<usize, String> for EchoHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: ReadHint) {
+impl Handler for Echo {
+    type Timeout = usize;
+    type Message = String;
+
+    fn readable(&mut self, event_loop: &mut EventLoop<Echo>, token: Token, hint: ReadHint) {
         assert_eq!(hint, ReadHint::data());
 
         match token {
@@ -178,7 +179,7 @@ impl Handler<usize, String> for EchoHandler {
         };
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop, token: Token) {
+    fn writable(&mut self, event_loop: &mut EventLoop<Echo>, token: Token) {
         match token {
             SERVER => panic!("received writable for token 0"),
             CLIENT => self.client.writable(event_loop).unwrap(),
@@ -186,7 +187,7 @@ impl Handler<usize, String> for EchoHandler {
         };
     }
 
-    fn notify(&mut self, event_loop: &mut TestEventLoop, msg: String) {
+    fn notify(&mut self, event_loop: &mut EventLoop<Echo>, msg: String) {
         match self.client.sock.write_slice(msg.as_bytes()) {
             Ok(Some(n)) => {
                 self.client.count += 1;
@@ -260,5 +261,5 @@ pub fn test_echo_server() {
     let _t = thread::scoped(go);
 
     // Start the event loop
-    event_loop.run(&mut EchoHandler::new(srv, sock)).unwrap();
+    event_loop.run(&mut Echo::new(srv, sock)).unwrap();
 }

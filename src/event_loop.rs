@@ -35,27 +35,26 @@ impl Default for EventLoopConfig {
 }
 
 /// Single threaded IO event loop.
-#[derive(Debug)]
-pub struct EventLoop<T, M: Send> {
+pub struct EventLoop<H: Handler> {
     run: bool,
     poll: Poll,
-    timer: Timer<T>,
-    notify: Notify<M>,
+    timer: Timer<H::Timeout>,
+    notify: Notify<H::Message>,
     config: EventLoopConfig,
 }
 
 // Token used to represent notifications
 const NOTIFY: Token = Token(usize::MAX);
 
-impl<T, M: Send> EventLoop<T, M> {
+impl<H: Handler> EventLoop<H> {
 
     /// Initializes a new event loop using default configuration settings. The
     /// event loop will not be running yet.
-    pub fn new() -> io::Result<EventLoop<T, M>> {
+    pub fn new() -> io::Result<EventLoop<H>> {
         EventLoop::configured(Default::default())
     }
 
-    pub fn configured(config: EventLoopConfig) -> io::Result<EventLoop<T, M>> {
+    pub fn configured(config: EventLoopConfig) -> io::Result<EventLoop<H>> {
         // Create the IO poller
         let mut poll = try!(Poll::new());
 
@@ -95,8 +94,11 @@ impl<T, M: Send> EventLoop<T, M> {
     ///
     /// struct MyHandler;
     ///
-    /// impl Handler<(), u32> for MyHandler {
-    ///     fn notify(&mut self, event_loop: &mut EventLoop<(), u32>, msg: u32) {
+    /// impl Handler for MyHandler {
+    ///     type Timeout = ();
+    ///     type Message = u32;
+    ///
+    ///     fn notify(&mut self, event_loop: &mut EventLoop<MyHandler>, msg: u32) {
     ///         assert_eq!(msg, 123);
     ///         event_loop.shutdown();
     ///     }
@@ -130,7 +132,7 @@ impl<T, M: Send> EventLoop<T, M> {
     ///
     /// The strategy of setting an atomic flag if the event loop is not already
     /// sleeping allows avoiding an expensive wakeup operation if at all possible.
-    pub fn channel(&self) -> EventLoopSender<M> {
+    pub fn channel(&self) -> EventLoopSender<H::Message> {
         EventLoopSender::new(self.notify.clone())
     }
 
@@ -151,8 +153,11 @@ impl<T, M: Send> EventLoop<T, M> {
     ///
     /// struct MyHandler;
     ///
-    /// impl Handler<u32, ()> for MyHandler {
-    ///     fn timeout(&mut self, event_loop: &mut EventLoop<u32, ()>, timeout: u32) {
+    /// impl Handler for MyHandler {
+    ///     type Timeout = u32;
+    ///     type Message = ();
+    ///
+    ///     fn timeout(&mut self, event_loop: &mut EventLoop<MyHandler>, timeout: u32) {
     ///         assert_eq!(timeout, 123);
     ///         event_loop.shutdown();
     ///     }
@@ -163,7 +168,7 @@ impl<T, M: Send> EventLoop<T, M> {
     /// let timeout = event_loop.timeout(123, Duration::milliseconds(300)).unwrap();
     /// let _ = event_loop.run(&mut MyHandler);
     /// ```
-    pub fn timeout(&mut self, token: T, delay: Duration) -> TimerResult<Timeout> {
+    pub fn timeout(&mut self, token: H::Timeout, delay: Duration) -> TimerResult<Timeout> {
         self.timer.timeout(token, delay)
     }
 
@@ -196,7 +201,7 @@ impl<T, M: Send> EventLoop<T, M> {
 
     /// Keep spinning the event loop indefinitely, and notify the handler whenever
     /// any of the registered handles are ready.
-    pub fn run<H: Handler<T, M>>(&mut self, handler: &mut H) -> io::Result<()> {
+    pub fn run(&mut self, handler: &mut H) -> io::Result<()> {
         self.run = true;
 
         while self.run {
@@ -215,7 +220,7 @@ impl<T, M: Send> EventLoop<T, M> {
     /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once<H: Handler<T, M>>(&mut self, handler: &mut H) -> io::Result<()> {
+    pub fn run_once(&mut self, handler: &mut H) -> io::Result<()> {
         let mut messages;
         let mut pending;
 
@@ -272,7 +277,7 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 
     // Process IO events that have been previously polled
-    fn io_process<H: Handler<T, M>>(&mut self, handler: &mut H, cnt: usize) {
+    fn io_process(&mut self, handler: &mut H, cnt: usize) {
         let mut i = 0;
 
         // Iterate over the notifications. Each event provides the token
@@ -293,7 +298,7 @@ impl<T, M: Send> EventLoop<T, M> {
         }
     }
 
-    fn io_event<H: Handler<T, M>>(&mut self, handler: &mut H, evt: IoEvent) {
+    fn io_event(&mut self, handler: &mut H, evt: IoEvent) {
         let tok = evt.token();
 
         if evt.is_readable() {
@@ -309,7 +314,7 @@ impl<T, M: Send> EventLoop<T, M> {
         }
     }
 
-    fn notify<H: Handler<T, M>>(&mut self, handler: &mut H, mut cnt: usize) {
+    fn notify(&mut self, handler: &mut H, mut cnt: usize) {
         while cnt > 0 {
             let msg = self.notify.poll()
                 .expect("[BUG] at this point there should always be a message");
@@ -319,7 +324,7 @@ impl<T, M: Send> EventLoop<T, M> {
         }
     }
 
-    fn timer_process<H: Handler<T, M>>(&mut self, handler: &mut H) {
+    fn timer_process(&mut self, handler: &mut H) {
         let now = self.timer.now();
 
         loop {
@@ -331,7 +336,7 @@ impl<T, M: Send> EventLoop<T, M> {
     }
 }
 
-unsafe impl<T, M: Send> Sync for EventLoop<T, M> { }
+unsafe impl<H: Handler> Sync for EventLoop<H> { }
 
 /// Sends messages to the EventLoop from other threads.
 pub struct EventLoopSender<M: Send> {
@@ -375,10 +380,8 @@ mod tests {
     #[test]
     pub fn test_event_loop_size() {
         use std::mem;
-        assert!(512 >= mem::size_of::<EventLoop<u32, u32>>());
+        assert!(512 >= mem::size_of::<EventLoop<Funtimes>>());
     }
-
-    type TestEventLoop = EventLoop<usize, ()>;
 
     struct Funtimes {
         rcount: Arc<AtomicIsize>,
@@ -394,8 +397,11 @@ mod tests {
         }
     }
 
-    impl Handler<usize, ()> for Funtimes {
-        fn readable(&mut self, _event_loop: &mut TestEventLoop, token: Token, _hint: event::ReadHint) {
+    impl Handler for Funtimes {
+        type Timeout = usize;
+        type Message = ();
+
+        fn readable(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token, _hint: event::ReadHint) {
             (*self.rcount).fetch_add(1, SeqCst);
             assert_eq!(token, Token(10));
         }

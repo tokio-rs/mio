@@ -6,8 +6,6 @@ use std::str;
 use std::net::{SocketAddr, IpAddr};
 use super::localhost;
 
-type TestEventLoop = EventLoop<usize, ()>;
-
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
 
@@ -31,8 +29,11 @@ impl UdpHandler {
     }
 }
 
-impl Handler<usize, ()> for UdpHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: ReadHint) {
+impl Handler for UdpHandler {
+    type Timeout = usize;
+    type Message = ();
+
+    fn readable(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, _: ReadHint) {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
@@ -51,7 +52,7 @@ impl Handler<usize, ()> for UdpHandler {
         }
     }
 
-    fn writable(&mut self, _: &mut TestEventLoop, token: Token) {
+    fn writable(&mut self, _: &mut EventLoop<UdpHandler>, token: Token) {
         match token {
             SENDER => {
                 self.tx.send_to(&mut self.buf, &self.rx.socket_addr().unwrap()).unwrap();

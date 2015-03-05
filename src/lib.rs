@@ -35,7 +35,7 @@
 //! let server = tcp::listen(&addr).unwrap();
 //!
 //! // Create an event loop
-//! let mut event_loop = EventLoop::<(), ()>::new().unwrap();
+//! let mut event_loop = EventLoop::new().unwrap();
 //!
 //! // Start listening for incoming connections
 //! event_loop.register(&server, SERVER).unwrap();
@@ -49,8 +49,11 @@
 //! // Define a handler to process the events
 //! struct MyHandler(NonBlock<TcpListener>);
 //!
-//! impl Handler<(), ()> for MyHandler {
-//!     fn readable(&mut self, event_loop: &mut EventLoop<(), ()>, token: Token, _: ReadHint) {
+//! impl Handler for MyHandler {
+//!     type Timeout = ();
+//!     type Message = ();
+//!
+//!     fn readable(&mut self, event_loop: &mut EventLoop<MyHandler>, token: Token, _: ReadHint) {
 //!         match token {
 //!             SERVER => {
 //!                 let MyHandler(ref mut server) = *self;

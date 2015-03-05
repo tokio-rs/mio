@@ -6,8 +6,6 @@ use super::localhost;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 
-type TestEventLoop = EventLoop<usize, ()>;
-
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
@@ -34,8 +32,11 @@ impl TestHandler {
     }
 }
 
-impl Handler<usize, ()> for TestHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: ReadHint) {
+impl Handler for TestHandler {
+    type Timeout = ();
+    type Message = ();
+
+    fn readable(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, hint: ReadHint) {
         debug!("readable; tok={:?}; hint={:?}", tok, hint);
 
         match tok {
@@ -78,7 +79,7 @@ impl Handler<usize, ()> for TestHandler {
         event_loop.reregister(&self.cli, CLIENT, Interest::readable() | Interest::hup(), PollOpt::edge()).unwrap();
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) {
+    fn writable(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {

@@ -7,8 +7,6 @@ use std::time::Duration;
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
-type TestEventLoop = EventLoop<usize, ()>;
-
 struct TestHandler {
     server: NonBlock<TcpListener>,
     client: NonBlock<TcpStream>,
@@ -25,8 +23,11 @@ impl TestHandler {
     }
 }
 
-impl Handler<usize, ()> for TestHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: ReadHint) {
+impl Handler for TestHandler {
+    type Timeout = usize;
+    type Message = ();
+
+    fn readable(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: ReadHint) {
         match token {
             SERVER => {
                 let mut sock = self.server.accept().unwrap().unwrap();
@@ -41,7 +42,7 @@ impl Handler<usize, ()> for TestHandler {
         }
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop, token: Token) {
+    fn writable(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token) {
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
@@ -50,7 +51,7 @@ impl Handler<usize, ()> for TestHandler {
         event_loop.timeout(1, Duration::milliseconds(200)).unwrap();
     }
 
-    fn timeout(&mut self, event_loop: &mut TestEventLoop, _: usize) {
+    fn timeout(&mut self, event_loop: &mut EventLoop<TestHandler>, _: usize) {
         event_loop.shutdown();
     }
 }

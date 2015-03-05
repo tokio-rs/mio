@@ -6,8 +6,6 @@ use mio::util::Slab;
 use std::io;
 use super::localhost;
 
-type TestEventLoop = EventLoop<usize, ()>;
-
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
@@ -30,7 +28,7 @@ impl EchoConn {
         }
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         let mut buf = self.buf.take().unwrap();
 
         match self.sock.write(&mut buf) {
@@ -54,7 +52,7 @@ impl EchoConn {
         event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
-    fn readable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         let mut buf = self.mut_buf.take().unwrap();
 
         match self.sock.read(&mut buf) {
@@ -85,7 +83,7 @@ struct EchoServer {
 }
 
 impl EchoServer {
-    fn accept(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn accept(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("server accepting socket");
 
         let sock = self.sock.accept().unwrap().unwrap();
@@ -101,12 +99,12 @@ impl EchoServer {
         Ok(())
     }
 
-    fn conn_readable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> io::Result<()> {
+    fn conn_readable(&mut self, event_loop: &mut EventLoop<Echo>, tok: Token) -> io::Result<()> {
         debug!("server conn readable; tok={:?}", tok);
         self.conn(tok).readable(event_loop)
     }
 
-    fn conn_writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) -> io::Result<()> {
+    fn conn_writable(&mut self, event_loop: &mut EventLoop<Echo>, tok: Token) -> io::Result<()> {
         debug!("server conn writable; tok={:?}", tok);
         self.conn(tok).writable(event_loop)
     }
@@ -143,7 +141,7 @@ impl EchoClient {
         }
     }
 
-    fn readable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("client socket readable");
 
         let mut buf = self.mut_buf.take().unwrap();
@@ -181,7 +179,7 @@ impl EchoClient {
         event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("client socket writable");
 
         match self.sock.write(&mut self.tx) {
@@ -200,7 +198,7 @@ impl EchoClient {
         event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
-    fn next_msg(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
+    fn next_msg(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         if self.msgs.is_empty() {
             event_loop.shutdown();
             return Ok(());
@@ -217,14 +215,14 @@ impl EchoClient {
     }
 }
 
-struct EchoHandler {
+struct Echo {
     server: EchoServer,
     client: EchoClient,
 }
 
-impl EchoHandler {
-    fn new(srv: NonBlock<TcpListener>, client: NonBlock<TcpStream>, msgs: Vec<&'static str>) -> EchoHandler {
-        EchoHandler {
+impl Echo {
+    fn new(srv: NonBlock<TcpListener>, client: NonBlock<TcpStream>, msgs: Vec<&'static str>) -> Echo {
+        Echo {
             server: EchoServer {
                 sock: srv,
                 conns: Slab::new_starting_at(Token(2), 128)
@@ -234,8 +232,11 @@ impl EchoHandler {
     }
 }
 
-impl Handler<usize, ()> for EchoHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, hint: ReadHint) {
+impl Handler for Echo {
+    type Timeout = usize;
+    type Message = ();
+
+    fn readable(&mut self, event_loop: &mut EventLoop<Echo>, token: Token, hint: ReadHint) {
         assert!(hint.is_data());
 
         match token {
@@ -245,7 +246,7 @@ impl Handler<usize, ()> for EchoHandler {
         };
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop, token: Token) {
+    fn writable(&mut self, event_loop: &mut EventLoop<Echo>, token: Token) {
         match token {
             SERVER => panic!("received writable for token 0"),
             CLIENT => self.client.writable(event_loop).unwrap(),
@@ -278,5 +279,5 @@ pub fn test_echo_server() {
     event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     // Start the event loop
-    event_loop.run(&mut EchoHandler::new(srv, sock, vec!["foo", "bar"])).unwrap();
+    event_loop.run(&mut Echo::new(srv, sock, vec!["foo", "bar"])).unwrap();
 }

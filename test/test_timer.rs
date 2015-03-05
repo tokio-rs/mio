@@ -6,8 +6,6 @@ use std::time::Duration;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 
-type TestEventLoop = EventLoop<NonBlock<TcpStream>, ()>;
-
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
@@ -34,8 +32,11 @@ impl TestHandler {
     }
 }
 
-impl Handler<NonBlock<TcpStream>, ()> for TestHandler {
-    fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: ReadHint) {
+impl Handler for TestHandler {
+    type Timeout = NonBlock<TcpStream>;
+    type Message = ();
+
+    fn readable(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, hint: ReadHint) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
@@ -88,7 +89,7 @@ impl Handler<NonBlock<TcpStream>, ()> for TestHandler {
         }
     }
 
-    fn writable(&mut self, event_loop: &mut TestEventLoop, tok: Token) {
+    fn writable(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
@@ -98,7 +99,7 @@ impl Handler<NonBlock<TcpStream>, ()> for TestHandler {
         event_loop.reregister(&self.cli, CLIENT, Interest::readable(), PollOpt::edge()).unwrap();
     }
 
-    fn timeout(&mut self, _event_loop: &mut TestEventLoop, mut sock: NonBlock<TcpStream>) {
+    fn timeout(&mut self, _event_loop: &mut EventLoop<TestHandler>, mut sock: NonBlock<TcpStream>) {
         debug!("timeout handler : writing to socket");
         sock.write(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
     }

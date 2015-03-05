@@ -6,8 +6,6 @@ use mio::net::*;
 use mio::net::tcp::*;
 use super::localhost;
 
-type TestEventLoop = EventLoop<usize, String>;
-
 struct TestHandler {
     sender: EventLoopSender<String>,
     notify: usize
@@ -22,8 +20,11 @@ impl TestHandler {
     }
 }
 
-impl Handler<usize, String> for TestHandler {
-    fn notify(&mut self, event_loop: &mut TestEventLoop, msg: String) {
+impl Handler for TestHandler {
+    type Timeout = usize;
+    type Message = String;
+
+    fn notify(&mut self, event_loop: &mut EventLoop<TestHandler>, msg: String) {
         match self.notify {
             0 => {
                 assert!(msg.as_slice() == "First", "actual={}", msg);

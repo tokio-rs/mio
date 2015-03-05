@@ -1,19 +1,22 @@
 use {EventLoop, ReadHint, Token};
 
 #[allow(unused_variables)]
-pub trait Handler<T, M: Send> {
-    fn readable(&mut self, event_loop: &mut EventLoop<T, M>, token: Token, hint: ReadHint) {
+pub trait Handler {
+    type Timeout;
+    type Message: Send;
+
+    fn readable(&mut self, event_loop: &mut EventLoop<Self>, token: Token, hint: ReadHint) {
     }
 
-    fn writable(&mut self, event_loop: &mut EventLoop<T, M>, token: Token) {
+    fn writable(&mut self, event_loop: &mut EventLoop<Self>, token: Token) {
     }
 
-    fn notify(&mut self, event_loop: &mut EventLoop<T, M>, msg: M) {
+    fn notify(&mut self, event_loop: &mut EventLoop<Self>, msg: Self::Message) {
     }
 
-    fn timeout(&mut self, event_loop: &mut EventLoop<T, M>, timeout: T) {
+    fn timeout(&mut self, event_loop: &mut EventLoop<Self>, timeout: Self::Timeout) {
     }
 
-    fn interrupted(&mut self, event_loop: &mut EventLoop<T, M>) {
+    fn interrupted(&mut self, event_loop: &mut EventLoop<Self>) {
     }
 }
