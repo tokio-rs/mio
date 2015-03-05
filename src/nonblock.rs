@@ -57,6 +57,6 @@ impl<T: AsRawFd> AsRawFd for NonBlock<T> {
 impl<T: Evented> Evented for NonBlock<T> {
 }
 
-pub trait AsNonBlock {
-    fn as_non_block(self) -> Result<NonBlock<Self>>;
+pub trait IntoNonBlock {
+    fn into_non_block(self) -> Result<NonBlock<Self>>;
 }

@@ -1,4 +1,4 @@
-use {NonBlock, AsNonBlock, Io};
+use {NonBlock, IntoNonBlock, Io};
 use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd, Result};
 use net::{self, nix, Socket};
@@ -43,8 +43,8 @@ impl FromFd for UdpSocket {
 impl Socket for UdpSocket {
 }
 
-impl AsNonBlock for UdpSocket {
-    fn as_non_block(self) -> Result<NonBlock<UdpSocket>> {
+impl IntoNonBlock for UdpSocket {
+    fn into_non_block(self) -> Result<NonBlock<UdpSocket>> {
         try!(net::set_non_block(as_io(&self)));
         Ok(NonBlock::new(self))
     }

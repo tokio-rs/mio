@@ -128,7 +128,7 @@ pub use io::{
     PipeWriter,
 };
 pub use nonblock::{
-    AsNonBlock,
+    IntoNonBlock,
     NonBlock,
 };
 pub use os::token::{
