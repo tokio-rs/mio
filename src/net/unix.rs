@@ -1,9 +1,25 @@
-use {TryRead, TryWrite};
+use {NonBlock, IntoNonBlock, TryRead, TryWrite};
 use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd, Io};
-use net::{self, nix, TryAccept, Socket};
+use net::{self, nix, Socket};
 use std::path::Path;
 use std::os::unix::{Fd, AsRawFd};
+
+pub fn stream() -> io::Result<NonBlock<UnixSocket>> {
+    UnixSocket::stream()
+        .map(|sock| NonBlock::new(sock))
+}
+
+pub fn bind(addr: &Path) -> io::Result<NonBlock<UnixListener>> {
+    stream().and_then(|sock| {
+        try!(sock.bind(addr));
+        sock.listen(256)
+    })
+}
+
+pub fn connect(addr: &Path) -> io::Result<(NonBlock<UnixStream>, bool)> {
+    stream().and_then(|sock| sock.connect(addr))
+}
 
 #[derive(Debug)]
 pub struct UnixSocket {
@@ -11,7 +27,7 @@ pub struct UnixSocket {
 }
 
 impl UnixSocket {
-    pub fn stream() -> io::Result<UnixSocket> {
+    fn stream() -> io::Result<UnixSocket> {
         UnixSocket::new(nix::SockType::Stream)
     }
 
@@ -57,6 +73,25 @@ impl FromFd for UnixSocket {
 impl Socket for UnixSocket {
 }
 
+impl IntoNonBlock for UnixSocket {
+    fn into_non_block(self) -> io::Result<NonBlock<UnixSocket>> {
+        try!(net::set_non_block(&self.io));
+        Ok(NonBlock::new(self))
+    }
+}
+
+impl NonBlock<UnixSocket> {
+    pub fn connect(self, addr: &Path) -> io::Result<(NonBlock<UnixStream>, bool)> {
+        self.unwrap().connect(addr)
+            .map(|(stream, complete)| (NonBlock::new(stream), complete))
+    }
+
+    pub fn listen(self, backlog: usize) -> io::Result<NonBlock<UnixListener>> {
+        self.unwrap().listen(backlog)
+            .map(NonBlock::new)
+    }
+}
+
 #[derive(Debug)]
 pub struct UnixListener {
     io: Io,
@@ -71,21 +106,26 @@ impl AsRawFd for UnixListener {
 impl Evented for UnixListener {
 }
 
+impl Socket for UnixListener {
+}
+
+impl IntoNonBlock for UnixListener {
+    fn into_non_block(self) -> io::Result<NonBlock<UnixListener>> {
+        try!(net::set_non_block(&self.io));
+        Ok(NonBlock::new(self))
+    }
+}
+
 impl FromFd for UnixListener {
     fn from_fd(fd: Fd) -> UnixListener {
         UnixListener { io: Io::new(fd) }
     }
 }
 
-impl Socket for UnixListener {
-}
-
-impl TryAccept for UnixListener {
-    type Sock = UnixStream;
-
-    fn try_accept(&self) -> io::Result<Option<UnixStream>> {
+impl NonBlock<UnixListener> {
+    pub fn accept(&self) -> io::Result<Option<NonBlock<UnixStream>>> {
         net::accept(&self.io)
-            .map(|fd| Some(FromFd::from_fd(fd)))
+            .map(|fd| Some(NonBlock::new(FromFd::from_fd(fd))))
             .or_else(io::to_non_block)
     }
 }
@@ -113,13 +153,20 @@ impl FromFd for UnixStream {
 impl Socket for UnixStream {
 }
 
-impl TryRead for UnixStream {
+impl IntoNonBlock for UnixStream {
+    fn into_non_block(self) -> io::Result<NonBlock<UnixStream>> {
+        try!(net::set_non_block(&self.io));
+        Ok(NonBlock::new(self))
+    }
+}
+
+impl TryRead for NonBlock<UnixStream> {
     fn read_slice(&mut self, buf: &mut[u8]) -> io::Result<Option<usize>> {
         self.io.read_slice(buf)
     }
 }
 
-impl TryWrite for UnixStream {
+impl TryWrite for NonBlock<UnixStream> {
     fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
         self.io.write_slice(buf)
     }
