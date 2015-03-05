@@ -19,13 +19,13 @@ enum TestState {
 }
 
 struct TestHandler {
-    srv: TcpListener,
-    cli: TcpStream,
+    srv: NonBlock<TcpListener>,
+    cli: NonBlock<TcpStream>,
     state: TestState
 }
 
 impl TestHandler {
-    fn new(srv: TcpListener, cli: TcpStream) -> TestHandler {
+    fn new(srv: NonBlock<TcpListener>, cli: NonBlock<TcpStream>) -> TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
@@ -41,7 +41,7 @@ impl Handler<usize, ()> for TestHandler {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
-                let _ = self.srv.try_accept().unwrap().unwrap();
+                let _ = self.srv.accept().unwrap().unwrap();
             }
             CLIENT => {
                 debug!("client readable");
@@ -101,7 +101,7 @@ pub fn test_close_on_drop() {
     let addr = localhost();
 
     // == Create & setup server socket
-    let srv = TcpSocket::v4().unwrap();
+    let srv = tcp::v4().unwrap();
     srv.set_reuseaddr(true).unwrap();
     srv.bind(&addr).unwrap();
 
@@ -110,7 +110,7 @@ pub fn test_close_on_drop() {
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
 
     // == Create & setup client socket
-    let (sock, _) = TcpSocket::v4().unwrap()
+    let (sock, _) = tcp::v4().unwrap()
         .connect(&addr).unwrap();
 
     event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge()).unwrap();

@@ -10,13 +10,13 @@ const CLIENT: Token = Token(1);
 type TestEventLoop = EventLoop<usize, ()>;
 
 struct TestHandler {
-    server: TcpListener,
-    client: TcpStream,
+    server: NonBlock<TcpListener>,
+    client: NonBlock<TcpStream>,
     state: usize,
 }
 
 impl TestHandler {
-    fn new(srv: TcpListener, cli: TcpStream) -> TestHandler {
+    fn new(srv: NonBlock<TcpListener>, cli: NonBlock<TcpStream>) -> TestHandler {
         TestHandler {
             server: srv,
             client: cli,
@@ -29,7 +29,7 @@ impl Handler<usize, ()> for TestHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, token: Token, _: ReadHint) {
         match token {
             SERVER => {
-                let mut sock = self.server.try_accept().unwrap().unwrap();
+                let mut sock = self.server.accept().unwrap().unwrap();
                 sock.write(&mut buf::SliceBuf::wrap("foobar".as_bytes())).unwrap();
             }
             CLIENT => {
@@ -62,7 +62,7 @@ pub fn test_register_deregister() {
 
     let addr = localhost();
 
-    let server = TcpSocket::v4().unwrap();
+    let server = tcp::v4().unwrap();
 
     info!("setting re-use addr");
     server.set_reuseaddr(true).unwrap();
@@ -73,7 +73,7 @@ pub fn test_register_deregister() {
     info!("register server socket");
     event_loop.register_opt(&server, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
 
-    let (client, _) = TcpSocket::v4().unwrap()
+    let (client, _) = tcp::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Register client socket only as writable

@@ -48,7 +48,7 @@ pub fn test_notify() {
     let addr = localhost();
 
     // Setup a server socket so that the event loop blocks
-    let srv = TcpSocket::v4().unwrap();
+    let srv = tcp::v4().unwrap();
     srv.set_reuseaddr(true).unwrap();
     srv.bind(&addr).unwrap();
 

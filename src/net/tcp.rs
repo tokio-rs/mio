@@ -1,12 +1,44 @@
-use {NonBlock, TryRead, TryWrite};
-use buf::{Buf, MutBuf};
+use {NonBlock};
 use io::{self, Evented, FromFd, Io};
-use net::{self, nix, TryAccept, Socket};
-use std::{mem};
-use std::net::SocketAddr;
+use net::{self, nix, Socket};
+use std::mem;
+use std::net::{SocketAddr, IpAddr};
 use std::os::unix::{Fd, AsRawFd};
 
 pub use std::net::{TcpStream, TcpListener};
+
+pub fn v4() -> io::Result<NonBlock<TcpSocket>> {
+    TcpSocket::new(nix::AddressFamily::Inet)
+        .map(NonBlock::new)
+}
+
+pub fn v6() -> io::Result<NonBlock<TcpSocket>> {
+    TcpSocket::new(nix::AddressFamily::Inet6)
+        .map(NonBlock::new)
+}
+
+pub fn listen(addr: &SocketAddr) -> io::Result<NonBlock<TcpListener>> {
+    // Create the socket
+    let sock = try!(match addr.ip() {
+        IpAddr::V4(..) => v4(),
+        IpAddr::V6(..) => v6(),
+    });
+
+    // Bind the socket
+    try!(sock.bind(addr));
+
+    // listen
+    sock.listen(1024)
+}
+
+pub fn connect(addr: &SocketAddr) -> io::Result<(NonBlock<TcpStream>, bool)> {
+    let sock = try!(match addr.ip() {
+        IpAddr::V4(..) => v4(),
+        IpAddr::V6(..) => v6(),
+    });
+
+    sock.connect(addr)
+}
 
 /*
  *
@@ -20,17 +52,9 @@ pub struct TcpSocket {
 }
 
 impl TcpSocket {
-    pub fn v4() -> io::Result<TcpSocket> {
-        TcpSocket::new(nix::AddressFamily::Inet)
-    }
-
-    pub fn v6() -> io::Result<TcpSocket> {
-        TcpSocket::new(nix::AddressFamily::Inet6)
-    }
-
     fn new(family: nix::AddressFamily) -> io::Result<TcpSocket> {
-        let fd = try!(net::socket(family, nix::SockType::Stream));
-        Ok(FromFd::from_fd(fd))
+        net::socket(family, nix::SockType::Stream)
+            .map(FromFd::from_fd)
     }
 
     pub fn connect(self, addr: &SocketAddr) -> io::Result<(TcpStream, bool)> {
@@ -63,7 +87,7 @@ impl TcpSocket {
 impl NonBlock<TcpSocket> {
     pub fn listen(self, backlog: usize) -> io::Result<NonBlock<TcpListener>> {
         self.unwrap().listen(backlog)
-            .map(|listener| NonBlock::new(listener))
+            .map(NonBlock::new)
     }
 
     pub fn connect(self, addr: &SocketAddr) -> io::Result<(NonBlock<TcpStream>, bool)> {
@@ -108,18 +132,6 @@ impl Evented for TcpStream {
 impl Socket for TcpStream {
 }
 
-impl TryRead for TcpStream {
-    fn read_slice(&mut self, buf: &mut[u8]) -> io::Result<Option<usize>> {
-        as_io_mut(self).read_slice(buf)
-    }
-}
-
-impl TryWrite for TcpStream {
-    fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
-        as_io_mut(self).write_slice(buf)
-    }
-}
-
 /*
  *
  * ===== TcpListener =====
@@ -138,10 +150,8 @@ impl Evented for TcpListener {
 impl Socket for TcpListener {
 }
 
-impl TryAccept for TcpListener {
-    type Sock = TcpStream;
-
-    fn try_accept(&self) -> io::Result<Option<TcpStream>> {
+impl NonBlock<TcpListener> {
+    pub fn accept(&self) -> io::Result<Option<NonBlock<TcpStream>>> {
         net::accept(as_io(self))
             .map(|fd| Some(FromFd::from_fd(fd)))
             .or_else(io::to_non_block)

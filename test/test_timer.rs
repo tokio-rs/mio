@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 
-type TestEventLoop = EventLoop<TcpStream, ()>;
+type TestEventLoop = EventLoop<NonBlock<TcpStream>, ()>;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -19,13 +19,13 @@ enum TestState {
 }
 
 struct TestHandler {
-    srv: TcpListener,
-    cli: TcpStream,
+    srv: NonBlock<TcpListener>,
+    cli: NonBlock<TcpStream>,
     state: TestState
 }
 
 impl TestHandler {
-    fn new(srv: TcpListener, cli: TcpStream) -> TestHandler {
+    fn new(srv: NonBlock<TcpListener>, cli: NonBlock<TcpStream>) -> TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
@@ -34,12 +34,12 @@ impl TestHandler {
     }
 }
 
-impl Handler<TcpStream, ()> for TestHandler {
+impl Handler<NonBlock<TcpStream>, ()> for TestHandler {
     fn readable(&mut self, event_loop: &mut TestEventLoop, tok: Token, hint: ReadHint) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
-                let conn = self.srv.try_accept().unwrap().unwrap();
+                let conn = self.srv.accept().unwrap().unwrap();
                 event_loop.timeout(conn, Duration::milliseconds(200)).unwrap();
 
                 event_loop.reregister(&self.srv, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
@@ -98,7 +98,7 @@ impl Handler<TcpStream, ()> for TestHandler {
         event_loop.reregister(&self.cli, CLIENT, Interest::readable(), PollOpt::edge()).unwrap();
     }
 
-    fn timeout(&mut self, _event_loop: &mut TestEventLoop, mut sock: TcpStream) {
+    fn timeout(&mut self, _event_loop: &mut TestEventLoop, mut sock: NonBlock<TcpStream>) {
         debug!("timeout handler : writing to socket");
         sock.write(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
     }
@@ -111,7 +111,7 @@ pub fn test_timer() {
 
     let addr = localhost();
 
-    let srv = TcpSocket::v4().unwrap();
+    let srv = tcp::v4().unwrap();
 
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
@@ -123,7 +123,7 @@ pub fn test_timer() {
 
     event_loop.register_opt(&srv, SERVER, Interest::all(), PollOpt::edge()).unwrap();
 
-    let (sock, _) = TcpSocket::v4().unwrap()
+    let (sock, _) = tcp::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Connect to the server

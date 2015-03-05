@@ -14,14 +14,14 @@ const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
 struct EchoConn {
-    sock: TcpStream,
+    sock: NonBlock<TcpStream>,
     token: Token,
     count: u32,
     buf: Vec<u8>
 }
 
 impl EchoConn {
-    fn new(sock: TcpStream) -> EchoConn {
+    fn new(sock: NonBlock<TcpStream>) -> EchoConn {
         let mut ec =
         EchoConn {
             sock: sock,
@@ -64,7 +64,7 @@ impl EchoConn {
 }
 
 struct EchoServer {
-    sock: TcpListener,
+    sock: NonBlock<TcpListener>,
     conns: Slab<EchoConn>
 }
 
@@ -72,7 +72,7 @@ impl EchoServer {
     fn accept(&mut self, event_loop: &mut TestEventLoop) -> io::Result<()> {
         debug!("server accepting socket");
 
-        let sock = self.sock.try_accept().unwrap().unwrap();
+        let sock = self.sock.accept().unwrap().unwrap();
         let conn = EchoConn::new(sock,);
         let tok = self.conns.insert(conn)
             .ok().expect("could not add connection to slab");
@@ -101,7 +101,7 @@ impl EchoServer {
 }
 
 struct EchoClient {
-    sock: TcpStream,
+    sock: NonBlock<TcpStream>,
     backlog: LinkedList<String>,
     token: Token,
     count: u32
@@ -110,7 +110,7 @@ struct EchoClient {
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: TcpStream, tok: Token) -> EchoClient {
+    fn new(sock: NonBlock<TcpStream>, tok: Token) -> EchoClient {
 
         EchoClient {
             sock: sock,
@@ -156,7 +156,7 @@ struct EchoHandler {
 }
 
 impl EchoHandler {
-    fn new(srv: TcpListener, client: TcpStream) -> EchoHandler {
+    fn new(srv: NonBlock<TcpListener>, client: NonBlock<TcpStream>) -> EchoHandler {
         EchoHandler {
             server: EchoServer {
                 sock: srv,
@@ -223,7 +223,7 @@ pub fn test_echo_server() {
 
     let addr = localhost();
 
-    let srv = TcpSocket::v4().unwrap();
+    let srv = tcp::v4().unwrap();
 
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
@@ -234,7 +234,8 @@ pub fn test_echo_server() {
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let (sock, _) = TcpSocket::v4().unwrap().connect(&addr).unwrap();
+    let (sock, _) = tcp::v4().unwrap()
+        .connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();

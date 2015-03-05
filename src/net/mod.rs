@@ -9,12 +9,6 @@ pub mod tcp;
 pub mod udp;
 pub mod unix;
 
-pub trait TryAccept {
-    type Sock;
-
-    fn try_accept(&self) -> io::Result<Option<Self::Sock>>;
-}
-
 /*
  *
  * ===== Socket options =====

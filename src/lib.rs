@@ -20,7 +20,7 @@
 //!
 //! ```
 //! use mio::*;
-//! use mio::net::tcp::{TcpSocket, TcpListener};
+//! use mio::net::tcp::{self, TcpListener};
 //! use std::net::SocketAddr;
 //! use std::str::FromStr;
 //!
@@ -32,9 +32,7 @@
 //! let addr = FromStr::from_str("127.0.0.1:13265").unwrap();
 //!
 //! // Setup the server socket
-//! let sock = TcpSocket::v4().unwrap();
-//! sock.bind(&addr).unwrap();
-//! let server = sock.listen(256).unwrap();
+//! let server = tcp::listen(&addr).unwrap();
 //!
 //! // Create an event loop
 //! let mut event_loop = EventLoop::<(), ()>::new().unwrap();
@@ -43,14 +41,13 @@
 //! event_loop.register(&server, SERVER).unwrap();
 //!
 //! // Setup the client socket
-//! let (sock, _) = TcpSocket::v4().unwrap()
-//!     .connect(&addr).unwrap();
+//! let (sock, _) = tcp::connect(&addr).unwrap();
 //!
 //! // Register the socket
 //! event_loop.register(&sock, CLIENT).unwrap();
 //!
 //! // Define a handler to process the events
-//! struct MyHandler(TcpListener);
+//! struct MyHandler(NonBlock<TcpListener>);
 //!
 //! impl Handler<(), ()> for MyHandler {
 //!     fn readable(&mut self, event_loop: &mut EventLoop<(), ()>, token: Token, _: ReadHint) {
