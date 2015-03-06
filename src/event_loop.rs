@@ -310,7 +310,7 @@ impl<H: Handler> EventLoop<H> {
         }
 
         if evt.is_error() {
-            handler.error(self, tok);
+            handler.error(self, tok, evt.read_hint());
         }
     }
 
