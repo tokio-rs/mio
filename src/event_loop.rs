@@ -301,16 +301,12 @@ impl<H: Handler> EventLoop<H> {
     fn io_event(&mut self, handler: &mut H, evt: IoEvent) {
         let tok = evt.token();
 
-        if evt.is_readable() {
+        if evt.is_readable() | evt.is_error() {
             handler.readable(self, tok, evt.read_hint());
         }
 
         if evt.is_writable() {
             handler.writable(self, tok);
-        }
-
-        if evt.is_error() {
-            println!(" + ERROR");
         }
     }
 
