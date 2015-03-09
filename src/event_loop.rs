@@ -370,8 +370,7 @@ mod tests {
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
-    use {io, buf, Buf, Handler, Token, TryRead, TryWrite};
-    use os::event;
+    use {io, buf, Buf, Handler, Token, TryRead, TryWrite, ReadHint};
 
     #[test]
     pub fn test_event_loop_size() {
@@ -397,8 +396,13 @@ mod tests {
         type Timeout = usize;
         type Message = ();
 
-        fn readable(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token, _hint: event::ReadHint) {
+        fn readable(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token, _: ReadHint) {
             (*self.rcount).fetch_add(1, SeqCst);
+            assert_eq!(token, Token(10));
+        }
+
+        fn writable(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token) {
+            (*self.wcount).fetch_add(1, SeqCst);
             assert_eq!(token, Token(10));
         }
     }
