@@ -20,10 +20,12 @@ exclude       = [
 [dependencies]
 log   = "0.2.3"
 time  = "0.1.16"
-bytes = "0.1.2"
 
 [dependencies.nix]
 git = "https://github.com/carllerche/nix-rust"
+
+[dependencies.bytes]
+git = "https://github.com/carllerche/bytes"
 
 [dev-dependencies]
 env_logger = "0.2.2"

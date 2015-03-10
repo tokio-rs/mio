@@ -37,7 +37,7 @@ impl Handler for UdpHandler {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
-                match self.rx.recv_from(&mut self.rx_buf.writer()) {
+                match self.rx.recv_from(&mut self.rx_buf) {
                     Ok(res) => {
                         assert_eq!(res.unwrap().ip(), IpAddr::new_v4(127, 0, 0, 1));
                     }
@@ -45,7 +45,7 @@ impl Handler for UdpHandler {
                         ret.unwrap();
                     }
                 }
-                assert!(str::from_utf8(self.rx_buf.reader().bytes()).unwrap() == self.msg);
+                assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
                 event_loop.shutdown();
             },
             _ => ()
