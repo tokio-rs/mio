@@ -451,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_reusing_slots_1() {
         let mut slab = Slab::new(16);
 
@@ -499,7 +499,7 @@ mod tests {
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_accessing_out_of_bounds() {
         let slab = Slab::<usize>::new(16);
         slab[Token(0)];
