@@ -1,7 +1,6 @@
 use mio::*;
 use mio::buf::ByteBuf;
-use mio::net::*;
-use mio::net::tcp::*;
+use mio::tcp::*;
 use super::localhost;
 
 use self::TestState::{Initial, AfterRead, AfterHup};

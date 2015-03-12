@@ -1,6 +1,5 @@
 use mio::*;
-use mio::net::*;
-use mio::net::unix::*;
+use mio::unix::*;
 use mio::buf::{ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
 use std::path::PathBuf;

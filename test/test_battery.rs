@@ -1,6 +1,5 @@
 use mio::*;
-use mio::net::*;
-use mio::net::tcp::*;
+use mio::tcp::*;
 use mio::util::Slab;
 use super::localhost;
 use std::collections::LinkedList;

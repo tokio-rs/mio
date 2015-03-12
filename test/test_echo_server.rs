@@ -1,6 +1,5 @@
 use mio::*;
-use mio::net::*;
-use mio::net::tcp::*;
+use mio::tcp::*;
 use mio::buf::{ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
 use std::io;

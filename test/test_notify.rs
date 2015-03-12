@@ -1,10 +1,9 @@
+use mio::*;
+use mio::tcp::*;
+use super::localhost;
 use std::old_io::timer::sleep;
 use std::thread;
 use std::time::Duration;
-use mio::*;
-use mio::net::*;
-use mio::net::tcp::*;
-use super::localhost;
 
 struct TestHandler {
     sender: EventLoopSender<String>,

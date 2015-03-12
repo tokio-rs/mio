@@ -20,7 +20,7 @@
 //!
 //! ```
 //! use mio::*;
-//! use mio::net::tcp::{self, TcpListener};
+//! use mio::tcp::TcpListener;
 //! use std::net::SocketAddr;
 //! use std::str::FromStr;
 //!
@@ -91,12 +91,12 @@ extern crate time;
 #[macro_use]
 extern crate log;
 
-pub mod net;
 pub mod util;
 
 mod event_loop;
 mod handler;
 mod io;
+mod net;
 mod nonblock;
 mod notify;
 mod os;
@@ -124,6 +124,12 @@ pub use io::{
     Evented,
     PipeReader,
     PipeWriter,
+};
+pub use net::{
+    tcp,
+    udp,
+    unix,
+    Socket,
 };
 pub use nonblock::{
     IntoNonBlock,
