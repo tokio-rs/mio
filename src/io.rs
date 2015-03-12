@@ -2,7 +2,7 @@ use buf::{Buf, MutBuf};
 use std::os::unix::{Fd, AsRawFd};
 
 // Re-export the io::Result / Error types for convenience
-pub use std::io::{Result, Error};
+pub use std::io::{Read, Write, Result, Error};
 
 /// A value that may be registered with an `EventLoop`
 pub trait Evented : AsRawFd {

@@ -67,7 +67,7 @@ mod nix {
         c_int,
         NixError,
     };
-    pub use nix::errno::EINPROGRESS;
+    pub use nix::errno::{EINPROGRESS, EAGAIN};
     pub use nix::fcntl::{fcntl, FcntlArg, O_NONBLOCK};
     pub use nix::sys::socket::{
         sockopt,
@@ -101,8 +101,14 @@ mod nix {
     };
 }
 
-fn socket(family: nix::AddressFamily, ty: nix::SockType) -> io::Result<Fd> {
-    nix::socket(family, ty, nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
+fn socket(family: nix::AddressFamily, ty: nix::SockType, nonblock: bool) -> io::Result<Fd> {
+    let opts = if nonblock {
+        nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC
+    } else {
+        nix::SOCK_CLOEXEC
+    };
+
+    nix::socket(family, ty, opts)
         .map_err(io::from_nix_error)
 }
 
@@ -128,8 +134,14 @@ fn listen(io: &Io, backlog: usize) -> io::Result<()> {
         .map_err(io::from_nix_error)
 }
 
-fn accept(io: &Io) -> io::Result<Fd> {
-    nix::accept4(io.as_raw_fd(), nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC)
+fn accept(io: &Io, nonblock: bool) -> io::Result<Fd> {
+    let opts = if nonblock {
+        nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC
+    } else {
+        nix::SOCK_CLOEXEC
+    };
+
+    nix::accept4(io.as_raw_fd(), opts)
         .map_err(io::from_nix_error)
 }
 

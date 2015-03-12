@@ -10,13 +10,13 @@ pub use std::net::UdpSocket;
 
 /// Returns a new, unbound, non-blocking, IPv4 UDP socket
 pub fn v4() -> Result<NonBlock<UdpSocket>> {
-    net::socket(nix::AddressFamily::Inet, nix::SockType::Datagram)
+    net::socket(nix::AddressFamily::Inet, nix::SockType::Datagram, true)
         .map(|fd| NonBlock::new(FromFd::from_fd(fd)))
 }
 
 /// Returns a new, unbound, non-blocking, IPv6 UDP socket
 pub fn v6() -> Result<NonBlock<UdpSocket>> {
-    net::socket(nix::AddressFamily::Inet6, nix::SockType::Datagram)
+    net::socket(nix::AddressFamily::Inet6, nix::SockType::Datagram, true)
         .map(|fd| NonBlock::new(FromFd::from_fd(fd)))
 }
 

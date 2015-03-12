@@ -8,12 +8,12 @@ use std::os::unix::{Fd, AsRawFd};
 pub use std::net::{TcpStream, TcpListener};
 
 pub fn v4() -> io::Result<NonBlock<TcpSocket>> {
-    TcpSocket::new(nix::AddressFamily::Inet)
+    TcpSocket::new(nix::AddressFamily::Inet, true)
         .map(NonBlock::new)
 }
 
 pub fn v6() -> io::Result<NonBlock<TcpSocket>> {
-    TcpSocket::new(nix::AddressFamily::Inet6)
+    TcpSocket::new(nix::AddressFamily::Inet6, true)
         .map(NonBlock::new)
 }
 
@@ -52,8 +52,8 @@ pub struct TcpSocket {
 }
 
 impl TcpSocket {
-    fn new(family: nix::AddressFamily) -> io::Result<TcpSocket> {
-        net::socket(family, nix::SockType::Stream)
+    fn new(family: nix::AddressFamily, nonblock: bool) -> io::Result<TcpSocket> {
+        net::socket(family, nix::SockType::Stream, nonblock)
             .map(FromFd::from_fd)
     }
 
@@ -152,7 +152,7 @@ impl Socket for TcpListener {
 
 impl NonBlock<TcpListener> {
     pub fn accept(&self) -> io::Result<Option<NonBlock<TcpStream>>> {
-        net::accept(as_io(self))
+        net::accept(as_io(self), true)
             .map(|fd| Some(FromFd::from_fd(fd)))
             .or_else(io::to_non_block)
     }
