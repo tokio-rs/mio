@@ -16,6 +16,8 @@ pub mod unix;
  */
 
 pub trait Socket : AsRawFd {
+
+    /// Returns the value for the `SO_LINGER` socket option.
     fn linger(&self) -> io::Result<usize> {
         let linger = try!(nix::getsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::Linger)
             .map_err(io::from_nix_error));
@@ -27,6 +29,7 @@ pub trait Socket : AsRawFd {
         }
     }
 
+    /// Sets the value for the `SO_LINGER` socket option
     fn set_linger(&self, dur_s: usize) -> io::Result<()> {
         let linger = nix::linger {
             l_onoff: (if dur_s > 0 { 1 } else { 0 }) as nix::c_int,
@@ -49,6 +52,28 @@ pub trait Socket : AsRawFd {
 
     fn set_tcp_nodelay(&self, val: bool) -> io::Result<()> {
         nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Tcp, nix::sockopt::TcpNoDelay, val)
+            .map_err(io::from_nix_error)
+    }
+
+    /// Sets the `SO_RCVTIMEO` socket option to the supplied number of
+    /// milliseconds.
+    ///
+    /// This function is hardcoded to milliseconds until Rust std includes a
+    /// stable duration type.
+    fn set_read_timeout_ms(&self, val: usize) -> io::Result<()> {
+        let t = nix::TimeVal::milliseconds(val as i64);
+        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::ReceiveTimeout, &t)
+            .map_err(io::from_nix_error)
+    }
+
+    /// Sets the `SO_SNDTIMEO` socket option to the supplied number of
+    /// milliseconds.
+    ///
+    /// This function is hardcoded to milliseconds until Rust std includes a
+    /// stable duration type.
+    fn set_write_timeout_ms(&self, val: usize) -> io::Result<()> {
+        let t = nix::TimeVal::milliseconds(val as i64);
+        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::SendTimeout, &t)
             .map_err(io::from_nix_error)
     }
 }
@@ -94,7 +119,7 @@ mod nix {
         setsockopt,
         socket,
     };
-
+    pub use nix::sys::time::TimeVal;
     pub use nix::unistd::{
         read,
         write
