@@ -1,9 +1,8 @@
+use {sleep_ms};
 use mio::*;
 use mio::tcp::*;
 use super::localhost;
-use std::old_io::timer::sleep;
 use std::thread;
-use std::time::Duration;
 
 struct TestHandler {
     sender: EventLoopSender<String>,
@@ -59,7 +58,7 @@ pub fn test_notify() {
     let sender = event_loop.channel();
 
     thread::spawn(move || {
-        sleep(Duration::seconds(1));
+        sleep_ms(1_000);
         sender.send("First".to_string()).unwrap();
     });
 

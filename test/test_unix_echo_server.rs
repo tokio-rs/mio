@@ -4,7 +4,7 @@ use mio::buf::{ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
 use std::path::PathBuf;
 use std::io;
-use std::old_io::TempDir;
+use tempdir::TempDir;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -262,8 +262,7 @@ pub fn test_unix_echo_server() {
     let mut event_loop = EventLoop::new().unwrap();
 
     let tmp_dir = TempDir::new("test_unix_echo_server").unwrap();
-    let tmp_sock_path = tmp_dir.path().join(Path::new("sock"));
-    let addr = PathBuf::new(tmp_sock_path.as_str().unwrap());
+    let addr = tmp_dir.path().join(&PathBuf::new("sock"));
 
     let srv = unix::bind(&addr).unwrap();
 

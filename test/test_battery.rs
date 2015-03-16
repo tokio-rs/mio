@@ -1,11 +1,10 @@
+use {sleep_ms};
 use mio::*;
 use mio::tcp::*;
 use mio::util::Slab;
 use super::localhost;
 use std::collections::LinkedList;
 use std::{io, thread};
-use std::old_io::timer::Timer;
-use std::time::duration::Duration;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -244,8 +243,7 @@ pub fn test_echo_server() {
     let go = move || {
         let mut i = 1_000_000;
 
-        let mut timer = Timer::new().unwrap();
-        timer.sleep(Duration::seconds(1));
+        sleep_ms(1_000);
 
         let message = String::from_str("THIS IS A TEST MESSAGE");
         while i > 0 {

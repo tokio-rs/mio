@@ -1,10 +1,12 @@
-#![feature(core, collections, net, io, old_path, old_io, path, std_misc)]
+#![feature(core, collections, net, std_misc)]
 
 extern crate mio;
+extern crate time;
 
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate tempdir;
 
 pub use ports::localhost;
 
@@ -43,5 +45,24 @@ mod ports {
     pub fn localhost() -> SocketAddr {
         let s = format!("127.0.0.1:{}", next_port());
         FromStr::from_str(s.as_slice()).unwrap()
+    }
+}
+
+pub fn sleep_ms(ms: usize) {
+    use std::thread;
+    use std::time::Duration;
+    use time::precise_time_ns;
+
+    let start = precise_time_ns();
+    let target = start + (ms as u64) * 1_000_000;
+
+    loop {
+        let now = precise_time_ns();
+
+        if now > target {
+            return;
+        }
+
+        thread::park_timeout(Duration::nanoseconds((target - now) as i64));
     }
 }

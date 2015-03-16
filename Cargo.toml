@@ -29,6 +29,7 @@ git = "https://github.com/carllerche/bytes"
 
 [dev-dependencies]
 env_logger = "0.2.2"
+tempdir    = "0.3.0"
 
 [[test]]
 
