@@ -91,7 +91,7 @@ impl<T: Send> State<T> {
         }
     }
 
-    fn push(&self, value: T) -> bool {
+    fn push(&self, value: T) -> Result<(), T> {
         let mask = self.mask;
         let mut pos = self.enqueue_pos.load(Relaxed);
         loop {
@@ -111,12 +111,12 @@ impl<T: Send> State<T> {
                     pos = enqueue_pos;
                 }
             } else if diff < 0 {
-                return false
+                return Err(value);
             } else {
                 pos = self.enqueue_pos.load(Relaxed);
             }
         }
-        true
+        Ok(())
     }
 
     fn pop(&self) -> Option<T> {
@@ -153,7 +153,7 @@ impl<T: Send> Queue<T> {
         }
     }
 
-    pub fn push(&self, value: T) -> bool {
+    pub fn push(&self, value: T) -> Result<(), T> {
         self.state.push(value)
     }
 
@@ -188,7 +188,7 @@ mod tests {
             thread::spawn(move || {
                 let q = q;
                 for i in range(0, nmsgs) {
-                    assert!(q.push(i));
+                    assert!(q.push(i).is_ok());
                 }
                 tx.send(()).unwrap();
             });

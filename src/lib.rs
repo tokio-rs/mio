@@ -135,6 +135,9 @@ pub use nonblock::{
     IntoNonBlock,
     NonBlock,
 };
+pub use notify::{
+    NotifyError,
+};
 pub use os::token::{
     Token,
 };

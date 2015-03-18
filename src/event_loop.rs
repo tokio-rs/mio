@@ -1,4 +1,4 @@
-use {Handler, Evented, Poll, Token};
+use {Handler, Evented, Poll, NotifyError, Token};
 use os::event::{IoEvent, Interest, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
@@ -358,7 +358,7 @@ impl<M: Send> EventLoopSender<M> {
         EventLoopSender { notify: notify }
     }
 
-    pub fn send(&self, msg: M) -> Result<(), M> {
+    pub fn send(&self, msg: M) -> Result<(), NotifyError<M>> {
         self.notify.notify(msg)
     }
 }

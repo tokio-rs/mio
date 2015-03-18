@@ -31,7 +31,7 @@ impl<M: Send> Notify<M> {
     }
 
     #[inline]
-    pub fn notify(&self, value: M) -> Result<(), M> {
+    pub fn notify(&self, value: M) -> Result<(), NotifyError<M>> {
         self.inner.notify(value)
     }
 
@@ -121,11 +121,10 @@ impl<M: Send> NotifyInner<M> {
         self.queue.pop()
     }
 
-    fn notify(&self, value: M) -> Result<(), M> {
+    fn notify(&self, value: M) -> Result<(), NotifyError<M>> {
         // First, push the message onto the queue
-        if !self.queue.push(value) {
-            // TODO: Don't fail
-            panic!("queue full");
+        if let Err(value) = self.queue.push(value) {
+            return Err(NotifyError::Full(value));
         }
 
         let mut cur = self.state.load(Relaxed);
@@ -144,9 +143,8 @@ impl<M: Send> NotifyInner<M> {
         }
 
         if cur == SLEEP {
-            if self.awaken.wakeup().is_err() {
-                // TODO: Don't fail
-                panic!("failed to awaken event loop");
+            if let Err(e) = self.awaken.wakeup() {
+                return Err(NotifyError::Io(e));
             }
         }
 
@@ -165,4 +163,22 @@ impl<M: Send> AsRawFd for Notify<M> {
 }
 
 impl<M: Send> Evented for Notify<M> {
+}
+
+pub enum NotifyError<T> {
+    Io(io::Error),
+    Full(T),
+}
+
+impl<M> fmt::Debug for NotifyError<M> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            NotifyError::Io(ref e) => {
+                write!(fmt, "NotifyError::Io({:?})", e)
+            }
+            NotifyError::Full(..) => {
+                write!(fmt, "NotifyError::Full(..)")
+            }
+        }
+    }
 }
