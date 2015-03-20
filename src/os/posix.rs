@@ -1,7 +1,7 @@
 use {TryRead, TryWrite};
 use io::{self, PipeReader, PipeWriter};
 use std::mem;
-use std::os::unix::{Fd, AsRawFd};
+use std::os::unix::io::{Fd, AsRawFd};
 
 /*
  *

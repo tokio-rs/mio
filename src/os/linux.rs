@@ -1,6 +1,6 @@
 use {io, Io, TryRead, TryWrite};
 use std::mem;
-use std::os::unix::{Fd, AsRawFd};
+use std::os::unix::io::{Fd, AsRawFd};
 
 const MARK: &'static [u8] = b"0x000x000x000x000x000x000x000x01";
 

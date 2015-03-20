@@ -1,4 +1,4 @@
-#![feature(core, collections, net, std_misc)]
+#![feature(core, collections, std_misc, udp)]
 
 extern crate mio;
 extern crate time;

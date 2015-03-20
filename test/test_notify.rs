@@ -108,20 +108,15 @@ pub fn test_notify_capacity() {
 
     assert!(notify.send(1).is_ok());
 
-    let mut err = false;
-
-    for _ in 0..10_000 {
+    loop {
         if notify.send(2).is_err() {
-            err = true;
             break;
         }
     }
 
-    assert!(err);
-
     tx.send(1).unwrap();
 
-    for _ in 0..10_000 {
+    loop {
         if notify.send(3).is_ok() {
             break;
         }

@@ -3,7 +3,7 @@ use nix::sys::event::EventFilter::*;
 use io;
 use os::event::{IoEvent, Interest, PollOpt};
 use std::slice;
-use std::os::unix::Fd;
+use std::os::unix::io::Fd;
 
 pub struct Selector {
     kq: Fd,

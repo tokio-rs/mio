@@ -5,7 +5,7 @@ use net::{self, nix, Socket};
 use std::iter::IntoIterator;
 use std::num::Int;
 use std::path::AsPath;
-use std::os::unix::{Fd, AsRawFd};
+use std::os::unix::io::{Fd, AsRawFd};
 
 pub fn stream() -> io::Result<NonBlock<UnixSocket>> {
     UnixSocket::stream(true)

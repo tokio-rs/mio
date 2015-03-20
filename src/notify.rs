@@ -4,7 +4,7 @@ use std::{fmt, cmp, io};
 use std::sync::Arc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
-use std::os::unix::{Fd, AsRawFd};
+use std::os::unix::io::{Fd, AsRawFd};
 
 const SLEEP: isize = -1;
 

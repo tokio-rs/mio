@@ -1,7 +1,7 @@
 use io::{self, Evented, FromFd, TryRead, TryWrite, Result};
 use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
-use std::os::unix::{Fd, AsRawFd};
+use std::os::unix::io::{Fd, AsRawFd};
 
 #[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct NonBlock<T> {

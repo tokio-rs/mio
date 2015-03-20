@@ -1,5 +1,5 @@
 use buf::{Buf, MutBuf};
-use std::os::unix::{Fd, AsRawFd};
+use std::os::unix::io::{Fd, AsRawFd};
 
 // Re-export the io::Result / Error types for convenience
 pub use std::io::{Read, Write, Result, Error};

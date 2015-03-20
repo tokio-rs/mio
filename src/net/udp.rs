@@ -3,8 +3,8 @@ use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd, Result};
 use net::{self, nix, Socket};
 use std::mem;
-use std::net::{SocketAddr, IpAddr};
-use std::os::unix::Fd;
+use std::net::SocketAddr;
+use std::os::unix::io::Fd;
 
 pub use std::net::UdpSocket;
 
@@ -22,9 +22,9 @@ pub fn v6() -> Result<NonBlock<UdpSocket>> {
 
 /// Returns a new, non-blocking, UDP socket bound to the given address
 pub fn bind(addr: &SocketAddr) -> io::Result<NonBlock<UdpSocket>> {
-    let sock = match addr.ip() {
-        IpAddr::V4(..) => try!(v4()),
-        IpAddr::V6(..) => try!(v6()),
+    let sock = match *addr {
+        SocketAddr::V4(..) => try!(v4()),
+        SocketAddr::V6(..) => try!(v6()),
     };
 
     try!(sock.bind(addr));

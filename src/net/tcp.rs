@@ -2,8 +2,8 @@ use {NonBlock};
 use io::{self, Evented, FromFd, Io};
 use net::{self, nix, Socket};
 use std::mem;
-use std::net::{SocketAddr, IpAddr};
-use std::os::unix::{Fd, AsRawFd};
+use std::net::SocketAddr;
+use std::os::unix::io::{Fd, AsRawFd};
 
 pub use std::net::{TcpStream, TcpListener};
 
@@ -19,9 +19,9 @@ pub fn v6() -> io::Result<NonBlock<TcpSocket>> {
 
 pub fn listen(addr: &SocketAddr) -> io::Result<NonBlock<TcpListener>> {
     // Create the socket
-    let sock = try!(match addr.ip() {
-        IpAddr::V4(..) => v4(),
-        IpAddr::V6(..) => v6(),
+    let sock = try!(match *addr {
+        SocketAddr::V4(..) => v4(),
+        SocketAddr::V6(..) => v6(),
     });
 
     // Bind the socket
@@ -32,9 +32,9 @@ pub fn listen(addr: &SocketAddr) -> io::Result<NonBlock<TcpListener>> {
 }
 
 pub fn connect(addr: &SocketAddr) -> io::Result<(NonBlock<TcpStream>, bool)> {
-    let sock = try!(match addr.ip() {
-        IpAddr::V4(..) => v4(),
-        IpAddr::V6(..) => v6(),
+    let sock = try!(match *addr {
+        SocketAddr::V4(..) => v4(),
+        SocketAddr::V6(..) => v6(),
     });
 
     sock.connect(addr)

@@ -3,7 +3,7 @@
 use {NonBlock};
 use io::{self, Io};
 use std::net::SocketAddr;
-use std::os::unix::{Fd, AsRawFd};
+use std::os::unix::io::{Fd, AsRawFd};
 
 pub mod tcp;
 pub mod udp;

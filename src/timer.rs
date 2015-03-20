@@ -1,7 +1,6 @@
 use std::{usize, iter};
 use std::cmp::max;
 use std::time::duration::Duration;
-use std::num::UnsignedInt;
 use time::precise_time_ns;
 use os::token::Token;
 use util::Slab;
@@ -47,8 +46,8 @@ pub struct Timeout {
 
 impl<T> Timer<T> {
     pub fn new(tick_ms: u64, mut slots: usize, mut capacity: usize) -> Timer<T> {
-        slots = UnsignedInt::next_power_of_two(slots);
-        capacity = UnsignedInt::next_power_of_two(capacity);
+        slots = slots.next_power_of_two();
+        capacity = capacity.next_power_of_two();
 
         Timer {
             tick_ms: tick_ms,

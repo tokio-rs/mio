@@ -25,8 +25,8 @@ impl Default for EventLoopConfig {
     fn default() -> EventLoopConfig {
         EventLoopConfig {
             io_poll_timeout_ms: 1_000,
-            notify_capacity: 1_024,
-            messages_per_tick: 64,
+            notify_capacity: 4_096,
+            messages_per_tick: 256,
             timer_tick_ms: 100,
             timer_wheel_size: 1_024,
             timer_capacity: 65_536,

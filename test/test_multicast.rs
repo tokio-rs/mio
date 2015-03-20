@@ -2,7 +2,7 @@ use mio::*;
 use mio::udp::*;
 use mio::buf::{RingBuf, SliceBuf};
 use std::str;
-use std::net::{SocketAddr, IpAddr};
+use std::net::{SocketAddr, Ipv4Addr};
 use super::localhost;
 
 const LISTENER: Token = Token(0);
@@ -37,12 +37,10 @@ impl Handler for UdpHandler {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
                 match self.rx.recv_from(&mut self.rx_buf) {
-                    Ok(res) => {
-                        assert_eq!(res.unwrap().ip(), IpAddr::new_v4(127, 0, 0, 1));
+                    Ok(Some(SocketAddr::V4(addr))) => {
+                        assert_eq!(*addr.ip(), Ipv4Addr::new(127, 0, 0, 1));
                     }
-                    ret => {
-                        ret.unwrap();
-                    }
+                    _ => panic!("unexpected result"),
                 }
                 assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
                 event_loop.shutdown();
@@ -54,7 +52,7 @@ impl Handler for UdpHandler {
     fn writable(&mut self, _: &mut EventLoop<UdpHandler>, token: Token) {
         match token {
             SENDER => {
-                self.tx.send_to(&mut self.buf, &self.rx.socket_addr().unwrap()).unwrap();
+                self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();
             },
             _ => ()
         }
@@ -67,16 +65,16 @@ pub fn test_multicast() {
     let mut event_loop = EventLoop::new().unwrap();
 
     let addr = localhost();
-    let any = SocketAddr::new(IpAddr::new_v4(0, 0, 0, 0), 0);
+    let any = "0.0.0.0:0".parse().unwrap();
 
     let tx = udp::bind(&any).unwrap();
     let rx = udp::bind(&addr).unwrap();
 
     info!("Joining group 227.1.1.100");
-    rx.join_multicast(&IpAddr::new_v4(227, 1, 1, 100)).unwrap();
+    rx.join_multicast(&"227.1.1.100:0".parse().unwrap()).unwrap();
 
     info!("Joining group 227.1.1.101");
-    rx.join_multicast(&IpAddr::new_v4(227, 1, 1, 101)).unwrap();
+    rx.join_multicast(&"227.1.1.101:0".parse().unwrap()).unwrap();
 
     info!("Registering SENDER");
     event_loop.register_opt(&tx, SENDER, Interest::writable(), PollOpt::edge()).unwrap();

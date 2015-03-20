@@ -398,7 +398,7 @@ mod tests {
     fn test_repeated_insertion() {
         let mut slab = Slab::new(10);
 
-        for i in range(0, 10) {
+        for i in (0..10) {
             let token = slab.insert(i + 10).ok().expect("Failed to insert");
             assert_eq!(slab[token], i + 10);
         }
@@ -411,7 +411,7 @@ mod tests {
         let mut slab = Slab::new(10);
         let mut tokens = vec![];
 
-        for i in range(0, 10) {
+        for i in (0..10) {
             let token = slab.insert(i + 10).ok().expect("Failed to insert");
             tokens.push(token);
             assert_eq!(slab[token], i + 10);
@@ -517,7 +517,7 @@ mod tests {
     #[test]
     fn test_iter() {
         let mut slab: Slab<u32> = Slab::new_starting_at(Token(0), 4);
-        for i in range(0, 4) {
+        for i in (0..4) {
             slab.insert(i).unwrap();
         }
         assert_eq!(slab.iter().map(|r| *r).collect(), vec![0, 1, 2, 3]);
@@ -528,7 +528,7 @@ mod tests {
     #[test]
     fn test_iter_mut() {
         let mut slab: Slab<u32> = Slab::new_starting_at(Token(0), 4);
-        for i in range(0, 4) {
+        for i in (0..4) {
             slab.insert(i).unwrap();
         }
         for e in slab.iter_mut() {

@@ -3,7 +3,6 @@ use mio::udp::*;
 use mio::buf::{RingBuf, SliceBuf, MutSliceBuf};
 use super::localhost;
 use std::str;
-use std::net::{SocketAddr, IpAddr};
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
@@ -47,7 +46,7 @@ impl Handler for UdpHandler {
     fn writable(&mut self, _: &mut EventLoop<UdpHandler>, token: Token) {
         match token {
             SENDER => {
-                self.tx.send_to(&mut self.buf, &self.rx.socket_addr().unwrap()).unwrap();
+                self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();
             },
             _ => {}
         }
@@ -60,7 +59,7 @@ pub fn test_udp_socket() {
     let mut event_loop = EventLoop::new().unwrap();
 
     let addr = localhost();
-    let any = SocketAddr::new(IpAddr::new_v4(0, 0, 0, 0), 0);
+    let any = str::FromStr::from_str("0.0.0.0:0").unwrap();
 
     let tx = udp::bind(&any).unwrap();
     let rx = udp::bind(&addr).unwrap();

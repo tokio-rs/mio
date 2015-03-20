@@ -32,7 +32,6 @@
 // This queue is copy pasted from old rust stdlib.
 
 use std::sync::Arc;
-use std::num::UnsignedInt;
 use std::cell::UnsafeCell;
 
 use std::sync::atomic::AtomicUsize;
@@ -76,7 +75,7 @@ impl<T: Send> State<T> {
         } else {
             capacity
         };
-        let buffer = range(0, capacity).map(|i| {
+        let buffer = (0..capacity).map(|i| {
             UnsafeCell::new(Node { sequence:AtomicUsize::new(i), value: None })
         }).collect::<Vec<_>>();
         State{
@@ -182,12 +181,12 @@ mod tests {
         assert_eq!(None, q.pop());
         let (tx, rx) = channel();
 
-        for _ in range(0, nthreads) {
+        for _ in (0..nthreads) {
             let q = q.clone();
             let tx = tx.clone();
             thread::spawn(move || {
                 let q = q;
-                for i in range(0, nmsgs) {
+                for i in (0..nmsgs) {
                     assert!(q.push(i).is_ok());
                 }
                 tx.send(()).unwrap();
@@ -195,7 +194,7 @@ mod tests {
         }
 
         let mut completion_rxs = vec![];
-        for _ in range(0, nthreads) {
+        for _ in (0..nthreads) {
             let (tx, rx) = channel();
             completion_rxs.push(rx);
             let q = q.clone();
@@ -218,7 +217,7 @@ mod tests {
         for rx in completion_rxs.iter_mut() {
             assert_eq!(nmsgs, rx.recv().unwrap());
         }
-        for _ in range(0, nthreads) {
+        for _ in (0..nthreads) {
             rx.recv().unwrap();
         }
     }
