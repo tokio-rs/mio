@@ -185,9 +185,9 @@ pub fn from_nix_error(err: ::nix::NixError) -> Error {
 }
 
 pub fn to_non_block<T>(err: Error) -> Result<Option<T>> {
-    use std::io::ErrorKind::ResourceUnavailable;
+    use std::io::ErrorKind::WouldBlock;
 
-    if let ResourceUnavailable = err.kind() {
+    if let WouldBlock = err.kind() {
         return Ok(None);
     }
 
