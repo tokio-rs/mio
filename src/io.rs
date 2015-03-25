@@ -175,11 +175,11 @@ impl TryWrite for PipeWriter {
  *
  */
 
-pub fn from_nix_error(err: ::nix::NixError) -> Error {
-    use nix::{errno, NixError};
+pub fn from_nix_error(err: ::nix::Error) -> Error {
+    use nix::{self, errno};
 
     match err {
-        NixError::Sys(errno) => Error::from_os_error(errno as i32),
+        nix::Error::Sys(errno) => Error::from_os_error(errno as i32),
         _ => Error::from_os_error(errno::EINVAL as i32)
     }
 }

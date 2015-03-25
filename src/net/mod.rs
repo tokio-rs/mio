@@ -90,7 +90,7 @@ impl<S: Socket> Socket for NonBlock<S> {
 mod nix {
     pub use nix::{
         c_int,
-        NixError,
+        Error,
     };
     pub use nix::errno::{EINPROGRESS, EAGAIN};
     pub use nix::fcntl::{fcntl, FcntlArg, O_NONBLOCK};
@@ -142,7 +142,7 @@ fn connect(io: &Io, addr: &nix::SockAddr) -> io::Result<bool> {
         Ok(_) => Ok(true),
         Err(e) => {
             match e {
-                nix::NixError::Sys(nix::EINPROGRESS) => Ok(false),
+                nix::Error::Sys(nix::EINPROGRESS) => Ok(false),
                 _ => Err(io::from_nix_error(e))
             }
         }
