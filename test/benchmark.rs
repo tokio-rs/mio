@@ -7,7 +7,6 @@ use mio::os::{from_sockaddr};
 use time;
 use std::vec::*;
 use std::io::timer;
-use std::time::Duration;
 
 mod nix {
     pub use nix::c_int;

@@ -3,7 +3,6 @@ use os::event::{IoEvent, Interest, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
 use std::default::Default;
-use std::time::duration::Duration;
 use std::{io, fmt, usize};
 
 /// Configure EventLoop runtime details
@@ -144,10 +143,7 @@ impl<H: Handler> EventLoop<H> {
     ///
     /// # Example
     /// ```
-    /// #![feature(std_misc)]
-    ///
     /// use mio::{EventLoop, Handler};
-    /// use std::time::Duration;
     ///
     /// struct MyHandler;
     ///
@@ -163,11 +159,11 @@ impl<H: Handler> EventLoop<H> {
     ///
     ///
     /// let mut event_loop = EventLoop::new().unwrap();
-    /// let timeout = event_loop.timeout(123, Duration::milliseconds(300)).unwrap();
+    /// let timeout = event_loop.timeout_ms(123, 300).unwrap();
     /// let _ = event_loop.run(&mut MyHandler);
     /// ```
-    pub fn timeout(&mut self, token: H::Timeout, delay: Duration) -> TimerResult<Timeout> {
-        self.timer.timeout(token, delay)
+    pub fn timeout_ms(&mut self, token: H::Timeout, delay: u64) -> TimerResult<Timeout> {
+        self.timer.timeout_ms(token, delay)
     }
 
     /// If the supplied timeout has not been triggered, cancel it such that it

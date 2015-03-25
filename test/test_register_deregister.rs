@@ -1,7 +1,6 @@
 use mio::*;
 use mio::tcp::*;
 use super::localhost;
-use std::time::Duration;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -47,7 +46,7 @@ impl Handler for TestHandler {
 
         self.state = 2;
         event_loop.deregister(&self.client).unwrap();
-        event_loop.timeout(1, Duration::milliseconds(200)).unwrap();
+        event_loop.timeout_ms(1, 200).unwrap();
     }
 
     fn timeout(&mut self, event_loop: &mut EventLoop<TestHandler>, _: usize) {

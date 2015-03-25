@@ -1,7 +1,6 @@
 use mio::*;
 use mio::tcp::*;
 use super::localhost;
-use std::time::Duration;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 
@@ -40,7 +39,7 @@ impl Handler for TestHandler {
             SERVER => {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().unwrap();
-                event_loop.timeout(conn, Duration::milliseconds(200)).unwrap();
+                event_loop.timeout_ms(conn, 200).unwrap();
 
                 event_loop.reregister(&self.srv, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
             }
