@@ -4,7 +4,7 @@ use io::{self, Evented, FromFd, Io};
 use net::{self, nix, Socket};
 use std::iter::IntoIterator;
 use std::num::Int;
-use std::path::AsPath;
+use std::path::Path;
 use std::os::unix::io::{Fd, AsRawFd};
 
 pub fn stream() -> io::Result<NonBlock<UnixSocket>> {
@@ -12,14 +12,14 @@ pub fn stream() -> io::Result<NonBlock<UnixSocket>> {
         .map(|sock| NonBlock::new(sock))
 }
 
-pub fn bind<P: AsPath + ?Sized>(addr: &P) -> io::Result<NonBlock<UnixListener>> {
+pub fn bind<P: AsRef<Path> + ?Sized>(addr: &P) -> io::Result<NonBlock<UnixListener>> {
     stream().and_then(|sock| {
         try!(sock.bind(addr));
         sock.listen(256)
     })
 }
 
-pub fn connect<P: AsPath + ?Sized>(addr: &P) -> io::Result<(NonBlock<UnixStream>, bool)> {
+pub fn connect<P: AsRef<Path> + ?Sized>(addr: &P) -> io::Result<(NonBlock<UnixStream>, bool)> {
     stream().and_then(|sock| sock.connect(addr))
 }
 
@@ -38,7 +38,7 @@ impl UnixSocket {
         Ok(FromFd::from_fd(fd))
     }
 
-    pub fn connect<P: AsPath + ?Sized>(self, addr: &P) -> io::Result<(UnixStream, bool)> {
+    pub fn connect<P: AsRef<Path> + ?Sized>(self, addr: &P) -> io::Result<(UnixStream, bool)> {
         let io = self.io;
         // Attempt establishing the context. This may not complete immediately.
         net::connect(&io, &try!(to_nix_addr(addr)))
@@ -52,7 +52,7 @@ impl UnixSocket {
             .map(|_| UnixListener { io: io })
     }
 
-    pub fn bind<P: AsPath + ?Sized>(&self, addr: &P) -> io::Result<()> {
+    pub fn bind<P: AsRef<Path> + ?Sized>(&self, addr: &P) -> io::Result<()> {
         net::bind(&self.io, &try!(to_nix_addr(addr)))
     }
 }
@@ -83,7 +83,7 @@ impl IntoNonBlock for UnixSocket {
 }
 
 impl NonBlock<UnixSocket> {
-    pub fn connect<P: AsPath + ?Sized>(self, addr: &P) -> io::Result<(NonBlock<UnixStream>, bool)> {
+    pub fn connect<P: AsRef<Path> + ?Sized>(self, addr: &P) -> io::Result<(NonBlock<UnixStream>, bool)> {
         self.unwrap().connect(addr)
             .map(|(stream, complete)| (NonBlock::new(stream), complete))
     }
@@ -106,7 +106,7 @@ pub struct UnixListener {
 }
 
 impl UnixListener {
-    pub fn listen<P: AsPath + ?Sized>(path: &P) -> io::Result<UnixListener> {
+    pub fn listen<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<UnixListener> {
         UnixSocket::stream(false)
             .and_then(|sock| {
                 try!(sock.bind(path));
@@ -198,7 +198,7 @@ pub struct UnixStream {
 }
 
 impl UnixStream {
-    pub fn connect<P: AsPath + ?Sized>(path: &P) -> io::Result<UnixStream> {
+    pub fn connect<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<UnixStream> {
         UnixSocket::stream(false)
             .and_then(|sock| sock.connect(path))
             .map(|(sock, _)| sock)
@@ -254,7 +254,7 @@ impl IntoNonBlock for UnixStream {
     }
 }
 
-fn to_nix_addr<P: AsPath + ?Sized>(path: &P) -> io::Result<nix::SockAddr> {
-    nix::SockAddr::new_unix(path.as_path())
+fn to_nix_addr<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<nix::SockAddr> {
+    nix::SockAddr::new_unix(path.as_ref())
         .map_err(io::from_nix_error)
 }

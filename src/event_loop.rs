@@ -87,9 +87,7 @@ impl<H: Handler> EventLoop<H> {
     ///
     /// # Example
     /// ```
-    /// #![allow(unstable)]
-    ///
-    /// use std::thread::Thread;
+    /// use std::thread;
     /// use mio::{EventLoop, Handler};
     ///
     /// struct MyHandler;
@@ -108,7 +106,7 @@ impl<H: Handler> EventLoop<H> {
     /// let sender = event_loop.channel();
     ///
     /// // Send the notification from another thread
-    /// Thread::spawn(move || {
+    /// thread::spawn(move || {
     ///     let _ = sender.send(123);
     /// });
     ///
@@ -146,7 +144,7 @@ impl<H: Handler> EventLoop<H> {
     ///
     /// # Example
     /// ```
-    /// #![allow(unstable)]
+    /// #![feature(std_misc)]
     ///
     /// use mio::{EventLoop, Handler};
     /// use std::time::Duration;

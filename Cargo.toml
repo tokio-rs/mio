@@ -19,13 +19,9 @@ exclude       = [
 
 [dependencies]
 log   = "0.3.0"
+nix   = "0.3.1"
 time  = "0.1.21"
-
-[dependencies.nix]
-git = "https://github.com/carllerche/nix-rust"
-
-[dependencies.bytes]
-git = "https://github.com/carllerche/bytes"
+bytes = "0.2.1"
 
 [dev-dependencies]
 env_logger = "0.3.0"

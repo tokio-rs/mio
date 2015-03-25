@@ -1,4 +1,4 @@
-#![feature(core, collections, std_misc, udp)]
+#![feature(convert, collections, std_misc, udp)]
 
 extern crate mio;
 extern crate time;
@@ -44,7 +44,7 @@ mod ports {
 
     pub fn localhost() -> SocketAddr {
         let s = format!("127.0.0.1:{}", next_port());
-        FromStr::from_str(s.as_slice()).unwrap()
+        FromStr::from_str(&s).unwrap()
     }
 }
 

@@ -243,8 +243,8 @@ impl<T> Slab<T> {
 impl<T> Index<Token> for Slab<T> {
     type Output = T;
 
-    fn index<'a>(&'a self, idx: &Token) -> &'a T {
-        let idx = self.token_to_idx(*idx);
+    fn index<'a>(&'a self, idx: Token) -> &'a T {
+        let idx = self.token_to_idx(idx);
         let idx = self.validate_idx(idx);
 
         let e = self.entry(idx);
@@ -258,8 +258,8 @@ impl<T> Index<Token> for Slab<T> {
 }
 
 impl<T> IndexMut<Token> for Slab<T> {
-    fn index_mut<'a>(&'a mut self, idx: &Token) -> &'a mut T {
-        let idx = self.token_to_idx(*idx);
+    fn index_mut<'a>(&'a mut self, idx: Token) -> &'a mut T {
+        let idx = self.token_to_idx(idx);
         let idx = self.validate_idx(idx);
 
         let e = self.mut_entry(idx);
@@ -447,7 +447,7 @@ mod tests {
 
         slab[t1].push_str("bar");
 
-        assert_eq!(slab[t1].as_slice(), "foobar");
+        assert_eq!(&slab[t1][..], "foobar");
     }
 
     #[test]

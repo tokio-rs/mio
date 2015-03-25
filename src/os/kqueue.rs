@@ -160,7 +160,7 @@ impl Events {
 
     fn as_slice(&self) -> &[KEvent] {
         unsafe {
-            let ptr = self.events.as_slice().as_ptr();
+            let ptr = (&self.events[..]).as_ptr();
             slice::from_raw_parts(ptr, self.events.len())
         }
     }

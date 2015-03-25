@@ -21,15 +21,13 @@
 //! ```
 //! use mio::*;
 //! use mio::tcp::TcpListener;
-//! use std::net::SocketAddr;
-//! use std::str::FromStr;
 //!
 //! // Setup some tokens to allow us to identify which event is
 //! // for which socket.
 //! const SERVER: Token = Token(0);
 //! const CLIENT: Token = Token(1);
 //!
-//! let addr = FromStr::from_str("127.0.0.1:13265").unwrap();
+//! let addr = "127.0.0.1:13265".parse().unwrap();
 //!
 //! // Setup the server socket
 //! let server = tcp::listen(&addr).unwrap();
@@ -81,7 +79,7 @@
 // mio is still in rapid development
 #![unstable]
 
-#![feature(alloc, core, io, io_ext, libc, std_misc, unsafe_destructor)]
+#![feature(alloc, convert, core, io, io_ext, libc, std_misc, unsafe_destructor)]
 
 extern crate alloc;
 extern crate bytes;

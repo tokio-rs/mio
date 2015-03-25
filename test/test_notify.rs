@@ -25,11 +25,11 @@ impl Handler for TestHandler {
     fn notify(&mut self, event_loop: &mut EventLoop<TestHandler>, msg: String) {
         match self.notify {
             0 => {
-                assert!(msg.as_slice() == "First", "actual={}", msg);
+                assert!(msg == "First", "actual={}", msg);
                 self.sender.send("Second".to_string()).unwrap();
             }
             1 => {
-                assert!(msg.as_slice() == "Second", "actual={}", msg);
+                assert!(msg == "Second", "actual={}", msg);
                 event_loop.shutdown();
             }
             v => panic!("unexpected value for notify; val={}", v)

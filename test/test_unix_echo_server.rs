@@ -262,7 +262,7 @@ pub fn test_unix_echo_server() {
     let mut event_loop = EventLoop::new().unwrap();
 
     let tmp_dir = TempDir::new("test_unix_echo_server").unwrap();
-    let addr = tmp_dir.path().join(&PathBuf::new("sock"));
+    let addr = tmp_dir.path().join(&PathBuf::from("sock"));
 
     let srv = unix::bind(&addr).unwrap();
 
