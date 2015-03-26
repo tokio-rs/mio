@@ -129,8 +129,8 @@ impl<H: Handler> EventLoop<H> {
     ///
     /// The strategy of setting an atomic flag if the event loop is not already
     /// sleeping allows avoiding an expensive wakeup operation if at all possible.
-    pub fn channel(&self) -> EventLoopSender<H::Message> {
-        EventLoopSender::new(self.notify.clone())
+    pub fn channel(&self) -> Sender<H::Message> {
+        Sender::new(self.notify.clone())
     }
 
     /// Schedules a timeout after the requested time interval. When the
@@ -329,27 +329,27 @@ impl<H: Handler> EventLoop<H> {
 unsafe impl<H: Handler> Sync for EventLoop<H> { }
 
 /// Sends messages to the EventLoop from other threads.
-pub struct EventLoopSender<M: Send> {
+pub struct Sender<M: Send> {
     notify: Notify<M>
 }
 
-impl<M: Send> Clone for EventLoopSender<M> {
-    fn clone(&self) -> EventLoopSender<M> {
-        EventLoopSender { notify: self.notify.clone() }
+impl<M: Send> Clone for Sender<M> {
+    fn clone(&self) -> Sender<M> {
+        Sender { notify: self.notify.clone() }
     }
 }
 
-impl<M: Send> fmt::Debug for EventLoopSender<M> {
+impl<M: Send> fmt::Debug for Sender<M> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "EventLoopSender<?> {{ ... }}")
+        write!(fmt, "Sender<?> {{ ... }}")
     }
 }
 
-unsafe impl<M: Send> Sync for EventLoopSender<M> { }
+unsafe impl<M: Send> Sync for Sender<M> { }
 
-impl<M: Send> EventLoopSender<M> {
-    fn new(notify: Notify<M>) -> EventLoopSender<M> {
-        EventLoopSender { notify: notify }
+impl<M: Send> Sender<M> {
+    fn new(notify: Notify<M>) -> Sender<M> {
+        Sender { notify: notify }
     }
 
     pub fn send(&self, msg: M) -> Result<(), NotifyError<M>> {

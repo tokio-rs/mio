@@ -5,12 +5,12 @@ use super::localhost;
 use std::thread;
 
 struct TestHandler {
-    sender: EventLoopSender<String>,
+    sender: Sender<String>,
     notify: usize
 }
 
 impl TestHandler {
-    fn new(sender: EventLoopSender<String>) -> TestHandler {
+    fn new(sender: Sender<String>) -> TestHandler {
         TestHandler {
             sender: sender,
             notify: 0

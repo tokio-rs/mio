@@ -108,7 +108,7 @@ pub use buf::{
 pub use event_loop::{
     EventLoop,
     EventLoopConfig,
-    EventLoopSender,
+    Sender,
 };
 pub use handler::{
     Handler,
