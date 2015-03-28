@@ -1,5 +1,5 @@
 use {Handler, Evented, Poll, NotifyError, Token};
-use os::event::{IoEvent, Interest, PollOpt};
+use event::{IoEvent, Interest, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
 use std::default::Default;

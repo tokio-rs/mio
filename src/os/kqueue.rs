@@ -1,7 +1,7 @@
 use nix::sys::event::*;
 use nix::sys::event::EventFilter::*;
 use io;
-use os::event::{IoEvent, Interest, PollOpt};
+use event::{IoEvent, Interest, PollOpt};
 use std::slice;
 use std::os::unix::io::Fd;
 

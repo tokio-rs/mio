@@ -1,5 +1,6 @@
 use {Evented, Token};
-use os::{self, event};
+use event::{Interest, IoEvent, PollOpt};
+use os;
 use std::{fmt, io};
 
 pub struct Poll {
@@ -15,7 +16,7 @@ impl Poll {
         })
     }
 
-    pub fn register<E: Evented>(&mut self, io: &E, token: Token, interest: event::Interest, opts: event::PollOpt) -> io::Result<()> {
+    pub fn register<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
         debug!("registering  with poller");
 
         // Register interests for this socket
@@ -24,7 +25,7 @@ impl Poll {
         Ok(())
     }
 
-    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: event::Interest, opts: event::PollOpt) -> io::Result<()> {
+    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
         debug!("registering  with poller");
 
         // Register interests for this socket
@@ -47,7 +48,7 @@ impl Poll {
         Ok(self.events.len())
     }
 
-    pub fn event(&self, idx: usize) -> event::IoEvent {
+    pub fn event(&self, idx: usize) -> IoEvent {
         self.events.get(idx)
     }
 
@@ -68,9 +69,9 @@ pub struct EventsIterator<'a> {
 }
 
 impl<'a> Iterator for EventsIterator<'a> {
-    type Item = event::IoEvent;
+    type Item = IoEvent;
 
-    fn next(&mut self) -> Option<event::IoEvent> {
+    fn next(&mut self) -> Option<IoEvent> {
         if self.index == self.events.len() {
             None
         } else {

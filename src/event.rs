@@ -1,4 +1,4 @@
-use os::token::Token;
+use token::Token;
 use std::{fmt, ops};
 
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]

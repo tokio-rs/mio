@@ -91,6 +91,7 @@ extern crate log;
 
 pub mod util;
 
+mod event;
 mod event_loop;
 mod handler;
 mod io;
@@ -100,10 +101,16 @@ mod notify;
 mod os;
 mod poll;
 mod timer;
+mod token;
 
 pub use buf::{
     Buf,
     MutBuf,
+};
+pub use event::{
+    PollOpt,
+    Interest,
+    ReadHint,
 };
 pub use event_loop::{
     EventLoop,
@@ -136,14 +143,6 @@ pub use nonblock::{
 pub use notify::{
     NotifyError,
 };
-pub use os::token::{
-    Token,
-};
-pub use os::event::{
-    PollOpt,
-    Interest,
-    ReadHint,
-};
 pub use poll::{
     Poll
 };
@@ -151,6 +150,9 @@ pub use timer::{
     Timeout,
     TimerError,
     TimerResult
+};
+pub use token::{
+    Token,
 };
 
 pub mod prelude {

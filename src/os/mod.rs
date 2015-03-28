@@ -21,7 +21,3 @@ mod linux;
 
 #[cfg(not(target_os = "linux"))]
 mod posix;
-
-pub mod event;
-
-pub mod token;

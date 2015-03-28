@@ -1,7 +1,7 @@
 use std::{usize, iter};
 use std::cmp::max;
 use time::precise_time_ns;
-use os::token::Token;
+use token::Token;
 use util::Slab;
 
 use self::TimerErrorKind::TimerOverflow;
