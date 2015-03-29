@@ -167,7 +167,7 @@ impl Events {
 
     fn as_mut_slice(&mut self) -> &mut [KEvent] {
         unsafe {
-            let ptr = self.events.as_mut_slice().as_mut_ptr();
+            let ptr = (&mut self.events[..]).as_mut_ptr();
             slice::from_raw_parts_mut(ptr, self.events.capacity())
         }
     }

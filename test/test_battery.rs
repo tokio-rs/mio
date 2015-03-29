@@ -35,7 +35,7 @@ impl EchoConn {
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         loop {
-            match self.sock.read_slice(self.buf.as_mut_slice()) {
+            match self.sock.read_slice(&mut self.buf[..]) {
                 Ok(None) => {
                     break;
                 }

@@ -49,7 +49,7 @@ impl Handler for TestHandler {
                 match self.state {
                     Initial => {
                         let mut buf = [0; 4096];
-                        debug!("GOT={:?}", self.cli.read_slice(buf.as_mut_slice()));
+                        debug!("GOT={:?}", self.cli.read_slice(&mut buf[..]));
                         assert!(hint.is_data(), "unexpected hint {:?}", hint);
 
                         // Whether or not Hup is included with actual data is platform specific

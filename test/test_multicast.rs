@@ -71,10 +71,10 @@ pub fn test_multicast() {
     let rx = udp::bind(&addr).unwrap();
 
     info!("Joining group 227.1.1.100");
-    rx.join_multicast(&"227.1.1.100:0".parse().unwrap()).unwrap();
+    rx.join_multicast(&"227.1.1.100".parse().unwrap()).unwrap();
 
     info!("Joining group 227.1.1.101");
-    rx.join_multicast(&"227.1.1.101:0".parse().unwrap()).unwrap();
+    rx.join_multicast(&"227.1.1.101".parse().unwrap()).unwrap();
 
     info!("Registering SENDER");
     event_loop.register_opt(&tx, SENDER, Interest::writable(), PollOpt::edge()).unwrap();
