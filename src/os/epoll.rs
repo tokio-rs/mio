@@ -2,7 +2,7 @@ use nix::fcntl::Fd;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 use io;
-use os::event::{IoEvent, Interest, PollOpt};
+use event::{IoEvent, Interest, PollOpt};
 
 pub struct Selector {
     epfd: Fd
@@ -21,7 +21,7 @@ impl Selector {
 
         let dst = unsafe {
             slice::from_raw_parts_mut(
-                evts.events.as_mut_slice().as_mut_ptr(),
+                evts.events.as_mut_ptr(),
                 evts.events.capacity())
         };
 
