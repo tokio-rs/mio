@@ -7,16 +7,16 @@ little overhead as possible over the OS abstractions.
 
 - [API documentation](http://carllerche.github.io/mio/mio/index.html)
 
+- [Crates.io](http://crates.io/crates/mio)
+
 ## Usage
 
 To use `mio`, first add this to your `Cargo.toml`:
 
 ```toml
-[dependencies.mio]
-git = "https://github.com/carllerche/mio"
+[dependencies]
+mio = "0.3.0"
 ```
-
-`mio` is on [Crates.io](http://crates.io/crates/mio), but is not often updated.
 
 Then, add this to your crate root:
 
