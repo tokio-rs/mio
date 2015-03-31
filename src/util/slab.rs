@@ -520,9 +520,14 @@ mod tests {
         for i in (0..4) {
             slab.insert(i).unwrap();
         }
-        assert_eq!(slab.iter().map(|r| *r).collect(), vec![0, 1, 2, 3]);
+
+        let vals: Vec<u32> = slab.iter().map(|r| *r).collect();
+        assert_eq!(vals, vec![0, 1, 2, 3]);
+
         slab.remove(Token(1));
-        assert_eq!(slab.iter().map(|r| *r).collect(), vec![0, 2, 3]);
+
+        let vals: Vec<u32> = slab.iter().map(|r| *r).collect();
+        assert_eq!(vals, vec![0, 2, 3]);
     }
 
     #[test]
@@ -535,11 +540,15 @@ mod tests {
             *e = *e + 1;
         }
 
-        assert_eq!(slab.iter().map(|r| *r).collect(), vec![1, 2, 3, 4]);
+        let vals: Vec<u32> = slab.iter().map(|r| *r).collect();
+        assert_eq!(vals, vec![1, 2, 3, 4]);
+
         slab.remove(Token(2));
         for e in slab.iter_mut() {
             *e = *e + 1;
         }
-        assert_eq!(slab.iter().map(|r| *r).collect(), vec![2, 3, 5]);
+
+        let vals: Vec<u32> = slab.iter().map(|r| *r).collect();
+        assert_eq!(vals, vec![2, 3, 5]);
     }
 }

@@ -25,7 +25,7 @@ bytes = "0.2.2"
 
 [dev-dependencies]
 env_logger = "0.3.0"
-tempdir    = "0.3.2"
+tempdir    = "0.3.3"
 
 [[test]]
 
