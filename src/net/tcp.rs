@@ -151,6 +151,10 @@ impl Socket for TcpListener {
 }
 
 impl NonBlock<TcpListener> {
+    /// Accepts a new `TcpStream`.
+    ///
+    /// Returns a `Ok(None)` when the socket `WOULDBLOCK`, this means the stream will be ready at
+    /// a later point.
     pub fn accept(&self) -> io::Result<Option<NonBlock<TcpStream>>> {
         net::accept(as_io(self), true)
             .map(|fd| Some(FromFd::from_fd(fd)))
