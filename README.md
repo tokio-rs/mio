@@ -49,3 +49,8 @@ or higher level libraries.
 
 Currently, MIO only supports Linux and Darwin. The goal is to support
 all platforms that support Rust and the readiness IO model.
+
+## Community
+
+A group of mio users hang out in the #mio channel on the Mozilla IRC
+server (irc.mozilla.org). This can be a good place to go for questions.
