@@ -2,8 +2,8 @@ use {NonBlock, IntoNonBlock, TryRead, TryWrite};
 use buf::{Buf, MutBuf};
 use io::{self, Evented, FromFd, Io};
 use net::{self, nix, Socket};
+use std::usize;
 use std::iter::IntoIterator;
-use std::num::Int;
 use std::path::Path;
 use std::os::unix::io::{Fd, AsRawFd};
 
@@ -182,7 +182,7 @@ impl<'a> Iterator for Incoming<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (Int::max_value(), None)
+        (usize::MAX, None)
     }
 }
 
