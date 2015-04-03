@@ -1,5 +1,5 @@
 use buf::{Buf, MutBuf};
-use std::os::unix::io::{Fd, AsRawFd};
+use std::os::unix::io::{RawFd, AsRawFd};
 
 // Re-export the io::Result / Error types for convenience
 pub use std::io::{Read, Write, Result, Error};
@@ -10,7 +10,7 @@ pub trait Evented : AsRawFd {
 
 /// Create a value with a FD
 pub trait FromFd {
-    fn from_fd(fd: Fd) -> Self;
+    fn from_fd(fd: RawFd) -> Self;
 }
 
 pub trait TryRead {
@@ -54,17 +54,17 @@ pub trait TryWrite {
 
 #[derive(Debug)]
 pub struct Io {
-    fd: Fd,
+    fd: RawFd,
 }
 
 impl Io {
-    pub fn new(fd: Fd) -> Io {
+    pub fn new(fd: RawFd) -> Io {
         Io { fd: fd }
     }
 }
 
 impl AsRawFd for Io {
-    fn as_raw_fd(&self) -> Fd {
+    fn as_raw_fd(&self) -> RawFd {
         self.fd
     }
 }
@@ -125,13 +125,13 @@ pub struct PipeReader {
 }
 
 impl FromFd for PipeReader {
-    fn from_fd(fd: Fd) -> PipeReader {
+    fn from_fd(fd: RawFd) -> PipeReader {
         PipeReader { io: Io::new(fd) }
     }
 }
 
 impl AsRawFd for PipeReader {
-    fn as_raw_fd(&self) -> Fd {
+    fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
     }
 }
@@ -149,13 +149,13 @@ pub struct PipeWriter {
 }
 
 impl FromFd for PipeWriter {
-    fn from_fd(fd: Fd) -> PipeWriter {
+    fn from_fd(fd: RawFd) -> PipeWriter {
         PipeWriter { io: Io::new(fd) }
     }
 }
 
 impl AsRawFd for PipeWriter {
-    fn as_raw_fd(&self) -> Fd {
+    fn as_raw_fd(&self) -> RawFd {
         self.io.fd
     }
 }

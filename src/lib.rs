@@ -79,7 +79,7 @@
 // mio is still in rapid development
 #![unstable]
 
-#![feature(alloc, convert, io, io_ext, unsafe_destructor)]
+#![feature(alloc, io, unsafe_destructor)]
 
 extern crate alloc;
 extern crate bytes;

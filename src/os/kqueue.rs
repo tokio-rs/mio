@@ -3,10 +3,10 @@ use nix::sys::event::EventFilter::*;
 use io;
 use event::{IoEvent, Interest, PollOpt};
 use std::slice;
-use std::os::unix::io::Fd;
+use std::os::unix::io::RawFd;
 
 pub struct Selector {
-    kq: Fd,
+    kq: RawFd,
     changes: Events
 }
 
@@ -32,7 +32,7 @@ impl Selector {
         Ok(())
     }
 
-    pub fn register(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&mut self, fd: RawFd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
         debug!("registering; token={}; interests={:?}", token, interests);
 
         try!(self.ev_register(fd, token, EVFILT_READ, interests.contains(Interest::readable()), opts));
@@ -41,20 +41,20 @@ impl Selector {
         Ok(())
     }
 
-    pub fn reregister(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&mut self, fd: RawFd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
         // Just need to call register here since EV_ADD is a mod if already
         // registered
         self.register(fd, token, interests, opts)
     }
 
-    pub fn deregister(&mut self, fd: Fd) -> io::Result<()> {
+    pub fn deregister(&mut self, fd: RawFd) -> io::Result<()> {
         try!(self.ev_push(fd, 0, EVFILT_READ, EV_DELETE));
         try!(self.ev_push(fd, 0, EVFILT_WRITE, EV_DELETE));
 
         Ok(())
     }
 
-    fn ev_register(&mut self, fd: Fd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) -> io::Result<()> {
+    fn ev_register(&mut self, fd: RawFd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) -> io::Result<()> {
         let mut flags = EV_ADD;
 
         if enable {
@@ -74,7 +74,7 @@ impl Selector {
         self.ev_push(fd, token, filter, flags)
     }
 
-    fn ev_push(&mut self, fd: Fd, token: usize, filter: EventFilter, flags: EventFlag) -> io::Result<()> {
+    fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) -> io::Result<()> {
         try!(self.maybe_flush_changes());
 
         let idx = self.changes.len();

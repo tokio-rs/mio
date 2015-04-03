@@ -4,7 +4,7 @@ use std::{fmt, cmp, io};
 use std::sync::Arc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
-use std::os::unix::io::{Fd, AsRawFd};
+use std::os::unix::io::{RawFd, AsRawFd};
 
 const SLEEP: isize = -1;
 
@@ -157,7 +157,7 @@ impl<M: Send> NotifyInner<M> {
 }
 
 impl<M: Send> AsRawFd for Notify<M> {
-    fn as_raw_fd(&self) -> Fd {
+    fn as_raw_fd(&self) -> RawFd {
         self.inner.awaken.as_raw_fd()
     }
 }
