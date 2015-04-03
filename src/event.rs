@@ -419,7 +419,7 @@ impl fmt::Debug for ReadHint {
 }
 
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct IoEvent {
     kind: Interest,
     token: Token

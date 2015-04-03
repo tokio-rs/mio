@@ -1,4 +1,4 @@
-#![feature(convert, collections, std_misc, udp)]
+#![feature(collections, negate_unsigned, udp)]
 
 extern crate mio;
 extern crate time;
@@ -50,7 +50,6 @@ mod ports {
 
 pub fn sleep_ms(ms: usize) {
     use std::thread;
-    use std::time::Duration;
     use time::precise_time_ns;
 
     let start = precise_time_ns();
@@ -63,6 +62,6 @@ pub fn sleep_ms(ms: usize) {
             return;
         }
 
-        thread::park_timeout(Duration::nanoseconds((target - now) as i64));
+        thread::park_timeout_ms(((target - now) / 1_000_000) as u32);
     }
 }

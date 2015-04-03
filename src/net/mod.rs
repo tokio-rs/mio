@@ -3,7 +3,7 @@
 use {NonBlock};
 use io::{self, Io};
 use std::net::SocketAddr;
-use std::os::unix::io::{Fd, AsRawFd};
+use std::os::unix::io::{RawFd, AsRawFd};
 
 pub mod tcp;
 pub mod udp;
@@ -126,7 +126,7 @@ mod nix {
     };
 }
 
-fn socket(family: nix::AddressFamily, ty: nix::SockType, nonblock: bool) -> io::Result<Fd> {
+fn socket(family: nix::AddressFamily, ty: nix::SockType, nonblock: bool) -> io::Result<RawFd> {
     let opts = if nonblock {
         nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC
     } else {
@@ -159,7 +159,7 @@ fn listen(io: &Io, backlog: usize) -> io::Result<()> {
         .map_err(io::from_nix_error)
 }
 
-fn accept(io: &Io, nonblock: bool) -> io::Result<Fd> {
+fn accept(io: &Io, nonblock: bool) -> io::Result<RawFd> {
     let opts = if nonblock {
         nix::SOCK_NONBLOCK | nix::SOCK_CLOEXEC
     } else {
