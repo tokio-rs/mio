@@ -11,7 +11,7 @@ const CLIENT: Token = Token(1);
 
 struct EchoConn {
     sock: NonBlock<TcpStream>,
-    token: Token,
+    token: Option<Token>,
     count: u32,
     buf: Vec<u8>
 }
@@ -21,7 +21,7 @@ impl EchoConn {
         let mut ec =
         EchoConn {
             sock: sock,
-            token: Token(-1),
+            token: None,
             buf: Vec::with_capacity(22),
             count: 0
         };
@@ -30,7 +30,7 @@ impl EchoConn {
     }
 
     fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
-        event_loop.reregister(&self.sock, self.token, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token.unwrap(), Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
@@ -55,7 +55,7 @@ impl EchoConn {
             };
         }
 
-        event_loop.reregister(&self.sock, self.token, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token.unwrap(), Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
     }
 }
 
@@ -74,7 +74,7 @@ impl EchoServer {
             .ok().expect("could not add connection to slab");
 
         // Register the connection
-        self.conns[tok].token = tok;
+        self.conns[tok].token = Some(tok);
         event_loop.register_opt(&self.conns[tok].sock, tok, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
@@ -245,7 +245,7 @@ pub fn test_echo_server() {
 
         sleep_ms(1_000);
 
-        let message = String::from_str("THIS IS A TEST MESSAGE");
+        let message = "THIS IS A TEST MESSAGE".to_string();
         while i > 0 {
             chan.send(message.clone()).unwrap();
             i -= 1;

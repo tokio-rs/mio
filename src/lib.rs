@@ -79,15 +79,17 @@
 // mio is still in rapid development
 #![unstable]
 
-#![feature(alloc, convert, io, io_ext, unsafe_destructor)]
+#![deny(warnings)]
 
-extern crate alloc;
 extern crate bytes;
 extern crate nix;
 extern crate time;
 
 #[macro_use]
 extern crate log;
+
+#[cfg(test)]
+extern crate env_logger;
 
 pub mod util;
 

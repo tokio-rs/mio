@@ -1,32 +1,25 @@
-use std::{fmt, mem, ptr, isize};
+use std::{fmt, mem, usize};
 use std::ops::{Index, IndexMut};
-use alloc::heap;
 use token::Token;
 
 /// A preallocated chunk of memory for storing objects of the same type.
 pub struct Slab<T> {
     // Chunk of memory
-    mem: *mut Entry<T>,
+    entries: Vec<Entry<T>>,
     // Number of elements currently in the slab
-    len: isize,
-    // The total number of elements that the slab can hold
-    cap: isize,
+    len: usize,
     // The token offset
     off: usize,
     // Offset of the next available slot in the slab. Set to the slab's
     // capacity when the slab is full.
-    nxt: isize,
-    // The total number of slots that were initialized
-    init: isize,
+    nxt: usize,
 }
 
-const MAX: usize = isize::MAX as usize;
-
-// When Entry.nxt is set to this, the entry is in use
-const IN_USE: isize = -1;
+const MAX: usize = usize::MAX;
 
 unsafe impl<T> Send for Slab<T> where T: Send {}
 
+// TODO: Once NonZero lands, use it to optimize the layout
 impl<T> Slab<T> {
     pub fn new(cap: usize) -> Slab<T> {
         Slab::new_starting_at(Token(0), cap)
@@ -39,18 +32,13 @@ impl<T> Slab<T> {
         // - Use a power of 2 capacity
         // - Ensure that mem size is less than usize::MAX
 
-        let size = cap.checked_mul(mem::size_of::<Entry<T>>())
-            .expect("capacity overflow");
-
-        let ptr = unsafe { heap::allocate(size, mem::min_align_of::<Entry<T>>()) };
+        let entries = Vec::with_capacity(cap);
 
         Slab {
-            mem: ptr as *mut Entry<T>,
-            cap: cap as isize,
+            entries: entries,
             len: 0,
             off: offset.as_usize(),
             nxt: 0,
-            init: 0,
         }
     }
 
@@ -66,7 +54,7 @@ impl<T> Slab<T> {
 
     #[inline]
     pub fn remaining(&self) -> usize {
-        (self.cap - self.len) as usize
+        (self.entries.capacity() - self.len) as usize
     }
 
     #[inline]
@@ -82,12 +70,8 @@ impl<T> Slab<T> {
 
         let idx = self.token_to_idx(idx);
 
-        if idx <= MAX {
-            let idx = idx as isize;
-
-            if idx < self.init {
-                return self.entry(idx).in_use();
-            }
+        if idx < self.entries.len() {
+            return self.entries[idx].in_use();
         }
 
         false
@@ -99,14 +83,8 @@ impl<T> Slab<T> {
         let idx = self.token_to_idx(idx);
 
         if idx <= MAX {
-            let idx = idx as isize;
-
-            if idx < self.init {
-                let entry = self.entry(idx);
-
-                if entry.in_use() {
-                    return Some(&entry.val);
-                }
+            if idx < self.entries.len() {
+                return self.entries[idx].val.as_ref();
             }
         }
 
@@ -117,14 +95,8 @@ impl<T> Slab<T> {
         let idx = self.token_to_idx(idx);
 
         if idx <= MAX {
-            let idx = idx as isize;
-
-            if idx < self.init {
-                let mut entry = self.mut_entry(idx);
-
-                if entry.in_use() {
-                    return Some(&mut entry.val);
-                }
+            if idx < self.entries.len() {
+                return self.entries[idx].val.as_mut();
             }
         }
 
@@ -134,27 +106,25 @@ impl<T> Slab<T> {
     pub fn insert(&mut self, val: T) -> Result<Token, T> {
         let idx = self.nxt;
 
-        if idx == self.init {
+        if idx == self.entries.len() {
             // Using an uninitialized entry
-            if idx == self.cap {
+            if idx == self.entries.capacity() {
                 // No more capacity
-                debug!("slab out of capacity; cap={}", self.cap);
+                debug!("slab out of capacity; cap={}", self.entries.capacity());
                 return Err(val);
             }
 
-            self.mut_entry(idx).put(val, true);
+            self.entries.push(Entry {
+                nxt: MAX,
+                val: Some(val),
+            });
 
-            self.init += 1;
-            self.len = self.init;
-            self.nxt = self.init;
-
-            debug!("inserting into new slot; idx={}", idx);
+            self.len += 1;
+            self.nxt = self.len;
         }
         else {
             self.len += 1;
-            self.nxt = self.mut_entry(idx).put(val, false);
-
-            debug!("inserting into reused slot; idx={}", idx);
+            self.nxt = self.entries[idx].put(val);
         }
 
         Ok(self.idx_to_token(idx))
@@ -162,25 +132,14 @@ impl<T> Slab<T> {
 
     /// Releases the given slot
     pub fn remove(&mut self, idx: Token) -> Option<T> {
-        debug!("removing value; idx={:?}", idx);
-
         // Cast to usize
         let idx = self.token_to_idx(idx);
 
-        if idx > MAX {
+        if idx > self.entries.len() {
             return None;
         }
 
-        let idx = idx as isize;
-
-        // Ensure index is within capacity of slab
-        if idx >= self.init {
-            return None;
-        }
-
-        let nxt = self.nxt;
-
-        match self.mut_entry(idx).remove(nxt) {
+        match self.entries[idx].remove(self.nxt) {
             Some(v) => {
                 self.nxt = idx;
                 self.len -= 1;
@@ -199,42 +158,23 @@ impl<T> Slab<T> {
     }
 
     pub fn iter_mut(&mut self) -> SlabMutIter<T> {
-        SlabMutIter {
-            slab: self,
-            cur_idx: 0,
-            yielded: 0
-        }
-    }
-
-
-    #[inline]
-    fn entry(&self, idx: isize) -> &Entry<T> {
-        unsafe { &*self.mem.offset(idx) }
+        SlabMutIter { iter: self.iter() }
     }
 
     #[inline]
-    fn mut_entry(&mut self, idx: isize) -> &mut Entry<T> {
-        unsafe { &mut *self.mem.offset(idx) }
-    }
-
-    #[inline]
-    fn validate_idx(&self, idx: usize) -> isize {
-        if idx <= MAX {
-            let idx = idx as isize;
-
-            if idx < self.init {
-                return idx;
-            }
+    fn validate_idx(&self, idx: usize) -> usize {
+        if idx < self.entries.len() {
+            return idx;
         }
 
-        panic!("invalid index {} -- greater than capacity {}", idx, self.cap);
+        panic!("invalid index {} -- greater than capacity {}", idx, self.entries.capacity());
     }
 
     fn token_to_idx(&self, token: Token) -> usize {
         token.as_usize() - self.off
     }
 
-    fn idx_to_token(&self, idx: isize) -> Token {
+    fn idx_to_token(&self, idx: usize) -> Token {
         Token(idx as usize + self.off)
     }
 }
@@ -246,13 +186,8 @@ impl<T> Index<Token> for Slab<T> {
         let idx = self.token_to_idx(idx);
         let idx = self.validate_idx(idx);
 
-        let e = self.entry(idx);
-
-        if !e.in_use() {
-            panic!("invalid index; idx={}", idx);
-        }
-
-        &e.val
+        self.entries[idx].val.as_ref()
+            .expect("invalid index")
     }
 }
 
@@ -261,122 +196,82 @@ impl<T> IndexMut<Token> for Slab<T> {
         let idx = self.token_to_idx(idx);
         let idx = self.validate_idx(idx);
 
-        let e = self.mut_entry(idx);
-
-        if !e.in_use() {
-            panic!("invalid index; idx={}", idx);
-        }
-
-        &mut e.val
+        self.entries[idx].val.as_mut()
+            .expect("invalid index")
     }
 }
 
 impl<T> fmt::Debug for Slab<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Slab {{ len: {}, cap: {} }}", self.len, self.cap)
-    }
-}
-
-#[unsafe_destructor]
-impl<T> Drop for Slab<T> {
-    fn drop(&mut self) {
-        // TODO: check whether or not this is needed with intrinsics::needs_drop
-        let mut i = 0;
-
-        while i < self.init {
-            self.mut_entry(i).release();
-            i += 1;
-        }
-
-        let cap = self.cap as usize;
-        let size = cap.checked_mul(mem::size_of::<Entry<T>>()).unwrap();
-        unsafe { heap::deallocate(self.mem as *mut u8, size, mem::min_align_of::<Entry<T>>()) };
+        write!(fmt, "Slab {{ len: {}, cap: {} }}", self.len, self.entries.capacity())
     }
 }
 
 // Holds the values in the slab.
 struct Entry<T> {
-    nxt: isize,
-    val: T
+    nxt: usize,
+    val: Option<T>,
 }
 
 impl<T> Entry<T> {
     #[inline]
-    fn put(&mut self, val: T, init: bool) -> isize {
-        assert!(init || self.nxt != IN_USE);
-
+    fn put(&mut self, val: T) -> usize{
         let ret = self.nxt;
-
-        unsafe { ptr::write(&mut self.val as *mut T, val); }
-        self.nxt = IN_USE;
-
-        // Could be uninitialized memory, but the caller (Slab) should guard
-        // not use the return value in those cases.
+        self.val = Some(val);
         ret
     }
 
-    fn remove(&mut self, nxt: isize) -> Option<T> {
+    fn remove(&mut self, nxt: usize) -> Option<T> {
         if self.in_use() {
             self.nxt = nxt;
-            Some(unsafe { ptr::read(&self.val as *const T) })
+            self.val.take()
         } else {
             None
         }
     }
 
-    fn release(&mut self) {
-        if self.in_use() {
-            let _ = Some(unsafe { ptr::read(&self.val as *const T) });
-        }
-    }
-
     #[inline]
     fn in_use(&self) -> bool {
-        self.nxt == IN_USE
+        self.val.is_some()
     }
 }
 
 pub struct SlabIter<'a, T: 'a> {
     slab: &'a Slab<T>,
-    cur_idx: isize,
-    yielded: isize
+    cur_idx: usize,
+    yielded: usize
 }
 
-impl <'a, T> Iterator for SlabIter<'a, T> {
+impl<'a, T> Iterator for SlabIter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<&'a T> {
         while self.yielded < self.slab.len {
-            let entry = self.slab.entry(self.cur_idx);
-            self.cur_idx += 1;
-            if entry.in_use() {
-                self.yielded += 1;
-                return Some(&entry.val);
+            match self.slab.entries[self.cur_idx].val {
+                Some(ref v) => {
+                    self.cur_idx += 1;
+                    self.yielded += 1;
+                    return Some(v);
+                }
+                None => {
+                    self.cur_idx += 1;
+                }
             }
         }
+
         None
     }
 }
 
 pub struct SlabMutIter<'a, T: 'a> {
-    slab: &'a mut Slab<T>,
-    cur_idx: isize,
-    yielded: isize
+    iter: SlabIter<'a, T>,
 }
 
-impl <'a, T> Iterator for SlabMutIter<'a, T> {
-    type Item = &'a mut T;
+impl<'a, 'b, T> Iterator for SlabMutIter<'a, T> {
+    type Item = &'b mut T;
 
-    fn next(&mut self) -> Option<&'a mut T> {
-        while self.yielded < self.slab.len {
-            let entry = unsafe { &mut *self.slab.mem.offset(self.cur_idx) };
-            self.cur_idx += 1;
-            if entry.in_use() {
-                self.yielded += 1;
-                return Some(&mut entry.val);
-            }
-        }
-        None
+    fn next(&mut self) -> Option<&'b mut T> {
+        unsafe { mem::transmute(self.iter.next()) }
     }
 }
 

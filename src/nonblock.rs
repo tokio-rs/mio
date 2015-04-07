@@ -1,7 +1,7 @@
 use io::{self, Evented, FromFd, TryRead, TryWrite, Result};
 use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
-use std::os::unix::io::{Fd, AsRawFd};
+use std::os::unix::io::{RawFd, AsRawFd};
 
 #[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct NonBlock<T> {
@@ -49,13 +49,13 @@ impl<T: Write> TryWrite for NonBlock<T> {
 }
 
 impl<T: AsRawFd> AsRawFd for NonBlock<T> {
-    fn as_raw_fd(&self) -> Fd {
+    fn as_raw_fd(&self) -> RawFd {
         (**self).as_raw_fd()
     }
 }
 
 impl<T: FromFd> FromFd for NonBlock<T> {
-    fn from_fd(fd: Fd) -> NonBlock<T> {
+    fn from_fd(fd: RawFd) -> NonBlock<T> {
         NonBlock::new(FromFd::from_fd(fd))
     }
 }

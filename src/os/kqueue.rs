@@ -1,9 +1,9 @@
+use nix::fcntl::Fd;
 use nix::sys::event::*;
 use nix::sys::event::EventFilter::*;
 use io;
 use event::{IoEvent, Interest, PollOpt};
 use std::slice;
-use std::os::unix::io::Fd;
 
 pub struct Selector {
     kq: Fd,

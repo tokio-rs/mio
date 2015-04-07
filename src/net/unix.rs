@@ -5,7 +5,7 @@ use net::{self, nix, Socket};
 use std::usize;
 use std::iter::IntoIterator;
 use std::path::Path;
-use std::os::unix::io::{Fd, AsRawFd};
+use std::os::unix::io::{RawFd, AsRawFd};
 
 pub fn stream() -> io::Result<NonBlock<UnixSocket>> {
     UnixSocket::stream(true)
@@ -58,7 +58,7 @@ impl UnixSocket {
 }
 
 impl AsRawFd for UnixSocket {
-    fn as_raw_fd(&self) -> Fd {
+    fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
     }
 }
@@ -67,7 +67,7 @@ impl Evented for UnixSocket {
 }
 
 impl FromFd for UnixSocket {
-    fn from_fd(fd: Fd) -> UnixSocket {
+    fn from_fd(fd: RawFd) -> UnixSocket {
         UnixSocket { io: Io::new(fd) }
     }
 }
@@ -125,7 +125,7 @@ impl UnixListener {
 }
 
 impl AsRawFd for UnixListener {
-    fn as_raw_fd(&self) -> Fd {
+    fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
     }
 }
@@ -144,7 +144,7 @@ impl IntoNonBlock for UnixListener {
 }
 
 impl FromFd for UnixListener {
-    fn from_fd(fd: Fd) -> UnixListener {
+    fn from_fd(fd: RawFd) -> UnixListener {
         UnixListener { io: Io::new(fd) }
     }
 }
@@ -209,7 +209,7 @@ impl io::Read for UnixStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self.io.read_slice(buf) {
             Ok(Some(cnt)) => Ok(cnt),
-            Ok(None) => Err(io::Error::from_os_error(nix::EAGAIN as i32)),
+            Ok(None) => Err(io::from_nix_error(nix::Error::from_errno(nix::EAGAIN))),
             Err(e) => Err(e),
         }
     }
@@ -219,7 +219,7 @@ impl io::Write for UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self.io.write_slice(buf) {
             Ok(Some(cnt)) => Ok(cnt),
-            Ok(None) => Err(io::Error::from_os_error(nix::EAGAIN as i32)),
+            Ok(None) => Err(io::from_nix_error(nix::Error::from_errno(nix::EAGAIN))),
             Err(e) => Err(e),
         }
     }
@@ -230,7 +230,7 @@ impl io::Write for UnixStream {
 }
 
 impl AsRawFd for UnixStream {
-    fn as_raw_fd(&self) -> Fd {
+    fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
     }
 }
@@ -239,7 +239,7 @@ impl Evented for UnixStream {
 }
 
 impl FromFd for UnixStream {
-    fn from_fd(fd: Fd) -> UnixStream {
+    fn from_fd(fd: RawFd) -> UnixStream {
         UnixStream { io: Io::new(fd) }
     }
 }

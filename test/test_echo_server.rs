@@ -12,7 +12,7 @@ struct EchoConn {
     sock: NonBlock<TcpStream>,
     buf: Option<ByteBuf>,
     mut_buf: Option<MutByteBuf>,
-    token: Token,
+    token: Option<Token>,
     interest: Interest
 }
 
@@ -22,7 +22,7 @@ impl EchoConn {
             sock: sock,
             buf: None,
             mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
-            token: Token(-1),
+            token: None,
             interest: Interest::hup()
         }
     }
@@ -48,7 +48,7 @@ impl EchoConn {
             Err(e) => debug!("not implemented; client err={:?}", e),
         }
 
-        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token.unwrap(), self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
@@ -72,7 +72,7 @@ impl EchoConn {
 
         // prepare to provide this to writable
         self.buf = Some(buf.flip());
-        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge())
+        event_loop.reregister(&self.sock, self.token.unwrap(), self.interest, PollOpt::edge())
     }
 }
 
@@ -91,7 +91,7 @@ impl EchoServer {
             .ok().expect("could not add connectiont o slab");
 
         // Register the connection
-        self.conns[tok].token = tok;
+        self.conns[tok].token = Some(tok);
         event_loop.register_opt(&self.conns[tok].sock, tok, Interest::readable(), PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 

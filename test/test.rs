@@ -1,5 +1,3 @@
-#![feature(convert, collections, std_misc, udp)]
-
 extern crate mio;
 extern crate time;
 
@@ -13,7 +11,8 @@ pub use ports::localhost;
 mod test_battery;
 mod test_close_on_drop;
 mod test_echo_server;
-mod test_multicast;
+// TODO: Bring back once multicast is stable
+// mod test_multicast;
 mod test_notify;
 mod test_register_deregister;
 mod test_sock_to;
@@ -50,19 +49,5 @@ mod ports {
 
 pub fn sleep_ms(ms: usize) {
     use std::thread;
-    use std::time::Duration;
-    use time::precise_time_ns;
-
-    let start = precise_time_ns();
-    let target = start + (ms as u64) * 1_000_000;
-
-    loop {
-        let now = precise_time_ns();
-
-        if now > target {
-            return;
-        }
-
-        thread::park_timeout(Duration::nanoseconds((target - now) as i64));
-    }
+    thread::sleep_ms(ms as u32);
 }

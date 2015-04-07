@@ -4,7 +4,7 @@ use io::{self, Evented, FromFd, Result};
 use net::{self, nix, Socket};
 use std::mem;
 use std::net::SocketAddr;
-use std::os::unix::io::Fd;
+use std::os::unix::io::RawFd;
 
 pub use std::net::UdpSocket;
 
@@ -35,7 +35,7 @@ impl Evented for UdpSocket {
 }
 
 impl FromFd for UdpSocket {
-    fn from_fd(fd: Fd) -> UdpSocket {
+    fn from_fd(fd: RawFd) -> UdpSocket {
         unsafe { mem::transmute(Io::new(fd)) }
     }
 }

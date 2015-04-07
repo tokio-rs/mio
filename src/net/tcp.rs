@@ -3,7 +3,7 @@ use io::{self, Evented, FromFd, Io};
 use net::{self, nix, Socket};
 use std::mem;
 use std::net::SocketAddr;
-use std::os::unix::io::{Fd, AsRawFd};
+use std::os::unix::io::{RawFd, AsRawFd};
 
 pub use std::net::{TcpStream, TcpListener};
 
@@ -100,13 +100,13 @@ impl Evented for TcpSocket {
 }
 
 impl AsRawFd for TcpSocket {
-    fn as_raw_fd(&self) -> Fd {
+    fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
     }
 }
 
 impl FromFd for TcpSocket {
-    fn from_fd(fd: Fd) -> TcpSocket {
+    fn from_fd(fd: RawFd) -> TcpSocket {
         TcpSocket { io: Io::new(fd) }
     }
 }
@@ -121,7 +121,7 @@ impl Socket for TcpSocket {
  */
 
 impl FromFd for TcpStream {
-    fn from_fd(fd: Fd) -> TcpStream {
+    fn from_fd(fd: RawFd) -> TcpStream {
         to_tcp_stream(Io::new(fd))
     }
 }
@@ -139,7 +139,7 @@ impl Socket for TcpStream {
  */
 
 impl FromFd for TcpListener {
-    fn from_fd(fd: Fd) -> TcpListener {
+    fn from_fd(fd: RawFd) -> TcpListener {
         to_tcp_listener(Io::new(fd))
     }
 }
