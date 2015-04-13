@@ -1,4 +1,5 @@
 use std::{fmt, mem, usize};
+use std::iter::IntoIterator;
 use std::ops::{Index, IndexMut};
 use token::Token;
 
@@ -275,6 +276,23 @@ impl<'a, 'b, T> Iterator for SlabMutIter<'a, T> {
     }
 }
 
+impl<'a, T> IntoIterator for &'a Slab<T> {
+    type Item = &'a T;
+    type IntoIter = SlabIter<'a, T>;
+
+    fn into_iter(self) -> SlabIter<'a, T> {
+        self.iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Slab<T> {
+    type Item = &'a mut T;
+    type IntoIter = SlabMutIter<'a, T>;
+
+    fn into_iter(self) -> SlabMutIter<'a, T> {
+        self.iter_mut()
+    }
+}
 
 #[cfg(test)]
 mod tests {
