@@ -9,7 +9,7 @@ pub fn test_sock_to() {
     let addr = localhost();
     let srv = TcpListener::bind(&addr).unwrap();
 
-    let t = thread::scoped(move || {
+    let t = thread::spawn(move || {
         let mut buf = [0; 1024];
 
         let (mut s, _) = srv.accept().unwrap();
@@ -27,5 +27,5 @@ pub fn test_sock_to() {
     let res = cli.read(&mut buf);
     assert!(res.is_err());
 
-    drop(t);
+    t.join().unwrap();
 }
