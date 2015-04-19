@@ -255,8 +255,9 @@ pub fn test_echo_server() {
         }
     };
 
-    let _t = thread::scoped(go);
+    let t = thread::spawn(go);
 
     // Start the event loop
     event_loop.run(&mut Echo::new(srv, sock)).unwrap();
+    t.join().unwrap();
 }

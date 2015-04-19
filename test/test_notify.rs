@@ -101,7 +101,7 @@ pub fn test_notify_capacity() {
     let mut event_loop = EventLoop::configured(config).unwrap();
     let notify = event_loop.channel();
 
-    let guard = thread::scoped(move || {
+    let handle = thread::spawn(move || {
         let mut handler = Capacity(rx);
         event_loop.run(&mut handler).unwrap();
     });
@@ -122,5 +122,5 @@ pub fn test_notify_capacity() {
         }
     }
 
-    drop(guard);
+    handle.join().unwrap();
 }
