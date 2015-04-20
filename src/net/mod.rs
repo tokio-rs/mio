@@ -41,17 +41,17 @@ pub trait Socket : AsRawFd {
     }
 
     fn set_reuseaddr(&self, val: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::ReuseAddr, val)
+        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::ReuseAddr, &val)
             .map_err(io::from_nix_error)
     }
 
     fn set_reuseport(&self, val: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::ReusePort, val)
+        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::ReusePort, &val)
             .map_err(io::from_nix_error)
     }
 
     fn set_tcp_nodelay(&self, val: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Tcp, nix::sockopt::TcpNoDelay, val)
+        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Tcp, nix::sockopt::TcpNoDelay, &val)
             .map_err(io::from_nix_error)
     }
 

@@ -75,10 +75,6 @@
 //! ```
 
 #![crate_name = "mio"]
-
-// mio is still in rapid development
-#![unstable]
-
 #![deny(warnings)]
 
 extern crate bytes;

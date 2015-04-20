@@ -268,10 +268,10 @@ pub struct SlabMutIter<'a, T: 'a> {
     iter: SlabIter<'a, T>,
 }
 
-impl<'a, 'b, T> Iterator for SlabMutIter<'a, T> {
-    type Item = &'b mut T;
+impl<'a, T> Iterator for SlabMutIter<'a, T> {
+    type Item = &'a mut T;
 
-    fn next(&mut self) -> Option<&'b mut T> {
+    fn next(&mut self) -> Option<&'a mut T> {
         unsafe { mem::transmute(self.iter.next()) }
     }
 }
