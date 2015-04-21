@@ -79,8 +79,6 @@ impl<T> Slab<T> {
     }
 
     pub fn get(&self, idx: Token) -> Option<&T> {
-        assert!(self.contains(idx), "slab does not contain token `{:?}`", idx);
-
         let idx = self.token_to_idx(idx);
 
         if idx <= MAX {
