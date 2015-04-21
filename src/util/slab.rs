@@ -79,8 +79,6 @@ impl<T> Slab<T> {
     }
 
     pub fn get(&self, idx: Token) -> Option<&T> {
-        assert!(self.contains(idx), "slab does not contain token `{:?}`", idx);
-
         let idx = self.token_to_idx(idx);
 
         if idx <= MAX {
@@ -462,5 +460,28 @@ mod tests {
 
         let vals: Vec<u32> = slab.iter().map(|r| *r).collect();
         assert_eq!(vals, vec![2, 3, 5]);
+    }
+
+    #[test]
+    fn test_get() {
+        let mut slab = Slab::new(16);
+        let tok = slab.insert(5).unwrap();
+        assert_eq!(slab.get(tok), Some(&5));
+        assert_eq!(slab.get(Token(1)), None);
+        assert_eq!(slab.get(Token(23)), None);
+    }
+
+    #[test]
+    fn test_get_mut() {
+        let mut slab = Slab::new(16);
+        let tok = slab.insert(5u32).unwrap();
+        {
+            let mut_ref = slab.get_mut(tok).unwrap();
+            assert_eq!(*mut_ref, 5);
+            *mut_ref = 12;
+        }
+        assert_eq!(slab[tok], 12);
+        assert_eq!(slab.get_mut(Token(1)), None);
+        assert_eq!(slab.get_mut(Token(23)), None);
     }
 }
