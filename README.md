@@ -35,6 +35,7 @@ extern crate mio;
 __Eventually__
 
 * Signal handling
+* Windows support
 
 ## Non goals
 
@@ -43,7 +44,6 @@ or higher level libraries.
 
 * File operations
 * Thread pools / multi-threaded event loop
-* Windows support
 
 ## Platforms
 
