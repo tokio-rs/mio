@@ -1,4 +1,4 @@
-use {NonBlock};
+use {NonBlock, IntoNonBlock};
 use io::{self, Evented, FromFd, Io};
 use net::{self, nix, Socket};
 use std::mem;
@@ -132,6 +132,13 @@ impl Evented for TcpStream {
 impl Socket for TcpStream {
 }
 
+impl IntoNonBlock for TcpStream {
+    fn into_non_block(self) -> io::Result<NonBlock<TcpStream>> {
+        try!(net::set_non_block(as_io(&self)));
+        Ok(NonBlock::new(self))
+    }
+}
+
 /*
  *
  * ===== TcpListener =====
@@ -148,6 +155,13 @@ impl Evented for TcpListener {
 }
 
 impl Socket for TcpListener {
+}
+
+impl IntoNonBlock for TcpListener {
+    fn into_non_block(self) -> io::Result<NonBlock<TcpListener>> {
+        try!(net::set_non_block(as_io(&self)));
+        Ok(NonBlock::new(self))
+    }
 }
 
 impl NonBlock<TcpListener> {
