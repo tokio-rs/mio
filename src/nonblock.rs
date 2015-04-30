@@ -40,11 +40,27 @@ impl<T: Read> TryRead for NonBlock<T> {
     }
 }
 
+impl<T: Read> Read for NonBlock<T> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        (**self).read(buf)
+    }
+}
+
 impl<T: Write> TryWrite for NonBlock<T> {
     fn write_slice(&mut self, buf: &[u8]) -> Result<Option<usize>> {
         (**self).write(buf)
             .map(|cnt| Some(cnt))
             .or_else(io::to_non_block)
+    }
+}
+
+impl<T: Write> Write for NonBlock<T> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        (**self).write(buf)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        (**self).flush()
     }
 }
 
