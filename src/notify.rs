@@ -1,4 +1,4 @@
-use {os, Evented};
+use {sys, Evented};
 use util::BoundedQueue;
 use std::{fmt, cmp, io};
 use std::sync::Arc;
@@ -66,7 +66,7 @@ unsafe impl<M: Send> Send for Notify<M> { }
 struct NotifyInner<M> {
     state: AtomicIsize,
     queue: BoundedQueue<M>,
-    awaken: os::Awakener
+    awaken: sys::Awakener
 }
 
 impl<M: Send> NotifyInner<M> {
@@ -74,7 +74,7 @@ impl<M: Send> NotifyInner<M> {
         Ok(NotifyInner {
             state: AtomicIsize::new(0),
             queue: BoundedQueue::with_capacity(capacity),
-            awaken: try!(os::Awakener::new())
+            awaken: try!(sys::Awakener::new())
         })
     }
 

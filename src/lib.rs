@@ -96,8 +96,8 @@ mod io;
 mod net;
 mod nonblock;
 mod notify;
-mod os;
 mod poll;
+mod sys;
 mod timer;
 mod token;
 

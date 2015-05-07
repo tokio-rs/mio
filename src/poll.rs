@@ -1,18 +1,17 @@
-use {Evented, Token};
+use {sys, Evented, Token};
 use event::{Interest, IoEvent, PollOpt};
-use os;
 use std::{fmt, io};
 
 pub struct Poll {
-    selector: os::Selector,
-    events: os::Events
+    selector: sys::Selector,
+    events: sys::Events
 }
 
 impl Poll {
     pub fn new() -> io::Result<Poll> {
         Ok(Poll {
-            selector: try!(os::Selector::new()),
-            events: os::Events::new()
+            selector: try!(sys::Selector::new()),
+            events: sys::Events::new()
         })
     }
 
@@ -64,7 +63,7 @@ impl fmt::Debug for Poll {
 }
 
 pub struct EventsIterator<'a> {
-    events: &'a os::Events,
+    events: &'a sys::Events,
     index: usize
 }
 
