@@ -1,8 +1,8 @@
-use std::{usize, iter};
-use std::cmp::max;
-use time::precise_time_ns;
 use token::Token;
 use util::Slab;
+use clock_ticks::precise_time_ns;
+use std::{usize, iter};
+use std::cmp::max;
 
 use self::TimerErrorKind::TimerOverflow;
 

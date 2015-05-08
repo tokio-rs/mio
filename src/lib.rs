@@ -79,7 +79,7 @@
 
 extern crate bytes;
 extern crate nix;
-extern crate time;
+extern crate clock_ticks;
 
 #[macro_use]
 extern crate log;

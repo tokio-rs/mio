@@ -1,5 +1,4 @@
 extern crate mio;
-extern crate time;
 
 #[macro_use]
 extern crate log;

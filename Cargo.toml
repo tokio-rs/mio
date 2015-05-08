@@ -18,12 +18,15 @@ exclude       = [
 ]
 
 [dependencies]
-log   = "0.3.1"
-time  = "0.1.24"
+log = "0.3.1"
 bytes = "0.2.7"
+clock_ticks = "0.0.5"
 
 [dependencies.nix]
 git = "https://github.com/carllerche/nix-rust"
+
+[dependencies.winapi]
+git = "https://github.com/retep998/winapi-rs"
 
 [dev-dependencies]
 env_logger = "0.3.0"
