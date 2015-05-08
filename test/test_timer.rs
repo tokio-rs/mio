@@ -15,13 +15,13 @@ enum TestState {
 }
 
 struct TestHandler {
-    srv: NonBlock<TcpListener>,
-    cli: NonBlock<TcpStream>,
+    srv: TcpListener,
+    cli: TcpStream,
     state: TestState
 }
 
 impl TestHandler {
-    fn new(srv: NonBlock<TcpListener>, cli: NonBlock<TcpStream>) -> TestHandler {
+    fn new(srv: TcpListener, cli: TcpStream) -> TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
@@ -31,7 +31,7 @@ impl TestHandler {
 }
 
 impl Handler for TestHandler {
-    type Timeout = NonBlock<TcpStream>;
+    type Timeout = TcpStream;
     type Message = ();
 
     fn readable(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, hint: ReadHint) {
@@ -97,7 +97,7 @@ impl Handler for TestHandler {
         event_loop.reregister(&self.cli, CLIENT, Interest::readable(), PollOpt::edge()).unwrap();
     }
 
-    fn timeout(&mut self, _event_loop: &mut EventLoop<TestHandler>, mut sock: NonBlock<TcpStream>) {
+    fn timeout(&mut self, _event_loop: &mut EventLoop<TestHandler>, mut sock: TcpStream) {
         debug!("timeout handler : writing to socket");
         sock.write(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
     }
@@ -110,7 +110,7 @@ pub fn test_timer() {
 
     let addr = localhost();
 
-    let srv = tcp::v4().unwrap();
+    let srv = TcpSocket::v4().unwrap();
 
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
@@ -122,7 +122,7 @@ pub fn test_timer() {
 
     event_loop.register_opt(&srv, SERVER, Interest::all(), PollOpt::edge()).unwrap();
 
-    let (sock, _) = tcp::v4().unwrap()
+    let (sock, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Connect to the server

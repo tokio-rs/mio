@@ -20,7 +20,7 @@
 //!
 //! ```
 //! use mio::*;
-//! use mio::tcp::TcpListener;
+//! use mio::tcp::{TcpListener, TcpStream};
 //!
 //! // Setup some tokens to allow us to identify which event is
 //! // for which socket.
@@ -30,7 +30,7 @@
 //! let addr = "127.0.0.1:13265".parse().unwrap();
 //!
 //! // Setup the server socket
-//! let server = tcp::listen(&addr).unwrap();
+//! let server = TcpListener::bind(&addr).unwrap();
 //!
 //! // Create an event loop
 //! let mut event_loop = EventLoop::new().unwrap();
@@ -39,13 +39,13 @@
 //! event_loop.register(&server, SERVER).unwrap();
 //!
 //! // Setup the client socket
-//! let (sock, _) = tcp::connect(&addr).unwrap();
+//! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
 //! event_loop.register(&sock, CLIENT).unwrap();
 //!
 //! // Define a handler to process the events
-//! struct MyHandler(NonBlock<TcpListener>);
+//! struct MyHandler(TcpListener);
 //!
 //! impl Handler for MyHandler {
 //!     type Timeout = ();
@@ -94,7 +94,6 @@ mod event_loop;
 mod handler;
 mod io;
 mod net;
-mod nonblock;
 mod notify;
 mod poll;
 mod sys;
@@ -132,11 +131,10 @@ pub use net::{
     tcp,
     udp,
     unix,
+    IpAddr,
+    Ipv4Addr,
+    Ipv6Addr,
     Socket,
-};
-pub use nonblock::{
-    IntoNonBlock,
-    NonBlock,
 };
 pub use notify::{
     NotifyError,

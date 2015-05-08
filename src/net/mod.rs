@@ -1,13 +1,36 @@
 //! Networking primitives
 //!
-use {NonBlock};
 use io::{self, Io};
-use std::net::SocketAddr;
+use std::net::{SocketAddr, AddrParseError};
 use std::os::unix::io::{RawFd, AsRawFd};
+use std::str::FromStr;
 
 pub mod tcp;
 pub mod udp;
 pub mod unix;
+
+/// An IP address, either a IPv4 or IPv6 address.
+///
+/// Once `std::net::IpAddr` is stable, this will go away.
+pub enum IpAddr {
+    V4(Ipv4Addr),
+    V6(Ipv6Addr),
+}
+
+pub use std::net::Ipv4Addr;
+pub use std::net::Ipv6Addr;
+
+impl FromStr for IpAddr {
+    type Err = AddrParseError;
+
+    fn from_str(s: &str) -> Result<IpAddr, AddrParseError> {
+        s.parse()
+            .map(|ip: Ipv4Addr| IpAddr::V4(ip))
+            .or_else(|_| {
+                s.parse().map(|ip: Ipv6Addr| IpAddr::V6(ip))
+            })
+    }
+}
 
 /*
  *
@@ -16,7 +39,6 @@ pub mod unix;
  */
 
 pub trait Socket : AsRawFd {
-
     /// Returns the value for the `SO_LINGER` socket option.
     fn linger(&self) -> io::Result<usize> {
         let linger = try!(nix::getsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::Linger)
@@ -78,9 +100,6 @@ pub trait Socket : AsRawFd {
     }
 }
 
-impl<S: Socket> Socket for NonBlock<S> {
-}
-
 /*
  *
  * ====== Re-exporting needed nix types ======
@@ -102,6 +121,7 @@ mod nix {
         SockLevel,
         InetAddr,
         Ipv4Addr,
+        Ipv6Addr,
         MSG_DONTWAIT,
         SOCK_NONBLOCK,
         SOCK_CLOEXEC,
@@ -112,6 +132,7 @@ mod nix {
         getsockname,
         getsockopt,
         ip_mreq,
+        ipv6_mreq,
         linger,
         listen,
         recvfrom,
@@ -191,11 +212,6 @@ fn getpeername(io: &Io) -> io::Result<nix::SockAddr> {
 
 fn getsockname(io: &Io) -> io::Result<nix::SockAddr> {
     nix::getsockname(io.as_raw_fd())
-        .map_err(io::from_nix_error)
-}
-
-fn set_non_block(io: &Io) -> io::Result<()> {
-    nix::fcntl(io.as_raw_fd(), nix::FcntlArg::F_SETFL(nix::O_NONBLOCK))
         .map_err(io::from_nix_error)
 }
 

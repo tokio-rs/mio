@@ -8,15 +8,15 @@ const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
 
 pub struct UdpHandler {
-    tx: NonBlock<UdpSocket>,
-    rx: NonBlock<UdpSocket>,
+    tx: UdpSocket,
+    rx: UdpSocket,
     msg: &'static str,
     buf: SliceBuf<'static>,
     rx_buf: RingBuf
 }
 
 impl UdpHandler {
-    fn new(tx: NonBlock<UdpSocket>, rx: NonBlock<UdpSocket>, msg : &'static str) -> UdpHandler {
+    fn new(tx: UdpSocket, rx: UdpSocket, msg : &'static str) -> UdpHandler {
         UdpHandler {
             tx: tx,
             rx: rx,
@@ -61,8 +61,8 @@ pub fn test_udp_socket() {
     let addr = localhost();
     let any = str::FromStr::from_str("0.0.0.0:0").unwrap();
 
-    let tx = udp::bind(&any).unwrap();
-    let rx = udp::bind(&addr).unwrap();
+    let tx = UdpSocket::bound(&any).unwrap();
+    let rx = UdpSocket::bound(&addr).unwrap();
 
     // ensure that the sockets are non-blocking
     let mut buf = [0; 128];

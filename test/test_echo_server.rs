@@ -9,7 +9,7 @@ const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
 struct EchoConn {
-    sock: NonBlock<TcpStream>,
+    sock: TcpStream,
     buf: Option<ByteBuf>,
     mut_buf: Option<MutByteBuf>,
     token: Option<Token>,
@@ -17,7 +17,7 @@ struct EchoConn {
 }
 
 impl EchoConn {
-    fn new(sock: NonBlock<TcpStream>) -> EchoConn {
+    fn new(sock: TcpStream) -> EchoConn {
         EchoConn {
             sock: sock,
             buf: None,
@@ -77,7 +77,7 @@ impl EchoConn {
 }
 
 struct EchoServer {
-    sock: NonBlock<TcpListener>,
+    sock: TcpListener,
     conns: Slab<EchoConn>
 }
 
@@ -114,7 +114,7 @@ impl EchoServer {
 }
 
 struct EchoClient {
-    sock: NonBlock<TcpStream>,
+    sock: TcpStream,
     msgs: Vec<&'static str>,
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
@@ -126,7 +126,7 @@ struct EchoClient {
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: NonBlock<TcpStream>, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
+    fn new(sock: TcpStream, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
         let curr = msgs.remove(0);
 
         EchoClient {
@@ -220,7 +220,7 @@ struct Echo {
 }
 
 impl Echo {
-    fn new(srv: NonBlock<TcpListener>, client: NonBlock<TcpStream>, msgs: Vec<&'static str>) -> Echo {
+    fn new(srv: TcpListener, client: TcpStream, msgs: Vec<&'static str>) -> Echo {
         Echo {
             server: EchoServer {
                 sock: srv,
@@ -260,7 +260,7 @@ pub fn test_echo_server() {
     let mut event_loop = EventLoop::new().unwrap();
 
     let addr = localhost();
-    let srv = tcp::v4().unwrap();
+    let srv = TcpSocket::v4().unwrap();
 
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
@@ -271,7 +271,7 @@ pub fn test_echo_server() {
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let (sock, _) = tcp::v4().unwrap()
+    let (sock, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Connect to the server

@@ -10,7 +10,7 @@ const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
 struct EchoConn {
-    sock: NonBlock<UnixStream>,
+    sock: UnixStream,
     buf: Option<ByteBuf>,
     mut_buf: Option<MutByteBuf>,
     token: Option<Token>,
@@ -18,7 +18,7 @@ struct EchoConn {
 }
 
 impl EchoConn {
-    fn new(sock: NonBlock<UnixStream>) -> EchoConn {
+    fn new(sock: UnixStream) -> EchoConn {
         EchoConn {
             sock: sock,
             buf: None,
@@ -78,7 +78,7 @@ impl EchoConn {
 }
 
 struct EchoServer {
-    sock: NonBlock<UnixListener>,
+    sock: UnixListener,
     conns: Slab<EchoConn>
 }
 
@@ -115,7 +115,7 @@ impl EchoServer {
 }
 
 struct EchoClient {
-    sock: NonBlock<UnixStream>,
+    sock: UnixStream,
     msgs: Vec<&'static str>,
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
@@ -127,7 +127,7 @@ struct EchoClient {
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: NonBlock<UnixStream>, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
+    fn new(sock: UnixStream, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
         let curr = msgs.remove(0);
 
         EchoClient {
@@ -222,7 +222,7 @@ struct Echo {
 }
 
 impl Echo {
-    fn new(srv: NonBlock<UnixListener>, client: NonBlock<UnixStream>, msgs: Vec<&'static str>) -> Echo {
+    fn new(srv: UnixListener, client: UnixStream, msgs: Vec<&'static str>) -> Echo {
         Echo {
             server: EchoServer {
                 sock: srv,
@@ -264,12 +264,12 @@ pub fn test_unix_echo_server() {
     let tmp_dir = TempDir::new("test_unix_echo_server").unwrap();
     let addr = tmp_dir.path().join(&PathBuf::from("sock"));
 
-    let srv = unix::bind(&addr).unwrap();
+    let srv = UnixListener::bind(&addr).unwrap();
 
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let (sock, _) = unix::connect(&addr).unwrap();
+    let sock = UnixStream::connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();

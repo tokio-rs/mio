@@ -2,22 +2,22 @@ use mio::*;
 use mio::udp::*;
 use mio::buf::{RingBuf, SliceBuf};
 use std::str;
-use std::net::{SocketAddr, Ipv4Addr};
+use std::net::{SocketAddr};
 use super::localhost;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
 
 pub struct UdpHandler {
-    tx: NonBlock<UdpSocket>,
-    rx: NonBlock<UdpSocket>,
+    tx: UdpSocket,
+    rx: UdpSocket,
     msg: &'static str,
     buf: SliceBuf<'static>,
     rx_buf: RingBuf
 }
 
 impl UdpHandler {
-    fn new(tx: NonBlock<UdpSocket>, rx: NonBlock<UdpSocket>, msg: &'static str) -> UdpHandler {
+    fn new(tx: UdpSocket, rx: UdpSocket, msg: &'static str) -> UdpHandler {
         UdpHandler {
             tx: tx,
             rx: rx,
@@ -67,8 +67,8 @@ pub fn test_multicast() {
     let addr = localhost();
     let any = "0.0.0.0:0".parse().unwrap();
 
-    let tx = udp::bind(&any).unwrap();
-    let rx = udp::bind(&addr).unwrap();
+    let tx = UdpSocket::bound(&any).unwrap();
+    let rx = UdpSocket::bound(&addr).unwrap();
 
     info!("Joining group 227.1.1.100");
     rx.join_multicast(&"227.1.1.100".parse().unwrap()).unwrap();

@@ -16,13 +16,13 @@ enum TestState {
 }
 
 struct TestHandler {
-    srv: NonBlock<TcpListener>,
-    cli: NonBlock<TcpStream>,
+    srv: TcpListener,
+    cli: TcpStream,
     state: TestState
 }
 
 impl TestHandler {
-    fn new(srv: NonBlock<TcpListener>, cli: NonBlock<TcpStream>) -> TestHandler {
+    fn new(srv: TcpListener, cli: TcpStream) -> TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
@@ -101,7 +101,7 @@ pub fn test_close_on_drop() {
     let addr = localhost();
 
     // == Create & setup server socket
-    let srv = tcp::v4().unwrap();
+    let srv = TcpSocket::v4().unwrap();
     srv.set_reuseaddr(true).unwrap();
     srv.bind(&addr).unwrap();
 
@@ -110,7 +110,7 @@ pub fn test_close_on_drop() {
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
 
     // == Create & setup client socket
-    let (sock, _) = tcp::v4().unwrap()
+    let (sock, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     event_loop.register_opt(&sock, CLIENT, Interest::writable(), PollOpt::edge()).unwrap();

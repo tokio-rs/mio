@@ -1,44 +1,8 @@
-use {NonBlock, IntoNonBlock};
+use {TryRead, TryWrite};
 use io::{self, Evented, FromFd, Io};
 use net::{self, nix, Socket};
-use std::mem;
 use std::net::SocketAddr;
 use std::os::unix::io::{RawFd, AsRawFd};
-
-pub use std::net::{TcpStream, TcpListener};
-
-pub fn v4() -> io::Result<NonBlock<TcpSocket>> {
-    TcpSocket::new(nix::AddressFamily::Inet, true)
-        .map(NonBlock::new)
-}
-
-pub fn v6() -> io::Result<NonBlock<TcpSocket>> {
-    TcpSocket::new(nix::AddressFamily::Inet6, true)
-        .map(NonBlock::new)
-}
-
-pub fn listen(addr: &SocketAddr) -> io::Result<NonBlock<TcpListener>> {
-    // Create the socket
-    let sock = try!(match *addr {
-        SocketAddr::V4(..) => v4(),
-        SocketAddr::V6(..) => v6(),
-    });
-
-    // Bind the socket
-    try!(sock.bind(addr));
-
-    // listen
-    sock.listen(1024)
-}
-
-pub fn connect(addr: &SocketAddr) -> io::Result<(NonBlock<TcpStream>, bool)> {
-    let sock = try!(match *addr {
-        SocketAddr::V4(..) => v4(),
-        SocketAddr::V6(..) => v6(),
-    });
-
-    sock.connect(addr)
-}
 
 /*
  *
@@ -52,16 +16,24 @@ pub struct TcpSocket {
 }
 
 impl TcpSocket {
-    fn new(family: nix::AddressFamily, nonblock: bool) -> io::Result<TcpSocket> {
-        net::socket(family, nix::SockType::Stream, nonblock)
+    /// Returns a new, unbound, non-blocking, IPv4 socket
+    pub fn v4() -> io::Result<TcpSocket> {
+        TcpSocket::new(nix::AddressFamily::Inet)
+    }
+
+    /// Returns a new, unbound, non-blocking, IPv6 socket
+    pub fn v6() -> io::Result<TcpSocket> {
+        TcpSocket::new(nix::AddressFamily::Inet6)
+    }
+
+    fn new(family: nix::AddressFamily) -> io::Result<TcpSocket> {
+        net::socket(family, nix::SockType::Stream, true)
             .map(FromFd::from_fd)
     }
 
     pub fn connect(self, addr: &SocketAddr) -> io::Result<(TcpStream, bool)> {
-        let io = self.io;
-        // Attempt establishing the context. This may not complete immediately.
-        net::connect(&io, &net::to_nix_addr(addr))
-            .map(|complete| (to_tcp_stream(io), complete))
+        let complete = try!(net::connect(&self.io, &net::to_nix_addr(addr)));
+        Ok((TcpStream { io: self.io }, complete))
     }
 
     pub fn bind(&self, addr: &SocketAddr) -> io::Result<()> {
@@ -70,29 +42,17 @@ impl TcpSocket {
 
     pub fn listen(self, backlog: usize) -> io::Result<TcpListener> {
         try!(net::listen(&self.io, backlog));
-        Ok(to_tcp_listener(self.io))
+        Ok(TcpListener { io: self.io })
     }
 
-    pub fn getpeername(&self) -> io::Result<SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         net::getpeername(&self.io)
             .map(net::to_std_addr)
     }
 
-    pub fn getsockname(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
         net::getsockname(&self.io)
             .map(net::to_std_addr)
-    }
-}
-
-impl NonBlock<TcpSocket> {
-    pub fn listen(self, backlog: usize) -> io::Result<NonBlock<TcpListener>> {
-        self.unwrap().listen(backlog)
-            .map(NonBlock::new)
-    }
-
-    pub fn connect(self, addr: &SocketAddr) -> io::Result<(NonBlock<TcpStream>, bool)> {
-        self.unwrap().connect(addr)
-            .map(|(stream, complete)| (NonBlock::new(stream), complete))
     }
 }
 
@@ -120,9 +80,57 @@ impl Socket for TcpSocket {
  *
  */
 
+pub struct TcpStream {
+    io: Io,
+}
+
+impl TcpStream {
+    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
+        let sock = try!(match *addr {
+            SocketAddr::V4(..) => TcpSocket::v4(),
+            SocketAddr::V6(..) => TcpSocket::v6(),
+        });
+
+        sock.connect(addr)
+            .map(|(stream, _)| stream)
+    }
+
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        net::getpeername(&self.io)
+            .map(net::to_std_addr)
+    }
+
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        net::getsockname(&self.io)
+            .map(net::to_std_addr)
+    }
+
+    pub fn try_clone(&self) -> io::Result<TcpStream> {
+        unimplemented!();
+    }
+}
+
+impl TryRead for TcpStream {
+    fn read_slice(&mut self, buf: &mut [u8]) -> io::Result<Option<usize>> {
+        self.io.read_slice(buf)
+    }
+}
+
+impl TryWrite for TcpStream {
+    fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
+        self.io.write_slice(buf)
+    }
+}
+
+impl AsRawFd for TcpStream {
+    fn as_raw_fd(&self) -> RawFd {
+        self.io.as_raw_fd()
+    }
+}
+
 impl FromFd for TcpStream {
     fn from_fd(fd: RawFd) -> TcpStream {
-        to_tcp_stream(Io::new(fd))
+        TcpStream { io: Io::new(fd) }
     }
 }
 
@@ -132,22 +140,60 @@ impl Evented for TcpStream {
 impl Socket for TcpStream {
 }
 
-impl IntoNonBlock for TcpStream {
-    fn into_non_block(self) -> io::Result<NonBlock<TcpStream>> {
-        try!(net::set_non_block(as_io(&self)));
-        Ok(NonBlock::new(self))
-    }
-}
-
 /*
  *
  * ===== TcpListener =====
  *
  */
 
+pub struct TcpListener {
+    io: Io,
+}
+
+impl TcpListener {
+    pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
+        // Create the socket
+        let sock = try!(match *addr {
+            SocketAddr::V4(..) => TcpSocket::v4(),
+            SocketAddr::V6(..) => TcpSocket::v6(),
+        });
+
+        // Bind the socket
+        try!(sock.bind(addr));
+
+        // listen
+        sock.listen(1024)
+    }
+
+    /// Accepts a new `TcpStream`.
+    ///
+    /// Returns a `Ok(None)` when the socket `WOULDBLOCK`, this means the stream will be ready at
+    /// a later point.
+    pub fn accept(&self) -> io::Result<Option<TcpStream>> {
+        net::accept(&self.io, true)
+            .map(|fd| Some(FromFd::from_fd(fd)))
+            .or_else(io::to_non_block)
+    }
+
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        net::getsockname(&self.io)
+            .map(net::to_std_addr)
+    }
+
+    pub fn try_clone(&self) -> io::Result<TcpListener> {
+        unimplemented!();
+    }
+}
+
 impl FromFd for TcpListener {
     fn from_fd(fd: RawFd) -> TcpListener {
-        to_tcp_listener(Io::new(fd))
+        TcpListener { io: Io::new(fd) }
+    }
+}
+
+impl AsRawFd for TcpListener {
+    fn as_raw_fd(&self) -> RawFd {
+        self.io.as_raw_fd()
     }
 }
 
@@ -155,42 +201,4 @@ impl Evented for TcpListener {
 }
 
 impl Socket for TcpListener {
-}
-
-impl IntoNonBlock for TcpListener {
-    fn into_non_block(self) -> io::Result<NonBlock<TcpListener>> {
-        try!(net::set_non_block(as_io(&self)));
-        Ok(NonBlock::new(self))
-    }
-}
-
-impl NonBlock<TcpListener> {
-    /// Accepts a new `TcpStream`.
-    ///
-    /// Returns a `Ok(None)` when the socket `WOULDBLOCK`, this means the stream will be ready at
-    /// a later point.
-    pub fn accept(&self) -> io::Result<Option<NonBlock<TcpStream>>> {
-        net::accept(as_io(self), true)
-            .map(|fd| Some(FromFd::from_fd(fd)))
-            .or_else(io::to_non_block)
-    }
-}
-
-/*
- *
- * ===== Conversions =====
- *
- */
-
-
-fn to_tcp_stream(io: Io) -> TcpStream {
-    unsafe { mem::transmute(io) }
-}
-
-fn to_tcp_listener(io: Io) -> TcpListener {
-    unsafe { mem::transmute(io) }
-}
-
-fn as_io<'a, T>(tcp: &'a T) -> &'a Io {
-    unsafe { mem::transmute(tcp) }
 }

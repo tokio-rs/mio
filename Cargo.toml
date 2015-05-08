@@ -1,7 +1,7 @@
 [package]
 
 name          = "mio"
-version       = "0.3.4"
+version       = "0.4.0"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
@@ -19,9 +19,11 @@ exclude       = [
 
 [dependencies]
 log   = "0.3.1"
-nix   = "0.3.5"
 time  = "0.1.24"
 bytes = "0.2.7"
+
+[dependencies.nix]
+git = "https://github.com/carllerche/nix-rust"
 
 [dev-dependencies]
 env_logger = "0.3.0"

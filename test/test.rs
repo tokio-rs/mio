@@ -11,11 +11,9 @@ pub use ports::localhost;
 mod test_battery;
 mod test_close_on_drop;
 mod test_echo_server;
-// TODO: Bring back once multicast is stable
-// mod test_multicast;
+mod test_multicast;
 mod test_notify;
 mod test_register_deregister;
-mod test_sock_to;
 mod test_timer;
 mod test_udp_socket;
 mod test_unix_echo_server;

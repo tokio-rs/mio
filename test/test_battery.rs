@@ -10,14 +10,14 @@ const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
 struct EchoConn {
-    sock: NonBlock<TcpStream>,
+    sock: TcpStream,
     token: Option<Token>,
     count: u32,
     buf: Vec<u8>
 }
 
 impl EchoConn {
-    fn new(sock: NonBlock<TcpStream>) -> EchoConn {
+    fn new(sock: TcpStream) -> EchoConn {
         let mut ec =
         EchoConn {
             sock: sock,
@@ -60,7 +60,7 @@ impl EchoConn {
 }
 
 struct EchoServer {
-    sock: NonBlock<TcpListener>,
+    sock: TcpListener,
     conns: Slab<EchoConn>
 }
 
@@ -97,7 +97,7 @@ impl EchoServer {
 }
 
 struct EchoClient {
-    sock: NonBlock<TcpStream>,
+    sock: TcpStream,
     backlog: LinkedList<String>,
     token: Token,
     count: u32
@@ -106,7 +106,7 @@ struct EchoClient {
 
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: NonBlock<TcpStream>, tok: Token) -> EchoClient {
+    fn new(sock: TcpStream, tok: Token) -> EchoClient {
 
         EchoClient {
             sock: sock,
@@ -152,7 +152,7 @@ struct Echo {
 }
 
 impl Echo {
-    fn new(srv: NonBlock<TcpListener>, client: NonBlock<TcpStream>) -> Echo {
+    fn new(srv: TcpListener, client: TcpStream) -> Echo {
         Echo {
             server: EchoServer {
                 sock: srv,
@@ -222,7 +222,7 @@ pub fn test_echo_server() {
 
     let addr = localhost();
 
-    let srv = tcp::v4().unwrap();
+    let srv = TcpSocket::v4().unwrap();
 
     info!("setting re-use addr");
     srv.set_reuseaddr(true).unwrap();
@@ -233,7 +233,7 @@ pub fn test_echo_server() {
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let (sock, _) = tcp::v4().unwrap()
+    let (sock, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Connect to the server

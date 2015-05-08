@@ -6,13 +6,13 @@ const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
 struct TestHandler {
-    server: NonBlock<TcpListener>,
-    client: NonBlock<TcpStream>,
+    server: TcpListener,
+    client: TcpStream,
     state: usize,
 }
 
 impl TestHandler {
-    fn new(srv: NonBlock<TcpListener>, cli: NonBlock<TcpStream>) -> TestHandler {
+    fn new(srv: TcpListener, cli: TcpStream) -> TestHandler {
         TestHandler {
             server: srv,
             client: cli,
@@ -61,7 +61,7 @@ pub fn test_register_deregister() {
 
     let addr = localhost();
 
-    let server = tcp::v4().unwrap();
+    let server = TcpSocket::v4().unwrap();
 
     info!("setting re-use addr");
     server.set_reuseaddr(true).unwrap();
@@ -72,7 +72,7 @@ pub fn test_register_deregister() {
     info!("register server socket");
     event_loop.register_opt(&server, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
 
-    let (client, _) = tcp::v4().unwrap()
+    let (client, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Register client socket only as writable
