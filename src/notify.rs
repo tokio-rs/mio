@@ -1,10 +1,9 @@
-use {sys, Evented};
+use {sys, Evented, Interest, PollOpt, Selector, Token};
 use util::BoundedQueue;
 use std::{fmt, cmp, io};
 use std::sync::Arc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
-use std::os::unix::io::{RawFd, AsRawFd};
 
 const SLEEP: isize = -1;
 
@@ -156,13 +155,18 @@ impl<M: Send> NotifyInner<M> {
     }
 }
 
-impl<M: Send> AsRawFd for Notify<M> {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.awaken.as_raw_fd()
-    }
-}
-
 impl<M: Send> Evented for Notify<M> {
+    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.inner.awaken.register(selector, token, interest, opts)
+    }
+
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.inner.awaken.reregister(selector, token, interest, opts)
+    }
+
+    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
+        self.inner.awaken.deregister(selector)
+    }
 }
 
 pub enum NotifyError<T> {

@@ -1,8 +1,5 @@
-use {TryRead, TryWrite};
-use io::{self, Evented, FromFd, Io};
-use net::{self, nix, Socket};
+use {io, sys, Evented, Interest, PollOpt, Selector, Token, TryRead, TryWrite};
 use std::net::SocketAddr;
-use std::os::unix::io::{RawFd, AsRawFd};
 
 /*
  *
@@ -12,66 +9,76 @@ use std::os::unix::io::{RawFd, AsRawFd};
 
 #[derive(Debug)]
 pub struct TcpSocket {
-    io: Io,
+    sys: sys::TcpSocket,
 }
 
 impl TcpSocket {
     /// Returns a new, unbound, non-blocking, IPv4 socket
     pub fn v4() -> io::Result<TcpSocket> {
-        TcpSocket::new(nix::AddressFamily::Inet)
+        sys::TcpSocket::v4().map(From::from)
     }
 
     /// Returns a new, unbound, non-blocking, IPv6 socket
     pub fn v6() -> io::Result<TcpSocket> {
-        TcpSocket::new(nix::AddressFamily::Inet6)
-    }
-
-    fn new(family: nix::AddressFamily) -> io::Result<TcpSocket> {
-        net::socket(family, nix::SockType::Stream, true)
-            .map(FromFd::from_fd)
+        sys::TcpSocket::v6().map(From::from)
     }
 
     pub fn connect(self, addr: &SocketAddr) -> io::Result<(TcpStream, bool)> {
-        let complete = try!(net::connect(&self.io, &net::to_nix_addr(addr)));
-        Ok((TcpStream { io: self.io }, complete))
+        let complete = try!(self.sys.connect(addr));
+        Ok((From::from(self.sys), complete))
     }
 
     pub fn bind(&self, addr: &SocketAddr) -> io::Result<()> {
-        net::bind(&self.io, &net::to_nix_addr(addr))
+        self.sys.bind(addr)
     }
 
     pub fn listen(self, backlog: usize) -> io::Result<TcpListener> {
-        try!(net::listen(&self.io, backlog));
-        Ok(TcpListener { io: self.io })
+        try!(self.sys.listen(backlog));
+        Ok(From::from(self.sys))
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        net::getpeername(&self.io)
-            .map(net::to_std_addr)
+        self.sys.peer_addr()
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        net::getsockname(&self.io)
-            .map(net::to_std_addr)
+        self.sys.local_addr()
+    }
+
+    pub fn try_clone(&self) -> io::Result<TcpSocket> {
+        self.sys.try_clone()
+            .map(From::from)
+    }
+
+    /*
+     *
+     * ===== Socket Options =====
+     *
+     */
+
+    pub fn set_reuseaddr(&self, val: bool) -> io::Result<()> {
+        self.sys.set_reuseaddr(val)
     }
 }
 
 impl Evented for TcpSocket {
-}
+    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.sys.register(selector, token, interest, opts)
+    }
 
-impl AsRawFd for TcpSocket {
-    fn as_raw_fd(&self) -> RawFd {
-        self.io.as_raw_fd()
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(selector, token, interest, opts)
+    }
+
+    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
+        self.sys.deregister(selector)
     }
 }
 
-impl FromFd for TcpSocket {
-    fn from_fd(fd: RawFd) -> TcpSocket {
-        TcpSocket { io: Io::new(fd) }
+impl From<sys::TcpSocket> for TcpSocket {
+    fn from(sys: sys::TcpSocket) -> TcpSocket {
+        TcpSocket { sys: sys }
     }
-}
-
-impl Socket for TcpSocket {
 }
 
 /*
@@ -81,7 +88,7 @@ impl Socket for TcpSocket {
  */
 
 pub struct TcpStream {
-    io: Io,
+    sys: sys::TcpSocket,
 }
 
 impl TcpStream {
@@ -96,48 +103,49 @@ impl TcpStream {
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        net::getpeername(&self.io)
-            .map(net::to_std_addr)
+        self.sys.peer_addr()
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        net::getsockname(&self.io)
-            .map(net::to_std_addr)
+        self.sys.local_addr()
     }
 
     pub fn try_clone(&self) -> io::Result<TcpStream> {
-        unimplemented!();
+        self.sys.try_clone()
+            .map(From::from)
     }
 }
 
 impl TryRead for TcpStream {
     fn read_slice(&mut self, buf: &mut [u8]) -> io::Result<Option<usize>> {
-        self.io.read_slice(buf)
+        self.sys.read_slice(buf)
     }
 }
 
 impl TryWrite for TcpStream {
     fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
-        self.io.write_slice(buf)
-    }
-}
-
-impl AsRawFd for TcpStream {
-    fn as_raw_fd(&self) -> RawFd {
-        self.io.as_raw_fd()
-    }
-}
-
-impl FromFd for TcpStream {
-    fn from_fd(fd: RawFd) -> TcpStream {
-        TcpStream { io: Io::new(fd) }
+        self.sys.write_slice(buf)
     }
 }
 
 impl Evented for TcpStream {
+    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.sys.register(selector, token, interest, opts)
+    }
+
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(selector, token, interest, opts)
+    }
+
+    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
+        self.sys.deregister(selector)
+    }
 }
 
-impl Socket for TcpStream {
+impl From<sys::TcpSocket> for TcpStream {
+    fn from(sys: sys::TcpSocket) -> TcpStream {
+        TcpStream { sys: sys }
+    }
 }
 
 /*
@@ -147,7 +155,7 @@ impl Socket for TcpStream {
  */
 
 pub struct TcpListener {
-    io: Io,
+    sys: sys::TcpSocket,
 }
 
 impl TcpListener {
@@ -170,35 +178,92 @@ impl TcpListener {
     /// Returns a `Ok(None)` when the socket `WOULDBLOCK`, this means the stream will be ready at
     /// a later point.
     pub fn accept(&self) -> io::Result<Option<TcpStream>> {
-        net::accept(&self.io, true)
-            .map(|fd| Some(FromFd::from_fd(fd)))
-            .or_else(io::to_non_block)
+        self.sys.accept()
+            .map(|opt| {
+                opt.map(|sys| TcpStream { sys: sys })
+            })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        net::getsockname(&self.io)
-            .map(net::to_std_addr)
+        self.sys.local_addr()
     }
 
     pub fn try_clone(&self) -> io::Result<TcpListener> {
-        unimplemented!();
+        self.sys.try_clone()
+            .map(From::from)
     }
 }
 
-impl FromFd for TcpListener {
-    fn from_fd(fd: RawFd) -> TcpListener {
-        TcpListener { io: Io::new(fd) }
-    }
-}
-
-impl AsRawFd for TcpListener {
-    fn as_raw_fd(&self) -> RawFd {
-        self.io.as_raw_fd()
+impl From<sys::TcpSocket> for TcpListener {
+    fn from(sys: sys::TcpSocket) -> TcpListener {
+        TcpListener { sys: sys }
     }
 }
 
 impl Evented for TcpListener {
+    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.sys.register(selector, token, interest, opts)
+    }
+
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(selector, token, interest, opts)
+    }
+
+    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
+        self.sys.deregister(selector)
+    }
 }
 
-impl Socket for TcpListener {
+/*
+ *
+ * ===== UNIX ext =====
+ *
+ */
+
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, RawFd};
+
+#[cfg(unix)]
+use unix::FromRawFd;
+
+#[cfg(unix)]
+impl AsRawFd for TcpSocket {
+    fn as_raw_fd(&self) -> RawFd {
+        self.sys.as_raw_fd()
+    }
+}
+
+#[cfg(unix)]
+impl FromRawFd for TcpSocket {
+    unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
+        TcpSocket { sys: FromRawFd::from_raw_fd(fd) }
+    }
+}
+
+#[cfg(unix)]
+impl AsRawFd for TcpStream {
+    fn as_raw_fd(&self) -> RawFd {
+        self.sys.as_raw_fd()
+    }
+}
+
+#[cfg(unix)]
+impl FromRawFd for TcpStream {
+    unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
+        TcpStream { sys: FromRawFd::from_raw_fd(fd) }
+    }
+}
+
+#[cfg(unix)]
+impl AsRawFd for TcpListener {
+    fn as_raw_fd(&self) -> RawFd {
+        self.sys.as_raw_fd()
+    }
+}
+
+#[cfg(unix)]
+impl FromRawFd for TcpListener {
+    unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
+        TcpListener { sys: FromRawFd::from_raw_fd(fd) }
+    }
 }

@@ -1,26 +1,22 @@
-use {Io, IpAddr};
+use {io, sys, Evented, Interest, IpAddr, PollOpt, Selector, Token};
 use buf::{Buf, MutBuf};
-use io::{self, Evented, FromFd};
-use net::{self, nix, Socket};
-use std::mem;
 use std::net::SocketAddr;
-use std::os::unix::io::{RawFd, AsRawFd};
 
 pub struct UdpSocket {
-    io: Io,
+    sys: sys::UdpSocket,
 }
 
 impl UdpSocket {
     /// Returns a new, unbound, non-blocking, IPv4 UDP socket
     pub fn v4() -> io::Result<UdpSocket> {
-        net::socket(nix::AddressFamily::Inet, nix::SockType::Datagram, true)
-            .map(|fd| UdpSocket { io: Io::new(fd) })
+        sys::UdpSocket::v4()
+            .map(From::from)
     }
 
     /// Returns a new, unbound, non-blocking, IPv6 UDP socket
     pub fn v6() -> io::Result<UdpSocket> {
-        net::socket(nix::AddressFamily::Inet6, nix::SockType::Datagram, true)
-            .map(|fd| UdpSocket { io: Io::new(fd) })
+        sys::UdpSocket::v6()
+            .map(From::from)
     }
 
     pub fn bound(addr: &SocketAddr) -> io::Result<UdpSocket> {
@@ -37,116 +33,89 @@ impl UdpSocket {
     }
 
     pub fn bind(&self, addr: &SocketAddr) -> io::Result<()> {
-        net::bind(&self.io, &net::to_nix_addr(addr))
+        self.sys.bind(addr)
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        net::getsockname(&self.io)
-            .map(net::to_std_addr)
+        self.sys.local_addr()
     }
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        unimplemented!();
+        self.sys.try_clone()
+            .map(From::from)
     }
 
     pub fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<Option<()>> {
-        net::sendto(&self.io, buf.bytes(), &net::to_nix_addr(target))
-            .map(|cnt| {
-                buf.advance(cnt);
-                Some(())
-            })
-            .or_else(io::to_non_block)
+        self.sys.send_to(buf, target)
     }
 
     pub fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<Option<SocketAddr>> {
-        net::recvfrom(&self.io, buf.mut_bytes())
-            .map(|(cnt, addr)| {
-                buf.advance(cnt);
-                Some(net::to_std_addr(addr))
-            })
-            .or_else(io::to_non_block)
+        self.sys.recv_from(buf)
     }
 
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::Broadcast, &on)
-            .map_err(io::from_nix_error)
+        self.sys.set_broadcast(on)
     }
 
     pub fn set_multicast_loop(&self, on: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ip, nix::sockopt::IpMulticastLoop, &on)
-            .map_err(io::from_nix_error)
+        self.sys.set_multicast_loop(on)
     }
 
     pub fn join_multicast(&self, multi: &IpAddr) -> io::Result<()> {
-        match *multi {
-            IpAddr::V4(ref addr) => {
-                // Create the request
-                let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
-
-                // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ip, nix::sockopt::IpAddMembership, &req)
-                    .map_err(io::from_nix_error)
-            }
-            IpAddr::V6(ref addr) => {
-                // Create the request
-                let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
-
-                // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ipv6, nix::sockopt::Ipv6AddMembership, &req)
-                    .map_err(io::from_nix_error)
-            }
-        }
+        self.sys.join_multicast(multi)
     }
 
     pub fn leave_multicast(&self, multi: &IpAddr) -> io::Result<()> {
-        match *multi {
-            IpAddr::V4(ref addr) => {
-                // Create the request
-                let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
-
-                // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ip, nix::sockopt::IpDropMembership, &req)
-                    .map_err(io::from_nix_error)
-            }
-            IpAddr::V6(ref addr) => {
-                // Create the request
-                let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
-
-                // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ipv6, nix::sockopt::Ipv6DropMembership, &req)
-                    .map_err(io::from_nix_error)
-            }
-        }
+        self.sys.leave_multicast(multi)
     }
 
     pub fn set_multicast_time_to_live(&self, ttl: i32) -> io::Result<()> {
-        let v = if ttl < 0 {
-            0
-        } else if ttl > 255 {
-            255
-        } else {
-            ttl as u8
-        };
-
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ip, nix::sockopt::IpMulticastTtl, &v)
-            .map_err(io::from_nix_error)
+        self.sys.set_multicast_time_to_live(ttl)
     }
 }
 
 impl Evented for UdpSocket {
-}
+    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.sys.register(selector, token, interest, opts)
+    }
 
-impl FromFd for UdpSocket {
-    fn from_fd(fd: RawFd) -> UdpSocket {
-        unsafe { mem::transmute(Io::new(fd)) }
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(selector, token, interest, opts)
+    }
+
+    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
+        self.sys.deregister(selector)
     }
 }
 
+impl From<sys::UdpSocket> for UdpSocket {
+    fn from(sys: sys::UdpSocket) -> UdpSocket {
+        UdpSocket { sys: sys }
+    }
+}
+
+/*
+ *
+ * ===== UNIX ext =====
+ *
+ */
+
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, RawFd};
+
+#[cfg(unix)]
+use unix::FromRawFd;
+
+#[cfg(unix)]
 impl AsRawFd for UdpSocket {
     fn as_raw_fd(&self) -> RawFd {
-        self.io.as_raw_fd()
+        self.sys.as_raw_fd()
     }
 }
 
-impl Socket for UdpSocket {
+#[cfg(unix)]
+impl FromRawFd for UdpSocket {
+    unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
+        UdpSocket { sys: FromRawFd::from_raw_fd(fd) }
+    }
 }

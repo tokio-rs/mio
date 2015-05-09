@@ -118,24 +118,20 @@ pub use handler::{
     Handler,
 };
 pub use io::{
-    pipe,
-    FromFd,
-    Io,
     TryRead,
     TryWrite,
     Evented,
-    PipeReader,
-    PipeWriter,
 };
 pub use net::{
     tcp,
     udp,
-    unix,
     IpAddr,
     Ipv4Addr,
     Ipv6Addr,
-    Socket,
 };
+#[cfg(unix)]
+pub use net::unix;
+
 pub use notify::{
     NotifyError,
 };
@@ -149,6 +145,10 @@ pub use timer::{
 };
 pub use token::{
     Token,
+};
+pub use sys::{
+    Io,
+    Selector,
 };
 
 pub mod prelude {

@@ -364,7 +364,7 @@ mod tests {
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
-    use {io, buf, Buf, Handler, Token, TryRead, TryWrite, ReadHint};
+    use {buf, unix, Buf, Handler, Token, TryRead, TryWrite, ReadHint};
 
     #[test]
     pub fn test_event_loop_size() {
@@ -405,7 +405,7 @@ mod tests {
     pub fn test_readable() {
         let mut event_loop = EventLoop::new().ok().expect("Couldn't make event loop");
 
-        let (mut reader, mut writer) = io::pipe().unwrap();
+        let (mut reader, mut writer) = unix::pipe().unwrap();
 
         let rcount = Arc::new(AtomicIsize::new(0));
         let wcount = Arc::new(AtomicIsize::new(0));

@@ -1,8 +1,8 @@
+use {io, Interest, PollOpt, Token};
+use event::IoEvent;
 use nix::fcntl::Fd;
 use nix::sys::epoll::*;
 use nix::unistd::close;
-use io;
-use event::{IoEvent, Interest, PollOpt};
 
 pub struct Selector {
     epfd: Fd
@@ -10,7 +10,7 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        let epfd = try!(epoll_create().map_err(io::from_nix_error));
+        let epfd = try!(epoll_create().map_err(super::from_nix_error));
 
         Ok(Selector { epfd: epfd })
     }
@@ -27,7 +27,7 @@ impl Selector {
 
         // Wait for epoll events for at most timeout_ms milliseconds
         let cnt = try!(epoll_wait(self.epfd, dst, timeout_ms)
-                           .map_err(io::from_nix_error));
+                           .map_err(super::from_nix_error));
 
         unsafe { evts.events.set_len(cnt); }
 
@@ -35,25 +35,25 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&mut self, fd: Fd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
-            data: token as u64
+            data: token.as_usize() as u64
         };
 
         epoll_ctl(self.epfd, EpollOp::EpollCtlAdd, fd, &info)
-            .map_err(io::from_nix_error)
+            .map_err(super::from_nix_error)
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&mut self, fd: Fd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
-            data: token as u64
+            data: token.as_usize() as u64
         };
 
         epoll_ctl(self.epfd, EpollOp::EpollCtlMod, fd, &info)
-            .map_err(io::from_nix_error)
+            .map_err(super::from_nix_error)
     }
 
     /// Deregister event interests for the given IO handle with the OS
@@ -67,7 +67,7 @@ impl Selector {
         };
 
         epoll_ctl(self.epfd, EpollOp::EpollCtlDel, fd, &info)
-            .map_err(io::from_nix_error)
+            .map_err(super::from_nix_error)
     }
 }
 
