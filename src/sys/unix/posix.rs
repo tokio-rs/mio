@@ -1,6 +1,7 @@
 use {TryRead, TryWrite};
 use io::{self, PipeReader, PipeWriter};
 use std::mem;
+use std::cell::UnsafeCell;
 use std::os::unix::io::{RawFd, AsRawFd};
 
 /*
@@ -10,8 +11,8 @@ use std::os::unix::io::{RawFd, AsRawFd};
  */
 
 pub struct Awakener {
-    reader: PipeReader,
-    writer: PipeWriter,
+    reader: UnsafeCell<PipeReader>,
+    writer: UnsafeCell<PipeWriter>,
 }
 
 impl Awakener {
@@ -19,20 +20,23 @@ impl Awakener {
         let (rd, wr) = try!(io::pipe());
 
         Ok(Awakener {
-            reader: rd,
-            writer: wr
+            reader: UnsafeCell::new(rd),
+            writer: UnsafeCell::new(wr),
         })
     }
 
     pub fn as_raw_fd(&self) -> RawFd {
-        self.reader.as_raw_fd()
+        unsafe {
+            let rd: &PipeReader = mem::transmute(self.reader.get());
+            rd.as_raw_fd()
+        }
     }
 
     pub fn wakeup(&self) -> io::Result<()> {
         // A hack, but such is life. PipeWriter is backed by a single FD, which
         // is thread safe.
         unsafe {
-            let wr: &mut PipeWriter = mem::transmute(&self.writer);
+            let wr: &mut PipeWriter = mem::transmute(self.writer.get());
             wr.write_slice(b"0x01").map(|_| ())
         }
     }
@@ -45,7 +49,7 @@ impl Awakener {
             // write sides of the awakener, but that would be a more
             // significant refactor. A transmute here is safe.
             unsafe {
-                let rd: &mut PipeReader = mem::transmute(&self.reader);
+                let rd: &mut PipeReader = mem::transmute(self.reader.get());
 
                 // Consume data until all bytes are purged
                 match rd.read_slice(&mut buf) {
