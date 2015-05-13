@@ -21,7 +21,7 @@ exclude       = [
 log   = "0.3.1"
 nix   = "0.3.5"
 time  = "0.1.24"
-bytes = "0.2.7"
+bytes = "0.2.9"
 
 [dev-dependencies]
 env_logger = "0.3.0"
