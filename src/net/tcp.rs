@@ -106,7 +106,8 @@ impl TcpStream {
     }
 
     pub fn try_clone(&self) -> io::Result<TcpStream> {
-        unimplemented!();
+        net::dup(&self.io)
+            .map(|fd| TcpStream { io: fd })
     }
 }
 

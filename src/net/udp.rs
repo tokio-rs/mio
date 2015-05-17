@@ -46,7 +46,8 @@ impl UdpSocket {
     }
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        unimplemented!();
+        net::dup(&self.io)
+            .map(|fd| UdpSocket { io: fd })
     }
 
     pub fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<Option<()>> {
