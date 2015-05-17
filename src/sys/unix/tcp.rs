@@ -54,7 +54,8 @@ impl TcpSocket {
     }
 
     pub fn try_clone(&self) -> io::Result<TcpSocket> {
-        unimplemented!();
+        net::dup(&self.io)
+            .map(From::from)
     }
 
     /*

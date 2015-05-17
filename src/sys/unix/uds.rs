@@ -42,7 +42,8 @@ impl UnixSocket {
     }
 
     pub fn try_clone(&self) -> io::Result<UnixSocket> {
-        unimplemented!();
+        net::dup(&self.io)
+            .map(From::from)
     }
 }
 

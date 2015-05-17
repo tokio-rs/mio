@@ -76,6 +76,7 @@ mod nix {
     pub use nix::sys::time::TimeVal;
     pub use nix::unistd::{
         read,
-        write
+        write,
+        dup,
     };
 }
