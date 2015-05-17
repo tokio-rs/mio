@@ -176,19 +176,7 @@ impl TryWrite for PipeWriter {
  */
 
 pub fn from_nix_error(err: ::nix::Error) -> Error {
-    use std::mem;
-
-    // TODO: Remove insane hacks once `std::io::Error::from_os_error` lands
-    //       rust-lang/rust#24028
-    #[allow(dead_code)]
-    enum Repr {
-        Os(i32),
-        Custom(*const ()),
-    }
-
-    unsafe {
-        mem::transmute(Repr::Os(err.errno() as i32))
-    }
+    Error::from_raw_os_error(err.errno() as i32)
 }
 
 pub fn to_non_block<T>(err: Error) -> Result<Option<T>> {
