@@ -41,6 +41,11 @@ impl UnixSocket {
     pub fn bind<P: AsRef<Path> + ?Sized>(&self, addr: &P) -> io::Result<()> {
         net::bind(&self.io, &try!(to_nix_addr(addr)))
     }
+
+    pub fn try_clone(&self) -> io::Result<UnixSocket> {
+        net::dup(&self.io)
+            .map(|fd| UnixSocket { io: fd })
+    }
 }
 
 impl AsRawFd for UnixSocket {

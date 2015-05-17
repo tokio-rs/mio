@@ -143,7 +143,8 @@ mod nix {
     pub use nix::sys::time::TimeVal;
     pub use nix::unistd::{
         read,
-        write
+        write,
+        dup
     };
 }
 
@@ -213,6 +214,14 @@ fn getpeername(io: &Io) -> io::Result<nix::SockAddr> {
 fn getsockname(io: &Io) -> io::Result<nix::SockAddr> {
     nix::getsockname(io.as_raw_fd())
         .map_err(io::from_nix_error)
+}
+
+// unistd
+#[inline]
+fn dup(io: &Io) -> io::Result<Io> {
+    nix::dup(io.as_raw_fd())
+        .map_err(io::from_nix_error)
+        .map(|fd| Io::new(fd))
 }
 
 /*
