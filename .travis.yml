@@ -1,14 +1,25 @@
----
 language: rust
 sudo: false
-
 script:
-  - cargo test
-  - cargo doc --no-deps
+- cargo test
+- cargo doc --no-deps
 
-after_success:
-  - test $TRAVIS_PULL_REQUEST == "false" && test $TRAVIS_BRANCH == "master" && bash deploy.sh
-
-env:
-  global:
-    secure: "btdSFScOk10KxYrlwXWcJVeUxVlWXV5YEsNvRWk1T+ysobKu/5uMznwB8zgxi7YtR+ICljXfJ+DhtalCYntFvGbhQ6HrKYoe7lCh0TH1GZX5sqvIdXbmoVZbeHsRV/uRshk1BBkY85cFm3afTHuh5pgGPwV+PVEcwYRrSn2JTQs="
+# Deploy documentation to S3 for specific branches. At some
+# point, it would be nice to also support building docs for
+# a specific tag
+deploy:
+  provider: s3
+  access_key_id: AKIAIGFX36YKEFRZJAXA
+  secret_access_key:
+    secure: blFcl9EMlWIiI+x8LZFWpyIxRZRScKWaftSXluFB0HLgbA1oYYX4lo8GgVYGQZ4kP3iIuL+WAlGvf3iCrAULGy0UOxLgvwOxX8XsgfCZpzF/Bw1G6od+IkPzbpNIgMtkceDhzZEmO+yatbAYCdMF0qq485QJ502inB7aeu1G94w=
+  bucket: rustdoc
+  endpoint: "rustdoc.s3-website-us-east-1.amazonaws.com"
+  skip_cleanup: true
+  local-dir: target/doc
+  upload-dir: mio/${TRAVIS_BRANCH}
+  acl: public_read
+  on:
+    repo: carllerche/mio
+    branch:
+      - master
+      - v0.3.x
