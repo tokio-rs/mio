@@ -2,6 +2,7 @@ use {io, sys, Evented, Interest, IpAddr, PollOpt, Selector, Token};
 use buf::{Buf, MutBuf};
 use std::net::SocketAddr;
 
+#[derive(Debug)]
 pub struct UdpSocket {
     sys: sys::UdpSocket,
 }

@@ -87,6 +87,7 @@ impl From<sys::TcpSocket> for TcpSocket {
  *
  */
 
+#[derive(Debug)]
 pub struct TcpStream {
     sys: sys::TcpSocket,
 }
@@ -154,6 +155,7 @@ impl From<sys::TcpSocket> for TcpStream {
  *
  */
 
+#[derive(Debug)]
 pub struct TcpListener {
     sys: sys::TcpSocket,
 }

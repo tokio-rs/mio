@@ -2,9 +2,10 @@ use {io, Interest, PollOpt, Token};
 use event::IoEvent;
 use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, ev_set, kqueue, kevent};
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ONESHOT};
-use std::slice;
+use std::{fmt, slice};
 use std::os::unix::io::RawFd;
 
+#[derive(Debug)]
 pub struct Selector {
     kq: RawFd,
     changes: Events
@@ -170,5 +171,11 @@ impl Events {
             let ptr = (&mut self.events[..]).as_mut_ptr();
             slice::from_raw_parts_mut(ptr, self.events.capacity())
         }
+    }
+}
+
+impl fmt::Debug for Events {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Events {{ len: {} }}", self.events.len())
     }
 }
