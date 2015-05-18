@@ -181,7 +181,7 @@ impl<H: Handler> EventLoop<H> {
 
     /// Registers an IO handle with the event loop.
     pub fn register<E: Evented>(&mut self, io: &E, token: Token) -> io::Result<()> {
-        self.poll.register(io, token, Interest::readable(), PollOpt::level())
+        self.poll.register(io, token, Interest::all(), PollOpt::level())
     }
 
     /// Registers an IO handle with the event loop.
