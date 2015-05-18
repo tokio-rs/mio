@@ -102,6 +102,7 @@ impl Selector {
     }
 }
 
+#[derive(Debug)]
 pub struct Events {
     events: Vec<KEvent>,
 }
