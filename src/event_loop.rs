@@ -34,6 +34,7 @@ impl Default for EventLoopConfig {
 }
 
 /// Single threaded IO event loop.
+#[derive(Debug)]
 pub struct EventLoop<H: Handler> {
     run: bool,
     poll: Poll,

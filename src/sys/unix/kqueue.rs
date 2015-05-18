@@ -5,6 +5,7 @@ use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF
 use std::slice;
 use std::os::unix::io::RawFd;
 
+#[derive(Debug)]
 pub struct Selector {
     kq: RawFd,
     changes: Events
@@ -101,6 +102,7 @@ impl Selector {
     }
 }
 
+#[derive(Debug)]
 pub struct Events {
     events: Vec<KEvent>,
 }

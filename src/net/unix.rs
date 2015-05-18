@@ -181,6 +181,7 @@ pub fn pipe() -> io::Result<(PipeReader, PipeWriter)> {
     Ok((From::from(rd), From::from(wr)))
 }
 
+#[derive(Debug)]
 pub struct PipeReader {
     io: Io,
 }
@@ -211,6 +212,7 @@ impl From<Io> for PipeReader {
     }
 }
 
+#[derive(Debug)]
 pub struct PipeWriter {
     io: Io,
 }

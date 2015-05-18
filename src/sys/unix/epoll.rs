@@ -4,6 +4,7 @@ use nix::fcntl::Fd;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 
+#[derive(Debug)]
 pub struct Selector {
     epfd: Fd
 }
