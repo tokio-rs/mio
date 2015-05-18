@@ -260,13 +260,7 @@ pub fn test_echo_server() {
     let mut event_loop = EventLoop::new().unwrap();
 
     let addr = localhost();
-    let srv = TcpSocket::v4().unwrap();
-
-    info!("setting re-use addr");
-    srv.set_reuseaddr(true).unwrap();
-    srv.bind(&addr).unwrap();
-
-    let srv = srv.listen(256).unwrap();
+    let srv = TcpListener::bind(&addr).unwrap();
 
     info!("listen for connections");
     event_loop.register_opt(&srv, SERVER, Interest::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();

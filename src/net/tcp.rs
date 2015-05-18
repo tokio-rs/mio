@@ -166,6 +166,9 @@ impl TcpListener {
             SocketAddr::V6(..) => TcpSocket::v6(),
         });
 
+        // Set SO_REUSEADDR
+        try!(sock.set_reuseaddr(true));
+
         // Bind the socket
         try!(sock.bind(addr));
 
