@@ -92,6 +92,8 @@ pub struct TcpStream {
     sys: sys::TcpSocket,
 }
 
+pub use sys::Shutdown;
+
 impl TcpStream {
     pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
         let sock = try!(match *addr {
@@ -114,6 +116,9 @@ impl TcpStream {
     pub fn try_clone(&self) -> io::Result<TcpStream> {
         self.sys.try_clone()
             .map(From::from)
+    }
+    pub fn shutdown(&self, how: &Shutdown) -> io::Result<()> {
+        self.sys.shutdown(how)
     }
 }
 

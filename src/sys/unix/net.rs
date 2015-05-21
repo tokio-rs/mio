@@ -47,6 +47,11 @@ pub fn accept(io: &Io, nonblock: bool) -> io::Result<RawFd> {
         .map_err(super::from_nix_error)
 }
 
+pub fn shutdown(io: &Io, how: &nix::Shutdown) -> io::Result<()> {
+    nix::shutdown(io.as_raw_fd(), how)
+        .map_err(super::from_nix_error)
+}
+
 // UDP & UDS
 #[inline]
 pub fn recvfrom(io: &Io, buf: &mut [u8]) -> io::Result<(usize, nix::SockAddr)> {

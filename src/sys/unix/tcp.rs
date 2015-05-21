@@ -58,6 +58,10 @@ impl TcpSocket {
             .map(From::from)
     }
 
+    pub fn shutdown(&self, how: &nix::Shutdown) -> io::Result<()> {
+        net::shutdown(&self.io, &how)
+    }
+
     /*
      *
      * ===== Socket Options =====

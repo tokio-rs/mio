@@ -22,6 +22,7 @@ pub use self::awakener::Awakener;
 pub use self::io::Io;
 pub use self::socket::Socket;
 pub use self::tcp::TcpSocket;
+pub use nix::sys::socket::Shutdown;
 pub use self::udp::UdpSocket;
 pub use self::uds::UnixSocket;
 
@@ -72,6 +73,8 @@ mod nix {
         sendto,
         setsockopt,
         socket,
+        shutdown,
+        Shutdown,
     };
     pub use nix::sys::time::TimeVal;
     pub use nix::unistd::{
@@ -80,3 +83,4 @@ mod nix {
         dup,
     };
 }
+
