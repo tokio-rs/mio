@@ -1,6 +1,7 @@
-use {io, Evented, Interest, Io, PollOpt, Selector, Token, TryRead, TryWrite};
+use {io, Evented, Interest, Io, PollOpt, Selector, Token};
 use unix::FromRawFd;
 use sys::unix::{net, nix, Socket};
+use std::io::{Read, Write};
 use std::path::Path;
 use std::os::unix::io::{RawFd, AsRawFd};
 
@@ -47,15 +48,19 @@ impl UnixSocket {
     }
 }
 
-impl TryRead for UnixSocket {
-    fn read_slice(&mut self, buf: &mut [u8]) -> io::Result<Option<usize>> {
-        self.io.read_slice(buf)
+impl Read for UnixSocket {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io.read(buf)
     }
 }
 
-impl TryWrite for UnixSocket {
-    fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
-        self.io.write_slice(buf)
+impl Write for UnixSocket {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.io.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.io.flush()
     }
 }
 

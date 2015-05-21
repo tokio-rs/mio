@@ -49,7 +49,7 @@ impl Handler for TestHandler {
                 match self.state {
                     Initial => {
                         let mut buf = [0; 4096];
-                        debug!("GOT={:?}", self.cli.read_slice(&mut buf[..]));
+                        debug!("GOT={:?}", self.cli.try_read(&mut buf[..]));
                         assert!(hint.is_data(), "unexpected hint {:?}", hint);
 
                         // Whether or not Hup is included with actual data is platform specific
@@ -68,7 +68,7 @@ impl Handler for TestHandler {
 
                 let mut buf = ByteBuf::mut_with_capacity(1024);
 
-                match self.cli.read(&mut buf) {
+                match self.cli.try_read_buf(&mut buf) {
                     Ok(Some(0)) => event_loop.shutdown(),
                     _ => panic!("the client socket should not be readable")
                 }

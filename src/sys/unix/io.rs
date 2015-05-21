@@ -1,5 +1,6 @@
-use {io, Evented, Interest, PollOpt, Selector, Token, TryRead, TryWrite};
+use {io, Evented, Interest, PollOpt, Selector, Token};
 use unix::FromRawFd;
+use std::io::{Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
 
 /*
@@ -51,25 +52,25 @@ impl Evented for Io {
     }
 }
 
-impl TryRead for Io {
-    fn read_slice(&mut self, dst: &mut [u8]) -> io::Result<Option<usize>> {
+impl Read for Io {
+    fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
         use nix::unistd::read;
 
         read(self.as_raw_fd(), dst)
-            .map(|cnt| Some(cnt))
             .map_err(super::from_nix_error)
-            .or_else(io::to_non_block)
     }
 }
 
-impl TryWrite for Io {
-    fn write_slice(&mut self, src: &[u8]) -> io::Result<Option<usize>> {
+impl Write for Io {
+    fn write(&mut self, src: &[u8]) -> io::Result<usize> {
         use nix::unistd::write;
 
         write(self.as_raw_fd(), src)
             .map_err(super::from_nix_error)
-            .map(|cnt| Some(cnt))
-            .or_else(io::to_non_block)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
