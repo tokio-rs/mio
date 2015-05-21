@@ -1,4 +1,5 @@
-use {io, sys, Evented, Interest, PollOpt, Selector, Token, TryRead, TryWrite};
+use {io, sys, Evented, Interest, PollOpt, Selector, Token};
+use std::io::{Read, Write};
 use std::net::SocketAddr;
 
 /*
@@ -117,15 +118,19 @@ impl TcpStream {
     }
 }
 
-impl TryRead for TcpStream {
-    fn read_slice(&mut self, buf: &mut [u8]) -> io::Result<Option<usize>> {
-        self.sys.read_slice(buf)
+impl Read for TcpStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.sys.read(buf)
     }
 }
 
-impl TryWrite for TcpStream {
-    fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
-        self.sys.write_slice(buf)
+impl Write for TcpStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.sys.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.sys.flush()
     }
 }
 

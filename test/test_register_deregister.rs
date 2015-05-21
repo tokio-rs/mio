@@ -29,7 +29,7 @@ impl Handler for TestHandler {
         match token {
             SERVER => {
                 let mut sock = self.server.accept().unwrap().unwrap();
-                sock.write(&mut buf::SliceBuf::wrap("foobar".as_bytes())).unwrap();
+                sock.try_write_buf(&mut buf::SliceBuf::wrap("foobar".as_bytes())).unwrap();
             }
             CLIENT => {
                 assert!(self.state == 0, "unexpected state {}", self.state);

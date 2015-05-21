@@ -33,7 +33,7 @@ mod pipe {
             // is thread safe.
             unsafe {
                 let wr: &mut PipeWriter = mem::transmute(self.writer.get());
-                wr.write_slice(b"0x01").map(|_| ())
+                wr.try_write(b"0x01").map(|_| ())
             }
         }
 
@@ -48,7 +48,7 @@ mod pipe {
                     let rd: &mut PipeReader = mem::transmute(self.reader.get());
 
                     // Consume data until all bytes are purged
-                    match rd.read_slice(&mut buf) {
+                    match rd.try_read(&mut buf) {
                         Ok(Some(i)) if i > 0 => {},
                         _ => return,
                     }

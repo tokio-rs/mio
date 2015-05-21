@@ -1,4 +1,5 @@
-use {io, sys, Evented, Interest, Io, PollOpt, Selector, Token, TryRead, TryWrite};
+use {io, sys, Evented, Interest, Io, PollOpt, Selector, Token};
+use std::io::{Read, Write};
 use std::path::Path;
 
 /// A trait to express the ability to construct an object from a raw file descriptor.
@@ -88,15 +89,19 @@ impl UnixStream {
     }
 }
 
-impl io::TryRead for UnixStream {
-    fn read_slice(&mut self, buf: &mut [u8]) -> io::Result<Option<usize>> {
-        self.sys.read_slice(buf)
+impl Read for UnixStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.sys.read(buf)
     }
 }
 
-impl io::TryWrite for UnixStream {
-    fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
-        self.sys.write_slice(buf)
+impl Write for UnixStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.sys.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.sys.flush()
     }
 }
 
@@ -186,9 +191,9 @@ pub struct PipeReader {
     io: Io,
 }
 
-impl TryRead for PipeReader {
-    fn read_slice(&mut self, buf: &mut [u8]) -> io::Result<Option<usize>> {
-        self.io.read_slice(buf)
+impl Read for PipeReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io.read(buf)
     }
 }
 
@@ -217,9 +222,13 @@ pub struct PipeWriter {
     io: Io,
 }
 
-impl TryWrite for PipeWriter {
-    fn write_slice(&mut self, buf: &[u8]) -> io::Result<Option<usize>> {
-        self.io.write_slice(buf)
+impl Write for PipeWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.io.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.io.flush()
     }
 }
 

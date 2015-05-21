@@ -412,7 +412,7 @@ mod tests {
         let wcount = Arc::new(AtomicIsize::new(0));
         let mut handler = Funtimes::new(rcount.clone(), wcount.clone());
 
-        writer.write(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();
+        writer.try_write_buf(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();
         event_loop.register(&reader, Token(10)).unwrap();
 
         let _ = event_loop.run_once(&mut handler);
@@ -420,7 +420,7 @@ mod tests {
 
         assert_eq!((*rcount).load(SeqCst), 1);
 
-        reader.read(&mut b).unwrap();
+        reader.try_read_buf(&mut b).unwrap();
 
         assert_eq!(str::from_utf8(b.flip().bytes()).unwrap(), "hello");
     }

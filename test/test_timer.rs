@@ -71,7 +71,7 @@ impl Handler for TestHandler {
 
                 let mut buf = buf::ByteBuf::mut_with_capacity(2048);
 
-                match self.cli.read(&mut buf) {
+                match self.cli.try_read_buf(&mut buf) {
                     Ok(n) => {
                         debug!("read {:?} bytes", n);
                         assert!(b"zomg" == buf.flip().bytes());
@@ -99,7 +99,7 @@ impl Handler for TestHandler {
 
     fn timeout(&mut self, _event_loop: &mut EventLoop<TestHandler>, mut sock: TcpStream) {
         debug!("timeout handler : writing to socket");
-        sock.write(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
+        sock.try_write_buf(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
     }
 }
 

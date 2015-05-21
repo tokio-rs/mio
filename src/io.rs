@@ -17,13 +17,13 @@ pub trait Evented {
 }
 
 pub trait TryRead {
-    fn read<B: MutBuf>(&mut self, buf: &mut B) -> Result<Option<usize>> {
+    fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> Result<Option<usize>> {
         // Reads the length of the slice supplied by buf.mut_bytes into the buffer
         // This is not guaranteed to consume an entire datagram or segment.
         // If your protocol is msg based (instead of continuous stream) you should
         // ensure that your buffer is large enough to hold an entire segment (1532 bytes if not jumbo
         // frames)
-        let res = self.read_slice(buf.mut_bytes());
+        let res = self.try_read(buf.mut_bytes());
 
         if let Ok(Some(cnt)) = res {
             buf.advance(cnt);
@@ -32,12 +32,12 @@ pub trait TryRead {
         res
     }
 
-    fn read_slice(&mut self, buf: &mut [u8]) -> Result<Option<usize>>;
+    fn try_read(&mut self, buf: &mut [u8]) -> Result<Option<usize>>;
 }
 
 pub trait TryWrite {
-    fn write<B: Buf>(&mut self, buf: &mut B) -> Result<Option<usize>> {
-        let res = self.write_slice(buf.bytes());
+    fn try_write_buf<B: Buf>(&mut self, buf: &mut B) -> Result<Option<usize>> {
+        let res = self.try_write(buf.bytes());
 
         if let Ok(Some(cnt)) = res {
             buf.advance(cnt);
@@ -46,7 +46,23 @@ pub trait TryWrite {
         res
     }
 
-    fn write_slice(&mut self, buf: &[u8]) -> Result<Option<usize>>;
+    fn try_write(&mut self, buf: &[u8]) -> Result<Option<usize>>;
+}
+
+impl<T: Read> TryRead for T {
+    fn try_read(&mut self, dst: &mut [u8]) -> Result<Option<usize>> {
+        self.read(dst)
+            .map(|cnt| Some(cnt))
+            .or_else(to_non_block)
+    }
+}
+
+impl<T: Write> TryWrite for T {
+    fn try_write(&mut self, src: &[u8]) -> Result<Option<usize>> {
+        self.write(src)
+            .map(|cnt| Some(cnt))
+            .or_else(to_non_block)
+    }
 }
 
 /*
