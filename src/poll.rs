@@ -15,7 +15,9 @@ impl Poll {
         })
     }
 
-    pub fn register<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()>
+        where E: Evented
+    {
         trace!("registering with poller");
 
         // Register interests for this socket
@@ -24,7 +26,9 @@ impl Poll {
         Ok(())
     }
 
-    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister<E: ?Sized>(&mut self, io: &E, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()>
+        where E: Evented
+    {
         trace!("registering with poller");
 
         // Register interests for this socket
@@ -33,7 +37,9 @@ impl Poll {
         Ok(())
     }
 
-    pub fn deregister<E: Evented>(&mut self, io: &E) -> io::Result<()> {
+    pub fn deregister<E: ?Sized>(&mut self, io: &E) -> io::Result<()>
+        where E: Evented
+    {
         trace!("deregistering IO with poller");
 
         // Deregister interests for this socket
