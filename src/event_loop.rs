@@ -219,7 +219,7 @@ impl<H: Handler> EventLoop<H> {
         let mut messages;
         let mut pending;
 
-        debug!("event loop tick");
+        trace!("event loop tick");
 
         // Check the notify channel for any pending messages. If there are any,
         // avoid blocking when polling for IO events. Messages will be
@@ -282,7 +282,7 @@ impl<H: Handler> EventLoop<H> {
         while i < cnt {
             let evt = self.poll.event(i);
 
-            debug!("event={:?}", evt);
+            trace!("event={:?}", evt);
 
             match evt.token() {
                 NOTIFY => self.notify.cleanup(),
