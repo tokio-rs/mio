@@ -18,7 +18,13 @@ impl Selector {
 
     /// Wait for events from the OS
     pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
-        use std::slice;
+        use std::{isize, slice};
+
+        let timeout_ms = if timeout_ms >= isize::MAX as usize {
+            isize::MAX
+        } else {
+            timeout_ms as isize
+        };
 
         let dst = unsafe {
             slice::from_raw_parts_mut(
