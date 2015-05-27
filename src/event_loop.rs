@@ -180,17 +180,17 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register<E: Evented>(&mut self, io: &E, token: Token) -> io::Result<()> {
+    pub fn register(&mut self, io: &Evented, token: Token) -> io::Result<()> {
         self.poll.register(io, token, Interest::all(), PollOpt::level())
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register_opt<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()> {
+    pub fn register_opt(&mut self, io: &Evented, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()> {
         self.poll.register(io, token, interest, opt)
     }
 
     /// Re-Registers an IO handle with the event loop.
-    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()> {
+    pub fn reregister(&mut self, io: &Evented, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()> {
         self.poll.reregister(io, token, interest, opt)
     }
 
@@ -208,7 +208,7 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Deregisters an IO handle with the event loop.
-    pub fn deregister<E: Evented>(&mut self, io: &E) -> io::Result<()> {
+    pub fn deregister(&mut self, io: &Evented) -> io::Result<()> {
         self.poll.deregister(io)
     }
 
