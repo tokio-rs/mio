@@ -148,6 +148,23 @@ impl<T> Slab<T> {
         }
     }
 
+    pub fn replace(&mut self, idx: Token, t : T) -> Option<T> {
+        let idx = self.token_to_idx(idx);
+
+        if idx > self.entries.len() {
+            return None;
+        }
+
+        if idx <= MAX {
+            if idx < self.entries.len() {
+                let val = self.entries[idx].val.as_mut().unwrap();
+                return Some(mem::replace(val, t))
+            }
+        }
+        None
+    }
+
+
     pub fn iter(&self) -> SlabIter<T> {
         SlabIter {
             slab: self,
