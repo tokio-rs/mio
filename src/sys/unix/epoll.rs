@@ -1,11 +1,11 @@
-use nix::fcntl::Fd;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 use io;
 use event::{IoEvent, Interest, PollOpt};
+use std::os::unix::io::RawFd;
 
 pub struct Selector {
-    epfd: Fd
+    epfd: RawFd
 }
 
 impl Selector {
@@ -17,7 +17,13 @@ impl Selector {
 
     /// Wait for events from the OS
     pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
-        use std::slice;
+        use std::{isize, slice};
+
+        let timeout_ms = if timeout_ms >= isize::MAX as usize {
+            isize::MAX
+        } else {
+            timeout_ms as isize
+        };
 
         let dst = unsafe {
             slice::from_raw_parts_mut(
@@ -35,7 +41,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&mut self, fd: RawFd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token as u64
@@ -46,7 +52,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&mut self, fd: Fd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&mut self, fd: RawFd, token: usize, interests: Interest, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token as u64
@@ -57,7 +63,7 @@ impl Selector {
     }
 
     /// Deregister event interests for the given IO handle with the OS
-    pub fn deregister(&mut self, fd: Fd) -> io::Result<()> {
+    pub fn deregister(&mut self, fd: RawFd) -> io::Result<()> {
         // The &info argument should be ignored by the system,
         // but linux < 2.6.9 required it to be not null.
         // For compatibility, we provide a dummy EpollEvent.
