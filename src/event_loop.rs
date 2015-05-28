@@ -214,7 +214,7 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Deregisters an IO handle with the event loop.
-    pub fn deregister<E: Evented>(&mut self, io: &E) -> io::Result<()> {
+    pub fn deregister<E: ?Sized>(&mut self, io: &E) -> io::Result<()> where E: Evented {
         self.poll.deregister(io)
     }
 
