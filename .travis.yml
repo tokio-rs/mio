@@ -1,8 +1,16 @@
 language: rust
 sudo: false
+rust:
+  - nightly
+  - 1.0.0
+
+os:
+  - linux
+  - osx
+
 script:
-- cargo test
-- cargo doc --no-deps
+  - cargo test
+  - cargo doc --no-deps
 
 # Deploy documentation to S3 for specific branches. At some
 # point, it would be nice to also support building docs for
@@ -19,6 +27,7 @@ deploy:
   upload-dir: mio/${TRAVIS_BRANCH}
   acl: public_read
   on:
+    condition: $TRAVIS_RUST_VERSION == "1.0.0" && $TRAVIS_OS_NAME == "linux"
     repo: carllerche/mio
     branch:
       - master
