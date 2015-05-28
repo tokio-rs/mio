@@ -1,12 +1,12 @@
 use {io, Interest, PollOpt, Token};
 use event::IoEvent;
-use nix::fcntl::Fd;
 use nix::sys::epoll::*;
 use nix::unistd::close;
+use std::os::unix::io::RawFd;
 
 #[derive(Debug)]
 pub struct Selector {
-    epfd: Fd
+    epfd: RawFd
 }
 
 impl Selector {
@@ -42,7 +42,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, fd: Fd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&mut self, fd: RawFd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token.as_usize() as u64
@@ -53,7 +53,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&mut self, fd: Fd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&mut self, fd: RawFd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token.as_usize() as u64
@@ -64,7 +64,7 @@ impl Selector {
     }
 
     /// Deregister event interests for the given IO handle with the OS
-    pub fn deregister(&mut self, fd: Fd) -> io::Result<()> {
+    pub fn deregister(&mut self, fd: RawFd) -> io::Result<()> {
         // The &info argument should be ignored by the system,
         // but linux < 2.6.9 required it to be not null.
         // For compatibility, we provide a dummy EpollEvent.
