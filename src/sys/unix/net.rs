@@ -54,7 +54,7 @@ pub fn shutdown(io: &Io, how: Shutdown) -> io::Result<()> {
         Shutdown::Write => nix::Shutdown::Write,
         Shutdown::Both  => nix::Shutdown::Both,
     };
-    nix::shutdown(io.as_raw_fd(), &how)
+    nix::shutdown(io.as_raw_fd(), how)
         .map_err(super::from_nix_error)
 }
 
