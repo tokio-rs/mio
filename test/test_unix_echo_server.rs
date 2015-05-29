@@ -31,7 +31,7 @@ impl EchoConn {
     fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         let mut buf = self.buf.take().unwrap();
 
-        match self.sock.write(&mut buf) {
+        match self.sock.try_write_buf(&mut buf) {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
 
@@ -54,7 +54,7 @@ impl EchoConn {
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         let mut buf = self.mut_buf.take().unwrap();
 
-        match self.sock.read(&mut buf) {
+        match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
                 panic!("We just got readable, but were unable to read from the socket?");
             }
@@ -146,7 +146,7 @@ impl EchoClient {
 
         let mut buf = self.mut_buf.take().unwrap();
 
-        match self.sock.read(&mut buf) {
+        match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
                 panic!("We just got readable, but were unable to read from the socket?");
             }
@@ -183,7 +183,7 @@ impl EchoClient {
     fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("client socket writable");
 
-        match self.sock.write(&mut self.tx) {
+        match self.sock.try_write_buf(&mut self.tx) {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
                 self.interest.insert(Interest::writable());

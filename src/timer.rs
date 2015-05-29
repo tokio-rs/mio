@@ -195,12 +195,12 @@ impl<T> Timer<T> {
     }
 
     pub fn tick_to(&mut self, now: u64) -> Option<T> {
-        debug!("tick_to; now={}; tick={}", now, self.tick);
+        trace!("tick_to; now={}; tick={}", now, self.tick);
 
         while self.tick <= now {
             let curr = self.next;
 
-            debug!("ticking; curr={:?}", curr);
+            trace!("ticking; curr={:?}", curr);
 
             if curr == EMPTY {
                 self.tick += 1;
@@ -209,7 +209,7 @@ impl<T> Timer<T> {
                 let links = self.entries[curr].links;
 
                 if links.tick <= self.tick {
-                    debug!("triggering; token={:?}", curr);
+                    trace!("triggering; token={:?}", curr);
 
                     // Unlink will also advance self.next
                     self.unlink(&links, curr);

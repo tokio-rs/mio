@@ -180,17 +180,23 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register<E: Evented>(&mut self, io: &E, token: Token) -> io::Result<()> {
+    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token) -> io::Result<()>
+        where E: Evented
+    {
         self.poll.register(io, token, Interest::all(), PollOpt::level())
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register_opt<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()> {
+    pub fn register_opt<E: ?Sized>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()>
+        where E: Evented
+    {
         self.poll.register(io, token, interest, opt)
     }
 
     /// Re-Registers an IO handle with the event loop.
-    pub fn reregister<E: Evented>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()> {
+    pub fn reregister<E: ?Sized>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()>
+        where E: Evented
+    {
         self.poll.reregister(io, token, interest, opt)
     }
 
@@ -208,7 +214,7 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Deregisters an IO handle with the event loop.
-    pub fn deregister<E: Evented>(&mut self, io: &E) -> io::Result<()> {
+    pub fn deregister<E: ?Sized>(&mut self, io: &E) -> io::Result<()> where E: Evented {
         self.poll.deregister(io)
     }
 
@@ -219,7 +225,7 @@ impl<H: Handler> EventLoop<H> {
         let mut messages;
         let mut pending;
 
-        debug!("event loop tick");
+        trace!("event loop tick");
 
         // Check the notify channel for any pending messages. If there are any,
         // avoid blocking when polling for IO events. Messages will be
@@ -282,7 +288,7 @@ impl<H: Handler> EventLoop<H> {
         while i < cnt {
             let evt = self.poll.event(i);
 
-            debug!("event={:?}", evt);
+            trace!("event={:?}", evt);
 
             match evt.token() {
                 NOTIFY => self.notify.cleanup(),
@@ -412,7 +418,7 @@ mod tests {
         let wcount = Arc::new(AtomicIsize::new(0));
         let mut handler = Funtimes::new(rcount.clone(), wcount.clone());
 
-        writer.write(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();
+        writer.try_write_buf(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();
         event_loop.register(&reader, Token(10)).unwrap();
 
         let _ = event_loop.run_once(&mut handler);
@@ -420,7 +426,7 @@ mod tests {
 
         assert_eq!((*rcount).load(SeqCst), 1);
 
-        reader.read(&mut b).unwrap();
+        reader.try_read_buf(&mut b).unwrap();
 
         assert_eq!(str::from_utf8(b.flip().bytes()).unwrap(), "hello");
     }

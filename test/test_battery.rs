@@ -35,7 +35,7 @@ impl EchoConn {
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         loop {
-            match self.sock.read_slice(&mut self.buf[..]) {
+            match self.sock.try_read(&mut self.buf[..]) {
                 Ok(None) => {
                     break;
                 }
@@ -124,7 +124,7 @@ impl EchoClient {
         debug!("client socket writable");
 
         while self.backlog.len() > 0 {
-            match self.sock.write_slice(self.backlog.front().unwrap().as_bytes()) {
+            match self.sock.try_write(self.backlog.front().unwrap().as_bytes()) {
                 Ok(None) => {
                     break;
                 }
@@ -186,7 +186,7 @@ impl Handler for Echo {
     }
 
     fn notify(&mut self, event_loop: &mut EventLoop<Echo>, msg: String) {
-        match self.client.sock.write_slice(msg.as_bytes()) {
+        match self.client.sock.try_write(msg.as_bytes()) {
             Ok(Some(n)) => {
                 self.client.count += 1;
                 if self.client.count % 10000 == 0 {
