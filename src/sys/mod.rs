@@ -8,7 +8,6 @@ pub use self::unix::{
     UdpSocket,
     UnixSocket,
     pipe,
-    Shutdown,
 };
 
 #[cfg(unix)]

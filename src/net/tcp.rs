@@ -92,7 +92,15 @@ pub struct TcpStream {
     sys: sys::TcpSocket,
 }
 
-pub use sys::Shutdown;
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Shutdown {
+    /// Further receptions will be disallowed.
+    Read,
+    /// Further  transmissions will be disallowed.
+    Write,
+    /// Further receptions and transmissions will be disallowed.
+    Both,
+}
 
 impl TcpStream {
     pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
@@ -117,7 +125,7 @@ impl TcpStream {
         self.sys.try_clone()
             .map(From::from)
     }
-    pub fn shutdown(&self, how: &Shutdown) -> io::Result<()> {
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.sys.shutdown(how)
     }
 }

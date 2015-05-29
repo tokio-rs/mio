@@ -2,6 +2,7 @@ use {io};
 use sys::unix::{nix, Io};
 use std::net::SocketAddr;
 use std::os::unix::io::{AsRawFd, RawFd};
+pub use net::tcp::Shutdown;
 
 pub fn socket(family: nix::AddressFamily, ty: nix::SockType, nonblock: bool) -> io::Result<RawFd> {
     let opts = if nonblock {
@@ -47,8 +48,13 @@ pub fn accept(io: &Io, nonblock: bool) -> io::Result<RawFd> {
         .map_err(super::from_nix_error)
 }
 
-pub fn shutdown(io: &Io, how: &nix::Shutdown) -> io::Result<()> {
-    nix::shutdown(io.as_raw_fd(), how)
+pub fn shutdown(io: &Io, how: Shutdown) -> io::Result<()> {
+    let how: nix::Shutdown = match how {
+        Shutdown::Read  => nix::Shutdown::Read,
+        Shutdown::Write => nix::Shutdown::Write,
+        Shutdown::Both  => nix::Shutdown::Both,
+    };
+    nix::shutdown(io.as_raw_fd(), &how)
         .map_err(super::from_nix_error)
 }
 

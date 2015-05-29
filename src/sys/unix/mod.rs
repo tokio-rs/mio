@@ -22,7 +22,6 @@ pub use self::awakener::Awakener;
 pub use self::io::Io;
 pub use self::socket::Socket;
 pub use self::tcp::TcpSocket;
-pub use nix::sys::socket::Shutdown;
 pub use self::udp::UdpSocket;
 pub use self::uds::UnixSocket;
 
