@@ -149,6 +149,8 @@ impl<M: Send> NotifyInner<M> {
             nxt = match cur {
                 CLOSED => {
                     // The receiving end has hung up, and we cannot reliably get our message back
+                    // We poll 1 message from the queue to make sure that no message is stuck
+                    let _ = self.queue.pop();
                     return Err(NotifyError::Closed(None));
                 }
                 SLEEP => { 1 }
@@ -175,6 +177,9 @@ impl<M: Send> NotifyInner<M> {
 
     fn close(&self) {
         self.state.swap(CLOSED, Relaxed);
+        while let Some(m) = self.queue.pop() {
+            drop(m);
+        }
     }
 
     fn cleanup(&self) {

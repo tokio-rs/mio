@@ -124,3 +124,76 @@ pub fn test_notify_capacity() {
 
     handle.join().unwrap();
 }
+
+#[test]
+pub fn test_notify_drop() {
+    use std::sync::mpsc::{self,Sender};
+    use std::thread;
+
+    struct MessageDrop(Sender<u8>);
+
+    impl Drop for MessageDrop {
+        fn drop(&mut self) {
+            self.0.send(0).unwrap();
+        }
+    }
+
+    struct DummyHandler;
+
+    impl Handler for DummyHandler {
+        type Timeout = ();
+        type Message = MessageDrop;
+
+        fn notify(&mut self, event_loop: &mut EventLoop<Self>, msg: MessageDrop) {
+            msg.0.send(1).unwrap();
+            drop(msg);
+            // We stop after the first message
+            event_loop.shutdown();
+        }
+    }
+
+    let (tx_notif_1, rx_notif_1) = mpsc::channel();
+    let (tx_notif_2, rx_notif_2) = mpsc::channel();
+    let (tx_notif_3, _unused) = mpsc::channel();
+    let (tx_exit_loop, rx_exit_loop) = mpsc::channel();
+    let (tx_drop_loop, rx_drop_loop) = mpsc::channel();
+
+    let mut event_loop = EventLoop::new().unwrap();
+    let notify = event_loop.channel();
+
+    let handle = thread::spawn(move || {
+        let mut handler = DummyHandler;
+        event_loop.run(&mut handler).unwrap();
+
+        // Confirmation we exited the loop
+        tx_exit_loop.send(()).unwrap();
+
+        // Order to drop the loop
+        rx_drop_loop.recv().unwrap();
+        drop(event_loop);
+    });
+    notify.send(MessageDrop(tx_notif_1)).unwrap();
+    assert_eq!(rx_notif_1.recv().unwrap(), 1); // Response from the loop
+    assert_eq!(rx_notif_1.recv().unwrap(), 0); // Drop notification
+
+    // We wait for the event loop to exit before sending the second notification
+    rx_exit_loop.recv().unwrap();
+    notify.send(MessageDrop(tx_notif_2)).unwrap();
+
+    // We ensure the message is indeed stuck in the queue
+    thread::sleep_ms(100);
+    assert!(rx_notif_2.try_recv().is_err());
+
+    // Give the order to drop the event loop
+    tx_drop_loop.send(()).unwrap();
+    assert_eq!(rx_notif_2.recv().unwrap(), 0); // Drop notification
+
+    // Check that sending a new notification will return an error
+    // We should also get our message back
+    match notify.send(MessageDrop(tx_notif_3)).unwrap_err() {
+        NotifyError::Closed(Some(..)) => {}
+        _ => panic!(),
+    }
+
+    handle.join().unwrap();
+}
