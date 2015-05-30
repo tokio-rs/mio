@@ -6,6 +6,7 @@ use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
 
 const SLEEP: isize = -1;
+const CLOSED: isize = -2;
 
 /// Send notifications to the event loop, waking it up if necessary. If the
 /// event loop is not currently sleeping, avoid using an OS wake-up strategy
@@ -42,6 +43,11 @@ impl<M: Send> Notify<M> {
     #[inline]
     pub fn cleanup(&self) {
         self.inner.cleanup();
+    }
+
+    #[inline]
+    pub fn close(&self) {
+        self.inner.close();
     }
 }
 
@@ -84,6 +90,9 @@ impl<M: Send> NotifyInner<M> {
         let mut val;
 
         loop {
+            // This should be impossible if close() in only called from the event loop destructor
+            debug_assert!(cur != CLOSED);
+
             // If there are pending messages, then whether or not the event loop
             // was planning to sleep does not matter - it will not sleep.
             if cur > 0 {
@@ -121,17 +130,31 @@ impl<M: Send> NotifyInner<M> {
     }
 
     fn notify(&self, value: M) -> Result<(), NotifyError<M>> {
+        let mut cur = self.state.load(Relaxed);
+
+        if cur == CLOSED {
+            // The receiving end has already hung up
+            return Err(NotifyError::Closed(Some(value)));
+        }
+
         // First, push the message onto the queue
         if let Err(value) = self.queue.push(value) {
             return Err(NotifyError::Full(value));
         }
 
-        let mut cur = self.state.load(Relaxed);
         let mut nxt;
         let mut val;
 
         loop {
-            nxt = if cur == SLEEP { 1 } else { cur + 1 };
+            nxt = match cur {
+                CLOSED => {
+                    // The receiving end has hung up, and we cannot reliably get our message back
+                    return Err(NotifyError::Closed(None));
+                }
+                SLEEP => { 1 }
+                _ => { cur + 1 }
+            };
+
             val = self.state.compare_and_swap(cur, nxt, Relaxed);
 
             if val == cur {
@@ -148,6 +171,10 @@ impl<M: Send> NotifyInner<M> {
         }
 
         Ok(())
+    }
+
+    fn close(&self) {
+        self.state.swap(CLOSED, Relaxed);
     }
 
     fn cleanup(&self) {
@@ -172,6 +199,7 @@ impl<M: Send> Evented for Notify<M> {
 pub enum NotifyError<T> {
     Io(io::Error),
     Full(T),
+    Closed(Option<T>),
 }
 
 impl<M> fmt::Debug for NotifyError<M> {
@@ -182,6 +210,9 @@ impl<M> fmt::Debug for NotifyError<M> {
             }
             NotifyError::Full(..) => {
                 write!(fmt, "NotifyError::Full(..)")
+            }
+            NotifyError::Closed(..) => {
+                write!(fmt, "NotifyError::Closed(..)")
             }
         }
     }

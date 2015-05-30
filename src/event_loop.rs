@@ -335,6 +335,12 @@ impl<H: Handler> EventLoop<H> {
 
 unsafe impl<H: Handler> Sync for EventLoop<H> { }
 
+impl <H: Handler> Drop for EventLoop<H> {
+    fn drop(&mut self) {
+        self.notify.close();
+    }
+}
+
 /// Sends messages to the EventLoop from other threads.
 pub struct Sender<M: Send> {
     notify: Notify<M>
