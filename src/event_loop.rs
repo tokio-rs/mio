@@ -179,6 +179,12 @@ impl<H: Handler> EventLoop<H> {
         self.run = false;
     }
 
+    /// Indicates whether the event loop is currently running. If it's not it has either
+    /// stopped or is scheduled to stop on the next tick.
+    pub fn is_running(&self) -> bool {
+        self.run
+    }
+
     /// Registers an IO handle with the event loop.
     pub fn register<E: ?Sized>(&mut self, io: &E, token: Token) -> io::Result<()>
         where E: Evented
