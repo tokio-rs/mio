@@ -129,6 +129,38 @@ impl<T> Slab<T> {
         Ok(self.idx_to_token(idx))
     }
 
+    /// Like `insert` but for objects that require newly allocated
+    /// Token in their constructor.
+    pub fn create_and_insert<F>(&mut self, f : F) -> Option<Token>
+    where F : FnOnce(Token) -> T {
+        let idx = self.nxt;
+
+        if idx == self.entries.len() {
+            // Using an uninitialized entry
+            if idx == self.entries.capacity() {
+                // No more capacity
+                debug!("slab out of capacity; cap={}", self.entries.capacity());
+                return None;
+            }
+
+            let val = f(self.idx_to_token(idx));
+            self.entries.push(Entry {
+                nxt: MAX,
+                val: Some(val),
+            });
+
+            self.len += 1;
+            self.nxt = self.len;
+        }
+        else {
+            let val = f(self.idx_to_token(idx));
+            self.len += 1;
+            self.nxt = self.entries[idx].put(val);
+        }
+
+        Some(self.idx_to_token(idx))
+    }
+
     /// Releases the given slot
     pub fn remove(&mut self, idx: Token) -> Option<T> {
         // Cast to usize
