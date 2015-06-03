@@ -104,34 +104,21 @@ impl<T> Slab<T> {
 
     pub fn insert(&mut self, val: T) -> Result<Token, T> {
         let idx = self.nxt;
-
-        if idx == self.entries.len() {
-            // Using an uninitialized entry
-            if idx == self.entries.capacity() {
-                // No more capacity
-                debug!("slab out of capacity; cap={}", self.entries.capacity());
-                return Err(val);
+        // check fail condition before val gets moved by insert_with,
+        // so `Err(val)` can be returned
+        if idx == self.entries.capacity() {
+            Err(val)
+        } else {
+            match self.insert_with(move |_| { val }) {
+                None => panic!("Slab::insert_with() should"),
+                Some(token) => Ok(token)
             }
-
-            self.entries.push(Entry {
-                nxt: MAX,
-                val: Some(val),
-            });
-
-            self.len += 1;
-            self.nxt = self.len;
         }
-        else {
-            self.len += 1;
-            self.nxt = self.entries[idx].put(val);
-        }
-
-        Ok(self.idx_to_token(idx))
     }
 
     /// Like `insert` but for objects that require newly allocated
     /// Token in their constructor.
-    pub fn create_and_insert<F>(&mut self, f : F) -> Option<Token>
+    pub fn insert_with<F>(&mut self, f : F) -> Option<Token>
     where F : FnOnce(Token) -> T {
         let idx = self.nxt;
 
