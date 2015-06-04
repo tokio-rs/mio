@@ -109,7 +109,7 @@ impl<T> Slab<T> {
         if idx == self.entries.capacity() {
             Err(val)
         } else {
-            match self.insert_with(move |_| { val }) {
+            match self.insert_with(move |_| val ) {
                 None => panic!("Slab::insert_with() should"),
                 Some(token) => Ok(token)
             }
