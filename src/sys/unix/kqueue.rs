@@ -126,18 +126,18 @@ impl Events {
         self.token_evts.clear();
         for e in self.events.iter() {
             let ioe = self.token_evts.entry(e.udata).or_insert(Interest::hinted(), e.udata);
-            if ev.filter == EventFilter::EVFILT_READ {
+            if e.filter == EventFilter::EVFILT_READ {
                 ioe.insert(Interest::readable());
-            } else if ev.filter == EventFilter::EVFILT_WRITE {
+            } else if e.filter == EventFilter::EVFILT_WRITE {
                 ioe.insert(Interest::writable());
             }
 
-            if ev.flags.contains(EV_EOF) {
+            if e.flags.contains(EV_EOF) {
                 ioe.insert(Interest::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
-                if !ev.fflags.is_empty() {
+                if !e.fflags.is_empty() {
                     ioe.insert(Interest::error());
                 }
             }
