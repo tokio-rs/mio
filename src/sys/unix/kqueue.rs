@@ -125,7 +125,7 @@ impl Events {
     pub fn coalesce(&mut self) {
         self.token_evts.clear();
         for e in self.events.iter() {
-            let ioe = self.token_evts.entry(e.udata).or_insert(Interest::hinted(), e.udata);
+            let ioe = self.token_evts.entry(Token(e.udata as usize)).or_insert(IoEvent::new(Interest::hinted(), Token(e.udata as usize)));
             if e.filter == EventFilter::EVFILT_READ {
                 ioe.kind.insert(Interest::readable());
             } else if e.filter == EventFilter::EVFILT_WRITE {
