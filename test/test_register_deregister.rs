@@ -19,13 +19,8 @@ impl TestHandler {
             state: 0,
         }
     }
-}
 
-impl Handler for TestHandler {
-    type Timeout = usize;
-    type Message = ();
-
-    fn readable(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: ReadHint) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: Interest) {
         match token {
             SERVER => {
                 let mut sock = self.server.accept().unwrap().unwrap();
@@ -40,13 +35,28 @@ impl Handler for TestHandler {
         }
     }
 
-    fn writable(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: Interest) {
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
         self.state = 2;
         event_loop.deregister(&self.client).unwrap();
         event_loop.timeout_ms(1, 200).unwrap();
+    }
+}
+
+impl Handler for TestHandler {
+    type Timeout = usize;
+    type Message = ();
+
+    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: Interest) {
+        if events.is_readable() {
+            self.handle_read(event_loop, token, events);
+        }
+
+        if events.is_writable() {
+            self.handle_write(event_loop, token, events);
+        }
     }
 
     fn timeout(&mut self, event_loop: &mut EventLoop<TestHandler>, _: usize) {

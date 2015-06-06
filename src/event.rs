@@ -287,137 +287,6 @@ impl fmt::Debug for Interest {
     }
 }
 
-#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct ReadHint(usize);
-
-impl ReadHint {
-    #[inline]
-    pub fn none() -> ReadHint {
-        ReadHint(0)
-    }
-
-    #[inline]
-    pub fn all() -> ReadHint {
-        ReadHint::data() | ReadHint::hup() | ReadHint::error()
-    }
-
-    #[inline]
-    pub fn data() -> ReadHint {
-        ReadHint(0x001)
-    }
-
-    #[inline]
-    pub fn hup() -> ReadHint {
-        ReadHint(0x002)
-    }
-
-    #[inline]
-    pub fn error() -> ReadHint {
-        ReadHint(0x004)
-    }
-
-    #[inline]
-    pub fn is_data(&self) -> bool {
-        self.contains(ReadHint::data())
-    }
-
-    #[inline]
-    pub fn is_hup(&self) -> bool {
-        self.contains(ReadHint::hup())
-    }
-
-    #[inline]
-    pub fn is_error(&self) -> bool {
-        self.contains(ReadHint::error())
-    }
-
-    #[inline]
-    pub fn insert(&mut self, other: ReadHint) {
-        self.0 |= other.0;
-    }
-
-    #[inline]
-    pub fn remove(&mut self, other: ReadHint) {
-        self.0 &= !other.0;
-    }
-
-    #[inline]
-    pub fn contains(&self, other: ReadHint) -> bool {
-        (*self & other) == other
-    }
-
-    #[inline]
-    pub fn bits(&self) -> usize {
-        self.0
-    }
-}
-
-impl ops::BitOr for ReadHint {
-    type Output = ReadHint;
-
-    #[inline]
-    fn bitor(self, other: ReadHint) -> ReadHint {
-        ReadHint(self.bits() | other.bits())
-    }
-}
-
-impl ops::BitXor for ReadHint {
-    type Output = ReadHint;
-
-    #[inline]
-    fn bitxor(self, other: ReadHint) -> ReadHint {
-        ReadHint(self.bits() ^ other.bits())
-    }
-}
-
-impl ops::BitAnd for ReadHint {
-    type Output = ReadHint;
-
-    #[inline]
-    fn bitand(self, other: ReadHint) -> ReadHint {
-        ReadHint(self.bits() & other.bits())
-    }
-}
-
-impl ops::Sub for ReadHint {
-    type Output = ReadHint;
-
-    #[inline]
-    fn sub(self, other: ReadHint) -> ReadHint {
-        ReadHint(self.bits() & !other.bits())
-    }
-}
-
-impl ops::Not for ReadHint {
-    type Output = ReadHint;
-
-    #[inline]
-    fn not(self) -> ReadHint {
-        ReadHint(!self.bits() & ReadHint::all().bits())
-    }
-}
-
-impl fmt::Debug for ReadHint {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        let mut one = false;
-        let flags = [
-            (ReadHint::data(),  "DataHint"),
-            (ReadHint::hup(),   "HupHint"),
-            (ReadHint::error(), "ErrorHint")];
-
-        for &(flag, msg) in flags.iter() {
-            if self.contains(flag) {
-                if one { try!(write!(fmt, " | ")) }
-                try!(write!(fmt, "{}", msg));
-
-                one = true
-            }
-        }
-
-        Ok(())
-    }
-}
-
 
 #[derive(Copy, Clone, Debug)]
 pub struct IoEvent {
@@ -440,49 +309,14 @@ impl IoEvent {
         }
     }
 
+    #[inline]
     pub fn token(&self) -> Token {
         self.token
     }
 
-    /// Return an optional hint for a readable  handle. Currently,
-    /// this method supports the HupHint, which indicates that the
-    /// kernel reported that the remote side hung up. This allows a
-    /// consumer to avoid reading in order to discover the hangup.
-    pub fn read_hint(&self) -> ReadHint {
-        let mut hint = ReadHint::none();
-
-        // The backend doesn't support hinting
-        if !self.kind.is_hinted() {
-            return hint;
-        }
-
-        if self.kind.is_hup() {
-            hint = hint | ReadHint::hup();
-        }
-
-        if self.kind.is_readable() {
-            hint = hint | ReadHint::data();
-        }
-
-        if self.kind.is_error() {
-            hint = hint | ReadHint::error();
-        }
-
-        hint
-    }
-
-    /// This event indicated that the  handle is now readable
-    pub fn is_readable(&self) -> bool {
-        self.kind.is_readable() || self.kind.is_hup()
-    }
-
-    /// This event indicated that the  handle is now writable
-    pub fn is_writable(&self) -> bool {
-        self.kind.is_writable()
-    }
-
-    /// This event indicated that the  handle had an error
-    pub fn is_error(&self) -> bool {
-        self.kind.is_error()
+    #[inline]
+    pub fn events(&self) -> Interest {
+        self.kind
     }
 }
+

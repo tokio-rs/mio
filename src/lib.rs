@@ -51,7 +51,7 @@
 //!     type Timeout = ();
 //!     type Message = ();
 //!
-//!     fn readable(&mut self, event_loop: &mut EventLoop<MyHandler>, token: Token, _: ReadHint) {
+//!     fn ready(&mut self, event_loop: &mut EventLoop<MyHandler>, token: Token, _: Interest) {
 //!         match token {
 //!             SERVER => {
 //!                 let MyHandler(ref mut server) = *self;
@@ -107,7 +107,6 @@ pub use buf::{
 pub use event::{
     PollOpt,
     Interest,
-    ReadHint,
 };
 pub use event_loop::{
     EventLoop,

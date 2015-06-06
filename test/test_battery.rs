@@ -167,22 +167,22 @@ impl Handler for Echo {
     type Timeout = usize;
     type Message = String;
 
-    fn readable(&mut self, event_loop: &mut EventLoop<Echo>, token: Token, hint: ReadHint) {
-        assert_eq!(hint, ReadHint::data());
+    fn ready(&mut self, event_loop: &mut EventLoop<Echo>, token: Token, events: Interest) {
 
-        match token {
-            SERVER => self.server.accept(event_loop).unwrap(),
-            CLIENT => self.client.readable(event_loop).unwrap(),
-            i => self.server.conn_readable(event_loop, i).unwrap()
-        };
-    }
-
-    fn writable(&mut self, event_loop: &mut EventLoop<Echo>, token: Token) {
-        match token {
-            SERVER => panic!("received writable for token 0"),
-            CLIENT => self.client.writable(event_loop).unwrap(),
-            _ => self.server.conn_writable(event_loop, token).unwrap()
-        };
+        if events.is_readable() {
+            match token {
+                SERVER => self.server.accept(event_loop).unwrap(),
+                CLIENT => self.client.readable(event_loop).unwrap(),
+                i => self.server.conn_readable(event_loop, i).unwrap()
+            }
+        }
+        if events.is_writable() {
+            match token {
+                SERVER => panic!("received writable for token 0"),
+                CLIENT => self.client.writable(event_loop).unwrap(),
+                _ => self.server.conn_writable(event_loop, token).unwrap()
+            }
+        }
     }
 
     fn notify(&mut self, event_loop: &mut EventLoop<Echo>, msg: String) {

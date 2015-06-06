@@ -2,6 +2,7 @@
 pub use self::unix::{
     Awakener,
     Events,
+    EventsIterator,
     Io,
     Selector,
     TcpSocket,

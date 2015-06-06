@@ -1,17 +1,19 @@
 use {sys, Evented, Token};
-use event::{Interest, IoEvent, PollOpt};
+use event::{Interest, PollOpt};
 use std::{fmt, io};
+
+pub use sys::{Events, EventsIterator };
 
 pub struct Poll {
     selector: sys::Selector,
-    events: sys::Events
+    events: Option<sys::Events>
 }
 
 impl Poll {
     pub fn new() -> io::Result<Poll> {
         Ok(Poll {
             selector: try!(sys::Selector::new()),
-            events: sys::Events::new()
+            events: Some(sys::Events::new())
         })
     }
 
@@ -48,17 +50,15 @@ impl Poll {
         Ok(())
     }
 
-    pub fn poll(&mut self, timeout_ms: usize) -> io::Result<usize> {
-        try!(self.selector.select(&mut self.events, timeout_ms));
-        Ok(self.events.len())
+    pub fn poll(&mut self, timeout_ms: usize) -> io::Result<Events> {
+        let mut evts = self.events.take().expect("poll run without events struct set. Call set_events");
+        try!(self.selector.select(&mut evts, timeout_ms));
+        evts.coalesce();
+        Ok(evts)
     }
 
-    pub fn event(&self, idx: usize) -> IoEvent {
-        self.events.get(idx)
-    }
-
-    pub fn iter(&self) -> EventsIterator {
-        EventsIterator { events: &self.events, index: 0 }
+    pub fn reset_events(&mut self, evts: Events) {
+        self.events = Some(evts)
     }
 }
 
@@ -68,20 +68,3 @@ impl fmt::Debug for Poll {
     }
 }
 
-pub struct EventsIterator<'a> {
-    events: &'a sys::Events,
-    index: usize
-}
-
-impl<'a> Iterator for EventsIterator<'a> {
-    type Item = IoEvent;
-
-    fn next(&mut self) -> Option<IoEvent> {
-        if self.index == self.events.len() {
-            None
-        } else {
-            self.index += 1;
-            Some(self.events.get(self.index - 1))
-        }
-    }
-}
