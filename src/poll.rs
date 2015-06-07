@@ -53,7 +53,6 @@ impl Poll {
     pub fn poll(&mut self, timeout_ms: usize) -> io::Result<Events> {
         let mut evts = self.events.take().expect("poll run without events struct set. Call set_events");
         try!(self.selector.select(&mut evts, timeout_ms));
-        evts.coalesce();
         Ok(evts)
     }
 
