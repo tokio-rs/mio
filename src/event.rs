@@ -290,7 +290,7 @@ impl fmt::Debug for Interest {
 
 #[derive(Copy, Clone, Debug)]
 pub struct IoEvent {
-    kind: Interest,
+    pub kind: Interest,
     token: Token
 }
 
