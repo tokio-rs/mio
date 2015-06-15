@@ -56,12 +56,12 @@ impl UdpSocket {
     }
 
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::Broadcast, &on)
+        nix::setsockopt(self.as_raw_fd(), nix::sockopt::Broadcast, &on)
             .map_err(super::from_nix_error)
     }
 
     pub fn set_multicast_loop(&self, on: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ip, nix::sockopt::IpMulticastLoop, &on)
+        nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpMulticastLoop, &on)
             .map_err(super::from_nix_error)
     }
 
@@ -72,7 +72,7 @@ impl UdpSocket {
                 let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
 
                 // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ip, nix::sockopt::IpAddMembership, &req)
+                nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpAddMembership, &req)
                     .map_err(super::from_nix_error)
             }
             IpAddr::V6(ref addr) => {
@@ -80,7 +80,7 @@ impl UdpSocket {
                 let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
 
                 // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ipv6, nix::sockopt::Ipv6AddMembership, &req)
+                nix::setsockopt(self.as_raw_fd(), nix::sockopt::Ipv6AddMembership, &req)
                     .map_err(super::from_nix_error)
             }
         }
@@ -93,7 +93,7 @@ impl UdpSocket {
                 let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
 
                 // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ip, nix::sockopt::IpDropMembership, &req)
+                nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpDropMembership, &req)
                     .map_err(super::from_nix_error)
             }
             IpAddr::V6(ref addr) => {
@@ -101,7 +101,7 @@ impl UdpSocket {
                 let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
 
                 // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ipv6, nix::sockopt::Ipv6DropMembership, &req)
+                nix::setsockopt(self.as_raw_fd(), nix::sockopt::Ipv6DropMembership, &req)
                     .map_err(super::from_nix_error)
             }
         }
@@ -116,7 +116,7 @@ impl UdpSocket {
             ttl as u8
         };
 
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Ip, nix::sockopt::IpMulticastTtl, &v)
+        nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpMulticastTtl, &v)
             .map_err(super::from_nix_error)
     }
 }

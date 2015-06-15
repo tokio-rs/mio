@@ -5,7 +5,7 @@ use std::os::unix::io::AsRawFd;
 pub trait Socket : AsRawFd {
     /// Returns the value for the `SO_LINGER` socket option.
     fn linger(&self) -> io::Result<usize> {
-        let linger = try!(nix::getsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::Linger)
+        let linger = try!(nix::getsockopt(self.as_raw_fd(), nix::sockopt::Linger)
             .map_err(super::from_nix_error));
 
         if linger.l_onoff > 0 {
@@ -22,22 +22,22 @@ pub trait Socket : AsRawFd {
             l_linger: dur_s as nix::c_int
         };
 
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::Linger, &linger)
+        nix::setsockopt(self.as_raw_fd(), nix::sockopt::Linger, &linger)
             .map_err(super::from_nix_error)
     }
 
     fn set_reuseaddr(&self, val: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::ReuseAddr, &val)
+        nix::setsockopt(self.as_raw_fd(), nix::sockopt::ReuseAddr, &val)
             .map_err(super::from_nix_error)
     }
 
     fn set_reuseport(&self, val: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::ReusePort, &val)
+        nix::setsockopt(self.as_raw_fd(), nix::sockopt::ReusePort, &val)
             .map_err(super::from_nix_error)
     }
 
     fn set_tcp_nodelay(&self, val: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Tcp, nix::sockopt::TcpNoDelay, &val)
+        nix::setsockopt(self.as_raw_fd(),  nix::sockopt::TcpNoDelay, &val)
             .map_err(super::from_nix_error)
     }
 
@@ -48,7 +48,7 @@ pub trait Socket : AsRawFd {
     /// stable duration type.
     fn set_read_timeout_ms(&self, val: usize) -> io::Result<()> {
         let t = nix::TimeVal::milliseconds(val as i64);
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::ReceiveTimeout, &t)
+        nix::setsockopt(self.as_raw_fd(), nix::sockopt::ReceiveTimeout, &t)
             .map_err(super::from_nix_error)
     }
 
@@ -59,7 +59,7 @@ pub trait Socket : AsRawFd {
     /// stable duration type.
     fn set_write_timeout_ms(&self, val: usize) -> io::Result<()> {
         let t = nix::TimeVal::milliseconds(val as i64);
-        nix::setsockopt(self.as_raw_fd(), nix::SockLevel::Socket, nix::sockopt::SendTimeout, &t)
+        nix::setsockopt(self.as_raw_fd(), nix::sockopt::SendTimeout, &t)
             .map_err(super::from_nix_error)
     }
 }

@@ -60,6 +60,18 @@ impl TcpSocket {
     pub fn set_reuseaddr(&self, val: bool) -> io::Result<()> {
         self.sys.set_reuseaddr(val)
     }
+
+    pub fn take_socket_error(&self) -> io::Result<()> {
+        self.sys.take_socket_error()
+    }
+
+    pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
+        self.sys.set_nodelay(nodelay)
+    }
+
+    pub fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
+        self.sys.set_keepalive(seconds)
+    }
 }
 
 impl Evented for TcpSocket {
@@ -128,6 +140,18 @@ impl TcpStream {
     }
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.sys.shutdown(how)
+    }
+
+    pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
+        self.sys.set_nodelay(nodelay)
+    }
+
+    pub fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
+        self.sys.set_keepalive(seconds)
+    }
+
+    pub fn take_socket_error(&self) -> io::Result<()> {
+        self.sys.take_socket_error()
     }
 }
 
