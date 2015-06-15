@@ -20,6 +20,7 @@ exclude       = [
 [dependencies]
 log = "0.3.1"
 bytes = "0.2.9"
+slab  = "0.1.0"
 clock_ticks = "0.0.5"
 
 [dependencies.nix]

@@ -72,6 +72,26 @@ impl TcpSocket {
     pub fn set_reuseaddr(&self, val: bool) -> io::Result<()> {
         Socket::set_reuseaddr(self, val)
     }
+
+    pub fn take_socket_error(&self) -> io::Result<()> {
+        net::take_socket_error(&self.io)
+    }
+
+    pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
+        net::set_nodelay(&self.io, nodelay)
+    }
+
+    pub fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
+        match seconds {
+            Some(sec) => {
+                try!(net::set_keepalive(&self.io, true));
+                net::set_tcp_keepalive(&self.io, sec)
+            },
+            None => {
+                net::set_keepalive(&self.io, false)
+            }
+        }
+    }
 }
 
 impl Read for TcpSocket {
