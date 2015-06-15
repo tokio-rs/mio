@@ -79,6 +79,7 @@
 
 extern crate bytes;
 extern crate nix;
+extern crate slab;
 extern crate time;
 
 #[macro_use]
