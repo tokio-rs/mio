@@ -1,9 +1,8 @@
 use {io, Evented, Interest, Io, PollOpt, Selector, Token};
-use unix::FromRawFd;
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::path::Path;
-use std::os::unix::io::{RawFd, AsRawFd};
+use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
 
 #[derive(Debug)]
 pub struct UnixSocket {

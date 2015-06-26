@@ -2,14 +2,6 @@ use {io, sys, Evented, Interest, Io, PollOpt, Selector, Token};
 use std::io::{Read, Write};
 use std::path::Path;
 
-/// A trait to express the ability to construct an object from a raw file descriptor.
-///
-/// Once `std::os::unix::io::FromRawFd` is stable, this will go away
-#[cfg(unix)]
-pub trait FromRawFd {
-    unsafe fn from_raw_fd(fd: RawFd) -> Self;
-}
-
 #[derive(Debug)]
 pub struct UnixSocket {
     sys: sys::UnixSocket,
@@ -258,7 +250,7 @@ impl From<Io> for PipeWriter {
  *
  */
 
-use std::os::unix::io::{RawFd, AsRawFd};
+use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
 
 impl AsRawFd for UnixSocket {
     fn as_raw_fd(&self) -> RawFd {

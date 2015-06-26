@@ -1,9 +1,8 @@
 use {io, Evented, Interest, Io, IpAddr, PollOpt, Selector, Token};
 use buf::{Buf, MutBuf};
-use unix::FromRawFd;
 use sys::unix::{net, nix, Socket};
 use std::net::SocketAddr;
-use std::os::unix::io::{RawFd, AsRawFd};
+use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
 
 #[derive(Debug)]
 pub struct UdpSocket {

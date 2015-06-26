@@ -1,7 +1,6 @@
 use {io, Evented, Interest, PollOpt, Selector, Token};
-use unix::FromRawFd;
 use std::io::{Read, Write};
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
 /*
  *

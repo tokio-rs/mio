@@ -1,9 +1,8 @@
 use {io, Evented, Interest, Io, PollOpt, Selector, Token};
-use unix::FromRawFd;
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::net::SocketAddr;
-use std::os::unix::io::{RawFd, AsRawFd};
+use std::os::unix::io::{RawFd, FromRawFd, AsRawFd};
 
 #[derive(Debug)]
 pub struct TcpSocket {

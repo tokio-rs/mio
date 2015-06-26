@@ -102,10 +102,7 @@ impl From<sys::UdpSocket> for UdpSocket {
  */
 
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, RawFd};
-
-#[cfg(unix)]
-use unix::FromRawFd;
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
 #[cfg(unix)]
 impl AsRawFd for UdpSocket {
