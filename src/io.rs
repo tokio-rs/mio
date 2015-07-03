@@ -17,7 +17,9 @@ pub trait Evented {
 }
 
 pub trait TryRead {
-    fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> Result<Option<usize>> {
+    fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> Result<Option<usize>>
+        where Self : Sized
+    {
         // Reads the length of the slice supplied by buf.mut_bytes into the buffer
         // This is not guaranteed to consume an entire datagram or segment.
         // If your protocol is msg based (instead of continuous stream) you should
@@ -36,7 +38,9 @@ pub trait TryRead {
 }
 
 pub trait TryWrite {
-    fn try_write_buf<B: Buf>(&mut self, buf: &mut B) -> Result<Option<usize>> {
+    fn try_write_buf<B: Buf>(&mut self, buf: &mut B) -> Result<Option<usize>>
+        where Self : Sized
+    {
         let res = self.try_write(buf.bytes());
 
         if let Ok(Some(cnt)) = res {
