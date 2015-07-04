@@ -1,6 +1,6 @@
 use {io, Interest, PollOpt, Token};
 use event::IoEvent;
-use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, ev_set, kqueue, kevent};
+use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent};
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ONESHOT};
 use std::{fmt, slice};
 use std::os::unix::io::RawFd;
@@ -78,14 +78,15 @@ impl Selector {
     fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) -> io::Result<()> {
         try!(self.maybe_flush_changes());
 
-        let idx = self.changes.len();
-
-        // Increase the vec size
-        unsafe { self.changes.events.set_len(idx + 1) };
-
-        let ev = &mut self.changes.events[idx];
-
-        ev_set(ev, fd as usize, filter, flags, FilterFlag::empty(), token);
+        self.changes.events.push(
+            KEvent {
+                ident: fd as ::libc::uintptr_t,
+                filter: filter,
+                flags: flags,
+                fflags: FilterFlag::empty(),
+                data: 0,
+                udata: token
+            });
 
         Ok(())
     }
