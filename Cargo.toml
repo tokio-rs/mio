@@ -19,6 +19,7 @@ exclude       = [
 
 [dependencies]
 log   = "0.3.1"
+libc  = "0.1.8"
 time  = "0.1.24"
 bytes = "0.2.9"
 slab  = "0.1.0"
