@@ -195,8 +195,9 @@ fn getsockname(io: &Io) -> io::Result<nix::SockAddr> {
 }
 
 fn set_non_block(io: &Io) -> io::Result<()> {
-    nix::fcntl(io.as_raw_fd(), nix::FcntlArg::F_SETFL(nix::O_NONBLOCK))
-        .map_err(io::from_nix_error)
+    try!(nix::fcntl(io.as_raw_fd(), nix::FcntlArg::F_SETFL(nix::O_NONBLOCK))
+            .map_err(io::from_nix_error));
+    Ok(())
 }
 
 /*
