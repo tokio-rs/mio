@@ -409,14 +409,13 @@ mod test {
     #[test]
     pub fn test_catching_up() {
         let mut t = timer();
-        let mut tick;
 
         t.timeout_at_ms("a", 110).unwrap();
         t.timeout_at_ms("b", 220).unwrap();
         t.timeout_at_ms("c", 230).unwrap();
         t.timeout_at_ms("d", 440).unwrap();
 
-        tick = t.ms_to_tick(600);
+        let tick = t.ms_to_tick(600);
         assert_eq!(Some("a"), t.tick_to(tick));
         assert_eq!(Some("c"), t.tick_to(tick));
         assert_eq!(Some("b"), t.tick_to(tick));
