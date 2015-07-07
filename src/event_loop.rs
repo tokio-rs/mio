@@ -229,7 +229,7 @@ impl<H: Handler> EventLoop<H> {
     /// time.
     pub fn run_once(&mut self, handler: &mut H) -> io::Result<()> {
         let mut messages;
-        let mut pending;
+        let pending;
 
         trace!("event loop tick");
 
