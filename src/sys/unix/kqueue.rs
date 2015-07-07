@@ -4,6 +4,7 @@ use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ONESHOT};
 use std::{fmt, slice};
 use std::os::unix::io::RawFd;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Selector {
@@ -20,15 +21,16 @@ impl Selector {
     }
 
     pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
-        let cnt = try!(kevent(self.kq, self.changes.as_slice(),
-                              evts.as_mut_slice(), timeout_ms)
+        let cnt = try!(kevent(self.kq, self.changes.as_slice(), evts.as_mut_slice(), timeout_ms)
                                   .map_err(super::from_nix_error));
 
-        self.changes.events.clear();
+        self.changes.sys_events.clear();
 
         unsafe {
-            evts.events.set_len(cnt);
+            evts.sys_events.set_len(cnt);
         }
+
+        evts.coalesce();
 
         Ok(())
     }
@@ -78,7 +80,7 @@ impl Selector {
     fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) -> io::Result<()> {
         try!(self.maybe_flush_changes());
 
-        self.changes.events.push(
+        self.changes.sys_events.push(
             KEvent {
                 ident: fd as ::libc::uintptr_t,
                 filter: filter,
@@ -96,7 +98,7 @@ impl Selector {
             try!(kevent(self.kq, self.changes.as_slice(), &mut [], 0)
                     .map_err(super::from_nix_error));
 
-            self.changes.events.clear();
+            self.changes.sys_events.clear();
         }
 
         Ok(())
@@ -104,12 +106,18 @@ impl Selector {
 }
 
 pub struct Events {
-    events: Vec<KEvent>,
+    sys_events: Vec<KEvent>,
+    events: Vec<IoEvent>,
+    event_map: HashMap<Token, usize>,
 }
 
 impl Events {
     pub fn new() -> Events {
-        Events { events: Vec::with_capacity(1024) }
+        Events {
+            sys_events: Vec::with_capacity(1024),
+            events: Vec::with_capacity(1024),
+            event_map: HashMap::with_capacity(1024)
+        }
     }
 
     #[inline]
@@ -117,66 +125,68 @@ impl Events {
         self.events.len()
     }
 
-    // TODO: We will get rid of this eventually in favor of an iterator
-    #[inline]
     pub fn get(&self, idx: usize) -> IoEvent {
-        if idx >= self.len() {
-            panic!("invalid index");
-        }
+        self.events[idx]
+    }
 
-        let ev = &self.events[idx];
-        let token = ev.udata;
+    pub fn coalesce(&mut self) {
+        self.events.clear();
+        self.event_map.clear();
 
-        trace!("get event; token={}; ev.filter={:?}; ev.flags={:?}", token, ev.filter, ev.flags);
+        for e in self.sys_events.iter() {
+            let token = Token(e.udata as usize);
+            let len = self.events.len();
 
-        // When the read end of the socket is closed, EV_EOF is set on the
-        // flags, and fflags contains the error, if any.
+            let idx = *self.event_map.entry(token)
+                .or_insert(len);
+                // .or_insert(IoEvent::new(Interest::hinted(), token));
 
-        let mut kind = Interest::hinted();
+            if idx == len {
+                // New entry, insert the default
+                self.events.push(IoEvent::new(Interest::hinted(), token));
 
-        if ev.filter == EventFilter::EVFILT_READ {
-            kind = kind | Interest::readable();
-        } else if ev.filter == EventFilter::EVFILT_WRITE {
-            kind = kind | Interest::writable();
-        } else {
-            panic!("GOT: {:?}", ev.filter);
-        }
+            }
 
-        if ev.flags.contains(EV_EOF) {
-            kind = kind | Interest::hup();
+            if e.filter == EventFilter::EVFILT_READ {
+                self.events[idx].kind.insert(Interest::readable());
+            } else if e.filter == EventFilter::EVFILT_WRITE {
+                self.events[idx].kind.insert(Interest::writable());
+            }
 
-            // When the read end of the socket is closed, EV_EOF is set on
-            // flags, and fflags contains the error if there is one.
-            if !ev.fflags.is_empty() {
-                kind = kind | Interest::error();
+            if e.flags.contains(EV_EOF) {
+                self.events[idx].kind.insert(Interest::hup());
+
+                // When the read end of the socket is closed, EV_EOF is set on
+                // flags, and fflags contains the error if there is one.
+                if !e.fflags.is_empty() {
+                    self.events[idx].kind.insert(Interest::error());
+                }
             }
         }
-
-        IoEvent::new(kind, token)
     }
 
     #[inline]
     fn is_full(&self) -> bool {
-        self.len() == self.events.capacity()
+        self.sys_events.len() == self.sys_events.capacity()
     }
 
     fn as_slice(&self) -> &[KEvent] {
         unsafe {
-            let ptr = (&self.events[..]).as_ptr();
-            slice::from_raw_parts(ptr, self.events.len())
+            let ptr = (&self.sys_events[..]).as_ptr();
+            slice::from_raw_parts(ptr, self.sys_events.len())
         }
     }
 
     fn as_mut_slice(&mut self) -> &mut [KEvent] {
         unsafe {
-            let ptr = (&mut self.events[..]).as_mut_ptr();
-            slice::from_raw_parts_mut(ptr, self.events.capacity())
+            let ptr = (&mut self.sys_events[..]).as_mut_ptr();
+            slice::from_raw_parts_mut(ptr, self.sys_events.capacity())
         }
     }
 }
 
 impl fmt::Debug for Events {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Events {{ len: {} }}", self.events.len())
+        write!(fmt, "Events {{ len: {} }}", self.sys_events.len())
     }
 }

@@ -28,13 +28,8 @@ impl TestHandler {
             state: Initial
         }
     }
-}
 
-impl Handler for TestHandler {
-    type Timeout = TcpStream;
-    type Message = ();
-
-    fn readable(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, hint: ReadHint) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Interest) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
@@ -48,17 +43,15 @@ impl Handler for TestHandler {
 
                 match self.state {
                     Initial => {
-                        assert!(hint.is_data(), "unexpected hint {:?}", hint);
-
                         // Whether or not Hup is included with actual data is platform specific
-                        if hint.is_hup() {
+                        if events.is_hup() {
                             self.state = AfterHup;
                         } else {
                             self.state = AfterRead;
                         }
                     }
                     AfterRead => {
-                        assert_eq!(hint, ReadHint::data() | ReadHint::hup());
+                        assert_eq!(events, Interest::readable() | Interest::hup() | Interest::hinted());
                         self.state = AfterHup;
                     }
                     AfterHup => panic!("Shouldn't get here"),
@@ -87,7 +80,7 @@ impl Handler for TestHandler {
         }
     }
 
-    fn writable(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Interest) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
@@ -95,6 +88,21 @@ impl Handler for TestHandler {
         }
 
         event_loop.reregister(&self.cli, CLIENT, Interest::readable(), PollOpt::edge()).unwrap();
+    }
+}
+
+impl Handler for TestHandler {
+    type Timeout = TcpStream;
+    type Message = ();
+
+    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Interest) {
+        if events.is_readable() {
+            self.handle_read(event_loop, tok, events);
+        }
+
+        if events.is_writable() {
+            self.handle_write(event_loop, tok, events);
+        }
     }
 
     fn timeout(&mut self, _event_loop: &mut EventLoop<TestHandler>, mut sock: TcpStream) {

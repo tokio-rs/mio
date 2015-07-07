@@ -120,7 +120,9 @@ pub struct Events {
 
 impl Events {
     pub fn new() -> Events {
-        Events { events: Vec::with_capacity(1024) }
+        Events {
+            events: Vec::with_capacity(1024),
+        }
     }
 
     #[inline]
@@ -130,10 +132,6 @@ impl Events {
 
     #[inline]
     pub fn get(&self, idx: usize) -> IoEvent {
-        if idx >= self.len() {
-            panic!("invalid index");
-        }
-
         let epoll = self.events[idx].events;
         let mut kind = Interest::hinted();
 
@@ -156,6 +154,6 @@ impl Events {
 
         let token = self.events[idx].data;
 
-        IoEvent::new(kind, token as usize)
+        IoEvent::new(kind, Token(token as usize))
     }
 }

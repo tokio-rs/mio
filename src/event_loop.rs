@@ -263,7 +263,6 @@ impl<H: Handler> EventLoop<H> {
         self.io_process(handler, events);
         self.notify(handler, messages);
         self.timer_process(handler);
-
         Ok(())
     }
 
@@ -295,9 +294,9 @@ impl<H: Handler> EventLoop<H> {
 
             trace!("event={:?}", evt);
 
-            match evt.token() {
+            match evt.token {
                 NOTIFY => self.notify.cleanup(),
-                _      => self.io_event(handler, evt)
+                _ => self.io_event(handler, evt)
             }
 
             i += 1;
@@ -305,15 +304,7 @@ impl<H: Handler> EventLoop<H> {
     }
 
     fn io_event(&mut self, handler: &mut H, evt: IoEvent) {
-        let tok = evt.token();
-
-        if evt.is_readable() | evt.is_error() {
-            handler.readable(self, tok, evt.read_hint());
-        }
-
-        if evt.is_writable() {
-            handler.writable(self, tok);
-        }
+        handler.ready(self, evt.token, evt.kind);
     }
 
     fn notify(&mut self, handler: &mut H, mut cnt: usize) {
@@ -382,7 +373,7 @@ mod tests {
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
-    use {buf, unix, Buf, Handler, Token, TryRead, TryWrite, ReadHint};
+    use {buf, unix, Buf, Handler, Token, TryRead, TryWrite, Interest};
 
     #[test]
     pub fn test_event_loop_size() {
@@ -408,14 +399,16 @@ mod tests {
         type Timeout = usize;
         type Message = ();
 
-        fn readable(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token, _: ReadHint) {
-            (*self.rcount).fetch_add(1, SeqCst);
-            assert_eq!(token, Token(10));
-        }
+        fn ready(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token, events: Interest) {
+            if events.is_readable() {
+                (*self.rcount).fetch_add(1, SeqCst);
+                assert_eq!(token, Token(10));
+            }
 
-        fn writable(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token) {
-            (*self.wcount).fetch_add(1, SeqCst);
-            assert_eq!(token, Token(10));
+            if events.is_writable() {
+                (*self.wcount).fetch_add(1, SeqCst);
+                assert_eq!(token, Token(10));
+            }
         }
     }
 
