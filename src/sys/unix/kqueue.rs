@@ -139,11 +139,10 @@ impl Events {
 
             let idx = *self.event_map.entry(token)
                 .or_insert(len);
-                // .or_insert(IoEvent::new(EventSet::hinted(), token));
 
             if idx == len {
                 // New entry, insert the default
-                self.events.push(IoEvent::new(EventSet::hinted(), token));
+                self.events.push(IoEvent::new(EventSet::none(), token));
 
             }
 

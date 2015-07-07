@@ -161,11 +161,6 @@ impl EventSet {
     }
 
     #[inline]
-    pub fn hinted() -> EventSet {
-        EventSet(0x010)
-    }
-
-    #[inline]
     pub fn all() -> EventSet {
         EventSet::readable() |
             EventSet::writable() |
@@ -191,11 +186,6 @@ impl EventSet {
     #[inline]
     pub fn is_hup(&self) -> bool {
         self.contains(EventSet::hup())
-    }
-
-    #[inline]
-    pub fn is_hinted(&self) -> bool {
-        self.contains(EventSet::hinted())
     }
 
     #[inline]
@@ -271,8 +261,7 @@ impl fmt::Debug for EventSet {
             (EventSet::readable(), "Readable"),
             (EventSet::writable(), "Writable"),
             (EventSet::error(),    "Error"),
-            (EventSet::hup(),      "HupHint"),
-            (EventSet::hinted(),   "Hinted")];
+            (EventSet::hup(),      "Hup")];
 
         for &(flag, msg) in flags.iter() {
             if self.contains(flag) {

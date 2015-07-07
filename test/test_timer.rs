@@ -51,7 +51,7 @@ impl TestHandler {
                         }
                     }
                     AfterRead => {
-                        assert_eq!(events, EventSet::readable() | EventSet::hup() | EventSet::hinted());
+                        assert_eq!(events, EventSet::readable() | EventSet::hup());
                         self.state = AfterHup;
                     }
                     AfterHup => panic!("Shouldn't get here"),

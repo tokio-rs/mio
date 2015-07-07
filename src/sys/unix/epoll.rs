@@ -133,7 +133,7 @@ impl Events {
     #[inline]
     pub fn get(&self, idx: usize) -> IoEvent {
         let epoll = self.events[idx].events;
-        let mut kind = EventSet::hinted();
+        let mut kind = EventSet::none();
 
         if epoll.contains(EPOLLIN) {
             kind = kind | EventSet::readable();
