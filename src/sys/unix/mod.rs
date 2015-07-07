@@ -2,13 +2,13 @@
 mod epoll;
 
 #[cfg(target_os = "linux")]
-pub use self::epoll::{Events, Selector};
+pub use self::epoll::{Events, Selector, EventsIterator};
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod kqueue;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
-pub use self::kqueue::{Events, Selector};
+pub use self::kqueue::{Events, Selector, EventsIterator};
 
 mod awakener;
 mod io;

@@ -31,24 +31,27 @@ impl Handler for UdpHandler {
     type Timeout = usize;
     type Message = ();
 
-    fn readable(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, _: ReadHint) {
-        match token {
-            LISTENER => {
-                debug!("We are receiving a datagram now...");
-                self.rx.recv_from(&mut self.rx_buf).unwrap();
-                assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
-                event_loop.shutdown();
-            },
-            _ => ()
-        }
-    }
+    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Interest) {
 
-    fn writable(&mut self, _: &mut EventLoop<UdpHandler>, token: Token) {
-        match token {
-            SENDER => {
-                self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();
-            },
-            _ => {}
+        if events.is_readable() {
+            match token {
+                LISTENER => {
+                    debug!("We are receiving a datagram now...");
+                    self.rx.recv_from(&mut self.rx_buf).unwrap();
+                    assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
+                    event_loop.shutdown();
+                },
+                _ => ()
+            }
+        }
+
+        if events.is_writable() {
+            match token {
+                SENDER => {
+                    self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();
+                },
+                _ => {}
+            }
         }
     }
 }

@@ -1,14 +1,11 @@
-use {EventLoop, ReadHint, Token};
+use {EventLoop, Interest, Token};
 
 #[allow(unused_variables)]
 pub trait Handler {
     type Timeout;
     type Message: Send;
 
-    fn readable(&mut self, event_loop: &mut EventLoop<Self>, token: Token, hint: ReadHint) {
-    }
-
-    fn writable(&mut self, event_loop: &mut EventLoop<Self>, token: Token) {
+    fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: Interest) {
     }
 
     fn notify(&mut self, event_loop: &mut EventLoop<Self>, msg: Self::Message) {

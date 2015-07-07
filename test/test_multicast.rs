@@ -26,13 +26,8 @@ impl UdpHandler {
             rx_buf: RingBuf::new(1024)
         }
     }
-}
 
-impl Handler for UdpHandler {
-    type Timeout = usize;
-    type Message = ();
-
-    fn readable(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, _: ReadHint) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Interest) {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
@@ -49,12 +44,27 @@ impl Handler for UdpHandler {
         }
     }
 
-    fn writable(&mut self, _: &mut EventLoop<UdpHandler>, token: Token) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Interest) {
         match token {
             SENDER => {
                 self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();
             },
             _ => ()
+        }
+    }
+}
+
+impl Handler for UdpHandler {
+    type Timeout = usize;
+    type Message = ();
+
+    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Interest) {
+        if events.is_readable() {
+            self.handle_read(event_loop, token, events);
+        }
+
+        if events.is_writable() {
+            self.handle_write(event_loop, token, events);
         }
     }
 }

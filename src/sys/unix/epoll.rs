@@ -3,6 +3,7 @@ use event::IoEvent;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 use std::os::unix::io::RawFd;
+use std::slice::Iter;
 
 #[derive(Debug)]
 pub struct Selector {
@@ -37,6 +38,8 @@ impl Selector {
                            .map_err(super::from_nix_error));
 
         unsafe { evts.events.set_len(cnt); }
+
+        evts.coalesce();
 
         Ok(())
     }
@@ -116,46 +119,59 @@ impl Drop for Selector {
 
 pub struct Events {
     events: Vec<EpollEvent>,
+    token_evts: Vec<IoEvent>
 }
 
 impl Events {
     pub fn new() -> Events {
-        Events { events: Vec::with_capacity(1024) }
+        Events { events: Vec::with_capacity(1024),
+                 token_evts: Vec::with_capacity(1024)
+               }
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        self.events.len()
+    pub fn coalesce(&mut self) {
+
+        unsafe { self.token_evts.set_len(self.events.len()); }
+
+        for (i,e) in self.events.iter().enumerate() {
+            let mut kind = Interest::hinted();
+
+            if e.events.contains(EPOLLIN) {
+                kind = kind | Interest::readable();
+            }
+
+            if e.events.contains(EPOLLOUT) {
+                kind = kind | Interest::writable();
+            }
+
+            // EPOLLHUP - Usually means a socket error happened
+            if e.events.contains(EPOLLERR) {
+                kind = kind | Interest::error();
+            }
+
+            if e.events.contains(EPOLLRDHUP) | e.events.contains(EPOLLHUP) {
+                kind = kind | Interest::hup();
+            }
+
+            self.token_evts[i] = IoEvent::new(kind, e.data as usize);
+        }
     }
 
     #[inline]
-    pub fn get(&self, idx: usize) -> IoEvent {
-        if idx >= self.len() {
-            panic!("invalid index");
-        }
+    pub fn iter<'a>(&'a self) -> EventsIterator<'a> {
+        EventsIterator{ iter: self.token_evts.iter() }
+    }
+}
 
-        let epoll = self.events[idx].events;
-        let mut kind = Interest::hinted();
+pub struct EventsIterator<'a> {
+    iter: Iter<'a, IoEvent>
+}
 
-        if epoll.contains(EPOLLIN) {
-            kind = kind | Interest::readable();
-        }
+impl<'a> Iterator for EventsIterator<'a> {
+    type Item = IoEvent;
 
-        if epoll.contains(EPOLLOUT) {
-            kind = kind | Interest::writable();
-        }
-
-        // EPOLLHUP - Usually means a socket error happened
-        if epoll.contains(EPOLLERR) {
-            kind = kind | Interest::error();
-        }
-
-        if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
-            kind = kind | Interest::hup();
-        }
-
-        let token = self.events[idx].data;
-
-        IoEvent::new(kind, token as usize)
+    fn next(&mut self) -> Option<IoEvent> {
+        self.iter.next().map(|e| *e)
     }
 }

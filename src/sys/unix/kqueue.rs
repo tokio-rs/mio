@@ -4,6 +4,8 @@ use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ONESHOT};
 use std::{fmt, slice};
 use std::os::unix::io::RawFd;
+use std::collections::HashMap;
+use std::collections::hash_map::Values;
 
 #[derive(Debug)]
 pub struct Selector {
@@ -29,6 +31,8 @@ impl Selector {
         unsafe {
             evts.events.set_len(cnt);
         }
+
+        evts.coalesce();
 
         Ok(())
     }
@@ -105,54 +109,44 @@ impl Selector {
 
 pub struct Events {
     events: Vec<KEvent>,
+    token_evts: HashMap<Token, IoEvent>
 }
 
 impl Events {
     pub fn new() -> Events {
-        Events { events: Vec::with_capacity(1024) }
+        Events { events: Vec::with_capacity(1024),
+                 token_evts: HashMap::with_capacity(1024) }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.events.len()
+        self.token_evts.len()
     }
 
-    // TODO: We will get rid of this eventually in favor of an iterator
-    #[inline]
-    pub fn get(&self, idx: usize) -> IoEvent {
-        if idx >= self.len() {
-            panic!("invalid index");
-        }
+    pub fn coalesce(&mut self) {
+        self.token_evts.clear();
+        for e in self.events.iter() {
+            let ioe = self.token_evts.entry(Token(e.udata as usize)).or_insert(IoEvent::new(Interest::hinted(), e.udata as usize));
+            if e.filter == EventFilter::EVFILT_READ {
+                ioe.kind.insert(Interest::readable());
+            } else if e.filter == EventFilter::EVFILT_WRITE {
+                ioe.kind.insert(Interest::writable());
+            }
 
-        let ev = &self.events[idx];
-        let token = ev.udata;
+            if e.flags.contains(EV_EOF) {
+                ioe.kind.insert(Interest::hup());
 
-        trace!("get event; token={}; ev.filter={:?}; ev.flags={:?}", token, ev.filter, ev.flags);
-
-        // When the read end of the socket is closed, EV_EOF is set on the
-        // flags, and fflags contains the error, if any.
-
-        let mut kind = Interest::hinted();
-
-        if ev.filter == EventFilter::EVFILT_READ {
-            kind = kind | Interest::readable();
-        } else if ev.filter == EventFilter::EVFILT_WRITE {
-            kind = kind | Interest::writable();
-        } else {
-            panic!("GOT: {:?}", ev.filter);
-        }
-
-        if ev.flags.contains(EV_EOF) {
-            kind = kind | Interest::hup();
-
-            // When the read end of the socket is closed, EV_EOF is set on
-            // flags, and fflags contains the error if there is one.
-            if !ev.fflags.is_empty() {
-                kind = kind | Interest::error();
+                // When the read end of the socket is closed, EV_EOF is set on
+                // flags, and fflags contains the error if there is one.
+                if !e.fflags.is_empty() {
+                    ioe.kind.insert(Interest::error());
+                }
             }
         }
+    }
 
-        IoEvent::new(kind, token)
+    pub fn iter<'a>(&'a self) -> EventsIterator<'a> {
+        EventsIterator{ iter: self.token_evts.values() }
     }
 
     #[inline]
@@ -178,5 +172,17 @@ impl Events {
 impl fmt::Debug for Events {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Events {{ len: {} }}", self.events.len())
+    }
+}
+
+pub struct EventsIterator<'a> {
+    iter: Values<'a, Token, IoEvent>
+}
+
+impl<'a> Iterator for EventsIterator<'a> {
+    type Item = IoEvent;
+
+    fn next(&mut self) -> Option<IoEvent> {
+        self.iter.next().map(|x| *x)
     }
 }

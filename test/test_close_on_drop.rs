@@ -29,14 +29,9 @@ impl TestHandler {
             state: Initial
         }
     }
-}
 
-impl Handler for TestHandler {
-    type Timeout = ();
-    type Message = ();
-
-    fn readable(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, hint: ReadHint) {
-        debug!("readable; tok={:?}; hint={:?}", tok, hint);
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Interest) {
+        debug!("readable; tok={:?}; hint={:?}", tok, events);
 
         match tok {
             SERVER => {
@@ -50,10 +45,9 @@ impl Handler for TestHandler {
                     Initial => {
                         let mut buf = [0; 4096];
                         debug!("GOT={:?}", self.cli.try_read(&mut buf[..]));
-                        assert!(hint.is_data(), "unexpected hint {:?}", hint);
 
                         // Whether or not Hup is included with actual data is platform specific
-                        if hint.is_hup() {
+                        if events.is_hup() {
                             self.state = AfterHup;
                         } else {
                             self.state = AfterRead;
@@ -78,7 +72,7 @@ impl Handler for TestHandler {
         event_loop.reregister(&self.cli, CLIENT, Interest::readable() | Interest::hup(), PollOpt::edge()).unwrap();
     }
 
-    fn writable(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Interest) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {
@@ -86,6 +80,22 @@ impl Handler for TestHandler {
                 event_loop.reregister(&self.cli, CLIENT, Interest::readable() | Interest::hup(), PollOpt::edge()).unwrap();
             }
             _ => panic!("received unknown token {:?}", tok)
+        }
+    }
+}
+
+
+impl Handler for TestHandler {
+    type Timeout = ();
+    type Message = ();
+
+    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Interest) {
+        if events.is_readable() {
+            self.handle_read(event_loop, tok, events);
+        }
+
+        if events.is_writable() {
+            self.handle_write(event_loop, tok, events);
         }
     }
 }

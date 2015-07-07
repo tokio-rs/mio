@@ -4,6 +4,7 @@ use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
 use std::default::Default;
 use std::{io, fmt, usize};
+use poll::Events;
 
 /// Configure EventLoop runtime details
 #[derive(Copy, Clone, Debug)]
@@ -246,7 +247,7 @@ impl<H: Handler> EventLoop<H> {
             Err(err) => {
                 if err.kind() == io::ErrorKind::Interrupted {
                     handler.interrupted(self);
-                    0
+                    return Err(err);
                 } else {
                     return Err(err);
                 }
@@ -263,12 +264,11 @@ impl<H: Handler> EventLoop<H> {
         self.io_process(handler, events);
         self.notify(handler, messages);
         self.timer_process(handler);
-
         Ok(())
     }
 
     #[inline]
-    fn io_poll(&mut self, immediate: bool) -> io::Result<usize> {
+    fn io_poll(&mut self, immediate: bool) -> io::Result<Events> {
         if immediate {
             self.poll.poll(0)
         } else {
@@ -283,15 +283,13 @@ impl<H: Handler> EventLoop<H> {
     }
 
     // Process IO events that have been previously polled
-    fn io_process(&mut self, handler: &mut H, cnt: usize) {
-        let mut i = 0;
-
+    fn io_process(&mut self, handler: &mut H, events: Events) {
         // Iterate over the notifications. Each event provides the token
         // it was registered with (which usually represents, at least, the
         // handle that the event is about) as well as information about
         // what kind of event occurred (readable, writable, signal, etc.)
-        while i < cnt {
-            let evt = self.poll.event(i);
+
+        for evt in events.iter() {
 
             trace!("event={:?}", evt);
 
@@ -299,21 +297,14 @@ impl<H: Handler> EventLoop<H> {
                 NOTIFY => self.notify.cleanup(),
                 _      => self.io_event(handler, evt)
             }
-
-            i += 1;
         }
+
+        self.poll.reset_events(events);
     }
 
     fn io_event(&mut self, handler: &mut H, evt: IoEvent) {
-        let tok = evt.token();
 
-        if evt.is_readable() | evt.is_error() {
-            handler.readable(self, tok, evt.read_hint());
-        }
-
-        if evt.is_writable() {
-            handler.writable(self, tok);
-        }
+        handler.ready(self, evt.token(), evt.events());
     }
 
     fn notify(&mut self, handler: &mut H, mut cnt: usize) {
@@ -382,7 +373,7 @@ mod tests {
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
-    use {buf, unix, Buf, Handler, Token, TryRead, TryWrite, ReadHint};
+    use {buf, unix, Buf, Handler, Token, TryRead, TryWrite, Interest};
 
     #[test]
     pub fn test_event_loop_size() {
@@ -408,14 +399,16 @@ mod tests {
         type Timeout = usize;
         type Message = ();
 
-        fn readable(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token, _: ReadHint) {
-            (*self.rcount).fetch_add(1, SeqCst);
-            assert_eq!(token, Token(10));
-        }
+        fn ready(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token, events: Interest) {
+            if events.is_readable() {
+                (*self.rcount).fetch_add(1, SeqCst);
+                assert_eq!(token, Token(10));
+            }
 
-        fn writable(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token) {
-            (*self.wcount).fetch_add(1, SeqCst);
-            assert_eq!(token, Token(10));
+            if events.is_writable() {
+                (*self.wcount).fetch_add(1, SeqCst);
+                assert_eq!(token, Token(10));
+            }
         }
     }
 
