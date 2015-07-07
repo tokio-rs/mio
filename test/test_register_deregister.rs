@@ -20,7 +20,7 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: Interest) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
         match token {
             SERVER => {
                 let mut sock = self.server.accept().unwrap().unwrap();
@@ -29,13 +29,13 @@ impl TestHandler {
             CLIENT => {
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                event_loop.reregister(&self.client, CLIENT, Interest::writable(), PollOpt::level()).unwrap();
+                event_loop.reregister(&self.client, CLIENT, EventSet::writable(), PollOpt::level()).unwrap();
             }
             _ => panic!("unexpected token"),
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: Interest) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
@@ -49,7 +49,7 @@ impl Handler for TestHandler {
     type Timeout = usize;
     type Message = ();
 
-    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: Interest) {
+    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
         if events.is_readable() {
             self.handle_read(event_loop, token, events);
         }
@@ -80,13 +80,13 @@ pub fn test_register_deregister() {
     let server = server.listen(256).unwrap();
 
     info!("register server socket");
-    event_loop.register_opt(&server, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
+    event_loop.register_opt(&server, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
 
     let (client, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Register client socket only as writable
-    event_loop.register_opt(&client, CLIENT, Interest::readable(), PollOpt::level()).unwrap();
+    event_loop.register_opt(&client, CLIENT, EventSet::readable(), PollOpt::level()).unwrap();
 
     let mut handler = TestHandler::new(server, client);
 

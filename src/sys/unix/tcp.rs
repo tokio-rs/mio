@@ -1,4 +1,4 @@
-use {io, Evented, Interest, Io, PollOpt, Selector, Token};
+use {io, Evented, EventSet, Io, PollOpt, Selector, Token};
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::net::SocketAddr;
@@ -110,11 +110,11 @@ impl Write for TcpSocket {
 }
 
 impl Evented for TcpSocket {
-    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.io.register(selector, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.io.reregister(selector, token, interest, opts)
     }
 

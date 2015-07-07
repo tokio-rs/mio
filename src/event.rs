@@ -133,78 +133,78 @@ impl fmt::Debug for PollOpt {
 }
 
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct Interest(usize);
+pub struct EventSet(usize);
 
-impl Interest {
-    pub fn none() -> Interest {
-        Interest(0)
+impl EventSet {
+    pub fn none() -> EventSet {
+        EventSet(0)
     }
 
     #[inline]
-    pub fn readable() -> Interest {
-        Interest(0x001)
+    pub fn readable() -> EventSet {
+        EventSet(0x001)
     }
 
     #[inline]
-    pub fn writable() -> Interest {
-        Interest(0x002)
+    pub fn writable() -> EventSet {
+        EventSet(0x002)
     }
 
     #[inline]
-    pub fn error() -> Interest {
-        Interest(0x004)
+    pub fn error() -> EventSet {
+        EventSet(0x004)
     }
 
     #[inline]
-    pub fn hup() -> Interest {
-        Interest(0x008)
+    pub fn hup() -> EventSet {
+        EventSet(0x008)
     }
 
     #[inline]
-    pub fn hinted() -> Interest {
-        Interest(0x010)
+    pub fn hinted() -> EventSet {
+        EventSet(0x010)
     }
 
     #[inline]
-    pub fn all() -> Interest {
-        Interest::readable() |
-            Interest::writable() |
-            Interest::hup() |
-            Interest::error()
+    pub fn all() -> EventSet {
+        EventSet::readable() |
+            EventSet::writable() |
+            EventSet::hup() |
+            EventSet::error()
     }
 
     #[inline]
     pub fn is_readable(&self) -> bool {
-        self.contains(Interest::readable())
+        self.contains(EventSet::readable())
     }
 
     #[inline]
     pub fn is_writable(&self) -> bool {
-        self.contains(Interest::writable())
+        self.contains(EventSet::writable())
     }
 
     #[inline]
     pub fn is_error(&self) -> bool {
-        self.contains(Interest::error())
+        self.contains(EventSet::error())
     }
 
     #[inline]
     pub fn is_hup(&self) -> bool {
-        self.contains(Interest::hup())
+        self.contains(EventSet::hup())
     }
 
     #[inline]
     pub fn is_hinted(&self) -> bool {
-        self.contains(Interest::hinted())
+        self.contains(EventSet::hinted())
     }
 
     #[inline]
-    pub fn insert(&mut self, other: Interest) {
+    pub fn insert(&mut self, other: EventSet) {
         self.0 |= other.0;
     }
 
     #[inline]
-    pub fn remove(&mut self, other: Interest) {
+    pub fn remove(&mut self, other: EventSet) {
         self.0 &= !other.0;
     }
 
@@ -214,65 +214,65 @@ impl Interest {
     }
 
     #[inline]
-    pub fn contains(&self, other: Interest) -> bool {
+    pub fn contains(&self, other: EventSet) -> bool {
         (*self & other) == other
     }
 }
 
-impl ops::BitOr for Interest {
-    type Output = Interest;
+impl ops::BitOr for EventSet {
+    type Output = EventSet;
 
     #[inline]
-    fn bitor(self, other: Interest) -> Interest {
-        Interest(self.bits() | other.bits())
+    fn bitor(self, other: EventSet) -> EventSet {
+        EventSet(self.bits() | other.bits())
     }
 }
 
-impl ops::BitXor for Interest {
-    type Output = Interest;
+impl ops::BitXor for EventSet {
+    type Output = EventSet;
 
     #[inline]
-    fn bitxor(self, other: Interest) -> Interest {
-        Interest(self.bits() ^ other.bits())
+    fn bitxor(self, other: EventSet) -> EventSet {
+        EventSet(self.bits() ^ other.bits())
     }
 }
 
-impl ops::BitAnd for Interest {
-    type Output = Interest;
+impl ops::BitAnd for EventSet {
+    type Output = EventSet;
 
     #[inline]
-    fn bitand(self, other: Interest) -> Interest {
-        Interest(self.bits() & other.bits())
+    fn bitand(self, other: EventSet) -> EventSet {
+        EventSet(self.bits() & other.bits())
     }
 }
 
-impl ops::Sub for Interest {
-    type Output = Interest;
+impl ops::Sub for EventSet {
+    type Output = EventSet;
 
     #[inline]
-    fn sub(self, other: Interest) -> Interest {
-        Interest(self.bits() & !other.bits())
+    fn sub(self, other: EventSet) -> EventSet {
+        EventSet(self.bits() & !other.bits())
     }
 }
 
-impl ops::Not for Interest {
-    type Output = Interest;
+impl ops::Not for EventSet {
+    type Output = EventSet;
 
     #[inline]
-    fn not(self) -> Interest {
-        Interest(!self.bits() & Interest::all().bits())
+    fn not(self) -> EventSet {
+        EventSet(!self.bits() & EventSet::all().bits())
     }
 }
 
-impl fmt::Debug for Interest {
+impl fmt::Debug for EventSet {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (Interest::readable(), "Readable"),
-            (Interest::writable(), "Writable"),
-            (Interest::error(),    "Error"),
-            (Interest::hup(),      "HupHint"),
-            (Interest::hinted(),   "Hinted")];
+            (EventSet::readable(), "Readable"),
+            (EventSet::writable(), "Writable"),
+            (EventSet::error(),    "Error"),
+            (EventSet::hup(),      "HupHint"),
+            (EventSet::hinted(),   "Hinted")];
 
         for &(flag, msg) in flags.iter() {
             if self.contains(flag) {
@@ -291,7 +291,7 @@ impl fmt::Debug for Interest {
 // Keep this struct internal to mio
 #[derive(Copy, Clone, Debug)]
 pub struct IoEvent {
-    pub kind: Interest,
+    pub kind: EventSet,
     pub token: Token
 }
 
@@ -303,7 +303,7 @@ pub struct IoEvent {
 /// Selector when they have events to report.
 impl IoEvent {
     /// Create a new IoEvent.
-    pub fn new(kind: Interest, token: Token) -> IoEvent {
+    pub fn new(kind: EventSet, token: Token) -> IoEvent {
         IoEvent {
             kind: kind,
             token: token,

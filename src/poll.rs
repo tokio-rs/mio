@@ -1,5 +1,5 @@
 use {sys, Evented, Token};
-use event::{Interest, IoEvent, PollOpt};
+use event::{EventSet, IoEvent, PollOpt};
 use std::{fmt, io};
 
 pub use sys::{Events};
@@ -17,7 +17,7 @@ impl Poll {
         })
     }
 
-    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()>
+    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
         trace!("registering with poller");
@@ -28,7 +28,7 @@ impl Poll {
         Ok(())
     }
 
-    pub fn reregister<E: ?Sized>(&mut self, io: &E, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()>
+    pub fn reregister<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
         trace!("registering with poller");

@@ -1,4 +1,4 @@
-use {Interest, Selector, PollOpt, Token};
+use {EventSet, Selector, PollOpt, Token};
 use buf::{Buf, MutBuf};
 
 // Re-export the io::Result / Error types for convenience
@@ -7,10 +7,10 @@ pub use std::io::{Read, Write, Result, Error};
 /// A value that may be registered with an `EventLoop`
 pub trait Evented {
     #[doc(hidden)]
-    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> Result<()>;
+    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> Result<()>;
 
     #[doc(hidden)]
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> Result<()>;
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> Result<()>;
 
     #[doc(hidden)]
     fn deregister(&self, selector: &mut Selector) -> Result<()>;

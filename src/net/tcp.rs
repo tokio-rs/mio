@@ -1,4 +1,4 @@
-use {io, sys, Evented, Interest, PollOpt, Selector, Token};
+use {io, sys, Evented, EventSet, PollOpt, Selector, Token};
 use std::io::{Read, Write};
 use std::net::SocketAddr;
 
@@ -75,11 +75,11 @@ impl TcpSocket {
 }
 
 impl Evented for TcpSocket {
-    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.sys.register(selector, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(selector, token, interest, opts)
     }
 
@@ -172,11 +172,11 @@ impl Write for TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.sys.register(selector, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(selector, token, interest, opts)
     }
 
@@ -248,11 +248,11 @@ impl From<sys::TcpSocket> for TcpListener {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.sys.register(selector, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(selector, token, interest, opts)
     }
 

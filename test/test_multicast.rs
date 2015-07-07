@@ -27,7 +27,7 @@ impl UdpHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Interest) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: EventSet) {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
@@ -44,7 +44,7 @@ impl UdpHandler {
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Interest) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: EventSet) {
         match token {
             SENDER => {
                 self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();
@@ -58,7 +58,7 @@ impl Handler for UdpHandler {
     type Timeout = usize;
     type Message = ();
 
-    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Interest) {
+    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: EventSet) {
         if events.is_readable() {
             self.handle_read(event_loop, token, events);
         }
@@ -87,10 +87,10 @@ pub fn test_multicast() {
     rx.join_multicast(&"227.1.1.101".parse().unwrap()).unwrap();
 
     info!("Registering SENDER");
-    event_loop.register_opt(&tx, SENDER, Interest::writable(), PollOpt::edge()).unwrap();
+    event_loop.register_opt(&tx, SENDER, EventSet::writable(), PollOpt::edge()).unwrap();
 
     info!("Registering LISTENER");
-    event_loop.register_opt(&rx, LISTENER, Interest::readable(), PollOpt::edge()).unwrap();
+    event_loop.register_opt(&rx, LISTENER, EventSet::readable(), PollOpt::edge()).unwrap();
 
     info!("Starting event loop to test with...");
     event_loop.run(&mut UdpHandler::new(tx, rx, "hello world")).unwrap();

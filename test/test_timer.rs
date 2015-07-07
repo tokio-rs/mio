@@ -29,14 +29,14 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Interest) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().unwrap();
                 event_loop.timeout_ms(conn, 200).unwrap();
 
-                event_loop.reregister(&self.srv, SERVER, Interest::readable(), PollOpt::edge()).unwrap();
+                event_loop.reregister(&self.srv, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
             }
             CLIENT => {
                 debug!("client readable");
@@ -51,7 +51,7 @@ impl TestHandler {
                         }
                     }
                     AfterRead => {
-                        assert_eq!(events, Interest::readable() | Interest::hup() | Interest::hinted());
+                        assert_eq!(events, EventSet::readable() | EventSet::hup() | EventSet::hinted());
                         self.state = AfterHup;
                     }
                     AfterHup => panic!("Shouldn't get here"),
@@ -74,20 +74,20 @@ impl TestHandler {
                     }
                 }
 
-                event_loop.reregister(&self.cli, CLIENT, Interest::readable() | Interest::hup(), PollOpt::edge()).unwrap();
+                event_loop.reregister(&self.cli, CLIENT, EventSet::readable() | EventSet::hup(), PollOpt::edge()).unwrap();
             }
             _ => panic!("received unknown token {:?}", tok),
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Interest) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
             _ => panic!("received unknown token {:?}", tok),
         }
 
-        event_loop.reregister(&self.cli, CLIENT, Interest::readable(), PollOpt::edge()).unwrap();
+        event_loop.reregister(&self.cli, CLIENT, EventSet::readable(), PollOpt::edge()).unwrap();
     }
 }
 
@@ -95,7 +95,7 @@ impl Handler for TestHandler {
     type Timeout = TcpStream;
     type Message = ();
 
-    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Interest) {
+    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
         if events.is_readable() {
             self.handle_read(event_loop, tok, events);
         }
@@ -128,13 +128,13 @@ pub fn test_timer() {
 
     info!("listening for connections");
 
-    event_loop.register_opt(&srv, SERVER, Interest::all(), PollOpt::edge()).unwrap();
+    event_loop.register_opt(&srv, SERVER, EventSet::all(), PollOpt::edge()).unwrap();
 
     let (sock, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register_opt(&sock, CLIENT, Interest::all(), PollOpt::edge()).unwrap();
+    event_loop.register_opt(&sock, CLIENT, EventSet::all(), PollOpt::edge()).unwrap();
 
     // Init the handler
     let mut handler = TestHandler::new(srv, sock);

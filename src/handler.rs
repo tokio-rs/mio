@@ -1,4 +1,4 @@
-use {EventLoop, Interest, Token};
+use {EventLoop, EventSet, Token};
 
 #[allow(unused_variables)]
 pub trait Handler {
@@ -15,7 +15,7 @@ pub trait Handler {
     ///
     /// This function will only be invoked a single time per socket per event
     /// loop tick.
-    fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: Interest) {
+    fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
     }
 
     /// Invoked when a message has been received via the event loop's channel.

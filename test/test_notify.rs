@@ -53,7 +53,7 @@ pub fn test_notify() {
 
     let srv = srv.listen(256).unwrap();
 
-    event_loop.register_opt(&srv, Token(0), Interest::all(), PollOpt::edge()).unwrap();
+    event_loop.register_opt(&srv, Token(0), EventSet::all(), PollOpt::edge()).unwrap();
 
     let sender = event_loop.channel();
 

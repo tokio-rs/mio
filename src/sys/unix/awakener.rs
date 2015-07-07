@@ -2,7 +2,7 @@ pub use self::pipe::Awakener;
 
 /// Default *nix awakener implementation
 mod pipe {
-    use {io, Evented, Interest, PollOpt, Selector, Token, TryRead, TryWrite};
+    use {io, Evented, EventSet, PollOpt, Selector, Token, TryRead, TryWrite};
     use unix::{self, PipeReader, PipeWriter};
     use std::mem;
     use std::cell::UnsafeCell;
@@ -62,11 +62,11 @@ mod pipe {
     }
 
     impl Evented for Awakener {
-        fn register(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
             self.reader().register(selector, token, interest, opts)
         }
 
-        fn reregister(&self, selector: &mut Selector, token: Token, interest: Interest, opts: PollOpt) -> io::Result<()> {
+        fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
             self.reader().reregister(selector, token, interest, opts)
         }
 

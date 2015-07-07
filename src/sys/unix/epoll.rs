@@ -1,4 +1,4 @@
-use {io, Interest, PollOpt, Token};
+use {io, EventSet, PollOpt, Token};
 use event::IoEvent;
 use nix::sys::epoll::*;
 use nix::unistd::close;
@@ -42,7 +42,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, fd: RawFd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token.as_usize() as u64
@@ -53,7 +53,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&mut self, fd: RawFd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token.as_usize() as u64
@@ -78,7 +78,7 @@ impl Selector {
     }
 }
 
-fn ioevent_to_epoll(interest: Interest, opts: PollOpt) -> EpollEventKind {
+fn ioevent_to_epoll(interest: EventSet, opts: PollOpt) -> EpollEventKind {
     let mut kind = EpollEventKind::empty();
 
     if interest.is_readable() {
@@ -133,23 +133,23 @@ impl Events {
     #[inline]
     pub fn get(&self, idx: usize) -> IoEvent {
         let epoll = self.events[idx].events;
-        let mut kind = Interest::hinted();
+        let mut kind = EventSet::hinted();
 
         if epoll.contains(EPOLLIN) {
-            kind = kind | Interest::readable();
+            kind = kind | EventSet::readable();
         }
 
         if epoll.contains(EPOLLOUT) {
-            kind = kind | Interest::writable();
+            kind = kind | EventSet::writable();
         }
 
         // EPOLLHUP - Usually means a socket error happened
         if epoll.contains(EPOLLERR) {
-            kind = kind | Interest::error();
+            kind = kind | EventSet::error();
         }
 
         if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
-            kind = kind | Interest::hup();
+            kind = kind | EventSet::hup();
         }
 
         let token = self.events[idx].data;

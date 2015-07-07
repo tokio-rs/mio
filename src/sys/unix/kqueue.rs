@@ -1,4 +1,4 @@
-use {io, Interest, PollOpt, Token};
+use {io, EventSet, PollOpt, Token};
 use event::IoEvent;
 use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent};
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ONESHOT};
@@ -35,16 +35,16 @@ impl Selector {
         Ok(())
     }
 
-    pub fn register(&mut self, fd: RawFd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        try!(self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, interests.contains(Interest::readable()), opts));
-        try!(self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_WRITE, interests.contains(Interest::writable()), opts));
+        try!(self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts));
+        try!(self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_WRITE, interests.contains(EventSet::writable()), opts));
 
         Ok(())
     }
 
-    pub fn reregister(&mut self, fd: RawFd, token: Token, interests: Interest, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         // Just need to call register here since EV_ADD is a mod if already
         // registered
         self.register(fd, token, interests, opts)
@@ -139,27 +139,27 @@ impl Events {
 
             let idx = *self.event_map.entry(token)
                 .or_insert(len);
-                // .or_insert(IoEvent::new(Interest::hinted(), token));
+                // .or_insert(IoEvent::new(EventSet::hinted(), token));
 
             if idx == len {
                 // New entry, insert the default
-                self.events.push(IoEvent::new(Interest::hinted(), token));
+                self.events.push(IoEvent::new(EventSet::hinted(), token));
 
             }
 
             if e.filter == EventFilter::EVFILT_READ {
-                self.events[idx].kind.insert(Interest::readable());
+                self.events[idx].kind.insert(EventSet::readable());
             } else if e.filter == EventFilter::EVFILT_WRITE {
-                self.events[idx].kind.insert(Interest::writable());
+                self.events[idx].kind.insert(EventSet::writable());
             }
 
             if e.flags.contains(EV_EOF) {
-                self.events[idx].kind.insert(Interest::hup());
+                self.events[idx].kind.insert(EventSet::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
                 if !e.fflags.is_empty() {
-                    self.events[idx].kind.insert(Interest::error());
+                    self.events[idx].kind.insert(EventSet::error());
                 }
             }
         }

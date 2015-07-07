@@ -1,5 +1,5 @@
 use {Handler, Evented, Poll, NotifyError, Token};
-use event::{IoEvent, Interest, PollOpt};
+use event::{IoEvent, EventSet, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
 use std::default::Default;
@@ -68,7 +68,7 @@ impl<H: Handler> EventLoop<H> {
         let notify = try!(Notify::with_capacity(config.notify_capacity));
 
         // Register the notification wakeup FD with the IO poller
-        try!(poll.register(&notify, NOTIFY, Interest::readable() | Interest::writable() , PollOpt::edge()));
+        try!(poll.register(&notify, NOTIFY, EventSet::readable() | EventSet::writable() , PollOpt::edge()));
 
         // Set the timer's starting time reference point
         timer.setup();
@@ -189,18 +189,18 @@ impl<H: Handler> EventLoop<H> {
     pub fn register<E: ?Sized>(&mut self, io: &E, token: Token) -> io::Result<()>
         where E: Evented
     {
-        self.poll.register(io, token, Interest::all(), PollOpt::level())
+        self.poll.register(io, token, EventSet::all(), PollOpt::level())
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register_opt<E: ?Sized>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()>
+    pub fn register_opt<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opt: PollOpt) -> io::Result<()>
         where E: Evented
     {
         self.poll.register(io, token, interest, opt)
     }
 
     /// Re-Registers an IO handle with the event loop.
-    pub fn reregister<E: ?Sized>(&mut self, io: &E, token: Token, interest: Interest, opt: PollOpt) -> io::Result<()>
+    pub fn reregister<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opt: PollOpt) -> io::Result<()>
         where E: Evented
     {
         self.poll.reregister(io, token, interest, opt)
@@ -373,7 +373,7 @@ mod tests {
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
-    use {buf, unix, Buf, Handler, Token, TryRead, TryWrite, Interest};
+    use {buf, unix, Buf, Handler, Token, TryRead, TryWrite, EventSet};
 
     #[test]
     pub fn test_event_loop_size() {
@@ -399,7 +399,7 @@ mod tests {
         type Timeout = usize;
         type Message = ();
 
-        fn ready(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token, events: Interest) {
+        fn ready(&mut self, _event_loop: &mut EventLoop<Funtimes>, token: Token, events: EventSet) {
             if events.is_readable() {
                 (*self.rcount).fetch_add(1, SeqCst);
                 assert_eq!(token, Token(10));
