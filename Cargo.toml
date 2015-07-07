@@ -20,12 +20,14 @@ exclude       = [
 [dependencies]
 log   = "0.3.1"
 libc  = "0.1.8"
-bytes = "0.2.9"
 slab  = "0.1.0"
 clock_ticks = "0.0.5"
 
 [dependencies.nix]
 git = "https://github.com/carllerche/nix-rust"
+
+[dependencies.bytes]
+git = "https://github.com/carllerche/bytes"
 
 [dependencies.winapi]
 git = "https://github.com/retep998/winapi-rs"
