@@ -153,7 +153,7 @@ impl<T> Timer<T> {
         // Update the head slot
         self.wheel[slot] = token;
 
-        debug!("inserted timout; slot={}; token={:?}", slot, token);
+        trace!("inserted timout; slot={}; token={:?}", slot, token);
 
         // Return the new timeout
         Ok(Timeout {
@@ -163,7 +163,7 @@ impl<T> Timer<T> {
     }
 
     fn unlink(&mut self, links: &EntryLinks, token: Token) {
-        debug!("unlinking timeout; slot={}; token={:?}",
+       trace!("unlinking timeout; slot={}; token={:?}",
                self.slot_for(links.tick), token);
 
         if links.prev == EMPTY {
