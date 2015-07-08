@@ -216,7 +216,6 @@ impl<H: Handler> EventLoop<H> {
     /// time.
     pub fn run_once(&mut self, handler: &mut H) -> io::Result<()> {
         let mut messages;
-        let mut pending;
 
         debug!("event loop tick");
 
@@ -224,7 +223,7 @@ impl<H: Handler> EventLoop<H> {
         // avoid blocking when polling for IO events. Messages will be
         // processed after IO events.
         messages = self.notify.check(self.config.messages_per_tick, true);
-        pending = messages > 0;
+        let pending = messages > 0;
 
         // Check the registered IO handles for any new events. Each poll
         // is for one second, so a shutdown request can last as long as
