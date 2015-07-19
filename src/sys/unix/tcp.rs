@@ -1,4 +1,4 @@
-use {io, Evented, EventSet, Io, PollOpt, Selector, Token};
+use {io, Evented, EventSet, Io, PollOpt, Selector, Token, TryAccept};
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::net::SocketAddr;
@@ -120,6 +120,14 @@ impl Evented for TcpSocket {
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
         self.io.deregister(selector)
+    }
+}
+
+impl TryAccept for TcpSocket {
+    type Output = TcpSocket;
+
+    fn accept(&self) -> io::Result<Option<TcpSocket>> {
+        TcpSocket::accept(self)
     }
 }
 

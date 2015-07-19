@@ -1,4 +1,4 @@
-use {io, Evented, EventSet, Io, PollOpt, Selector, Token};
+use {io, Evented, EventSet, Io, PollOpt, Selector, Token, TryAccept};
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -74,6 +74,14 @@ impl Evented for UnixSocket {
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
         self.io.deregister(selector)
+    }
+}
+
+impl TryAccept for UnixSocket {
+    type Output = UnixSocket;
+
+    fn accept(&self) -> io::Result<Option<UnixSocket>> {
+        UnixSocket::accept(self)
     }
 }
 

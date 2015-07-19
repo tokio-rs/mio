@@ -122,6 +122,7 @@ pub use io::{
     TryRead,
     TryWrite,
     Evented,
+    TryAccept,
 };
 pub use net::{
     tcp,
