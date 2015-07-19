@@ -69,6 +69,12 @@ impl<T: Write> TryWrite for T {
     }
 }
 
+pub trait TryAccept {
+    type Output;
+
+    fn accept(&self) -> Result<Option<Self::Output>>;
+}
+
 /*
  *
  * ===== Helpers =====

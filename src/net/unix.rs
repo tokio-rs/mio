@@ -1,4 +1,4 @@
-use {io, sys, Evented, EventSet, Io, PollOpt, Selector, Token};
+use {io, sys, Evented, EventSet, Io, PollOpt, Selector, Token, TryAccept};
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -158,6 +158,14 @@ impl Evented for UnixListener {
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
         self.sys.deregister(selector)
+    }
+}
+
+impl TryAccept for UnixListener {
+    type Output = UnixStream;
+
+    fn accept(&self) -> io::Result<Option<UnixStream>> {
+        UnixListener::accept(self)
     }
 }
 
