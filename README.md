@@ -49,6 +49,12 @@ or higher level libraries.
 Currently, MIO only supports Linux and Darwin. The goal is to support
 all platforms that support Rust and the readiness IO model.
 
+## Reading
+
+Please submit PRs containing links to MIO resources.
+
+* [My Basic Understanding of mio and Asynchronous IO](http://hermanradtke.com/2015/07/12/my-basic-understanding-of-mio-and-async-io.html)
+
 ## Community
 
 A group of mio users hang out in the #mio channel on the Mozilla IRC
