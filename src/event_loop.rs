@@ -314,6 +314,11 @@ impl<H: Handler> EventLoop<H> {
                     handler.notify(self, msg);
                     cnt -= 1;
                 },
+                // If we expect messages, but the queue seems empty, a context
+                // switch has occurred in the queue's push() method between
+                // reserving a slot and marking that slot; let's spin for
+                // what should be a very brief period of time until the push
+                // is done.
                 None => thread::yield_now(),
             }
         }
