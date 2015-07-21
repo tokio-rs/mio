@@ -3,7 +3,7 @@ use event::{IoEvent, EventSet, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
 use std::default::Default;
-use std::{io, fmt, usize};
+use std::{io, fmt, thread, usize};
 
 /// Configure EventLoop runtime details
 #[derive(Copy, Clone, Debug)]
@@ -309,11 +309,18 @@ impl<H: Handler> EventLoop<H> {
 
     fn notify(&mut self, handler: &mut H, mut cnt: usize) {
         while cnt > 0 {
-            let msg = self.notify.poll()
-                .expect("[BUG] at this point there should always be a message");
-
-            handler.notify(self, msg);
-            cnt -= 1;
+            match self.notify.poll() {
+                Some(msg) => {
+                    handler.notify(self, msg);
+                    cnt -= 1;
+                },
+                // If we expect messages, but the queue seems empty, a context
+                // switch has occurred in the queue's push() method between
+                // reserving a slot and marking that slot; let's spin for
+                // what should be a very brief period of time until the push
+                // is done.
+                None => thread::yield_now(),
+            }
         }
     }
 
