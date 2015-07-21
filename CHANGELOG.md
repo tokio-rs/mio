@@ -1,3 +1,7 @@
+# 0.4.1 (July 21)
+
+* [BUGFIX] Fix notify channel concurrency bug (#216)
+
 # 0.4.0 (July 16)
 
 * [BUGFIX] EventLoop::register requests all events, not just readable.

@@ -1,7 +1,7 @@
 [package]
 
 name          = "mio"
-version       = "0.4.0"
+version       = "0.4.1"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
