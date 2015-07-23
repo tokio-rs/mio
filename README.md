@@ -54,6 +54,7 @@ all platforms that support Rust and the readiness IO model.
 Please submit PRs containing links to MIO resources.
 
 * [My Basic Understanding of mio and Asynchronous IO](http://hermanradtke.com/2015/07/12/my-basic-understanding-of-mio-and-async-io.html)
+* [Creating A Multi-echo Server using Rust and mio](http://hermanradtke.com/2015/07/22/creating-a-multi-echo-server-using-rust-and-mio.html)
 
 ## Community
 
