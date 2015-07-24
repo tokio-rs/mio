@@ -1,3 +1,7 @@
+# 0.5.0 (unreleased)
+
+* Don't re-export bytes types
+
 # 0.4.1 (July 21)
 
 * [BUGFIX] Fix notify channel concurrency bug (#216)

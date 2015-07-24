@@ -102,10 +102,6 @@ mod sys;
 mod timer;
 mod token;
 
-pub use buf::{
-    Buf,
-    MutBuf,
-};
 pub use event::{
     PollOpt,
     EventSet,
@@ -158,18 +154,5 @@ pub mod prelude {
         EventLoop,
         TryRead,
         TryWrite,
-    };
-}
-
-// Re-export bytes
-pub mod buf {
-    pub use bytes::{
-        Buf,
-        MutBuf,
-        ByteBuf,
-        MutByteBuf,
-        RingBuf,
-        SliceBuf,
-        MutSliceBuf,
     };
 }

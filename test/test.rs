@@ -1,4 +1,5 @@
 extern crate mio;
+extern crate bytes;
 
 #[macro_use]
 extern crate log;

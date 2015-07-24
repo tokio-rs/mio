@@ -1,5 +1,6 @@
 use mio::*;
 use mio::tcp::*;
+use bytes::SliceBuf;
 use super::localhost;
 
 const SERVER: Token = Token(0);
@@ -20,11 +21,11 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: EventSet) {
         match token {
             SERVER => {
                 let mut sock = self.server.accept().unwrap().unwrap();
-                sock.try_write_buf(&mut buf::SliceBuf::wrap("foobar".as_bytes())).unwrap();
+                sock.try_write_buf(&mut SliceBuf::wrap("foobar".as_bytes())).unwrap();
             }
             CLIENT => {
                 assert!(self.state == 0, "unexpected state {}", self.state);
@@ -35,7 +36,7 @@ impl TestHandler {
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: EventSet) {
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 

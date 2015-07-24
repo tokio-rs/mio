@@ -1,6 +1,6 @@
 use mio::*;
 use mio::tcp::*;
-use mio::buf::{ByteBuf, MutByteBuf, SliceBuf};
+use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
 use std::io;
 use super::localhost;

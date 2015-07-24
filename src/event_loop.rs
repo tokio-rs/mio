@@ -380,7 +380,8 @@ mod tests {
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
-    use {buf, unix, Buf, Handler, Token, TryRead, TryWrite, EventSet};
+    use {unix, Handler, Token, TryRead, TryWrite, EventSet};
+    use bytes::{Buf, SliceBuf, ByteBuf};
 
     #[test]
     pub fn test_event_loop_size() {
@@ -429,11 +430,11 @@ mod tests {
         let wcount = Arc::new(AtomicIsize::new(0));
         let mut handler = Funtimes::new(rcount.clone(), wcount.clone());
 
-        writer.try_write_buf(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();
+        writer.try_write_buf(&mut SliceBuf::wrap("hello".as_bytes())).unwrap();
         event_loop.register(&reader, Token(10)).unwrap();
 
         let _ = event_loop.run_once(&mut handler);
-        let mut b = buf::ByteBuf::mut_with_capacity(16);
+        let mut b = ByteBuf::mut_with_capacity(16);
 
         assert_eq!((*rcount).load(SeqCst), 1);
 

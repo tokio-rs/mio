@@ -1,5 +1,5 @@
 use {EventSet, Selector, PollOpt, Token};
-use buf::{Buf, MutBuf};
+use bytes::{Buf, MutBuf};
 
 // Re-export the io::Result / Error types for convenience
 pub use std::io::{Read, Write, Result, Error};

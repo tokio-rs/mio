@@ -1,5 +1,5 @@
 use {io, sys, Evented, EventSet, IpAddr, PollOpt, Selector, Token};
-use buf::{Buf, MutBuf};
+use bytes::{Buf, MutBuf};
 use std::net::SocketAddr;
 
 #[derive(Debug)]

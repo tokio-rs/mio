@@ -1,6 +1,6 @@
 use mio::*;
 use mio::udp::*;
-use mio::buf::{RingBuf, SliceBuf};
+use bytes::{Buf, RingBuf, SliceBuf};
 use std::str;
 use std::net::{SocketAddr};
 use super::localhost;
@@ -27,7 +27,7 @@ impl UdpHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: EventSet) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, _: EventSet) {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
@@ -44,7 +44,7 @@ impl UdpHandler {
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: EventSet) {
+    fn handle_write(&mut self, _: &mut EventLoop<UdpHandler>, token: Token, _: EventSet) {
         match token {
             SENDER => {
                 self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();

@@ -1,5 +1,5 @@
 use {io, Evented, EventSet, Io, IpAddr, PollOpt, Selector, Token};
-use buf::{Buf, MutBuf};
+use bytes::{Buf, MutBuf};
 use sys::unix::{net, nix, Socket};
 use std::net::SocketAddr;
 use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};

@@ -1,5 +1,6 @@
 use mio::*;
 use mio::tcp::*;
+use bytes::{Buf, ByteBuf, SliceBuf};
 use super::localhost;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
@@ -62,7 +63,7 @@ impl TestHandler {
                     return;
                 }
 
-                let mut buf = buf::ByteBuf::mut_with_capacity(2048);
+                let mut buf = ByteBuf::mut_with_capacity(2048);
 
                 match self.cli.try_read_buf(&mut buf) {
                     Ok(n) => {
@@ -80,7 +81,7 @@ impl TestHandler {
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, _: EventSet) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
@@ -107,7 +108,7 @@ impl Handler for TestHandler {
 
     fn timeout(&mut self, _event_loop: &mut EventLoop<TestHandler>, mut sock: TcpStream) {
         debug!("timeout handler : writing to socket");
-        sock.try_write_buf(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
+        sock.try_write_buf(&mut SliceBuf::wrap(b"zomg")).unwrap().unwrap();
     }
 }
 

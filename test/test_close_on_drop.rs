@@ -1,5 +1,5 @@
 use mio::*;
-use mio::buf::ByteBuf;
+use bytes::ByteBuf;
 use mio::tcp::*;
 use super::localhost;
 
@@ -72,7 +72,7 @@ impl TestHandler {
         event_loop.reregister(&self.cli, CLIENT, EventSet::readable() | EventSet::hup(), PollOpt::edge()).unwrap();
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, _: EventSet) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {

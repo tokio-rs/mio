@@ -1,6 +1,6 @@
 use mio::*;
 use mio::udp::*;
-use mio::buf::{RingBuf, SliceBuf, MutSliceBuf};
+use bytes::{Buf, RingBuf, SliceBuf, MutSliceBuf};
 use super::localhost;
 use std::str;
 
