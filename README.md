@@ -6,7 +6,11 @@ little overhead as possible over the OS abstractions.
 [![Build Status](https://travis-ci.org/carllerche/mio.svg?branch=master)](https://travis-ci.org/carllerche/mio)
 [![crates.io](http://meritbadge.herokuapp.com/mio)](https://crates.io/crates/mio)
 
-- API documentation: [master](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/), [v0.3](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.3.x/mio/)
+**API documentation**
+
+* [master](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/)
+* [v0.4](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.4.x/mio/)
+* [v0.3](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.3.x/mio/)
 
 ## Usage
 
