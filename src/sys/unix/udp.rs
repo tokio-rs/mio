@@ -46,7 +46,7 @@ impl UdpSocket {
     }
 
     pub fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<Option<SocketAddr>> {
-        net::recvfrom(&self.io, buf.mut_bytes())
+        net::recvfrom(&self.io, unsafe { buf.mut_bytes() })
             .map(|(cnt, addr)| {
                 buf.advance(cnt);
                 Some(net::to_std_addr(addr))

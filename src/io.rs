@@ -25,7 +25,7 @@ pub trait TryRead {
         // If your protocol is msg based (instead of continuous stream) you should
         // ensure that your buffer is large enough to hold an entire segment (1532 bytes if not jumbo
         // frames)
-        let res = self.try_read(buf.mut_bytes());
+        let res = self.try_read(unsafe { buf.mut_bytes() });
 
         if let Ok(Some(cnt)) = res {
             buf.advance(cnt);
