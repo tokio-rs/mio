@@ -3,8 +3,9 @@ name = "ping_pong"
 version = "0.1.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 
-[dependencies]
-bytes = "0.2.10"
-
 [dependencies.mio]
 path = "../../"
+
+[dependencies.bytes]
+git = "https://github.com/carllerche/bytes"
+branch = "v0.2.x"
