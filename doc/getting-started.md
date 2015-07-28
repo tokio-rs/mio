@@ -85,7 +85,7 @@ impl mio::Handler for Pong {
 
                 println!("the server socket is ready to accept a connection");
                 match self.server.accept() {
-                    Ok(Some(connection)) => {
+                    Ok(Some(socket)) => {
                         println!("accepted a socket, exiting program");
                         event_loop.shutdown();
                     }
@@ -140,7 +140,7 @@ functions](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/trai
 that can be defined to handle other event types.
 
 In our `main` function, we create the `EventLoop` value and start it by
-calling `event_loop.run` passing a mutable reference to our handler. The
+calling `event_loop.run(..)` passing a mutable reference to our handler. The
 `run` function will block until the event loop is shutdown.
 
 However, before the event loop is started, it must be set up to do some
@@ -154,6 +154,26 @@ to be operated on.
 > Note:
 > [`EventLoop::register_opt`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventLoop.html#method.register_opt)
 > allows configuring how the socket is registered with the event loop.
+
+#### Level vs. Edge
+
+Mio (just like Epoll, Kqueue, etc..) supports both level-triggered and
+edge-triggered notifications. By default, when registering a socket with
+`EventLoop::register`, level-triggered is used.
+
+With level-triggered, sockets that have pending data will result in a
+call to the handler's `ready()` fn on every event loop iteration, even
+if it is the same data as the previous iteration. In other words,
+the handler's `ready()` fn will be called until the data has been read
+off of the socket. The same is true for writable events. As long as a
+socket can accept data written to it, the handler's `ready()` fn will be
+called with `EventSet::writable()` set.
+
+However, with edge-triggered events. The handler's `ready()` fn will
+only be called once for a state change. So, when a socket receives new
+data, `ready()` will be called with `EventSet::readable()`. If the data
+is not read, `ready()` will not be called for the socket on the next
+event loop iteration.
 
 ### Handling Events
 
@@ -179,7 +199,7 @@ itself. This allows us to register additional sockets. It also passes in
 the `Token` that was associated with the socket during the `register`
 call.
 
-The last argument, [`hint:
+The last argument, [`events:
 EventSet`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventSet.html)
 sometimes provides a hint as to what will happen when the read is
 performed. For example, if the socket experienced an error, a read on
@@ -236,9 +256,9 @@ blocking socket, the operation would block. Instead, it returns
 immediately with Ok(None), in which case we must wait for the event loop
 to notify us again that the socket is readable.
 
-Even if we just received a ready notification, there is no guarantee
-that a read from the socket will succeed and not return `Ok(None)`, so
-we must handle that case as well.
+> **Important:** Even if we just received a ready notification, there is
+> no guarantee that a read from the socket will succeed and not return
+> `Ok(None)`, so we must handle that case as well.
 
 If a connection was successfully accepted, we just print some output and
 shutdown the event loop. The `event_loop.run(...)` call will return and
