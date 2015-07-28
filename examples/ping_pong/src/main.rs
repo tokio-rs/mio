@@ -43,6 +43,8 @@ impl mio::Handler for Pong {
     // Called by the `EventLoop` when a socket is ready to be operated on. All
     // socket events are filtered through this function.
     fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, token: mio::Token, events: mio::EventSet) {
+        println!("socket is ready; token={:?}; events={:?}", token, events);
+
         match token {
             SERVER => {
                 // The server socket is ready to be operated on. In this case,
@@ -50,7 +52,6 @@ impl mio::Handler for Pong {
                 // accepted. This is represented by a `readable` event.
                 assert!(events.is_readable());
 
-                println!("the server socket is ready to accept a connection");
                 match self.server.accept() {
                     Ok(Some(socket)) => {
                         // A new client connection has been established. A
@@ -137,6 +138,8 @@ impl Connection {
     }
 
     fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, events: mio::EventSet) {
+        println!("    connection-state={:?}", self.state);
+
         match self.state {
             State::Reading(..) => {
                 assert!(events.is_readable(), "unexpected events; events={:?}", events);
@@ -153,7 +156,26 @@ impl Connection {
     fn read(&mut self, event_loop: &mut mio::EventLoop<Pong>) {
         match self.socket.try_read_buf(self.state.mut_read_buf()) {
             Ok(Some(0)) => {
-                self.state = State::Closed;
+                // If there is any data buffered up, attempt to write it back
+                // to the client. Either the socket is currently closed, in
+                // which case writing will result in an error, or the client
+                // only shutdown half of the socket and is still expecting to
+                // receive the buffered data back. See
+                // test_handling_client_shutdown() for an illustration
+                println!("    read 0 bytes from client; buffered={}", self.state.read_buf().len());
+
+                match self.state.read_buf().len() {
+                    n if n > 0 => {
+                        // Transition to a writing state even if a new line has
+                        // not yet been received.
+                        self.state.transition_to_writing(n);
+
+                        // Re-register the socket with the event loop. This
+                        // will notify us when the socket becomes writable.
+                        self.reregister(event_loop);
+                    }
+                    _ => self.state = State::Closed,
+                }
             }
             Ok(Some(n)) => {
                 println!("read {} bytes", n);
@@ -257,19 +279,23 @@ impl State {
     // writing
     fn try_transition_to_writing(&mut self) {
         if let Some(pos) = self.read_buf().iter().position(|b| *b == b'\n') {
-            // First, remove the current read buffer, replacing it with an
-            // empty Vec<u8>.
-            let buf = mem::replace(self, State::Closed)
-                .unwrap_read_buf();
-
-            // Wrap in `Cursor`, this allows Vec<u8> to act as a readable
-            // buffer
-            let buf = Cursor::new(buf);
-
-            // Transition the state to `Writing`, limiting the buffer to the
-            // new line (inclusive).
-            *self = State::Writing(Take::new(buf, pos + 1));
+            self.transition_to_writing(pos + 1);
         }
+    }
+
+    fn transition_to_writing(&mut self, pos: usize) {
+        // First, remove the current read buffer, replacing it with an
+        // empty Vec<u8>.
+        let buf = mem::replace(self, State::Closed)
+            .unwrap_read_buf();
+
+        // Wrap in `Cursor`, this allows Vec<u8> to act as a readable
+        // buffer
+        let buf = Cursor::new(buf);
+
+        // Transition the state to `Writing`, limiting the buffer to the
+        // new line (inclusive).
+        *self = State::Writing(Take::new(buf, pos));
     }
 
     // If the buffer being written back to the client has been consumed, switch
@@ -361,8 +387,8 @@ fn drain_to(vec: &mut Vec<u8>, count: usize) {
 
 #[cfg(test)]
 mod test {
-    use std::io::{BufRead, BufReader, Write};
-    use std::net::TcpStream;
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::net::{Shutdown, TcpStream};
 
     #[test]
     pub fn test_basic_echoing() {
@@ -382,6 +408,21 @@ mod test {
         sock.read_line(&mut recv).unwrap();
 
         assert_eq!(recv, "this is a line\n");
+    }
+
+    #[test]
+    pub fn test_handling_client_shutdown() {
+        start_server();
+
+        let mut sock = TcpStream::connect(HOST).unwrap();
+
+        sock.write_all(b"hello world").unwrap();
+        sock.shutdown(Shutdown::Write).unwrap();
+
+        let mut recv = vec![];
+        sock.read_to_end(&mut recv).unwrap();
+
+        assert_eq!(recv, b"hello world");
     }
 
     const HOST: &'static str = "0.0.0.0:13254";
