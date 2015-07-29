@@ -6,6 +6,12 @@ little overhead as possible over the OS abstractions.
 [![Build Status](https://travis-ci.org/carllerche/mio.svg?branch=master)](https://travis-ci.org/carllerche/mio)
 [![crates.io](http://meritbadge.herokuapp.com/mio)](https://crates.io/crates/mio)
 
+**Getting started guide**
+
+Currently a work in progress: [Getting
+Started](https://github.com/carllerche/mio/blob/getting-started/doc/getting-started.md).
+Feedback can be posted on the [PR](https://github.com/carllerche/mio/pull/222).
+
 **API documentation**
 
 * [master](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/)
