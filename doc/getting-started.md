@@ -268,10 +268,29 @@ the program will exit.
 
 Our echo server will be pretty simple. It will receive data off of the
 connection, buffer it until it sees a newline, and then return the data
-to the client. We'll set a max line length to 256 characters, and if we
-receive more than that, we will close the client connection.
+to the client.
 
-### Tokens
+First, we need a way to store the connection state on the `Pong` server.
+To do this, we are going to create a `Connection` struct that will
+contain the state for a single client connection. The `Pong` struct will
+use a `Slab` to store all the `Connection` instances.
+
+A `Slab` is a fixed capacity map of `Token`, the type that mio uses to
+identify sockets (discussed below) to T, defined by the user. In this
+case, it will be a `Slab<Connection>`. The advantage of using a slab
+over a HashMap is that it is much lighter weight and optimized for use
+with mio.
+
+Our `Pong` struct looks like this now:
+
+```rust
+struct Pong {
+    server: TcpListener,
+    connections: Slab<Connection>,
+}
+```
+
+#### Tokens
 
 Mio's strategy of using token's vs. callbacks for being notified of
 events may seem surprising. The reason for this design is to allow Mio
@@ -279,6 +298,49 @@ applications to be able to operate at runtime without performing any
 allocations. Using a callback for event notification would violate this
 requirement.
 
-Handlers should be able to access and modify the state surrounding a
-socket using only a `Token`. Mio comes with a `Slab` utility to aid in
-this process.
+A `Token` is simply a wrapper around `usize`. In our example, we have
+`SERVER` hardcoded to `Token(0)`. We need to ensure that no client
+socket gets registered with the same token, otherwise there will be no
+way to tell the difference. The `Slab` that we are using to store the
+`Connection` instances will be responsible for generating the `Token`
+values that are associated with each `Connection` instance. So, we need
+to tell it to skip `Token(0)`.
+
+We do it like this:
+
+```rust
+impl Pong {
+    // Initialize a new `Pong` server from the given TCP listener socket
+    fn new(server: TcpListener) -> Pong {
+        // Create a Slab with capacity 1024. Skip Token(0).
+        let slab = Slab::new_starting_at(mio::Token(1), 1024);
+
+        Pong {
+            server: server,
+            connections: slab,
+        }
+    }
+}
+```
+
+Now when we accept a new client socket, we initialize a new `Connection`
+instance and insert it into the `Slab`. We take the token that `Slab`
+gives us and use it to register the client socket with the EventLoop. We
+will then receive event notifications for that socket.
+
+```rust
+match self.server.accept() {
+    Ok(Some(socket)) => {
+        let token = self.connections
+            .insert_with(|token| Connection::new(socket, token))
+            .unwrap();
+
+        event_loop.register_opt(
+            &self.connections[token].socket,
+            token,
+            mio::EventSet::readable(),
+            mio::PollOpt::edge() | mio::PollOpt::oneshot()).unwrap();
+    }
+    ...
+}
+```
