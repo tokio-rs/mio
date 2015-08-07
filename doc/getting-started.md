@@ -16,6 +16,13 @@ The complete echo server can be found
 > **Note:** As of the time of writing, Mio does not support Windows
 > (though support is currently in progress).
 
+Before you get started, setup an empty text file. Write down any
+thoughts, confusions, questions that you have while going through this
+guide. You only have one first impression, and I would like to capture
+this in order to improve this document.
+
+Post your notes as a comment [here](https://github.com/carllerche/mio/pull/222).
+
 ## Setting up the project
 
 The first step is getting a new Cargo project setup. In a new
@@ -344,3 +351,106 @@ match self.server.accept() {
     ...
 }
 ```
+
+#### Handling client socket events
+
+The client connections are now being accepted and tracked. When events
+are pending for these connections, the `ready` function on our handler
+will be called. Currently, the `ready` function only handles the server
+socket. To start handling client connections, we need to update the
+function as such:
+
+```rust
+fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, token: mio::Token, events: mio::EventSet) {
+    match token {
+        SERVER => {
+            // ... handle incoming connections
+        }
+        _ => {
+            self.connections[token].ready(event_loop, events);
+        }
+    }
+}
+```
+
+Here, we assume that any token that is not the server token is a client
+one. We lookup the connection state in the `Slab` and then forward the
+notifcation to the specific client connection state struct.
+
+## Client connections
+
+The echo server's goal is to read from the client connection until a new
+line has been reached, then write back that line to the client (and
+repeat). So, there are two clear states. First, the connection is in a
+"reading" state where it focuses on reading from the socket then looking
+for a new line. If no new line is found, it stays in the reading state.
+Otherwise, if a new line is found, it transitions to a writing state
+until the line is written back to the client, at which point it
+transitions back to the reading state.
+
+So, let's setup the Connection struct to represent that:
+
+```rust
+struct Connection {
+    socket: TcpStream,
+    token: mio::Token,
+    state: State,
+}
+
+enum State {
+    Reading(Vec<u8>),
+    Writing(Take<Cursor<Vec<u8>>>),
+}
+```
+
+In the `Connection` struct, we track the socket so that we can read &
+write. We also track token so that we can make calls to
+`EventLoop::reregister`. The last field is an enum representing the
+current state of the socket as well as any fields required for that
+state.
+
+In our case, we only need a buffer to hold data read from the socket.
+
+### Buffers
+
+A **buffer** is an abstraction around byte storage and a cursor and is
+used extensively with Mio. The byte storage may or may not be contiguous
+memory. Buffers can be readable, represented by the `Buf` trait, they
+can also be writable, represented by the `MutBuf` trait.
+
+For example, `Vec<u8>` implements `MutBuf` such that, when new bytes are
+written to `Vec<u8>`, they are appended to the end of the array. This
+allows using `Vec<u8>` as an argument when reading from an mio socket:
+
+```rust
+let mut buf = vec![];
+try!(sock.try_read_buf(&mut buf));
+```
+
+To write to a socket, `std::io::Cursor<Vec<u8>>` is needed, as such:
+
+```rust
+let mut buf = Cursor::new(vec);
+try!(sock.try_write_buf(&mut buf));
+```
+
+The reason to use a `Buf` vs. just calling `try_write(...)` with a slice
+is that, buffers contain an cursor that tracks the current position. So,
+it allows calling `try_write_buf` multiple times with the same buffer
+and each time, the call will resume from where it left off.
+
+This is an especially useful helper when working with non blocking
+sockets, since at any point, the socket may not be ready and we have to
+wait and try again later. For example:
+
+```rust
+let mut buf = Cursor::new(vec);
+
+while buf.has_remaining() {
+  try!(sock.try_read_buf(&mut buf));
+}
+
+Also, because the actual byte backend is abstracted, it's possible to
+have a whole set of different kinds of buffers suitable for different
+use cases. The [bytes](github.com/carllerche/bytes) crate contains basic
+byte buffers, ring buffer, ropes, etc...
