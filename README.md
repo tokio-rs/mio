@@ -71,7 +71,10 @@ Please submit PRs containing links to MIO resources.
 
 ### Libraries
 
-* [`mioco` - MIO COroutines](//github.com/dpc/mioco)
+* [Eventual IO](//github.com/carllerche/eventual_io) - Proof of
+  concept TCP library built on top of Mio and Eventual's futures &
+  streams.
+* [mioco](//github.com/dpc/mioco) - Mio COroutines
 
 ## Community
 
