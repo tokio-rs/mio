@@ -22,7 +22,7 @@ log   = "0.3.1"
 nix   = "0.3.9"
 libc  = "0.1.8"
 slab  = "0.1.0"
-bytes = "0.2.10"
+bytes = "0.2.11"
 winapi = "0.1.23"
 clock_ticks = "0.0.5"
 
