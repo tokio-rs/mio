@@ -541,4 +541,43 @@ a spurious event, so we reregister the socket with the event loop and
 wait for another ready notification.
 
 When the read completes successfully, some number of bytes have been
-loaded into our buffer.
+loaded into our buffer. The buffer's internal cursor is moved forward,
+so if the call to `try_read_buf` is repeated, additional data will be
+appended to any data that was just read.
+
+The first thing to do is check to see if a new line has been read. In
+which case, we want to write back the data up to the new line to the
+client.
+
+```rust
+fn try_transition_to_writing(&mut self) {
+    if let Some(pos) = self.read_buf().iter().position(|b| *b == b'\n') {
+        self.transition_to_writing(pos + 1);
+    }
+}
+
+fn transition_to_writing(&mut self, pos: usize) {
+    // First, remove the current read buffer, replacing it with an
+    // empty Vec<u8>.
+    let buf = mem::replace(self, State::Closed)
+        .unwrap_read_buf();
+
+    // Wrap in `Cursor`, this allows Vec<u8> to act as a readable
+    // buffer
+    let buf = Cursor::new(buf);
+
+    // Transition the state to `Writing`, limiting the buffer to the
+    // new line (inclusive).
+    *self = State::Writing(Take::new(buf, pos));
+}
+```
+
+Transitioning to the writing state is done by getting the buffer, which
+for us is a `Vec<u8>`, wrapping it in `Cursor`, which makes the byte vec
+a `Buf`, then transitioning our state field to `State::Writing`.
+
+Now that the state has been transitioned to writing, when
+`self.reregister` is called, we will ask for writable notifications
+instead of readable. So, our `Connection::ready` function will be called
+once the socket is ready to accept writes. Once this happens, we will be
+ready to write back the data that we just read.
