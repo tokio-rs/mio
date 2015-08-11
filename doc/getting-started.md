@@ -352,6 +352,19 @@ match self.server.accept() {
 }
 ```
 
+In this case, we register the socket with edge + oneshot. When a ready
+notification is fired, the socket will be "unarmed". In otherwords, once
+a notification for the socket is received, no further notifications will
+be fired. When we want to receive another event, we [`reregister`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventLoop.html#method.reregister) the socket with the event loop.
+
+Using this pattern of edge + oneshot makes state management a bit
+easier. We only receive notifications when we are ready to handle them.
+The alternative is to simply use edge triggered notifications without
+oneshot, in which case we would need to handle receiving a notification
+but not actually be ready to do anything with it. For example, if we
+receive a writable notification for our socket, but we don't have
+anything to write yet.
+
 #### Handling client socket events
 
 The client connections are now being accepted and tracked. When events
@@ -449,8 +462,83 @@ let mut buf = Cursor::new(vec);
 while buf.has_remaining() {
   try!(sock.try_read_buf(&mut buf));
 }
+```
 
 Also, because the actual byte backend is abstracted, it's possible to
 have a whole set of different kinds of buffers suitable for different
 use cases. The [bytes](github.com/carllerche/bytes) crate contains basic
 byte buffers, ring buffer, ropes, etc...
+
+## Reading data
+
+The `Connection::ready` function now looks like this:
+
+> The guide omits a number of utility functions, most of them on
+> [`State`](../examples/ping_pong/src/main.rs#L249). The full source of
+> the echo server in its final form is
+> [here](../examples/ping_pong/src/main.rs).
+
+```rust
+fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, events: mio::EventSet) {
+    match self.state {
+        State::Reading(ref mut buf) => {
+            assert!(events.is_readable(), "unexpected events; events={:?}", events);
+            self.read(event_loop);
+        }
+        _ => unimplemented!(),
+    }
+}
+
+fn read(&mut self, event_loop: &mut mio::EventLoop<Pong>) {
+    match self.socket.try_read_buf(self.state.mut_read_buf()) {
+        Ok(Some(0)) => {
+            unimplemented!();
+        }
+        Ok(Some(n)) => {
+            // Look for a new line. If a new line is received, then the
+            // state is transitioned from `Reading` to `Writing`.
+            self.state.try_transition_to_writing();
+
+            // Re-register the socket with the event loop. The current
+            // state is used to determine whether we are currently reading
+            // or writing.
+            self.reregister(event_loop);
+        }
+        Ok(None) => {
+            self.reregister(event_loop);
+        }
+        Err(e) => {
+            panic!("got an error trying to read; err={:?}", e);
+        }
+    }
+}
+
+fn reregister(&self, event_loop: &mut mio::EventLoop<Pong>) {
+    let event_set = match self {
+        State::Reading(..) => mio::EventSet::readable(),
+        State::Writing(..) => mio::EventSet::writable(),
+        _ => mio::EventSet::none(),
+    };
+
+    event_loop.reregister(&self.socket, self.token, event_set, mio::PollOpt::oneshot())
+        .unwrap();
+}
+```
+
+Our `Connection::ready` function first checks the current state. The way
+our connection handler is structured, when the state is set to
+`State::Reading`, we can only receive readable notifications. Once we do
+receive the notification, we attempt a read. This is done by calling
+`try_read_buf` passing in our buffer.
+
+The only time a read can succeed with 0 bytes read is if the socket is
+closed or the other end shutdown half the socket using
+[`shutdown()`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/tcp/enum.Shutdown.html).
+We'll come back around to handling this later.
+
+In the case of the read returning `Ok(None)`, the ready notification is
+a spurious event, so we reregister the socket with the event loop and
+wait for another ready notification.
+
+When the read completes successfully, some number of bytes have been
+loaded into our buffer.

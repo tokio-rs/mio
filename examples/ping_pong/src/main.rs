@@ -221,7 +221,17 @@ impl Connection {
     }
 
     fn reregister(&self, event_loop: &mut mio::EventLoop<Pong>) {
-        event_loop.reregister(&self.socket, self.token, self.state.event_set(), mio::PollOpt::oneshot())
+        // Maps the current client state to the mio `EventSet` that will provide us
+        // with the notifications that we want. When we are currently reading from
+        // the client, we want `readable` socket notifications. When we are writing
+        // to the client, we want `writable` notifications.
+        let event_set = match self {
+            State::Reading(..) => mio::EventSet::readable(),
+            State::Writing(..) => mio::EventSet::writable(),
+            _ => mio::EventSet::none(),
+        };
+
+        event_loop.reregister(&self.socket, self.token, event_set, mio::PollOpt::oneshot())
             .unwrap();
     }
 
@@ -318,18 +328,6 @@ impl State {
 
             // Check for any new lines that have already been read.
             self.try_transition_to_writing();
-        }
-    }
-
-    // Maps the current client state to the mio `EventSet` that will provide us
-    // with the notifications that we want. When we are currently reading from
-    // the client, we want `readable` socket notifications. When we are writing
-    // to the client, we want `writable` notifications.
-    fn event_set(&self) -> mio::EventSet {
-        match *self {
-            State::Reading(..) => mio::EventSet::readable(),
-            State::Writing(..) => mio::EventSet::writable(),
-            _ => mio::EventSet::none(),
         }
     }
 
