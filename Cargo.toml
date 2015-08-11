@@ -27,7 +27,7 @@ clock_ticks = "0.0.5"
 
 [dependencies.bytes]
 git = "https://github.com/carllerche/bytes"
-commit = "b4abd1431a"
+rev = "b4abd1431a"
 
 [dev-dependencies]
 env_logger = "0.3.0"
