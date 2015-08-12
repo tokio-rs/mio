@@ -3,6 +3,12 @@ name = "ping_pong"
 version = "0.1.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 
+[[bin]]
+name = "server"
+
+[[bin]]
+name = "client"
+
 [dependencies]
 bytes = "0.2.11"
 

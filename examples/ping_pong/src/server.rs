@@ -225,7 +225,7 @@ impl Connection {
         // with the notifications that we want. When we are currently reading from
         // the client, we want `readable` socket notifications. When we are writing
         // to the client, we want `writable` notifications.
-        let event_set = match self {
+        let event_set = match self.state {
             State::Reading(..) => mio::EventSet::readable(),
             State::Writing(..) => mio::EventSet::writable(),
             _ => mio::EventSet::none(),

@@ -11,7 +11,7 @@ Of course, you will need Rust installed. If you haven't already, get it
 here: [rust-lang.org](https://www.rust-lang.org).
 
 The complete echo server can be found
-[here](../examples/ping_pong/src/main.rs).
+[here](../examples/ping_pong/src/server.rs).
 
 > **Note:** As of the time of writing, Mio does not support Windows
 > (though support is currently in progress).
@@ -36,7 +36,7 @@ cd pingpong
 Now, open the directory in your favorite text editor. You should see the
 following files:
 
-* src/main.rs
+* src/server.rs
 * Cargo.toml
 
 If you are not already familiar with Cargo, you can learn more about it
@@ -474,9 +474,9 @@ byte buffers, ring buffer, ropes, etc...
 The `Connection::ready` function now looks like this:
 
 > The guide omits a number of utility functions, most of them on
-> [`State`](../examples/ping_pong/src/main.rs#L249). The full source of
+> [`State`](../examples/ping_pong/src/server.rs#L249). The full source of
 > the echo server in its final form is
-> [here](../examples/ping_pong/src/main.rs).
+> [here](../examples/ping_pong/src/server.rs).
 
 ```rust
 fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, events: mio::EventSet) {

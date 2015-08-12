@@ -5,7 +5,7 @@ connections and reads data until it sees a new line. The server will
 then write back the contents of the line to the client. It will keep
 doing this as long as the client remains connected.
 
-[Source](src/main.rs)
+[Source](src/server.rs)
 
 ## Usage
 
