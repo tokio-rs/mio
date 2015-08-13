@@ -11,7 +11,8 @@ Of course, you will need Rust installed. If you haven't already, get it
 here: [rust-lang.org](https://www.rust-lang.org).
 
 The complete echo server can be found
-[here](../examples/ping_pong/src/server.rs).
+[here](../examples/ping_pong/src/server.rs). A client example is
+[here](../examples/ping_pong/src/client.rs).
 
 > **Note:** As of the time of writing, Mio does not support Windows
 > (though support is currently in progress).
