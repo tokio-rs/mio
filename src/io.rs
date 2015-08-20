@@ -90,3 +90,27 @@ pub fn to_non_block<T>(err: Error) -> Result<Option<T>> {
 
     Err(err)
 }
+
+/*
+ *
+ * ===== UNIX ext =====
+ *
+ */
+
+#[cfg(unix)]
+use std::os::unix::io::RawFd;
+
+#[cfg(unix)]
+impl Evented for RawFd {
+    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> Result<()> {
+        selector.register(*self, token, interest, opts)
+    }
+
+    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> Result<()> {
+        selector.reregister(*self, token, interest, opts)
+    }
+
+    fn deregister(&self, selector: &mut Selector) -> Result<()> {
+        selector.deregister(*self)
+    }
+}
