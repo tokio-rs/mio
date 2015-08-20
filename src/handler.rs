@@ -1,7 +1,7 @@
 use {EventLoop, EventSet, Token};
 
 #[allow(unused_variables)]
-pub trait Handler {
+pub trait Handler: Sized {
     type Timeout;
     type Message: Send;
 

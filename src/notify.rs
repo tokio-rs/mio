@@ -59,7 +59,7 @@ impl<M: Send> Clone for Notify<M> {
     }
 }
 
-impl<M> fmt::Debug for Notify<M> {
+impl<M: Send> fmt::Debug for Notify<M> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Notify<?>")
     }
