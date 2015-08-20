@@ -197,6 +197,12 @@ impl Read for PipeReader {
     }
 }
 
+impl<'a> Read for &'a PipeReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (&self.io).read(buf)
+    }
+}
+
 impl Evented for PipeReader {
     fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.io.register(selector, token, interest, opts)
@@ -229,6 +235,16 @@ impl Write for PipeWriter {
 
     fn flush(&mut self) -> io::Result<()> {
         self.io.flush()
+    }
+}
+
+impl<'a> Write for &'a PipeWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        (&self.io).write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        (&self.io).flush()
     }
 }
 
