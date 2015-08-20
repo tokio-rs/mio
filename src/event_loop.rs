@@ -263,6 +263,7 @@ impl<H: Handler> EventLoop<H> {
         self.io_process(handler, events);
         self.notify(handler, messages);
         self.timer_process(handler);
+        handler.tick(self);
         Ok(())
     }
 
