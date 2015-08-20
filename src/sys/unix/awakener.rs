@@ -4,8 +4,6 @@ pub use self::pipe::Awakener;
 mod pipe {
     use {io, Evented, EventSet, PollOpt, Selector, Token, TryRead, TryWrite};
     use unix::{self, PipeReader, PipeWriter};
-    use std::mem;
-    use std::cell::UnsafeCell;
 
     /*
      *
@@ -14,8 +12,8 @@ mod pipe {
      */
 
     pub struct Awakener {
-        reader: UnsafeCell<PipeReader>,
-        writer: UnsafeCell<PipeWriter>,
+        reader: PipeReader,
+        writer: PipeWriter,
     }
 
     impl Awakener {
@@ -23,41 +21,29 @@ mod pipe {
             let (rd, wr) = try!(unix::pipe());
 
             Ok(Awakener {
-                reader: UnsafeCell::new(rd),
-                writer: UnsafeCell::new(wr),
+                reader: rd,
+                writer: wr,
             })
         }
 
         pub fn wakeup(&self) -> io::Result<()> {
-            // A hack, but such is life. PipeWriter is backed by a single FD, which
-            // is thread safe.
-            unsafe {
-                let wr: &mut PipeWriter = mem::transmute(self.writer.get());
-                wr.try_write(b"0x01").map(|_| ())
-            }
+            (&self.writer).try_write(b"0x01").map(|_| ())
         }
 
         pub fn cleanup(&self) {
             let mut buf = [0; 128];
 
             loop {
-                // Also a bit hackish. It would be possible to split up the read /
-                // write sides of the awakener, but that would be a more
-                // significant refactor. A transmute here is safe.
-                unsafe {
-                    let rd: &mut PipeReader = mem::transmute(self.reader.get());
-
-                    // Consume data until all bytes are purged
-                    match rd.try_read(&mut buf) {
-                        Ok(Some(i)) if i > 0 => {},
-                        _ => return,
-                    }
+                // Consume data until all bytes are purged
+                match (&self.reader).try_read(&mut buf) {
+                    Ok(Some(i)) if i > 0 => {},
+                    _ => return,
                 }
             }
         }
 
         fn reader(&self) -> &PipeReader {
-            unsafe { mem::transmute(self.reader.get()) }
+            &self.reader
         }
     }
 

@@ -53,6 +53,12 @@ impl Evented for Io {
 
 impl Read for Io {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
+        <&Io as Read>::read(&mut &*self, dst)
+    }
+}
+
+impl<'a> Read for &'a Io {
+    fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
         use nix::unistd::read;
 
         read(self.as_raw_fd(), dst)
@@ -61,6 +67,16 @@ impl Read for Io {
 }
 
 impl Write for Io {
+    fn write(&mut self, src: &[u8]) -> io::Result<usize> {
+        <&Io as Write>::write(&mut &*self, src)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> Write for &'a Io {
     fn write(&mut self, src: &[u8]) -> io::Result<usize> {
         use nix::unistd::write;
 
