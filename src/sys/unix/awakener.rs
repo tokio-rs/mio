@@ -2,7 +2,8 @@ pub use self::pipe::Awakener;
 
 /// Default *nix awakener implementation
 mod pipe {
-    use {io, Evented, EventSet, PollOpt, Selector, Token, TryRead, TryWrite};
+    use {io, Evented, EventSet, PollOpt, Token, TryRead, TryWrite};
+    use sys::Selector;
     use unix::{self, PipeReader, PipeWriter};
     use std::mem;
     use std::cell::UnsafeCell;

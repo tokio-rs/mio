@@ -1,4 +1,5 @@
-use {sys, Evented, EventSet, PollOpt, Selector, Token};
+use {sys, Evented, EventSet, PollOpt, Token};
+use sys::Selector;
 use util::BoundedQueue;
 use std::{fmt, cmp, io};
 use std::sync::Arc;

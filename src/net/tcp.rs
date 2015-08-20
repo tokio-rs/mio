@@ -1,4 +1,5 @@
-use {io, sys, Evented, EventSet, PollOpt, Selector, Token, TryAccept};
+use {io, sys, Evented, EventSet, PollOpt, Token, TryAccept};
+use sys::Selector;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
 
