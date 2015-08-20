@@ -74,6 +74,8 @@ Please submit PRs containing links to MIO resources.
   concept TCP library built on top of Mio and Eventual's futures &
   streams.
 * [mioco](//github.com/dpc/mioco) - Mio COroutines
+* [simplesched](//github.com/zonyitoo/simplesched) - Coroutine I/O with a simple scheduler
+* [coio-rs](//github.com/zonyitoo/coio-rs) - Coroutine I/O with work-stealing scheduler
 
 ## Community
 
