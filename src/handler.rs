@@ -29,4 +29,8 @@ pub trait Handler: Sized {
     /// Invoked when `EventLoop` has been interrupted by a signal interrupt.
     fn interrupted(&mut self, event_loop: &mut EventLoop<Self>) {
     }
+
+    /// Invoked at the end of an event loop tick.
+    fn tick(&mut self, event_loop: &mut EventLoop<Self>) {
+    }
 }
