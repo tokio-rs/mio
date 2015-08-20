@@ -1,4 +1,5 @@
-use {io, Evented, EventSet, PollOpt, Selector, Token};
+use {io, Evented, EventSet, PollOpt, Token};
+use sys::Selector;
 use std::io::{Read, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 

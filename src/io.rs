@@ -1,4 +1,5 @@
-use {EventSet, Selector, PollOpt, Token};
+use {EventSet, PollOpt, Token};
+use sys::Selector;
 use bytes::{Buf, MutBuf};
 
 // Re-export the io::Result / Error types for convenience

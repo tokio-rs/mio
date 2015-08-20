@@ -144,10 +144,6 @@ pub use timer::{
 pub use token::{
     Token,
 };
-pub use sys::{
-    Io,
-    Selector,
-};
 
 pub mod prelude {
     pub use super::{
