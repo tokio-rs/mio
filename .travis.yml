@@ -2,7 +2,7 @@ language: rust
 sudo: false
 rust:
   - nightly
-  - 1.1.0
+  - stable
 
 os:
   - linux
@@ -27,7 +27,7 @@ deploy:
   upload-dir: mio/${TRAVIS_BRANCH}
   acl: public_read
   on:
-    condition: $TRAVIS_RUST_VERSION == "1.1.0" && $TRAVIS_OS_NAME == "linux"
+    condition: $TRAVIS_RUST_VERSION == "stable" && $TRAVIS_OS_NAME == "linux"
     repo: carllerche/mio
     branch:
       - master
