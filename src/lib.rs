@@ -137,7 +137,19 @@ pub use net::{
     Ipv6Addr,
 };
 #[cfg(unix)]
-pub use net::unix;
+pub mod unix {
+    pub use net::unix::{
+        pipe,
+        PipeReader,
+        PipeWriter,
+        UnixListener,
+        UnixSocket,
+        UnixStream,
+    };
+    pub use sys::{
+        EventedFd,
+    };
+}
 
 pub use notify::{
     NotifyError,

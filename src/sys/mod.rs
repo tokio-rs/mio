@@ -1,6 +1,7 @@
 #[cfg(unix)]
 pub use self::unix::{
     Awakener,
+    EventedFd,
     Events,
     Io,
     Selector,

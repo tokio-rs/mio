@@ -11,6 +11,7 @@ mod kqueue;
 pub use self::kqueue::{Events, Selector};
 
 mod awakener;
+mod eventedfd;
 mod io;
 mod net;
 mod socket;
@@ -19,6 +20,7 @@ mod udp;
 mod uds;
 
 pub use self::awakener::Awakener;
+pub use self::eventedfd::EventedFd;
 pub use self::io::Io;
 pub use self::socket::Socket;
 pub use self::tcp::TcpSocket;
