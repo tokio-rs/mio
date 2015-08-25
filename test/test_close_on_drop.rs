@@ -102,8 +102,6 @@ impl Handler for TestHandler {
 
 #[test]
 pub fn test_close_on_drop() {
-    ::env_logger::init().unwrap();
-
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut event_loop = EventLoop::new().unwrap();
 

@@ -26,6 +26,9 @@
 //! // for which socket.
 //! const SERVER: Token = Token(0);
 //! const CLIENT: Token = Token(1);
+//! #
+//! # // level() isn't implemented on windows yet
+//! # if cfg!(windows) { return }
 //!
 //! let addr = "127.0.0.1:13265".parse().unwrap();
 //!
@@ -75,13 +78,19 @@
 //! ```
 
 #![crate_name = "mio"]
-#![deny(warnings)]
+#![cfg_attr(unix, deny(warnings))]
 
 extern crate bytes;
-extern crate nix;
 extern crate clock_ticks;
 extern crate slab;
 extern crate libc;
+
+#[cfg(unix)]
+extern crate nix;
+
+extern crate winapi;
+extern crate wio;
+extern crate net2;
 
 #[macro_use]
 extern crate log;
@@ -144,10 +153,9 @@ pub use timer::{
 pub use token::{
     Token,
 };
-pub use sys::{
-    Io,
-    Selector,
-};
+#[cfg(unix)]
+pub use sys::Io;
+pub use sys::Selector;
 
 pub mod prelude {
     pub use super::{

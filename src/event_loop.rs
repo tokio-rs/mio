@@ -375,6 +375,7 @@ impl<M: Send> Sender<M> {
 }
 
 #[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use std::str;
     use std::sync::Arc;

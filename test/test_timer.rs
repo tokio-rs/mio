@@ -7,6 +7,7 @@ use self::TestState::{Initial, AfterRead, AfterHup};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
+const CONN: Token = Token(2);
 
 #[derive(Debug, PartialEq)]
 enum TestState {
@@ -30,21 +31,26 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>,
+                   tok: Token, events: EventSet) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().unwrap();
+                event_loop.register_opt(&conn, CONN, EventSet::all(),
+                                        PollOpt::edge()).unwrap();
                 event_loop.timeout_ms(conn, 200).unwrap();
 
-                event_loop.reregister(&self.srv, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
+                event_loop.reregister(&self.srv, SERVER, EventSet::readable(),
+                                      PollOpt::edge()).unwrap();
             }
             CLIENT => {
                 debug!("client readable");
 
                 match self.state {
                     Initial => {
-                        // Whether or not Hup is included with actual data is platform specific
+                        // Whether or not Hup is included with actual data is
+                        // platform specific
                         if events.is_hup() {
                             self.state = AfterHup;
                         } else {
@@ -75,20 +81,26 @@ impl TestHandler {
                     }
                 }
 
-                event_loop.reregister(&self.cli, CLIENT, EventSet::readable() | EventSet::hup(), PollOpt::edge()).unwrap();
+                event_loop.reregister(&self.cli, CLIENT,
+                                      EventSet::readable() | EventSet::hup(),
+                                      PollOpt::edge()).unwrap();
             }
+            CONN => {}
             _ => panic!("received unknown token {:?}", tok),
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, _: EventSet) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>,
+                    tok: Token, _: EventSet) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
+            CONN => {}
             _ => panic!("received unknown token {:?}", tok),
         }
 
-        event_loop.reregister(&self.cli, CLIENT, EventSet::readable(), PollOpt::edge()).unwrap();
+        event_loop.reregister(&self.cli, CLIENT, EventSet::readable(),
+                              PollOpt::edge()).unwrap();
     }
 }
 

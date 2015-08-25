@@ -66,6 +66,7 @@ impl Handler for TestHandler {
 }
 
 #[test]
+#[cfg(unix)] // level() not implemented on windows yet
 pub fn test_register_deregister() {
     debug!("Starting TEST_REGISTER_DEREGISTER");
     let mut event_loop = EventLoop::new().unwrap();

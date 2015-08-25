@@ -9,10 +9,15 @@ use std::{io, thread};
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
+#[cfg(windows)]
+const N: usize = 1_000;
+#[cfg(not(windows))]
+const N: usize = 1_000_000;
+
 struct EchoConn {
     sock: TcpStream,
     token: Option<Token>,
-    count: u32,
+    count: usize,
     buf: Vec<u8>
 }
 
@@ -30,7 +35,9 @@ impl EchoConn {
     }
 
     fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
-        event_loop.reregister(&self.sock, self.token.unwrap(), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token.unwrap(),
+                              EventSet::readable(),
+                              PollOpt::edge() | PollOpt::oneshot())
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
@@ -42,9 +49,9 @@ impl EchoConn {
                 Ok(Some(_)) => {
                     self.count += 1;
                     if self.count % 10000 == 0 {
-                        debug!("Received {} messages", self.count);
+                        info!("Received {} messages", self.count);
                     }
-                    if self.count == 1_000_000 {
+                    if self.count == N {
                         event_loop.shutdown();
                     }
                 }
@@ -75,18 +82,21 @@ impl EchoServer {
 
         // Register the connection
         self.conns[tok].token = Some(tok);
-        event_loop.register_opt(&self.conns[tok].sock, tok, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot())
+        event_loop.register_opt(&self.conns[tok].sock, tok, EventSet::readable(),
+                                PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
         Ok(())
     }
 
-    fn conn_readable(&mut self, event_loop: &mut EventLoop<Echo>, tok: Token) -> io::Result<()> {
+    fn conn_readable(&mut self, event_loop: &mut EventLoop<Echo>,
+                     tok: Token) -> io::Result<()> {
         debug!("server conn readable; tok={:?}", tok);
         self.conn(tok).readable(event_loop)
     }
 
-    fn conn_writable(&mut self, event_loop: &mut EventLoop<Echo>, tok: Token) -> io::Result<()> {
+    fn conn_writable(&mut self, event_loop: &mut EventLoop<Echo>,
+                     tok: Token) -> io::Result<()> {
         debug!("server conn writable; tok={:?}", tok);
         self.conn(tok).writable(event_loop)
     }
@@ -132,14 +142,15 @@ impl EchoClient {
                     self.backlog.pop_front();
                     self.count += 1;
                     if self.count % 10000 == 0 {
-                        debug!("Sent {} messages", self.count);
+                        info!("Sent {} messages", self.count);
                     }
                 }
                 Err(e) => { debug!("not implemented; client err={:?}", e); break; }
             }
         }
         if self.backlog.len() > 0 {
-            event_loop.reregister(&self.sock, self.token, EventSet::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+            event_loop.reregister(&self.sock, self.token, EventSet::writable(),
+                                  PollOpt::edge() | PollOpt::oneshot()).unwrap();
         }
 
         Ok(())
@@ -167,7 +178,8 @@ impl Handler for Echo {
     type Timeout = usize;
     type Message = String;
 
-    fn ready(&mut self, event_loop: &mut EventLoop<Echo>, token: Token, events: EventSet) {
+    fn ready(&mut self, event_loop: &mut EventLoop<Echo>, token: Token,
+             events: EventSet) {
 
         if events.is_readable() {
             match token {
@@ -190,7 +202,7 @@ impl Handler for Echo {
             Ok(Some(n)) => {
                 self.client.count += 1;
                 if self.client.count % 10000 == 0 {
-                    debug!("Sent {} bytes:   count {}", n, self.client.count);
+                    info!("Sent {} bytes:   count {}", n, self.client.count);
                 }
             },
 
@@ -231,17 +243,19 @@ pub fn test_echo_server() {
     let srv = srv.listen(256).unwrap();
 
     info!("listen for connections");
-    event_loop.register_opt(&srv, SERVER, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    event_loop.register_opt(&srv, SERVER, EventSet::readable(),
+                            PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     let (sock, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register_opt(&sock, CLIENT, EventSet::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    event_loop.register_opt(&sock, CLIENT, EventSet::writable(),
+                            PollOpt::edge() | PollOpt::oneshot()).unwrap();
     let chan = event_loop.channel();
 
     let go = move || {
-        let mut i = 1_000_000;
+        let mut i = N;
 
         sleep_ms(1_000);
 
@@ -250,7 +264,7 @@ pub fn test_echo_server() {
             chan.send(message.clone()).unwrap();
             i -= 1;
             if i % 10000 == 0 {
-                debug!("Enqueued {} messages", 1_000_000 - i);
+                info!("Enqueued {} messages", N - i);
             }
         }
     };
