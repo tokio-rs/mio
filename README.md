@@ -76,6 +76,7 @@ Please submit PRs containing links to MIO resources.
 * [mioco](//github.com/dpc/mioco) - Mio COroutines
 * [simplesched](//github.com/zonyitoo/simplesched) - Coroutine I/O with a simple scheduler
 * [coio-rs](//github.com/zonyitoo/coio-rs) - Coroutine I/O with work-stealing scheduler
+* [rotor](//github.com/tailhook/rotor) - A wrapper that allows to create composable I/O libraries on top of mio
 
 ## Community
 
