@@ -137,6 +137,7 @@ mod awakener;
 mod selector;
 mod tcp;
 mod udp;
+mod buffer_pool;
 
 pub use self::awakener::Awakener;
 pub use self::selector::{Events, Selector};
