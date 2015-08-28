@@ -13,13 +13,14 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use net2::{UdpBuilder, UdpSocketExt};
 use winapi::*;
-use wio::Overlapped;
+use wio::iocp::CompletionStatus;
 use wio::net::SocketAddrBuf;
 use wio::net::UdpSocketExt as WioUdpSocketExt;
 
 use {Evented, EventSet, IpAddr, PollOpt, Selector, Token};
 use bytes::{Buf, MutBuf};
-use sys::windows::selector::SelectorInner;
+use sys::windows::selector::{SelectorInner, Overlapped};
+use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::{bad_state, wouldblock, Family};
 
 pub struct UdpSocket {
@@ -28,22 +29,22 @@ pub struct UdpSocket {
 
 #[derive(Clone)]
 struct Imp {
-    inner: Arc<Mutex<Inner>>,
-    family: Family,
-}
-
-struct Inner {
-    socket: Socket,
-    iocp: Option<Arc<SelectorInner>>,
-    read: State<Vec<u8>>,
-    write: State<(Vec<u8>, usize)>,
-    io: Io,
+    inner: FromRawArc<Io>,
 }
 
 struct Io {
     read: Overlapped,
-    read_buf: SocketAddrBuf,
     write: Overlapped,
+    inner: Mutex<Inner>,
+}
+
+struct Inner {
+    socket: Socket,
+    family: Family,
+    iocp: Option<Arc<SelectorInner>>,
+    read: State<Vec<u8>, Vec<u8>>,
+    write: State<Vec<u8>, (Vec<u8>, usize)>,
+    read_buf: SocketAddrBuf,
 }
 
 enum Socket {
@@ -52,10 +53,10 @@ enum Socket {
     Bound(net::UdpSocket),
 }
 
-enum State<T> {
+enum State<T, U> {
     Empty,
-    Pending,
-    Ready(T),
+    Pending(T),
+    Ready(U),
     Error(io::Error),
 }
 
@@ -76,18 +77,18 @@ impl UdpSocket {
     fn new(socket: Socket, fam: Family) -> UdpSocket {
         UdpSocket {
             imp: Imp {
-                inner: Arc::new(Mutex::new(Inner {
-                    socket: socket,
-                    iocp: None,
-                    read: State::Empty,
-                    write: State::Empty,
-                    io: Io {
-                        read: Overlapped::zero(),
+                inner: FromRawArc::new(Io {
+                    read: Overlapped::new(recv_done),
+                    write: Overlapped::new(send_done),
+                    inner: Mutex::new(Inner {
+                        socket: socket,
+                        family: fam,
+                        iocp: None,
+                        read: State::Empty,
+                        write: State::Empty,
                         read_buf: SocketAddrBuf::new(),
-                        write: Overlapped::zero(),
-                    },
-                })),
-                family: fam,
+                    }),
+                }),
             },
         }
     }
@@ -104,8 +105,9 @@ impl UdpSocket {
     }
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        try!(self.inner().socket.socket()).try_clone().map(|s| {
-            UdpSocket::new(Socket::Bound(s), self.imp.family)
+        let me = self.inner();
+        try!(me.socket.socket()).try_clone().map(|s| {
+            UdpSocket::new(Socket::Bound(s), me.family)
         })
     }
 
@@ -132,24 +134,17 @@ impl UdpSocket {
             _ => return Err(wouldblock())
         }
         let s = try!(me.socket.socket());
-        let iocp = match me.iocp {
-            Some(ref s) => s,
-            None => return Err(wouldblock()),
-        };
+        if me.iocp.is_none() {
+            return Err(wouldblock())
+        }
         let owned_buf = buf.to_vec();
         try!(unsafe {
             trace!("scheduling a send");
-            s.send_to_overlapped(&owned_buf, target, &mut me.io.write)
+            s.send_to_overlapped(&owned_buf, target,
+                                 self.imp.inner.write.get_mut())
         });
-        me.write = State::Pending;
-        let me2 = self.imp.clone();
-        iocp.register(&mut me.io.write, move |s, push, _| {
-            trace!("finished a send {}", s.bytes_transferred());
-            let mut me = me2.inner();
-            me.write = State::Empty;
-            push(me.socket.handle(), EventSet::writable());
-            drop(owned_buf); // keep the buf alive until I/O is done
-        });
+        me.write = State::Pending(owned_buf);
+        mem::forget(self.imp.clone());
         Ok(buf.len())
     }
 
@@ -158,7 +153,7 @@ impl UdpSocket {
         let mut me = self.inner();
         match mem::replace(&mut me.read, State::Empty) {
             State::Empty => Ok(None),
-            State::Pending => { me.read = State::Pending; Ok(None) }
+            State::Pending(b) => { me.read = State::Pending(b); Ok(None) }
             State::Ready(data) => {
                 // If we weren't provided enough space to receive the message
                 // then don't actually read any data, just return an error.
@@ -166,7 +161,7 @@ impl UdpSocket {
                     me.read = State::Ready(data);
                     Err(io::Error::from_raw_os_error(WSAEMSGSIZE as i32))
                 } else {
-                    let r = if let Some(addr) = me.io.read_buf.to_socket_addr() {
+                    let r = if let Some(addr) = me.read_buf.to_socket_addr() {
                         buf.write_slice(&data);
                         Ok(Some(addr))
                     } else {
@@ -193,7 +188,7 @@ impl UdpSocket {
     pub fn set_multicast_loop(&self, on: bool) -> io::Result<()> {
         let me = self.inner();
         let socket = try!(me.socket.socket());
-        match self.imp.family {
+        match me.family {
             Family::V4 => socket.set_multicast_loop_v4(on),
             Family::V6 => socket.set_multicast_loop_v6(on),
         }
@@ -249,7 +244,7 @@ impl UdpSocket {
 
 impl Imp {
     fn inner(&self) -> MutexGuard<Inner> {
-        self.inner.lock().unwrap()
+        self.inner.inner.lock().unwrap()
     }
 
     fn schedule_read(&self) {
@@ -260,7 +255,6 @@ impl Imp {
             _ => return,
         }
         let iocp = me.iocp.as_ref().unwrap();
-        let io = &mut me.io;
         let socket = match me.socket {
             Socket::Empty |
             Socket::Building(..) => return,
@@ -271,22 +265,13 @@ impl Imp {
             trace!("scheduling a read");
             let cap = buf.capacity();
             buf.set_len(cap);
-            socket.recv_from_overlapped(&mut buf, &mut io.read_buf,
-                                        &mut io.read)
+            socket.recv_from_overlapped(&mut buf, &mut me.read_buf,
+                                        self.inner.read.get_mut())
         };
         match res {
             Ok(_) => {
-                me.read = State::Pending;
-                let me2 = self.clone();
-                iocp.register(&mut io.read, move |s, push, _| {
-                    let mut me = me2.inner();
-                    unsafe {
-                        buf.set_len(s.bytes_transferred() as usize);
-                    }
-                    trace!("finished a read {}", buf.len());
-                    me.read = State::Ready(buf);
-                    push(me.socket.handle(), EventSet::readable());
-                });
+                me.read = State::Pending(buf);
+                mem::forget(self.clone());
             }
             Err(e) => {
                 me.read = State::Error(e);
@@ -387,4 +372,31 @@ impl Socket {
             Socket::Empty => INVALID_HANDLE_VALUE,
         }
     }
+}
+
+fn send_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
+    trace!("finished a send {}", status.bytes_transferred());
+    let me2 = Imp {
+        inner: unsafe { overlapped2arc!(status.overlapped(), Io, write) },
+    };
+    let mut me = me2.inner();
+    me.write = State::Empty;
+    push(me.socket.handle(), EventSet::writable());
+}
+
+fn recv_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
+    trace!("finished a recv {}", status.bytes_transferred());
+    let me2 = Imp {
+        inner: unsafe { overlapped2arc!(status.overlapped(), Io, read) },
+    };
+    let mut me = me2.inner();
+    let mut buf = match mem::replace(&mut me.read, State::Empty) {
+        State::Pending(buf) => buf,
+        _ => unreachable!(),
+    };
+    unsafe {
+        buf.set_len(status.bytes_transferred() as usize);
+    }
+    me.read = State::Ready(buf);
+    push(me.socket.handle(), EventSet::readable());
 }
