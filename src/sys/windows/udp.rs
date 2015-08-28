@@ -9,7 +9,7 @@ use std::io;
 use std::mem;
 use std::net::{self, SocketAddr};
 use std::os::windows::prelude::*;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 
 use net2::{UdpBuilder, UdpSocketExt};
 use winapi::*;
@@ -19,7 +19,8 @@ use wio::net::UdpSocketExt as WioUdpSocketExt;
 
 use {Evented, EventSet, IpAddr, PollOpt, Selector, Token};
 use bytes::{Buf, MutBuf};
-use sys::windows::selector::{SelectorInner, Overlapped};
+use event::IoEvent;
+use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::{bad_state, wouldblock, Family};
 
@@ -41,7 +42,7 @@ struct Io {
 struct Inner {
     socket: Socket,
     family: Family,
-    iocp: Option<Arc<SelectorInner>>,
+    iocp: Registration,
     read: State<Vec<u8>, Vec<u8>>,
     write: State<Vec<u8>, (Vec<u8>, usize)>,
     read_buf: SocketAddrBuf,
@@ -83,7 +84,7 @@ impl UdpSocket {
                     inner: Mutex::new(Inner {
                         socket: socket,
                         family: fam,
-                        iocp: None,
+                        iocp: Registration::new(),
                         read: State::Empty,
                         write: State::Empty,
                         read_buf: SocketAddrBuf::new(),
@@ -134,11 +135,10 @@ impl UdpSocket {
             _ => return Err(wouldblock())
         }
         let s = try!(me.socket.socket());
-        let iocp = match me.iocp {
-            Some(ref s) => s,
-            None => return Err(wouldblock()),
-        };
-        let mut owned_buf = iocp.get_buffer(64 * 1024);
+        if me.iocp.port().is_none() {
+            return Err(wouldblock())
+        }
+        let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = try!(owned_buf.write(buf));
         try!(unsafe {
             trace!("scheduling a send");
@@ -170,7 +170,7 @@ impl UdpSocket {
                         Err(io::Error::new(io::ErrorKind::Other,
                                            "failed to parse socket address"))
                     };
-                    me.iocp.as_ref().map(|i| i.put_buffer(data));
+                    me.iocp.put_buffer(data);
                     drop(me);
                     self.imp.schedule_read();
                     r
@@ -229,16 +229,16 @@ impl UdpSocket {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: EventSet, selector: &SelectorInner) {
+    fn post_register(&self, interest: EventSet) {
         if interest.is_readable() {
             self.imp.schedule_read();
         }
         // See comments in TcpSocket::post_register for what's going on here
         if interest.is_writable() {
-            let me = self.inner();
+            let mut me = self.inner();
             if let State::Empty = me.write {
                 if let Socket::Bound(..) = me.socket {
-                    selector.defer(me.socket.handle(), EventSet::writable());
+                    me.iocp.defer(EventSet::writable());
                 }
             }
         }
@@ -257,13 +257,12 @@ impl Imp {
             State::Empty => {}
             _ => return,
         }
-        let iocp = me.iocp.as_ref().unwrap();
         let socket = match me.socket {
             Socket::Empty |
             Socket::Building(..) => return,
             Socket::Bound(ref s) => s,
         };
-        let mut buf = iocp.get_buffer(64 * 1024);
+        let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
             trace!("scheduling a read");
             let cap = buf.capacity();
@@ -278,8 +277,8 @@ impl Imp {
             }
             Err(e) => {
                 me.read = State::Error(e);
-                iocp.defer(me.socket.handle(), EventSet::readable());
-                iocp.put_buffer(buf);
+                me.iocp.defer(EventSet::readable());
+                me.iocp.put_buffer(buf);
             }
         }
     }
@@ -288,57 +287,40 @@ impl Imp {
 impl Evented for UdpSocket {
     fn register(&self, selector: &mut Selector, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        let mut me = self.inner();
-        let selector = selector.inner();
-        match me.socket {
-            Socket::Bound(ref s) => {
-                try!(selector.register_socket(s, token, interest, opts));
-            }
-            Socket::Building(ref b) => {
-                try!(selector.register_socket(b, token, interest, opts));
-            }
-            Socket::Empty => return Err(bad_state()),
+        {
+            let mut me = self.inner();
+            let me = &mut *me;
+            let socket = match me.socket {
+                Socket::Bound(ref s) => s as &AsRawSocket,
+                Socket::Building(ref b) => b as &AsRawSocket,
+                Socket::Empty => return Err(bad_state()),
+            };
+            try!(me.iocp.register_socket(socket, selector, token, interest,
+                                         opts));
         }
-        me.iocp = Some(selector.clone());
-        drop(me);
-        self.post_register(interest, selector);
+        self.post_register(interest);
         Ok(())
     }
 
     fn reregister(&self, selector: &mut Selector, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        let me = self.inner();
-        let selector = selector.inner();
-        // TODO: assert that me.iocp == selector?
-        if me.iocp.is_none() {
-            return Err(bad_state())
+        {
+            let mut me = self.inner();
+            let me = &mut *me;
+            let socket = match me.socket {
+                Socket::Bound(ref s) => s as &AsRawSocket,
+                Socket::Building(ref b) => b as &AsRawSocket,
+                Socket::Empty => return Err(bad_state()),
+            };
+            try!(me.iocp.reregister_socket(socket, selector, token, interest,
+                                           opts));
         }
-        match me.socket {
-            Socket::Bound(ref s) => {
-                try!(selector.reregister_socket(s, token, interest, opts));
-            }
-            Socket::Building(ref b) => {
-                try!(selector.reregister_socket(b, token, interest, opts));
-            }
-            Socket::Empty => return Err(bad_state()),
-        }
-        drop(me);
-        self.post_register(interest, selector);
+        self.post_register(interest);
         Ok(())
     }
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        let me = self.inner();
-        let selector = selector.inner();
-        // TODO: assert that me.iocp == selector?
-        if me.iocp.is_none() {
-            return Err(bad_state())
-        }
-        match me.socket {
-            Socket::Bound(ref s) => selector.deregister_socket(s),
-            Socket::Building(ref b) => selector.deregister_socket(b),
-            Socket::Empty => Err(bad_state()),
-        }
+        self.inner().iocp.deregister(selector)
     }
 }
 
@@ -368,27 +350,19 @@ impl Socket {
             _ => Err(bad_state()),
         }
     }
-
-    fn handle(&self) -> HANDLE {
-        match *self {
-            Socket::Bound(ref s) => s.as_raw_socket() as HANDLE,
-            Socket::Building(ref b) => b.as_raw_socket() as HANDLE,
-            Socket::Empty => INVALID_HANDLE_VALUE,
-        }
-    }
 }
 
-fn send_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
+fn send_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     trace!("finished a send {}", status.bytes_transferred());
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, write) },
     };
     let mut me = me2.inner();
     me.write = State::Empty;
-    push(me.socket.handle(), EventSet::writable());
+    me.iocp.push_event(EventSet::writable(), dst);
 }
 
-fn recv_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
+fn recv_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     trace!("finished a recv {}", status.bytes_transferred());
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, read) },
@@ -402,5 +376,5 @@ fn recv_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
         buf.set_len(status.bytes_transferred() as usize);
     }
     me.read = State::Ready(buf);
-    push(me.socket.handle(), EventSet::readable());
+    me.iocp.push_event(EventSet::readable(), dst);
 }

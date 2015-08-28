@@ -1,22 +1,17 @@
-use std::sync::{Mutex, Arc};
+use std::sync::{Mutex, MutexGuard};
 
 use {io, Evented, EventSet, PollOpt, Selector, Token};
-use sys::windows::selector::SelectorInner;
+use sys::windows::selector::Registration;
 use wio::iocp::CompletionStatus;
 
 pub struct Awakener {
-    iocp: Mutex<Option<Registration>>,
-}
-
-struct Registration {
-    iocp: Arc<SelectorInner>,
-    token: Token,
+    iocp: Mutex<Registration>,
 }
 
 impl Awakener {
     pub fn new() -> io::Result<Awakener> {
         Ok(Awakener {
-            iocp: Mutex::new(None),
+            iocp: Mutex::new(Registration::new()),
         })
     }
 
@@ -27,11 +22,11 @@ impl Awakener {
         //
         // If we haven't been registered with an event loop yet just silently
         // succeed.
-        let iocp = self.iocp.lock().unwrap();
-        if let Some(ref r) = *iocp {
-            let status = CompletionStatus::new(0, r.token.as_usize(),
+        let iocp = self.iocp();
+        if let Some(port) = iocp.port() {
+            let status = CompletionStatus::new(0, iocp.token().as_usize(),
                                                0 as *mut _);
-            try!(r.iocp.port().post(status));
+            try!(port.post(status));
         }
         Ok(())
     }
@@ -39,15 +34,16 @@ impl Awakener {
     pub fn cleanup(&self) {
         // noop
     }
+
+    fn iocp(&self) -> MutexGuard<Registration> {
+        self.iocp.lock().unwrap()
+    }
 }
 
 impl Evented for Awakener {
     fn register(&self, selector: &mut Selector, token: Token, _events: EventSet,
                 _opts: PollOpt) -> io::Result<()> {
-        *self.iocp.lock().unwrap() = Some(Registration {
-            iocp: selector.inner().clone(),
-            token: token,
-        });
+        self.iocp().associate(selector, token);
         Ok(())
     }
 
@@ -56,8 +52,7 @@ impl Evented for Awakener {
         self.register(selector, token, events, opts)
     }
 
-    fn deregister(&self, _selector: &mut Selector) -> io::Result<()> {
-        *self.iocp.lock().unwrap() = None;
-        Ok(())
+    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
+        self.iocp().deregister(selector)
     }
 }
