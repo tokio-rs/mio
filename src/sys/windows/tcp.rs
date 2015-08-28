@@ -8,13 +8,14 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use net2::{self, TcpBuilder};
 use net::tcp::Shutdown;
+use wio::iocp::CompletionStatus;
 use wio::net::*;
-use wio::Overlapped;
 use winapi::*;
 
 use {Evented, EventSet, PollOpt, Selector, Token};
-use sys::windows::selector::SelectorInner;
+use sys::windows::selector::{SelectorInner, Overlapped};
 use sys::windows::{bad_state, wouldblock, Family};
+use sys::windows::from_raw_arc::FromRawArc;
 
 pub struct TcpSocket {
     /// Separately stored implementation to ensure that the `Drop`
@@ -29,24 +30,31 @@ struct Imp {
     /// to ensure that all `Overlapped` pointers are valid for a long period of
     /// time as well as allowing completion callbacks to have access to the
     /// internals without having ownership.
-    inner: Arc<Mutex<Inner>>,
-    family: Family,
+    ///
+    /// Note that the reference count also allows us "loan out" copies to
+    /// completion ports while I/O is running to guarantee that this stays alive
+    /// until the I/O completes. You'll notice a number of calls to
+    /// `mem::forget` below, and these only happen on successful scheduling of
+    /// I/O and are paired with `overlapped2arc!` macro invocations in the
+    /// completion callbacks (to have a decrement match the increment).
+    inner: FromRawArc<Io>,
+}
+
+struct Io {
+    inner: Mutex<Inner>,
+    read: Overlapped, // also used for connect/accept
+    write: Overlapped,
 }
 
 struct Inner {
     socket: Socket,
+    family: Family,
     iocp: Option<Arc<SelectorInner>>,
     deferred_connect: Option<SocketAddr>,
     bound: bool,
-    read: State<Cursor<Vec<u8>>>,
-    write: State<(Vec<u8>, usize)>,
-    accept: State<TcpStream>,
-    io: Io,
-}
-
-struct Io {
-    read: Overlapped, // also used for connect/accept
-    write: Overlapped,
+    read: State<Vec<u8>, Cursor<Vec<u8>>>,
+    write: State<(Vec<u8>, usize), (Vec<u8>, usize)>,
+    accept: State<TcpStream, TcpStream>,
     accept_buf: AcceptAddrsBuf,
 }
 
@@ -62,10 +70,10 @@ enum Socket {
     Listener(TcpListener),  // listened socket
 }
 
-enum State<T> {
+enum State<T, U> {
     Empty,              // no I/O operation in progress
-    Pending,            // an I/O operation is in progress
-    Ready(T),           // I/O has finished with this value
+    Pending(T),         // an I/O operation is in progress
+    Ready(U),           // I/O has finished with this value
     Error(io::Error),   // there was an I/O error
 }
 
@@ -85,21 +93,21 @@ impl TcpSocket {
     fn new(socket: Socket, fam: Family) -> TcpSocket {
         TcpSocket {
             imp: Imp {
-                inner: Arc::new(Mutex::new(Inner {
-                    socket: socket,
-                    iocp: None,
-                    deferred_connect: None,
-                    bound: false,
-                    accept: State::Empty,
-                    read: State::Empty,
-                    write: State::Empty,
-                    io: Io {
-                        read: Overlapped::zero(),
-                        write: Overlapped::zero(),
+                inner: FromRawArc::new(Io {
+                    read: Overlapped::new(read_done),
+                    write: Overlapped::new(write_done),
+                    inner: Mutex::new(Inner {
+                        socket: socket,
+                        family: fam,
+                        iocp: None,
+                        deferred_connect: None,
+                        bound: false,
+                        accept: State::Empty,
+                        read: State::Empty,
+                        write: State::Empty,
                         accept_buf: AcceptAddrsBuf::new(),
-                    },
-                })),
-                family: fam,
+                    }),
+                }),
             },
         }
     }
@@ -112,31 +120,25 @@ impl TcpSocket {
         }
         // If we haven't been registered defer the actual connect until we're
         // registered
-        let iocp = match me.iocp {
-            Some(ref s) => s,
-            None => {
-                me.deferred_connect = Some(*addr);
-                return Ok(false)
-            }
-        };
+        if me.iocp.is_none() {
+            me.deferred_connect = Some(*addr);
+            return Ok(false)
+        }
         let (socket, connected) = match me.socket {
             Socket::Building(ref b) => {
                 // connect_overlapped only works on bound sockets, so if we're
                 // not bound yet go ahead and bind us
                 if !me.bound {
-                    try!(b.bind(&addr_any(self.imp.family)));
+                    try!(b.bind(&addr_any(me.family)));
                     me.bound = true;
                 }
                 let res = unsafe {
                     trace!("scheduling a connect");
-                    try!(b.connect_overlapped(addr, &mut me.io.read))
+                    try!(b.connect_overlapped(addr,
+                                              self.imp.inner.read.get_mut()))
                 };
-                let me2 = self.imp.clone();
-                iocp.register(&mut me.io.read, move |_, push, _| {
-                    trace!("finished a connect");
-                    me2.schedule_read();
-                    push(me2.inner().socket.handle(), EventSet::writable());
-                });
+                // see docs above on Imp.inner for rationale on forget
+                mem::forget(self.imp.clone());
                 res
             }
             _ => return Err(bad_state()),
@@ -164,12 +166,12 @@ impl TcpSocket {
         try!(me.socket.listener());
         let ret = match mem::replace(&mut me.accept, State::Empty) {
             State::Empty => return Ok(None),
-            State::Pending => {
-                me.accept = State::Pending;
+            State::Pending(t) => {
+                me.accept = State::Pending(t);
                 return Ok(None)
             }
             State::Ready(s) => {
-                Ok(Some(TcpSocket::new(Socket::Stream(s), self.imp.family)))
+                Ok(Some(TcpSocket::new(Socket::Stream(s), me.family)))
             }
             State::Error(e) => Err(e),
         };
@@ -192,12 +194,13 @@ impl TcpSocket {
     }
 
     pub fn try_clone(&self) -> io::Result<TcpSocket> {
-        match self.inner().socket {
+        let me = self.inner();
+        match me.socket {
             Socket::Stream(ref s) => s.try_clone().map(|s| {
-                TcpSocket::new(Socket::Stream(s), self.imp.family)
+                TcpSocket::new(Socket::Stream(s), me.family)
             }),
             Socket::Listener(ref s) => s.try_clone().map(|s| {
-                TcpSocket::new(Socket::Listener(s), self.imp.family)
+                TcpSocket::new(Socket::Listener(s), me.family)
             }),
             Socket::Empty |
             Socket::Building(..) => Err(bad_state()),
@@ -262,7 +265,7 @@ impl TcpSocket {
 
 impl Imp {
     fn inner(&self) -> MutexGuard<Inner> {
-        self.inner.lock().unwrap()
+        self.inner.inner.lock().unwrap()
     }
 
     /// Issues a "read" operation for this socket, if applicable.
@@ -276,8 +279,6 @@ impl Imp {
     fn schedule_read(&self) {
         let mut me = self.inner();
         let me = &mut *me;
-        let iocp = me.iocp.as_ref().unwrap();
-        let io = &mut me.io;
         match me.socket {
             Socket::Empty |
             Socket::Building(..) => {}
@@ -287,28 +288,25 @@ impl Imp {
                     State::Empty => {}
                     _ => return
                 }
-                let res = match self.family {
+                let accept_buf = &mut me.accept_buf;
+                let res = match me.family {
                     Family::V4 => TcpBuilder::new_v4(),
                     Family::V6 => TcpBuilder::new_v6(),
                 }.and_then(|builder| unsafe {
                     trace!("scheduling an accept");
-                    l.accept_overlapped(&builder, &mut io.accept_buf,
-                                        &mut io.read)
+                    l.accept_overlapped(&builder, accept_buf,
+                                        self.inner.read.get_mut())
                 });
                 match res {
                     Ok((socket, _)) => {
-                        me.accept = State::Pending;
-                        let me2 = self.clone();
-                        iocp.register(&mut io.read, move |_, push, _| {
-                            trace!("finished an accept");
-                            let mut me = me2.inner();
-                            me.accept = State::Ready(socket);
-                            push(me.socket.handle(), EventSet::readable());
-                        });
+                        // see docs above on Imp.inner for rationale on forget
+                        me.accept = State::Pending(socket);
+                        mem::forget(self.clone());
                     }
                     Err(e) => {
                         me.accept = State::Error(e);
-                        iocp.defer(me.socket.handle(), EventSet::readable());
+                        me.iocp.as_ref().unwrap()
+                          .defer(me.socket.handle(), EventSet::readable());
                     }
                 }
             }
@@ -323,28 +321,13 @@ impl Imp {
                     trace!("scheduling a read");
                     let cap = buf.capacity();
                     buf.set_len(cap);
-                    s.read_overlapped(&mut buf, &mut io.read)
+                    s.read_overlapped(&mut buf, self.inner.read.get_mut())
                 };
                 match res {
                     Ok(_) => {
-                        me.read = State::Pending;
-                        let me2 = self.clone();
-                        iocp.register(&mut io.read, move |s, push, _| {
-                            let mut me = me2.inner();
-                            unsafe {
-                                buf.set_len(s.bytes_transferred() as usize);
-                            }
-                            trace!("finished a read {}", buf.len());
-                            me.read = State::Ready(Cursor::new(buf));
-
-                            // If we transferred 0 bytes then be sure to
-                            // indicate that hup has happened.
-                            let mut e = EventSet::readable();
-                            if s.bytes_transferred() == 0 {
-                                e = e | EventSet::hup();
-                            }
-                            push(me.socket.handle(), e);
-                        });
+                        // see docs above on Imp.inner for rationale on forget
+                        me.read = State::Pending(buf);
+                        mem::forget(self.clone());
                     }
                     Err(e) => {
                         // Like above, be sure to indicate that hup has happened
@@ -354,7 +337,8 @@ impl Imp {
                             set = set | EventSet::hup();
                         }
                         me.read = State::Error(e);
-                        iocp.defer(me.socket.handle(), set);
+                        me.iocp.as_ref().unwrap()
+                          .defer(me.socket.handle(), set);
                     }
                 }
             }
@@ -371,34 +355,24 @@ impl Imp {
     /// A new writable event (e.g. allowing another write) will only happen once
     /// the buffer has been written completely (or hit an error).
     fn schedule_write(&self, buf: Vec<u8>, pos: usize) {
+        trace!("scheduling a write");
         let mut me = self.inner();
-        let me = &mut *me;
-        let s = me.socket.stream().unwrap();
-        let iocp = me.iocp.as_ref().unwrap();
-        let err = unsafe {
-            trace!("scheduling a write");
-            s.write_overlapped(&buf[pos..], &mut me.io.write)
+        let err = match me.socket.stream() {
+            Ok(s) => unsafe {
+                s.write_overlapped(&buf[pos..], self.inner.write.get_mut())
+            },
+            Err(..) => return,
         };
         match err {
             Ok(_) => {
-                me.write = State::Pending;
-                let me2 = self.clone();
-                iocp.register(&mut me.io.write, move |s, push, _| {
-                    trace!("finished a write {}", s.bytes_transferred());
-                    let mut me = me2.inner();
-                    let new_pos = pos + (s.bytes_transferred() as usize);
-                    if new_pos == buf.len() {
-                        me.write = State::Empty;
-                        push(me.socket.handle(), EventSet::writable());
-                    } else {
-                        drop(me);
-                        me2.schedule_write(buf, new_pos);
-                    }
-                });
+                // see docs above on Imp.inner for rationale on forget
+                me.write = State::Pending((buf, pos));
+                mem::forget(self.clone());
             }
             Err(e) => {
                 me.write = State::Error(e);
-                iocp.defer(me.socket.handle(), EventSet::writable());
+                me.iocp.as_ref().unwrap()
+                  .defer(me.socket.handle(), EventSet::writable());
             }
         }
     }
@@ -436,6 +410,69 @@ impl Socket {
     }
 }
 
+fn read_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
+    let me2 = Imp {
+        inner: unsafe { overlapped2arc!(status.overlapped(), Io, read) },
+    };
+
+    let mut me = me2.inner();
+    match mem::replace(&mut me.accept, State::Empty) {
+        State::Pending(s) => {
+            trace!("finished an accept");
+            me.accept = State::Ready(s);
+            return push(me.socket.handle(), EventSet::readable())
+        }
+        s => me.accept = s,
+    }
+
+    match mem::replace(&mut me.read, State::Empty) {
+        State::Pending(mut buf) => {
+            trace!("finished a read: {}", status.bytes_transferred());
+            unsafe {
+                buf.set_len(status.bytes_transferred() as usize);
+            }
+            me.read = State::Ready(Cursor::new(buf));
+
+            // If we transferred 0 bytes then be sure to indicate that hup
+            // happened.
+            let mut e = EventSet::readable();
+            if status.bytes_transferred() == 0 {
+                e = e | EventSet::hup();
+            }
+            return push(me.socket.handle(), e)
+        }
+        s => me.read = s,
+    }
+
+    // If neither an accept nor a read completed, then the connect must have
+    // just finished.
+    trace!("finished a connect");
+    let handle = me.socket.handle();
+    drop(me);
+    me2.schedule_read();
+    push(handle, EventSet::writable());
+
+}
+
+fn write_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
+    trace!("finished a write {}", status.bytes_transferred());
+    let me2 = Imp {
+        inner: unsafe { overlapped2arc!(status.overlapped(), Io, write) },
+    };
+    let mut me = me2.inner();
+    let (buf, pos) = match mem::replace(&mut me.write, State::Empty) {
+        State::Pending(pair) => pair,
+        _ => unreachable!(),
+    };
+    let new_pos = pos + (status.bytes_transferred() as usize);
+    if new_pos == buf.len() {
+        push(me.socket.handle(), EventSet::writable());
+    } else {
+        drop(me);
+        me2.schedule_write(buf, new_pos);
+    }
+}
+
 fn addr_any(family: Family) -> SocketAddr {
     match family {
         Family::V4 => {
@@ -454,7 +491,10 @@ impl Read for TcpSocket {
         let mut me = self.inner();
         match mem::replace(&mut me.read, State::Empty) {
             State::Empty => Err(wouldblock()),
-            State::Pending => { me.read = State::Pending; Err(wouldblock()) }
+            State::Pending(buf) => {
+                me.read = State::Pending(buf);
+                Err(wouldblock())
+            }
             State::Ready(mut cursor) => {
                 let amt = try!(cursor.read(buf));
                 // Once the entire buffer is written we need to schedule the

@@ -1,3 +1,4 @@
+use std::cell::UnsafeCell;
 use std::collections::hash_map::{HashMap, Entry};
 use std::io;
 use std::mem;
@@ -6,11 +7,12 @@ use std::sync::{Arc, Mutex};
 
 use slab::Index;
 use winapi::*;
-use wio::Overlapped;
+use wio;
 use wio::iocp::{CompletionPort, CompletionStatus};
 
 use {Token, PollOpt};
 use event::{IoEvent, EventSet};
+use sys::windows::from_raw_arc::FromRawArc;
 
 /// The guts of the Windows event loop, this is the struct which actually owns
 /// a completion port.
@@ -34,27 +36,28 @@ pub struct SelectorInner {
     /// `Some` if the handle is registered and receiving events.
     handles: Mutex<HashMap<usize, Option<Registration>>>,
 
-    /// A list of all active I/O operations currently on this selector.
-    ///
-    /// The key of this map is the address of the `OVERLAPPED` operation and the
-    /// value is a completion callback to be invoked when it's done. Using raw
-    /// pointers as keys here should be ok for two reasons:
-    ///
-    /// 1. The kernel already requires that the pointer to the `OVERLAPPED` is
-    ///    stable and valid for the entire duration of the I/O operation.
-    /// 2. It is required that an `OVERLAPPED` instance is associated with at
-    ///    most one concurrent I/O operation.
-    ///
-    /// Consequently, an `OVERLAPPED` pointer should uniquely identify a pending
-    /// I/O request and be valid while it's running.
-    io: Mutex<HashMap<usize, Box<Callback>>>,
-
     /// A list of deferred events to be generated on the next call to `select`.
     ///
     /// Events can sometimes be generated without an associated I/O operation
     /// having completed, and this list is emptied out and returned on each turn
     /// of the event loop.
     defers: Mutex<Vec<(usize, EventSet, Token)>>,
+}
+
+pub type Callback = fn(&CompletionStatus, &mut FnMut(HANDLE, EventSet));
+
+/// See sys::windows module docs for why this exists.
+///
+/// The gist of it is that `Selector` assumes that all `OVERLAPPED` pointers are
+/// actually inside one of these structures so it can use the `Callback` stored
+/// right after it.
+///
+/// We use repr(C) here to ensure that we can assume the overlapped pointer is
+/// at the start of the structure so we can just do a cast.
+#[repr(C)]
+pub struct Overlapped {
+    inner: UnsafeCell<wio::Overlapped>,
+    callback: Callback,
 }
 
 #[derive(Copy, Clone)]
@@ -71,7 +74,6 @@ impl Selector {
                 inner: Arc::new(SelectorInner {
                     port: cp,
                     handles: Mutex::new(HashMap::new()),
-                    io: Mutex::new(HashMap::new()),
                     defers: Mutex::new(Vec::new()),
                 }),
             }
@@ -114,12 +116,12 @@ impl Selector {
                 continue
             }
 
-            let callback = inner.io.lock().unwrap()
-                                .remove(&(status.overlapped() as usize))
-                                .expect("I/O finished with no handler");
-            callback.call(status, &mut |handle, set| {
+            let callback = unsafe {
+                (*(status.overlapped() as *mut Overlapped)).callback
+            };
+            callback(status, &mut |handle, set| {
                 inner.push_event(dst, handle, set, Token(status.token()));
-            }, self);
+            });
         }
 
         // Finally, clear out the list of deferred events and process them all
@@ -265,24 +267,6 @@ impl SelectorInner {
         };
         self.defers.lock().unwrap().push((handle as usize, set, token));
     }
-
-    /// Register a callback to be executed after some I/O has been issued.
-    ///
-    /// Callbacks are keyed off the `OVERLAPPED` pointer (or in this case
-    /// `wio::Overlapped`). The arguments to the callback are:
-    ///
-    /// * The status of the I/O operation (e.g. number of bytes transferred)
-    /// * A thunk to invoke to generate `IoEvent` structures
-    /// * The outer selector at the time of the I/O completion
-    pub fn register<F>(&self, overlapped: *mut Overlapped, handler: F)
-        where F: FnOnce(&CompletionStatus, &mut FnMut(HANDLE, EventSet),
-                        &mut Selector) +
-                 Send + Sync + 'static
-    {
-        let prev = self.io.lock().unwrap()
-                       .insert(overlapped as usize, Box::new(handler));
-        debug_assert!(prev.is_none());
-    }
 }
 
 /// From a given interest set return the event set mask used to generate events.
@@ -336,20 +320,34 @@ impl Events {
     }
 }
 
-trait Callback: Send + Sync + 'static {
-    fn call(self: Box<Self>, status: &CompletionStatus,
-            push: &mut FnMut(HANDLE, EventSet),
-            selector: &mut Selector);
+macro_rules! overlapped2arc {
+    ($e:expr, $t:ty, $($field:ident).+) => (
+        ::sys::windows::selector::Overlapped::cast_to_arc::<$t>($e,
+                offset_of!($t, $($field).+))
+    )
 }
 
-impl<F> Callback for F
-    where F: FnOnce(&CompletionStatus, &mut FnMut(HANDLE, EventSet),
-                    &mut Selector) +
-             Send + Sync + 'static
-{
-    fn call(self: Box<Self>, status: &CompletionStatus,
-            push: &mut FnMut(HANDLE, EventSet),
-            selector: &mut Selector) {
-        (*self)(status, push, selector)
+macro_rules! offset_of {
+    ($t:ty, $($field:ident).+) => (
+        &(*(0 as *const $t)).$($field).+ as *const _ as usize
+    )
+}
+
+impl Overlapped {
+    pub fn new(cb: Callback) -> Overlapped {
+        Overlapped {
+            inner: UnsafeCell::new(wio::Overlapped::zero()),
+            callback: cb,
+        }
+    }
+
+    pub unsafe fn get_mut(&self) -> &mut wio::Overlapped {
+        &mut *self.inner.get()
+    }
+
+    pub unsafe fn cast_to_arc<T>(overlapped: *mut wio::Overlapped,
+                                 offset: usize) -> FromRawArc<T> {
+        debug_assert!(offset < mem::size_of::<T>());
+        FromRawArc::from_raw((overlapped as usize - offset) as *mut T)
     }
 }
