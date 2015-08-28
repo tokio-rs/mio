@@ -279,6 +279,7 @@ impl Imp {
     fn schedule_read(&self) {
         let mut me = self.inner();
         let me = &mut *me;
+        let iocp = me.iocp.as_ref().unwrap();
         match me.socket {
             Socket::Empty |
             Socket::Building(..) => {}
@@ -305,8 +306,7 @@ impl Imp {
                     }
                     Err(e) => {
                         me.accept = State::Error(e);
-                        me.iocp.as_ref().unwrap()
-                          .defer(me.socket.handle(), EventSet::readable());
+                        iocp.defer(me.socket.handle(), EventSet::readable());
                     }
                 }
             }
@@ -316,7 +316,7 @@ impl Imp {
                     State::Empty => {}
                     _ => return,
                 }
-                let mut buf = Vec::with_capacity(64 * 1024);
+                let mut buf = iocp.get_buffer(64 * 1024);
                 let res = unsafe {
                     trace!("scheduling a read");
                     let cap = buf.capacity();
@@ -337,8 +337,8 @@ impl Imp {
                             set = set | EventSet::hup();
                         }
                         me.read = State::Error(e);
-                        me.iocp.as_ref().unwrap()
-                          .defer(me.socket.handle(), set);
+                        iocp.defer(me.socket.handle(), set);
+                        iocp.put_buffer(buf);
                     }
                 }
             }
@@ -371,8 +371,9 @@ impl Imp {
             }
             Err(e) => {
                 me.write = State::Error(e);
-                me.iocp.as_ref().unwrap()
-                  .defer(me.socket.handle(), EventSet::writable());
+                let iocp = me.iocp.as_ref().unwrap();
+                iocp.defer(me.socket.handle(), EventSet::writable());
+                iocp.put_buffer(buf);
             }
         }
     }
@@ -500,6 +501,7 @@ impl Read for TcpSocket {
                 // Once the entire buffer is written we need to schedule the
                 // next read operation.
                 if cursor.position() as usize == cursor.get_ref().len() {
+                    me.iocp.as_ref().map(|s| s.put_buffer(cursor.into_inner()));
                     drop(me);
                     self.imp.schedule_read();
                 } else {
@@ -518,7 +520,7 @@ impl Read for TcpSocket {
 
 impl Write for TcpSocket {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        {
+        let mut intermediate = {
             let mut me = self.inner();
             let me = &mut *me;
             match me.write {
@@ -526,12 +528,14 @@ impl Write for TcpSocket {
                 _ => return Err(wouldblock())
             }
             try!(me.socket.stream());
-            if me.iocp.is_none() {
-                return Err(wouldblock())
+            match me.iocp {
+                Some(ref s) => s.get_buffer(64 * 1024),
+                None => return Err(wouldblock()),
             }
-        }
-        self.imp.schedule_write(buf.to_vec(), 0);
-        Ok(buf.len())
+        };
+        let amt = try!(intermediate.write(buf));
+        self.imp.schedule_write(intermediate, 0);
+        Ok(amt)
     }
 
     fn flush(&mut self) -> io::Result<()> {

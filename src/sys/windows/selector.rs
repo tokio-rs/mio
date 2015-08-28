@@ -13,6 +13,7 @@ use wio::iocp::{CompletionPort, CompletionStatus};
 use {Token, PollOpt};
 use event::{IoEvent, EventSet};
 use sys::windows::from_raw_arc::FromRawArc;
+use sys::windows::buffer_pool::BufferPool;
 
 /// The guts of the Windows event loop, this is the struct which actually owns
 /// a completion port.
@@ -42,6 +43,12 @@ pub struct SelectorInner {
     /// having completed, and this list is emptied out and returned on each turn
     /// of the event loop.
     defers: Mutex<Vec<(usize, EventSet, Token)>>,
+
+    /// A pool of buffers usable by this selector.
+    ///
+    /// Primitives will take buffers from this pool to perform I/O operations,
+    /// and once complete they'll be put back in.
+    buffers: Mutex<BufferPool>,
 }
 
 pub type Callback = fn(&CompletionStatus, &mut FnMut(HANDLE, EventSet));
@@ -75,6 +82,7 @@ impl Selector {
                     port: cp,
                     handles: Mutex::new(HashMap::new()),
                     defers: Mutex::new(Vec::new()),
+                    buffers: Mutex::new(BufferPool::new(256)),
                 }),
             }
         })
@@ -138,6 +146,14 @@ impl Selector {
 
 impl SelectorInner {
     pub fn port(&self) -> &CompletionPort { &self.port }
+
+    pub fn get_buffer(&self, size: usize) -> Vec<u8> {
+        self.buffers.lock().unwrap().get(size)
+    }
+
+    pub fn put_buffer(&self, buf: Vec<u8>) {
+        self.buffers.lock().unwrap().put(buf);
+    }
 
     /// Given a handle, token, and an event set describing how its ready,
     /// translate that to an `IoEvent` and process accordingly.

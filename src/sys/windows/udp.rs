@@ -134,10 +134,12 @@ impl UdpSocket {
             _ => return Err(wouldblock())
         }
         let s = try!(me.socket.socket());
-        if me.iocp.is_none() {
-            return Err(wouldblock())
-        }
-        let owned_buf = buf.to_vec();
+        let iocp = match me.iocp {
+            Some(ref s) => s,
+            None => return Err(wouldblock()),
+        };
+        let mut owned_buf = iocp.get_buffer(64 * 1024);
+        let amt = try!(owned_buf.write(buf));
         try!(unsafe {
             trace!("scheduling a send");
             s.send_to_overlapped(&owned_buf, target,
@@ -145,7 +147,7 @@ impl UdpSocket {
         });
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
-        Ok(buf.len())
+        Ok(amt)
     }
 
     pub fn recv_from<B: MutBuf>(&self, buf: &mut B)
@@ -168,6 +170,7 @@ impl UdpSocket {
                         Err(io::Error::new(io::ErrorKind::Other,
                                            "failed to parse socket address"))
                     };
+                    me.iocp.as_ref().map(|i| i.put_buffer(data));
                     drop(me);
                     self.imp.schedule_read();
                     r
@@ -260,7 +263,7 @@ impl Imp {
             Socket::Building(..) => return,
             Socket::Bound(ref s) => s,
         };
-        let mut buf = Vec::with_capacity(64 * 1024);
+        let mut buf = iocp.get_buffer(64 * 1024);
         let res = unsafe {
             trace!("scheduling a read");
             let cap = buf.capacity();
@@ -276,6 +279,7 @@ impl Imp {
             Err(e) => {
                 me.read = State::Error(e);
                 iocp.defer(me.socket.handle(), EventSet::readable());
+                iocp.put_buffer(buf);
             }
         }
     }

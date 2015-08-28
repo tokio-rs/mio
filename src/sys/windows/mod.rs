@@ -145,6 +145,7 @@ mod selector;
 mod tcp;
 mod udp;
 mod from_raw_arc;
+mod buffer_pool;
 
 pub use self::awakener::Awakener;
 pub use self::selector::{Events, Selector};
