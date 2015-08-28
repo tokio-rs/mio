@@ -4,7 +4,7 @@ use std::mem;
 use std::net::{SocketAddrV4, SocketAddrV6};
 use std::net::{self, SocketAddr, TcpStream, TcpListener};
 use std::os::windows::prelude::*;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 
 use net2::{self, TcpBuilder};
 use net::tcp::Shutdown;
@@ -13,7 +13,8 @@ use wio::net::*;
 use winapi::*;
 
 use {Evented, EventSet, PollOpt, Selector, Token};
-use sys::windows::selector::{SelectorInner, Overlapped};
+use event::IoEvent;
+use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::{bad_state, wouldblock, Family};
 use sys::windows::from_raw_arc::FromRawArc;
 
@@ -49,7 +50,7 @@ struct Io {
 struct Inner {
     socket: Socket,
     family: Family,
-    iocp: Option<Arc<SelectorInner>>,
+    iocp: Registration,
     deferred_connect: Option<SocketAddr>,
     bound: bool,
     read: State<Vec<u8>, Cursor<Vec<u8>>>,
@@ -99,7 +100,7 @@ impl TcpSocket {
                     inner: Mutex::new(Inner {
                         socket: socket,
                         family: fam,
-                        iocp: None,
+                        iocp: Registration::new(),
                         deferred_connect: None,
                         bound: false,
                         accept: State::Empty,
@@ -120,7 +121,7 @@ impl TcpSocket {
         }
         // If we haven't been registered defer the actual connect until we're
         // registered
-        if me.iocp.is_none() {
+        if me.iocp.port().is_none() {
             me.deferred_connect = Some(*addr);
             return Ok(false)
         }
@@ -244,7 +245,7 @@ impl TcpSocket {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: EventSet, selector: &SelectorInner) {
+    fn post_register(&self, interest: EventSet) {
         if interest.is_readable() {
             self.imp.schedule_read();
         }
@@ -253,10 +254,10 @@ impl TcpSocket {
         // writing and it's immediately writable then a writable event is
         // generated immediately, so do so here.
         if interest.is_writable() {
-            let me = self.inner();
+            let mut me = self.inner();
             if let State::Empty = me.write {
                 if let Socket::Stream(..) = me.socket {
-                    selector.defer(me.socket.handle(), EventSet::writable());
+                    me.iocp.defer(EventSet::writable());
                 }
             }
         }
@@ -279,7 +280,6 @@ impl Imp {
     fn schedule_read(&self) {
         let mut me = self.inner();
         let me = &mut *me;
-        let iocp = me.iocp.as_ref().unwrap();
         match me.socket {
             Socket::Empty |
             Socket::Building(..) => {}
@@ -306,7 +306,7 @@ impl Imp {
                     }
                     Err(e) => {
                         me.accept = State::Error(e);
-                        iocp.defer(me.socket.handle(), EventSet::readable());
+                        me.iocp.defer(EventSet::readable());
                     }
                 }
             }
@@ -316,7 +316,7 @@ impl Imp {
                     State::Empty => {}
                     _ => return,
                 }
-                let mut buf = iocp.get_buffer(64 * 1024);
+                let mut buf = me.iocp.get_buffer(64 * 1024);
                 let res = unsafe {
                     trace!("scheduling a read");
                     let cap = buf.capacity();
@@ -337,8 +337,8 @@ impl Imp {
                             set = set | EventSet::hup();
                         }
                         me.read = State::Error(e);
-                        iocp.defer(me.socket.handle(), set);
-                        iocp.put_buffer(buf);
+                        me.iocp.defer(set);
+                        me.iocp.put_buffer(buf);
                     }
                 }
             }
@@ -357,6 +357,7 @@ impl Imp {
     fn schedule_write(&self, buf: Vec<u8>, pos: usize) {
         trace!("scheduling a write");
         let mut me = self.inner();
+        let me = &mut *me;
         let err = match me.socket.stream() {
             Ok(s) => unsafe {
                 s.write_overlapped(&buf[pos..], self.inner.write.get_mut())
@@ -371,9 +372,8 @@ impl Imp {
             }
             Err(e) => {
                 me.write = State::Error(e);
-                let iocp = me.iocp.as_ref().unwrap();
-                iocp.defer(me.socket.handle(), EventSet::writable());
-                iocp.put_buffer(buf);
+                me.iocp.defer(EventSet::writable());
+                me.iocp.put_buffer(buf);
             }
         }
     }
@@ -400,18 +400,9 @@ impl Socket {
             _ => Err(bad_state()),
         }
     }
-
-    fn handle(&self) -> HANDLE {
-        match *self {
-            Socket::Stream(ref s) => s.as_raw_socket() as HANDLE,
-            Socket::Listener(ref l) => l.as_raw_socket() as HANDLE,
-            Socket::Building(ref b) => b.as_raw_socket() as HANDLE,
-            Socket::Empty => INVALID_HANDLE_VALUE,
-        }
-    }
 }
 
-fn read_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
+fn read_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, read) },
     };
@@ -421,7 +412,7 @@ fn read_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
         State::Pending(s) => {
             trace!("finished an accept");
             me.accept = State::Ready(s);
-            return push(me.socket.handle(), EventSet::readable())
+            return me.iocp.push_event(EventSet::readable(), dst)
         }
         s => me.accept = s,
     }
@@ -440,7 +431,7 @@ fn read_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
             if status.bytes_transferred() == 0 {
                 e = e | EventSet::hup();
             }
-            return push(me.socket.handle(), e)
+            return me.iocp.push_event(e, dst)
         }
         s => me.read = s,
     }
@@ -448,14 +439,13 @@ fn read_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
     // If neither an accept nor a read completed, then the connect must have
     // just finished.
     trace!("finished a connect");
-    let handle = me.socket.handle();
+    me.iocp.push_event(EventSet::writable(), dst);
     drop(me);
     me2.schedule_read();
-    push(handle, EventSet::writable());
 
 }
 
-fn write_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
+fn write_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     trace!("finished a write {}", status.bytes_transferred());
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, write) },
@@ -467,7 +457,7 @@ fn write_done(status: &CompletionStatus, push: &mut FnMut(HANDLE, EventSet)) {
     };
     let new_pos = pos + (status.bytes_transferred() as usize);
     if new_pos == buf.len() {
-        push(me.socket.handle(), EventSet::writable());
+        me.iocp.push_event(EventSet::writable(), dst);
     } else {
         drop(me);
         me2.schedule_write(buf, new_pos);
@@ -501,7 +491,7 @@ impl Read for TcpSocket {
                 // Once the entire buffer is written we need to schedule the
                 // next read operation.
                 if cursor.position() as usize == cursor.get_ref().len() {
-                    me.iocp.as_ref().map(|s| s.put_buffer(cursor.into_inner()));
+                    me.iocp.put_buffer(cursor.into_inner());
                     drop(me);
                     self.imp.schedule_read();
                 } else {
@@ -528,10 +518,10 @@ impl Write for TcpSocket {
                 _ => return Err(wouldblock())
             }
             try!(me.socket.stream());
-            match me.iocp {
-                Some(ref s) => s.get_buffer(64 * 1024),
-                None => return Err(wouldblock()),
+            if me.iocp.port().is_none() {
+                return Err(wouldblock())
             }
+            me.iocp.get_buffer(64 * 1024)
         };
         let amt = try!(intermediate.write(buf));
         self.imp.schedule_write(intermediate, 0);
@@ -546,74 +536,51 @@ impl Write for TcpSocket {
 impl Evented for TcpSocket {
     fn register(&self, selector: &mut Selector, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        let mut me = self.inner();
-        let selector = selector.inner();
-        match me.socket {
-            Socket::Stream(ref s) => {
-                try!(selector.register_socket(s, token, interest, opts));
-            }
-            Socket::Listener(ref l) => {
-                try!(selector.register_socket(l, token, interest, opts));
-            }
-            Socket::Building(ref b) => {
-                try!(selector.register_socket(b, token, interest, opts));
-            }
-            Socket::Empty => return Err(bad_state()),
-        }
-        me.iocp = Some(selector.clone());
+        let addr = {
+            let mut me = self.inner();
+            let me = &mut *me;
+            let socket = match me.socket {
+                Socket::Stream(ref s) => s as &AsRawSocket,
+                Socket::Listener(ref l) => l as &AsRawSocket,
+                Socket::Building(ref b) => b as &AsRawSocket,
+                Socket::Empty => return Err(bad_state()),
+            };
+            try!(me.iocp.register_socket(socket, selector, token, interest,
+                                         opts));
+            me.deferred_connect.take()
+        };
 
         // If we were connected before being registered process that request
         // here and go along our merry ways. Note that the callback for a
         // successful connect will worry about generating writable/readable
         // events and scheduling a new read.
-        let addr = me.deferred_connect.take();
-        drop(me);
         if let Some(addr) = addr {
             return self.connect(&addr).map(|_| ())
         }
-        self.post_register(interest, selector);
+        self.post_register(interest);
         Ok(())
     }
 
     fn reregister(&self, selector: &mut Selector, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        let me = self.inner();
-        let selector = selector.inner();
-        // TODO: assert that me.iocp == selector?
-        if me.iocp.is_none() {
-            return Err(bad_state())
+        {
+            let mut me = self.inner();
+            let me = &mut *me;
+            let socket = match me.socket {
+                Socket::Stream(ref s) => s as &AsRawSocket,
+                Socket::Listener(ref l) => l as &AsRawSocket,
+                Socket::Building(ref b) => b as &AsRawSocket,
+                Socket::Empty => return Err(bad_state()),
+            };
+            try!(me.iocp.reregister_socket(socket, selector, token, interest,
+                                           opts));
         }
-        assert!(me.deferred_connect.is_none());
-        match me.socket {
-            Socket::Stream(ref s) => {
-                try!(selector.reregister_socket(s, token, interest, opts));
-            }
-            Socket::Listener(ref l) => {
-                try!(selector.reregister_socket(l, token, interest, opts));
-            }
-            Socket::Building(ref b) => {
-                try!(selector.reregister_socket(b, token, interest, opts));
-            }
-            Socket::Empty => return Err(bad_state()),
-        }
-        drop(me);
-        self.post_register(interest, selector);
+        self.post_register(interest);
         Ok(())
     }
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        let me = self.inner();
-        let selector = selector.inner();
-        // TODO: assert that me.iocp == selector?
-        if me.iocp.is_none() {
-            return Err(bad_state())
-        }
-        match me.socket {
-            Socket::Stream(ref s) => selector.deregister_socket(s),
-            Socket::Listener(ref l) => selector.deregister_socket(l),
-            Socket::Building(ref b) => selector.deregister_socket(b),
-            Socket::Empty => Err(bad_state()),
-        }
+        self.inner().iocp.deregister(selector)
     }
 }
 

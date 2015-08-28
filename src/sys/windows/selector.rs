@@ -1,5 +1,4 @@
 use std::cell::UnsafeCell;
-use std::collections::hash_map::{HashMap, Entry};
 use std::io;
 use std::mem;
 use std::os::windows::prelude::*;
@@ -26,23 +25,17 @@ pub struct Selector {
     inner: Arc<SelectorInner>,
 }
 
-pub struct SelectorInner {
+struct SelectorInner {
     /// The actual completion port that's used to manage all I/O
     port: CompletionPort,
 
-    /// A list of all registered handles with this selector.
-    ///
-    /// The key of this map is either a `SOCKET` or a `HANDLE`, and the value is
-    /// `None` if the handle was registered with `oneshot` and it expired, or
-    /// `Some` if the handle is registered and receiving events.
-    handles: Mutex<HashMap<usize, Option<Registration>>>,
 
     /// A list of deferred events to be generated on the next call to `select`.
     ///
     /// Events can sometimes be generated without an associated I/O operation
     /// having completed, and this list is emptied out and returned on each turn
     /// of the event loop.
-    defers: Mutex<Vec<(usize, EventSet, Token)>>,
+    defers: Mutex<Vec<IoEvent>>,
 
     /// A pool of buffers usable by this selector.
     ///
@@ -51,7 +44,7 @@ pub struct SelectorInner {
     buffers: Mutex<BufferPool>,
 }
 
-pub type Callback = fn(&CompletionStatus, &mut FnMut(HANDLE, EventSet));
+pub type Callback = fn(&CompletionStatus, &mut Vec<IoEvent>);
 
 /// See sys::windows module docs for why this exists.
 ///
@@ -67,8 +60,8 @@ pub struct Overlapped {
     callback: Callback,
 }
 
-#[derive(Copy, Clone)]
-struct Registration {
+pub struct Registration {
+    selector: Option<Arc<SelectorInner>>,
     token: Token,
     opts: PollOpt,
     interest: EventSet,
@@ -80,7 +73,6 @@ impl Selector {
             Selector {
                 inner: Arc::new(SelectorInner {
                     port: cp,
-                    handles: Mutex::new(HashMap::new()),
                     defers: Mutex::new(Vec::new()),
                     buffers: Mutex::new(BufferPool::new(256)),
                 }),
@@ -127,32 +119,57 @@ impl Selector {
             let callback = unsafe {
                 (*(status.overlapped() as *mut Overlapped)).callback
             };
-            callback(status, &mut |handle, set| {
-                inner.push_event(dst, handle, set, Token(status.token()));
-            });
+            callback(status, dst);
         }
 
         // Finally, clear out the list of deferred events and process them all
         // here.
         let defers = mem::replace(&mut *inner.defers.lock().unwrap(), Vec::new());
-        for (handle, set, token) in defers {
-            inner.push_event(dst, handle as HANDLE, set, token);
+        for event in defers {
+            dst.push(event);
         }
         Ok(())
     }
-
-    pub fn inner(&self) -> &Arc<SelectorInner> { &self.inner }
 }
 
-impl SelectorInner {
-    pub fn port(&self) -> &CompletionPort { &self.port }
+impl Registration {
+    pub fn new() -> Registration {
+        Registration {
+            selector: None,
+            token: Token(0),
+            opts: PollOpt::empty(),
+            interest: EventSet::none(),
+        }
+    }
+
+    fn validate_opts(opts: PollOpt) -> io::Result<()> {
+        if opts.contains(PollOpt::level()) {
+            Err(io::Error::new(io::ErrorKind::Other,
+                               "level opt not implemented on windows"))
+        } else if !opts.contains(PollOpt::edge()) {
+            Err(other("must have edge opt"))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn port(&self) -> Option<&CompletionPort> {
+        self.selector.as_ref().map(|s| &s.port)
+    }
+
+    pub fn token(&self) -> Token { self.token }
 
     pub fn get_buffer(&self, size: usize) -> Vec<u8> {
-        self.buffers.lock().unwrap().get(size)
+        match self.selector {
+            Some(ref s) => s.buffers.lock().unwrap().get(size),
+            None => Vec::with_capacity(size),
+        }
     }
 
     pub fn put_buffer(&self, buf: Vec<u8>) {
-        self.buffers.lock().unwrap().put(buf);
+        if let Some(ref s) = self.selector {
+            s.buffers.lock().unwrap().put(buf);
+        }
     }
 
     /// Given a handle, token, and an event set describing how its ready,
@@ -164,104 +181,70 @@ impl SelectorInner {
     ///
     /// Eventually this function will probably also be modified to handle the
     /// `level()` polling option.
-    fn push_event(&self, events: &mut Vec<IoEvent>, handle: HANDLE,
-                  set: EventSet, token: Token) {
-        // A vacant handle means it's been deregistered, so just skip this
-        // event.
-        let mut handles = self.handles.lock().unwrap();
-        let mut e = match handles.entry(handle as usize) {
-            Entry::Vacant(..) => return,
-            Entry::Occupied(e) => e,
-        };
-
-        // A handle in the map without a registration is one that's become idle
-        // as a result of a `oneshot`, so just use a registration that will turn
-        // this function into a noop.
-        let reg = e.get().unwrap_or(Registration {
-            token: Token(0),
-            interest: EventSet::none(),
-            opts: PollOpt::oneshot(),
-        });
-
+    pub fn push_event(&mut self, set: EventSet, events: &mut Vec<IoEvent>) {
         // If we're not actually interested in any of these events,
         // discard the event, and then if we're actually delivering an event we
         // stop listening if it's also a oneshot.
-        let set = reg.interest & set;
+        let set = self.interest & set;
         if set != EventSet::none() {
-            events.push(IoEvent::new(set, token));
+            events.push(IoEvent::new(set, self.token));
 
-            if reg.opts.is_oneshot() {
+            if self.opts.is_oneshot() {
                 trace!("deregistering because of oneshot");
-                e.insert(None);
+                self.interest = EventSet::none();
             }
         }
     }
 
-    pub fn register_socket(&self, socket: &AsRawSocket, token: Token,
-                           interest: EventSet, opts: PollOpt)
-                           -> io::Result<()> {
-        if opts.contains(PollOpt::level()) {
-            return Err(io::Error::new(io::ErrorKind::Other,
-                                      "level opt not implemented on windows"))
-        } else if !opts.contains(PollOpt::edge()) {
-            return Err(other("must have edge opt"))
-        }
+    pub fn associate(&mut self, selector: &mut Selector, token: Token) {
+        self.selector = Some(selector.inner.clone());
+        self.token = token;
+    }
 
-        let mut handles = self.handles.lock().unwrap();
-        match handles.entry(socket.as_raw_socket() as usize) {
-            Entry::Occupied(..) => return Err(other("socket already registered")),
-            Entry::Vacant(v) => {
-                try!(self.port.add_socket(token.as_usize(), socket));
-                v.insert(Some(Registration {
-                    token: token,
-                    interest: set2mask(interest),
-                    opts: opts,
-                }));
-            }
+    pub fn register_socket(&mut self,
+                           socket: &AsRawSocket,
+                           selector: &mut Selector,
+                           token: Token,
+                           interest: EventSet,
+                           opts: PollOpt) -> io::Result<()> {
+        if self.selector.is_some() {
+            return Err(other("socket already registered"))
         }
-
+        try!(Registration::validate_opts(opts));
+        try!(selector.inner.port.add_socket(self.token.as_usize(), socket));
+        self.associate(selector, token);
+        self.interest = set2mask(interest);
+        self.opts = opts;
         Ok(())
     }
 
-    pub fn reregister_socket(&self, socket: &AsRawSocket, token: Token,
-                             interest: EventSet, opts: PollOpt)
-                             -> io::Result<()> {
-        if opts.contains(PollOpt::level()) {
-            return Err(io::Error::new(io::ErrorKind::Other,
-                                      "level opt not implemented on windows"))
-        } else if !opts.contains(PollOpt::edge()) {
-            return Err(other("must have edge opt"))
+    pub fn reregister_socket(&mut self,
+                             _socket: &AsRawSocket,
+                             _selector: &mut Selector,
+                             token: Token,
+                             interest: EventSet,
+                             opts: PollOpt) -> io::Result<()> {
+        if self.selector.is_none() {
+            return Err(other("socket not registered"))
+        } else if self.token != token {
+            return Err(other("cannot change token values on reregistration"))
         }
+        try!(Registration::validate_opts(opts));
+        // TODO: assert that self.selector == selector?
 
-        let mut handles = self.handles.lock().unwrap();
-        match handles.entry(socket.as_raw_socket() as usize) {
-            Entry::Vacant(..) => return Err(other("socket not registered")),
-            Entry::Occupied(mut v) => {
-                match v.get().as_ref().map(|t| t.token) {
-                    Some(t) if t == token => {}
-                    Some(..) => return Err(other("cannot change tokens")),
-                    None => {}
-                }
-                v.insert(Some(Registration {
-                    token: token,
-                    interest: set2mask(interest),
-                    opts: opts,
-                }));
-            }
-        }
-
+        self.interest = set2mask(interest);
+        self.opts = opts;
         Ok(())
     }
 
-    pub fn deregister_socket(&self, socket: &AsRawSocket) -> io::Result<()> {
-        // Note that we can't actually deregister the socket from the completion
-        // port here, so we just remove our own internal metadata about it.
-        let mut handles = self.handles.lock().unwrap();
-        match handles.entry(socket.as_raw_socket() as usize) {
-            Entry::Vacant(..) => return Err(other("socket not registered")),
-            Entry::Occupied(v) => { v.remove(); }
+    pub fn deregister(&mut self, _selector: &mut Selector) -> io::Result<()> {
+        // TODO: assert that self.selector == selector?
+        if self.selector.is_none() {
+            Err(super::bad_state())
+        } else {
+            self.selector = None;
+            Ok(())
         }
-        Ok(())
     }
 
     /// Schedules some events for a handle to be delivered on the next turn of
@@ -272,16 +255,11 @@ impl SelectorInner {
     /// * The handle has been de-registered
     /// * The handle doesn't have an active registration (e.g. its oneshot
     ///   expired)
-    pub fn defer(&self, handle: HANDLE, set: EventSet) {
-        debug!("defer {:?} {:?}", handle, set);
-        let handles = self.handles.lock().unwrap();
-        let reg = handles.get(&(handle as usize)).and_then(|t| t.as_ref())
-                         .map(|t| t.token);
-        let token = match reg {
-            Some(token) => token,
-            None => return,
-        };
-        self.defers.lock().unwrap().push((handle as usize, set, token));
+    pub fn defer(&mut self, set: EventSet) {
+        if let Some(s) = self.selector.clone() {
+            let mut dst = s.defers.lock().unwrap();
+            self.push_event(set, &mut dst);
+        }
     }
 }
 

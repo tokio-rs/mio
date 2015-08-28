@@ -1,6 +1,7 @@
 # 0.5.0 (unreleased)
 
 * Don't re-export bytes types
+* Preliminary Windows support
 
 # 0.4.1 (July 21)
 
