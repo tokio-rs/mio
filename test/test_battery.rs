@@ -10,8 +10,8 @@ const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
 
 #[cfg(windows)]
-const N: usize = 1_000;
-#[cfg(not(windows))]
+const N: usize = 10_000;
+#[cfg(unix)]
 const N: usize = 1_000_000;
 
 struct EchoConn {

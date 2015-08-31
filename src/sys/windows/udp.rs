@@ -171,14 +171,12 @@ impl UdpSocket {
                                            "failed to parse socket address"))
                     };
                     me.iocp.put_buffer(data);
-                    drop(me);
-                    self.imp.schedule_read();
+                    self.imp.schedule_read(&mut me);
                     r
                 }
             }
             State::Error(e) => {
-                drop(me);
-                self.imp.schedule_read();
+                self.imp.schedule_read(&mut me);
                 Err(e)
             }
         }
@@ -229,13 +227,12 @@ impl UdpSocket {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: EventSet) {
+    fn post_register(&self, interest: EventSet, me: &mut Inner) {
         if interest.is_readable() {
-            self.imp.schedule_read();
+            self.imp.schedule_read(me);
         }
         // See comments in TcpSocket::post_register for what's going on here
         if interest.is_writable() {
-            let mut me = self.inner();
             if let State::Empty = me.write {
                 if let Socket::Bound(..) = me.socket {
                     me.iocp.defer(EventSet::writable());
@@ -250,9 +247,7 @@ impl Imp {
         self.inner.inner.lock().unwrap()
     }
 
-    fn schedule_read(&self) {
-        let mut me = self.inner();
-        let me = &mut *me;
+    fn schedule_read(&self, me: &mut Inner) {
         match me.read {
             State::Empty => {}
             _ => return,
@@ -287,8 +282,8 @@ impl Imp {
 impl Evented for UdpSocket {
     fn register(&self, selector: &mut Selector, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        let mut me = self.inner();
         {
-            let mut me = self.inner();
             let me = &mut *me;
             let socket = match me.socket {
                 Socket::Bound(ref s) => s as &AsRawSocket,
@@ -298,14 +293,14 @@ impl Evented for UdpSocket {
             try!(me.iocp.register_socket(socket, selector, token, interest,
                                          opts));
         }
-        self.post_register(interest);
+        self.post_register(interest, &mut me);
         Ok(())
     }
 
     fn reregister(&self, selector: &mut Selector, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        let mut me = self.inner();
         {
-            let mut me = self.inner();
             let me = &mut *me;
             let socket = match me.socket {
                 Socket::Bound(ref s) => s as &AsRawSocket,
@@ -315,7 +310,7 @@ impl Evented for UdpSocket {
             try!(me.iocp.reregister_socket(socket, selector, token, interest,
                                            opts));
         }
-        self.post_register(interest);
+        self.post_register(interest, &mut me);
         Ok(())
     }
 

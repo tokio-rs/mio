@@ -176,8 +176,7 @@ impl TcpSocket {
             }
             State::Error(e) => Err(e),
         };
-        drop(me);
-        self.imp.schedule_read();
+        self.imp.schedule_read(&mut me);
         return ret
     }
 
@@ -245,16 +244,15 @@ impl TcpSocket {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: EventSet) {
+    fn post_register(&self, interest: EventSet, me: &mut Inner) {
         if interest.is_readable() {
-            self.imp.schedule_read();
+            self.imp.schedule_read(me);
         }
 
         // At least with epoll, if a socket is registered with an interest in
         // writing and it's immediately writable then a writable event is
         // generated immediately, so do so here.
         if interest.is_writable() {
-            let mut me = self.inner();
             if let State::Empty = me.write {
                 if let Socket::Stream(..) = me.socket {
                     me.iocp.defer(EventSet::writable());
@@ -277,9 +275,7 @@ impl Imp {
     ///
     /// It is required that this function is only called after the handle has
     /// been registered with an event loop.
-    fn schedule_read(&self) {
-        let mut me = self.inner();
-        let me = &mut *me;
+    fn schedule_read(&self, me: &mut Inner) {
         match me.socket {
             Socket::Empty |
             Socket::Building(..) => {}
@@ -354,10 +350,9 @@ impl Imp {
     ///
     /// A new writable event (e.g. allowing another write) will only happen once
     /// the buffer has been written completely (or hit an error).
-    fn schedule_write(&self, buf: Vec<u8>, pos: usize) {
+    fn schedule_write(&self, buf: Vec<u8>, pos: usize,
+                      me: &mut Inner) {
         trace!("scheduling a write");
-        let mut me = self.inner();
-        let me = &mut *me;
         let err = match me.socket.stream() {
             Ok(s) => unsafe {
                 s.write_overlapped(&buf[pos..], self.inner.write.get_mut())
@@ -408,40 +403,41 @@ fn read_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     };
 
     let mut me = me2.inner();
-    match mem::replace(&mut me.accept, State::Empty) {
-        State::Pending(s) => {
-            trace!("finished an accept");
-            me.accept = State::Ready(s);
-            return me.iocp.push_event(EventSet::readable(), dst)
-        }
-        s => me.accept = s,
-    }
 
-    match mem::replace(&mut me.read, State::Empty) {
-        State::Pending(mut buf) => {
-            trace!("finished a read: {}", status.bytes_transferred());
-            unsafe {
-                buf.set_len(status.bytes_transferred() as usize);
+    if let Socket::Listener(..) = me.socket {
+        match mem::replace(&mut me.accept, State::Empty) {
+            State::Pending(s) => {
+                trace!("finished an accept");
+                me.accept = State::Ready(s);
+                return me.iocp.push_event(EventSet::readable(), dst)
             }
-            me.read = State::Ready(Cursor::new(buf));
-
-            // If we transferred 0 bytes then be sure to indicate that hup
-            // happened.
-            let mut e = EventSet::readable();
-            if status.bytes_transferred() == 0 {
-                e = e | EventSet::hup();
-            }
-            return me.iocp.push_event(e, dst)
+            s => me.accept = s,
         }
-        s => me.read = s,
-    }
+    } else {
+        match mem::replace(&mut me.read, State::Empty) {
+            State::Pending(mut buf) => {
+                trace!("finished a read: {}", status.bytes_transferred());
+                unsafe {
+                    buf.set_len(status.bytes_transferred() as usize);
+                }
+                me.read = State::Ready(Cursor::new(buf));
 
-    // If neither an accept nor a read completed, then the connect must have
-    // just finished.
-    trace!("finished a connect");
-    me.iocp.push_event(EventSet::writable(), dst);
-    drop(me);
-    me2.schedule_read();
+                // If we transferred 0 bytes then be sure to indicate that hup
+                // happened.
+                let mut e = EventSet::readable();
+                if status.bytes_transferred() == 0 {
+                    e = e | EventSet::hup();
+                }
+                return me.iocp.push_event(e, dst)
+            }
+            s => me.read = s,
+        }
+
+        // If a read didn't complete, then the connect must have just finished.
+        trace!("finished a connect");
+        me.iocp.push_event(EventSet::writable(), dst);
+        me2.schedule_read(&mut me);
+    }
 
 }
 
@@ -459,8 +455,7 @@ fn write_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     if new_pos == buf.len() {
         me.iocp.push_event(EventSet::writable(), dst);
     } else {
-        drop(me);
-        me2.schedule_write(buf, new_pos);
+        me2.schedule_write(buf, new_pos, &mut me);
     }
 }
 
@@ -492,16 +487,14 @@ impl Read for TcpSocket {
                 // next read operation.
                 if cursor.position() as usize == cursor.get_ref().len() {
                     me.iocp.put_buffer(cursor.into_inner());
-                    drop(me);
-                    self.imp.schedule_read();
+                    self.imp.schedule_read(&mut me);
                 } else {
                     me.read = State::Ready(cursor);
                 }
                 Ok(amt)
             }
             State::Error(e) => {
-                drop(me);
-                self.imp.schedule_read();
+                self.imp.schedule_read(&mut me);
                 Err(e)
             }
         }
@@ -510,21 +503,19 @@ impl Read for TcpSocket {
 
 impl Write for TcpSocket {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let mut intermediate = {
-            let mut me = self.inner();
-            let me = &mut *me;
-            match me.write {
-                State::Empty => {}
-                _ => return Err(wouldblock())
-            }
-            try!(me.socket.stream());
-            if me.iocp.port().is_none() {
-                return Err(wouldblock())
-            }
-            me.iocp.get_buffer(64 * 1024)
-        };
+        let mut me = self.inner();
+        let me = &mut *me;
+        match me.write {
+            State::Empty => {}
+            _ => return Err(wouldblock())
+        }
+        try!(me.socket.stream());
+        if me.iocp.port().is_none() {
+            return Err(wouldblock())
+        }
+        let mut intermediate = me.iocp.get_buffer(64 * 1024);
         let amt = try!(intermediate.write(buf));
-        self.imp.schedule_write(intermediate, 0);
+        self.imp.schedule_write(intermediate, 0, me);
         Ok(amt)
     }
 
@@ -538,33 +529,37 @@ impl Evented for TcpSocket {
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let addr = {
             let mut me = self.inner();
-            let me = &mut *me;
-            let socket = match me.socket {
-                Socket::Stream(ref s) => s as &AsRawSocket,
-                Socket::Listener(ref l) => l as &AsRawSocket,
-                Socket::Building(ref b) => b as &AsRawSocket,
-                Socket::Empty => return Err(bad_state()),
-            };
-            try!(me.iocp.register_socket(socket, selector, token, interest,
-                                         opts));
-            me.deferred_connect.take()
+            {
+                let me = &mut *me;
+                let socket = match me.socket {
+                    Socket::Stream(ref s) => s as &AsRawSocket,
+                    Socket::Listener(ref l) => l as &AsRawSocket,
+                    Socket::Building(ref b) => b as &AsRawSocket,
+                    Socket::Empty => return Err(bad_state()),
+                };
+                try!(me.iocp.register_socket(socket, selector, token, interest,
+                                             opts));
+            }
+            match me.deferred_connect.take() {
+                Some(addr) => addr,
+                None => {
+                    self.post_register(interest, &mut me);
+                    return Ok(())
+                }
+            }
         };
 
         // If we were connected before being registered process that request
         // here and go along our merry ways. Note that the callback for a
         // successful connect will worry about generating writable/readable
         // events and scheduling a new read.
-        if let Some(addr) = addr {
-            return self.connect(&addr).map(|_| ())
-        }
-        self.post_register(interest);
-        Ok(())
+        self.connect(&addr).map(|_| ())
     }
 
     fn reregister(&self, selector: &mut Selector, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        let mut me = self.inner();
         {
-            let mut me = self.inner();
             let me = &mut *me;
             let socket = match me.socket {
                 Socket::Stream(ref s) => s as &AsRawSocket,
@@ -575,7 +570,7 @@ impl Evented for TcpSocket {
             try!(me.iocp.reregister_socket(socket, selector, token, interest,
                                            opts));
         }
-        self.post_register(interest);
+        self.post_register(interest, &mut me);
         Ok(())
     }
 
