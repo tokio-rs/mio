@@ -44,7 +44,8 @@ pub fn test_tick() {
 
     let (reader, mut writer) = unix::pipe().unwrap();
 
-    event_loop.register(&reader, Token(0)).unwrap();
+    event_loop.register(&reader, Token(0), EventSet::all(),
+                        PollOpt::level()).unwrap();
 
     let mut handler = TestHandler::new();
     writer.write(&[0u8]).unwrap();

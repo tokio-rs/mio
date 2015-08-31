@@ -115,13 +115,13 @@ pub fn test_close_on_drop() {
 
     let srv = srv.listen(256).unwrap();
 
-    event_loop.register_opt(&srv, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&srv, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
 
     // == Create & setup client socket
     let (sock, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
-    event_loop.register_opt(&sock, CLIENT, EventSet::writable(), PollOpt::edge()).unwrap();
+    event_loop.register(&sock, CLIENT, EventSet::writable(), PollOpt::edge()).unwrap();
 
     // == Setup test handler
     let mut handler = TestHandler::new(srv, sock);

@@ -33,7 +33,7 @@ fn run_once_with_nothing() {
 fn add_then_drop() {
     let mut e = EventLoop::<E>::new().unwrap();
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
-    e.register_opt(&l, Token(1), EventSet::all(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), EventSet::all(), PollOpt::edge()).unwrap();
     drop(l);
     e.run_once(&mut E).unwrap();
 }

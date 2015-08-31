@@ -39,13 +39,15 @@
 //! let mut event_loop = EventLoop::new().unwrap();
 //!
 //! // Start listening for incoming connections
-//! event_loop.register(&server, SERVER).unwrap();
+//! event_loop.register(&server, SERVER, EventSet::readable(),
+//!                     PollOpt::edge()).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
-//! event_loop.register(&sock, CLIENT).unwrap();
+//! event_loop.register(&sock, CLIENT, EventSet::readable(),
+//!                     PollOpt::edge()).unwrap();
 //!
 //! // Define a handler to process the events
 //! struct MyHandler(TcpListener);

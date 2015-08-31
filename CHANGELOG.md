@@ -2,6 +2,7 @@
 
 * Don't re-export bytes types
 * Preliminary Windows support
+* Renamed `EventLoop::register_opt` to `EventLoop::register`
 
 # 0.4.1 (July 21)
 
