@@ -82,13 +82,13 @@ pub fn test_register_deregister() {
     let server = server.listen(256).unwrap();
 
     info!("register server socket");
-    event_loop.register_opt(&server, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
 
     let (client, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Register client socket only as writable
-    event_loop.register_opt(&client, CLIENT, EventSet::readable(), PollOpt::level()).unwrap();
+    event_loop.register(&client, CLIENT, EventSet::readable(), PollOpt::level()).unwrap();
 
     let mut handler = TestHandler::new(server, client);
 

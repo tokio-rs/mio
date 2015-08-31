@@ -37,7 +37,7 @@ impl TestHandler {
             SERVER => {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().unwrap();
-                event_loop.register_opt(&conn, CONN, EventSet::all(),
+                event_loop.register(&conn, CONN, EventSet::all(),
                                         PollOpt::edge()).unwrap();
                 event_loop.timeout_ms(conn, 200).unwrap();
 
@@ -141,13 +141,13 @@ pub fn test_timer() {
 
     info!("listening for connections");
 
-    event_loop.register_opt(&srv, SERVER, EventSet::all(), PollOpt::edge()).unwrap();
+    event_loop.register(&srv, SERVER, EventSet::all(), PollOpt::edge()).unwrap();
 
     let (sock, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register_opt(&sock, CLIENT, EventSet::all(), PollOpt::edge()).unwrap();
+    event_loop.register(&sock, CLIENT, EventSet::all(), PollOpt::edge()).unwrap();
 
     // Init the handler
     let mut handler = TestHandler::new(srv, sock);

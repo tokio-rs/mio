@@ -186,14 +186,7 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token) -> io::Result<()>
-        where E: Evented
-    {
-        self.poll.register(io, token, EventSet::all(), PollOpt::level())
-    }
-
-    /// Registers an IO handle with the event loop.
-    pub fn register_opt<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opt: PollOpt) -> io::Result<()>
+    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opt: PollOpt) -> io::Result<()>
         where E: Evented
     {
         self.poll.register(io, token, interest, opt)
@@ -382,7 +375,7 @@ mod tests {
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use super::EventLoop;
-    use {unix, Handler, Token, TryRead, TryWrite, EventSet};
+    use {unix, Handler, Token, TryRead, TryWrite, EventSet, PollOpt};
     use bytes::{Buf, SliceBuf, ByteBuf};
 
     #[test]
@@ -433,7 +426,8 @@ mod tests {
         let mut handler = Funtimes::new(rcount.clone(), wcount.clone());
 
         writer.try_write_buf(&mut SliceBuf::wrap("hello".as_bytes())).unwrap();
-        event_loop.register(&reader, Token(10)).unwrap();
+        event_loop.register(&reader, Token(10), EventSet::readable(),
+                            PollOpt::edge()).unwrap();
 
         let _ = event_loop.run_once(&mut handler);
         let mut b = ByteBuf::mut_with_capacity(16);

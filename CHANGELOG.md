@@ -1,6 +1,7 @@
 # 0.5.0 (unreleased)
 
 * Don't re-export bytes types
+* Renamed `EventLoop::register_opt` to `EventLoop::register`
 
 # 0.4.1 (July 21)
 
