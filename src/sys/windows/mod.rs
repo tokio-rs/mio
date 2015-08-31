@@ -93,9 +93,17 @@
 //! `TcpStream` is connected it generates a writable event and also schedules a
 //! read.
 //!
-//! To manage all this the `Selector` maintains an internal hash map of I/O
-//! operations to callbacks, and the callbacks are invoked whenever the
-//! operation completes.
+//! To manage all this the `Selector` uses the `OVERLAPPED` pointer from the
+//! completion status. The selector assumes that all `OVERLAPPED` pointers are
+//! actually pointers to the interior of a `selector::Overlapped` which means
+//! that right after the `OVERLAPPED` itself there's a function pointer. This
+//! function pointer is given the completion status as well as another callback
+//! to push events onto the selector.
+//!
+//! The callback for each I/O operation doesn't have any environment, so it
+//! relies on memory layout and unsafe casting to translate an `OVERLAPPED`
+//! pointer (or in this case a `selector::Overlapped` pointer) to a type of
+//! `FromRawArc<T>` (see module docs the for why this type exists).
 //!
 //! ## Thread Safety
 //!
@@ -127,16 +135,16 @@
 //! * No calls to `write` are internally buffered before being scheduled, which
 //!   means that writing performance is abysmal compared to Unix. There should
 //!   be some level of buffering of writes probably.
-//! * All callbacks are stored as `Box<FnOnce(...)>`, but these should ideally
-//!   be `Arc<Fn(...)>` to avoid these extraneous `Box` allocations.
 
 use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 mod awakener;
+#[macro_use]
 mod selector;
 mod tcp;
 mod udp;
+mod from_raw_arc;
 
 pub use self::awakener::Awakener;
 pub use self::selector::{Events, Selector};
