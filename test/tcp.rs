@@ -36,7 +36,7 @@ fn accept() {
 
     let mut e = EventLoop::new().unwrap();
 
-    e.register_opt(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
 
     let mut h = H { hit: false, listener: l };
     e.run(&mut h).unwrap();
@@ -81,7 +81,7 @@ fn connect() {
     let mut e = EventLoop::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register_opt(&s, Token(1), EventSet::all(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(1), EventSet::all(), PollOpt::edge()).unwrap();
 
     let mut h = H { hit: 0 };
     e.run(&mut h).unwrap();
@@ -135,7 +135,7 @@ fn read() {
     let mut e = EventLoop::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register_opt(&s, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
 
     let mut h = H { amt: 0, socket: s };
     e.run(&mut h).unwrap();
@@ -184,7 +184,7 @@ fn write() {
     let mut e = EventLoop::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register_opt(&s, Token(1), EventSet::writable(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(1), EventSet::writable(), PollOpt::edge()).unwrap();
 
     let mut h = H { amt: 0, socket: s };
     e.run(&mut h).unwrap();
@@ -203,7 +203,7 @@ fn connect_then_close() {
                  _events: EventSet) {
             if token == Token(1) {
                 let s = self.listener.accept().unwrap().unwrap();
-                event_loop.register_opt(&s, Token(3), EventSet::all(),
+                event_loop.register(&s, Token(3), EventSet::all(),
                                         PollOpt::edge()).unwrap();
                 drop(s);
             } else if token == Token(2) {
@@ -216,8 +216,8 @@ fn connect_then_close() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let s = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
 
-    e.register_opt(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
-    e.register_opt(&s, Token(2), EventSet::readable(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(2), EventSet::readable(), PollOpt::edge()).unwrap();
 
     let mut h = H { listener: l };
     e.run(&mut h).unwrap();

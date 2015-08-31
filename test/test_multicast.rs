@@ -87,10 +87,10 @@ pub fn test_multicast() {
     rx.join_multicast(&"227.1.1.101".parse().unwrap()).unwrap();
 
     info!("Registering SENDER");
-    event_loop.register_opt(&tx, SENDER, EventSet::writable(), PollOpt::edge()).unwrap();
+    event_loop.register(&tx, SENDER, EventSet::writable(), PollOpt::edge()).unwrap();
 
     info!("Registering LISTENER");
-    event_loop.register_opt(&rx, LISTENER, EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&rx, LISTENER, EventSet::readable(), PollOpt::edge()).unwrap();
 
     info!("Starting event loop to test with...");
     event_loop.run(&mut UdpHandler::new(tx, rx, "hello world")).unwrap();

@@ -94,7 +94,7 @@ impl EchoServer {
 
         // Register the connection
         self.conns[tok].token = Some(tok);
-        event_loop.register_opt(&self.conns[tok].sock, tok, EventSet::readable(),
+        event_loop.register(&self.conns[tok].sock, tok, EventSet::readable(),
                                 PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
@@ -273,15 +273,15 @@ pub fn test_echo_server() {
     let srv = TcpListener::bind(&addr).unwrap();
 
     info!("listen for connections");
-    event_loop.register_opt(&srv, SERVER, EventSet::readable(),
+    event_loop.register(&srv, SERVER, EventSet::readable(),
                             PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     let (sock, _) = TcpSocket::v4().unwrap()
         .connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register_opt(&sock, CLIENT, EventSet::writable(),
-                            PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    event_loop.register(&sock, CLIENT, EventSet::writable(),
+                        PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     // Start the event loop
     event_loop.run(&mut Echo::new(srv, sock, vec!["foo", "bar"])).unwrap();
