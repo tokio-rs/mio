@@ -136,21 +136,25 @@ impl UdpSocket {
             Some(ref s) => s,
             None => return Err(wouldblock()),
         };
-        let owned_buf = buf.to_vec();
-        try!(unsafe {
-            trace!("scheduling a send");
+        let mut owned_buf = iocp.buffers().get(64 * 1024);
+        let amt = try!(owned_buf.write(buf));
+        let err = unsafe {
             s.send_to_overlapped(&owned_buf, target, &mut me.io.write)
-        });
+        };
+        if let Err(e) = err {
+            iocp.buffers().put(owned_buf);
+            return Err(e)
+        }
         me.write = State::Pending;
         let me2 = self.imp.clone();
-        iocp.register(&mut me.io.write, move |s, push, _| {
+        iocp.register(&mut me.io.write, move |s, push, sel| {
             trace!("finished a send {}", s.bytes_transferred());
             let mut me = me2.inner();
             me.write = State::Empty;
             push(me.socket.handle(), EventSet::writable());
-            drop(owned_buf); // keep the buf alive until I/O is done
+            sel.inner().buffers().put(owned_buf);
         });
-        Ok(buf.len())
+        Ok(amt)
     }
 
     pub fn recv_from<B: MutBuf>(&self, buf: &mut B)
@@ -173,6 +177,9 @@ impl UdpSocket {
                         Err(io::Error::new(io::ErrorKind::Other,
                                            "failed to parse socket address"))
                     };
+                    if let Some(ref s) = me.iocp {
+                        s.buffers().put(data);
+                    }
                     drop(me);
                     self.imp.schedule_read();
                     r
@@ -266,7 +273,7 @@ impl Imp {
             Socket::Building(..) => return,
             Socket::Bound(ref s) => s,
         };
-        let mut buf = Vec::with_capacity(64 * 1024);
+        let mut buf = iocp.buffers().get(64 * 1024);
         let res = unsafe {
             trace!("scheduling a read");
             let cap = buf.capacity();
@@ -291,6 +298,7 @@ impl Imp {
             Err(e) => {
                 me.read = State::Error(e);
                 iocp.defer(me.socket.handle(), EventSet::readable());
+                iocp.buffers().put(buf);
             }
         }
     }

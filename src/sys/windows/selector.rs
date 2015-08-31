@@ -2,7 +2,7 @@ use std::collections::hash_map::{HashMap, Entry};
 use std::io;
 use std::mem;
 use std::os::windows::prelude::*;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use slab::Index;
 use winapi::*;
@@ -11,6 +11,7 @@ use wio::iocp::{CompletionPort, CompletionStatus};
 
 use {Token, PollOpt};
 use event::{IoEvent, EventSet};
+use sys::windows::buffer_pool::BufferPool;
 
 /// The guts of the Windows event loop, this is the struct which actually owns
 /// a completion port.
@@ -55,6 +56,12 @@ pub struct SelectorInner {
     /// having completed, and this list is emptied out and returned on each turn
     /// of the event loop.
     defers: Mutex<Vec<(usize, EventSet, Token)>>,
+
+    /// A pool of buffers usable by this selector.
+    ///
+    /// Primitives will take buffers from this pool to perform I/O operations,
+    /// and once complete they'll be put back in.
+    buffers: Mutex<BufferPool>,
 }
 
 #[derive(Copy, Clone)]
@@ -73,6 +80,7 @@ impl Selector {
                     handles: Mutex::new(HashMap::new()),
                     io: Mutex::new(HashMap::new()),
                     defers: Mutex::new(Vec::new()),
+                    buffers: Mutex::new(BufferPool::new(256)),
                 }),
             }
         })
@@ -136,6 +144,10 @@ impl Selector {
 
 impl SelectorInner {
     pub fn port(&self) -> &CompletionPort { &self.port }
+
+    pub fn buffers(&self) -> MutexGuard<BufferPool> {
+        self.buffers.lock().unwrap()
+    }
 
     /// Given a handle, token, and an event set describing how its ready,
     /// translate that to an `IoEvent` and process accordingly.
