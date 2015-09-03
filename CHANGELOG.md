@@ -3,6 +3,8 @@
 * Don't re-export bytes types
 * Preliminary Windows support
 * Renamed `EventLoop::register_opt` to `EventLoop::register`
+* `EventLoopConfig` is now a builder instead of having public struct fields. It
+  is also no longer `Copy`.
 
 # 0.4.1 (July 21)
 

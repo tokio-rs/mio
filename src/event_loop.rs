@@ -2,26 +2,27 @@ use {Handler, Evented, Poll, NotifyError, Token};
 use event::{IoEvent, EventSet, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
-use std::default::Default;
 use std::{io, fmt, thread, usize};
 
 /// Configure EventLoop runtime details
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct EventLoopConfig {
-    pub io_poll_timeout_ms: usize,
+    io_poll_timeout_ms: usize,
 
     // == Notifications ==
-    pub notify_capacity: usize,
-    pub messages_per_tick: usize,
+    notify_capacity: usize,
+    messages_per_tick: usize,
 
     // == Timer ==
-    pub timer_tick_ms: u64,
-    pub timer_wheel_size: usize,
-    pub timer_capacity: usize,
+    timer_tick_ms: u64,
+    timer_wheel_size: usize,
+    timer_capacity: usize,
 }
 
-impl Default for EventLoopConfig {
-    fn default() -> EventLoopConfig {
+impl EventLoopConfig {
+    /// Creates a new configuration for the event loop with all default options
+    /// specified.
+    pub fn new() -> EventLoopConfig {
         EventLoopConfig {
             io_poll_timeout_ms: 1_000,
             notify_capacity: 4_096,
@@ -30,6 +31,52 @@ impl Default for EventLoopConfig {
             timer_wheel_size: 1_024,
             timer_capacity: 65_536,
         }
+    }
+
+    /// Sets the default amount of time that a thread will be blocked in I/O
+    /// before timing out.
+    ///
+    /// If the event loop receives no I/O events during the specified timeout
+    /// then it will use this timeout to return control back to the original
+    /// program and run one more tick of the event loop.
+    ///
+    /// The default value for this is 1000.
+    pub fn io_poll_timeout_ms(&mut self, timeout: usize) -> &mut Self {
+        self.io_poll_timeout_ms = timeout;
+        self
+    }
+
+    /// Sets the maximum number of messages that can be buffered on the event
+    /// loop's notification channel before a send will fail.
+    ///
+    /// The default value for this is 4096.
+    pub fn notify_capacity(&mut self, capacity: usize) -> &mut Self {
+        self.notify_capacity = capacity;
+        self
+    }
+
+    /// Sets the maximum number of messages that can be processed on any tick of
+    /// the event loop.
+    ///
+    /// The default value for this is 256.
+    pub fn messages_per_tick(&mut self, messages: usize) -> &mut Self {
+        self.messages_per_tick = messages;
+        self
+    }
+
+    pub fn timer_tick_ms(&mut self, ms: u64) -> &mut Self {
+        self.timer_tick_ms = ms;
+        self
+    }
+
+    pub fn timer_wheel_size(&mut self, size: usize) -> &mut Self {
+        self.timer_wheel_size = size;
+        self
+    }
+
+    pub fn timer_capacity(&mut self, cap: usize) -> &mut Self {
+        self.timer_capacity = cap;
+        self
     }
 }
 
@@ -51,7 +98,7 @@ impl<H: Handler> EventLoop<H> {
     /// Initializes a new event loop using default configuration settings. The
     /// event loop will not be running yet.
     pub fn new() -> io::Result<EventLoop<H>> {
-        EventLoop::configured(Default::default())
+        EventLoop::configured(EventLoopConfig::new())
     }
 
     pub fn configured(config: EventLoopConfig) -> io::Result<EventLoop<H>> {
@@ -117,7 +164,7 @@ impl<H: Handler> EventLoop<H> {
     ///
     /// Each [EventLoop](#) contains a lock-free queue with a pre-allocated
     /// buffer size. The size can be changed by modifying
-    /// [EventLoopConfig.notify_capacity](struct.EventLoopConfig.html#structfield.notify_capacity).
+    /// [EventLoopConfig.notify_capacity](struct.EventLoopConfig.html#method.notify_capacity).
     /// When a message is sent to the EventLoop, it is first pushed on to the
     /// queue. Then, if the EventLoop is currently running, an atomic flag is
     /// set to indicate that the next loop iteration should be started without
