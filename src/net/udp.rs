@@ -1,5 +1,4 @@
 use {io, sys, Evented, EventSet, IpAddr, PollOpt, Selector, Token};
-use bytes::{Buf, MutBuf};
 use std::net::SocketAddr;
 
 #[derive(Debug)]
@@ -46,11 +45,13 @@ impl UdpSocket {
             .map(From::from)
     }
 
-    pub fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<Option<()>> {
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
+                   -> io::Result<Option<usize>> {
         self.sys.send_to(buf, target)
     }
 
-    pub fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<Option<SocketAddr>> {
+    pub fn recv_from(&self, buf: &mut [u8])
+                     -> io::Result<Option<(usize, SocketAddr)>> {
         self.sys.recv_from(buf)
     }
 

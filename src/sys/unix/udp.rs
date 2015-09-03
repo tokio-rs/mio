@@ -1,5 +1,4 @@
 use {io, Evented, EventSet, Io, IpAddr, PollOpt, Selector, Token};
-use bytes::{Buf, MutBuf};
 use sys::unix::{net, nix, Socket};
 use std::net::SocketAddr;
 use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
@@ -36,21 +35,17 @@ impl UdpSocket {
             .map(From::from)
     }
 
-    pub fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<Option<()>> {
-        net::sendto(&self.io, buf.bytes(), &net::to_nix_addr(target))
-            .map(|cnt| {
-                buf.advance(cnt);
-                Some(())
-            })
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
+                   -> io::Result<Option<usize>> {
+        net::sendto(&self.io, buf, &net::to_nix_addr(target))
+            .map(Some)
             .or_else(io::to_non_block)
     }
 
-    pub fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<Option<SocketAddr>> {
-        net::recvfrom(&self.io, unsafe { buf.mut_bytes() })
-            .map(|(cnt, addr)| {
-                buf.advance(cnt);
-                Some(net::to_std_addr(addr))
-            })
+    pub fn recv_from(&self, buf: &mut [u8])
+                     -> io::Result<Option<(usize, SocketAddr)>> {
+        net::recvfrom(&self.io, buf)
+            .map(|(cnt, addr)| Some((cnt, net::to_std_addr(addr))))
             .or_else(io::to_non_block)
     }
 

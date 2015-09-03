@@ -7,6 +7,9 @@
   is also no longer `Copy`. (#259)
 * `TcpSocket` is no longer exported in the public API (#262)
 * `TcpListener` now returns the remote peer address from `accept` as well (#275)
+* The `UdpSocket::{send_to, recv_from}` methods are no longer generic over `Buf`
+  or `MutBuf` but instead take slices directly. The return types have also been
+  updated to return the number of bytes transferred. (#260)
 
 # 0.4.1 (July 21)
 
