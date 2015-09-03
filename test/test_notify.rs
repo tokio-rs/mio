@@ -73,7 +73,6 @@ pub fn test_notify() {
 
 #[test]
 pub fn test_notify_capacity() {
-    use std::default::Default;
     use std::sync::mpsc::*;
     use std::thread;
 
@@ -92,10 +91,8 @@ pub fn test_notify_capacity() {
         }
     }
 
-    let config = EventLoopConfig {
-        notify_capacity: 1,
-        .. EventLoopConfig::default()
-    };
+    let mut config = EventLoopConfig::new();
+    config.notify_capacity(1);
 
     let (tx, rx) = channel::<i32>();
     let mut event_loop = EventLoop::configured(config).unwrap();
