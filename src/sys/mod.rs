@@ -5,7 +5,8 @@ pub use self::unix::{
     Events,
     Io,
     Selector,
-    TcpSocket,
+    TcpStream,
+    TcpListener,
     UdpSocket,
     UnixSocket,
     pipe,
@@ -19,7 +20,8 @@ pub use self::windows::{
     Awakener,
     Events,
     Selector,
-    TcpSocket,
+    TcpStream,
+    TcpListener,
     UdpSocket,
 };
 
