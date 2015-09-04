@@ -23,7 +23,7 @@ pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
 pub use self::io::Io;
 pub use self::socket::Socket;
-pub use self::tcp::TcpSocket;
+pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 pub use self::uds::UnixSocket;
 

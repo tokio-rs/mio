@@ -276,8 +276,7 @@ pub fn test_echo_server() {
     event_loop.register(&srv, SERVER, EventSet::readable(),
                             PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let (sock, _) = TcpSocket::v4().unwrap()
-        .connect(&addr).unwrap();
+    let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register(&sock, CLIENT, EventSet::writable(),

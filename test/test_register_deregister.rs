@@ -73,19 +73,12 @@ pub fn test_register_deregister() {
 
     let addr = localhost();
 
-    let server = TcpSocket::v4().unwrap();
-
-    info!("setting re-use addr");
-    server.set_reuseaddr(true).unwrap();
-    server.bind(&addr).unwrap();
-
-    let server = server.listen(256).unwrap();
+    let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
     event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
 
-    let (client, _) = TcpSocket::v4().unwrap()
-        .connect(&addr).unwrap();
+    let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
     event_loop.register(&client, CLIENT, EventSet::readable(), PollOpt::level()).unwrap();

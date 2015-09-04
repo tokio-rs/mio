@@ -131,20 +131,13 @@ pub fn test_timer() {
 
     let addr = localhost();
 
-    let srv = TcpSocket::v4().unwrap();
-
-    info!("setting re-use addr");
-    srv.set_reuseaddr(true).unwrap();
-    srv.bind(&addr).unwrap();
-
-    let srv = srv.listen(256).unwrap();
+    let srv = TcpListener::bind(&addr).unwrap();
 
     info!("listening for connections");
 
     event_loop.register(&srv, SERVER, EventSet::all(), PollOpt::edge()).unwrap();
 
-    let (sock, _) = TcpSocket::v4().unwrap()
-        .connect(&addr).unwrap();
+    let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register(&sock, CLIENT, EventSet::all(), PollOpt::edge()).unwrap();

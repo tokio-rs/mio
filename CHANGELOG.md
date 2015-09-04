@@ -1,10 +1,11 @@
 # 0.5.0 (unreleased)
 
 * Don't re-export bytes types
-* Preliminary Windows support
-* Renamed `EventLoop::register_opt` to `EventLoop::register`
+* Preliminary Windows support (#239)
+* Renamed `EventLoop::register_opt` to `EventLoop::register` (#257)
 * `EventLoopConfig` is now a builder instead of having public struct fields. It
-  is also no longer `Copy`.
+  is also no longer `Copy`. (#259)
+* `TcpSocket` is no longer exported in the public API (#262)
 
 # 0.4.1 (July 21)
 

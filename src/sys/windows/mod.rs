@@ -137,7 +137,7 @@
 //!   be some level of buffering of writes probably.
 
 use std::io;
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::Ipv4Addr;
 
 mod awakener;
 #[macro_use]
@@ -149,7 +149,7 @@ mod buffer_pool;
 
 pub use self::awakener::Awakener;
 pub use self::selector::{Events, Selector};
-pub use self::tcp::TcpSocket;
+pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 
 #[derive(Copy, Clone)]
@@ -166,4 +166,3 @@ fn wouldblock() -> io::Error {
 }
 
 fn ipv4_any() -> Ipv4Addr { Ipv4Addr::new(0, 0, 0, 0) }
-fn ipv6_any() -> Ipv6Addr { Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0) }
