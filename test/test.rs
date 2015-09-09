@@ -20,6 +20,7 @@ mod test_timer;
 mod test_udp_socket;
 #[cfg(unix)]
 mod test_unix_echo_server;
+mod test_deregister_remove;
 
 mod ports {
     use std::net::SocketAddr;
