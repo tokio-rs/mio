@@ -4,10 +4,10 @@ mod epoll;
 #[cfg(target_os = "linux")]
 pub use self::epoll::{Events, Selector};
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "dragonfly"))]
 mod kqueue;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "dragonfly"))]
 pub use self::kqueue::{Events, Selector};
 
 mod awakener;

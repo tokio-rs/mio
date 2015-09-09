@@ -16,7 +16,7 @@ fn reregister_before_register() {
 
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let res = e.reregister(&l, Token(1), EventSet::all(), PollOpt::edge());
-    if cfg!(target_os = "macos") {
+    if cfg!(target_os = "macos") || cfg!(target_os = "freebsd") || cfg!(target_os = "dragonfly") {
         assert!(res.is_ok());
     } else {
         assert!(res.is_err());
