@@ -105,7 +105,11 @@ fn ioevent_to_epoll(interest: EventSet, opts: PollOpt) -> EpollEventKind {
     let mut kind = EpollEventKind::empty();
 
     if interest.is_readable() {
-        kind.insert(EPOLLIN);
+        if opts.is_urgent() {
+            kind.insert(EPOLLPRI);
+        } else {
+            kind.insert(EPOLLIN);
+        }
     }
 
     if interest.is_writable() {
@@ -164,7 +168,7 @@ impl Events {
             let epoll = event.events;
             let mut kind = EventSet::none();
 
-            if epoll.contains(EPOLLIN) {
+            if epoll.contains(EPOLLIN) |  epoll.contains(EPOLLPRI) {
                 kind = kind | EventSet::readable();
             }
 
