@@ -277,6 +277,14 @@ impl Imp {
             }
         }
     }
+
+    // See comments in tcp::StreamImp::push
+    fn push(&self, me: &mut Inner, set: EventSet, into: &mut Vec<IoEvent>) {
+        if let Socket::Empty = me.socket {
+            return
+        }
+        me.iocp.push_event(set, into);
+    }
 }
 
 impl Evented for UdpSocket {
@@ -354,7 +362,7 @@ fn send_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     };
     let mut me = me2.inner();
     me.write = State::Empty;
-    me.iocp.push_event(EventSet::writable(), dst);
+    me2.push(&mut me, EventSet::writable(), dst);
 }
 
 fn recv_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
@@ -371,5 +379,5 @@ fn recv_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
         buf.set_len(status.bytes_transferred() as usize);
     }
     me.read = State::Ready(buf);
-    me.iocp.push_event(EventSet::readable(), dst);
+    me2.push(&mut me, EventSet::readable(), dst);
 }

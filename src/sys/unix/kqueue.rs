@@ -38,10 +38,10 @@ impl Selector {
     pub fn register(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        try!(self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts));
-        try!(self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_WRITE, interests.contains(EventSet::writable()), opts));
+        self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts);
+        self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_WRITE, interests.contains(EventSet::writable()), opts);
 
-        Ok(())
+        self.flush_changes()
     }
 
     pub fn reregister(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
@@ -51,13 +51,13 @@ impl Selector {
     }
 
     pub fn deregister(&mut self, fd: RawFd) -> io::Result<()> {
-        try!(self.ev_push(fd, 0, EventFilter::EVFILT_READ, EV_DELETE));
-        try!(self.ev_push(fd, 0, EventFilter::EVFILT_WRITE, EV_DELETE));
+        self.ev_push(fd, 0, EventFilter::EVFILT_READ, EV_DELETE);
+        self.ev_push(fd, 0, EventFilter::EVFILT_WRITE, EV_DELETE);
 
-        Ok(())
+        self.flush_changes()
     }
 
-    fn ev_register(&mut self, fd: RawFd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) -> io::Result<()> {
+    fn ev_register(&mut self, fd: RawFd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) {
         let mut flags = EV_ADD;
 
         if enable {
@@ -74,12 +74,10 @@ impl Selector {
             flags = flags | EV_ONESHOT;
         }
 
-        self.ev_push(fd, token, filter, flags)
+        self.ev_push(fd, token, filter, flags);
     }
 
-    fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) -> io::Result<()> {
-        try!(self.maybe_flush_changes());
-
+    fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
         self.changes.sys_events.push(
             KEvent {
                 ident: fd as ::libc::uintptr_t,
@@ -89,18 +87,13 @@ impl Selector {
                 data: 0,
                 udata: token
             });
-
-        Ok(())
     }
 
-    fn maybe_flush_changes(&mut self) -> io::Result<()> {
-        if self.changes.is_full() {
-            try!(kevent(self.kq, self.changes.as_slice(), &mut [], 0)
-                    .map_err(super::from_nix_error));
+    fn flush_changes(&mut self) -> io::Result<()> {
+        try!(kevent(self.kq, self.changes.as_slice(), &mut [], 0)
+             .map_err(super::from_nix_error));
 
-            self.changes.sys_events.clear();
-        }
-
+        self.changes.sys_events.clear();
         Ok(())
     }
 }
@@ -162,11 +155,6 @@ impl Events {
                 }
             }
         }
-    }
-
-    #[inline]
-    fn is_full(&self) -> bool {
-        self.sys_events.len() == self.sys_events.capacity()
     }
 
     fn as_slice(&self) -> &[KEvent] {
