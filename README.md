@@ -67,6 +67,7 @@ Please submit PRs containing links to MIO resources.
 * [My Basic Understanding of mio and Asynchronous IO](http://hermanradtke.com/2015/07/12/my-basic-understanding-of-mio-and-async-io.html)
 * [Creating A Multi-echo Server using Rust and mio](http://hermanradtke.com/2015/07/22/creating-a-multi-echo-server-using-rust-and-mio.html)
 * [Writing Scalable Chat Service from Scratch](http://nbaksalyar.github.io/2015/07/10/writing-chat-in-rust.html)
+* [Design Notes About Rotor Library](https://medium.com/@paulcolomiets/asynchronous-io-in-rust-36b623e7b965)
 
 ### Libraries
 
