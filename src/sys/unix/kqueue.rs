@@ -1,7 +1,7 @@
 use {io, EventSet, PollOpt, Token};
 use event::IoEvent;
 use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent};
-use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ONESHOT};
+use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
 use std::{fmt, slice};
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
@@ -144,6 +144,10 @@ impl Events {
                 // New entry, insert the default
                 self.events.push(IoEvent::new(EventSet::none(), token));
 
+            }
+
+            if e.flags.contains(EV_ERROR) {
+                self.events[idx].kind.insert(EventSet::error());
             }
 
             if e.filter == EventFilter::EVFILT_READ {
