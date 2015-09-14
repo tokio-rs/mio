@@ -237,6 +237,18 @@ impl StreamImp {
             }
         }
     }
+
+    /// Pushes an event for this socket onto the selector its registered for.
+    ///
+    /// When an event is generated on this socket, if it happened after the
+    /// socket was closed then we don't want to actually push the event onto our
+    /// selector as otherwise it's just a spurious notification.
+    fn push(&self, me: &mut StreamInner, set: EventSet,
+            into: &mut Vec<IoEvent>) {
+        if me.socket.as_raw_socket() != INVALID_SOCKET {
+            me.iocp.push_event(set, into);
+        }
+    }
 }
 
 fn read_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
@@ -259,14 +271,14 @@ fn read_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
             if status.bytes_transferred() == 0 {
                 e = e | EventSet::hup();
             }
-            return me.iocp.push_event(e, dst)
+            return me2.push(&mut me, e, dst)
         }
         s => me.read = s,
     }
 
     // If a read didn't complete, then the connect must have just finished.
     trace!("finished a connect");
-    me.iocp.push_event(EventSet::writable(), dst);
+    me2.push(&mut me, EventSet::writable(), dst);
     me2.schedule_read(&mut me);
 }
 
@@ -282,7 +294,7 @@ fn write_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     };
     let new_pos = pos + (status.bytes_transferred() as usize);
     if new_pos == buf.len() {
-        me.iocp.push_event(EventSet::writable(), dst);
+        me2.push(&mut me, EventSet::writable(), dst);
     } else {
         me2.schedule_write(buf, new_pos, &mut me);
     }
@@ -484,6 +496,14 @@ impl ListenerImp {
             }
         }
     }
+
+    // See comments in StreamImp::push
+    fn push(&self, me: &mut ListenerInner, set: EventSet,
+            into: &mut Vec<IoEvent>) {
+        if me.socket.as_raw_socket() != INVALID_SOCKET {
+            me.iocp.push_event(set, into);
+        }
+    }
 }
 
 fn accept_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
@@ -498,7 +518,7 @@ fn accept_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     };
     trace!("finished an accept");
     me.accept = State::Ready(socket);
-    me.iocp.push_event(EventSet::readable(), dst);
+    me2.push(&mut me, EventSet::readable(), dst);
 }
 
 impl Evented for TcpListener {
