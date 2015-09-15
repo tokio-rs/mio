@@ -121,10 +121,10 @@ impl TcpListener {
         self.inner.try_clone().map(|s| TcpListener { inner: s })
     }
 
-    pub fn accept(&self) -> io::Result<Option<TcpStream>> {
-        self.inner.accept().and_then(|(s, _)| {
+    pub fn accept(&self) -> io::Result<Option<(TcpStream, SocketAddr)>> {
+        self.inner.accept().and_then(|(s, a)| {
             try!(set_nonblock(&s));
-            Ok(Some(TcpStream { inner: s }))
+            Ok(Some((TcpStream { inner: s }, a)))
         }).or_else(io::to_non_block)
     }
 }

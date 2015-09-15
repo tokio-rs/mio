@@ -202,7 +202,7 @@ fn connect_then_close() {
         fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
                  _events: EventSet) {
             if token == Token(1) {
-                let s = self.listener.accept().unwrap().unwrap();
+                let s = self.listener.accept().unwrap().unwrap().0;
                 event_loop.register(&s, Token(3), EventSet::all(),
                                         PollOpt::edge()).unwrap();
                 drop(s);

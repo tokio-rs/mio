@@ -6,6 +6,7 @@
 * `EventLoopConfig` is now a builder instead of having public struct fields. It
   is also no longer `Copy`. (#259)
 * `TcpSocket` is no longer exported in the public API (#262)
+* `TcpListener` now returns the remote peer address from `accept` as well (#275)
 
 # 0.4.1 (July 21)
 

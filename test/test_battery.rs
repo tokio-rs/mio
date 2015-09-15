@@ -75,7 +75,7 @@ impl EchoServer {
     fn accept(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("server accepting socket");
 
-        let sock = self.sock.accept().unwrap().unwrap();
+        let sock = self.sock.accept().unwrap().unwrap().0;
         let conn = EchoConn::new(sock,);
         let tok = self.conns.insert(conn)
             .ok().expect("could not add connection to slab");

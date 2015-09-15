@@ -72,7 +72,7 @@ struct ListenerInner {
     socket: net::TcpListener,
     family: Family,
     iocp: Registration,
-    accept: State<net::TcpStream, net::TcpStream>,
+    accept: State<net::TcpStream, (net::TcpStream, SocketAddr)>,
     accept_buf: AcceptAddrsBuf,
 }
 
@@ -435,7 +435,7 @@ impl TcpListener {
         }
     }
 
-    pub fn accept(&self) -> io::Result<Option<TcpStream>> {
+    pub fn accept(&self) -> io::Result<Option<(TcpStream, SocketAddr)>> {
         let mut me = self.inner();
         let ret = match mem::replace(&mut me.accept, State::Empty) {
             State::Empty => return Ok(None),
@@ -443,7 +443,7 @@ impl TcpListener {
                 me.accept = State::Pending(t);
                 return Ok(None)
             }
-            State::Ready(s) => Ok(Some(TcpStream::new(s, None))),
+            State::Ready((s, a)) => Ok(Some((TcpStream::new(s, None), a))),
             State::Error(e) => Err(e),
         };
         self.imp.schedule_accept(&mut me);
@@ -517,7 +517,10 @@ fn accept_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
         _ => unreachable!(),
     };
     trace!("finished an accept");
-    me.accept = State::Ready(socket);
+    me.accept = match me.accept_buf.parse(&me.socket) {
+        Ok(buf) => State::Ready((socket, buf.remote().unwrap())),
+        Err(e) => State::Error(e),
+    };
     me2.push(&mut me, EventSet::readable(), dst);
 }
 

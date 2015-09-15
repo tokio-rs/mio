@@ -200,9 +200,10 @@ impl TcpListener {
     /// Accepts a new `TcpStream`.
     ///
     /// Returns a `Ok(None)` when the socket `WOULDBLOCK`, this means the stream
-    /// will be ready at a later point.
-    pub fn accept(&self) -> io::Result<Option<TcpStream>> {
-        self.sys.accept().map(|o| o.map(|s| TcpStream { sys: s }))
+    /// will be ready at a later point. If an accepted stream is returned, the
+    /// address of the peer is returned along with it
+    pub fn accept(&self) -> io::Result<Option<(TcpStream, SocketAddr)>> {
+        self.sys.accept().map(|o| o.map(|(s, a)| (TcpStream { sys: s }, a)))
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -234,7 +235,7 @@ impl TryAccept for TcpListener {
     type Output = TcpStream;
 
     fn accept(&self) -> io::Result<Option<TcpStream>> {
-        TcpListener::accept(self)
+        TcpListener::accept(self).map(|a| a.map(|(s, _)| s))
     }
 }
 

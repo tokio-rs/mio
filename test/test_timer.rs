@@ -36,7 +36,7 @@ impl TestHandler {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
-                let conn = self.srv.accept().unwrap().unwrap();
+                let conn = self.srv.accept().unwrap().unwrap().0;
                 event_loop.register(&conn, CONN, EventSet::all(),
                                         PollOpt::edge()).unwrap();
                 event_loop.timeout_ms(conn, 200).unwrap();

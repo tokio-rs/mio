@@ -24,7 +24,7 @@ impl TestHandler {
     fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: EventSet) {
         match token {
             SERVER => {
-                let mut sock = self.server.accept().unwrap().unwrap();
+                let mut sock = self.server.accept().unwrap().unwrap().0;
                 sock.try_write_buf(&mut SliceBuf::wrap("foobar".as_bytes())).unwrap();
             }
             CLIENT => {
