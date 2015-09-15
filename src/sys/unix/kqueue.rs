@@ -21,7 +21,7 @@ impl Selector {
     }
 
     pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
-        let cnt = try!(kevent(self.kq, self.changes.as_slice(), evts.as_mut_slice(), timeout_ms)
+        let cnt = try!(kevent(self.kq, &[], evts.as_mut_slice(), timeout_ms)
                                   .map_err(super::from_nix_error));
 
         self.changes.sys_events.clear();
@@ -90,11 +90,11 @@ impl Selector {
     }
 
     fn flush_changes(&mut self) -> io::Result<()> {
-        try!(kevent(self.kq, self.changes.as_slice(), &mut [], 0)
-             .map_err(super::from_nix_error));
+        let result = kevent(self.kq, self.changes.as_slice(), &mut [], 0).map(|_| ())
+            .map_err(super::from_nix_error).map(|_| ());
 
         self.changes.sys_events.clear();
-        Ok(())
+        result
     }
 }
 
