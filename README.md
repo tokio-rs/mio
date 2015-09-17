@@ -77,6 +77,7 @@ Please submit PRs containing links to MIO resources.
 * [simplesched](//github.com/zonyitoo/simplesched) - Coroutine I/O with a simple scheduler
 * [coio-rs](//github.com/zonyitoo/coio-rs) - Coroutine I/O with work-stealing scheduler
 * [rotor](//github.com/tailhook/rotor) - A wrapper that allows to create composable I/O libraries on top of mio
+* [ws-rs](//github.com/housleyjk/ws-rs) - WebSockets based on Mio
 
 ## Community
 
