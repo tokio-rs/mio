@@ -7,8 +7,6 @@ use std::{io, fmt, thread, usize};
 /// Configure EventLoop runtime details
 #[derive(Clone, Debug)]
 pub struct EventLoopConfig {
-    io_poll_timeout_ms: Option<usize>,
-
     // == Notifications ==
     notify_capacity: usize,
     messages_per_tick: usize,
@@ -24,27 +22,12 @@ impl EventLoopConfig {
     /// specified.
     pub fn new() -> EventLoopConfig {
         EventLoopConfig {
-            io_poll_timeout_ms: None,
             notify_capacity: 4_096,
             messages_per_tick: 256,
             timer_tick_ms: 100,
             timer_wheel_size: 1_024,
             timer_capacity: 65_536,
         }
-    }
-
-    /// Sets the default amount of time that a thread will be blocked in I/O
-    /// before timing out.
-    ///
-    /// If the event loop receives no I/O events during the specified timeout
-    /// then it will use this timeout to return control back to the original
-    /// program and run one more tick of the event loop.
-    ///
-    /// The default value for this is None, which means that the event loop
-    /// will sleep until I/O, a notification or a timer expires
-    pub fn io_poll_timeout_ms(&mut self, timeout: Option<usize>) -> &mut Self {
-        self.io_poll_timeout_ms = timeout;
-        self
     }
 
     /// Sets the maximum number of messages that can be buffered on the event
@@ -89,6 +72,7 @@ pub struct EventLoop<H: Handler> {
     timer: Timer<H::Timeout>,
     notify: Notify<H::Message>,
     config: EventLoopConfig,
+    pub tick_ms: Option<usize>
 }
 
 // Token used to represent notifications
@@ -127,6 +111,7 @@ impl<H: Handler> EventLoop<H> {
             timer: timer,
             notify: notify,
             config: config,
+            tick_ms: None
         })
     }
 
@@ -282,7 +267,7 @@ impl<H: Handler> EventLoop<H> {
         // Check the registered IO handles for any new events. Each poll
         // is for one second, so a shutdown request can last as long as
         // one second before it takes effect.
-        let timeout_ms = if pending {Some(0)} else {self.config.io_poll_timeout_ms};
+        let timeout_ms = if pending {Some(0)} else {self.tick_ms};
         let events = match self.io_poll(timeout_ms) {
             Ok(e) => e,
             Err(err) => {
@@ -424,7 +409,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
-    use super::{EventLoop, EventLoopConfig};
+    use super::EventLoop;
     use {unix, Handler, Token, TryRead, TryWrite, EventSet, PollOpt};
     use bytes::{Buf, SliceBuf, ByteBuf};
 
@@ -503,9 +488,8 @@ mod tests {
 
     #[test]
     pub fn broken_pipe() {
-        let mut config = EventLoopConfig::new();
-        config.io_poll_timeout_ms(Some(10));
-        let mut event_loop: EventLoop<BrokenPipeHandler> = EventLoop::configured(config).unwrap();
+        let mut event_loop: EventLoop<BrokenPipeHandler> = EventLoop::new().unwrap();
+        event_loop.tick_ms = Some(10);
         let (reader, _) = unix::pipe().unwrap();
 
         // On Darwin this returns a "broken pipe" error.
