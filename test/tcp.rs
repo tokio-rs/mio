@@ -6,7 +6,7 @@ use std::net;
 use std::sync::mpsc::channel;
 use std::thread;
 
-use mio::{EventLoop, Handler, Token, EventSet, PollOpt, TryRead, TryWrite};
+use mio::{EventLoop, EventLoopConfig, Handler, Token, EventSet, PollOpt, TryRead, TryWrite};
 use mio::tcp::{TcpListener, TcpStream};
 
 #[test]
@@ -238,7 +238,9 @@ fn listen_then_close() {
         }
     }
 
-    let mut e = EventLoop::new().unwrap();
+    let mut config = EventLoopConfig::new();
+    config.io_poll_timeout_ms(Some(10));
+    let mut e = EventLoop::configured(config).unwrap();
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     e.register(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();

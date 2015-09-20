@@ -1,10 +1,11 @@
 use {io, EventSet, PollOpt, Token};
 use event::IoEvent;
-use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent};
+use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent, kevent_ts};
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
 use std::{fmt, slice};
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
+use libc::{timespec, time_t, c_long};
 
 #[derive(Debug)]
 pub struct Selector {
@@ -20,8 +21,13 @@ impl Selector {
         })
     }
 
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
-        let cnt = try!(kevent(self.kq, &[], evts.as_mut_slice(), timeout_ms)
+    pub fn select(&mut self, evts: &mut Events, timeout_ms: Option<usize>) -> io::Result<()> {
+        let timeout = timeout_ms.map(|x| timespec {
+            tv_sec: (x / 1000) as time_t,
+            tv_nsec: ((x % 1000) * 1_000_000) as c_long
+        });
+
+        let cnt = try!(kevent_ts(self.kq, &[], evts.as_mut_slice(), timeout)
                                   .map_err(super::from_nix_error));
 
         self.changes.sys_events.clear();

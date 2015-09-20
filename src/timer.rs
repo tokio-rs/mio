@@ -76,6 +76,15 @@ impl<T> Timer<T> {
         nxt - now
     }
 
+    // Number of ms remaining until the next timer, or None if no timers
+    pub fn next_timer_in_ms(&self) -> Option<u64> {
+        if self.entries.count() == 0 {
+            None
+        } else {
+            Some(self.next_tick_in_ms())
+        }
+    }
+
     /*
      *
      * ===== Initialization =====
