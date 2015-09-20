@@ -72,7 +72,7 @@ pub struct EventLoop<H: Handler> {
     timer: Timer<H::Timeout>,
     notify: Notify<H::Message>,
     config: EventLoopConfig,
-    pub tick_ms: Option<usize>
+    tick_ms: Option<usize>
 }
 
 // Token used to represent notifications
@@ -216,6 +216,21 @@ impl<H: Handler> EventLoop<H> {
     /// stopped or is scheduled to stop on the next tick.
     pub fn is_running(&self) -> bool {
         self.run
+    }
+
+    pub fn tick_ms(&self) -> Option<usize> {
+        self.tick_ms
+    }
+
+    pub fn set_tick_ms(&mut self, tick_ms: Option<usize>) {
+        self.tick_ms = tick_ms
+    }
+
+    pub fn shorten_tick_ms(&mut self, tick_ms: usize) {
+        match self.tick_ms {
+            Some(old) if old <= tick_ms => {}
+            _ => {self.tick_ms = Some(tick_ms)}
+        }
     }
 
     /// Registers an IO handle with the event loop.
@@ -489,7 +504,7 @@ mod tests {
     #[test]
     pub fn broken_pipe() {
         let mut event_loop: EventLoop<BrokenPipeHandler> = EventLoop::new().unwrap();
-        event_loop.tick_ms = Some(10);
+        event_loop.set_tick_ms(Some(10));
         let (reader, _) = unix::pipe().unwrap();
 
         // On Darwin this returns a "broken pipe" error.

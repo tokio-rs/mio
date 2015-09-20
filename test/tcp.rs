@@ -239,7 +239,7 @@ fn listen_then_close() {
     }
 
     let mut e = EventLoop::new().unwrap();
-    e.tick_ms = Some(10);
+    e.set_tick_ms(Some(10));
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     e.register(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
