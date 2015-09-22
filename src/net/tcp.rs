@@ -88,6 +88,10 @@ impl TcpStream {
     pub fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
         self.sys.set_keepalive(seconds)
     }
+
+    pub fn take_socket_error(&self) -> io::Result<()> {
+        self.sys.take_socket_error()
+    }
 }
 
 fn inaddr_any(other: &SocketAddr) -> SocketAddr {
@@ -212,6 +216,10 @@ impl TcpListener {
 
     pub fn try_clone(&self) -> io::Result<TcpListener> {
         self.sys.try_clone().map(|s| TcpListener { sys: s })
+    }
+
+    pub fn take_socket_error(&self) -> io::Result<()> {
+        self.sys.take_socket_error()
     }
 }
 

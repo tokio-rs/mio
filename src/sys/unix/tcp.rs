@@ -3,7 +3,7 @@ use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, AsRawFd};
 
 use libc;
-use net2::TcpStreamExt;
+use net2::{TcpStreamExt, TcpListenerExt};
 use nix::fcntl::FcntlArg::F_SETFL;
 use nix::fcntl::{fcntl, O_NONBLOCK};
 
@@ -59,6 +59,15 @@ impl TcpStream {
 
     pub fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
         self.inner.set_keepalive_ms(seconds.map(|s| s * 1000))
+    }
+
+    pub fn take_socket_error(&self) -> io::Result<()> {
+        self.inner.take_error().and_then(|e| {
+            match e {
+                Some(e) => Err(e),
+                None => Ok(())
+            }
+        })
     }
 }
 
@@ -126,6 +135,15 @@ impl TcpListener {
             try!(set_nonblock(&s));
             Ok(Some((TcpStream { inner: s }, a)))
         }).or_else(io::to_non_block)
+    }
+
+    pub fn take_socket_error(&self) -> io::Result<()> {
+        self.inner.take_error().and_then(|e| {
+            match e {
+                Some(e) => Err(e),
+                None => Ok(())
+            }
+        })
     }
 }
 

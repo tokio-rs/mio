@@ -133,6 +133,15 @@ impl TcpStream {
         net2::TcpStreamExt::set_keepalive_ms(&self.inner().socket, dur)
     }
 
+    pub fn take_socket_error(&self) -> io::Result<()> {
+        net2::TcpStreamExt::take_error(&self.inner().socket).and_then(|e| {
+            match e {
+                Some(e) => Err(e),
+                None => Ok(())
+            }
+        })
+    }
+
     fn inner(&self) -> MutexGuard<StreamInner> {
         self.imp.inner()
     }
@@ -458,6 +467,15 @@ impl TcpListener {
         let inner = self.inner();
         inner.socket.try_clone().map(|s| {
             TcpListener::new_family(s, inner.family)
+        })
+    }
+
+    pub fn take_socket_error(&self) -> io::Result<()> {
+        net2::TcpListenerExt::take_error(&self.inner().socket).and_then(|e| {
+            match e {
+                Some(e) => Err(e),
+                None => Ok(())
+            }
         })
     }
 

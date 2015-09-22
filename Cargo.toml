@@ -26,7 +26,7 @@ clock_ticks = "0.0.5"
 bytes = { git = "https://github.com/carllerche/bytes", rev = "7edb577d0a" }
 winapi = "0.2.1"
 wio = { git = "https://github.com/alexcrichton/wio" }
-net2 = "0.2.9"
+net2 = "0.2.11"
 
 [dev-dependencies]
 env_logger = "0.3.0"
