@@ -1,4 +1,5 @@
 use {io, Evented, EventSet, Io, PollOpt, Selector, Token, TryAccept};
+use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -32,8 +33,8 @@ impl UnixSocket {
 
     pub fn accept(&self) -> io::Result<Option<UnixSocket>> {
         net::accept(&self.io, true)
-            .map(|fd| Some(From::from(Io::from_raw_fd(fd))))
-            .or_else(io::to_non_block)
+            .map(|fd| From::from(Io::from_raw_fd(fd)))
+            .map_non_block()
     }
 
     /// Bind the socket to the specified address
