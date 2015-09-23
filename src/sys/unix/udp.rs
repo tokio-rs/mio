@@ -1,4 +1,5 @@
 use {io, Evented, EventSet, Io, IpAddr, PollOpt, Selector, Token};
+use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::net::SocketAddr;
 use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
@@ -38,15 +39,14 @@ impl UdpSocket {
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
                    -> io::Result<Option<usize>> {
         net::sendto(&self.io, buf, &net::to_nix_addr(target))
-            .map(Some)
-            .or_else(io::to_non_block)
+            .map_non_block()
     }
 
     pub fn recv_from(&self, buf: &mut [u8])
                      -> io::Result<Option<(usize, SocketAddr)>> {
         net::recvfrom(&self.io, buf)
-            .map(|(cnt, addr)| Some((cnt, net::to_std_addr(addr))))
-            .or_else(io::to_non_block)
+            .map(|(cnt, addr)| (cnt, net::to_std_addr(addr)))
+            .map_non_block()
     }
 
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
