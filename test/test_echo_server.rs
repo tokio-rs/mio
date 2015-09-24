@@ -57,10 +57,15 @@ impl EchoConn {
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
-                panic!("We just got readable, but were unable to read from the socket?");
+                debug!("CONN : spurious read wakeup");
+                self.mut_buf = Some(buf);
             }
             Ok(Some(r)) => {
                 debug!("CONN : we read {} bytes!", r);
+
+                // prepare to provide this to writable
+                self.buf = Some(buf.flip());
+
                 self.interest.remove(EventSet::readable());
                 self.interest.insert(EventSet::writable());
             }
@@ -71,8 +76,6 @@ impl EchoConn {
 
         };
 
-        // prepare to provide this to writable
-        self.buf = Some(buf.flip());
         event_loop.reregister(&self.sock, self.token.unwrap(), self.interest,
                               PollOpt::edge())
     }
@@ -152,33 +155,34 @@ impl EchoClient {
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
-                panic!("We just got readable, but were unable to read from the socket?");
+                debug!("CLIENT : spurious read wakeup");
+                self.mut_buf = Some(buf);
             }
             Ok(Some(r)) => {
                 debug!("CLIENT : We read {} bytes!", r);
+
+                // prepare for reading
+                let mut buf = buf.flip();
+
+                while buf.has_remaining() {
+                    let actual = buf.read_byte().unwrap();
+                    let expect = self.rx.read_byte().unwrap();
+
+                    assert!(actual == expect, "actual={}; expect={}", actual, expect);
+                }
+
+                self.mut_buf = Some(buf.flip());
+
+                self.interest.remove(EventSet::readable());
+
+                if !self.rx.has_remaining() {
+                    self.next_msg(event_loop).unwrap();
+                }
             }
             Err(e) => {
                 panic!("not implemented; client err={:?}", e);
             }
         };
-
-        // prepare for reading
-        let mut buf = buf.flip();
-
-        while buf.has_remaining() {
-            let actual = buf.read_byte().unwrap();
-            let expect = self.rx.read_byte().unwrap();
-
-            assert!(actual == expect, "actual={}; expect={}", actual, expect);
-        }
-
-        self.mut_buf = Some(buf.flip());
-
-        self.interest.remove(EventSet::readable());
-
-        if !self.rx.has_remaining() {
-            self.next_msg(event_loop).unwrap();
-        }
 
         event_loop.reregister(&self.sock, self.token, self.interest,
                               PollOpt::edge() | PollOpt::oneshot())
