@@ -24,7 +24,7 @@ To use `mio`, first add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mio = "0.3.0"
+mio = "0.4"
 ```
 
 Then, add this to your crate root:
