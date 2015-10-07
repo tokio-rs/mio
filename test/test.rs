@@ -20,6 +20,8 @@ mod test_timer;
 mod test_udp_socket;
 #[cfg(unix)]
 mod test_unix_echo_server;
+#[cfg(unix)]
+mod test_unix_pass_fd;
 
 mod ports {
     use std::net::SocketAddr;
