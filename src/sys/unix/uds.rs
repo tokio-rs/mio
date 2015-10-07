@@ -46,6 +46,32 @@ impl UnixSocket {
         net::dup(&self.io)
             .map(From::from)
     }
+
+    pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {
+        let iov = [nix::IoVec::from_mut_slice(buf)];
+        let mut cmsgspace: nix::CmsgSpace<[RawFd; 1]> = nix::CmsgSpace::new();
+        let msg = try!(nix::recvmsg(self.io.as_raw_fd(), &iov, Some(&mut cmsgspace), 0)
+                           .map_err(super::from_nix_error));
+        let mut fd = None;
+        for cmsg in msg.cmsgs() {
+            if let nix::ControlMessage::ScmRights(fds) = cmsg {
+                // statically, there is room for at most one fd
+                if fds.len() == 1 {
+                    fd = Some(fds[0]);
+                    break;
+                }
+            }
+        }
+        Ok((msg.bytes, fd))
+    }
+
+    pub fn write_send_fd(&mut self, buf: &[u8], fd: RawFd) -> io::Result<usize> {
+        let iov = [nix::IoVec::from_slice(buf)];
+        let fds = [fd];
+        let cmsg = nix::ControlMessage::ScmRights(&fds);
+        nix::sendmsg(self.io.as_raw_fd(),&iov, &[cmsg], 0, None)
+            .map_err(super::from_nix_error)
+    }
 }
 
 impl Read for UnixSocket {

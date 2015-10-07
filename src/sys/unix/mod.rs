@@ -57,6 +57,8 @@ mod nix {
         InetAddr,
         Ipv4Addr,
         Ipv6Addr,
+        ControlMessage,
+        CmsgSpace,
         MSG_DONTWAIT,
         SOCK_NONBLOCK,
         SOCK_CLOEXEC,
@@ -71,13 +73,16 @@ mod nix {
         linger,
         listen,
         recvfrom,
+        recvmsg,
         sendto,
+        sendmsg,
         setsockopt,
         socket,
         shutdown,
         Shutdown,
     };
     pub use nix::sys::time::TimeVal;
+    pub use nix::sys::uio::IoVec;
     pub use nix::unistd::{
         read,
         write,
