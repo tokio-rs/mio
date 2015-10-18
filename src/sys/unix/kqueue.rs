@@ -38,7 +38,16 @@ impl Selector {
     pub fn register(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts);
+        // coerce the read filter
+        // see https://github.com/carllerche/mio/issues/240
+        let enable_read = if !interests.contains(EventSet::writable())
+                        && interests.contains(EventSet::hup()) {
+            true
+        } else {
+            interests.contains(EventSet::readable())
+        };
+
+        self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, enable_read, opts);
         self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_WRITE, interests.contains(EventSet::writable()), opts);
 
         self.flush_changes()
