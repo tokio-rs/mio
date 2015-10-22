@@ -181,12 +181,12 @@ mod tests {
         assert_eq!(None, q.pop());
         let (tx, rx) = channel();
 
-        for _ in (0..nthreads) {
+        for _ in 0..nthreads {
             let q = q.clone();
             let tx = tx.clone();
             thread::spawn(move || {
                 let q = q;
-                for i in (0..nmsgs) {
+                for i in 0..nmsgs {
                     assert!(q.push(i).is_ok());
                 }
                 tx.send(()).unwrap();
@@ -194,7 +194,7 @@ mod tests {
         }
 
         let mut completion_rxs = vec![];
-        for _ in (0..nthreads) {
+        for _ in 0..nthreads {
             let (tx, rx) = channel();
             completion_rxs.push(rx);
             let q = q.clone();
@@ -217,7 +217,7 @@ mod tests {
         for rx in completion_rxs.iter_mut() {
             assert_eq!(nmsgs, rx.recv().unwrap());
         }
-        for _ in (0..nthreads) {
+        for _ in 0..nthreads {
             rx.recv().unwrap();
         }
     }
