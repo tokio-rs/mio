@@ -50,7 +50,7 @@ impl Poll {
         Ok(())
     }
 
-    pub fn poll(&mut self, timeout_ms: usize) -> io::Result<usize> {
+    pub fn poll(&mut self, timeout_ms: Option<usize>) -> io::Result<usize> {
         try!(self.selector.select(&mut self.events, timeout_ms));
         Ok(self.events.len())
     }

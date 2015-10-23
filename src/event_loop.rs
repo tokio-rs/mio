@@ -7,8 +7,6 @@ use std::{io, fmt, thread, usize};
 /// Configure EventLoop runtime details
 #[derive(Clone, Debug)]
 pub struct EventLoopConfig {
-    io_poll_timeout_ms: usize,
-
     // == Notifications ==
     notify_capacity: usize,
     messages_per_tick: usize,
@@ -24,26 +22,12 @@ impl EventLoopConfig {
     /// specified.
     pub fn new() -> EventLoopConfig {
         EventLoopConfig {
-            io_poll_timeout_ms: 1_000,
             notify_capacity: 4_096,
             messages_per_tick: 256,
             timer_tick_ms: 100,
             timer_wheel_size: 1_024,
             timer_capacity: 65_536,
         }
-    }
-
-    /// Sets the default amount of time that a thread will be blocked in I/O
-    /// before timing out.
-    ///
-    /// If the event loop receives no I/O events during the specified timeout
-    /// then it will use this timeout to return control back to the original
-    /// program and run one more tick of the event loop.
-    ///
-    /// The default value for this is 1000.
-    pub fn io_poll_timeout_ms(&mut self, timeout: usize) -> &mut Self {
-        self.io_poll_timeout_ms = timeout;
-        self
     }
 
     /// Sets the maximum number of messages that can be buffered on the event
@@ -88,6 +72,7 @@ pub struct EventLoop<H: Handler> {
     timer: Timer<H::Timeout>,
     notify: Notify<H::Message>,
     config: EventLoopConfig,
+    tick_ms: Option<usize>
 }
 
 // Token used to represent notifications
@@ -126,6 +111,7 @@ impl<H: Handler> EventLoop<H> {
             timer: timer,
             notify: notify,
             config: config,
+            tick_ms: None
         })
     }
 
@@ -232,6 +218,21 @@ impl<H: Handler> EventLoop<H> {
         self.run
     }
 
+    pub fn tick_ms(&self) -> Option<usize> {
+        self.tick_ms
+    }
+
+    pub fn set_tick_ms(&mut self, tick_ms: Option<usize>) {
+        self.tick_ms = tick_ms
+    }
+
+    pub fn shorten_tick_ms(&mut self, tick_ms: usize) {
+        match self.tick_ms {
+            Some(old) if old <= tick_ms => {}
+            _ => {self.tick_ms = Some(tick_ms)}
+        }
+    }
+
     /// Registers an IO handle with the event loop.
     pub fn register<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opt: PollOpt) -> io::Result<()>
         where E: Evented
@@ -281,7 +282,8 @@ impl<H: Handler> EventLoop<H> {
         // Check the registered IO handles for any new events. Each poll
         // is for one second, so a shutdown request can last as long as
         // one second before it takes effect.
-        let events = match self.io_poll(pending) {
+        let timeout_ms = if pending {Some(0)} else {self.tick_ms};
+        let events = match self.io_poll(timeout_ms) {
             Ok(e) => e,
             Err(err) => {
                 if err.kind() == io::ErrorKind::Interrupted {
@@ -308,18 +310,19 @@ impl<H: Handler> EventLoop<H> {
     }
 
     #[inline]
-    fn io_poll(&mut self, immediate: bool) -> io::Result<usize> {
-        if immediate {
-            self.poll.poll(0)
+    fn io_poll(&mut self, timeout_ms_opt: Option<usize>) -> io::Result<usize> {
+        let sleep = if timeout_ms_opt == Some(0) {
+            Some(0)
+        } else if let Some(next_timer_ms) = self.timer.next_timer_in_ms() {
+            Some(match timeout_ms_opt {
+                Some(timeout_ms) if (timeout_ms as u64) < next_timer_ms => timeout_ms,
+                _ => if next_timer_ms >= usize::MAX as u64 {usize::MAX} else {next_timer_ms as usize}
+            })
         } else {
-            let mut sleep = self.timer.next_tick_in_ms() as usize;
+            timeout_ms_opt
+        };
 
-            if sleep > self.config.io_poll_timeout_ms {
-                sleep = self.config.io_poll_timeout_ms;
-            }
-
-            self.poll.poll(sleep)
-        }
+        self.poll.poll(sleep)
     }
 
     // Process IO events that have been previously polled
@@ -501,6 +504,7 @@ mod tests {
     #[test]
     pub fn broken_pipe() {
         let mut event_loop: EventLoop<BrokenPipeHandler> = EventLoop::new().unwrap();
+        event_loop.set_tick_ms(Some(10));
         let (reader, _) = unix::pipe().unwrap();
 
         // On Darwin this returns a "broken pipe" error.
