@@ -14,6 +14,7 @@ mod test_echo_server;
 mod test_multicast;
 mod test_notify;
 mod test_register_deregister;
+mod test_eventset_hup;
 #[cfg(unix)]
 mod test_tick;
 mod test_timer;
