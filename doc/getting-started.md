@@ -37,7 +37,7 @@ cd pingpong
 Now, open the directory in your favorite text editor. You should see the
 following files:
 
-* src/server.rs
+* src/main.rs
 * Cargo.toml
 
 If you are not already familiar with Cargo, you can learn more about it
