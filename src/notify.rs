@@ -1,6 +1,6 @@
 use {sys, Evented, EventSet, PollOpt, Selector, Token};
 use util::BoundedQueue;
-use std::{fmt, cmp, io};
+use std::{fmt, cmp, io, error, any};
 use std::sync::Arc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -219,6 +219,35 @@ impl<M> fmt::Debug for NotifyError<M> {
             NotifyError::Closed(..) => {
                 write!(fmt, "NotifyError::Closed(..)")
             }
+        }
+    }
+}
+
+impl<M> fmt::Display for NotifyError<M> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            NotifyError::Io(ref e) => {
+                write!(fmt, "IO error: {}", e)
+            }
+            NotifyError::Full(..) => write!(fmt, "Full"),
+            NotifyError::Closed(..) => write!(fmt, "Closed")
+        }
+    }
+}
+
+impl<M: any::Any> error::Error for NotifyError<M> {
+    fn description(&self) -> &str {
+        match *self {
+            NotifyError::Io(ref err) => err.description(),
+            NotifyError::Closed(..) => "The receiving end has hung up",
+            NotifyError::Full(..) => "Queue is full"
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            NotifyError::Io(ref err) => Some(err),
+            _ => None
         }
     }
 }
