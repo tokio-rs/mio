@@ -100,6 +100,7 @@ extern crate log;
 #[cfg(test)]
 extern crate env_logger;
 
+pub mod fd;
 pub mod util;
 
 mod event;
