@@ -24,7 +24,7 @@ libc  = "0.1.8"
 slab  = "0.1.0"
 bytes = "0.2.11"
 winapi = "0.1.23"
-clock_ticks = "0.0.5"
+time = "0.1.33"
 
 [dev-dependencies]
 env_logger = "0.3.0"

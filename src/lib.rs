@@ -79,7 +79,7 @@
 
 extern crate bytes;
 extern crate nix;
-extern crate clock_ticks;
+extern crate time;
 extern crate slab;
 extern crate libc;
 
