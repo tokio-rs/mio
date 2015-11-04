@@ -1,6 +1,6 @@
 use token::Token;
 use util::Slab;
-use clock_ticks::precise_time_ns;
+use time::precise_time_ns;
 use std::{usize, iter};
 use std::cmp::max;
 
