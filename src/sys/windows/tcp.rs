@@ -7,8 +7,8 @@ use std::sync::{Mutex, MutexGuard};
 
 use net2::{self, TcpBuilder};
 use net::tcp::Shutdown;
-use wio::iocp::CompletionStatus;
-use wio::net::*;
+use miow::iocp::CompletionStatus;
+use miow::net::*;
 use winapi::*;
 
 use {Evented, EventSet, PollOpt, Selector, Token};

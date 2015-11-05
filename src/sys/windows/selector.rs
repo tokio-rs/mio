@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 
 use slab::Index;
 use winapi::*;
-use wio;
-use wio::iocp::{CompletionPort, CompletionStatus};
+use miow;
+use miow::iocp::{CompletionPort, CompletionStatus};
 
 use {Token, PollOpt};
 use event::{IoEvent, EventSet};
@@ -56,7 +56,7 @@ pub type Callback = fn(&CompletionStatus, &mut Vec<IoEvent>);
 /// at the start of the structure so we can just do a cast.
 #[repr(C)]
 pub struct Overlapped {
-    inner: UnsafeCell<wio::Overlapped>,
+    inner: UnsafeCell<miow::Overlapped>,
     callback: Callback,
 }
 
@@ -330,16 +330,16 @@ macro_rules! offset_of {
 impl Overlapped {
     pub fn new(cb: Callback) -> Overlapped {
         Overlapped {
-            inner: UnsafeCell::new(wio::Overlapped::zero()),
+            inner: UnsafeCell::new(miow::Overlapped::zero()),
             callback: cb,
         }
     }
 
-    pub unsafe fn get_mut(&self) -> &mut wio::Overlapped {
+    pub unsafe fn get_mut(&self) -> &mut miow::Overlapped {
         &mut *self.inner.get()
     }
 
-    pub unsafe fn cast_to_arc<T>(overlapped: *mut wio::Overlapped,
+    pub unsafe fn cast_to_arc<T>(overlapped: *mut miow::Overlapped,
                                  offset: usize) -> FromRawArc<T> {
         debug_assert!(offset < mem::size_of::<T>());
         FromRawArc::from_raw((overlapped as usize - offset) as *mut T)

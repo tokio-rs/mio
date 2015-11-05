@@ -13,9 +13,9 @@ use std::sync::{Mutex, MutexGuard};
 
 use net2::{UdpBuilder, UdpSocketExt};
 use winapi::*;
-use wio::iocp::CompletionStatus;
-use wio::net::SocketAddrBuf;
-use wio::net::UdpSocketExt as WioUdpSocketExt;
+use miow::iocp::CompletionStatus;
+use miow::net::SocketAddrBuf;
+use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
 use {Evented, EventSet, IpAddr, PollOpt, Selector, Token};
 use event::IoEvent;

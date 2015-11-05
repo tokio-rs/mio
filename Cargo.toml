@@ -25,7 +25,7 @@ slab  = "0.1.0"
 time = "0.1.33"
 bytes = { git = "https://github.com/carllerche/bytes", rev = "7edb577d0a" }
 winapi = "0.2.1"
-wio = { git = "https://github.com/alexcrichton/wio", rev = "2c3bc1a07b" }
+miow = { git = "https://github.com/alexcrichton/miow", rev = "2adb93247f" }
 net2 = { version = "0.2.11", default-features = false }
 
 [dev-dependencies]

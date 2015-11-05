@@ -32,7 +32,7 @@
 //! will block execution of the calling thread until an I/O event has completed
 //! (or a timeout has elapsed).
 //!
-//! Currently all of these low-level operations are housed in a separate `wio`
+//! Currently all of these low-level operations are housed in a separate `miow`
 //! crate to provide a 0-cost abstraction over IOCP. This crate uses that to
 //! implement all fiddly bits so there's very few actual Windows API calls or
 //! `unsafe` blocks as a result.

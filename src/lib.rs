@@ -91,7 +91,7 @@ extern crate libc;
 extern crate nix;
 
 extern crate winapi;
-extern crate wio;
+extern crate miow;
 extern crate net2;
 
 #[macro_use]
