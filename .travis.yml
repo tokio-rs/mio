@@ -9,7 +9,7 @@ os:
   - osx
 
 script:
-  - cargo test
+  - ./test-all
   - cargo doc --no-deps
 
 # Deploy documentation to S3 for specific branches. At some

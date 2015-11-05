@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Run the library tests
+cargo test
+
+# Run example tests
+pushd examples/ping_pong
+cargo test
+popd
