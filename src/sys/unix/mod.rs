@@ -4,10 +4,12 @@ mod epoll;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use self::epoll::{Events, Selector};
 
-#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "dragonfly"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd",
+    target_os = "dragonfly", target_os = "netbsd",))]
 mod kqueue;
 
-#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "dragonfly"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd",
+    target_os = "dragonfly", target_os = "netbsd",))]
 pub use self::kqueue::{Events, Selector};
 
 mod awakener;
@@ -89,4 +91,3 @@ mod nix {
         dup,
     };
 }
-

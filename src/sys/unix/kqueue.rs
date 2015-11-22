@@ -100,6 +100,7 @@ impl Selector {
         self.ev_push(fd, token, filter, flags);
     }
 
+    #[cfg(not(target_os = "netbsd"))]
     fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
         self.changes.sys_events.push(
             KEvent {
@@ -109,6 +110,19 @@ impl Selector {
                 fflags: FilterFlag::empty(),
                 data: 0,
                 udata: token
+            });
+    }
+
+    #[cfg(target_os = "netbsd")]
+    fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
+        self.changes.sys_events.push(
+            KEvent {
+                ident: fd as ::libc::uintptr_t,
+                filter: filter,
+                flags: flags,
+                fflags: FilterFlag::empty(),
+                data: 0,
+                udata: token as i64
             });
     }
 
