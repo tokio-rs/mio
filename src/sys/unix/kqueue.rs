@@ -5,19 +5,36 @@ use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF
 use std::{fmt, slice};
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+
+/// Each Selector has a globally unique(ish) ID associated with it. This ID
+/// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
+/// registered with the `Selector`. If a type that is previously associatd with
+/// a `Selector` attempts to register itself with a different `Selector`, the
+/// operation will return with an error. This matches windows behavior.
+static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
 #[derive(Debug)]
 pub struct Selector {
+    id: usize,
     kq: RawFd,
     changes: Events
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let kq = try!(kqueue().map_err(super::from_nix_error));
+
         Ok(Selector {
-            kq: try!(kqueue().map_err(super::from_nix_error)),
+            id: id,
+            kq: kq,
             changes: Events::new()
         })
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 
     pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {

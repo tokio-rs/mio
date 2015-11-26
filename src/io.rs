@@ -2,7 +2,7 @@ use {EventSet, Selector, PollOpt, Token};
 use bytes::{Buf, MutBuf};
 
 // Re-export the io::Result / Error types for convenience
-pub use std::io::{Read, Write, Result, Error};
+pub use std::io::{Read, Write, Result, Error, ErrorKind};
 
 /// A value that may be registered with an `EventLoop`
 pub trait Evented {

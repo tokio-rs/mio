@@ -1,25 +1,37 @@
 use {io, Evented, EventSet, Io, IpAddr, PollOpt, Selector, Token};
 use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
+use std::cell::Cell;
 use std::net::SocketAddr;
 use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
 
 #[derive(Debug)]
 pub struct UdpSocket {
     io: Io,
+    selector_id: Cell<Option<usize>>,
 }
 
 impl UdpSocket {
     /// Returns a new, unbound, non-blocking, IPv4 UDP socket
     pub fn v4() -> io::Result<UdpSocket> {
         net::socket(nix::AddressFamily::Inet, nix::SockType::Datagram, true)
-            .map(|fd| UdpSocket { io: Io::from_raw_fd(fd) })
+            .map(|fd| {
+                UdpSocket {
+                    io: Io::from_raw_fd(fd),
+                    selector_id: Cell::new(None),
+                }
+            })
     }
 
     /// Returns a new, unbound, non-blocking, IPv6 UDP socket
     pub fn v6() -> io::Result<UdpSocket> {
         net::socket(nix::AddressFamily::Inet6, nix::SockType::Datagram, true)
-            .map(|fd| UdpSocket { io: Io::from_raw_fd(fd) })
+            .map(|fd| {
+                UdpSocket {
+                    io: Io::from_raw_fd(fd),
+                    selector_id: Cell::new(None),
+                }
+            })
     }
 
     pub fn bind(&self, addr: &SocketAddr) -> io::Result<()> {
@@ -32,8 +44,12 @@ impl UdpSocket {
     }
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        net::dup(&self.io)
-            .map(From::from)
+        net::dup(&self.io).map(|io| {
+            UdpSocket {
+                io: io,
+                selector_id: self.selector_id.clone(),
+            }
+        })
     }
 
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
@@ -113,10 +129,22 @@ impl UdpSocket {
         nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpMulticastTtl, &v)
             .map_err(super::from_nix_error)
     }
+
+    fn associate_selector(&self, selector: &Selector) -> io::Result<()> {
+        let selector_id = self.selector_id.get();
+
+        if selector_id.is_some() && selector_id != Some(selector.id()) {
+            Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
+        } else {
+            self.selector_id.set(Some(selector.id()));
+            Ok(())
+        }
+    }
 }
 
 impl Evented for UdpSocket {
     fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        try!(self.associate_selector(selector));
         self.io.register(selector, token, interest, opts)
     }
 
@@ -132,15 +160,12 @@ impl Evented for UdpSocket {
 impl Socket for UdpSocket {
 }
 
-impl From<Io> for UdpSocket {
-    fn from(io: Io) -> UdpSocket {
-        UdpSocket { io: io }
-    }
-}
-
 impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
-        UdpSocket { io: Io::from_raw_fd(fd) }
+        UdpSocket {
+            io: Io::from_raw_fd(fd),
+            selector_id: Cell::new(None),
+        }
     }
 }
 
