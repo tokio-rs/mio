@@ -247,3 +247,12 @@ fn listen_then_close() {
     let mut h = H;
     e.run_once(&mut h).unwrap();
 }
+
+fn assert_send<T: Send>() {
+}
+
+#[test]
+fn test_tcp_sockets_are_send() {
+    assert_send::<TcpListener>();
+    assert_send::<TcpStream>();
+}

@@ -44,22 +44,6 @@ struct SelectorInner {
     buffers: Mutex<BufferPool>,
 }
 
-pub type Callback = fn(&CompletionStatus, &mut Vec<IoEvent>);
-
-/// See sys::windows module docs for why this exists.
-///
-/// The gist of it is that `Selector` assumes that all `OVERLAPPED` pointers are
-/// actually inside one of these structures so it can use the `Callback` stored
-/// right after it.
-///
-/// We use repr(C) here to ensure that we can assume the overlapped pointer is
-/// at the start of the structure so we can just do a cast.
-#[repr(C)]
-pub struct Overlapped {
-    inner: UnsafeCell<miow::Overlapped>,
-    callback: Callback,
-}
-
 pub struct Registration {
     selector: Option<Arc<SelectorInner>>,
     token: Token,
@@ -117,7 +101,7 @@ impl Selector {
             }
 
             let callback = unsafe {
-                (*(status.overlapped() as *mut Overlapped)).callback
+                (*(status.overlapped() as *mut Overlapped)).callback()
             };
             callback(status, dst);
         }
@@ -327,6 +311,22 @@ macro_rules! offset_of {
     )
 }
 
+pub type Callback = fn(&CompletionStatus, &mut Vec<IoEvent>);
+
+/// See sys::windows module docs for why this exists.
+///
+/// The gist of it is that `Selector` assumes that all `OVERLAPPED` pointers are
+/// actually inside one of these structures so it can use the `Callback` stored
+/// right after it.
+///
+/// We use repr(C) here to ensure that we can assume the overlapped pointer is
+/// at the start of the structure so we can just do a cast.
+#[repr(C)]
+pub struct Overlapped {
+    inner: UnsafeCell<miow::Overlapped>,
+    callback: Callback,
+}
+
 impl Overlapped {
     pub fn new(cb: Callback) -> Overlapped {
         Overlapped {
@@ -344,4 +344,14 @@ impl Overlapped {
         debug_assert!(offset < mem::size_of::<T>());
         FromRawArc::from_raw((overlapped as usize - offset) as *mut T)
     }
+
+    pub unsafe fn callback(&self) -> &Callback {
+        &self.callback
+    }
 }
+
+// Overlapped's APIs are marked as unsafe Overlapped's APIs are marked as
+// unsafe as they must be used with caution to ensure thread safety. The
+// structure itself is safe to send across threads.
+unsafe impl Send for Overlapped {}
+unsafe impl Sync for Overlapped {}

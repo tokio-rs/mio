@@ -63,6 +63,9 @@ impl Handler for UdpHandler {
     }
 }
 
+fn assert_send<T: Send>() {
+}
+
 #[test]
 pub fn test_udp_socket() {
     debug!("Starting TEST_UDP_SOCKETS");
@@ -73,6 +76,8 @@ pub fn test_udp_socket() {
 
     let tx = UdpSocket::bound(&any).unwrap();
     let rx = UdpSocket::bound(&addr).unwrap();
+
+    assert_send::<UdpSocket>();
 
     // ensure that the sockets are non-blocking
     let mut buf = [0; 128];
