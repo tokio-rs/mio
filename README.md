@@ -3,8 +3,9 @@
 MIO is a lightweight IO library for Rust with a focus on adding as
 little overhead as possible over the OS abstractions.
 
-[![Build Status](https://travis-ci.org/carllerche/mio.svg?branch=master)](https://travis-ci.org/carllerche/mio)
 [![crates.io](http://meritbadge.herokuapp.com/mio)](https://crates.io/crates/mio)
+[![Build Status](https://travis-ci.org/carllerche/mio.svg?branch=master)](https://travis-ci.org/carllerche/mio)
+[![Build status](https://ci.appveyor.com/api/projects/status/ok90r1tcgkyndnvw/branch/master?svg=true)](https://ci.appveyor.com/project/carllerche/mio/branch/master)
 
 **Getting started guide**
 
