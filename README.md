@@ -42,11 +42,6 @@ extern crate mio;
 * High performance timer system
 * Thread safe message channel for cross thread communication
 
-__Eventually__
-
-* Signal handling
-* Windows support
-
 ## Non goals
 
 The following are specifically omitted from MIO and are left to the user
@@ -57,8 +52,8 @@ or higher level libraries.
 
 ## Platforms
 
-Currently, MIO only supports Linux and Darwin. The goal is to support
-all platforms that support Rust and the readiness IO model.
+Currently, MIO fully supports Linux and OS X. The master branch has beta
+support for Windows.
 
 ## Resources
 
