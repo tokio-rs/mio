@@ -53,6 +53,6 @@ impl Evented for Awakener {
     }
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.iocp().deregister(selector)
+        self.iocp().checked_deregister(selector)
     }
 }

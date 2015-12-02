@@ -24,10 +24,12 @@ impl TestHandler {
     fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: EventSet) {
         match token {
             SERVER => {
+                trace!("handle_read; token=SERVER");
                 let mut sock = self.server.accept().unwrap().unwrap().0;
                 sock.try_write_buf(&mut SliceBuf::wrap("foobar".as_bytes())).unwrap();
             }
             CLIENT => {
+                trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
                 event_loop.reregister(&self.client, CLIENT, EventSet::writable(), PollOpt::level()).unwrap();
@@ -37,6 +39,8 @@ impl TestHandler {
     }
 
     fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: EventSet) {
+        debug!("handle_write; token={:?}; state={:?}", token, self.state);
+
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
@@ -61,12 +65,12 @@ impl Handler for TestHandler {
     }
 
     fn timeout(&mut self, event_loop: &mut EventLoop<TestHandler>, _: usize) {
+        trace!("timeout");
         event_loop.shutdown();
     }
 }
 
 #[test]
-#[cfg(unix)] // level() not implemented on windows yet
 pub fn test_register_deregister() {
     debug!("Starting TEST_REGISTER_DEREGISTER");
     let mut event_loop = EventLoop::new().unwrap();

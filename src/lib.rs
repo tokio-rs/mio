@@ -116,6 +116,7 @@ mod token;
 pub use event::{
     PollOpt,
     EventSet,
+    IoEvent,
 };
 pub use event_loop::{
     EventLoop,
@@ -157,7 +158,8 @@ pub use notify::{
     NotifyError,
 };
 pub use poll::{
-    Poll
+    Poll,
+    Events,
 };
 pub use timer::{
     Timeout,

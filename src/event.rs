@@ -276,9 +276,8 @@ impl fmt::Debug for EventSet {
     }
 }
 
-
 // Keep this struct internal to mio
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct IoEvent {
     pub kind: EventSet,
     pub token: Token

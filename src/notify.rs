@@ -189,15 +189,16 @@ impl<M: Send> NotifyInner<M> {
 
 impl<M: Send> Evented for Notify<M> {
     fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        assert!(opts.is_edge(), "awakener can only be registered using edge-triggered events");
         self.inner.awaken.register(selector, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.inner.awaken.reregister(selector, token, interest, opts)
+    fn reregister(&self, _: &mut Selector, _: Token, _: EventSet, _: PollOpt) -> io::Result<()> {
+        panic!("awakener is never reregistered");
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner.awaken.deregister(selector)
+    fn deregister(&self, _: &mut Selector) -> io::Result<()> {
+        panic!("awakener is never deregistered");
     }
 }
 

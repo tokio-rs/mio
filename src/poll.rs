@@ -2,8 +2,6 @@ use {sys, Evented, Token};
 use event::{EventSet, IoEvent, PollOpt};
 use std::{fmt, io};
 
-pub use sys::{Events};
-
 pub struct Poll {
     selector: sys::Selector,
     events: sys::Events,
@@ -58,6 +56,13 @@ impl Poll {
     pub fn event(&self, idx: usize) -> IoEvent {
         self.events.get(idx)
     }
+
+    pub fn events(&self) -> Events {
+        Events {
+            curr: 0,
+            poll: self,
+        }
+    }
 }
 
 impl fmt::Debug for Poll {
@@ -66,3 +71,21 @@ impl fmt::Debug for Poll {
     }
 }
 
+pub struct Events<'a> {
+    curr: usize,
+    poll: &'a Poll,
+}
+
+impl<'a> Iterator for Events<'a> {
+    type Item = IoEvent;
+
+    fn next(&mut self) -> Option<IoEvent> {
+        if self.curr == self.poll.events.len() {
+            return None;
+        }
+
+        let ret = self.poll.event(self.curr);
+        self.curr += 1;
+        Some(ret)
+    }
+}

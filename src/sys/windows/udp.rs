@@ -121,14 +121,19 @@ impl UdpSocket {
                    -> io::Result<Option<usize>> {
         let mut me = self.inner();
         let me = &mut *me;
+
         match me.write {
             State::Empty => {}
             _ => return Ok(None),
         }
+
         let s = try!(me.socket.socket());
         if me.iocp.port().is_none() {
             return Ok(None)
         }
+
+        me.iocp.unset_readiness(EventSet::writable());
+
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = try!(owned_buf.write(buf));
         try!(unsafe {
@@ -248,6 +253,9 @@ impl Imp {
             Socket::Building(..) => return,
             Socket::Bound(ref s) => s,
         };
+
+        me.iocp.unset_readiness(EventSet::readable());
+
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
             trace!("scheduling a read");
@@ -314,7 +322,7 @@ impl Evented for UdpSocket {
     }
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner().iocp.deregister(selector)
+        self.inner().iocp.checked_deregister(selector)
     }
 }
 
@@ -326,7 +334,12 @@ impl fmt::Debug for UdpSocket {
 
 impl Drop for UdpSocket {
     fn drop(&mut self) {
-        self.inner().socket = Socket::Empty;
+        let mut inner = self.inner();
+
+        inner.socket = Socket::Empty;
+
+        // Then run any finalization code including level notifications
+        inner.iocp.deregister();
     }
 }
 

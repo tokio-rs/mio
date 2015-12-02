@@ -191,6 +191,9 @@ impl StreamImp {
             State::Empty => {}
             _ => return,
         }
+
+        me.iocp.unset_readiness(EventSet::readable());
+
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
             trace!("scheduling a read");
@@ -229,6 +232,10 @@ impl StreamImp {
     /// the buffer has been written completely (or hit an error).
     fn schedule_write(&self, buf: Vec<u8>, pos: usize,
                       me: &mut StreamInner) {
+
+        // About to write, clear any pending level triggered events
+        me.iocp.unset_readiness(EventSet::writable());
+
         trace!("scheduling a write");
         let err = unsafe {
             me.socket.write_overlapped(&buf[pos..], self.inner.write.get_mut())
@@ -269,17 +276,21 @@ fn read_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     match mem::replace(&mut me.read, State::Empty) {
         State::Pending(mut buf) => {
             trace!("finished a read: {}", status.bytes_transferred());
+
             unsafe {
                 buf.set_len(status.bytes_transferred() as usize);
             }
+
             me.read = State::Ready(Cursor::new(buf));
 
             // If we transferred 0 bytes then be sure to indicate that hup
             // happened.
             let mut e = EventSet::readable();
+
             if status.bytes_transferred() == 0 {
                 e = e | EventSet::hup();
             }
+
             return me2.push(&mut me, e, dst)
         }
         s => me.read = s,
@@ -312,6 +323,7 @@ fn write_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut me = self.inner();
+
         match mem::replace(&mut me.read, State::Empty) {
             State::Empty => Err(wouldblock()),
             State::Pending(buf) => {
@@ -342,13 +354,16 @@ impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
+
         match me.write {
             State::Empty => {}
             _ => return Err(wouldblock())
         }
+
         if me.iocp.port().is_none() {
             return Err(wouldblock())
         }
+
         let mut intermediate = me.iocp.get_buffer(64 * 1024);
         let amt = try!(intermediate.write(buf));
         self.imp.schedule_write(intermediate, 0, me);
@@ -392,7 +407,7 @@ impl Evented for TcpStream {
     }
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner().iocp.deregister(selector)
+        self.inner().iocp.checked_deregister(selector)
     }
 }
 
@@ -404,6 +419,7 @@ impl fmt::Debug for TcpStream {
 
 impl Drop for TcpStream {
     fn drop(&mut self) {
+        let mut inner = self.inner();
         // When the `TcpSocket` itself is dropped then we close the internal
         // handle (e.g. call `closesocket`). This will cause all pending I/O
         // operations to forcibly finish and we'll get notifications for all of
@@ -412,9 +428,12 @@ impl Drop for TcpStream {
         // This is achieved by replacing our socket with an invalid one, so all
         // further operations will return an error (but no further operations
         // should be done anyway).
-        self.inner().socket = unsafe {
+        inner.socket = unsafe {
             net::TcpStream::from_raw_socket(INVALID_SOCKET)
         };
+
+        // Then run any finalization code including level notifications
+        inner.iocp.deregister();
     }
 }
 
@@ -446,16 +465,21 @@ impl TcpListener {
 
     pub fn accept(&self) -> io::Result<Option<(TcpStream, SocketAddr)>> {
         let mut me = self.inner();
+
         let ret = match mem::replace(&mut me.accept, State::Empty) {
             State::Empty => return Ok(None),
             State::Pending(t) => {
                 me.accept = State::Pending(t);
                 return Ok(None)
             }
-            State::Ready((s, a)) => Ok(Some((TcpStream::new(s, None), a))),
+            State::Ready((s, a)) => {
+                Ok(Some((TcpStream::new(s, None), a)))
+            }
             State::Error(e) => Err(e),
         };
+
         self.imp.schedule_accept(&mut me);
+
         return ret
     }
 
@@ -494,6 +518,9 @@ impl ListenerImp {
             State::Empty => {}
             _ => return
         }
+
+        me.iocp.unset_readiness(EventSet::readable());
+
         let res = match me.family {
             Family::V4 => TcpBuilder::new_v4(),
             Family::V6 => TcpBuilder::new_v6(),
@@ -564,7 +591,7 @@ impl Evented for TcpListener {
     }
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner().iocp.deregister(selector)
+        self.inner().iocp.checked_deregister(selector)
     }
 }
 
@@ -576,9 +603,14 @@ impl fmt::Debug for TcpListener {
 
 impl Drop for TcpListener {
     fn drop(&mut self) {
+        let mut inner = self.inner();
+
         // See comments in TcpStream
-        self.inner().socket = unsafe {
+        inner.socket = unsafe {
             net::TcpListener::from_raw_socket(INVALID_SOCKET)
         };
+
+        // Then run any finalization code including level notifications
+        inner.iocp.deregister();
     }
 }
