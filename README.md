@@ -85,3 +85,15 @@ Please submit PRs containing links to MIO resources.
 
 A group of mio users hang out in the #mio channel on the Mozilla IRC
 server (irc.mozilla.org). This can be a good place to go for questions.
+
+## Contributing
+
+Interested in getting involved? We would love to help you! For simple
+bug fixes, just submit a PR with the fix and we can discuss the fix
+directly in the PR. If the fix is more complex, start with an issue.
+
+If you want to propose an API change, create an issue to start a
+discussion with the community. Also, feel free to talk with us in the
+IRC channel.
+
+Finally, be kind. We support the [Rust Code of Conduct](https://www.rust-lang.org/conduct.html).
