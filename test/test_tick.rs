@@ -55,7 +55,7 @@ pub fn test_tick() {
     let mut handler = TestHandler::new();
 
     for _ in 0..2 {
-        event_loop.run_once(&mut handler).unwrap();
+        event_loop.run_once(&mut handler, None).unwrap();
     }
 
     assert!(handler.tick == 2, "actual={}", handler.tick);

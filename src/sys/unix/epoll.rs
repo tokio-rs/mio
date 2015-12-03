@@ -34,13 +34,12 @@ impl Selector {
     }
 
     /// Wait for events from the OS
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
-        use std::{isize, slice};
+    pub fn select(&mut self, evts: &mut Events, timeout_ms: Option<usize>) -> io::Result<()> {
+        use std::{cmp, i32, slice};
 
-        let timeout_ms = if timeout_ms >= isize::MAX as usize {
-            isize::MAX
-        } else {
-            timeout_ms as isize
+        let timeout_ms = match timeout_ms {
+            None => -1 as i32,
+            Some(x) => cmp::min(i32::MAX as usize, x) as i32,
         };
 
         let dst = unsafe {
@@ -50,7 +49,7 @@ impl Selector {
         };
 
         // Wait for epoll events for at most timeout_ms milliseconds
-        let cnt = try!(epoll_wait(self.epfd, dst, timeout_ms)
+        let cnt = try!(epoll_wait(self.epfd, dst, timeout_ms as isize)
                            .map_err(super::from_nix_error));
 
         unsafe { evts.events.set_len(cnt); }

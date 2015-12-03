@@ -16,7 +16,7 @@ pub fn test_udp_level_triggered() {
     poll.register(&rx, Token(1), EventSet::all(), PollOpt::level()).unwrap();
 
     for _ in 0..2 {
-        poll.poll(MS).unwrap();
+        poll.poll(Some(MS)).unwrap();
 
         let tx_events = filter(&poll, Token(0));
         assert_eq!(1, tx_events.len());
@@ -32,7 +32,7 @@ pub fn test_udp_level_triggered() {
     thread::sleep_ms(250);
 
     for _ in 0..2 {
-        poll.poll(MS).unwrap();
+        poll.poll(Some(MS)).unwrap();
         let rx_events = filter(&poll, Token(1));
         assert_eq!(1, rx_events.len());
         assert_eq!(rx_events[0], IoEvent::new(EventSet::readable() | EventSet::writable(), Token(1)));
@@ -43,7 +43,7 @@ pub fn test_udp_level_triggered() {
     }
 
     for _ in 0..2 {
-        poll.poll(MS).unwrap();
+        poll.poll(Some(MS)).unwrap();
         let rx_events = filter(&poll, Token(1));
         assert_eq!(1, rx_events.len());
         assert_eq!(rx_events[0], IoEvent::new(EventSet::writable(), Token(1)));
@@ -52,14 +52,14 @@ pub fn test_udp_level_triggered() {
     tx.send_to(b"hello world!", &rx.local_addr().unwrap()).unwrap();
     thread::sleep_ms(250);
 
-    poll.poll(MS).unwrap();
+    poll.poll(Some(MS)).unwrap();
     let rx_events = filter(&poll, Token(1));
     assert_eq!(1, rx_events.len());
     assert_eq!(rx_events[0], IoEvent::new(EventSet::readable() | EventSet::writable(), Token(1)));
 
     drop(rx);
 
-    poll.poll(MS).unwrap();
+    poll.poll(Some(MS)).unwrap();
     let rx_events = filter(&poll, Token(1));
     assert!(rx_events.is_empty());
 }

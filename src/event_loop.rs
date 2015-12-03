@@ -2,14 +2,12 @@ use {Handler, Evented, Poll, NotifyError, Token};
 use event::{IoEvent, EventSet, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
-use std::{io, fmt, thread, usize};
+use std::{cmp, io, fmt, thread, usize};
 use std::default::Default;
 
 /// Configure EventLoop runtime details
 #[derive(Clone, Debug)]
 pub struct EventLoopConfig {
-    io_poll_timeout_ms: usize,
-
     // == Notifications ==
     notify_capacity: usize,
     messages_per_tick: usize,
@@ -25,26 +23,12 @@ impl EventLoopConfig {
     /// specified.
     pub fn new() -> EventLoopConfig {
         EventLoopConfig {
-            io_poll_timeout_ms: 1_000,
             notify_capacity: 4_096,
             messages_per_tick: 256,
             timer_tick_ms: 100,
             timer_wheel_size: 1_024,
             timer_capacity: 65_536,
         }
-    }
-
-    /// Sets the default amount of time that a thread will be blocked in I/O
-    /// before timing out.
-    ///
-    /// If the event loop receives no I/O events during the specified timeout
-    /// then it will use this timeout to return control back to the original
-    /// program and run one more tick of the event loop.
-    ///
-    /// The default value for this is 1000.
-    pub fn io_poll_timeout_ms(&mut self, timeout: usize) -> &mut Self {
-        self.io_poll_timeout_ms = timeout;
-        self
     }
 
     /// Sets the maximum number of messages that can be buffered on the event
@@ -260,7 +244,7 @@ impl<H: Handler> EventLoop<H> {
 
         while self.run {
             // Execute ticks as long as the event loop is running
-            try!(self.run_once(handler));
+            try!(self.run_once(handler, None));
         }
 
         Ok(())
@@ -274,7 +258,7 @@ impl<H: Handler> EventLoop<H> {
     /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once(&mut self, handler: &mut H) -> io::Result<()> {
+    pub fn run_once(&mut self, handler: &mut H, mut timeout_ms: Option<usize>) -> io::Result<()> {
         let mut messages;
 
         trace!("event loop tick");
@@ -285,10 +269,14 @@ impl<H: Handler> EventLoop<H> {
         messages = self.notify.check(self.config.messages_per_tick, true);
         let pending = messages > 0;
 
+        if pending {
+            timeout_ms = Some(0);
+        }
+
         // Check the registered IO handles for any new events. Each poll
         // is for one second, so a shutdown request can last as long as
         // one second before it takes effect.
-        let events = match self.io_poll(pending) {
+        let events = match self.io_poll(timeout_ms) {
             Ok(e) => e,
             Err(err) => {
                 if err.kind() == io::ErrorKind::Interrupted {
@@ -315,18 +303,18 @@ impl<H: Handler> EventLoop<H> {
     }
 
     #[inline]
-    fn io_poll(&mut self, immediate: bool) -> io::Result<usize> {
-        if immediate {
-            self.poll.poll(0)
-        } else {
-            let mut sleep = self.timer.next_tick_in_ms() as usize;
+    fn io_poll(&mut self, timeout: Option<usize>) -> io::Result<usize> {
+        let next_tick = self.timer.next_tick_in_ms()
+            .map(|ms| cmp::min(ms, usize::MAX as u64) as usize);
 
-            if sleep > self.config.io_poll_timeout_ms {
-                sleep = self.config.io_poll_timeout_ms;
-            }
+        let timeout = match (timeout, next_tick) {
+            (Some(a), Some(b)) => Some(cmp::min(a, b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            _ => None,
+        };
 
-            self.poll.poll(sleep)
-        }
+        self.poll.poll(timeout)
     }
 
     // Process IO events that have been previously polled
@@ -483,7 +471,7 @@ mod tests {
         event_loop.register(&reader, Token(10), EventSet::readable(),
                             PollOpt::edge()).unwrap();
 
-        let _ = event_loop.run_once(&mut handler);
+        let _ = event_loop.run_once(&mut handler, None);
         let mut b = ByteBuf::mut_with_capacity(16);
 
         assert_eq!((*rcount).load(SeqCst), 1);
@@ -515,6 +503,6 @@ mod tests {
 
         let mut handler = BrokenPipeHandler;
         drop(reader);
-        event_loop.run_once(&mut handler).unwrap();
+        event_loop.run_once(&mut handler, Some(1000)).unwrap();
     }
 }

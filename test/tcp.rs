@@ -245,7 +245,7 @@ fn listen_then_close() {
     drop(l);
 
     let mut h = H;
-    e.run_once(&mut h).unwrap();
+    e.run_once(&mut h, Some(100)).unwrap();
 }
 
 fn assert_send<T: Send>() {

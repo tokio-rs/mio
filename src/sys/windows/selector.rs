@@ -63,19 +63,19 @@ impl Selector {
 
     pub fn select(&mut self,
                   events: &mut Events,
-                  timeout_ms: usize) -> io::Result<()> {
+                  timeout_ms: Option<usize>) -> io::Result<()> {
         // If we have some deferred events then we only want to poll for I/O
         // events, so clamp the timeout to 0 in that case.
-        let timeout = if self.should_block() {
-            timeout_ms as u32
+        let timeout = if !self.should_block() {
+            Some(0)
         } else {
-            0
+            timeout_ms.map(|ms| ms as u32)
         };
 
         // Clear out the previous list of I/O events and get some more!
         events.events.truncate(0);
         let inner = self.inner.clone();
-        let n = match inner.port.get_many(&mut events.statuses, Some(timeout)) {
+        let n = match inner.port.get_many(&mut events.statuses, timeout) {
             Ok(statuses) => statuses.len(),
             Err(ref e) if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) => 0,
             Err(e) => return Err(e),
