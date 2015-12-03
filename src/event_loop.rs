@@ -3,6 +3,7 @@ use event::{IoEvent, EventSet, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
 use std::{io, fmt, thread, usize};
+use std::default::Default;
 
 /// Configure EventLoop runtime details
 #[derive(Clone, Debug)]
@@ -77,6 +78,12 @@ impl EventLoopConfig {
     pub fn timer_capacity(&mut self, cap: usize) -> &mut Self {
         self.timer_capacity = cap;
         self
+    }
+}
+
+impl Default for EventLoopConfig {
+    fn default() -> EventLoopConfig {
+        EventLoopConfig::new()
     }
 }
 
