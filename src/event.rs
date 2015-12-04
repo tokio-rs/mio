@@ -26,6 +26,11 @@ impl PollOpt {
     }
 
     #[inline]
+    pub fn urgent() -> PollOpt {
+        PollOpt(0x100)
+    }
+
+    #[inline]
     pub fn all() -> PollOpt {
         PollOpt::edge() | PollOpt::level() | PollOpt::oneshot()
     }
@@ -43,6 +48,11 @@ impl PollOpt {
     #[inline]
     pub fn is_oneshot(&self) -> bool {
         self.contains(PollOpt::oneshot())
+    }
+
+    #[inline]
+    pub fn is_urgent(&self) -> bool {
+        self.contains(PollOpt::urgent())
     }
 
     #[inline]
