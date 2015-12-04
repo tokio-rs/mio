@@ -26,7 +26,7 @@ time = "0.1.33"
 bytes = { git = "https://github.com/carllerche/bytes", rev = "6b624b849a" }
 winapi = "0.2.1"
 miow = "0.1.1"
-net2 = { version = "0.2.11", default-features = false }
+net2 = { version = "0.2.19", default-features = false }
 
 [dev-dependencies]
 env_logger = "0.3.0"
