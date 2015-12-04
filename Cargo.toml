@@ -18,15 +18,15 @@ exclude       = [
 ]
 
 [dependencies]
-log   = "0.3.1"
-nix   = "0.4.2"
-libc  = "0.1.8"
-slab  = "0.1.0"
-time = "0.1.33"
-bytes = { git = "https://github.com/carllerche/bytes", rev = "6b624b849a" }
+log    = "0.3.1"
+nix    = "0.4.2"
+libc   = "0.1.8"
+slab   = "0.1.0"
+time   = "0.1.33"
+bytes  = "0.3.0"
 winapi = "0.2.1"
-miow = "0.1.1"
-net2 = { version = "0.2.19", default-features = false }
+miow   = "0.1.1"
+net2   = { version = "0.2.19", default-features = false }
 
 [dev-dependencies]
 env_logger = "0.3.0"
