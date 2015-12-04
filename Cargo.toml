@@ -23,7 +23,7 @@ nix   = "0.4.2"
 libc  = "0.1.8"
 slab  = "0.1.0"
 time = "0.1.33"
-bytes = { git = "https://github.com/carllerche/bytes", rev = "7edb577d0a" }
+bytes = { git = "https://github.com/carllerche/bytes", rev = "6b624b849a" }
 winapi = "0.2.1"
 miow = { git = "https://github.com/alexcrichton/miow", rev = "b00451dfb1" }
 net2 = { version = "0.2.11", default-features = false }

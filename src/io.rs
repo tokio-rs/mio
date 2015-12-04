@@ -28,7 +28,7 @@ pub trait TryRead {
         let res = self.try_read(unsafe { buf.mut_bytes() });
 
         if let Ok(Some(cnt)) = res {
-            buf.advance(cnt);
+            unsafe { buf.advance(cnt); }
         }
 
         res

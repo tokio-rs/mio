@@ -93,7 +93,7 @@ impl UnixStream {
     pub fn try_read_buf_recv_fd<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<(usize, Option<RawFd>)>> {
         let res = self.try_read_recv_fd(unsafe { buf.mut_bytes() });
         if let Ok(Some((cnt, _))) = res {
-            buf.advance(cnt);
+            unsafe { buf.advance(cnt); }
         }
         res
     }

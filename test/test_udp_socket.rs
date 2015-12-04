@@ -41,7 +41,7 @@ impl Handler for UdpHandler {
                         self.rx.recv_from(self.rx_buf.mut_bytes()).unwrap()
                                                                   .unwrap()
                     };
-                    MutBuf::advance(&mut self.rx_buf, cnt);
+                    unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
                     assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
                     event_loop.shutdown();
                 },
