@@ -1,5 +1,6 @@
 use mio::*;
-use std::io::Write;
+use mio::tcp::*;
+use std::thread;
 
 struct TestHandler {
     tick: usize,
@@ -28,6 +29,7 @@ impl Handler for TestHandler {
     }
 
     fn ready(&mut self, _event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
+        debug!("READY: {:?} - {:?}", token, events);
         if events.is_readable() {
             debug!("Handler::ready() readable event");
             assert_eq!(token, Token(0));
@@ -42,17 +44,18 @@ pub fn test_tick() {
     debug!("Starting TEST_TICK");
     let mut event_loop = EventLoop::new().ok().expect("Couldn't make event loop");
 
-    let (reader, mut writer) = unix::pipe().unwrap();
+    let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    event_loop.register(&listener, Token(0), EventSet::readable(), PollOpt::level()).unwrap();
 
-    event_loop.register(&reader, Token(0), EventSet::all(),
-                        PollOpt::level()).unwrap();
+    let client = TcpStream::connect(&listener.local_addr().unwrap()).unwrap();
+    event_loop.register(&client, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+
+    thread::sleep_ms(250);
 
     let mut handler = TestHandler::new();
-    writer.write(&[0u8]).unwrap();
 
     for _ in 0..2 {
-
-        event_loop.run_once(&mut handler).unwrap();
+        event_loop.run_once(&mut handler, None).unwrap();
     }
 
     assert!(handler.tick == 2, "actual={}", handler.tick);

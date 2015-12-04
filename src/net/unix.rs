@@ -1,6 +1,8 @@
 use {io, sys, Evented, EventSet, Io, PollOpt, Selector, Token, TryAccept};
+use io::MapNonBlock;
 use std::io::{Read, Write};
 use std::path::Path;
+use bytes::{Buf, MutBuf};
 
 #[derive(Debug)]
 pub struct UnixSocket {
@@ -78,6 +80,38 @@ impl UnixStream {
     pub fn try_clone(&self) -> io::Result<UnixStream> {
         self.sys.try_clone()
             .map(From::from)
+    }
+
+    pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {
+        self.sys.read_recv_fd(buf)
+    }
+
+    pub fn try_read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<Option<(usize, Option<RawFd>)>> {
+        self.read_recv_fd(buf).map_non_block()
+    }
+
+    pub fn try_read_buf_recv_fd<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<(usize, Option<RawFd>)>> {
+        let res = self.try_read_recv_fd(unsafe { buf.mut_bytes() });
+        if let Ok(Some((cnt, _))) = res {
+            unsafe { buf.advance(cnt); }
+        }
+        res
+    }
+
+    pub fn write_send_fd(&mut self, buf: &[u8], fd: RawFd) -> io::Result<usize> {
+        self.sys.write_send_fd(buf, fd)
+    }
+
+    pub fn try_write_send_fd(&mut self, buf: &[u8], fd: RawFd) -> io::Result<Option<usize>> {
+        self.write_send_fd(buf, fd).map_non_block()
+    }
+
+    pub fn try_write_buf_send_fd<B: Buf>(&mut self, buf: &mut B, fd: RawFd) -> io::Result<Option<usize>> {
+        let res = self.try_write_send_fd(buf.bytes(), fd);
+        if let Ok(Some(cnt)) = res {
+            buf.advance(cnt);
+        }
+        res
     }
 }
 

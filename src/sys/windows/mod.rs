@@ -32,7 +32,7 @@
 //! will block execution of the calling thread until an I/O event has completed
 //! (or a timeout has elapsed).
 //!
-//! Currently all of these low-level operations are housed in a separate `wio`
+//! Currently all of these low-level operations are housed in a separate `miow`
 //! crate to provide a 0-cost abstraction over IOCP. This crate uses that to
 //! implement all fiddly bits so there's very few actual Windows API calls or
 //! `unsafe` blocks as a result.
@@ -137,7 +137,7 @@
 //!   be some level of buffering of writes probably.
 
 use std::io;
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::Ipv4Addr;
 
 mod awakener;
 #[macro_use]
@@ -149,7 +149,7 @@ mod buffer_pool;
 
 pub use self::awakener::Awakener;
 pub use self::selector::{Events, Selector};
-pub use self::tcp::TcpSocket;
+pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 
 #[derive(Copy, Clone)]
@@ -166,4 +166,3 @@ fn wouldblock() -> io::Error {
 }
 
 fn ipv4_any() -> Ipv4Addr { Ipv4Addr::new(0, 0, 0, 0) }
-fn ipv6_any() -> Ipv6Addr { Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0) }

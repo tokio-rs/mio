@@ -47,11 +47,7 @@ pub fn test_notify() {
     let addr = localhost();
 
     // Setup a server socket so that the event loop blocks
-    let srv = TcpSocket::v4().unwrap();
-    srv.set_reuseaddr(true).unwrap();
-    srv.bind(&addr).unwrap();
-
-    let srv = srv.listen(256).unwrap();
+    let srv = TcpListener::bind(&addr).unwrap();
 
     event_loop.register(&srv, Token(0), EventSet::all(), PollOpt::edge()).unwrap();
 

@@ -26,7 +26,7 @@ fn reregister_before_register() {
 #[test]
 fn run_once_with_nothing() {
     let mut e = EventLoop::<E>::new().unwrap();
-    e.run_once(&mut E).unwrap();
+    e.run_once(&mut E, Some(100)).unwrap();
 }
 
 #[test]
@@ -35,5 +35,5 @@ fn add_then_drop() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     e.register(&l, Token(1), EventSet::all(), PollOpt::edge()).unwrap();
     drop(l);
-    e.run_once(&mut E).unwrap();
+    e.run_once(&mut E, Some(100)).unwrap();
 }

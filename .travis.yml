@@ -31,5 +31,6 @@ deploy:
     repo: carllerche/mio
     branch:
       - master
+      - v0.5.x
       - v0.4.x
       - v0.3.x

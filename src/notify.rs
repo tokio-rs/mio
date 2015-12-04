@@ -1,6 +1,6 @@
 use {sys, Evented, EventSet, PollOpt, Selector, Token};
 use util::BoundedQueue;
-use std::{fmt, cmp, io};
+use std::{fmt, cmp, io, error, any};
 use std::sync::Arc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -189,15 +189,16 @@ impl<M: Send> NotifyInner<M> {
 
 impl<M: Send> Evented for Notify<M> {
     fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        assert!(opts.is_edge(), "awakener can only be registered using edge-triggered events");
         self.inner.awaken.register(selector, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.inner.awaken.reregister(selector, token, interest, opts)
+    fn reregister(&self, _: &mut Selector, _: Token, _: EventSet, _: PollOpt) -> io::Result<()> {
+        panic!("awakener is never reregistered");
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner.awaken.deregister(selector)
+    fn deregister(&self, _: &mut Selector) -> io::Result<()> {
+        panic!("awakener is never deregistered");
     }
 }
 
@@ -219,6 +220,35 @@ impl<M> fmt::Debug for NotifyError<M> {
             NotifyError::Closed(..) => {
                 write!(fmt, "NotifyError::Closed(..)")
             }
+        }
+    }
+}
+
+impl<M> fmt::Display for NotifyError<M> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            NotifyError::Io(ref e) => {
+                write!(fmt, "IO error: {}", e)
+            }
+            NotifyError::Full(..) => write!(fmt, "Full"),
+            NotifyError::Closed(..) => write!(fmt, "Closed")
+        }
+    }
+}
+
+impl<M: any::Any> error::Error for NotifyError<M> {
+    fn description(&self) -> &str {
+        match *self {
+            NotifyError::Io(ref err) => err.description(),
+            NotifyError::Closed(..) => "The receiving end has hung up",
+            NotifyError::Full(..) => "Queue is full"
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            NotifyError::Io(ref err) => Some(err),
+            _ => None
         }
     }
 }

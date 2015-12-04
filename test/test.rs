@@ -14,12 +14,18 @@ mod test_echo_server;
 mod test_multicast;
 mod test_notify;
 mod test_register_deregister;
-#[cfg(unix)]
+mod test_register_multiple_event_loops;
+mod test_tcp_level;
 mod test_tick;
 mod test_timer;
+mod test_udp_level;
 mod test_udp_socket;
+
+// ===== Unix only tests =====
 #[cfg(unix)]
 mod test_unix_echo_server;
+#[cfg(unix)]
+mod test_unix_pass_fd;
 
 mod ports {
     use std::net::SocketAddr;

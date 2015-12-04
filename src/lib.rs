@@ -83,7 +83,7 @@
 #![cfg_attr(unix, deny(warnings))]
 
 extern crate bytes;
-extern crate clock_ticks;
+extern crate time;
 extern crate slab;
 extern crate libc;
 
@@ -91,7 +91,7 @@ extern crate libc;
 extern crate nix;
 
 extern crate winapi;
-extern crate wio;
+extern crate miow;
 extern crate net2;
 
 #[macro_use]
@@ -116,6 +116,7 @@ mod token;
 pub use event::{
     PollOpt,
     EventSet,
+    IoEvent,
 };
 pub use event_loop::{
     EventLoop,
@@ -157,7 +158,8 @@ pub use notify::{
     NotifyError,
 };
 pub use poll::{
-    Poll
+    Poll,
+    Events,
 };
 pub use timer::{
     Timeout,

@@ -75,7 +75,7 @@ impl EchoServer {
     fn accept(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("server accepting socket");
 
-        let sock = self.sock.accept().unwrap().unwrap();
+        let sock = self.sock.accept().unwrap().unwrap().0;
         let conn = EchoConn::new(sock,);
         let tok = self.conns.insert(conn)
             .ok().expect("could not add connection to slab");
@@ -222,8 +222,7 @@ impl Handler for Echo {
 pub fn test_echo_server() {
     debug!("Starting TEST_ECHO_SERVER");
     let mut config = EventLoopConfig::new();
-    config.io_poll_timeout_ms(1_000)
-          .notify_capacity(1_048_576)
+    config.notify_capacity(1_048_576)
           .messages_per_tick(64)
           .timer_tick_ms(100)
           .timer_wheel_size(1_024)
@@ -232,20 +231,13 @@ pub fn test_echo_server() {
 
     let addr = localhost();
 
-    let srv = TcpSocket::v4().unwrap();
-
-    info!("setting re-use addr");
-    srv.set_reuseaddr(true).unwrap();
-    srv.bind(&addr).unwrap();
-
-    let srv = srv.listen(256).unwrap();
+    let srv = TcpListener::bind(&addr).unwrap();
 
     info!("listen for connections");
     event_loop.register(&srv, SERVER, EventSet::readable(),
                         PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let (sock, _) = TcpSocket::v4().unwrap()
-        .connect(&addr).unwrap();
+    let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register(&sock, CLIENT, EventSet::writable(),

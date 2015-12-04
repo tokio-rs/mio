@@ -2,7 +2,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use {io, Evented, EventSet, PollOpt, Selector, Token};
 use sys::windows::selector::Registration;
-use wio::iocp::CompletionStatus;
+use miow::iocp::CompletionStatus;
 
 pub struct Awakener {
     iocp: Mutex<Registration>,
@@ -53,6 +53,6 @@ impl Evented for Awakener {
     }
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.iocp().deregister(selector)
+        self.iocp().checked_deregister(selector)
     }
 }

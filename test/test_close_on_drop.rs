@@ -109,17 +109,12 @@ pub fn test_close_on_drop() {
     let addr = localhost();
 
     // == Create & setup server socket
-    let srv = TcpSocket::v4().unwrap();
-    srv.set_reuseaddr(true).unwrap();
-    srv.bind(&addr).unwrap();
-
-    let srv = srv.listen(256).unwrap();
+    let srv = TcpListener::bind(&addr).unwrap();
 
     event_loop.register(&srv, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
 
     // == Create & setup client socket
-    let (sock, _) = TcpSocket::v4().unwrap()
-        .connect(&addr).unwrap();
+    let sock = TcpStream::connect(&addr).unwrap();
 
     event_loop.register(&sock, CLIENT, EventSet::writable(), PollOpt::edge()).unwrap();
 

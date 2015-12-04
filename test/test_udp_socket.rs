@@ -1,6 +1,6 @@
 use mio::*;
 use mio::udp::*;
-use bytes::{Buf, RingBuf, SliceBuf, MutSliceBuf};
+use bytes::{Buf, RingBuf, SliceBuf, MutBuf};
 use super::localhost;
 use std::str;
 
@@ -37,7 +37,11 @@ impl Handler for UdpHandler {
             match token {
                 LISTENER => {
                     debug!("We are receiving a datagram now...");
-                    self.rx.recv_from(&mut self.rx_buf).unwrap();
+                    let (cnt, _) = unsafe {
+                        self.rx.recv_from(self.rx_buf.mut_bytes()).unwrap()
+                                                                  .unwrap()
+                    };
+                    unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
                     assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
                     event_loop.shutdown();
                 },
@@ -48,12 +52,18 @@ impl Handler for UdpHandler {
         if events.is_writable() {
             match token {
                 SENDER => {
-                    self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();
+                    let addr = self.rx.local_addr().unwrap();
+                    let cnt = self.tx.send_to(self.buf.bytes(), &addr).unwrap()
+                                                                      .unwrap();
+                    self.buf.advance(cnt);
                 },
                 _ => {}
             }
         }
     }
+}
+
+fn assert_send<T: Send>() {
 }
 
 #[test]
@@ -67,9 +77,11 @@ pub fn test_udp_socket() {
     let tx = UdpSocket::bound(&any).unwrap();
     let rx = UdpSocket::bound(&addr).unwrap();
 
+    assert_send::<UdpSocket>();
+
     // ensure that the sockets are non-blocking
     let mut buf = [0; 128];
-    assert!(rx.recv_from(&mut MutSliceBuf::wrap(&mut buf)).unwrap().is_none());
+    assert!(rx.recv_from(&mut buf).unwrap().is_none());
 
     info!("Registering SENDER");
     event_loop.register(&tx, SENDER, EventSet::writable(), PollOpt::edge()).unwrap();

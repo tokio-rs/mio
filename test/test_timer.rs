@@ -36,7 +36,7 @@ impl TestHandler {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
-                let conn = self.srv.accept().unwrap().unwrap();
+                let conn = self.srv.accept().unwrap().unwrap().0;
                 event_loop.register(&conn, CONN, EventSet::all(),
                                         PollOpt::edge()).unwrap();
                 event_loop.timeout_ms(conn, 200).unwrap();
@@ -131,20 +131,13 @@ pub fn test_timer() {
 
     let addr = localhost();
 
-    let srv = TcpSocket::v4().unwrap();
-
-    info!("setting re-use addr");
-    srv.set_reuseaddr(true).unwrap();
-    srv.bind(&addr).unwrap();
-
-    let srv = srv.listen(256).unwrap();
+    let srv = TcpListener::bind(&addr).unwrap();
 
     info!("listening for connections");
 
     event_loop.register(&srv, SERVER, EventSet::all(), PollOpt::edge()).unwrap();
 
-    let (sock, _) = TcpSocket::v4().unwrap()
-        .connect(&addr).unwrap();
+    let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register(&sock, CLIENT, EventSet::all(), PollOpt::edge()).unwrap();

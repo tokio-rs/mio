@@ -13,16 +13,15 @@ use std::sync::{Mutex, MutexGuard};
 
 use net2::{UdpBuilder, UdpSocketExt};
 use winapi::*;
-use wio::iocp::CompletionStatus;
-use wio::net::SocketAddrBuf;
-use wio::net::UdpSocketExt as WioUdpSocketExt;
+use miow::iocp::CompletionStatus;
+use miow::net::SocketAddrBuf;
+use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
 use {Evented, EventSet, IpAddr, PollOpt, Selector, Token};
-use bytes::{Buf, MutBuf};
 use event::IoEvent;
 use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::from_raw_arc::FromRawArc;
-use sys::windows::{bad_state, wouldblock, Family};
+use sys::windows::{bad_state, Family};
 
 pub struct UdpSocket {
     imp: Imp,
@@ -112,32 +111,29 @@ impl UdpSocket {
         })
     }
 
-    pub fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr)
-                           -> io::Result<Option<()>> {
-        match self._send_to(buf.bytes(), target) {
-            Ok(n) => { buf.advance(n); Ok(Some(())) }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(e) => Err(e),
-        }
-    }
-
     /// Note that unlike `TcpStream::write` this function will not attempt to
     /// continue writing `buf` until its entirely written.
     ///
     /// TODO: This... may be wrong in the long run. We're reporting that we
     ///       successfully wrote all of the bytes in `buf` but it's possible
     ///       that we don't actually end up writing all of them!
-    fn _send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
+                   -> io::Result<Option<usize>> {
         let mut me = self.inner();
         let me = &mut *me;
+
         match me.write {
             State::Empty => {}
-            _ => return Err(wouldblock())
+            _ => return Ok(None),
         }
+
         let s = try!(me.socket.socket());
         if me.iocp.port().is_none() {
-            return Err(wouldblock())
+            return Ok(None)
         }
+
+        me.iocp.unset_readiness(EventSet::writable());
+
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = try!(owned_buf.write(buf));
         try!(unsafe {
@@ -147,11 +143,11 @@ impl UdpSocket {
         });
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
-        Ok(amt)
+        Ok(Some(amt))
     }
 
-    pub fn recv_from<B: MutBuf>(&self, buf: &mut B)
-                                -> io::Result<Option<SocketAddr>> {
+    pub fn recv_from(&self, mut buf: &mut [u8])
+                     -> io::Result<Option<(usize, SocketAddr)>> {
         let mut me = self.inner();
         match mem::replace(&mut me.read, State::Empty) {
             State::Empty => Ok(None),
@@ -159,13 +155,13 @@ impl UdpSocket {
             State::Ready(data) => {
                 // If we weren't provided enough space to receive the message
                 // then don't actually read any data, just return an error.
-                if buf.remaining() < data.len() {
+                if buf.len() < data.len() {
                     me.read = State::Ready(data);
                     Err(io::Error::from_raw_os_error(WSAEMSGSIZE as i32))
                 } else {
                     let r = if let Some(addr) = me.read_buf.to_socket_addr() {
-                        buf.write_slice(&data);
-                        Ok(Some(addr))
+                        buf.write(&data).unwrap();
+                        Ok(Some((data.len(), addr)))
                     } else {
                         Err(io::Error::new(io::ErrorKind::Other,
                                            "failed to parse socket address"))
@@ -257,6 +253,9 @@ impl Imp {
             Socket::Building(..) => return,
             Socket::Bound(ref s) => s,
         };
+
+        me.iocp.unset_readiness(EventSet::readable());
+
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
             trace!("scheduling a read");
@@ -276,6 +275,14 @@ impl Imp {
                 me.iocp.put_buffer(buf);
             }
         }
+    }
+
+    // See comments in tcp::StreamImp::push
+    fn push(&self, me: &mut Inner, set: EventSet, into: &mut Vec<IoEvent>) {
+        if let Socket::Empty = me.socket {
+            return
+        }
+        me.iocp.push_event(set, into);
     }
 }
 
@@ -315,7 +322,7 @@ impl Evented for UdpSocket {
     }
 
     fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner().iocp.deregister(selector)
+        self.inner().iocp.checked_deregister(selector)
     }
 }
 
@@ -327,7 +334,12 @@ impl fmt::Debug for UdpSocket {
 
 impl Drop for UdpSocket {
     fn drop(&mut self) {
-        self.inner().socket = Socket::Empty;
+        let mut inner = self.inner();
+
+        inner.socket = Socket::Empty;
+
+        // Then run any finalization code including level notifications
+        inner.iocp.deregister();
     }
 }
 
@@ -354,7 +366,7 @@ fn send_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     };
     let mut me = me2.inner();
     me.write = State::Empty;
-    me.iocp.push_event(EventSet::writable(), dst);
+    me2.push(&mut me, EventSet::writable(), dst);
 }
 
 fn recv_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
@@ -371,5 +383,5 @@ fn recv_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
         buf.set_len(status.bytes_transferred() as usize);
     }
     me.read = State::Ready(buf);
-    me.iocp.push_event(EventSet::readable(), dst);
+    me2.push(&mut me, EventSet::readable(), dst);
 }

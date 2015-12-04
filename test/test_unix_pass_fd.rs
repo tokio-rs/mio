@@ -4,6 +4,7 @@ use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
 use std::path::PathBuf;
 use std::io;
+use std::os::unix::io::AsRawFd;
 use tempdir::TempDir;
 
 const SERVER: Token = Token(0);
@@ -11,8 +12,7 @@ const CLIENT: Token = Token(1);
 
 struct EchoConn {
     sock: UnixStream,
-    buf: Option<ByteBuf>,
-    mut_buf: Option<MutByteBuf>,
+    pipe_fd: Option<PipeReader>,
     token: Option<Token>,
     interest: EventSet,
 }
@@ -21,27 +21,25 @@ impl EchoConn {
     fn new(sock: UnixStream) -> EchoConn {
         EchoConn {
             sock: sock,
-            buf: None,
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
+            pipe_fd: None,
             token: None,
             interest: EventSet::hup(),
         }
     }
 
     fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
-        let mut buf = self.buf.take().unwrap();
+        let fd = self.pipe_fd.take().unwrap();
 
-        match self.sock.try_write_buf(&mut buf) {
+        match self.sock.try_write_send_fd(b"x", fd.as_raw_fd()) {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
 
-                self.buf = Some(buf);
+                self.pipe_fd = Some(fd);
                 self.interest.insert(EventSet::writable());
             }
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
-                self.mut_buf = Some(buf.flip());
                 self.interest.insert(EventSet::readable());
                 self.interest.remove(EventSet::writable());
             }
@@ -52,19 +50,14 @@ impl EchoConn {
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
-        let mut buf = self.mut_buf.take().unwrap();
+        let mut buf = ByteBuf::mut_with_capacity(2048);
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
-                debug!("CONN : spurious read wakeup");
-                self.mut_buf = Some(buf);
+                panic!("We just got readable, but were unable to read from the socket?");
             }
             Ok(Some(r)) => {
                 debug!("CONN : we read {} bytes!", r);
-
-                // prepare to provide this to writable
-                self.buf = Some(buf.flip());
-
                 self.interest.remove(EventSet::readable());
                 self.interest.insert(EventSet::writable());
             }
@@ -74,6 +67,24 @@ impl EchoConn {
             }
 
         };
+
+        // create fd to pass back. Assume that the write will work
+        // without blocking, for simplicity -- we're only testing that
+        // the FD makes it through somehow
+        let (rd, mut wr) = pipe().unwrap();
+        let mut buf = buf.flip();
+        match wr.try_write_buf(&mut buf) {
+            Ok(None) => {
+                panic!("writing to our own pipe blocked :(");
+            }
+            Ok(Some(r)) => {
+                debug!("CONN: we wrote {} bytes to the FD", r);
+            }
+            Err(e) => {
+                panic!("not implemented; client err={:?}", e);
+            }
+        }
+        self.pipe_fd = Some(rd);
 
         event_loop.reregister(&self.sock, self.token.unwrap(), self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
@@ -147,38 +158,60 @@ impl EchoClient {
         debug!("client socket readable");
 
         let mut buf = self.mut_buf.take().unwrap();
+        let mut pipe: PipeReader;
 
-        match self.sock.try_read_buf(&mut buf) {
+        match self.sock.try_read_buf_recv_fd(&mut buf) {
             Ok(None) => {
-                debug!("CLIENT : spurious read wakeup");
-                self.mut_buf = Some(buf);
+                panic!("We just got readable, but were unable to read from the socket?");
             }
-            Ok(Some(r)) => {
+            Ok(Some((_, None))) => {
+                panic!("Did not receive passed file descriptor");
+            }
+            Ok(Some((r, Some(fd)))) => {
                 debug!("CLIENT : We read {} bytes!", r);
-
-                // prepare for reading
-                let mut buf = buf.flip();
-
-                debug!("CLIENT : buf = {:?} -- rx = {:?}", buf.bytes(), self.rx.bytes());
-                while buf.has_remaining() {
-                    let actual = buf.read_byte().unwrap();
-                    let expect = self.rx.read_byte().unwrap();
-
-                    assert!(actual == expect, "actual={}; expect={}", actual, expect);
-                }
-
-                self.mut_buf = Some(buf.flip());
-
-                self.interest.remove(EventSet::readable());
-
-                if !self.rx.has_remaining() {
-                    self.next_msg(event_loop).unwrap();
-                }
+                pipe = From::<Io>::from(From::from(fd));
             }
             Err(e) => {
                 panic!("not implemented; client err={:?}", e);
             }
         };
+
+        // read the message accompanying the FD
+        let mut buf = buf.flip();
+        assert_eq!(buf.remaining(), 1);
+        assert_eq!(buf.read_byte(), Some(b'x'));
+
+        // read the data out of the FD itself
+        let mut buf = buf.flip();
+        match pipe.try_read_buf(&mut buf) {
+            Ok(None) => {
+                panic!("unimplemented");
+            }
+            Ok(Some(r)) => {
+                debug!("CLIENT : We read {} bytes from the FD", r);
+            }
+            Err(e) => {
+                panic!("not implemented, client err={:?}", e);
+            }
+        }
+
+        let mut buf = buf.flip();
+
+        debug!("CLIENT : buf = {:?} -- rx = {:?}", buf.bytes(), self.rx.bytes());
+        while buf.has_remaining() {
+            let actual = buf.read_byte().unwrap();
+            let expect = self.rx.read_byte().unwrap();
+
+            assert!(actual == expect, "actual={}; expect={}", actual, expect);
+        }
+
+        self.mut_buf = Some(buf.flip());
+
+        self.interest.remove(EventSet::readable());
+
+        if !self.rx.has_remaining() {
+            self.next_msg(event_loop).unwrap();
+        }
 
         event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
@@ -260,11 +293,11 @@ impl Handler for Echo {
 }
 
 #[test]
-pub fn test_unix_echo_server() {
-    debug!("Starting TEST_UNIX_ECHO_SERVER");
+pub fn test_unix_pass_fd() {
+    debug!("Starting TEST_UNIX_PASS_FD");
     let mut event_loop = EventLoop::new().unwrap();
 
-    let tmp_dir = TempDir::new("test_unix_echo_server").unwrap();
+    let tmp_dir = TempDir::new("test_unix_pass_fd").unwrap();
     let addr = tmp_dir.path().join(&PathBuf::from("sock"));
 
     let srv = UnixListener::bind(&addr).unwrap();

@@ -1,6 +1,6 @@
 use mio::*;
 use mio::udp::*;
-use bytes::{Buf, RingBuf, SliceBuf};
+use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use std::str;
 use std::net::{SocketAddr};
 use super::localhost;
@@ -31,8 +31,9 @@ impl UdpHandler {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
-                match self.rx.recv_from(&mut self.rx_buf) {
-                    Ok(Some(SocketAddr::V4(addr))) => {
+                match unsafe { self.rx.recv_from(self.rx_buf.mut_bytes()) } {
+                    Ok(Some((cnt, SocketAddr::V4(addr)))) => {
+                        unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
                         assert_eq!(*addr.ip(), Ipv4Addr::new(127, 0, 0, 1));
                     }
                     _ => panic!("unexpected result"),
@@ -47,7 +48,10 @@ impl UdpHandler {
     fn handle_write(&mut self, _: &mut EventLoop<UdpHandler>, token: Token, _: EventSet) {
         match token {
             SENDER => {
-                self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();
+                let addr = self.rx.local_addr().unwrap();
+                let cnt = self.tx.send_to(self.buf.bytes(), &addr)
+                                 .unwrap().unwrap();
+                self.buf.advance(cnt);
             },
             _ => ()
         }

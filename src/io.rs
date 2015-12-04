@@ -2,7 +2,7 @@ use {EventSet, Selector, PollOpt, Token};
 use bytes::{Buf, MutBuf};
 
 // Re-export the io::Result / Error types for convenience
-pub use std::io::{Read, Write, Result, Error};
+pub use std::io::{Read, Write, Result, Error, ErrorKind};
 
 /// A value that may be registered with an `EventLoop`
 pub trait Evented {
@@ -28,7 +28,7 @@ pub trait TryRead {
         let res = self.try_read(unsafe { buf.mut_bytes() });
 
         if let Ok(Some(cnt)) = res {
-            buf.advance(cnt);
+            unsafe { buf.advance(cnt); }
         }
 
         res
@@ -55,17 +55,13 @@ pub trait TryWrite {
 
 impl<T: Read> TryRead for T {
     fn try_read(&mut self, dst: &mut [u8]) -> Result<Option<usize>> {
-        self.read(dst)
-            .map(|cnt| Some(cnt))
-            .or_else(to_non_block)
+        self.read(dst).map_non_block()
     }
 }
 
 impl<T: Write> TryWrite for T {
     fn try_write(&mut self, src: &[u8]) -> Result<Option<usize>> {
-        self.write(src)
-            .map(|cnt| Some(cnt))
-            .or_else(to_non_block)
+        self.write(src).map_non_block()
     }
 }
 
@@ -81,12 +77,26 @@ pub trait TryAccept {
  *
  */
 
-pub fn to_non_block<T>(err: Error) -> Result<Option<T>> {
-    use std::io::ErrorKind::WouldBlock;
+/// A helper trait to provide the map_non_block function on Results.
+pub trait MapNonBlock<T> {
+    /// Maps a `Result<T>` to a `Result<Option<T>>` by converting
+    /// operation-would-block errors into `Ok(None)`.
+    fn map_non_block(self) -> Result<Option<T>>;
+}
 
-    if let WouldBlock = err.kind() {
-        return Ok(None);
+impl<T> MapNonBlock<T> for Result<T> {
+    fn map_non_block(self) -> Result<Option<T>> {
+        use std::io::ErrorKind::WouldBlock;
+
+        match self {
+            Ok(value) => Ok(Some(value)),
+            Err(err) => {
+                if let WouldBlock = err.kind() {
+                    Ok(None)
+                } else {
+                    Err(err)
+                }
+            }
+        }
     }
-
-    Err(err)
 }

@@ -202,7 +202,7 @@ fn connect_then_close() {
         fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
                  _events: EventSet) {
             if token == Token(1) {
-                let s = self.listener.accept().unwrap().unwrap();
+                let s = self.listener.accept().unwrap().unwrap().0;
                 event_loop.register(&s, Token(3), EventSet::all(),
                                         PollOpt::edge()).unwrap();
                 drop(s);
@@ -221,4 +221,38 @@ fn connect_then_close() {
 
     let mut h = H { listener: l };
     e.run(&mut h).unwrap();
+}
+
+#[test]
+fn listen_then_close() {
+    struct H;
+
+    impl Handler for H {
+        type Timeout = ();
+        type Message = ();
+
+        fn ready(&mut self, _: &mut EventLoop<Self>, token: Token, _: EventSet) {
+            if token == Token(1) {
+                panic!("recieved ready() on a closed TcpListener")
+            }
+        }
+    }
+
+    let mut e = EventLoop::new().unwrap();
+    let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+
+    e.register(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+    drop(l);
+
+    let mut h = H;
+    e.run_once(&mut h, Some(100)).unwrap();
+}
+
+fn assert_send<T: Send>() {
+}
+
+#[test]
+fn test_tcp_sockets_are_send() {
+    assert_send::<TcpListener>();
+    assert_send::<TcpStream>();
 }
