@@ -1,7 +1,9 @@
 # 0.5.0 (unreleased)
 
+* Windows support (#239)
+* NetBSD support (#306)
+* Android support (#295)
 * Don't re-export bytes types
-* Preliminary Windows support (#239)
 * Renamed `EventLoop::register_opt` to `EventLoop::register` (#257)
 * `EventLoopConfig` is now a builder instead of having public struct fields. It
   is also no longer `Copy`. (#259)
@@ -10,6 +12,12 @@
 * The `UdpSocket::{send_to, recv_from}` methods are no longer generic over `Buf`
   or `MutBuf` but instead take slices directly. The return types have also been
   updated to return the number of bytes transferred. (#260)
+* Fix bug with kqueue wher ean error on registration prevented the
+  changelist from getting flushed (#276)
+* Support sending/receiving FDs over UNIX sockets (#291)
+* Mio's socket types are permanently associated with an EventLoop (#308)
+* Reduce unnecessary poll wakeups (#314)
+
 
 # 0.4.1 (July 21)
 
