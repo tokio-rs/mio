@@ -16,8 +16,8 @@ Feedback can be posted on the [PR](https://github.com/carllerche/mio/pull/222).
 **API documentation**
 
 * [master](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/)
+* [v0.5](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/)
 * [v0.4](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.4.x/mio/)
-* [v0.3](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.3.x/mio/)
 
 ## Usage
 
@@ -25,7 +25,7 @@ To use `mio`, first add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mio = "0.4"
+mio = "0.5"
 ```
 
 Then, add this to your crate root:
@@ -52,8 +52,16 @@ or higher level libraries.
 
 ## Platforms
 
-Currently, MIO fully supports Linux and OS X. The master branch has beta
-support for Windows.
+Currently supported platforms:
+
+* Linux
+* OS X
+* Windows
+* Android
+* NetBSD
+
+There are potentially others. If you find that Mio works on another
+platform, submit a PR to update the list!
 
 ## Resources
 
