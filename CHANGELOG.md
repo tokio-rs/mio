@@ -1,4 +1,4 @@
-# 0.5.0 (unreleased)
+# 0.5.0 (December 3, 2015)
 
 * Windows support (#239)
 * NetBSD support (#306)
@@ -8,6 +8,7 @@
 * `EventLoopConfig` is now a builder instead of having public struct fields. It
   is also no longer `Copy`. (#259)
 * `TcpSocket` is no longer exported in the public API (#262)
+* Integrate with net2. (#262)
 * `TcpListener` now returns the remote peer address from `accept` as well (#275)
 * The `UdpSocket::{send_to, recv_from}` methods are no longer generic over `Buf`
   or `MutBuf` but instead take slices directly. The return types have also been
@@ -19,11 +20,11 @@
 * Reduce unnecessary poll wakeups (#314)
 
 
-# 0.4.1 (July 21)
+# 0.4.1 (July 21, 2015)
 
 * [BUGFIX] Fix notify channel concurrency bug (#216)
 
-# 0.4.0 (July 16)
+# 0.4.0 (July 16, 2015)
 
 * [BUGFIX] EventLoop::register requests all events, not just readable.
 * [BUGFIX] Attempting to send a message to a shutdown event loop fails correctly.
