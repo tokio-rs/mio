@@ -393,25 +393,23 @@ impl <H: Handler> Drop for EventLoop<H> {
 }
 
 /// Sends messages to the EventLoop from other threads.
-pub struct Sender<M: Send> {
+pub struct Sender<M> {
     notify: Notify<M>
 }
 
-impl<M: Send> Clone for Sender<M> {
+impl<M> Clone for Sender<M> {
     fn clone(&self) -> Sender<M> {
         Sender { notify: self.notify.clone() }
     }
 }
 
-impl<M: Send> fmt::Debug for Sender<M> {
+impl<M> fmt::Debug for Sender<M> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Sender<?> {{ ... }}")
     }
 }
 
-unsafe impl<M: Send> Sync for Sender<M> { }
-
-impl<M: Send> Sender<M> {
+impl<M> Sender<M> {
     fn new(notify: Notify<M>) -> Sender<M> {
         Sender { notify: notify }
     }

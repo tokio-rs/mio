@@ -3,7 +3,7 @@ use {EventLoop, EventSet, Token};
 #[allow(unused_variables)]
 pub trait Handler: Sized {
     type Timeout;
-    type Message: Send;
+    type Message;
 
     /// Invoked when the socket represented by `token` is ready to be operated
     /// on. `events` indicates the specific operations that are
