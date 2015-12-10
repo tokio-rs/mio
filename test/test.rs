@@ -54,7 +54,8 @@ mod ports {
     }
 }
 
-pub fn sleep_ms(ms: usize) {
+#[allow(deprecated)]
+pub fn sleep_ms(ms: u64) {
     use std::thread;
     thread::sleep_ms(ms as u32);
 }

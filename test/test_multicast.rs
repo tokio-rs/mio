@@ -3,7 +3,7 @@ use mio::udp::*;
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use std::str;
 use std::net::{SocketAddr};
-use super::localhost;
+use localhost;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
