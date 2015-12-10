@@ -1,6 +1,6 @@
 use mio::*;
 use mio::tcp::*;
-use std::thread;
+use {sleep_ms};
 
 struct TestHandler {
     tick: usize,
@@ -50,7 +50,7 @@ pub fn test_tick() {
     let client = TcpStream::connect(&listener.local_addr().unwrap()).unwrap();
     event_loop.register(&client, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
 
-    thread::sleep_ms(250);
+    sleep_ms(250);
 
     let mut handler = TestHandler::new();
 

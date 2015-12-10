@@ -1,4 +1,4 @@
-use super::localhost;
+use localhost;
 use mio::*;
 use mio::tcp::*;
 use mio::udp::*;

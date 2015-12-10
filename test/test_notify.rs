@@ -1,7 +1,6 @@
-use {sleep_ms};
+use {localhost, sleep_ms};
 use mio::*;
 use mio::tcp::*;
-use super::localhost;
 use std::thread;
 
 struct TestHandler {
@@ -174,7 +173,7 @@ pub fn test_notify_drop() {
     notify.send(MessageDrop(tx_notif_2)).unwrap();
 
     // We ensure the message is indeed stuck in the queue
-    thread::sleep_ms(100);
+    sleep_ms(100);
     assert!(rx_notif_2.try_recv().is_err());
 
     // Give the order to drop the event loop

@@ -1,7 +1,7 @@
 use mio::*;
 use mio::tcp::*;
 use bytes::SliceBuf;
-use super::localhost;
+use localhost;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
