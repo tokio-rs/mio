@@ -13,11 +13,11 @@ const CLOSED: isize = -2;
 /// (eventfd, pipe, ...). Backed by a pre-allocated lock free MPMC queue.
 ///
 /// TODO: Use more efficient wake-up strategy if available
-pub struct Notify<M: Send> {
+pub struct Notify<M> {
     inner: Arc<NotifyInner<M>>
 }
 
-impl<M: Send> Notify<M> {
+impl<M> Notify<M> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> io::Result<Notify<M>> {
         Ok(Notify {
@@ -51,7 +51,7 @@ impl<M: Send> Notify<M> {
     }
 }
 
-impl<M: Send> Clone for Notify<M> {
+impl<M> Clone for Notify<M> {
     fn clone(&self) -> Notify<M> {
         Notify {
             inner: self.inner.clone()
@@ -59,7 +59,7 @@ impl<M: Send> Clone for Notify<M> {
     }
 }
 
-impl<M: Send> fmt::Debug for Notify<M> {
+impl<M> fmt::Debug for Notify<M> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Notify<?>")
     }
@@ -74,7 +74,7 @@ struct NotifyInner<M> {
     awaken: sys::Awakener
 }
 
-impl<M: Send> NotifyInner<M> {
+impl<M> NotifyInner<M> {
     fn with_capacity(capacity: usize) -> io::Result<NotifyInner<M>> {
         Ok(NotifyInner {
             state: AtomicIsize::new(0),
@@ -187,7 +187,7 @@ impl<M: Send> NotifyInner<M> {
     }
 }
 
-impl<M: Send> Evented for Notify<M> {
+impl<M> Evented for Notify<M> {
     fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         assert!(opts.is_edge(), "awakener can only be registered using edge-triggered events");
         self.inner.awaken.register(selector, token, interest, opts)
@@ -252,3 +252,15 @@ impl<M: any::Any> error::Error for NotifyError<M> {
         }
     }
 }
+
+fn _assert_notify_send_sync_bounds() {
+    fn _is_send<T: Send>() {}
+
+    _is_send::<Notify<Vec<u8>>>();
+
+    /* Compile fail
+    struct NotSend(::std::marker::PhantomData<*mut ()>);
+    is_send::<Notify<NotSend>>();
+    */
+}
+
