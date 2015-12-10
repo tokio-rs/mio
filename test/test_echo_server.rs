@@ -3,7 +3,7 @@ use mio::tcp::*;
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use mio::util::Slab;
 use std::io;
-use super::localhost;
+use localhost;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
