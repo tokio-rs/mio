@@ -1,8 +1,7 @@
-use {sleep_ms};
+use {localhost, sleep_ms};
 use mio::*;
 use mio::tcp::*;
 use mio::util::Slab;
-use super::localhost;
 use std::collections::LinkedList;
 use std::{io, thread};
 

@@ -1,8 +1,8 @@
 use mio::*;
 use mio::udp::*;
 use bytes::{Buf, RingBuf, SliceBuf, MutBuf};
-use super::localhost;
 use std::str;
+use localhost;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
