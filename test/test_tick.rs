@@ -61,3 +61,35 @@ pub fn test_tick() {
     assert!(handler.tick == 2, "actual={}", handler.tick);
     assert!(handler.state == 0, "actual={}", handler.state);
 }
+
+#[test]
+pub fn test_tick_ms() {
+    struct TestHandler;
+
+    impl TestHandler {
+        fn new() -> TestHandler {
+            TestHandler
+        }
+    }
+
+    impl Handler for TestHandler {
+        type Timeout = usize;
+        type Message = String;
+
+        fn tick(&mut self, event_loop: &mut EventLoop<TestHandler>) {
+            event_loop.shutdown();
+        }
+
+        fn ready(&mut self, _event_loop: &mut EventLoop<TestHandler>, _token: Token, _events: EventSet) { }
+    }
+
+    debug!("Starting TEST_TICK_MS");
+    let mut config = EventLoopConfig::new();
+    config.tick_ms(Some(1000));
+
+    let mut event_loop = EventLoop::configured(config).ok().expect("Couldn't make event loop");
+
+    let mut handler = TestHandler::new();
+
+    event_loop.run(&mut handler).unwrap();
+}

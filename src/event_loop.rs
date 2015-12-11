@@ -12,6 +12,8 @@ pub struct EventLoopConfig {
     notify_capacity: usize,
     messages_per_tick: usize,
 
+    tick_ms: Option<usize>,
+
     // == Timer ==
     timer_tick_ms: u64,
     timer_wheel_size: usize,
@@ -25,6 +27,7 @@ impl EventLoopConfig {
         EventLoopConfig {
             notify_capacity: 4_096,
             messages_per_tick: 256,
+            tick_ms: None,
             timer_tick_ms: 100,
             timer_wheel_size: 1_024,
             timer_capacity: 65_536,
@@ -46,6 +49,20 @@ impl EventLoopConfig {
     /// The default value for this is 256.
     pub fn messages_per_tick(&mut self, messages: usize) -> &mut Self {
         self.messages_per_tick = messages;
+        self
+    }
+
+    /// Sets the tick frequency.
+    ///
+    /// If `None` event loop will call `Handler::tick()` only
+    /// when some events were delivered.
+    ///
+    /// If `Some(ms)` the `Handler::tick()` will by called at least
+    /// every `ms` milliseconds.
+    ///
+    /// The default value for this is `None`.
+    pub fn tick_ms(&mut self, ms: Option<usize>) -> &mut Self {
+        self.tick_ms = ms;
         self
     }
 
@@ -242,9 +259,10 @@ impl<H: Handler> EventLoop<H> {
     pub fn run(&mut self, handler: &mut H) -> io::Result<()> {
         self.run = true;
 
+        let tick_ms = self.config.tick_ms;
         while self.run {
             // Execute ticks as long as the event loop is running
-            try!(self.run_once(handler, None));
+            try!(self.run_once(handler, tick_ms));
         }
 
         Ok(())
