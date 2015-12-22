@@ -34,12 +34,4 @@ tempdir    = "0.3.4"
 
 [[test]]
 name = "test"
-path = "test/test.rs"
-
-[[test]]
-name = "tcp"
-path = "test/tcp.rs"
-
-[[test]]
-name = "smoke"
-path = "test/smoke.rs"
+path = "test/mod.rs"
