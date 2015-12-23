@@ -12,7 +12,7 @@ use miow::net::*;
 use winapi::*;
 
 use {Evented, EventSet, PollOpt, Selector, Token};
-use event::IoEvent;
+use event::Event;
 use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::{wouldblock, Family};
 use sys::windows::from_raw_arc::FromRawArc;
@@ -260,14 +260,14 @@ impl StreamImp {
     /// socket was closed then we don't want to actually push the event onto our
     /// selector as otherwise it's just a spurious notification.
     fn push(&self, me: &mut StreamInner, set: EventSet,
-            into: &mut Vec<IoEvent>) {
+            into: &mut Vec<Event>) {
         if me.socket.as_raw_socket() != INVALID_SOCKET {
             me.iocp.push_event(set, into);
         }
     }
 }
 
-fn read_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
+fn read_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
     let me2 = StreamImp {
         inner: unsafe { overlapped2arc!(status.overlapped(), StreamIo, read) },
     };
@@ -302,7 +302,7 @@ fn read_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     me2.schedule_read(&mut me);
 }
 
-fn write_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
+fn write_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
     trace!("finished a write {}", status.bytes_transferred());
     let me2 = StreamImp {
         inner: unsafe { overlapped2arc!(status.overlapped(), StreamIo, write) },
@@ -544,14 +544,14 @@ impl ListenerImp {
 
     // See comments in StreamImp::push
     fn push(&self, me: &mut ListenerInner, set: EventSet,
-            into: &mut Vec<IoEvent>) {
+            into: &mut Vec<Event>) {
         if me.socket.as_raw_socket() != INVALID_SOCKET {
             me.iocp.push_event(set, into);
         }
     }
 }
 
-fn accept_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
+fn accept_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
     let me2 = ListenerImp {
         inner: unsafe { overlapped2arc!(status.overlapped(), ListenerIo, accept) },
     };

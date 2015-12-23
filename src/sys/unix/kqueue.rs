@@ -1,5 +1,5 @@
 use {io, EventSet, PollOpt, Token};
-use event::IoEvent;
+use event::Event;
 use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent, kevent_ts};
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
 use libc::{timespec, time_t, c_long};
@@ -137,7 +137,7 @@ impl Selector {
 
 pub struct Events {
     sys_events: Vec<KEvent>,
-    events: Vec<IoEvent>,
+    events: Vec<Event>,
     event_map: HashMap<Token, usize>,
 }
 
@@ -155,7 +155,7 @@ impl Events {
         self.events.len()
     }
 
-    pub fn get(&self, idx: usize) -> IoEvent {
+    pub fn get(&self, idx: usize) -> Event {
         self.events[idx]
     }
 
@@ -172,7 +172,7 @@ impl Events {
 
             if idx == len {
                 // New entry, insert the default
-                self.events.push(IoEvent::new(EventSet::none(), token));
+                self.events.push(Event::new(EventSet::none(), token));
 
             }
 

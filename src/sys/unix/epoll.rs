@@ -1,5 +1,5 @@
 use {io, EventSet, PollOpt, Token};
-use event::IoEvent;
+use event::Event;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 use std::os::unix::io::RawFd;
@@ -147,7 +147,7 @@ impl Events {
     }
 
     #[inline]
-    pub fn get(&self, idx: usize) -> IoEvent {
+    pub fn get(&self, idx: usize) -> Event {
         let epoll = self.events[idx].events;
         let mut kind = EventSet::none();
 
@@ -170,6 +170,6 @@ impl Events {
 
         let token = self.events[idx].data;
 
-        IoEvent::new(kind, Token(token as usize))
+        Event::new(kind, Token(token as usize))
     }
 }

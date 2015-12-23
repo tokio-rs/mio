@@ -18,7 +18,7 @@ use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
 use {Evented, EventSet, IpAddr, PollOpt, Selector, Token};
-use event::IoEvent;
+use event::Event;
 use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::{bad_state, Family};
@@ -278,7 +278,7 @@ impl Imp {
     }
 
     // See comments in tcp::StreamImp::push
-    fn push(&self, me: &mut Inner, set: EventSet, into: &mut Vec<IoEvent>) {
+    fn push(&self, me: &mut Inner, set: EventSet, into: &mut Vec<Event>) {
         if let Socket::Empty = me.socket {
             return
         }
@@ -359,7 +359,7 @@ impl Socket {
     }
 }
 
-fn send_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
+fn send_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
     trace!("finished a send {}", status.bytes_transferred());
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, write) },
@@ -369,7 +369,7 @@ fn send_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     me2.push(&mut me, EventSet::writable(), dst);
 }
 
-fn recv_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
+fn recv_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
     trace!("finished a recv {}", status.bytes_transferred());
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, read) },

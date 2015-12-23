@@ -22,12 +22,12 @@ pub fn test_tcp_listener_level_triggered() {
     let events = filter(&poll, Token(0));
 
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0], IoEvent::new(EventSet::readable(), Token(0)));
+    assert_eq!(events[0], Event::new(EventSet::readable(), Token(0)));
 
     poll.poll(Some(MS)).unwrap();
     let events = filter(&poll, Token(0));
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0], IoEvent::new(EventSet::readable(), Token(0)));
+    assert_eq!(events[0], Event::new(EventSet::readable(), Token(0)));
 
     // Accept the connection then test that the events stop
     let _ = l.accept().unwrap();
@@ -42,7 +42,7 @@ pub fn test_tcp_listener_level_triggered() {
     poll.poll(Some(MS)).unwrap();
     let events = filter(&poll, Token(0));
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0], IoEvent::new(EventSet::readable(), Token(0)));
+    assert_eq!(events[0], Event::new(EventSet::readable(), Token(0)));
 
     drop(l);
 
@@ -65,9 +65,9 @@ pub fn test_tcp_stream_level_triggered() {
     poll.register(&s1, Token(1), EventSet::readable() | EventSet::writable(), PollOpt::level()).unwrap();
 
     let _ = poll.poll(Some(MS)).unwrap();
-    let events: Vec<IoEvent> = poll.events().collect();
+    let events: Vec<Event> = poll.events().collect();
     assert!(events.len() == 2, "actual={:?}", events);
-    assert_eq!(filter(&poll, Token(1))[0], IoEvent::new(EventSet::writable(), Token(1)));
+    assert_eq!(filter(&poll, Token(1))[0], Event::new(EventSet::writable(), Token(1)));
 
     // Server side of socket
     let (mut s1_tx, _) = l.accept().unwrap().unwrap();
@@ -75,7 +75,7 @@ pub fn test_tcp_stream_level_triggered() {
     poll.poll(Some(MS)).unwrap();
     let events = filter(&poll, Token(1));
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0], IoEvent::new(EventSet::writable(), Token(1)));
+    assert_eq!(events[0], Event::new(EventSet::writable(), Token(1)));
 
     // Register the socket
     poll.register(&s1_tx, Token(123), EventSet::readable(), PollOpt::edge()).unwrap();
@@ -91,7 +91,7 @@ pub fn test_tcp_stream_level_triggered() {
     poll.poll(Some(MS)).unwrap();
     let events = filter(&poll, Token(1));
     assert!(events.len() == 1, "actual={:?}", events);
-    assert_eq!(events[0], IoEvent::new(EventSet::readable() | EventSet::writable(), Token(1)));
+    assert_eq!(events[0], Event::new(EventSet::readable() | EventSet::writable(), Token(1)));
 
     // Reading the data should clear it
     let mut res = vec![];
@@ -103,7 +103,7 @@ pub fn test_tcp_stream_level_triggered() {
     poll.poll(Some(MS)).unwrap();
     let events = filter(&poll, Token(1));
     assert!(events.len() == 1);
-    assert_eq!(events[0], IoEvent::new(EventSet::writable(), Token(1)));
+    assert_eq!(events[0], Event::new(EventSet::writable(), Token(1)));
 
     // Closing the socket clears all active level events
     drop(s1);
@@ -113,6 +113,6 @@ pub fn test_tcp_stream_level_triggered() {
     assert!(events.is_empty());
 }
 
-fn filter(poll: &Poll, token: Token) -> Vec<IoEvent> {
+fn filter(poll: &Poll, token: Token) -> Vec<Event> {
     poll.events().filter(|e| e.token == token).collect()
 }

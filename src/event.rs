@@ -278,21 +278,21 @@ impl fmt::Debug for EventSet {
 
 // Keep this struct internal to mio
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct IoEvent {
+pub struct Event {
     pub kind: EventSet,
     pub token: Token
 }
 
-/// IoEvent represents the raw event that the OS-specific selector
+/// Event represents the raw event that the OS-specific selector
 /// returned. An event can represent more than one kind (such as
 /// readable or writable) at a time.
 ///
-/// These IoEvent objects are created by the OS-specific concrete
+/// These Event objects are created by the OS-specific concrete
 /// Selector when they have events to report.
-impl IoEvent {
-    /// Create a new IoEvent.
-    pub fn new(kind: EventSet, token: Token) -> IoEvent {
-        IoEvent {
+impl Event {
+    /// Create a new Event.
+    pub fn new(kind: EventSet, token: Token) -> Event {
+        Event {
             kind: kind,
             token: token,
         }

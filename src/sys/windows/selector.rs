@@ -11,7 +11,7 @@ use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 
 use {Token, PollOpt};
-use event::{IoEvent, EventSet};
+use event::{Event, EventSet};
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::buffer_pool::BufferPool;
 
@@ -35,7 +35,7 @@ struct SelectorInner {
     /// Events can sometimes be generated without an associated I/O operation
     /// having completed, and this list is emptied out and returned on each turn
     /// of the event loop.
-    defers: Mutex<Vec<IoEvent>>,
+    defers: Mutex<Vec<Event>>,
 
     /// A pool of buffers usable by this selector.
     ///
@@ -43,8 +43,8 @@ struct SelectorInner {
     /// and once complete they'll be put back in.
     buffers: Mutex<BufferPool>,
 
-    /// A list of registered level triggered `IoEvent`s
-    level_triggered: Mutex<HashMap<usize, IoEvent>>,
+    /// A list of registered level triggered `Event`s
+    level_triggered: Mutex<HashMap<usize, Event>>,
 }
 
 impl Selector {
@@ -93,8 +93,8 @@ impl Selector {
 
         for status in events.statuses[..n].iter_mut() {
             if status.overlapped() as usize == 0 {
-                dst.push(IoEvent::new(EventSet::readable(),
-                                      Token(status.token())));
+                dst.push(Event::new(EventSet::readable(),
+                                    Token(status.token())));
                 continue
             }
 
@@ -177,7 +177,7 @@ impl Registration {
     }
 
     /// Given a handle, token, and an event set describing how its ready,
-    /// translate that to an `IoEvent` and process accordingly.
+    /// translate that to an `Event` and process accordingly.
     ///
     /// This function will mask out all ignored events (e.g. ignore `writable`
     /// events if they weren't requested) and also handle properties such as
@@ -185,7 +185,7 @@ impl Registration {
     ///
     /// Eventually this function will probably also be modified to handle the
     /// `level()` polling option.
-    pub fn push_event(&mut self, set: EventSet, events: &mut Vec<IoEvent>) {
+    pub fn push_event(&mut self, set: EventSet, events: &mut Vec<Event>) {
         trace!("push_event; token={:?}; set={:?}; opts={:?}", self.token, set, self.opts);
 
         // If we're not actually interested in any of these events,
@@ -194,7 +194,7 @@ impl Registration {
         let set = self.interest & set;
 
         if set != EventSet::none() {
-            let event = IoEvent::new(set, self.token);
+            let event = Event::new(set, self.token);
 
             if self.opts.is_edge() {
                 events.push(event);
@@ -365,7 +365,7 @@ pub struct Events {
     statuses: Box<[CompletionStatus]>,
 
     /// Literal events returned by `get` to the upwards `EventLoop`
-    events: Vec<IoEvent>,
+    events: Vec<Event>,
 }
 
 impl Events {
@@ -387,7 +387,7 @@ impl Events {
         self.events.len()
     }
 
-    pub fn get(&self, idx: usize) -> IoEvent {
+    pub fn get(&self, idx: usize) -> Event {
         self.events[idx]
     }
 }
@@ -405,7 +405,7 @@ macro_rules! offset_of {
     )
 }
 
-pub type Callback = fn(&CompletionStatus, &mut Vec<IoEvent>);
+pub type Callback = fn(&CompletionStatus, &mut Vec<Event>);
 
 /// See sys::windows module docs for why this exists.
 ///

@@ -20,11 +20,11 @@ pub fn test_udp_level_triggered() {
 
         let tx_events = filter(&poll, Token(0));
         assert_eq!(1, tx_events.len());
-        assert_eq!(tx_events[0], IoEvent::new(EventSet::writable(), Token(0)));
+        assert_eq!(tx_events[0], Event::new(EventSet::writable(), Token(0)));
 
         let rx_events = filter(&poll, Token(1));
         assert_eq!(1, rx_events.len());
-        assert_eq!(rx_events[0], IoEvent::new(EventSet::writable(), Token(1)));
+        assert_eq!(rx_events[0], Event::new(EventSet::writable(), Token(1)));
     }
 
     tx.send_to(b"hello world!", &rx.local_addr().unwrap()).unwrap();
@@ -35,7 +35,7 @@ pub fn test_udp_level_triggered() {
         poll.poll(Some(MS)).unwrap();
         let rx_events = filter(&poll, Token(1));
         assert_eq!(1, rx_events.len());
-        assert_eq!(rx_events[0], IoEvent::new(EventSet::readable() | EventSet::writable(), Token(1)));
+        assert_eq!(rx_events[0], Event::new(EventSet::readable() | EventSet::writable(), Token(1)));
     }
 
     let mut buf = [0; 200];
@@ -46,7 +46,7 @@ pub fn test_udp_level_triggered() {
         poll.poll(Some(MS)).unwrap();
         let rx_events = filter(&poll, Token(1));
         assert_eq!(1, rx_events.len());
-        assert_eq!(rx_events[0], IoEvent::new(EventSet::writable(), Token(1)));
+        assert_eq!(rx_events[0], Event::new(EventSet::writable(), Token(1)));
     }
 
     tx.send_to(b"hello world!", &rx.local_addr().unwrap()).unwrap();
@@ -55,7 +55,7 @@ pub fn test_udp_level_triggered() {
     poll.poll(Some(MS)).unwrap();
     let rx_events = filter(&poll, Token(1));
     assert_eq!(1, rx_events.len());
-    assert_eq!(rx_events[0], IoEvent::new(EventSet::readable() | EventSet::writable(), Token(1)));
+    assert_eq!(rx_events[0], Event::new(EventSet::readable() | EventSet::writable(), Token(1)));
 
     drop(rx);
 
@@ -64,6 +64,6 @@ pub fn test_udp_level_triggered() {
     assert!(rx_events.is_empty());
 }
 
-fn filter(poll: &Poll, token: Token) -> Vec<IoEvent> {
+fn filter(poll: &Poll, token: Token) -> Vec<Event> {
     poll.events().filter(|e| e.token == token).collect()
 }

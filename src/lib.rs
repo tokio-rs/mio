@@ -116,7 +116,7 @@ mod token;
 pub use event::{
     PollOpt,
     EventSet,
-    IoEvent,
+    Event,
 };
 pub use event_loop::{
     EventLoop,

@@ -1,5 +1,5 @@
 use {sys, Evented, Token};
-use event::{EventSet, IoEvent, PollOpt};
+use event::{EventSet, Event, PollOpt};
 use std::{fmt, io};
 
 pub struct Poll {
@@ -53,7 +53,7 @@ impl Poll {
         Ok(self.events.len())
     }
 
-    pub fn event(&self, idx: usize) -> IoEvent {
+    pub fn event(&self, idx: usize) -> Event {
         self.events.get(idx)
     }
 
@@ -77,9 +77,9 @@ pub struct Events<'a> {
 }
 
 impl<'a> Iterator for Events<'a> {
-    type Item = IoEvent;
+    type Item = Event;
 
-    fn next(&mut self) -> Option<IoEvent> {
+    fn next(&mut self) -> Option<Event> {
         if self.curr == self.poll.events.len() {
             return None;
         }

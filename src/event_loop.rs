@@ -1,5 +1,5 @@
 use {Handler, Evented, Poll, NotifyError, Token};
-use event::{IoEvent, EventSet, PollOpt};
+use event::{Event, EventSet, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
 use std::{cmp, io, fmt, thread, usize};
@@ -351,7 +351,7 @@ impl<H: Handler> EventLoop<H> {
         }
     }
 
-    fn io_event(&mut self, handler: &mut H, evt: IoEvent) {
+    fn io_event(&mut self, handler: &mut H, evt: Event) {
         handler.ready(self, evt.token, evt.kind);
     }
 
