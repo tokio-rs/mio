@@ -163,7 +163,7 @@ impl Events {
         self.events.clear();
         self.event_map.clear();
 
-        for e in self.sys_events.iter() {
+        for e in &self.sys_events {
             let token = Token(e.udata as usize);
             let len = self.events.len();
 

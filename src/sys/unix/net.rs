@@ -71,7 +71,7 @@ pub fn getsockname(io: &Io) -> io::Result<nix::SockAddr> {
 pub fn dup(io: &Io) -> io::Result<Io> {
     nix::dup(io.as_raw_fd())
         .map_err(super::from_nix_error)
-        .map(|fd| Io::from_raw_fd(fd))
+        .map(Io::from_raw_fd)
 }
 
 /*
