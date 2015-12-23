@@ -5,9 +5,14 @@ use timer::{Timer, Timeout, TimerResult};
 use std::{cmp, io, fmt, thread, usize};
 use std::default::Default;
 
-/// Configure EventLoop runtime details
+#[derive(Debug, Default, Clone)]
+pub struct EventLoopBuilder {
+    config: Config,
+}
+
+/// `EventLoop` configuration details
 #[derive(Clone, Debug)]
-pub struct EventLoopConfig {
+struct Config {
     // == Notifications ==
     notify_capacity: usize,
     messages_per_tick: usize,
@@ -18,11 +23,10 @@ pub struct EventLoopConfig {
     timer_capacity: usize,
 }
 
-impl EventLoopConfig {
-    /// Creates a new configuration for the event loop with all default options
-    /// specified.
-    pub fn new() -> EventLoopConfig {
-        EventLoopConfig {
+impl Default for Config {
+    fn default() -> Config {
+        // Default EventLoop configuration values
+        Config {
             notify_capacity: 4_096,
             messages_per_tick: 256,
             timer_tick_ms: 100,
@@ -30,13 +34,21 @@ impl EventLoopConfig {
             timer_capacity: 65_536,
         }
     }
+}
+
+impl EventLoopBuilder {
+    /// Construct a new `EventLoopBuilder` with the default configuration
+    /// values.
+    pub fn new() -> EventLoopBuilder {
+        EventLoopBuilder::default()
+    }
 
     /// Sets the maximum number of messages that can be buffered on the event
     /// loop's notification channel before a send will fail.
     ///
     /// The default value for this is 4096.
     pub fn notify_capacity(&mut self, capacity: usize) -> &mut Self {
-        self.notify_capacity = capacity;
+        self.config.notify_capacity = capacity;
         self
     }
 
@@ -45,29 +57,29 @@ impl EventLoopConfig {
     ///
     /// The default value for this is 256.
     pub fn messages_per_tick(&mut self, messages: usize) -> &mut Self {
-        self.messages_per_tick = messages;
+        self.config.messages_per_tick = messages;
         self
     }
 
     pub fn timer_tick_ms(&mut self, ms: u64) -> &mut Self {
-        self.timer_tick_ms = ms;
+        self.config.timer_tick_ms = ms;
         self
     }
 
     pub fn timer_wheel_size(&mut self, size: usize) -> &mut Self {
-        self.timer_wheel_size = size;
+        self.config.timer_wheel_size = size;
         self
     }
 
     pub fn timer_capacity(&mut self, cap: usize) -> &mut Self {
-        self.timer_capacity = cap;
+        self.config.timer_capacity = cap;
         self
     }
-}
 
-impl Default for EventLoopConfig {
-    fn default() -> EventLoopConfig {
-        EventLoopConfig::new()
+    /// Constructs a new `EventLoop` using the configured values. The
+    /// `EventLoop` will not be running.
+    pub fn build<H: Handler>(self) -> io::Result<EventLoop<H>> {
+        EventLoop::configured(self.config)
     }
 }
 
@@ -78,7 +90,7 @@ pub struct EventLoop<H: Handler> {
     poll: Poll,
     timer: Timer<H::Timeout>,
     notify: Notify<H::Message>,
-    config: EventLoopConfig,
+    config: Config,
 }
 
 // Token used to represent notifications
@@ -86,13 +98,13 @@ const NOTIFY: Token = Token(usize::MAX);
 
 impl<H: Handler> EventLoop<H> {
 
-    /// Initializes a new event loop using default configuration settings. The
-    /// event loop will not be running yet.
+    /// Constructs a new `EventLoop` using the default configuration values.
+    /// The `EventLoop` will not be running.
     pub fn new() -> io::Result<EventLoop<H>> {
-        EventLoop::configured(EventLoopConfig::new())
+        EventLoop::configured(Config::default())
     }
 
-    pub fn configured(config: EventLoopConfig) -> io::Result<EventLoop<H>> {
+    fn configured(config: Config) -> io::Result<EventLoop<H>> {
         // Create the IO poller
         let mut poll = try!(Poll::new());
 

@@ -86,11 +86,11 @@ pub fn test_notify_capacity() {
         }
     }
 
-    let mut config = EventLoopConfig::new();
-    config.notify_capacity(1);
+    let mut builder = EventLoopBuilder::new();
+    builder.notify_capacity(1);
 
     let (tx, rx) = channel::<i32>();
-    let mut event_loop = EventLoop::configured(config).unwrap();
+    let mut event_loop = builder.build().unwrap();
     let notify = event_loop.channel();
 
     let handle = thread::spawn(move || {

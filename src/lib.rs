@@ -120,7 +120,7 @@ pub use event::{
 };
 pub use event_loop::{
     EventLoop,
-    EventLoopConfig,
+    EventLoopBuilder,
     Sender,
 };
 pub use handler::{

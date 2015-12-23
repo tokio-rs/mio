@@ -220,13 +220,14 @@ impl Handler for Echo {
 #[test]
 pub fn test_echo_server() {
     debug!("Starting TEST_ECHO_SERVER");
-    let mut config = EventLoopConfig::new();
-    config.notify_capacity(1_048_576)
-          .messages_per_tick(64)
-          .timer_tick_ms(100)
-          .timer_wheel_size(1_024)
-          .timer_capacity(65_536);
-    let mut event_loop = EventLoop::configured(config).unwrap();
+    let mut b = EventLoopBuilder::new();
+    b.notify_capacity(1_048_576)
+        .messages_per_tick(64)
+        .timer_tick_ms(100)
+        .timer_wheel_size(1_024)
+        .timer_capacity(65_536);
+
+    let mut event_loop = b.build().unwrap();
 
     let addr = localhost();
 
