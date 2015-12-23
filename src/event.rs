@@ -119,7 +119,7 @@ impl fmt::Debug for PollOpt {
             (PollOpt::level(), "Level-Triggered"),
             (PollOpt::oneshot(), "OneShot")];
 
-        for &(flag, msg) in flags.iter() {
+        for &(flag, msg) in &flags {
             if self.contains(flag) {
                 if one { try!(write!(fmt, " | ")) }
                 try!(write!(fmt, "{}", msg));
@@ -263,7 +263,7 @@ impl fmt::Debug for EventSet {
             (EventSet::error(),    "Error"),
             (EventSet::hup(),      "Hup")];
 
-        for &(flag, msg) in flags.iter() {
+        for &(flag, msg) in &flags {
             if self.contains(flag) {
                 if one { try!(write!(fmt, " | ")) }
                 try!(write!(fmt, "{}", msg));
