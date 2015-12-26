@@ -1,7 +1,7 @@
 use token::Token;
 use util::Slab;
 use time::precise_time_ns;
-use std::{usize, iter};
+use std::{error, fmt, usize, iter};
 use std::cmp::max;
 
 use self::TimerErrorKind::TimerOverflow;
@@ -294,12 +294,28 @@ pub struct TimerError {
     desc: &'static str,
 }
 
+impl fmt::Display for TimerError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.desc)
+    }
+}
+
 impl TimerError {
     fn overflow() -> TimerError {
         TimerError {
             kind: TimerOverflow,
             desc: "too many timer entries"
         }
+    }
+}
+
+impl error::Error for TimerError {
+    fn description(&self) -> &str {
+        self.desc
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        None
     }
 }
 
