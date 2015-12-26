@@ -313,10 +313,6 @@ impl error::Error for TimerError {
     fn description(&self) -> &str {
         self.desc
     }
-
-    fn cause(&self) -> Option<&error::Error> {
-        None
-    }
 }
 
 #[derive(Debug)]
