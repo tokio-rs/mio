@@ -296,7 +296,7 @@ pub struct TimerError {
 
 impl fmt::Display for TimerError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}", self.desc)
+        write!(fmt, "{}: {}", self.kind, self.desc)
     }
 }
 
@@ -322,6 +322,14 @@ impl error::Error for TimerError {
 #[derive(Debug)]
 pub enum TimerErrorKind {
     TimerOverflow,
+}
+
+impl fmt::Display for TimerErrorKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TimerOverflow => write!(fmt, "TimerOverflow"),
+        }
+    }
 }
 
 #[cfg(test)]
