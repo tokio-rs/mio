@@ -338,7 +338,7 @@ impl<H: Handler> EventLoop<H> {
         // handle that the event is about) as well as information about
         // what kind of event occurred (readable, writable, signal, etc.)
         while i < cnt {
-            let evt = self.poll.event(i);
+            let evt = self.poll.events().get(i).unwrap();
 
             trace!("event={:?}", evt);
 

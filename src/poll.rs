@@ -2,6 +2,44 @@ use {sys, Evented, Token};
 use event::{EventSet, Event, PollOpt};
 use std::{fmt, io};
 
+/// The `Poll` type acts as an interface allowing a program to wait on a set of
+/// IO handles until one or more become "ready" to be operated on. An IO handle
+/// is considered ready to operate on when the given operation can complete
+/// without blocking.
+///
+/// To use `Poll`, an IO handle must first be registered with the `Poll`
+/// instance using the `register()` handle. An `EventSet` representing the
+/// program's interest in the socket is specified as well as an arbitrary
+/// `Token` which is used to identify the IO handle in the future.
+///
+/// ## Edge-triggered and level-triggered
+///
+/// An IO handle registration may request edge-triggered notifications or
+/// level-triggered notifications. This is done by specifying the `PollOpt`
+/// argument to `register()` and `reregister()`.
+///
+/// ## Portability
+///
+/// Cross platform portability is provided for Mio's TCP & UDP implementations.
+///
+/// ## Examples
+///
+/// ```no_run
+/// use mio::*;
+/// use mio::tcp::*;
+///
+/// // Construct a new `Poll` handle
+/// let mut poll = Poll::new().unwrap();
+///
+/// // Connect the stream
+/// let stream = TcpStream::connect(&"173.194.33.80:80".parse().unwrap()).unwrap();
+///
+/// // Register the stream with `Poll`
+/// poll.register(&stream, Token(0), EventSet::all(), PollOpt::edge()).unwrap();
+///
+/// // Wait for the socket to become ready
+/// poll.poll(None).unwrap();
+/// ```
 pub struct Poll {
     selector: sys::Selector,
     events: sys::Events,
@@ -53,10 +91,6 @@ impl Poll {
         Ok(self.events.len())
     }
 
-    pub fn event(&self, idx: usize) -> Event {
-        self.events.get(idx)
-    }
-
     pub fn events(&self) -> Events {
         Events {
             curr: 0,
@@ -76,6 +110,12 @@ pub struct Events<'a> {
     poll: &'a Poll,
 }
 
+impl<'a> Events<'a> {
+    pub fn get(&self, idx: usize) -> Option<Event> {
+        self.poll.events.get(idx)
+    }
+}
+
 impl<'a> Iterator for Events<'a> {
     type Item = Event;
 
@@ -84,7 +124,7 @@ impl<'a> Iterator for Events<'a> {
             return None;
         }
 
-        let ret = self.poll.event(self.curr);
+        let ret = self.poll.events.get(self.curr).unwrap();
         self.curr += 1;
         Some(ret)
     }

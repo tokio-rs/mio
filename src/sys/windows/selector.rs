@@ -387,8 +387,8 @@ impl Events {
         self.events.len()
     }
 
-    pub fn get(&self, idx: usize) -> Event {
-        self.events[idx]
+    pub fn get(&self, idx: usize) -> Option<Event> {
+        self.events.get(idx).map(|e| *e)
     }
 }
 

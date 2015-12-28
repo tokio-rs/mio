@@ -147,29 +147,31 @@ impl Events {
     }
 
     #[inline]
-    pub fn get(&self, idx: usize) -> Event {
-        let epoll = self.events[idx].events;
-        let mut kind = EventSet::none();
+    pub fn get(&self, idx: usize) -> Option<Event> {
+        self.events.get(idx).map(|event| {
+            let epoll = event.events;
+            let mut kind = EventSet::none();
 
-        if epoll.contains(EPOLLIN) {
-            kind = kind | EventSet::readable();
-        }
+            if epoll.contains(EPOLLIN) {
+                kind = kind | EventSet::readable();
+            }
 
-        if epoll.contains(EPOLLOUT) {
-            kind = kind | EventSet::writable();
-        }
+            if epoll.contains(EPOLLOUT) {
+                kind = kind | EventSet::writable();
+            }
 
-        // EPOLLHUP - Usually means a socket error happened
-        if epoll.contains(EPOLLERR) {
-            kind = kind | EventSet::error();
-        }
+            // EPOLLHUP - Usually means a socket error happened
+            if epoll.contains(EPOLLERR) {
+                kind = kind | EventSet::error();
+            }
 
-        if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
-            kind = kind | EventSet::hup();
-        }
+            if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
+                kind = kind | EventSet::hup();
+            }
 
-        let token = self.events[idx].data;
+            let token = self.events[idx].data;
 
-        Event::new(kind, Token(token as usize))
+            Event::new(kind, Token(token as usize))
+        })
     }
 }
