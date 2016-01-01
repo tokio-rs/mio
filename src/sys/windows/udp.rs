@@ -219,6 +219,10 @@ impl UdpSocket {
         try!(self.inner().socket.socket()).set_multicast_ttl_v4(ttl as u32)
     }
 
+    pub fn set_reuse_address(&self, reuse_address: bool) -> io::Result<()> {
+        try!(self.inner().socket.builder()).reuse_address(reuse_address).map(|_| ())
+    }
+
     fn inner(&self) -> MutexGuard<Inner> {
         self.imp.inner()
     }
@@ -234,6 +238,15 @@ impl UdpSocket {
                     me.iocp.defer(EventSet::writable());
                 }
             }
+        }
+    }
+}
+
+impl AsRawSocket for UdpSocket {
+    fn as_raw_socket(&self) -> RawSocket {
+        match self.inner().socket {
+            Socket::Bound(ref s) => s.as_raw_socket(),
+            _ => INVALID_SOCKET,
         }
     }
 }

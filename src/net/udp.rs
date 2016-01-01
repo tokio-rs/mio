@@ -74,6 +74,10 @@ impl UdpSocket {
     pub fn set_multicast_time_to_live(&self, ttl: i32) -> io::Result<()> {
         self.sys.set_multicast_time_to_live(ttl)
     }
+
+    pub fn set_reuse_address(&self, reuse_address: bool) -> io::Result<()> {
+        self.sys.set_reuse_address(reuse_address)
+    }
 }
 
 impl Evented for UdpSocket {
