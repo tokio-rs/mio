@@ -130,6 +130,26 @@ impl UdpSocket {
             .map_err(super::from_nix_error)
     }
 
+    pub fn set_reuse_address(&self, reuse_address: bool) -> io::Result<()> {
+        try!(nix::setsockopt(self.as_raw_fd(), nix::sockopt::ReuseAddr, &reuse_address)
+                 .map_err(super::from_nix_error));
+
+        if cfg!(any(target_os = "bitrig",
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "netbsd",
+                    target_os = "openbsd")) {
+            // To implement portable behaviour for SO_REUSEADDR with UDP sockets
+            // we need to also set SO_REUSEPORT on BSD-based platforms.
+            try!(nix::setsockopt(self.as_raw_fd(), nix::sockopt::ReusePort, &reuse_address)
+                     .map_err(super::from_nix_error));
+        }
+
+        Ok(())
+    }
+
     fn associate_selector(&self, selector: &Selector) -> io::Result<()> {
         let selector_id = self.selector_id.get();
 

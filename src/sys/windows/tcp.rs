@@ -508,6 +508,12 @@ impl TcpListener {
     }
 }
 
+impl AsRawSocket for TcpListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner().socket.as_raw_socket()
+    }
+}
+
 impl ListenerImp {
     fn inner(&self) -> MutexGuard<ListenerInner> {
         self.inner.inner.lock().unwrap()
