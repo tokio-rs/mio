@@ -1,9 +1,10 @@
+use {sleep_ms};
 use mio::*;
 use mio::tcp::*;
 use std::io::Write;
-use sleep_ms;
+use std::time::Duration;
 
-const MS: usize = 1_000;
+const MS: u64 = 1_000;
 
 #[test]
 pub fn test_tcp_listener_level_triggered() {
@@ -18,13 +19,13 @@ pub fn test_tcp_listener_level_triggered() {
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
     poll.register(&s1, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
 
-    poll.poll(Some(MS)).unwrap();
+    poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(0));
 
     assert_eq!(events.len(), 1);
     assert_eq!(events[0], Event::new(EventSet::readable(), Token(0)));
 
-    poll.poll(Some(MS)).unwrap();
+    poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(0));
     assert_eq!(events.len(), 1);
     assert_eq!(events[0], Event::new(EventSet::readable(), Token(0)));
@@ -32,21 +33,21 @@ pub fn test_tcp_listener_level_triggered() {
     // Accept the connection then test that the events stop
     let _ = l.accept().unwrap();
 
-    poll.poll(Some(MS)).unwrap();
+    poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(0));
     assert!(events.is_empty(), "actual={:?}", events);
 
     let s3 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
     poll.register(&s3, Token(2), EventSet::readable(), PollOpt::edge()).unwrap();
 
-    poll.poll(Some(MS)).unwrap();
+    poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(0));
     assert_eq!(events.len(), 1);
     assert_eq!(events[0], Event::new(EventSet::readable(), Token(0)));
 
     drop(l);
 
-    poll.poll(Some(MS)).unwrap();
+    poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(0));
     assert!(events.is_empty());
 }
@@ -64,7 +65,7 @@ pub fn test_tcp_stream_level_triggered() {
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
     poll.register(&s1, Token(1), EventSet::readable() | EventSet::writable(), PollOpt::level()).unwrap();
 
-    let _ = poll.poll(Some(MS)).unwrap();
+    let _ = poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events: Vec<Event> = poll.events().collect();
     assert!(events.len() == 2, "actual={:?}", events);
     assert_eq!(filter(&poll, Token(1))[0], Event::new(EventSet::writable(), Token(1)));
@@ -72,7 +73,7 @@ pub fn test_tcp_stream_level_triggered() {
     // Server side of socket
     let (mut s1_tx, _) = l.accept().unwrap().unwrap();
 
-    poll.poll(Some(MS)).unwrap();
+    poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(1));
     assert_eq!(events.len(), 1);
     assert_eq!(events[0], Event::new(EventSet::writable(), Token(1)));
@@ -88,7 +89,7 @@ pub fn test_tcp_stream_level_triggered() {
     sleep_ms(250);
 
     // Poll rx end
-    poll.poll(Some(MS)).unwrap();
+    poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(1));
     assert!(events.len() == 1, "actual={:?}", events);
     assert_eq!(events[0], Event::new(EventSet::readable() | EventSet::writable(), Token(1)));
@@ -100,7 +101,7 @@ pub fn test_tcp_stream_level_triggered() {
 
     assert_eq!(res, b"hello world!");
 
-    poll.poll(Some(MS)).unwrap();
+    poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(1));
     assert!(events.len() == 1);
     assert_eq!(events[0], Event::new(EventSet::writable(), Token(1)));
@@ -108,7 +109,7 @@ pub fn test_tcp_stream_level_triggered() {
     // Closing the socket clears all active level events
     drop(s1);
 
-    poll.poll(Some(MS)).unwrap();
+    poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(1));
     assert!(events.is_empty());
 }

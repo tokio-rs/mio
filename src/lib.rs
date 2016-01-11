@@ -180,3 +180,15 @@ pub mod prelude {
         TryWrite,
     };
 }
+
+// Conversion utilities
+mod convert {
+    use std::time::Duration;
+
+    const NANOS_PER_MILLI: u32 = 1_000_000;
+    const MILLIS_PER_SEC: u64 = 1_000;
+
+    pub fn millis(duration: Duration) -> u64 {
+        duration.as_secs() * MILLIS_PER_SEC + ((duration.subsec_nanos() / NANOS_PER_MILLI) as u64)
+    }
+}

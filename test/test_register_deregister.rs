@@ -2,6 +2,7 @@ use mio::*;
 use mio::tcp::*;
 use bytes::SliceBuf;
 use localhost;
+use std::time::Duration;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -46,7 +47,7 @@ impl TestHandler {
 
         self.state = 2;
         event_loop.deregister(&self.client).unwrap();
-        event_loop.timeout_ms(1, 200).unwrap();
+        event_loop.timeout(1, Duration::from_millis(200)).unwrap();
     }
 }
 

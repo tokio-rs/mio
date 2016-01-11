@@ -1,9 +1,10 @@
-use {Handler, Evented, Poll, NotifyError, Token};
+use {convert, Handler, Evented, Poll, NotifyError, Token};
 use event::{Event, EventSet, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
 use std::{cmp, io, fmt, thread, usize};
 use std::default::Default;
+use std::time::Duration;
 
 #[derive(Debug, Default, Clone)]
 pub struct EventLoopBuilder {
@@ -18,7 +19,7 @@ struct Config {
     messages_per_tick: usize,
 
     // == Timer ==
-    timer_tick_ms: u64,
+    timer_tick: Duration,
     timer_wheel_size: usize,
     timer_capacity: usize,
 }
@@ -29,7 +30,7 @@ impl Default for Config {
         Config {
             notify_capacity: 4_096,
             messages_per_tick: 256,
-            timer_tick_ms: 100,
+            timer_tick: Duration::from_millis(100),
             timer_wheel_size: 1_024,
             timer_capacity: 65_536,
         }
@@ -61,8 +62,8 @@ impl EventLoopBuilder {
         self
     }
 
-    pub fn timer_tick_ms(&mut self, ms: u64) -> &mut Self {
-        self.config.timer_tick_ms = ms;
+    pub fn timer_tick(&mut self, val: Duration) -> &mut Self {
+        self.config.timer_tick = val;
         self
     }
 
@@ -110,7 +111,7 @@ impl<H: Handler> EventLoop<H> {
 
         // Create the timer
         let mut timer = Timer::new(
-            config.timer_tick_ms,
+            convert::millis(config.timer_tick),
             config.timer_wheel_size,
             config.timer_capacity);
 
@@ -195,6 +196,7 @@ impl<H: Handler> EventLoop<H> {
     /// # Example
     /// ```
     /// use mio::{EventLoop, Handler};
+    /// use std::time::Duration;
     ///
     /// struct MyHandler;
     ///
@@ -210,11 +212,11 @@ impl<H: Handler> EventLoop<H> {
     ///
     ///
     /// let mut event_loop = EventLoop::new().unwrap();
-    /// let timeout = event_loop.timeout_ms(123, 300).unwrap();
+    /// let timeout = event_loop.timeout(123, Duration::from_millis(300)).unwrap();
     /// let _ = event_loop.run(&mut MyHandler);
     /// ```
-    pub fn timeout_ms(&mut self, token: H::Timeout, delay: u64) -> TimerResult<Timeout> {
-        self.timer.timeout_ms(token, delay)
+    pub fn timeout(&mut self, token: H::Timeout, delay: Duration) -> TimerResult<Timeout> {
+        self.timer.timeout_ms(token, convert::millis(delay))
     }
 
     /// If the supplied timeout has not been triggered, cancel it such that it
@@ -270,7 +272,7 @@ impl<H: Handler> EventLoop<H> {
     /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once(&mut self, handler: &mut H, mut timeout_ms: Option<usize>) -> io::Result<()> {
+    pub fn run_once(&mut self, handler: &mut H, mut timeout: Option<Duration>) -> io::Result<()> {
         let mut messages;
 
         trace!("event loop tick");
@@ -282,13 +284,13 @@ impl<H: Handler> EventLoop<H> {
         let pending = messages > 0;
 
         if pending {
-            timeout_ms = Some(0);
+            timeout = Some(Duration::from_millis(0));
         }
 
         // Check the registered IO handles for any new events. Each poll
         // is for one second, so a shutdown request can last as long as
         // one second before it takes effect.
-        let events = match self.io_poll(timeout_ms) {
+        let events = match self.io_poll(timeout) {
             Ok(e) => e,
             Err(err) => {
                 if err.kind() == io::ErrorKind::Interrupted {
@@ -315,14 +317,14 @@ impl<H: Handler> EventLoop<H> {
     }
 
     #[inline]
-    fn io_poll(&mut self, timeout: Option<usize>) -> io::Result<usize> {
+    fn io_poll(&mut self, timeout: Option<Duration>) -> io::Result<usize> {
         let next_tick = self.timer.next_tick_in_ms()
-            .map(|ms| cmp::min(ms, usize::MAX as u64) as usize);
+            .map(|ms| cmp::min(ms, usize::MAX as u64));
 
         let timeout = match (timeout, next_tick) {
-            (Some(a), Some(b)) => Some(cmp::min(a, b)),
+            (Some(a), Some(b)) => Some(cmp::min(a, Duration::from_millis(b))),
             (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b),
+            (None, Some(b)) => Some(Duration::from_millis(b)),
             _ => None,
         };
 
@@ -422,13 +424,13 @@ impl<M> Sender<M> {
 #[cfg(test)]
 #[cfg(unix)]
 mod tests {
+    use {unix, EventLoop, Handler, Token, TryRead, TryWrite, EventSet, PollOpt};
+    use bytes::{Buf, SliceBuf, ByteBuf};
     use std::str;
     use std::sync::Arc;
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
-    use super::EventLoop;
-    use {unix, Handler, Token, TryRead, TryWrite, EventSet, PollOpt};
-    use bytes::{Buf, SliceBuf, ByteBuf};
+    use std::time::Duration;
 
     #[test]
     pub fn test_event_loop_size() {
@@ -513,6 +515,6 @@ mod tests {
 
         let mut handler = BrokenPipeHandler;
         drop(reader);
-        event_loop.run_once(&mut handler, Some(1000)).unwrap();
+        event_loop.run_once(&mut handler, Some(Duration::from_millis(1000))).unwrap();
     }
 }

@@ -5,6 +5,7 @@ use std::io::prelude::*;
 use std::net;
 use std::sync::mpsc::channel;
 use std::thread;
+use std::time::Duration;
 
 use mio::{EventLoop, Handler, Token, EventSet, PollOpt, TryRead, TryWrite};
 use mio::tcp::{TcpListener, TcpStream};
@@ -245,7 +246,7 @@ fn listen_then_close() {
     drop(l);
 
     let mut h = H;
-    e.run_once(&mut h, Some(100)).unwrap();
+    e.run_once(&mut h, Some(Duration::from_millis(100))).unwrap();
 }
 
 fn assert_send<T: Send>() {

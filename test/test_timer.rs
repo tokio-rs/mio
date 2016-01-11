@@ -2,6 +2,7 @@ use mio::*;
 use mio::tcp::*;
 use bytes::{Buf, ByteBuf, SliceBuf};
 use localhost;
+use std::time::Duration;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 
@@ -39,7 +40,7 @@ impl TestHandler {
                 let conn = self.srv.accept().unwrap().unwrap().0;
                 event_loop.register(&conn, CONN, EventSet::all(),
                                         PollOpt::edge()).unwrap();
-                event_loop.timeout_ms(conn, 200).unwrap();
+                event_loop.timeout(conn, Duration::from_millis(200)).unwrap();
 
                 event_loop.reregister(&self.srv, SERVER, EventSet::readable(),
                                       PollOpt::edge()).unwrap();

@@ -4,6 +4,7 @@ use mio::tcp::*;
 use mio::util::Slab;
 use std::collections::LinkedList;
 use std::{io, thread};
+use std::time::Duration;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -223,7 +224,7 @@ pub fn test_echo_server() {
     let mut b = EventLoopBuilder::new();
     b.notify_capacity(1_048_576)
         .messages_per_tick(64)
-        .timer_tick_ms(100)
+        .timer_tick(Duration::from_millis(100))
         .timer_wheel_size(1_024)
         .timer_capacity(65_536);
 

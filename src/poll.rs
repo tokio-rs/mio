@@ -1,6 +1,7 @@
-use {sys, Evented, Token};
+use {convert, sys, Evented, Token};
 use event::{EventSet, Event, PollOpt};
 use std::{fmt, io};
+use std::time::Duration;
 
 /// The `Poll` type acts as an interface allowing a program to wait on a set of
 /// IO handles until one or more become "ready" to be operated on. An IO handle
@@ -86,8 +87,9 @@ impl Poll {
         Ok(())
     }
 
-    pub fn poll(&mut self, timeout_ms: Option<usize>) -> io::Result<usize> {
-        try!(self.selector.select(&mut self.events, timeout_ms));
+    pub fn poll(&mut self, timeout: Option<Duration>) -> io::Result<usize> {
+        let timeout = timeout.map(|to| convert::millis(to) as usize);
+        try!(self.selector.select(&mut self.events, timeout));
         Ok(self.events.len())
     }
 
