@@ -173,14 +173,6 @@ pub use token::{
 pub use sys::Io;
 pub use sys::Selector;
 
-pub mod prelude {
-    pub use super::{
-        EventLoop,
-        TryRead,
-        TryWrite,
-    };
-}
-
 // Conversion utilities
 mod convert {
     use std::time::Duration;
