@@ -1,8 +1,8 @@
 use {localhost, sleep_ms};
 use mio::*;
 use mio::tcp::*;
-use mio::util::Slab;
 use std::collections::LinkedList;
+use slab;
 use std::{io, thread};
 use std::time::Duration;
 
@@ -20,6 +20,8 @@ struct EchoConn {
     count: usize,
     buf: Vec<u8>
 }
+
+type Slab<T> = slab::Slab<T, Token>;
 
 impl EchoConn {
     fn new(sock: TcpStream) -> EchoConn {

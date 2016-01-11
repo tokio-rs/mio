@@ -1,5 +1,4 @@
 use token::Token;
-use util::Slab;
 use time::precise_time_ns;
 use std::{error, fmt, usize, iter};
 use std::cmp::max;
@@ -42,6 +41,8 @@ pub struct Timeout {
     // Tick that it should matchup with
     tick: u64,
 }
+
+type Slab<T> = ::slab::Slab<T, ::Token>;
 
 impl<T> Timer<T> {
     pub fn new(tick_ms: u64, mut slots: usize, mut capacity: usize) -> Timer<T> {

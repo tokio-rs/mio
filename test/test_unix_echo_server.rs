@@ -1,7 +1,7 @@
 use mio::*;
 use mio::unix::*;
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
-use mio::util::Slab;
+use slab;
 use std::path::PathBuf;
 use std::io;
 use tempdir::TempDir;
@@ -16,6 +16,8 @@ struct EchoConn {
     token: Option<Token>,
     interest: EventSet,
 }
+
+type Slab<T> = slab::Slab<T, Token>;
 
 impl EchoConn {
     fn new(sock: UnixStream) -> EchoConn {

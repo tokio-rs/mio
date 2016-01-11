@@ -100,8 +100,6 @@ extern crate log;
 #[cfg(test)]
 extern crate env_logger;
 
-pub mod util;
-
 mod event;
 mod event_loop;
 mod handler;
@@ -112,6 +110,7 @@ mod poll;
 mod sys;
 mod timer;
 mod token;
+mod util;
 
 pub use event::{
     PollOpt,

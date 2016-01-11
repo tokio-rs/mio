@@ -1,7 +1,7 @@
 use mio::*;
 use mio::tcp::*;
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
-use mio::util::Slab;
+use slab;
 use std::io;
 use localhost;
 
@@ -15,6 +15,8 @@ struct EchoConn {
     token: Option<Token>,
     interest: EventSet
 }
+
+type Slab<T> = slab::Slab<T, Token>;
 
 impl EchoConn {
     fn new(sock: TcpStream) -> EchoConn {
