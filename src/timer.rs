@@ -35,7 +35,7 @@ pub struct Timer<T> {
     mask: u64,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Timeout {
     // Reference into the timer entry slab
     token: Token,
@@ -122,7 +122,7 @@ impl<T> Timer<T> {
         self.insert(token, tick)
     }
 
-    pub fn clear(&mut self, timeout: Timeout) -> bool {
+    pub fn clear(&mut self, timeout: &Timeout) -> bool {
         let links = match self.entries.get(timeout.token) {
             Some(e) => e.links,
             None => return false
@@ -361,7 +361,7 @@ mod test {
         let mut tick;
 
         let to = t.timeout_at_ms("a", 100).unwrap();
-        assert!(t.clear(to));
+        assert!(t.clear(&to));
 
         tick = t.ms_to_tick(100);
         assert_eq!(None, t.tick_to(tick));
@@ -481,7 +481,7 @@ mod test {
         assert_eq!(Some("b"), t.tick_to(tick));
         assert_eq!(2, t.count());
 
-        t.clear(a);
+        t.clear(&a);
         assert_eq!(1, t.count());
 
         assert_eq!(None, t.tick_to(tick));

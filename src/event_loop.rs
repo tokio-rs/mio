@@ -221,8 +221,8 @@ impl<H: Handler> EventLoop<H> {
 
     /// If the supplied timeout has not been triggered, cancel it such that it
     /// will not be triggered in the future.
-    pub fn clear_timeout(&mut self, timeout: Timeout) -> bool {
-        self.timer.clear(timeout)
+    pub fn clear_timeout(&mut self, timeout: &Timeout) -> bool {
+        self.timer.clear(&timeout)
     }
 
     /// Tells the event loop to exit after it is done handling all events in the

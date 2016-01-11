@@ -8,6 +8,7 @@
 * Relax `Send` bound on notify messages.
 * Implement `std::error::Error` for `TimerError`
 * Use `std::time::Duration` for all APIs that require a time duration.
+* Remove `Clone` impl for `Timeout` (future proof)
 
 # 0.5.0 (December 3, 2015)
 
