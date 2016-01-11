@@ -1,5 +1,5 @@
 use {io, EventSet, PollOpt, Token};
-use event::Event;
+use event::{self, Event};
 use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent, kevent_ts};
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
 use libc::{timespec, time_t, c_long};
@@ -177,22 +177,22 @@ impl Events {
             }
 
             if e.flags.contains(EV_ERROR) {
-                self.events[idx].kind.insert(EventSet::error());
+                event::kind_mut(&mut self.events[idx]).insert(EventSet::error());
             }
 
             if e.filter == EventFilter::EVFILT_READ {
-                self.events[idx].kind.insert(EventSet::readable());
+                event::kind_mut(&mut self.events[idx]).insert(EventSet::readable());
             } else if e.filter == EventFilter::EVFILT_WRITE {
-                self.events[idx].kind.insert(EventSet::writable());
+                event::kind_mut(&mut self.events[idx]).insert(EventSet::writable());
             }
 
             if e.flags.contains(EV_EOF) {
-                self.events[idx].kind.insert(EventSet::hup());
+                event::kind_mut(&mut self.events[idx]).insert(EventSet::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
                 if !e.fflags.is_empty() {
-                    self.events[idx].kind.insert(EventSet::error());
+                    event::kind_mut(&mut self.events[idx]).insert(EventSet::error());
                 }
             }
         }

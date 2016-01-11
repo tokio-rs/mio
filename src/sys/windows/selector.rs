@@ -11,7 +11,7 @@ use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 
 use {Token, PollOpt};
-use event::{Event, EventSet};
+use event::{self, Event, EventSet};
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::buffer_pool::BufferPool;
 
@@ -212,8 +212,8 @@ impl Registration {
                 match level.entry(self.key.expect("expected registration key")) {
                     Entry::Occupied(mut e) => {
                         let e = e.get_mut();
-                        debug_assert!(e.token == self.token);
-                        e.kind = e.kind | event.kind;
+                        debug_assert!(e.token() == self.token);
+                        *event::kind_mut(e) = e.kind() | event.kind();
                     }
                     Entry::Vacant(e) => {
                         e.insert(event);
@@ -233,10 +233,10 @@ impl Registration {
             if let Entry::Occupied(mut e) = map.entry(key) {
                 {
                     let event = e.get_mut();
-                    event.kind = event.kind & !set;
+                    *event::kind_mut(event) = event.kind() & !set;
                 }
 
-                if e.get().kind == EventSet::none() {
+                if e.get().kind() == EventSet::none() {
                     e.remove();
                 }
             }

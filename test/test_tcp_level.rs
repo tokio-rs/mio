@@ -115,5 +115,5 @@ pub fn test_tcp_stream_level_triggered() {
 }
 
 fn filter(poll: &Poll, token: Token) -> Vec<Event> {
-    poll.events().filter(|e| e.token == token).collect()
+    poll.events().filter(|e| e.token() == token).collect()
 }

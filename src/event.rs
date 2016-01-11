@@ -279,8 +279,8 @@ impl fmt::Debug for EventSet {
 // Keep this struct internal to mio
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Event {
-    pub kind: EventSet,
-    pub token: Token
+    kind: EventSet,
+    token: Token
 }
 
 /// Event represents the raw event that the OS-specific selector
@@ -297,4 +297,19 @@ impl Event {
             token: token,
         }
     }
+
+    pub fn kind(&self) -> EventSet {
+        self.kind
+    }
+
+    pub fn token(&self) -> Token {
+        self.token
+    }
+}
+
+// Used internally to mutate an `Event` in place
+// Not used on all platforms
+#[allow(dead_code)]
+pub fn kind_mut(event: &mut Event) -> &mut EventSet {
+    &mut event.kind
 }

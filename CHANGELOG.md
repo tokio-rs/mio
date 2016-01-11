@@ -3,6 +3,7 @@
 * Increase minimum supported Rust version to 1.3.0
 * Rename `EventLoopConfig` -> `EventLoopBuilder`
 * Rename `IoEvent` -> `Event`
+* Access `Event` data via functions vs. public fields.
 * Polled events are now retrieved via `Events` type.
 * Relax `Send` bound on notify messages.
 * Implement `std::error::Error` for `TimerError`

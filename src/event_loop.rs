@@ -344,7 +344,7 @@ impl<H: Handler> EventLoop<H> {
 
             trace!("event={:?}", evt);
 
-            match evt.token {
+            match evt.token() {
                 NOTIFY => self.notify.cleanup(),
                 _ => self.io_event(handler, evt)
             }
@@ -354,7 +354,7 @@ impl<H: Handler> EventLoop<H> {
     }
 
     fn io_event(&mut self, handler: &mut H, evt: Event) {
-        handler.ready(self, evt.token, evt.kind);
+        handler.ready(self, evt.token(), evt.kind());
     }
 
     fn notify(&mut self, handler: &mut H, mut cnt: usize) {

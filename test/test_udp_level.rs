@@ -66,5 +66,5 @@ pub fn test_udp_level_triggered() {
 }
 
 fn filter(poll: &Poll, token: Token) -> Vec<Event> {
-    poll.events().filter(|e| e.token == token).collect()
+    poll.events().filter(|e| e.token() == token).collect()
 }
