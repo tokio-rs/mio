@@ -17,7 +17,7 @@ use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
-use {Evented, EventSet, IpAddr, PollOpt, Selector, Token};
+use {poll, Evented, EventSet, IpAddr, Poll, PollOpt, Token};
 use event::Event;
 use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::from_raw_arc::FromRawArc;
@@ -287,7 +287,7 @@ impl Imp {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, selector: &mut Selector, token: Token,
+    fn register(&self, poll: &mut Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         {
@@ -297,14 +297,14 @@ impl Evented for UdpSocket {
                 Socket::Building(ref b) => b as &AsRawSocket,
                 Socket::Empty => return Err(bad_state()),
             };
-            try!(me.iocp.register_socket(socket, selector, token, interest,
+            try!(me.iocp.register_socket(socket, poll::selector_mut(poll), token, interest,
                                          opts));
         }
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token,
+    fn reregister(&self, poll: &mut Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         {
@@ -314,15 +314,15 @@ impl Evented for UdpSocket {
                 Socket::Building(ref b) => b as &AsRawSocket,
                 Socket::Empty => return Err(bad_state()),
             };
-            try!(me.iocp.reregister_socket(socket, selector, token, interest,
+            try!(me.iocp.reregister_socket(socket, poll::selector_mut(poll), token, interest,
                                            opts));
         }
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner().iocp.checked_deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.inner().iocp.checked_deregister(poll::selector(poll))
     }
 }
 

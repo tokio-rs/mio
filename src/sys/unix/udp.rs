@@ -1,4 +1,4 @@
-use {io, Evented, EventSet, Io, IpAddr, PollOpt, Selector, Token};
+use {io, poll, Evented, EventSet, Io, IpAddr, Poll, PollOpt, Token};
 use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::cell::Cell;
@@ -130,30 +130,30 @@ impl UdpSocket {
             .map_err(super::from_nix_error)
     }
 
-    fn associate_selector(&self, selector: &Selector) -> io::Result<()> {
+    fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
         let selector_id = self.selector_id.get();
 
-        if selector_id.is_some() && selector_id != Some(selector.id()) {
+        if selector_id.is_some() && selector_id != Some(poll::selector(poll).id()) {
             Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
         } else {
-            self.selector_id.set(Some(selector.id()));
+            self.selector_id.set(Some(poll::selector(poll).id()));
             Ok(())
         }
     }
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        try!(self.associate_selector(selector));
-        self.io.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        try!(self.associate_selector(poll));
+        self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.io.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.io.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.io.deregister(poll)
     }
 }
 

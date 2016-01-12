@@ -170,7 +170,6 @@ pub use token::{
 };
 #[cfg(unix)]
 pub use sys::Io;
-pub use sys::Selector;
 
 // Conversion utilities
 mod convert {

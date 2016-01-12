@@ -1,4 +1,4 @@
-use {io, Evented, EventSet, Io, PollOpt, Selector, Token, TryAccept};
+use {io, Evented, EventSet, Io, Poll, PollOpt, Token, TryAccept};
 use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
@@ -91,16 +91,16 @@ impl Write for UnixSocket {
 }
 
 impl Evented for UnixSocket {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.io.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.io.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.io.deregister(poll)
     }
 }
 

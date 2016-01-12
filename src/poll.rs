@@ -60,7 +60,7 @@ impl Poll {
         trace!("registering with poller");
 
         // Register interests for this socket
-        try!(io.register(&mut self.selector, token, interest, opts));
+        try!(io.register(self, token, interest, opts));
 
         Ok(())
     }
@@ -71,7 +71,7 @@ impl Poll {
         trace!("registering with poller");
 
         // Register interests for this socket
-        try!(io.reregister(&mut self.selector, token, interest, opts));
+        try!(io.reregister(self, token, interest, opts));
 
         Ok(())
     }
@@ -82,7 +82,7 @@ impl Poll {
         trace!("deregistering IO with poller");
 
         // Deregister interests for this socket
-        try!(io.deregister(&mut self.selector));
+        try!(io.deregister(self));
 
         Ok(())
     }
@@ -130,4 +130,14 @@ impl<'a> Iterator for Events<'a> {
         self.curr += 1;
         Some(ret)
     }
+}
+
+// ===== Accessors for internal usage =====
+
+pub fn selector(poll: &Poll) -> &sys::Selector {
+    &poll.selector
+}
+
+pub fn selector_mut(poll: &mut Poll) -> &mut sys::Selector {
+    &mut poll.selector
 }

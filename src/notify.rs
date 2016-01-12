@@ -1,4 +1,4 @@
-use {sys, Evented, EventSet, PollOpt, Selector, Token};
+use {sys, Evented, EventSet, Poll, PollOpt, Token};
 use util::BoundedQueue;
 use std::{fmt, cmp, io, error, any};
 use std::sync::Arc;
@@ -188,16 +188,16 @@ impl<M> NotifyInner<M> {
 }
 
 impl<M> Evented for Notify<M> {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         assert!(opts.is_edge(), "awakener can only be registered using edge-triggered events");
-        self.inner.awaken.register(selector, token, interest, opts)
+        self.inner.awaken.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, _: &mut Selector, _: Token, _: EventSet, _: PollOpt) -> io::Result<()> {
+    fn reregister(&self, _: &mut Poll, _: Token, _: EventSet, _: PollOpt) -> io::Result<()> {
         panic!("awakener is never reregistered");
     }
 
-    fn deregister(&self, _: &mut Selector) -> io::Result<()> {
+    fn deregister(&self, _: &mut Poll) -> io::Result<()> {
         panic!("awakener is never deregistered");
     }
 }

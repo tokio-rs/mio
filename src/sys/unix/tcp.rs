@@ -9,7 +9,7 @@ use net2::{TcpStreamExt, TcpListenerExt};
 use nix::fcntl::FcntlArg::F_SETFL;
 use nix::fcntl::{fcntl, O_NONBLOCK};
 
-use {io, Evented, EventSet, PollOpt, Selector, Token, TryAccept};
+use {io, poll, Evented, EventSet, Poll, PollOpt, Token, TryAccept};
 use sys::unix::eventedfd::EventedFd;
 
 #[derive(Debug)]
@@ -83,13 +83,13 @@ impl TcpStream {
         })
     }
 
-    fn associate_selector(&self, selector: &Selector) -> io::Result<()> {
+    fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
         let selector_id = self.selector_id.get();
 
-        if selector_id.is_some() && selector_id != Some(selector.id()) {
+        if selector_id.is_some() && selector_id != Some(poll::selector(poll).id()) {
             Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
         } else {
-            self.selector_id.set(Some(selector.id()));
+            self.selector_id.set(Some(poll::selector(poll).id()));
             Ok(())
         }
     }
@@ -112,19 +112,19 @@ impl Write for TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, selector: &mut Selector, token: Token,
+    fn register(&self, poll: &mut Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        try!(self.associate_selector(selector));
-        EventedFd(&self.as_raw_fd()).register(selector, token, interest, opts)
+        try!(self.associate_selector(poll));
+        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token,
+    fn reregister(&self, poll: &mut Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(selector, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).deregister(poll)
     }
 }
 
@@ -184,32 +184,32 @@ impl TcpListener {
         })
     }
 
-    fn associate_selector(&self, selector: &Selector) -> io::Result<()> {
+    fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
         let selector_id = self.selector_id.get();
 
-        if selector_id.is_some() && selector_id != Some(selector.id()) {
+        if selector_id.is_some() && selector_id != Some(poll::selector(poll).id()) {
             Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
         } else {
-            self.selector_id.set(Some(selector.id()));
+            self.selector_id.set(Some(poll::selector(poll).id()));
             Ok(())
         }
     }
 }
 
 impl Evented for TcpListener {
-    fn register(&self, selector: &mut Selector, token: Token,
+    fn register(&self, poll: &mut Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        try!(self.associate_selector(selector));
-        EventedFd(&self.as_raw_fd()).register(selector, token, interest, opts)
+        try!(self.associate_selector(poll));
+        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token,
+    fn reregister(&self, poll: &mut Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(selector, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).deregister(poll)
     }
 }
 

@@ -3,7 +3,7 @@ use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr}
 
 use net2::TcpBuilder;
 
-use {io, sys, Evented, EventSet, PollOpt, Selector, Token, TryAccept};
+use {io, sys, Evented, EventSet, Poll, PollOpt, Token, TryAccept};
 
 /*
  *
@@ -126,18 +126,18 @@ impl Write for TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, selector: &mut Selector, token: Token,
+    fn register(&self, poll: &mut Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.register(selector, token, interest, opts)
+        self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token,
+    fn reregister(&self, poll: &mut Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(selector, token, interest, opts)
+        self.sys.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.sys.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.sys.deregister(poll)
     }
 }
 
@@ -224,18 +224,18 @@ impl TcpListener {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, selector: &mut Selector, token: Token,
+    fn register(&self, poll: &mut Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.register(selector, token, interest, opts)
+        self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token,
+    fn reregister(&self, poll: &mut Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(selector, token, interest, opts)
+        self.sys.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.sys.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.sys.deregister(poll)
     }
 }
 

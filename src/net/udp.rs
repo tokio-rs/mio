@@ -1,4 +1,4 @@
-use {io, sys, Evented, EventSet, IpAddr, PollOpt, Selector, Token};
+use {io, sys, Evented, EventSet, IpAddr, Poll, PollOpt, Token};
 use std::net::SocketAddr;
 
 #[derive(Debug)]
@@ -77,16 +77,16 @@ impl UdpSocket {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.sys.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.sys.deregister(poll)
     }
 }
 

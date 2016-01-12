@@ -1,4 +1,4 @@
-use {io, Evented, EventSet, PollOpt, Selector, Token};
+use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
 use std::io::{Read, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
@@ -38,16 +38,16 @@ impl AsRawFd for Io {
 }
 
 impl Evented for Io {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        selector.register(self.fd, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        poll::selector_mut(poll).register(self.fd, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        selector.reregister(self.fd, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        poll::selector_mut(poll).reregister(self.fd, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        selector.deregister(self.fd)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        poll::selector_mut(poll).deregister(self.fd)
     }
 }
 

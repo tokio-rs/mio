@@ -1,6 +1,6 @@
 use std::sync::{Mutex, MutexGuard};
 
-use {io, Evented, EventSet, PollOpt, Selector, Token};
+use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
 use sys::windows::selector::Registration;
 use miow::iocp::CompletionStatus;
 
@@ -41,18 +41,18 @@ impl Awakener {
 }
 
 impl Evented for Awakener {
-    fn register(&self, selector: &mut Selector, token: Token, _events: EventSet,
+    fn register(&self, poll: &mut Poll, token: Token, _events: EventSet,
                 _opts: PollOpt) -> io::Result<()> {
-        self.iocp().associate(selector, token);
+        self.iocp().associate(poll::selector_mut(poll), token);
         Ok(())
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, events: EventSet,
+    fn reregister(&self, poll: &mut Poll, token: Token, events: EventSet,
                   opts: PollOpt) -> io::Result<()> {
-        self.register(selector, token, events, opts)
+        self.register(poll, token, events, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.iocp().checked_deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.iocp().checked_deregister(poll::selector(poll))
     }
 }

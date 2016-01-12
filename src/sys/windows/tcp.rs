@@ -11,7 +11,7 @@ use miow::iocp::CompletionStatus;
 use miow::net::*;
 use winapi::*;
 
-use {Evented, EventSet, PollOpt, Selector, Token};
+use {poll, Evented, EventSet, Poll, PollOpt, Token};
 use event::Event;
 use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::{wouldblock, Family};
@@ -376,11 +376,11 @@ impl Write for TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, selector: &mut Selector, token: Token,
+    fn register(&self, poll: &mut Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         let me = &mut *me;
-        try!(me.iocp.register_socket(&me.socket, selector, token, interest,
+        try!(me.iocp.register_socket(&me.socket, poll::selector_mut(poll), token, interest,
                                      opts));
 
         // If we were connected before being registered process that request
@@ -394,20 +394,20 @@ impl Evented for TcpStream {
         Ok(())
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token,
+    fn reregister(&self, poll: &mut Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         {
             let me = &mut *me;
-            try!(me.iocp.reregister_socket(&me.socket, selector, token,
+            try!(me.iocp.reregister_socket(&me.socket, poll::selector_mut(poll), token,
                                            interest, opts));
         }
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner().iocp.checked_deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.inner().iocp.checked_deregister(poll::selector(poll))
     }
 }
 
@@ -570,28 +570,28 @@ fn accept_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, selector: &mut Selector, token: Token,
+    fn register(&self, poll: &mut Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         let me = &mut *me;
-        try!(me.iocp.register_socket(&me.socket, selector, token, interest,
+        try!(me.iocp.register_socket(&me.socket, poll::selector_mut(poll), token, interest,
                                      opts));
         self.imp.schedule_accept(me);
         Ok(())
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token,
+    fn reregister(&self, poll: &mut Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         let me = &mut *me;
-        try!(me.iocp.reregister_socket(&me.socket, selector, token,
+        try!(me.iocp.reregister_socket(&me.socket, poll::selector_mut(poll), token,
                                        interest, opts));
         self.imp.schedule_accept(me);
         Ok(())
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner().iocp.checked_deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.inner().iocp.checked_deregister(poll::selector(poll))
     }
 }
 
