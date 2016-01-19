@@ -11,7 +11,7 @@ pub fn socket(family: nix::AddressFamily, ty: nix::SockType, nonblock: bool) -> 
         nix::SOCK_CLOEXEC
     };
 
-    nix::socket(family, ty, opts)
+    nix::socket(family, ty, opts, 0)
         .map_err(super::from_nix_error)
 }
 
