@@ -12,8 +12,7 @@ use miow::net::*;
 use winapi::*;
 
 use {poll, Evented, EventSet, Poll, PollOpt, Token};
-use event::Event;
-use sys::windows::selector::{Overlapped, Registration};
+use sys::windows::selector::{EventRef, Overlapped, Registration};
 use sys::windows::{wouldblock, Family};
 use sys::windows::from_raw_arc::FromRawArc;
 
@@ -148,7 +147,7 @@ impl TcpStream {
 
     fn post_register(&self, interest: EventSet, me: &mut StreamInner) {
         if interest.is_readable() {
-            self.imp.schedule_read(me);
+            self.imp.schedule_read(me, false);
         }
 
         // At least with epoll, if a socket is registered with an interest in
@@ -186,13 +185,18 @@ impl StreamImp {
     ///
     /// It is required that this function is only called after the handle has
     /// been registered with an event loop.
-    fn schedule_read(&self, me: &mut StreamInner) {
+    fn schedule_read(&self, me: &mut StreamInner, need_lock: bool) {
         match me.read {
             State::Empty => {}
+            State::Ready(_) | State::Error(_) => {
+                let set = EventSet::readable();
+                me.iocp.defer(set);
+                return;
+            }
             _ => return,
         }
 
-        me.iocp.unset_readiness(EventSet::readable());
+        me.iocp.unset_readiness(EventSet::readable(), need_lock);
 
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
@@ -231,10 +235,11 @@ impl StreamImp {
     /// A new writable event (e.g. allowing another write) will only happen once
     /// the buffer has been written completely (or hit an error).
     fn schedule_write(&self, buf: Vec<u8>, pos: usize,
-                      me: &mut StreamInner) {
+                      me: &mut StreamInner,
+                      need_lock: bool) {
 
         // About to write, clear any pending level triggered events
-        me.iocp.unset_readiness(EventSet::writable());
+        me.iocp.unset_readiness(EventSet::writable(), need_lock);
 
         trace!("scheduling a write");
         let err = unsafe {
@@ -260,14 +265,14 @@ impl StreamImp {
     /// socket was closed then we don't want to actually push the event onto our
     /// selector as otherwise it's just a spurious notification.
     fn push(&self, me: &mut StreamInner, set: EventSet,
-            into: &mut Vec<Event>) {
+            into: &mut Vec<EventRef>) {
         if me.socket.as_raw_socket() != INVALID_SOCKET {
             me.iocp.push_event(set, into);
         }
     }
 }
 
-fn read_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
+fn read_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
     let me2 = StreamImp {
         inner: unsafe { overlapped2arc!(status.overlapped(), StreamIo, read) },
     };
@@ -299,10 +304,10 @@ fn read_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
     // If a read didn't complete, then the connect must have just finished.
     trace!("finished a connect");
     me2.push(&mut me, EventSet::writable(), dst);
-    me2.schedule_read(&mut me);
+    me2.schedule_read(&mut me, false);
 }
 
-fn write_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
+fn write_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
     trace!("finished a write {}", status.bytes_transferred());
     let me2 = StreamImp {
         inner: unsafe { overlapped2arc!(status.overlapped(), StreamIo, write) },
@@ -316,7 +321,7 @@ fn write_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
     if new_pos == buf.len() {
         me2.push(&mut me, EventSet::writable(), dst);
     } else {
-        me2.schedule_write(buf, new_pos, &mut me);
+        me2.schedule_write(buf, new_pos, &mut me, false);
     }
 }
 
@@ -336,14 +341,14 @@ impl Read for TcpStream {
                 // next read operation.
                 if cursor.position() as usize == cursor.get_ref().len() {
                     me.iocp.put_buffer(cursor.into_inner());
-                    self.imp.schedule_read(&mut me);
+                    self.imp.schedule_read(&mut me, true);
                 } else {
                     me.read = State::Ready(cursor);
                 }
                 Ok(amt)
             }
             State::Error(e) => {
-                self.imp.schedule_read(&mut me);
+                self.imp.schedule_read(&mut me, true);
                 Err(e)
             }
         }
@@ -366,7 +371,7 @@ impl Write for TcpStream {
 
         let mut intermediate = me.iocp.get_buffer(64 * 1024);
         let amt = try!(intermediate.write(buf));
-        self.imp.schedule_write(intermediate, 0, me);
+        self.imp.schedule_write(intermediate, 0, me, true);
         Ok(amt)
     }
 
@@ -433,7 +438,7 @@ impl Drop for TcpStream {
         };
 
         // Then run any finalization code including level notifications
-        inner.iocp.deregister();
+        inner.iocp.deregister(true);
     }
 }
 
@@ -478,7 +483,7 @@ impl TcpListener {
             State::Error(e) => Err(e),
         };
 
-        self.imp.schedule_accept(&mut me);
+        self.imp.schedule_accept(&mut me, true);
 
         return ret
     }
@@ -513,13 +518,13 @@ impl ListenerImp {
         self.inner.inner.lock().unwrap()
     }
 
-    fn schedule_accept(&self, me: &mut ListenerInner) {
+    fn schedule_accept(&self, me: &mut ListenerInner, need_lock: bool) {
         match me.accept {
             State::Empty => {}
             _ => return
         }
 
-        me.iocp.unset_readiness(EventSet::readable());
+        me.iocp.unset_readiness(EventSet::readable(), need_lock);
 
         let res = match me.family {
             Family::V4 => TcpBuilder::new_v4(),
@@ -544,14 +549,14 @@ impl ListenerImp {
 
     // See comments in StreamImp::push
     fn push(&self, me: &mut ListenerInner, set: EventSet,
-            into: &mut Vec<Event>) {
+            into: &mut Vec<EventRef>) {
         if me.socket.as_raw_socket() != INVALID_SOCKET {
             me.iocp.push_event(set, into);
         }
     }
 }
 
-fn accept_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
+fn accept_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
     let me2 = ListenerImp {
         inner: unsafe { overlapped2arc!(status.overlapped(), ListenerIo, accept) },
     };
@@ -576,7 +581,7 @@ impl Evented for TcpListener {
         let me = &mut *me;
         try!(me.iocp.register_socket(&me.socket, poll::selector_mut(poll), token, interest,
                                      opts));
-        self.imp.schedule_accept(me);
+        self.imp.schedule_accept(me, false);
         Ok(())
     }
 
@@ -586,7 +591,7 @@ impl Evented for TcpListener {
         let me = &mut *me;
         try!(me.iocp.reregister_socket(&me.socket, poll::selector_mut(poll), token,
                                        interest, opts));
-        self.imp.schedule_accept(me);
+        self.imp.schedule_accept(me, false);
         Ok(())
     }
 
@@ -611,6 +616,6 @@ impl Drop for TcpListener {
         };
 
         // Then run any finalization code including level notifications
-        inner.iocp.deregister();
+        inner.iocp.deregister(true);
     }
 }

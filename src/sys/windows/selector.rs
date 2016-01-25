@@ -1,9 +1,7 @@
+use std::{fmt, io, mem};
 use std::cell::UnsafeCell;
-use std::io;
-use std::mem;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
-use std::collections::hash_map::{Entry, HashMap};
 
 use slab::Index;
 use winapi::*;
@@ -11,7 +9,7 @@ use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 
 use {Token, PollOpt};
-use event::{self, Event, EventSet};
+use event::{Event, EventSet};
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::buffer_pool::BufferPool;
 
@@ -35,16 +33,13 @@ struct SelectorInner {
     /// Events can sometimes be generated without an associated I/O operation
     /// having completed, and this list is emptied out and returned on each turn
     /// of the event loop.
-    defers: Mutex<Vec<Event>>,
+    pending: Mutex<Vec<EventRef>>,
 
     /// A pool of buffers usable by this selector.
     ///
     /// Primitives will take buffers from this pool to perform I/O operations,
     /// and once complete they'll be put back in.
     buffers: Mutex<BufferPool>,
-
-    /// A list of registered level triggered `Event`s
-    level_triggered: Mutex<HashMap<usize, Event>>,
 }
 
 impl Selector {
@@ -53,9 +48,8 @@ impl Selector {
             Selector {
                 inner: Arc::new(SelectorInner {
                     port: cp,
-                    defers: Mutex::new(Vec::new()),
                     buffers: Mutex::new(BufferPool::new(256)),
-                    level_triggered: Mutex::new(HashMap::new()),
+                    pending: Mutex::new(Vec::new()),
                 }),
             }
         })
@@ -64,6 +58,7 @@ impl Selector {
     pub fn select(&mut self,
                   events: &mut Events,
                   timeout_ms: Option<usize>) -> io::Result<()> {
+
         // If we have some deferred events then we only want to poll for I/O
         // events, so clamp the timeout to 0 in that case.
         let timeout = if !self.should_block() {
@@ -72,9 +67,13 @@ impl Selector {
             timeout_ms.map(|ms| ms as u32)
         };
 
+        trace!("select; timeout={:?}", timeout);
+
         // Clear out the previous list of I/O events and get some more!
         events.events.truncate(0);
-        let inner = self.inner.clone();
+        let inner = &*self.inner;
+
+        trace!("polling IOCP");
         let n = match inner.port.get_many(&mut events.statuses, timeout) {
             Ok(statuses) => statuses.len(),
             Err(ref e) if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) => 0,
@@ -91,6 +90,11 @@ impl Selector {
         // notification for it and carry on.
         let dst = &mut events.events;
 
+        // Clear out the list of pending events and process them all
+        // here.
+        trace!("select; locking mutex");
+        let mut pending = inner.pending.lock().unwrap();
+
         for status in events.statuses[..n].iter_mut() {
             if status.overlapped() as usize == 0 {
                 dst.push(Event::new(EventSet::readable(),
@@ -102,38 +106,130 @@ impl Selector {
                 (*(status.overlapped() as *mut Overlapped)).callback()
             };
 
-            callback(status, dst);
+            trace!("select; -> got overlapped");
+            callback(status, &mut *pending);
         }
 
-        // Clear out the list of deferred events and process them all
-        // here.
-        let defers = mem::replace(&mut *inner.defers.lock().unwrap(), Vec::new());
+        // TODO: improve
+        for event in mem::replace(&mut *pending, Vec::new()) {
+            trace!("polled event; event={:?}", event);
 
-        for event in defers {
-            dst.push(event);
+            if !event.is_none() {
+                dst.push(event.as_event());
+
+                if event.is_level() {
+                    pending.push(event);
+                } else {
+                    event.unset_pending();
+                }
+            } else {
+                event.unset_pending();
+            }
         }
 
-        // Finally, push all level triggered events
-        for event in inner.level_triggered.lock().unwrap().values() {
-            dst.push(*event);
-        }
-
+        trace!("returning");
         Ok(())
     }
 
     fn should_block(&self) -> bool {
-        if !self.inner.defers.lock().unwrap().is_empty() {
-            return false;
-        }
-
-        self.inner.level_triggered.lock().unwrap().is_empty()
+        trace!("should_block; locking mutex");
+        self.inner.pending.lock().unwrap().is_empty()
     }
 }
 
-pub struct Registration {
-    key: Option<usize>,
-    selector: Option<Arc<SelectorInner>>,
+impl SelectorInner {
+    fn identical(&self, other: &SelectorInner) -> bool {
+        (self as *const SelectorInner) == (other as *const SelectorInner)
+    }
+}
+
+// EventInner because we want access to the inner fields
+struct EventInner {
     token: Token,
+    kind: EventSet,
+    pending: bool,
+    level: bool,
+}
+
+#[derive(Clone)]
+pub struct EventRef {
+    inner: Arc<UnsafeCell<EventInner>>,
+}
+
+impl EventRef {
+    fn token(&self) -> Token {
+        self.inner().token
+    }
+
+    fn is_pending(&self) -> bool {
+        self.inner().pending
+    }
+
+    fn is_none(&self) -> bool {
+        self.inner().kind.is_none()
+    }
+
+    fn is_level(&self) -> bool {
+        self.inner().level
+    }
+
+    fn associate(&self, token: Token, opts: PollOpt) {
+        let inner = self.mut_inner();
+        inner.token = token;
+        inner.level = opts.is_level();
+    }
+
+    fn set_pending(&self) {
+        self.mut_inner().pending = true;
+    }
+
+    fn unset_pending(&self) {
+        self.mut_inner().pending = false;
+    }
+
+    fn update(&self, interest: EventSet, events: EventSet) -> EventSet {
+        let curr = interest & (self.inner().kind | events);
+        self.mut_inner().kind = curr;
+        curr
+    }
+
+    fn unset(&self, events: EventSet) {
+        let curr = self.inner().kind & !events;
+        self.mut_inner().kind = curr;
+    }
+
+    fn inner(&self) -> &EventInner {
+        unsafe { &*self.inner.get() }
+    }
+
+    fn mut_inner(&self) -> &mut EventInner {
+        unsafe { &mut *self.inner.get() }
+    }
+
+    fn as_event(&self) -> Event {
+        let inner = self.inner();
+        Event::new(inner.kind, inner.token)
+    }
+}
+
+impl fmt::Debug for EventRef {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let i = self.inner();
+        fmt.debug_struct("EventRef")
+            .field("token", &i.token)
+            .field("kind", &i.kind)
+            .field("pending", &i.pending)
+            .field("level", &i.level)
+            .finish()
+    }
+}
+
+unsafe impl Send for EventRef {}
+unsafe impl Sync for EventRef {}
+
+pub struct Registration {
+    selector: Option<Arc<SelectorInner>>,
+    event: EventRef,
     opts: PollOpt,
     interest: EventSet,
 }
@@ -141,9 +237,15 @@ pub struct Registration {
 impl Registration {
     pub fn new() -> Registration {
         Registration {
-            key: None,
             selector: None,
-            token: Token(0),
+            event: EventRef {
+                inner: Arc::new(UnsafeCell::new(EventInner {
+                    token: Token(0),
+                    kind: EventSet::none(),
+                    pending: false,
+                    level: false,
+                }))
+            },
             opts: PollOpt::empty(),
             interest: EventSet::none(),
         }
@@ -161,7 +263,9 @@ impl Registration {
         self.selector.as_ref().map(|s| &s.port)
     }
 
-    pub fn token(&self) -> Token { self.token }
+    pub fn token(&self) -> Token {
+        self.event.token()
+    }
 
     pub fn get_buffer(&self, size: usize) -> Vec<u8> {
         match self.selector {
@@ -185,67 +289,55 @@ impl Registration {
     ///
     /// Eventually this function will probably also be modified to handle the
     /// `level()` polling option.
-    pub fn push_event(&mut self, set: EventSet, events: &mut Vec<Event>) {
-        trace!("push_event; token={:?}; set={:?}; opts={:?}", self.token, set, self.opts);
+    pub fn push_event(&mut self, set: EventSet, events: &mut Vec<EventRef>) {
+        trace!("push_event; set={:?}; self.event={:?}", set, self.event);
+        // The lock on EventInner is currently held, update interest
+        let curr = self.event.update(self.interest, set);
 
-        // If we're not actually interested in any of these events,
-        // discard the event, and then if we're actually delivering an event we
-        // stop listening if it's also a oneshot.
-        let set = self.interest & set;
-
-        if set != EventSet::none() {
-            let event = Event::new(set, self.token);
-
-            if self.opts.is_edge() {
-                events.push(event);
-
-                if self.opts.is_oneshot() {
-                    trace!("deregistering because of oneshot");
-                    self.interest = EventSet::none();
-                }
-            } else {
-                let selector = self.selector.as_ref()
-                    .expect("expected a selector");
-
-                let mut level = selector.level_triggered.lock().unwrap();
-
-                match level.entry(self.key.expect("expected registration key")) {
-                    Entry::Occupied(mut e) => {
-                        let e = e.get_mut();
-                        debug_assert!(e.token() == self.token);
-                        *event::kind_mut(e) = e.kind() | event.kind();
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(event);
-                    }
-                }
+        if !curr.is_none() {
+            if !self.event.is_pending() {
+                self.event.set_pending();
+                events.push(self.event.clone());
+                trace!("pushing event; event={:?}", self.event);
             }
+
+            if self.opts.is_oneshot() {
+                trace!("deregistering because of oneshot");
+                self.interest = EventSet::none();
+            }
+        } else {
+            trace!("   -> is_none");
         }
     }
 
-    pub fn unset_readiness(&mut self, set: EventSet) {
-        trace!("unset_readiness; token={:?}; set={:?}", self.token, set);
+    pub fn unset_readiness(&mut self, set: EventSet, need_lock: bool) {
+        trace!("unset_readiness; locking mutex");
+        // Acquire the lock if needed
 
-        if let Some(key) = self.key {
-            let mut map = self.selector.as_ref().expect("expected selector")
-                .level_triggered.lock().unwrap();
+        let _lock = if need_lock {
+            Some(self.selector.as_ref()
+                .map(|s| s.pending.lock().unwrap()))
+        } else {
+            None
+        };
 
-            if let Entry::Occupied(mut e) = map.entry(key) {
-                {
-                    let event = e.get_mut();
-                    *event::kind_mut(event) = event.kind() & !set;
-                }
-
-                if e.get().kind() == EventSet::none() {
-                    e.remove();
-                }
-            }
-        }
+        self.event.unset(set);
     }
 
-    pub fn associate(&mut self, selector: &mut Selector, token: Token) {
-        self.selector = Some(selector.inner.clone());
-        self.token = token;
+    pub fn associate(&mut self, selector: &mut Selector, token: Token, opts: PollOpt) -> io::Result<()> {
+        // Structured like this to make the borrow checker happy
+        if self.selector.is_some() {
+            if let Some(sa) = self.selector.as_ref() {
+                if !selector.inner.identical(&**sa) {
+                    return Err(other("socket already registered"));
+                }
+            }
+        } else {
+            self.selector = Some(selector.inner.clone());
+        }
+
+        self.event.associate(token, opts);
+        Ok(())
     }
 
     pub fn register_socket(&mut self,
@@ -254,17 +346,10 @@ impl Registration {
                            token: Token,
                            interest: EventSet,
                            opts: PollOpt) -> io::Result<()> {
-        if self.selector.is_some() {
-            return Err(other("socket already registered"))
-        }
 
         try!(Registration::validate_opts(opts));
-        try!(selector.inner.port.add_socket(self.token.as_usize(), socket));
-        self.associate(selector, token);
-
-        if opts.is_level() {
-            self.key = Some(socket.as_raw_socket() as usize);
-        }
+        try!(self.associate(selector, token, opts));
+        try!(selector.inner.port.add_socket(token.as_usize(), socket));
 
         self.interest = set2mask(interest);
         self.opts = opts;
@@ -273,46 +358,34 @@ impl Registration {
 
     pub fn reregister_socket(&mut self,
                              _socket: &AsRawSocket,
-                             _selector: &mut Selector,
+                             selector: &mut Selector,
                              token: Token,
                              interest: EventSet,
                              opts: PollOpt) -> io::Result<()> {
+
         if self.selector.is_none() {
-            return Err(other("socket not registered"))
-        } else if self.token != token {
-            return Err(other("cannot change token values on reregistration"))
+            return Err(other("socket not registered"));
         }
+
         try!(Registration::validate_opts(opts));
-        // TODO: assert that self.selector == selector?
+        try!(self.associate(selector, token, opts));
 
+        trace!("reregister_socket; interest={:?}", set2mask(interest));
         self.interest = set2mask(interest);
-
-        // Reset any queued level events
-        if self.key.is_some() {
-            self.unset_readiness(!interest);
-        }
+        self.unset_readiness(!interest, false);
 
         self.opts = opts;
         Ok(())
     }
 
-    pub fn deregister(&mut self) {
-        trace!("deregister; token={:?}", self.token);
-
-        if let Some(key) = self.key {
-            self.key = None;
-            self.selector.as_ref().expect("expected selector")
-                .level_triggered.lock().unwrap().remove(&key);
-        }
+    pub fn deregister(&mut self, need_lock: bool) {
+        self.unset_readiness(EventSet::all(), need_lock);
     }
 
     pub fn checked_deregister(&mut self, selector: &Selector) -> io::Result<()> {
         match self.selector {
             Some(ref s) => {
-                let inner1: &SelectorInner = &*selector.inner;
-                let inner2: &SelectorInner = &*s;
-
-                if inner1 as *const SelectorInner != inner2 as *const SelectorInner {
+                if !s.identical(&*selector.inner) {
                     return Err(other("socket registered with other selector"));
                 }
             }
@@ -321,7 +394,8 @@ impl Registration {
             }
         }
 
-        self.deregister();
+        // This is always called from the event loop thread
+        self.deregister(false);
         Ok(())
     }
 
@@ -335,8 +409,9 @@ impl Registration {
     ///   expired)
     pub fn defer(&mut self, set: EventSet) {
         if let Some(s) = self.selector.clone() {
-            let mut dst = s.defers.lock().unwrap();
-            self.push_event(set, &mut dst);
+            trace!("defer; locking mutex");
+            let mut dst = s.pending.lock().unwrap();
+            self.push_event(set, &mut *dst);
         }
     }
 }
@@ -405,7 +480,7 @@ macro_rules! offset_of {
     )
 }
 
-pub type Callback = fn(&CompletionStatus, &mut Vec<Event>);
+pub type Callback = fn(&CompletionStatus, &mut Vec<EventRef>);
 
 /// See sys::windows module docs for why this exists.
 ///

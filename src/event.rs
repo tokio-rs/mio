@@ -169,6 +169,11 @@ impl EventSet {
     }
 
     #[inline]
+    pub fn is_none(&self) -> bool {
+        self.0 == 0
+    }
+
+    #[inline]
     pub fn is_readable(&self) -> bool {
         self.contains(EventSet::readable())
     }

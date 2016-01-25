@@ -127,6 +127,8 @@ impl Handler for TestHandler {
 
 #[test]
 pub fn test_timer() {
+    let _ = ::env_logger::init();
+
     debug!("Starting TEST_TIMER");
     let mut event_loop = EventLoop::new().unwrap();
 

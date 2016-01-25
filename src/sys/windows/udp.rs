@@ -18,8 +18,7 @@ use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
 use {poll, Evented, EventSet, IpAddr, Poll, PollOpt, Token};
-use event::Event;
-use sys::windows::selector::{Overlapped, Registration};
+use sys::windows::selector::{EventRef, Overlapped, Registration};
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::{bad_state, Family};
 
@@ -132,7 +131,7 @@ impl UdpSocket {
             return Ok(None)
         }
 
-        me.iocp.unset_readiness(EventSet::writable());
+        me.iocp.unset_readiness(EventSet::writable(), true);
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = try!(owned_buf.write(buf));
@@ -167,12 +166,12 @@ impl UdpSocket {
                                            "failed to parse socket address"))
                     };
                     me.iocp.put_buffer(data);
-                    self.imp.schedule_read(&mut me);
+                    self.imp.schedule_read(&mut me, true);
                     r
                 }
             }
             State::Error(e) => {
-                self.imp.schedule_read(&mut me);
+                self.imp.schedule_read(&mut me, true);
                 Err(e)
             }
         }
@@ -225,7 +224,7 @@ impl UdpSocket {
 
     fn post_register(&self, interest: EventSet, me: &mut Inner) {
         if interest.is_readable() {
-            self.imp.schedule_read(me);
+            self.imp.schedule_read(me, false);
         }
         // See comments in TcpSocket::post_register for what's going on here
         if interest.is_writable() {
@@ -243,7 +242,7 @@ impl Imp {
         self.inner.inner.lock().unwrap()
     }
 
-    fn schedule_read(&self, me: &mut Inner) {
+    fn schedule_read(&self, me: &mut Inner, need_lock: bool) {
         match me.read {
             State::Empty => {}
             _ => return,
@@ -254,7 +253,7 @@ impl Imp {
             Socket::Bound(ref s) => s,
         };
 
-        me.iocp.unset_readiness(EventSet::readable());
+        me.iocp.unset_readiness(EventSet::readable(), need_lock);
 
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
@@ -278,7 +277,7 @@ impl Imp {
     }
 
     // See comments in tcp::StreamImp::push
-    fn push(&self, me: &mut Inner, set: EventSet, into: &mut Vec<Event>) {
+    fn push(&self, me: &mut Inner, set: EventSet, into: &mut Vec<EventRef>) {
         if let Socket::Empty = me.socket {
             return
         }
@@ -339,7 +338,7 @@ impl Drop for UdpSocket {
         inner.socket = Socket::Empty;
 
         // Then run any finalization code including level notifications
-        inner.iocp.deregister();
+        inner.iocp.deregister(true);
     }
 }
 
@@ -359,7 +358,7 @@ impl Socket {
     }
 }
 
-fn send_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
+fn send_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
     trace!("finished a send {}", status.bytes_transferred());
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, write) },
@@ -369,7 +368,7 @@ fn send_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
     me2.push(&mut me, EventSet::writable(), dst);
 }
 
-fn recv_done(status: &CompletionStatus, dst: &mut Vec<Event>) {
+fn recv_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
     trace!("finished a recv {}", status.bytes_transferred());
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, read) },

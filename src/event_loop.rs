@@ -335,6 +335,8 @@ impl<H: Handler> EventLoop<H> {
     fn io_process(&mut self, handler: &mut H, cnt: usize) {
         let mut i = 0;
 
+        trace!("io_process(..); cnt={}; len={}", cnt, self.poll.events().len());
+
         // Iterate over the notifications. Each event provides the token
         // it was registered with (which usually represents, at least, the
         // handle that the event is about) as well as information about
@@ -342,7 +344,7 @@ impl<H: Handler> EventLoop<H> {
         while i < cnt {
             let evt = self.poll.events().get(i).unwrap();
 
-            trace!("event={:?}", evt);
+            trace!("event={:?}; idx={:?}", evt, i);
 
             match evt.token() {
                 NOTIFY => self.notify.cleanup(),

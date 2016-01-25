@@ -116,6 +116,10 @@ impl<'a> Events<'a> {
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.poll.events.get(idx)
     }
+
+    pub fn len(&self) -> usize {
+        self.poll.events.len()
+    }
 }
 
 impl<'a> Iterator for Events<'a> {
