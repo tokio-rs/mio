@@ -285,6 +285,7 @@ impl Registration {
         try!(Registration::validate_opts(opts));
         // TODO: assert that self.selector == selector?
 
+        trace!("reregister_socket; interest={:?}", set2mask(interest));
         self.interest = set2mask(interest);
 
         // Reset any queued level events

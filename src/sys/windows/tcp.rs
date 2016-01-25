@@ -189,6 +189,11 @@ impl StreamImp {
     fn schedule_read(&self, me: &mut StreamInner) {
         match me.read {
             State::Empty => {}
+            State::Ready(_) | State::Error(_) => {
+                let mut set = EventSet::readable();
+                me.iocp.defer(set);
+                return;
+            }
             _ => return,
         }
 
