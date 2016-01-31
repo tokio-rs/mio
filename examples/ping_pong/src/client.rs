@@ -6,6 +6,7 @@ extern crate slab;
 
 use mio::{TryRead, TryWrite};
 use mio::tcp::TcpStream;
+use mio::Token;
 use slab::Slab;
 use bytes::Buf;
 use std::{mem, str};
@@ -26,7 +27,7 @@ const MESSAGES: &'static [&'static str] = &[
 // Pong server client. Manages multiple connections where each connection sends
 // and receives its own data.
 struct Ping {
-    connections: Slab<Connection>,
+    connections: Slab<Connection, Token>,
 }
 
 impl Ping {
@@ -297,7 +298,7 @@ fn run(address: SocketAddr) {
         // on our `Ping` client struct.
         ping.connections.insert_with(|token| {
             // Register the socket with the event loop
-            event_loop.register_opt(
+            event_loop.register(
                 &socket,
                 token,
                 mio::EventSet::writable(),
