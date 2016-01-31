@@ -2,10 +2,11 @@
 
 extern crate mio;
 extern crate bytes;
+extern crate slab;
 
 use mio::{TryRead, TryWrite};
 use mio::tcp::TcpStream;
-use mio::util::Slab;
+use slab::Slab;
 use bytes::Buf;
 use std::{mem, str};
 use std::io::Cursor;
@@ -60,7 +61,7 @@ impl mio::Handler for Ping {
 }
 
 struct Connection {
-    // The connection's TCP socket 
+    // The connection's TCP socket
     socket: TcpStream,
     // The token used to register this connection with the EventLoop
     token: mio::Token,
