@@ -1,7 +1,6 @@
 use token::Token;
-use util::Slab;
-use clock_ticks::precise_time_ns;
-use std::{usize, iter};
+use time::precise_time_ns;
+use std::{error, fmt, usize, iter};
 use std::cmp::max;
 
 use self::TimerErrorKind::TimerOverflow;
@@ -35,13 +34,15 @@ pub struct Timer<T> {
     mask: u64,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Timeout {
     // Reference into the timer entry slab
     token: Token,
     // Tick that it should matchup with
     tick: u64,
 }
+
+type Slab<T> = ::slab::Slab<T, ::Token>;
 
 impl<T> Timer<T> {
     pub fn new(tick_ms: u64, mut slots: usize, mut capacity: usize) -> Timer<T> {
@@ -65,15 +66,19 @@ impl<T> Timer<T> {
     }
 
     // Number of ms remaining until the next tick
-    pub fn next_tick_in_ms(&self) -> u64 {
+    pub fn next_tick_in_ms(&self) -> Option<u64> {
+        if self.entries.count() == 0 {
+            return None;
+        }
+
         let now = self.now_ms();
         let nxt = self.start + (self.tick + 1) * self.tick_ms;
 
         if nxt <= now {
-            return 0;
+            return Some(0);
         }
 
-        nxt - now
+        Some(nxt - now)
     }
 
     /*
@@ -118,7 +123,7 @@ impl<T> Timer<T> {
         self.insert(token, tick)
     }
 
-    pub fn clear(&mut self, timeout: Timeout) -> bool {
+    pub fn clear(&mut self, timeout: &Timeout) -> bool {
         let links = match self.entries.get(timeout.token) {
             Some(e) => e.links,
             None => return false
@@ -290,6 +295,12 @@ pub struct TimerError {
     desc: &'static str,
 }
 
+impl fmt::Display for TimerError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}: {}", self.kind, self.desc)
+    }
+}
+
 impl TimerError {
     fn overflow() -> TimerError {
         TimerError {
@@ -299,9 +310,23 @@ impl TimerError {
     }
 }
 
+impl error::Error for TimerError {
+    fn description(&self) -> &str {
+        self.desc
+    }
+}
+
 #[derive(Debug)]
 pub enum TimerErrorKind {
     TimerOverflow,
+}
+
+impl fmt::Display for TimerErrorKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TimerOverflow => write!(fmt, "TimerOverflow"),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -337,7 +362,7 @@ mod test {
         let mut tick;
 
         let to = t.timeout_at_ms("a", 100).unwrap();
-        assert!(t.clear(to));
+        assert!(t.clear(&to));
 
         tick = t.ms_to_tick(100);
         assert_eq!(None, t.tick_to(tick));
@@ -457,7 +482,7 @@ mod test {
         assert_eq!(Some("b"), t.tick_to(tick));
         assert_eq!(2, t.count());
 
-        t.clear(a);
+        t.clear(&a);
         assert_eq!(1, t.count());
 
         assert_eq!(None, t.tick_to(tick));

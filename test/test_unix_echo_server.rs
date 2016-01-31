@@ -1,7 +1,7 @@
 use mio::*;
 use mio::unix::*;
-use mio::buf::{ByteBuf, MutByteBuf, SliceBuf};
-use mio::util::Slab;
+use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
+use slab;
 use std::path::PathBuf;
 use std::io;
 use tempdir::TempDir;
@@ -16,6 +16,8 @@ struct EchoConn {
     token: Option<Token>,
     interest: EventSet,
 }
+
+type Slab<T> = slab::Slab<T, Token>;
 
 impl EchoConn {
     fn new(sock: UnixStream) -> EchoConn {
@@ -56,10 +58,15 @@ impl EchoConn {
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
-                panic!("We just got readable, but were unable to read from the socket?");
+                debug!("CONN : spurious read wakeup");
+                self.mut_buf = Some(buf);
             }
             Ok(Some(r)) => {
                 debug!("CONN : we read {} bytes!", r);
+
+                // prepare to provide this to writable
+                self.buf = Some(buf.flip());
+
                 self.interest.remove(EventSet::readable());
                 self.interest.insert(EventSet::writable());
             }
@@ -69,9 +76,6 @@ impl EchoConn {
             }
 
         };
-
-        // prepare to provide this to writable
-        self.buf = Some(buf.flip());
 
         event_loop.reregister(&self.sock, self.token.unwrap(), self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
@@ -93,7 +97,7 @@ impl EchoServer {
 
         // Register the connection
         self.conns[tok].token = Some(tok);
-        event_loop.register_opt(&self.conns[tok].sock, tok, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot())
+        event_loop.register(&self.conns[tok].sock, tok, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
         Ok(())
@@ -148,34 +152,35 @@ impl EchoClient {
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
-                panic!("We just got readable, but were unable to read from the socket?");
+                debug!("CLIENT : spurious read wakeup");
+                self.mut_buf = Some(buf);
             }
             Ok(Some(r)) => {
                 debug!("CLIENT : We read {} bytes!", r);
+
+                // prepare for reading
+                let mut buf = buf.flip();
+
+                debug!("CLIENT : buf = {:?} -- rx = {:?}", buf.bytes(), self.rx.bytes());
+                while buf.has_remaining() {
+                    let actual = buf.read_byte().unwrap();
+                    let expect = self.rx.read_byte().unwrap();
+
+                    assert!(actual == expect, "actual={}; expect={}", actual, expect);
+                }
+
+                self.mut_buf = Some(buf.flip());
+
+                self.interest.remove(EventSet::readable());
+
+                if !self.rx.has_remaining() {
+                    self.next_msg(event_loop).unwrap();
+                }
             }
             Err(e) => {
                 panic!("not implemented; client err={:?}", e);
             }
         };
-
-        // prepare for reading
-        let mut buf = buf.flip();
-
-        debug!("CLIENT : buf = {:?} -- rx = {:?}", buf.bytes(), self.rx.bytes());
-        while buf.has_remaining() {
-            let actual = buf.read_byte().unwrap();
-            let expect = self.rx.read_byte().unwrap();
-
-            assert!(actual == expect, "actual={}; expect={}", actual, expect);
-        }
-
-        self.mut_buf = Some(buf.flip());
-
-        self.interest.remove(EventSet::readable());
-
-        if !self.rx.has_remaining() {
-            self.next_msg(event_loop).unwrap();
-        }
 
         event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
     }
@@ -267,12 +272,12 @@ pub fn test_unix_echo_server() {
     let srv = UnixListener::bind(&addr).unwrap();
 
     info!("listen for connections");
-    event_loop.register_opt(&srv, SERVER, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    event_loop.register(&srv, SERVER, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     let sock = UnixStream::connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register_opt(&sock, CLIENT, EventSet::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    event_loop.register(&sock, CLIENT, EventSet::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     // Start the event loop
     event_loop.run(&mut Echo::new(srv, sock, vec!["foo", "bar"])).unwrap();

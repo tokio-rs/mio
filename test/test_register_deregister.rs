@@ -1,6 +1,8 @@
 use mio::*;
 use mio::tcp::*;
-use super::localhost;
+use bytes::SliceBuf;
+use localhost;
+use std::time::Duration;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -20,13 +22,15 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: EventSet) {
         match token {
             SERVER => {
-                let mut sock = self.server.accept().unwrap().unwrap();
-                sock.try_write_buf(&mut buf::SliceBuf::wrap("foobar".as_bytes())).unwrap();
+                trace!("handle_read; token=SERVER");
+                let mut sock = self.server.accept().unwrap().unwrap().0;
+                sock.try_write_buf(&mut SliceBuf::wrap("foobar".as_bytes())).unwrap();
             }
             CLIENT => {
+                trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
                 event_loop.reregister(&self.client, CLIENT, EventSet::writable(), PollOpt::level()).unwrap();
@@ -35,13 +39,15 @@ impl TestHandler {
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: EventSet) {
+        debug!("handle_write; token={:?}; state={:?}", token, self.state);
+
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
         self.state = 2;
         event_loop.deregister(&self.client).unwrap();
-        event_loop.timeout_ms(1, 200).unwrap();
+        event_loop.timeout(1, Duration::from_millis(200)).unwrap();
     }
 }
 
@@ -60,6 +66,7 @@ impl Handler for TestHandler {
     }
 
     fn timeout(&mut self, event_loop: &mut EventLoop<TestHandler>, _: usize) {
+        trace!("timeout");
         event_loop.shutdown();
     }
 }
@@ -71,22 +78,15 @@ pub fn test_register_deregister() {
 
     let addr = localhost();
 
-    let server = TcpSocket::v4().unwrap();
-
-    info!("setting re-use addr");
-    server.set_reuseaddr(true).unwrap();
-    server.bind(&addr).unwrap();
-
-    let server = server.listen(256).unwrap();
+    let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
-    event_loop.register_opt(&server, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
 
-    let (client, _) = TcpSocket::v4().unwrap()
-        .connect(&addr).unwrap();
+    let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
-    event_loop.register_opt(&client, CLIENT, EventSet::readable(), PollOpt::level()).unwrap();
+    event_loop.register(&client, CLIENT, EventSet::readable(), PollOpt::level()).unwrap();
 
     let mut handler = TestHandler::new(server, client);
 

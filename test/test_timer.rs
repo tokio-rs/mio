@@ -1,11 +1,14 @@
 use mio::*;
 use mio::tcp::*;
-use super::localhost;
+use bytes::{Buf, ByteBuf, SliceBuf};
+use localhost;
+use std::time::Duration;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
+const CONN: Token = Token(2);
 
 #[derive(Debug, PartialEq)]
 enum TestState {
@@ -29,21 +32,26 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>,
+                   tok: Token, events: EventSet) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
-                let conn = self.srv.accept().unwrap().unwrap();
-                event_loop.timeout_ms(conn, 200).unwrap();
+                let conn = self.srv.accept().unwrap().unwrap().0;
+                event_loop.register(&conn, CONN, EventSet::all(),
+                                        PollOpt::edge()).unwrap();
+                event_loop.timeout(conn, Duration::from_millis(200)).unwrap();
 
-                event_loop.reregister(&self.srv, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
+                event_loop.reregister(&self.srv, SERVER, EventSet::readable(),
+                                      PollOpt::edge()).unwrap();
             }
             CLIENT => {
                 debug!("client readable");
 
                 match self.state {
                     Initial => {
-                        // Whether or not Hup is included with actual data is platform specific
+                        // Whether or not Hup is included with actual data is
+                        // platform specific
                         if events.is_hup() {
                             self.state = AfterHup;
                         } else {
@@ -62,7 +70,7 @@ impl TestHandler {
                     return;
                 }
 
-                let mut buf = buf::ByteBuf::mut_with_capacity(2048);
+                let mut buf = ByteBuf::mut_with_capacity(2048);
 
                 match self.cli.try_read_buf(&mut buf) {
                     Ok(n) => {
@@ -74,20 +82,26 @@ impl TestHandler {
                     }
                 }
 
-                event_loop.reregister(&self.cli, CLIENT, EventSet::readable() | EventSet::hup(), PollOpt::edge()).unwrap();
+                event_loop.reregister(&self.cli, CLIENT,
+                                      EventSet::readable() | EventSet::hup(),
+                                      PollOpt::edge()).unwrap();
             }
+            CONN => {}
             _ => panic!("received unknown token {:?}", tok),
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>,
+                    tok: Token, _: EventSet) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
+            CONN => {}
             _ => panic!("received unknown token {:?}", tok),
         }
 
-        event_loop.reregister(&self.cli, CLIENT, EventSet::readable(), PollOpt::edge()).unwrap();
+        event_loop.reregister(&self.cli, CLIENT, EventSet::readable(),
+                              PollOpt::edge()).unwrap();
     }
 }
 
@@ -107,7 +121,7 @@ impl Handler for TestHandler {
 
     fn timeout(&mut self, _event_loop: &mut EventLoop<TestHandler>, mut sock: TcpStream) {
         debug!("timeout handler : writing to socket");
-        sock.try_write_buf(&mut buf::SliceBuf::wrap(b"zomg")).unwrap().unwrap();
+        sock.try_write_buf(&mut SliceBuf::wrap(b"zomg")).unwrap().unwrap();
     }
 }
 
@@ -118,23 +132,16 @@ pub fn test_timer() {
 
     let addr = localhost();
 
-    let srv = TcpSocket::v4().unwrap();
-
-    info!("setting re-use addr");
-    srv.set_reuseaddr(true).unwrap();
-    srv.bind(&addr).unwrap();
-
-    let srv = srv.listen(256).unwrap();
+    let srv = TcpListener::bind(&addr).unwrap();
 
     info!("listening for connections");
 
-    event_loop.register_opt(&srv, SERVER, EventSet::all(), PollOpt::edge()).unwrap();
+    event_loop.register(&srv, SERVER, EventSet::all(), PollOpt::edge()).unwrap();
 
-    let (sock, _) = TcpSocket::v4().unwrap()
-        .connect(&addr).unwrap();
+    let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register_opt(&sock, CLIENT, EventSet::all(), PollOpt::edge()).unwrap();
+    event_loop.register(&sock, CLIENT, EventSet::all(), PollOpt::edge()).unwrap();
 
     // Init the handler
     let mut handler = TestHandler::new(srv, sock);

@@ -57,13 +57,13 @@ struct State<T> {
 }
 
 unsafe impl<T: Send> Send for State<T> {}
-unsafe impl<T: Sync> Sync for State<T> {}
+unsafe impl<T: Send + Sync> Sync for State<T> {}
 
 pub struct Queue<T> {
     state: Arc<State<T>>,
 }
 
-impl<T: Send> State<T> {
+impl<T> State<T> {
     fn with_capacity(capacity: usize) -> State<T> {
         let capacity = if capacity < 2 || (capacity & (capacity - 1)) != 0 {
             if capacity < 2 {
@@ -145,7 +145,7 @@ impl<T: Send> State<T> {
     }
 }
 
-impl<T: Send> Queue<T> {
+impl<T> Queue<T> {
     pub fn with_capacity(capacity: usize) -> Queue<T> {
         Queue{
             state: Arc::new(State::with_capacity(capacity))
@@ -161,7 +161,7 @@ impl<T: Send> Queue<T> {
     }
 }
 
-impl<T: Send> Clone for Queue<T> {
+impl<T> Clone for Queue<T> {
     fn clone(&self) -> Queue<T> {
         Queue { state: self.state.clone() }
     }
@@ -181,12 +181,12 @@ mod tests {
         assert_eq!(None, q.pop());
         let (tx, rx) = channel();
 
-        for _ in (0..nthreads) {
+        for _ in 0..nthreads {
             let q = q.clone();
             let tx = tx.clone();
             thread::spawn(move || {
                 let q = q;
-                for i in (0..nmsgs) {
+                for i in 0..nmsgs {
                     assert!(q.push(i).is_ok());
                 }
                 tx.send(()).unwrap();
@@ -194,7 +194,7 @@ mod tests {
         }
 
         let mut completion_rxs = vec![];
-        for _ in (0..nthreads) {
+        for _ in 0..nthreads {
             let (tx, rx) = channel();
             completion_rxs.push(rx);
             let q = q.clone();
@@ -217,7 +217,7 @@ mod tests {
         for rx in completion_rxs.iter_mut() {
             assert_eq!(nmsgs, rx.recv().unwrap());
         }
-        for _ in (0..nthreads) {
+        for _ in 0..nthreads {
             rx.recv().unwrap();
         }
     }

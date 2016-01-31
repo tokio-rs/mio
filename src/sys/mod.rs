@@ -1,10 +1,12 @@
 #[cfg(unix)]
 pub use self::unix::{
     Awakener,
+    EventedFd,
     Events,
     Io,
     Selector,
-    TcpSocket,
+    TcpStream,
+    TcpListener,
     UdpSocket,
     UnixSocket,
     pipe,
@@ -12,3 +14,16 @@ pub use self::unix::{
 
 #[cfg(unix)]
 mod unix;
+
+#[cfg(windows)]
+pub use self::windows::{
+    Awakener,
+    Events,
+    Selector,
+    TcpStream,
+    TcpListener,
+    UdpSocket,
+};
+
+#[cfg(windows)]
+mod windows;

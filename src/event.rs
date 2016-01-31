@@ -119,7 +119,7 @@ impl fmt::Debug for PollOpt {
             (PollOpt::level(), "Level-Triggered"),
             (PollOpt::oneshot(), "OneShot")];
 
-        for &(flag, msg) in flags.iter() {
+        for &(flag, msg) in &flags {
             if self.contains(flag) {
                 if one { try!(write!(fmt, " | ")) }
                 try!(write!(fmt, "{}", msg));
@@ -263,7 +263,7 @@ impl fmt::Debug for EventSet {
             (EventSet::error(),    "Error"),
             (EventSet::hup(),      "Hup")];
 
-        for &(flag, msg) in flags.iter() {
+        for &(flag, msg) in &flags {
             if self.contains(flag) {
                 if one { try!(write!(fmt, " | ")) }
                 try!(write!(fmt, "{}", msg));
@@ -276,26 +276,40 @@ impl fmt::Debug for EventSet {
     }
 }
 
-
 // Keep this struct internal to mio
-#[derive(Copy, Clone, Debug)]
-pub struct IoEvent {
-    pub kind: EventSet,
-    pub token: Token
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Event {
+    kind: EventSet,
+    token: Token
 }
 
-/// IoEvent represents the raw event that the OS-specific selector
+/// Event represents the raw event that the OS-specific selector
 /// returned. An event can represent more than one kind (such as
 /// readable or writable) at a time.
 ///
-/// These IoEvent objects are created by the OS-specific concrete
+/// These Event objects are created by the OS-specific concrete
 /// Selector when they have events to report.
-impl IoEvent {
-    /// Create a new IoEvent.
-    pub fn new(kind: EventSet, token: Token) -> IoEvent {
-        IoEvent {
+impl Event {
+    /// Create a new Event.
+    pub fn new(kind: EventSet, token: Token) -> Event {
+        Event {
             kind: kind,
             token: token,
         }
     }
+
+    pub fn kind(&self) -> EventSet {
+        self.kind
+    }
+
+    pub fn token(&self) -> Token {
+        self.token
+    }
+}
+
+// Used internally to mutate an `Event` in place
+// Not used on all platforms
+#[allow(dead_code)]
+pub fn kind_mut(event: &mut Event) -> &mut EventSet {
+    &mut event.kind
 }

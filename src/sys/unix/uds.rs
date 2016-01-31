@@ -1,4 +1,5 @@
-use {io, Evented, EventSet, Io, PollOpt, Selector, Token, TryAccept};
+use {io, Evented, EventSet, Io, Poll, PollOpt, Token, TryAccept};
+use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -32,8 +33,8 @@ impl UnixSocket {
 
     pub fn accept(&self) -> io::Result<Option<UnixSocket>> {
         net::accept(&self.io, true)
-            .map(|fd| Some(From::from(Io::from_raw_fd(fd))))
-            .or_else(io::to_non_block)
+            .map(|fd| From::from(Io::from_raw_fd(fd)))
+            .map_non_block()
     }
 
     /// Bind the socket to the specified address
@@ -44,6 +45,32 @@ impl UnixSocket {
     pub fn try_clone(&self) -> io::Result<UnixSocket> {
         net::dup(&self.io)
             .map(From::from)
+    }
+
+    pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {
+        let iov = [nix::IoVec::from_mut_slice(buf)];
+        let mut cmsgspace: nix::CmsgSpace<[RawFd; 1]> = nix::CmsgSpace::new();
+        let msg = try!(nix::recvmsg(self.io.as_raw_fd(), &iov, Some(&mut cmsgspace), 0)
+                           .map_err(super::from_nix_error));
+        let mut fd = None;
+        for cmsg in msg.cmsgs() {
+            if let nix::ControlMessage::ScmRights(fds) = cmsg {
+                // statically, there is room for at most one fd
+                if fds.len() == 1 {
+                    fd = Some(fds[0]);
+                    break;
+                }
+            }
+        }
+        Ok((msg.bytes, fd))
+    }
+
+    pub fn write_send_fd(&mut self, buf: &[u8], fd: RawFd) -> io::Result<usize> {
+        let iov = [nix::IoVec::from_slice(buf)];
+        let fds = [fd];
+        let cmsg = nix::ControlMessage::ScmRights(&fds);
+        nix::sendmsg(self.io.as_raw_fd(),&iov, &[cmsg], 0, None)
+            .map_err(super::from_nix_error)
     }
 }
 
@@ -64,16 +91,16 @@ impl Write for UnixSocket {
 }
 
 impl Evented for UnixSocket {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.io.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.io.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.io.deregister(poll)
     }
 }
 

@@ -1,6 +1,6 @@
-use {sys, Evented, EventSet, PollOpt, Selector, Token};
+use {sys, Evented, EventSet, Poll, PollOpt, Token};
 use util::BoundedQueue;
-use std::{fmt, cmp, io};
+use std::{fmt, cmp, io, error, any};
 use std::sync::Arc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -13,11 +13,11 @@ const CLOSED: isize = -2;
 /// (eventfd, pipe, ...). Backed by a pre-allocated lock free MPMC queue.
 ///
 /// TODO: Use more efficient wake-up strategy if available
-pub struct Notify<M: Send> {
+pub struct Notify<M> {
     inner: Arc<NotifyInner<M>>
 }
 
-impl<M: Send> Notify<M> {
+impl<M> Notify<M> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> io::Result<Notify<M>> {
         Ok(Notify {
@@ -51,7 +51,7 @@ impl<M: Send> Notify<M> {
     }
 }
 
-impl<M: Send> Clone for Notify<M> {
+impl<M> Clone for Notify<M> {
     fn clone(&self) -> Notify<M> {
         Notify {
             inner: self.inner.clone()
@@ -74,7 +74,7 @@ struct NotifyInner<M> {
     awaken: sys::Awakener
 }
 
-impl<M: Send> NotifyInner<M> {
+impl<M> NotifyInner<M> {
     fn with_capacity(capacity: usize) -> io::Result<NotifyInner<M>> {
         Ok(NotifyInner {
             state: AtomicIsize::new(0),
@@ -187,17 +187,18 @@ impl<M: Send> NotifyInner<M> {
     }
 }
 
-impl<M: Send> Evented for Notify<M> {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.inner.awaken.register(selector, token, interest, opts)
+impl<M> Evented for Notify<M> {
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        assert!(opts.is_edge(), "awakener can only be registered using edge-triggered events");
+        self.inner.awaken.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.inner.awaken.reregister(selector, token, interest, opts)
+    fn reregister(&self, _: &mut Poll, _: Token, _: EventSet, _: PollOpt) -> io::Result<()> {
+        panic!("awakener is never reregistered");
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.inner.awaken.deregister(selector)
+    fn deregister(&self, _: &mut Poll) -> io::Result<()> {
+        panic!("awakener is never deregistered");
     }
 }
 
@@ -222,3 +223,44 @@ impl<M> fmt::Debug for NotifyError<M> {
         }
     }
 }
+
+impl<M> fmt::Display for NotifyError<M> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            NotifyError::Io(ref e) => {
+                write!(fmt, "IO error: {}", e)
+            }
+            NotifyError::Full(..) => write!(fmt, "Full"),
+            NotifyError::Closed(..) => write!(fmt, "Closed")
+        }
+    }
+}
+
+impl<M: any::Any> error::Error for NotifyError<M> {
+    fn description(&self) -> &str {
+        match *self {
+            NotifyError::Io(ref err) => err.description(),
+            NotifyError::Closed(..) => "The receiving end has hung up",
+            NotifyError::Full(..) => "Queue is full"
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            NotifyError::Io(ref err) => Some(err),
+            _ => None
+        }
+    }
+}
+
+fn _assert_notify_send_sync_bounds() {
+    fn _is_send<T: Send>() {}
+
+    _is_send::<Notify<Vec<u8>>>();
+
+    /* Compile fail
+    struct NotSend(::std::marker::PhantomData<*mut ()>);
+    is_send::<Notify<NotSend>>();
+    */
+}
+

@@ -1,8 +1,10 @@
 extern crate mio;
+extern crate bytes;
 
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate slab;
 extern crate tempdir;
 
 pub use ports::localhost;
@@ -13,9 +15,20 @@ mod test_echo_server;
 mod test_multicast;
 mod test_notify;
 mod test_register_deregister;
+mod test_register_multiple_event_loops;
+mod test_smoke;
+mod test_tcp;
+mod test_tcp_level;
+mod test_tick;
 mod test_timer;
+mod test_udp_level;
 mod test_udp_socket;
+
+// ===== Unix only tests =====
+#[cfg(unix)]
 mod test_unix_echo_server;
+#[cfg(unix)]
+mod test_unix_pass_fd;
 
 mod ports {
     use std::net::SocketAddr;
@@ -44,7 +57,8 @@ mod ports {
     }
 }
 
-pub fn sleep_ms(ms: usize) {
+#[allow(deprecated)]
+pub fn sleep_ms(ms: u64) {
     use std::thread;
     thread::sleep_ms(ms as u32);
 }

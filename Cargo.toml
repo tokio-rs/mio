@@ -1,11 +1,11 @@
 [package]
 
 name          = "mio"
-version       = "0.4.1"
+version       = "0.5.0"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
-documentation = "http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.4.x/mio/"
+documentation = "http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/"
 homepage      = "https://github.com/carllerche/mio"
 repository    = "https://github.com/carllerche/mio"
 readme        = "README.md"
@@ -18,19 +18,20 @@ exclude       = [
 ]
 
 [dependencies]
-log   = "0.3.1"
-nix   = "0.3.9"
-libc  = "0.1.8"
-slab  = "0.1.0"
-bytes = "0.2.11"
-winapi = "0.1.23"
-clock_ticks = "0.0.5"
+log    = "0.3.1"
+nix    = { git = "https://github.com/carllerche/nix-rust", rev = "c4257f8a76" }
+libc   = "0.2.4"
+slab   = "0.1.0"
+time   = "0.1.33"
+bytes  = "0.3.0"
+winapi = "0.2.1"
+miow   = "0.1.1"
+net2   = { version = "0.2.19", default-features = false }
 
 [dev-dependencies]
 env_logger = "0.3.0"
 tempdir    = "0.3.4"
 
 [[test]]
-
 name = "test"
-path = "test/test.rs"
+path = "test/mod.rs"

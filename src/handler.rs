@@ -1,9 +1,9 @@
 use {EventLoop, EventSet, Token};
 
 #[allow(unused_variables)]
-pub trait Handler {
+pub trait Handler: Sized {
     type Timeout;
-    type Message: Send;
+    type Message;
 
     /// Invoked when the socket represented by `token` is ready to be operated
     /// on. `events` indicates the specific operations that are
@@ -28,5 +28,9 @@ pub trait Handler {
 
     /// Invoked when `EventLoop` has been interrupted by a signal interrupt.
     fn interrupted(&mut self, event_loop: &mut EventLoop<Self>) {
+    }
+
+    /// Invoked at the end of an event loop tick.
+    fn tick(&mut self, event_loop: &mut EventLoop<Self>) {
     }
 }

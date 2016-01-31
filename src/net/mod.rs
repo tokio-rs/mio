@@ -25,9 +25,9 @@ impl FromStr for IpAddr {
 
     fn from_str(s: &str) -> Result<IpAddr, AddrParseError> {
         s.parse()
-            .map(|ip: Ipv4Addr| IpAddr::V4(ip))
+            .map(IpAddr::V4)
             .or_else(|_| {
-                s.parse().map(|ip: Ipv6Addr| IpAddr::V6(ip))
+                s.parse().map(IpAddr::V6)
             })
     }
 }

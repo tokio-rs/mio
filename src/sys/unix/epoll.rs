@@ -1,29 +1,45 @@
 use {io, EventSet, PollOpt, Token};
-use event::IoEvent;
+use event::Event;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 use std::os::unix::io::RawFd;
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+
+/// Each Selector has a globally unique(ish) ID associated with it. This ID
+/// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
+/// registered with the `Selector`. If a type that is previously associatd with
+/// a `Selector` attempts to register itself with a different `Selector`, the
+/// operation will return with an error. This matches windows behavior.
+static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
 #[derive(Debug)]
 pub struct Selector {
+    id: usize,
     epfd: RawFd
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let epfd = try!(epoll_create().map_err(super::from_nix_error));
 
-        Ok(Selector { epfd: epfd })
+        Ok(Selector {
+            id: id,
+            epfd: epfd,
+        })
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 
     /// Wait for events from the OS
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
-        use std::{isize, slice};
+    pub fn select(&mut self, evts: &mut Events, timeout_ms: Option<usize>) -> io::Result<()> {
+        use std::{cmp, i32, slice};
 
-        let timeout_ms = if timeout_ms >= isize::MAX as usize {
-            isize::MAX
-        } else {
-            timeout_ms as isize
+        let timeout_ms = match timeout_ms {
+            None => -1 as i32,
+            Some(x) => cmp::min(i32::MAX as usize, x) as i32,
         };
 
         let dst = unsafe {
@@ -33,7 +49,7 @@ impl Selector {
         };
 
         // Wait for epoll events for at most timeout_ms milliseconds
-        let cnt = try!(epoll_wait(self.epfd, dst, timeout_ms)
+        let cnt = try!(epoll_wait(self.epfd, dst, timeout_ms as isize)
                            .map_err(super::from_nix_error));
 
         unsafe { evts.events.set_len(cnt); }
@@ -131,29 +147,31 @@ impl Events {
     }
 
     #[inline]
-    pub fn get(&self, idx: usize) -> IoEvent {
-        let epoll = self.events[idx].events;
-        let mut kind = EventSet::none();
+    pub fn get(&self, idx: usize) -> Option<Event> {
+        self.events.get(idx).map(|event| {
+            let epoll = event.events;
+            let mut kind = EventSet::none();
 
-        if epoll.contains(EPOLLIN) {
-            kind = kind | EventSet::readable();
-        }
+            if epoll.contains(EPOLLIN) {
+                kind = kind | EventSet::readable();
+            }
 
-        if epoll.contains(EPOLLOUT) {
-            kind = kind | EventSet::writable();
-        }
+            if epoll.contains(EPOLLOUT) {
+                kind = kind | EventSet::writable();
+            }
 
-        // EPOLLHUP - Usually means a socket error happened
-        if epoll.contains(EPOLLERR) {
-            kind = kind | EventSet::error();
-        }
+            // EPOLLHUP - Usually means a socket error happened
+            if epoll.contains(EPOLLERR) {
+                kind = kind | EventSet::error();
+            }
 
-        if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
-            kind = kind | EventSet::hup();
-        }
+            if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
+                kind = kind | EventSet::hup();
+            }
 
-        let token = self.events[idx].data;
+            let token = self.events[idx].data;
 
-        IoEvent::new(kind, Token(token as usize))
+            Event::new(kind, Token(token as usize))
+        })
     }
 }

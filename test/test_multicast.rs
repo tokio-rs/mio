@@ -1,9 +1,9 @@
 use mio::*;
 use mio::udp::*;
-use mio::buf::{RingBuf, SliceBuf};
+use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use std::str;
 use std::net::{SocketAddr};
-use super::localhost;
+use localhost;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
@@ -27,12 +27,13 @@ impl UdpHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: EventSet) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, _: EventSet) {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
-                match self.rx.recv_from(&mut self.rx_buf) {
-                    Ok(Some(SocketAddr::V4(addr))) => {
+                match unsafe { self.rx.recv_from(self.rx_buf.mut_bytes()) } {
+                    Ok(Some((cnt, SocketAddr::V4(addr)))) => {
+                        unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
                         assert_eq!(*addr.ip(), Ipv4Addr::new(127, 0, 0, 1));
                     }
                     _ => panic!("unexpected result"),
@@ -44,10 +45,13 @@ impl UdpHandler {
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: EventSet) {
+    fn handle_write(&mut self, _: &mut EventLoop<UdpHandler>, token: Token, _: EventSet) {
         match token {
             SENDER => {
-                self.tx.send_to(&mut self.buf, &self.rx.local_addr().unwrap()).unwrap();
+                let addr = self.rx.local_addr().unwrap();
+                let cnt = self.tx.send_to(self.buf.bytes(), &addr)
+                                 .unwrap().unwrap();
+                self.buf.advance(cnt);
             },
             _ => ()
         }
@@ -87,10 +91,10 @@ pub fn test_multicast() {
     rx.join_multicast(&"227.1.1.101".parse().unwrap()).unwrap();
 
     info!("Registering SENDER");
-    event_loop.register_opt(&tx, SENDER, EventSet::writable(), PollOpt::edge()).unwrap();
+    event_loop.register(&tx, SENDER, EventSet::writable(), PollOpt::edge()).unwrap();
 
     info!("Registering LISTENER");
-    event_loop.register_opt(&rx, LISTENER, EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&rx, LISTENER, EventSet::readable(), PollOpt::edge()).unwrap();
 
     info!("Starting event loop to test with...");
     event_loop.run(&mut UdpHandler::new(tx, rx, "hello world")).unwrap();
