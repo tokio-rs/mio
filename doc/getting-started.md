@@ -174,10 +174,7 @@ This is how the handler identifies on which sockets it should operate.
 There are two additional pieces of configuration conveyed with the registration
 of the server socket; the event set and the polling option.
 
-We'll talk about the event set later.  Right now let's talk about the polling
-options which will also provide insight into how Mio works at the lowest level.
-
-#### Level vs. Edge
+#### Polling Options: Level vs. Edge
 
 Mio (like Epoll, Kqueue, etc..) supports both level-triggered and
 edge-triggered notifications.
