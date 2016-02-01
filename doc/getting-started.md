@@ -75,6 +75,7 @@ Here is the entire code, we'll step through it in a bit.
 extern crate mio;
 
 use mio::tcp::*;
+use mio::{Token, EventSet, PollOpt};
 
 const SERVER: mio::Token = mio::Token(0);
 
@@ -117,7 +118,7 @@ fn main() {
     let server = TcpListener::bind(&address).unwrap();
 
     let mut event_loop = mio::EventLoop::new().unwrap();
-    event_loop.register(&server, SERVER);
+    event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::level());
 
     println!("running pingpong server");
     event_loop.run(&mut Pong { server: server });
