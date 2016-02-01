@@ -49,6 +49,9 @@ mio = "0.5.0"
 bytes = "0.3.0"
 ```
 
+**If you're attempting to follow this tutorial using the code on the master branch
+you will also need to add `slab = "0.1.0"` to the list of dependencies.**
+
 Save the file, then compile and run the project using the following
 command:
 
