@@ -48,9 +48,9 @@ the bottom of the file:
 mio = "0.5.0"
 bytes = "0.3.0"
 ```
-
-**If you're attempting to follow this tutorial using the code on the master branch
-you will also need to add `slab = "0.1.0"` to the list of dependencies.**
+> Note:
+> If you're attempting to follow this tutorial using the master branch you will
+> also need to add `slab = "0.1.0"` to the list of dependencies.
 
 Save the file, then compile and run the project using the following
 command:
@@ -149,26 +149,29 @@ event function on the custom handler passing the function the `Token`
 associated with the socket which has changed.***
 
 In our case, the event handler is the `Pong` struct as it implements the
-`mio::Handler` trait. We only define the `ready` function, but the
-`mio::Handler` trait has [other
-functions](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/trait.Handler.html)
-that can be defined to handle other event types.
+[Handler](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/trait.Handler.html)
+trait. We only define the
+[ready](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/trait.Handler.html#method.ready)
+function, but the `mio::Handler` trait has other functions that can be defined
+to handle other types of events.
 
-In our `main` function, we create the `EventLoop` value and start it by
-calling `event_loop.run(..)` passing a mutable reference to our handler. The
-`run` function will block until the event loop is shutdown.
+In our `main` function, we create the `EventLoop` binding and start the event loop
+by calling `event_loop.run(..)`.  We pass `run(..)` a mutable reference to our
+handler. The `run(..)` function will block the application from exiting until
+the event loop is shut down.
 
-However, before the event loop is started, it must be set up to do some
-work. In this case, the pingpong server socket is registered with the
-event loop. The constant `SERVER` token is used when registering the
-socket. Whenever a connection is ready to be accepted, the event loop
-will call the handler's `ready` function passing in the `SERVER` token.
-This is how we are able to know, in the handler, which sockets are ready
-to be operated on.
+The event loop isn't much good if it has no input upon which to act.  
+Before the event loop is started we must provide the event loop a link to the
+outside world.  In our case, we register the pingpong server socket with the
+event loop
+`event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::level())`.
+and associate the socket with a token named `SERVER`, a constant binding in our
+application.  Whenever a connection is ready to be accepted, the event loop
+will call our custom handler's `ready` function passing it the `SERVER` token.
+This is how the handler identifies on which sockets it should operate.
 
-> Note:
-> [`EventLoop::register_opt`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventLoop.html#method.register_opt)
-> allows configuring how the socket is registered with the event loop.
+There are two additional pieces of configuration conveyed with the registration
+of the server socket; the event set and the polling option.
 
 #### Level vs. Edge
 
