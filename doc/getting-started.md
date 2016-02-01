@@ -1,26 +1,23 @@
 # Getting Started
 
-This section will serve as an introductory Mio tutorial. It assumes that
+This section will serve as an introductory Mio tutorial. It assumes
 you have familiarity with the [Rust](http://www.rust-lang.org/)
 programming language and the [Cargo](https://crates.io) tool. It will
 start from generating a new [Rust](http://www.rust-lang.org/) project
 using [Cargo](https://crates.io) up to writing a simple TCP echo server
 and client.
 
-Of course, you will need Rust installed. If you haven't already, get it
+Of course, Rust needs to be installed. If you haven't already installed it, get it
 here: [rust-lang.org](https://www.rust-lang.org).
 
 The complete echo server can be found
-[here](../examples/ping_pong/src/server.rs). A client example is
+[here](../examples/ping_pong/src/server.rs). An example of an echo client can be found
 [here](../examples/ping_pong/src/client.rs).
 
-> **Note:** As of the time of writing, Mio does not support Windows
-> (though support is currently in progress).
-
-Before you get started, setup an empty text file. Write down any
-thoughts, confusions, questions that you have while going through this
-guide. You only have one first impression, and I would like to capture
-this in order to improve this document.
+Before you get started, set up an empty text file. As you go through this guide
+capture any thoughts, confusions, or questions that come to mind.
+You only have one first impression and I would like to capture
+your first impression in order to improve this document.
 
 Post your notes as a comment [here](https://github.com/carllerche/mio/pull/222).
 
