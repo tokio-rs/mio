@@ -174,25 +174,29 @@ This is how the handler identifies on which sockets it should operate.
 There are two additional pieces of configuration conveyed with the registration
 of the server socket; the event set and the polling option.
 
+We'll talk about the event set later.  Right now let's talk about the polling
+options which will also provide insight into how Mio works at the lowest level.
+
 #### Level vs. Edge
 
-Mio (just like Epoll, Kqueue, etc..) supports both level-triggered and
-edge-triggered notifications. By default, when registering a socket with
-`EventLoop::register`, level-triggered is used.
+Mio (like Epoll, Kqueue, etc..) supports both level-triggered and
+edge-triggered notifications.
 
-With level-triggered, sockets that have pending data will result in a
-call to the handler's `ready()` fn on every event loop iteration, even
-if it is the same data as the previous iteration. In other words,
-the handler's `ready()` fn will be called until the data has been read
-off of the socket. The same is true for writable events. As long as a
-socket can accept data written to it, the handler's `ready()` fn will be
-called with `EventSet::writable()` set.
+A level-triggered socket having pending data will result in a
+call to a handler's `ready()` function each time the event loop iterates through
+its registered sockets even if the socket is buffering the exact same data
+during consecutive iterations. In other words, a handler's `ready()` function
+will be called until the data has been read from the socket.  
+The same is true for writable events. As long as a socket can accept data
+written to it, the handler's `ready()` function will be called.
 
-However, with edge-triggered events. The handler's `ready()` fn will
-only be called once for a state change. So, when a socket receives new
-data, `ready()` will be called with `EventSet::readable()`. If the data
-is not read, `ready()` will not be called for the socket on the next
-event loop iteration.
+An edge-triggered socket, on the other hand, will only call a handler's
+`ready()` function once per state change. That is, when a socket receives new
+data, `ready()` will be called. But it will only be called once regardless of
+whether or not the data is read from the socket.
+
+Whether a socket is ready to be read or ready to be written is conveyed to a
+handler via an EventSet.
 
 ### Handling Events
 
