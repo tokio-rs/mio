@@ -132,7 +132,7 @@ connections.
 
 The next step is to create the event loop and register the socket with it.
 
-### The [Event Loop]http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/struct.EventLoop.html
+### The [Event Loop](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/struct.EventLoop.html)
 
 The Mio event loop is able to monitor many sockets and notify the
 application when the state of a socket changes. The application
