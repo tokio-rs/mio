@@ -160,13 +160,14 @@ by calling `event_loop.run(..)`.  We pass `run(..)` a mutable reference to our
 handler. The `run(..)` function will block the application from exiting until
 the event loop is shut down.
 
-The event loop isn't much good if it has no input upon which to act.  
+The event loop isn't much good if it has no input upon which to act.
+
 Before the event loop is started we must provide the event loop a link to the
 outside world.  In our case, we register the pingpong server socket with the
 event loop
-`event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::level())`.
+`event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::level())`
 and associate the socket with a token named `SERVER`, a constant binding in our
-application.  Whenever a connection is ready to be accepted, the event loop
+application.  Whenever a connection is ready to be accepted the event loop
 will call our custom handler's `ready` function passing it the `SERVER` token.
 This is how the handler identifies on which sockets it should operate.
 
