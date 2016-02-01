@@ -137,11 +137,13 @@ The next step is to create the event loop and register the socket with it.
 The Mio event loop is able to monitor many sockets and notify the
 application when the state of a socket changes. The application
 registers sockets with the event loop. This is done by supplying a
-`Token` with the socket, associating the two. When the event loop is
-started, the application passes in a custom event handler. Whenever the
-state of any socket changes, the event loop will notify the event
-handler, calling the appropriate event function on the handler and
-passing in the originally supplied `Token`.
+[Token](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/struct.Token.html)
+along with the socket, associating the two.  When the event loop notifies the application
+about changes in a socket's state it is the `Token` the event loop will use to
+identify which socket has changed to the application.  The event loop passes the
+identifying `Token` to the custom event handler specified when the event loop is
+started.  Specifically, the event loop calls the appropriate event function on
+the custom handler passing the `Token` associated with the socket which has changed.
 
 In our case, the event handler is the `Pong` struct as it implements the
 `mio::Handler` trait. We only define the `ready` function, but the
