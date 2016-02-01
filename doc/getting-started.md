@@ -142,8 +142,11 @@ along with the socket, associating the two.  When the event loop notifies the ap
 about changes in a socket's state it is the `Token` the event loop will use to
 identify which socket has changed to the application.  The event loop passes the
 identifying `Token` to the custom event handler specified when the event loop is
-started.  Specifically, the event loop calls the appropriate event function on
-the custom handler passing the `Token` associated with the socket which has changed.
+started, `event_loop.run(&mut Pong { server: server });`.  
+
+***When the state of a socket changes, the event loop will call the appropriate
+event function on the custom handler passing the function the `Token`
+associated with the socket which has changed.***
 
 In our case, the event handler is the `Pong` struct as it implements the
 `mio::Handler` trait. We only define the `ready` function, but the
