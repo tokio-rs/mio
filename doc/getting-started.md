@@ -4,7 +4,7 @@ This section will serve as an introductory Mio tutorial. It assumes
 you have familiarity with the [Rust](http://www.rust-lang.org/)
 programming language and the [Cargo](https://crates.io) tool. It will
 start from generating a new [Rust](http://www.rust-lang.org/) project
-using [Cargo](https://crates.io) up to writing a simple TCP echo server
+using [Cargo](https://crates.io) and guide you through writing a simple TCP echo server
 and client.
 
 Of course, Rust needs to be installed. If you haven't already installed it, get it
@@ -23,7 +23,7 @@ Post your notes as a comment [here](https://github.com/carllerche/mio/pull/222).
 
 ## Setting up the project
 
-The first step is getting a new Cargo project setup. In a new
+The first step is to set up a new Rust project using Cargo. In a new
 directory, run the following:
 
 ```not_rust
@@ -45,7 +45,8 @@ the bottom of the file:
 
 ```toml
 [dependencies]
-mio = "0.4.1"
+mio = "0.5.0"
+bytes = "0.3.0"
 ```
 
 Save the file, then compile and run the project using the following
