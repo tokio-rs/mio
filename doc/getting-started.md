@@ -130,9 +130,9 @@ function), is to create a TCP listener. This will create the socket,
 bind to the specified address, and start listening for inbound
 connections.
 
-The next step is to register the socket with the event loop.
+The next step is to create the event loop and register the socket with it.
 
-### The Event Loop
+### The [Event Loop]http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/struct.EventLoop.html
 
 The Mio event loop is able to monitor many sockets and notify the
 application when the state of a socket changes. The application
