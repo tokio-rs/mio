@@ -221,7 +221,8 @@ registered any other tokens.  When there are many sockets, handlers get more
 involved.  We will cover handling more than one sockets later in the guide.
 
 The event loop will also pass a reference to itself allowing us to register
-additional sockets.
+additional sockets.  This becomes important when we're accepting multiple
+connections.
 
 The last argument, the [`events:
 EventSet`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventSet.html)
@@ -229,7 +230,7 @@ argument, may provide a hint with regard to what will happen when an attempt to
 read from the socket is performed.  For example, if the socket experienced an
 error, a read from the socket will fail. The `EventSet` argument will be set
 to `EventSet::error()`.  But it's important to understand the `events` argument
-provides no guarantees. Even if `events` is set to `EventSet::readable()`,
+provides no guarantees.  Even if `events` is set to `EventSet::readable()`,
 a read from the socket may fail.
 
 With that information let's study the body of our implementation of the ready
@@ -283,8 +284,8 @@ An operation on a non-blocking socket can flat out fail and return an error
 while the socket is still in a good state.  It may be, however, that the socket
 is not be ready to be operated on.  If it were a blocking socket, the operation
 would block.  Instead, the non-blocking socket returns immediately with Ok(None)
-when it isn't ready to be operated on.  When the socket is in that state we must
-wait for the event loop to notify the handler that the socket is
+when the socket isn't ready to be operated on.  When the socket is in that state
+we must wait for the event loop to notify the handler that the socket is
 readable again.
 
 > **Important:** Even if we just received a ready notification, there is
