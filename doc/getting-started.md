@@ -232,7 +232,8 @@ to `EventSet::error()`.  But it's important to understand the `events` argument
 provides no guarantees. Even if `events` is set to `EventSet::readable()`,
 a read from the socket may fail.
 
-Now let's look at the body:
+With that information let's study the body of our implementation of the ready
+function.
 
 ```rust
 fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, token: mio::Token, events: mio::EventSet) {
@@ -243,7 +244,7 @@ fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, token: mio::Token, ev
 
             println!("the server socket is ready to accept a connection");
             match self.server.accept() {
-                Ok(Some(connection)) => {
+                Ok(Some(socket)) => {
                     println!("accepted a socket, exiting program");
                     event_loop.shutdown();
                 }
@@ -261,33 +262,38 @@ fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, token: mio::Token, ev
 }
 ```
 
-Since we only ever registered one socket with the event loop, the
-`ready` handler will only ever be called with the `SERVER` token.
-Then, we try to accept a connection. It's important to note that the
-event loop will never operate on any sockets. It only watches sockets
-for changes in state.
+Once our `ready` handler has determined the identity of the socket the handler
+ensures `events` is set to `EventSet::readable()`.  We're only interested in
+data coming to our server at the moment.
 
-The signature for the `TcpListener::accept()` function is as follows:
+With that out of the way we accept the incoming connection.
+
+The signature for the [`TcpListener::accept()`]
+(http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/tcp/struct.TcpListener.html#method.accept)
+function follows.
 
 ```no_run
-fn accept(&self) -> io::Result<Option<TcpStream>>;
+fn accept(&self) -> Result<Option<(TcpStream, SocketAddr)>>
 ```
 
 All non-blocking socket types follow a similar pattern of returning
-`io::Result<Option<T>>`. An operation on a non-blocking socket can
-obviously flat out fail and return an error. However, the socket can
-also be in a good state, but not be ready to operate on. If it were a
-blocking socket, the operation would block. Instead, it returns
-immediately with Ok(None), in which case we must wait for the event loop
-to notify us again that the socket is readable.
+`io::Result<Option<(T, SocketAddr)>>`.
+
+An operation on a non-blocking socket can flat out fail and return an error
+while the socket is still in a good state.  It may be, however, that the socket
+is not be ready to be operated on.  If it were a blocking socket, the operation
+would block.  Instead, the non-blocking socket returns immediately with Ok(None)
+when it isn't ready to be operated on.  When the socket is in that state we must
+wait for the event loop to notify the handler that the socket is
+readable again.
 
 > **Important:** Even if we just received a ready notification, there is
-> no guarantee that a read from the socket will succeed and not return
-> `Ok(None)`, so we must handle that case as well.
+> no guarantee a read from the socket will succeed and not return
+> `Ok(None)` so we must handle that case as well.
 
-If a connection was successfully accepted, we just print some output and
-shutdown the event loop. The `event_loop.run(...)` call will return and
-the program will exit.
+If a connection was successfully accepted the handler prints a short message and
+shuts down the event loop.  At that point the `event_loop.run(...)` call will
+return and the program will exit.
 
 ### Handling connections
 
