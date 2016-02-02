@@ -202,7 +202,7 @@ to be operated on.  The handler needs to do something. The handler may read
 from, write to, or close a socket.
 
 The event loop notifies the handler via a call to one of its handler
-functions.  In the case of our pingpong server the ready handler function
+functions.  In the case of our pingpong server the `ready` handler function
 is called.
 
 The following is the `ready` function's signature.
