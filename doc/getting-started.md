@@ -201,8 +201,9 @@ As discussed previously, the event loop notifies a handler that a socket is read
 to be operated on.  The handler needs to do something. The handler may read
 from, write to, or close a socket.
 
-The event loop notifies the handler via a call to one of its handler functions.  
-In the case of our pingpong server the ready handler function is called.
+The event loop notifies the handler via a call to one of its handler
+functions.  In the case of our pingpong server the ready handler function
+is called.
 
 The following is the `ready` function's signature.
 
@@ -213,7 +214,8 @@ fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: Even
 The socket which caused the notification is identified by the token passed to the
 handler function.  So far we've only created a single socket: the
 `server` socket.  So we simply ensure that the only token passed to our handler
-is the `server` socket by matching against the `SERVER` `Token`.  If we receive
+is the `server` socket by matching against the `SERVER` `Token` which was
+associated with the `server` socket by the register call.  If we receive
 another token we panic because that would be very, very weird since we haven't
 registered any other tokens.  When there are many sockets, handlers get more
 involved.  We will cover handling more than one sockets later in the guide.
@@ -221,13 +223,14 @@ involved.  We will cover handling more than one sockets later in the guide.
 The event loop will also pass a reference to itself allowing us to register
 additional sockets.
 
-The last argument, [`events:
+The last argument, the [`events:
 EventSet`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventSet.html)
-sometimes provides a hint as to what will happen when the read is
-performed. For example, if the socket experienced an error, a read on
-the socket will fail. In this case, the `EventSet` argument will be set
-to `EventSet::error()`. However, this is not a guarantee. Even if
-`EventSet` is set to `EventSet::readable()`, the read may fail.
+argument, may provide a hint with regard to what will happen when an attempt to
+read from the socket is performed.  For example, if the socket experienced an
+error, a read from the socket will fail. The `EventSet` argument will be set
+to `EventSet::error()`.  But it's important to understand the `events` argument
+provides no guarantees. Even if `events` is set to `EventSet::readable()`,
+a read from the socket may fail.
 
 Now let's look at the body:
 
