@@ -197,27 +197,29 @@ handler via an EventSet.
 
 ### Handling Events
 
-Once the event loop notifies the handler that a socket is ready to be
-operated on, the handler needs to do something. This may include reading
-from, writing to, or closing a socket. The first step is to identify the
-socket that is ready via the token. So far we only have a single socket
-to manage: the `server` socket, so all we do is assert that the given
-`Token` matches `SERVER`. However, when there are many sockets, things
-get more involved. We will cover handling more than one sockets later in
-the guide.
+As discussed previously, the event loop notifies a handler that a socket is ready
+to be operated on.  The handler needs to do something. The handler may read
+from, write to, or close a socket.
 
-Here is the `ready` signature:
+The event loop notifies the handler via a call to one of its handler functions.  
+In the case of our pingpong server the ready handler function is called.
+
+The following is the `ready` function's signature.
 
 ```rust
-fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, token: mio::Token, events: mio::EventSet) {
-  // ...
-}
+fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) { ... }
 ```
 
-For every call into the handler, the event loop will pass a reference to
-itself. This allows us to register additional sockets. It also passes in
-the `Token` that was associated with the socket during the `register`
-call.
+The socket which caused the notification is identified by the token passed to the
+handler function.  So far we've only created a single socket: the
+`server` socket.  So we simply ensure that the only token passed to our handler
+is the `server` socket by matching against the `SERVER` `Token`.  If we receive
+another token we panic because that would be very, very weird since we haven't
+registered any other tokens.  When there are many sockets, handlers get more
+involved.  We will cover handling more than one sockets later in the guide.
+
+The event loop will also pass a reference to itself allowing us to register
+additional sockets.
 
 The last argument, [`events:
 EventSet`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventSet.html)
