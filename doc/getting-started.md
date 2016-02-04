@@ -296,16 +296,52 @@ If a connection was successfully accepted the handler prints a short message and
 shuts down the event loop.  At that point the `event_loop.run(...)` call will
 return and the program will exit.
 
-### Handling connections
+So far our server doesn't really do much.  Let's change that by managing the
+connections made to our pingpong server.
 
-Our echo server will be pretty simple. It will receive data off of the
-connection, buffer it until it sees a newline, and then return the data
-to the client.
+### Handling Client Connections
 
-First, we need a way to store the connection state on the `Pong` server.
-To do this, we are going to create a `Connection` struct that will
-contain the state for a single client connection. The `Pong` struct will
-use a `Slab` to store all the `Connection` instances.
+Our echo server will be pretty simple when complete. It will receive data from
+a socket, the connection, buffer the data until a newline is received, and send
+the data back to the client (hence the echo).
+
+We need a way to store the connection state on the `Pong` server.
+To do this, we will create a `Connection` struct that will
+store the state of a single client connection.  The `Pong` struct will
+use a [`Slab`](http://rustdoc.s3-website-us-east-1.amazonaws.com/slab/master/slab/struct.Slab.html)
+to store all of the `Connection` instances.
+
+The echo server's goal is to read from the client connection until a new
+line has been reached, then write back that line to the client (and
+repeat). So, there are two clear states. First, the connection is in a
+"reading" state where it focuses on reading from the socket then looking
+for a new line. If no new line is found, it stays in the reading state.
+Otherwise, if a new line is found, it transitions to a writing state
+until the line is written back to the client, at which point it
+transitions back to the reading state.
+
+So, let's setup the Connection struct to represent that:
+
+```rust
+struct Connection {
+    socket: TcpStream,
+    token: mio::Token,
+    state: State,
+}
+
+enum State {
+    Reading(Vec<u8>),
+    Writing(Take<Cursor<Vec<u8>>>),
+}
+```
+
+In the `Connection` struct, we track the socket so that we can read &
+write. We also track token so that we can make calls to
+`EventLoop::reregister`. The last field is an enum representing the
+current state of the socket as well as any fields required for that
+state.
+
+In our case, we only need a buffer to hold data read from the socket.
 
 A `Slab` is a fixed capacity map of `Token`, the type that mio uses to
 identify sockets (discussed below) to T, defined by the user. In this
@@ -414,40 +450,6 @@ fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, token: mio::Token, ev
 Here, we assume that any token that is not the server token is a client
 one. We lookup the connection state in the `Slab` and then forward the
 notifcation to the specific client connection state struct.
-
-## Client connections
-
-The echo server's goal is to read from the client connection until a new
-line has been reached, then write back that line to the client (and
-repeat). So, there are two clear states. First, the connection is in a
-"reading" state where it focuses on reading from the socket then looking
-for a new line. If no new line is found, it stays in the reading state.
-Otherwise, if a new line is found, it transitions to a writing state
-until the line is written back to the client, at which point it
-transitions back to the reading state.
-
-So, let's setup the Connection struct to represent that:
-
-```rust
-struct Connection {
-    socket: TcpStream,
-    token: mio::Token,
-    state: State,
-}
-
-enum State {
-    Reading(Vec<u8>),
-    Writing(Take<Cursor<Vec<u8>>>),
-}
-```
-
-In the `Connection` struct, we track the socket so that we can read &
-write. We also track token so that we can make calls to
-`EventLoop::reregister`. The last field is an enum representing the
-current state of the socket as well as any fields required for that
-state.
-
-In our case, we only need a buffer to hold data read from the socket.
 
 ### Buffers
 
