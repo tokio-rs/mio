@@ -306,21 +306,12 @@ a socket, the connection, buffer the data until a newline is received, and send
 the data back to the client (hence the echo).
 
 We need a way to store the connection state on the `Pong` server.
-To do this, we will create a `Connection` struct that will
+To do this, we create a `Connection` struct that will
 store the state of a single client connection.  The `Pong` struct will
 use a [`Slab`](http://rustdoc.s3-website-us-east-1.amazonaws.com/slab/master/slab/struct.Slab.html)
-to store all of the `Connection` instances.
+to store all of the `Connection` instances.  We'll come back to the `Slab`.
 
-The echo server's goal is to read from the client connection until a new
-line has been reached, then write back that line to the client (and
-repeat). So, there are two clear states. First, the connection is in a
-"reading" state where it focuses on reading from the socket then looking
-for a new line. If no new line is found, it stays in the reading state.
-Otherwise, if a new line is found, it transitions to a writing state
-until the line is written back to the client, at which point it
-transitions back to the reading state.
-
-So, let's setup the Connection struct to represent that:
+The `Connection` struct follows.
 
 ```rust
 struct Connection {
@@ -328,33 +319,52 @@ struct Connection {
     token: mio::Token,
     state: State,
 }
+```
 
+The `Connection` struct provides a way to store the association between a
+`Token` and socket in a convenient package.  This makes it easy to access when
+we want to read from the socket or write to the socket.  Including the `Token`
+also makes it convenient reregister the socket via the `EventLoop::reregister`
+method.
+
+The last field represents the state of a `Connection` at any point while the
+`Pong` server is running.  We represent the states as an enum.
+
+The echo server's goal is to read from a client connection until a new
+line has been received, then write the line back to the client (and
+repeat). That implies two clear states.  While in the first state the connection
+is reading from a socket, looking for a new line.  If a new line is never
+received, the `Connection` stays in the reading state.
+If a new line is found, the `Connection` transitions to a writing state
+until the line has been written back to the client.  Once the write is complete
+the `Connection` transitions back to the reading state.
+
+We'll use and enum to represent the states of a `Connection` and the data
+required by the `Connection` in a particular state.
+
+```rust
 enum State {
     Reading(Vec<u8>),
     Writing(Take<Cursor<Vec<u8>>>),
+    Closed,
 }
 ```
 
-In the `Connection` struct, we track the socket so that we can read &
-write. We also track token so that we can make calls to
-`EventLoop::reregister`. The last field is an enum representing the
-current state of the socket as well as any fields required for that
-state.
+Of course, a `Connection` could be closed so we also include that as a valid
+`State`.
 
-In our case, we only need a buffer to hold data read from the socket.
+Now that we have a convenient representation of connections our `Pong` server
+can store all of the connections it is handling.  
 
-A `Slab` is a fixed capacity map of `Token`, the type that mio uses to
-identify sockets (discussed below) to T, defined by the user. In this
-case, it will be a `Slab<Connection>`. The advantage of using a slab
-over a HashMap is that it is much lighter weight and optimized for use
-with mio.
+A `Slab` is a fixed capacity map of `Token` to `Connection` similar to a HashMap
+but lighter weight and optimized for use with mio.
 
-Our `Pong` struct looks like this now:
+Our `Pong` struct looks like this now.
 
 ```rust
 struct Pong {
     server: TcpListener,
-    connections: Slab<Connection>,
+    connections: Slab<Connection, Token>
 }
 ```
 
