@@ -240,7 +240,6 @@ function.
 fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, token: mio::Token, events: mio::EventSet) {
     match token {
         SERVER => {
-            // Only receive readable events
             assert!(events.is_readable());
 
             println!("the server socket is ready to accept a connection");
@@ -368,29 +367,31 @@ struct Pong {
 }
 ```
 
+There's one more significant architectural component which we need to discuss.
+The `Token`.
+
 #### Tokens
 
-Mio's strategy of using token's vs. callbacks for being notified of
-events may seem surprising. The reason for this design is to allow Mio
-applications to be able to operate at runtime without performing any
-allocations. Using a callback for event notification would violate this
-requirement.
+Mio's decision to use tokens that identify sockets on which events take place
+may seem surprising.  We could have used some form of callback strategy as a
+lot of async frameworks do. The reason Mio chose a token based strategy
+is that it to allows Mio applications to operate at runtime without performing
+allocations. Using a callback strategy for handling event notifications would
+violate this requirement.
 
-A `Token` is simply a wrapper around `usize`. In our example, we have
-`SERVER` hardcoded to `Token(0)`. We need to ensure that no client
-socket gets registered with the same token, otherwise there will be no
-way to tell the difference. The `Slab` that we are using to store the
-`Connection` instances will be responsible for generating the `Token`
-values that are associated with each `Connection` instance. So, we need
-to tell it to skip `Token(0)`.
+A `Token` is simply a wrapper around `usize`. In our example we have
+`SERVER` hardcoded to `Token(0)`. We need to ensure that a client
+socket does not get registered with the same token otherwise there will be no
+way to differentiate between sockets.  The `Slab` we are using to store the
+`Connection` instances will be responsible for generating the value of the `Token`
+associated with each `Connection` instance.
 
-We do it like this:
+We're going to add a factory function to our `Pong` server that configures the
+`Slab` so that it can't reuse `Token(0)`.
 
 ```rust
 impl Pong {
-    // Initialize a new `Pong` server from the given TCP listener socket
     fn new(server: TcpListener) -> Pong {
-        // Create a Slab with capacity 1024. Skip Token(0).
         let slab = Slab::new_starting_at(mio::Token(1), 1024);
 
         Pong {
@@ -401,19 +402,20 @@ impl Pong {
 }
 ```
 
-Now when we accept a new client socket, we initialize a new `Connection`
-instance and insert it into the `Slab`. We take the token that `Slab`
-gives us and use it to register the client socket with the EventLoop. We
-will then receive event notifications for that socket.
+Now when a new client socket comes knocking and we accept,
+we initialize a new `Connection`instance and insert it into the `Slab`.
+We take the token that the `Slab` associates with the socket and use it to
+register the client socket with the EventLoop. Once registered, our handler will
+receive notifications about events on that socket.
 
 ```rust
 match self.server.accept() {
-    Ok(Some(socket)) => {
+    Ok(Some((socket, _))) => {
         let token = self.connections
             .insert_with(|token| Connection::new(socket, token))
             .unwrap();
 
-        event_loop.register_opt(
+        event_loop.register(
             &self.connections[token].socket,
             token,
             mio::EventSet::readable(),
@@ -423,17 +425,21 @@ match self.server.accept() {
 }
 ```
 
-In this case, we register the socket with edge + oneshot. When a ready
-notification is fired, the socket will be "unarmed". In otherwords, once
-a notification for the socket is received, no further notifications will
-be fired. When we want to receive another event, we [`reregister`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventLoop.html#method.reregister) the socket with the event loop.
+There's one detail in this change that should be pointed out.  
+In this case, we register new sockets with
+edge + oneshot `mio::PollOpt::edge() | mio::PollOpt::oneshot()).unwrap();`.
+This means that when a ready notification is fired the socket will be
+"unarmed". In other words, once a notification for the socket is received,
+no further notifications will be fired. When we want to receive another notification,
+we [`reregister`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventLoop.html#method.reregister)
+the socket with the event loop.
 
 Using this pattern of edge + oneshot makes state management a bit
 easier. We only receive notifications when we are ready to handle them.
 The alternative is to simply use edge triggered notifications without
-oneshot, in which case we would need to handle receiving a notification
-but not actually be ready to do anything with it. For example, if we
-receive a writable notification for our socket, but we don't have
+oneshot, in which case we would have to handle receiving a notification
+while not being ready to handle it. For example, if we
+receive a writable notification for a socket, but we don't have
 anything to write yet.
 
 #### Handling client socket events
