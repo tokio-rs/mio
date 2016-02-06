@@ -21,7 +21,7 @@ your first impression in order to improve this document.
 
 Post your notes as a comment [here](https://github.com/carllerche/mio/pull/222).
 
-## Setting up the project
+## Setting Up the Project
 
 The first step is to set up a new Rust project using Cargo. In a new
 directory, run the following:
@@ -63,7 +63,7 @@ You will see some Cargo related output followed by `Hello, world!`. We
 haven't written any code yet and this is the default behavior of a
 freshly generated Cargo project.
 
-## Writing the Echo Server
+## The Echo Server
 
 Let's start by writing a very simple server that accepts connections and
 does nothing with them. The connections will be accepted and shutdown
@@ -425,7 +425,8 @@ match self.server.accept() {
 }
 ```
 
-There's one detail in this change that should be pointed out.  
+There's one detail in this change that should be pointed out.
+
 In this case, we register new sockets with
 edge + oneshot `mio::PollOpt::edge() | mio::PollOpt::oneshot()).unwrap();`.
 This means that when a ready notification is fired the socket will be
@@ -442,7 +443,7 @@ while not being ready to handle it. For example, if we
 receive a writable notification for a socket, but we don't have
 anything to write yet.
 
-#### Handling client socket events
+#### Handling Client Events
 
 The client connections are now being accepted and tracked. When events
 are pending for these connections, the `ready` function on our handler
