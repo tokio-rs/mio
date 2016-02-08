@@ -367,15 +367,19 @@ struct Pong {
 }
 ```
 
-There's one more significant architectural component which we need to discuss.
-The `Token`.
+We have a pretty good server now.  We understand how a Mio based application
+should be structured at the lowest layers.
+
+There are a few implementation details we need to discuss.  The final sections
+will bring some of the architectural decisions to light and help you understand
+how to use Mio in a finer grained detail.
 
 #### Tokens
 
 Mio's decision to use tokens that identify sockets on which events take place
 may seem surprising.  We could have used some form of callback strategy as a
 lot of async frameworks do. The reason Mio chose a token based strategy
-is that it to allows Mio applications to operate at runtime without performing
+is that it allows Mio applications to operate at runtime without performing
 allocations. Using a callback strategy for handling event notifications would
 violate this requirement.
 
