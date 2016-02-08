@@ -481,35 +481,40 @@ no longer be tracked.
 
 ### Buffers
 
-A **buffer** is an abstraction around byte storage and a cursor and is
-used extensively with Mio. The byte storage may or may not be contiguous
-memory. Buffers can be readable, represented by the `Buf` trait, they
-can also be writable, represented by the `MutBuf` trait.
+Mio uses buffers extensively.  A **buffer** is an abstraction representing byte
+storage and a cursor that tracks the current position in that byte storage.  
+The byte storage may or may not be contiguous memory. Buffers can be readable,
+represented by the [`Buf`](http://carllerche.github.io/bytes/bytes/buf/trait.Buf.html)
+trait, and they can be writable, represented by the
+[`MutBuf`](http://carllerche.github.io/bytes/bytes/buf/trait.MutBuf.html) trait.
 
 For example, `Vec<u8>` implements `MutBuf` such that, when new bytes are
-written to `Vec<u8>`, they are appended to the end of the array. This
-allows using `Vec<u8>` as an argument when reading from an mio socket:
+written to `Vec<u8>` they are appended to the end of the vector. This
+allows us to use `Vec<u8>` as an argument when reading from an Mio socket.
 
 ```rust
 let mut buf = vec![];
 try!(sock.try_read_buf(&mut buf));
 ```
 
-To write to a socket, `std::io::Cursor<Vec<u8>>` is needed, as such:
+Similarly, to write to a socket we use `std::io::Cursor<Vec<u8>>` as follows.
 
 ```rust
 let mut buf = Cursor::new(vec);
 try!(sock.try_write_buf(&mut buf));
 ```
 
-The reason to use a `Buf` vs. just calling `try_write(...)` with a slice
-is that, buffers contain an cursor that tracks the current position. So,
-it allows calling `try_write_buf` multiple times with the same buffer
-and each time, the call will resume from where it left off.
+The reason it's advisable to use a `Buf` instead of just calling
+`try_write(...)` with a slice is that buffers maintain a cursor that tracks the
+current position in the buffer, the next accessible byte. That means calling
+`try_write_buf` multiple times using the same buffer isn't a problem because
+each time `try_write_buf` is called, writing starts where the previous write
+finished.
 
-This is an especially useful helper when working with non blocking
-sockets, since at any point, the socket may not be ready and we have to
-wait and try again later. For example:
+Having a buffer that maintains the cursor and keep track of its current position
+is especially useful when working with non blocking sockets since, at any
+point, the socket may not be ready to be operated on the operation will
+have to be attempted at a later time. For example:
 
 ```rust
 let mut buf = Cursor::new(vec);
@@ -519,10 +524,10 @@ while buf.has_remaining() {
 }
 ```
 
-Also, because the actual byte backend is abstracted, it's possible to
-have a whole set of different kinds of buffers suitable for different
-use cases. The [bytes](github.com/carllerche/bytes) crate contains basic
-byte buffers, ring buffer, ropes, etc...
+Also, because the memory backing the buffer is abstracted, it's possible to
+have different kinds of buffers suitable for different use cases.
+The [bytes](https://github.com/carllerche/bytes) crate contains basic byte buffers,
+ring buffer, ropes, etc...
 
 ## Reading data
 
