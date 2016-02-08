@@ -370,9 +370,10 @@ struct Pong {
 We have a pretty good server now.  We understand how a Mio based application
 should be structured at the lowest layers.
 
-There are a few implementation details we need to discuss.  The final sections
-will bring some of the architectural decisions to light and help you understand
-how to use Mio in a finer grained detail.
+There are a few implementation details we need to discus before we finish
+writing our server.  The final sections will bring some of the architectural
+decisions to light and help you understand how to use Mio in a finer grained
+detail.
 
 #### Tokens
 
@@ -531,24 +532,31 @@ ring buffer, ropes, etc...
 
 ## Reading data
 
-The `Connection::ready` function now looks like this:
+Now that we've covered reading and writing to sockets we can finish our server.
 
-> The guide omits a number of utility functions, most of them on
-> [`State`](../examples/ping_pong/src/server.rs#L249). The full source of
-> the echo server in its final form is
-> [here](../examples/ping_pong/src/server.rs).
+We modify the `Connection::ready` function so that it now looks like the following.
 
 ```rust
 fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, events: mio::EventSet) {
+    println!("    connection-state={:?}", self.state);
+
     match self.state {
-        State::Reading(ref mut buf) => {
+        State::Reading(..) => {
             assert!(events.is_readable(), "unexpected events; events={:?}", events);
-            self.read(event_loop);
+            self.read(event_loop)
+        }
+        State::Writing(..) => {
+            assert!(events.is_writable(), "unexpected events; events={:?}", events);
+            self.write(event_loop)
         }
         _ => unimplemented!(),
     }
 }
+```
 
+Each connection
+
+```rust
 fn read(&mut self, event_loop: &mut mio::EventLoop<Pong>) {
     match self.socket.try_read_buf(self.state.mut_read_buf()) {
         Ok(Some(0)) => {
@@ -641,3 +649,8 @@ Now that the state has been transitioned to writing, when
 instead of readable. So, our `Connection::ready` function will be called
 once the socket is ready to accept writes. Once this happens, we will be
 ready to write back the data that we just read.
+
+> The guide omits a number of utility functions, most of them on
+> [`State`](../examples/ping_pong/src/server.rs#L249). The full source of
+> the echo server in its final form is
+> [here](../examples/ping_pong/src/server.rs).
