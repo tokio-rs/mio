@@ -1,6 +1,7 @@
 use mio::*;
 use mio::udp::*;
 use std::thread;
+use std::time::duration::Duration;
 
 const MS: usize = 1_000;
 
@@ -29,7 +30,7 @@ pub fn test_udp_level_triggered() {
 
     tx.send_to(b"hello world!", &rx.local_addr().unwrap()).unwrap();
 
-    thread::sleep_ms(250);
+    thread::sleep(Duration::from_millis(250));
 
     for _ in 0..2 {
         poll.poll(Some(MS)).unwrap();
@@ -50,7 +51,7 @@ pub fn test_udp_level_triggered() {
     }
 
     tx.send_to(b"hello world!", &rx.local_addr().unwrap()).unwrap();
-    thread::sleep_ms(250);
+    thread::sleep(Duration::from_millis(250));
 
     poll.poll(Some(MS)).unwrap();
     let rx_events = filter(&poll, Token(1));

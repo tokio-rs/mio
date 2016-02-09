@@ -2,6 +2,7 @@ use mio::*;
 use mio::tcp::*;
 use std::io::Write;
 use std::thread;
+use std::time::duration::Duration;
 
 const MS: usize = 1_000;
 
@@ -85,7 +86,7 @@ pub fn test_tcp_stream_level_triggered() {
     assert!(res.unwrap() > 0);
 
     // Sleep a bit to ensure it arrives at dest
-    thread::sleep_ms(250);
+    thread::sleep(Duration::from_millis(250));
 
     // Poll rx end
     poll.poll(Some(MS)).unwrap();

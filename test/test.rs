@@ -1,5 +1,6 @@
 extern crate mio;
 extern crate bytes;
+extern crate time;
 
 #[macro_use]
 extern crate log;
@@ -52,9 +53,4 @@ mod ports {
         let s = format!("127.0.0.1:{}", next_port());
         FromStr::from_str(&s).unwrap()
     }
-}
-
-pub fn sleep_ms(ms: usize) {
-    use std::thread;
-    thread::sleep_ms(ms as u32);
 }

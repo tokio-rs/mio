@@ -1,10 +1,10 @@
-use {sleep_ms};
 use mio::*;
 use mio::tcp::*;
 use mio::util::Slab;
 use super::localhost;
 use std::collections::LinkedList;
 use std::{io, thread};
+use std::time::duration::Duration;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -247,7 +247,7 @@ pub fn test_echo_server() {
     let go = move || {
         let mut i = N;
 
-        sleep_ms(1_000);
+        thread::sleep(Duration::from_millis(1000));
 
         let message = "THIS IS A TEST MESSAGE".to_string();
         while i > 0 {

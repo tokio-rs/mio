@@ -1,8 +1,8 @@
-use {sleep_ms};
 use mio::*;
 use mio::tcp::*;
 use super::localhost;
 use std::thread;
+use std::time::duration::Duration;
 
 struct TestHandler {
     sender: Sender<String>,
@@ -54,7 +54,7 @@ pub fn test_notify() {
     let sender = event_loop.channel();
 
     thread::spawn(move || {
-        sleep_ms(1_000);
+        thread::sleep(Duration::from_millis(1000));
         sender.send("First".to_string()).unwrap();
     });
 
@@ -174,7 +174,7 @@ pub fn test_notify_drop() {
     notify.send(MessageDrop(tx_notif_2)).unwrap();
 
     // We ensure the message is indeed stuck in the queue
-    thread::sleep_ms(100);
+    thread::sleep(Duration::from_millis(100));
     assert!(rx_notif_2.try_recv().is_err());
 
     // Give the order to drop the event loop
