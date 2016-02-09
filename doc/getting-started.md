@@ -530,11 +530,12 @@ have different kinds of buffers suitable for different use cases.
 The [bytes](https://github.com/carllerche/bytes) crate contains basic byte buffers,
 ring buffer, ropes, etc...
 
-## Reading data
+## Reading and Writing Data
 
 Now that we've covered reading and writing to sockets we can finish our server.
 
-We modify the `Connection::ready` function so that it now looks like the following.
+We modify the `Connection::ready` function so that it now looks like the
+following.
 
 ```rust
 fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, events: mio::EventSet) {
@@ -554,68 +555,81 @@ fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, events: mio::EventSet
 }
 ```
 
-Each connection
+And the read function which is called from the ready function `self.read(event_loop)`
+follows.
+
+Our `Connection::ready` function handles the two connection states we care
+about for our `Pong` server; `State::Reading` and `State::Writing`.
+
+Lets talk about `State::Reading` first.
+
+The way our connection handler is structured, when the state is set to
+`State::Reading` it can only receive notifications indicating the socket is
+readable.  We do that by asserting the event is readable `events.is_readable()`.
+Once the handler do receives a notification that the connection is readable it
+attempts to read from the socket via the `read` function
+`self.read(event_loop)`. This is done by calling `try_read_buf` and passing in
+our buffer.
 
 ```rust
 fn read(&mut self, event_loop: &mut mio::EventLoop<Pong>) {
-    match self.socket.try_read_buf(self.state.mut_read_buf()) {
-        Ok(Some(0)) => {
-            unimplemented!();
-        }
-        Ok(Some(n)) => {
-            // Look for a new line. If a new line is received, then the
-            // state is transitioned from `Reading` to `Writing`.
-            self.state.try_transition_to_writing();
+      match self.socket.try_read_buf(self.state.mut_read_buf()) {
+          Ok(Some(0)) => {
+              println!("    read 0 bytes from client; buffered={}", self.state.read_buf().len());
 
-            // Re-register the socket with the event loop. The current
-            // state is used to determine whether we are currently reading
-            // or writing.
-            self.reregister(event_loop);
-        }
-        Ok(None) => {
-            self.reregister(event_loop);
-        }
-        Err(e) => {
-            panic!("got an error trying to read; err={:?}", e);
-        }
-    }
-}
+              match self.state.read_buf().len() {
+                  n if n > 0 => {
+                      self.state.transition_to_writing(n);
+                      self.reregister(event_loop);
+                  }
 
-fn reregister(&self, event_loop: &mut mio::EventLoop<Pong>) {
-    let event_set = match self {
-        State::Reading(..) => mio::EventSet::readable(),
-        State::Writing(..) => mio::EventSet::writable(),
-        _ => mio::EventSet::none(),
-    };
-
-    event_loop.reregister(&self.socket, self.token, event_set, mio::PollOpt::oneshot())
-        .unwrap();
-}
+                  _ => self.state = State::Closed,
+              }
+          }
+          Ok(Some(n)) => {
+              println!("read {} bytes", n);
+              self.state.try_transition_to_writing();
+              self.reregister(event_loop);
+          }
+          Ok(None) => {
+              self.reregister(event_loop);
+          }
+          Err(e) => {
+              panic!("got an error trying to read; err={:?}", e);
+          }
+      }
+  }
 ```
 
-Our `Connection::ready` function first checks the current state. The way
-our connection handler is structured, when the state is set to
-`State::Reading`, we can only receive readable notifications. Once we do
-receive the notification, we attempt a read. This is done by calling
-`try_read_buf` passing in our buffer.
+The `read` function is fully annotated in the example
+[here](../examples/ping_pong/src/server.rs).
 
-The only time a read can succeed with 0 bytes read is if the socket is
-closed or the other end shutdown half the socket using
+But lets talk about some the nuanced parts.
+
+The only time a read can succeed while pushing 0 bytes into the buffer
+`Ok(Some(0))` is when the socket is closed or the client end of the connection
+shut down its half of the connection using
 [`shutdown()`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/tcp/enum.Shutdown.html).
-We'll come back around to handling this later.
 
-In the case of the read returning `Ok(None)`, the ready notification is
-a spurious event, so we reregister the socket with the event loop and
-wait for another ready notification.
+We'll come back to how we handle this later.
 
-When the read completes successfully, some number of bytes have been
-loaded into our buffer. The buffer's internal cursor is moved forward,
-so if the call to `try_read_buf` is repeated, additional data will be
-appended to any data that was just read.
+If the read returns an `Ok(None)`, the event notification is
+a spurious so we reregister the socket with the event loop and wait for another
+ready notification.
 
-The first thing to do is check to see if a new line has been read. In
-which case, we want to write back the data up to the new line to the
-client.
+The most interesting result of a read operation is when the read completes
+successfully and some number of bytes have been pushed into our buffer.
+
+The buffer's internal cursor is moved forward, so if the call to `try_read_buf`
+is repeated, additional data will be appended to any data that was just pushed
+into the buffer.
+
+Once the read is complete and data has been pushed into the buffer, the first
+thing to do is check to see if a new line is part of the data in the buffer. If
+a new lined character was sent by the client and pushed into the buffer
+we want to write all of the data up to the new line back to the client.
+
+The handler transitions the connection into its writing state.
 
 ```rust
 fn try_transition_to_writing(&mut self) {
