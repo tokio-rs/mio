@@ -1,9 +1,11 @@
 extern crate mio;
 extern crate bytes;
+extern crate slab;
 
 use mio::{TryRead, TryWrite};
 use mio::tcp::*;
-use mio::util::Slab;
+use mio::{Token, EventSet, PollOpt};
+use slab::Slab;
 use bytes::{Buf, Take};
 use std::mem;
 use std::net::SocketAddr;
@@ -18,7 +20,7 @@ const SERVER: mio::Token = mio::Token(0);
 // containing all the state for the client connections.
 struct Pong {
     server: TcpListener,
-    connections: Slab<Connection>,
+    connections: Slab<Connection, Token>,
 }
 
 impl Pong {
@@ -53,7 +55,7 @@ impl mio::Handler for Pong {
                 assert!(events.is_readable());
 
                 match self.server.accept() {
-                    Ok(Some(socket)) => {
+                    Ok(Some((socket, _))) => {
                         // A new client connection has been established. A
                         // `Connection` instance will be created to represent
                         // this connection. The socket will then be registered
@@ -77,7 +79,7 @@ impl mio::Handler for Pong {
                         // full line of input before attempting to write to the
                         // socket, so we don't want to receive `writable`
                         // events yet since there is nothing to do.
-                        event_loop.register_opt(
+                        event_loop.register(
                             &self.connections[token].socket,
                             token,
                             mio::EventSet::readable(),
@@ -351,11 +353,11 @@ pub fn start(address: SocketAddr) {
     // created by mio are set to non-blocking mode.
     let server = TcpListener::bind(&address).unwrap();
 
-    // Create a new `EventLoop`. 
+    // Create a new `EventLoop`.
     let mut event_loop = mio::EventLoop::new().unwrap();
 
     // Register the server socket with the event loop.
-    event_loop.register(&server, SERVER).unwrap();
+    event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::level()).unwrap();
 
     // Create a new `Pong` instance that will track the state of the server.
     let mut pong = Pong::new(server);

@@ -1,35 +1,86 @@
-use {Handler, Evented, Poll, NotifyError, Token};
-use event::{IoEvent, EventSet, PollOpt};
+use {convert, Handler, Evented, Poll, NotifyError, Token};
+use event::{Event, EventSet, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
+use std::{cmp, io, fmt, thread, usize};
 use std::default::Default;
-use std::{io, fmt, thread, usize};
+use std::time::Duration;
 
-/// Configure EventLoop runtime details
-#[derive(Copy, Clone, Debug)]
-pub struct EventLoopConfig {
-    pub io_poll_timeout_ms: usize,
-
-    // == Notifications ==
-    pub notify_capacity: usize,
-    pub messages_per_tick: usize,
-
-    // == Timer ==
-    pub timer_tick_ms: u64,
-    pub timer_wheel_size: usize,
-    pub timer_capacity: usize,
+#[derive(Debug, Default, Clone)]
+pub struct EventLoopBuilder {
+    config: Config,
 }
 
-impl Default for EventLoopConfig {
-    fn default() -> EventLoopConfig {
-        EventLoopConfig {
-            io_poll_timeout_ms: 1_000,
+/// `EventLoop` configuration details
+#[derive(Clone, Debug)]
+struct Config {
+    // == Notifications ==
+    notify_capacity: usize,
+    messages_per_tick: usize,
+
+    // == Timer ==
+    timer_tick: Duration,
+    timer_wheel_size: usize,
+    timer_capacity: usize,
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        // Default EventLoop configuration values
+        Config {
             notify_capacity: 4_096,
             messages_per_tick: 256,
-            timer_tick_ms: 100,
+            timer_tick: Duration::from_millis(100),
             timer_wheel_size: 1_024,
             timer_capacity: 65_536,
         }
+    }
+}
+
+impl EventLoopBuilder {
+    /// Construct a new `EventLoopBuilder` with the default configuration
+    /// values.
+    pub fn new() -> EventLoopBuilder {
+        EventLoopBuilder::default()
+    }
+
+    /// Sets the maximum number of messages that can be buffered on the event
+    /// loop's notification channel before a send will fail.
+    ///
+    /// The default value for this is 4096.
+    pub fn notify_capacity(&mut self, capacity: usize) -> &mut Self {
+        self.config.notify_capacity = capacity;
+        self
+    }
+
+    /// Sets the maximum number of messages that can be processed on any tick of
+    /// the event loop.
+    ///
+    /// The default value for this is 256.
+    pub fn messages_per_tick(&mut self, messages: usize) -> &mut Self {
+        self.config.messages_per_tick = messages;
+        self
+    }
+
+    pub fn timer_tick(&mut self, val: Duration) -> &mut Self {
+        self.config.timer_tick = val;
+        self
+    }
+
+    pub fn timer_wheel_size(&mut self, size: usize) -> &mut Self {
+        self.config.timer_wheel_size = size;
+        self
+    }
+
+    pub fn timer_capacity(&mut self, cap: usize) -> &mut Self {
+        self.config.timer_capacity = cap;
+        self
+    }
+
+    /// Constructs a new `EventLoop` using the configured values. The
+    /// `EventLoop` will not be running.
+    pub fn build<H: Handler>(self) -> io::Result<EventLoop<H>> {
+        EventLoop::configured(self.config)
     }
 }
 
@@ -40,7 +91,7 @@ pub struct EventLoop<H: Handler> {
     poll: Poll,
     timer: Timer<H::Timeout>,
     notify: Notify<H::Message>,
-    config: EventLoopConfig,
+    config: Config,
 }
 
 // Token used to represent notifications
@@ -48,19 +99,19 @@ const NOTIFY: Token = Token(usize::MAX);
 
 impl<H: Handler> EventLoop<H> {
 
-    /// Initializes a new event loop using default configuration settings. The
-    /// event loop will not be running yet.
+    /// Constructs a new `EventLoop` using the default configuration values.
+    /// The `EventLoop` will not be running.
     pub fn new() -> io::Result<EventLoop<H>> {
-        EventLoop::configured(Default::default())
+        EventLoop::configured(Config::default())
     }
 
-    pub fn configured(config: EventLoopConfig) -> io::Result<EventLoop<H>> {
+    fn configured(config: Config) -> io::Result<EventLoop<H>> {
         // Create the IO poller
         let mut poll = try!(Poll::new());
 
         // Create the timer
         let mut timer = Timer::new(
-            config.timer_tick_ms,
+            convert::millis(config.timer_tick),
             config.timer_wheel_size,
             config.timer_capacity);
 
@@ -117,7 +168,7 @@ impl<H: Handler> EventLoop<H> {
     ///
     /// Each [EventLoop](#) contains a lock-free queue with a pre-allocated
     /// buffer size. The size can be changed by modifying
-    /// [EventLoopConfig.notify_capacity](struct.EventLoopConfig.html#structfield.notify_capacity).
+    /// [EventLoopConfig.notify_capacity](struct.EventLoopConfig.html#method.notify_capacity).
     /// When a message is sent to the EventLoop, it is first pushed on to the
     /// queue. Then, if the EventLoop is currently running, an atomic flag is
     /// set to indicate that the next loop iteration should be started without
@@ -145,6 +196,7 @@ impl<H: Handler> EventLoop<H> {
     /// # Example
     /// ```
     /// use mio::{EventLoop, Handler};
+    /// use std::time::Duration;
     ///
     /// struct MyHandler;
     ///
@@ -160,17 +212,17 @@ impl<H: Handler> EventLoop<H> {
     ///
     ///
     /// let mut event_loop = EventLoop::new().unwrap();
-    /// let timeout = event_loop.timeout_ms(123, 300).unwrap();
+    /// let timeout = event_loop.timeout(123, Duration::from_millis(300)).unwrap();
     /// let _ = event_loop.run(&mut MyHandler);
     /// ```
-    pub fn timeout_ms(&mut self, token: H::Timeout, delay: u64) -> TimerResult<Timeout> {
-        self.timer.timeout_ms(token, delay)
+    pub fn timeout(&mut self, token: H::Timeout, delay: Duration) -> TimerResult<Timeout> {
+        self.timer.timeout_ms(token, convert::millis(delay))
     }
 
     /// If the supplied timeout has not been triggered, cancel it such that it
     /// will not be triggered in the future.
-    pub fn clear_timeout(&mut self, timeout: Timeout) -> bool {
-        self.timer.clear(timeout)
+    pub fn clear_timeout(&mut self, timeout: &Timeout) -> bool {
+        self.timer.clear(&timeout)
     }
 
     /// Tells the event loop to exit after it is done handling all events in the
@@ -186,14 +238,7 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token) -> io::Result<()>
-        where E: Evented
-    {
-        self.poll.register(io, token, EventSet::all(), PollOpt::level())
-    }
-
-    /// Registers an IO handle with the event loop.
-    pub fn register_opt<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opt: PollOpt) -> io::Result<()>
+    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opt: PollOpt) -> io::Result<()>
         where E: Evented
     {
         self.poll.register(io, token, interest, opt)
@@ -213,7 +258,7 @@ impl<H: Handler> EventLoop<H> {
 
         while self.run {
             // Execute ticks as long as the event loop is running
-            try!(self.run_once(handler));
+            try!(self.run_once(handler, None));
         }
 
         Ok(())
@@ -227,7 +272,7 @@ impl<H: Handler> EventLoop<H> {
     /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once(&mut self, handler: &mut H) -> io::Result<()> {
+    pub fn run_once(&mut self, handler: &mut H, mut timeout: Option<Duration>) -> io::Result<()> {
         let mut messages;
 
         trace!("event loop tick");
@@ -238,10 +283,14 @@ impl<H: Handler> EventLoop<H> {
         messages = self.notify.check(self.config.messages_per_tick, true);
         let pending = messages > 0;
 
+        if pending {
+            timeout = Some(Duration::from_millis(0));
+        }
+
         // Check the registered IO handles for any new events. Each poll
         // is for one second, so a shutdown request can last as long as
         // one second before it takes effect.
-        let events = match self.io_poll(pending) {
+        let events = match self.io_poll(timeout) {
             Ok(e) => e,
             Err(err) => {
                 if err.kind() == io::ErrorKind::Interrupted {
@@ -263,22 +312,23 @@ impl<H: Handler> EventLoop<H> {
         self.io_process(handler, events);
         self.notify(handler, messages);
         self.timer_process(handler);
+        handler.tick(self);
         Ok(())
     }
 
     #[inline]
-    fn io_poll(&mut self, immediate: bool) -> io::Result<usize> {
-        if immediate {
-            self.poll.poll(0)
-        } else {
-            let mut sleep = self.timer.next_tick_in_ms() as usize;
+    fn io_poll(&mut self, timeout: Option<Duration>) -> io::Result<usize> {
+        let next_tick = self.timer.next_tick_in_ms()
+            .map(|ms| cmp::min(ms, usize::MAX as u64));
 
-            if sleep > self.config.io_poll_timeout_ms {
-                sleep = self.config.io_poll_timeout_ms;
-            }
+        let timeout = match (timeout, next_tick) {
+            (Some(a), Some(b)) => Some(cmp::min(a, Duration::from_millis(b))),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(Duration::from_millis(b)),
+            _ => None,
+        };
 
-            self.poll.poll(sleep)
-        }
+        self.poll.poll(timeout)
     }
 
     // Process IO events that have been previously polled
@@ -290,11 +340,11 @@ impl<H: Handler> EventLoop<H> {
         // handle that the event is about) as well as information about
         // what kind of event occurred (readable, writable, signal, etc.)
         while i < cnt {
-            let evt = self.poll.event(i);
+            let evt = self.poll.events().get(i).unwrap();
 
             trace!("event={:?}", evt);
 
-            match evt.token {
+            match evt.token() {
                 NOTIFY => self.notify.cleanup(),
                 _ => self.io_event(handler, evt)
             }
@@ -303,8 +353,8 @@ impl<H: Handler> EventLoop<H> {
         }
     }
 
-    fn io_event(&mut self, handler: &mut H, evt: IoEvent) {
-        handler.ready(self, evt.token, evt.kind);
+    fn io_event(&mut self, handler: &mut H, evt: Event) {
+        handler.ready(self, evt.token(), evt.kind());
     }
 
     fn notify(&mut self, handler: &mut H, mut cnt: usize) {
@@ -345,25 +395,23 @@ impl <H: Handler> Drop for EventLoop<H> {
 }
 
 /// Sends messages to the EventLoop from other threads.
-pub struct Sender<M: Send> {
+pub struct Sender<M> {
     notify: Notify<M>
 }
 
-impl<M: Send> Clone for Sender<M> {
+impl<M> Clone for Sender<M> {
     fn clone(&self) -> Sender<M> {
         Sender { notify: self.notify.clone() }
     }
 }
 
-impl<M: Send> fmt::Debug for Sender<M> {
+impl<M> fmt::Debug for Sender<M> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Sender<?> {{ ... }}")
     }
 }
 
-unsafe impl<M: Send> Sync for Sender<M> { }
-
-impl<M: Send> Sender<M> {
+impl<M> Sender<M> {
     fn new(notify: Notify<M>) -> Sender<M> {
         Sender { notify: notify }
     }
@@ -374,13 +422,15 @@ impl<M: Send> Sender<M> {
 }
 
 #[cfg(test)]
+#[cfg(unix)]
 mod tests {
+    use {unix, EventLoop, Handler, Token, TryRead, TryWrite, EventSet, PollOpt};
+    use bytes::{Buf, SliceBuf, ByteBuf};
     use std::str;
     use std::sync::Arc;
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
-    use super::EventLoop;
-    use {buf, unix, Buf, Handler, Token, TryRead, TryWrite, EventSet};
+    use std::time::Duration;
 
     #[test]
     pub fn test_event_loop_size() {
@@ -429,16 +479,42 @@ mod tests {
         let wcount = Arc::new(AtomicIsize::new(0));
         let mut handler = Funtimes::new(rcount.clone(), wcount.clone());
 
-        writer.try_write_buf(&mut buf::SliceBuf::wrap("hello".as_bytes())).unwrap();
-        event_loop.register(&reader, Token(10)).unwrap();
+        writer.try_write_buf(&mut SliceBuf::wrap("hello".as_bytes())).unwrap();
+        event_loop.register(&reader, Token(10), EventSet::readable(),
+                            PollOpt::edge()).unwrap();
 
-        let _ = event_loop.run_once(&mut handler);
-        let mut b = buf::ByteBuf::mut_with_capacity(16);
+        let _ = event_loop.run_once(&mut handler, None);
+        let mut b = ByteBuf::mut_with_capacity(16);
 
         assert_eq!((*rcount).load(SeqCst), 1);
 
         reader.try_read_buf(&mut b).unwrap();
 
         assert_eq!(str::from_utf8(b.flip().bytes()).unwrap(), "hello");
+    }
+
+    pub struct BrokenPipeHandler;
+
+    impl Handler for BrokenPipeHandler {
+        type Timeout = ();
+        type Message = ();
+        fn ready(&mut self, _: &mut EventLoop<Self>, token: Token, _: EventSet) {
+            if token == Token(1) {
+                panic!("Received ready() on a closed pipe.");
+            }
+        }
+    }
+
+    #[test]
+    pub fn broken_pipe() {
+        let mut event_loop: EventLoop<BrokenPipeHandler> = EventLoop::new().unwrap();
+        let (reader, _) = unix::pipe().unwrap();
+
+        // On Darwin this returns a "broken pipe" error.
+        let _ = event_loop.register(&reader, Token(1), EventSet::all(), PollOpt::edge());
+
+        let mut handler = BrokenPipeHandler;
+        drop(reader);
+        event_loop.run_once(&mut handler, Some(Duration::from_millis(1000))).unwrap();
     }
 }

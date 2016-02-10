@@ -2,7 +2,7 @@ language: rust
 sudo: false
 rust:
   - nightly
-  - 1.1.0
+  - 1.3.0
 
 os:
   - linux
@@ -31,5 +31,6 @@ deploy:
     repo: carllerche/mio
     branch:
       - master
+      - v0.5.x
       - v0.4.x
       - v0.3.x

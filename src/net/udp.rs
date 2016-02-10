@@ -1,5 +1,4 @@
-use {io, sys, Evented, EventSet, IpAddr, PollOpt, Selector, Token};
-use buf::{Buf, MutBuf};
+use {io, sys, Evented, EventSet, IpAddr, Poll, PollOpt, Token};
 use std::net::SocketAddr;
 
 #[derive(Debug)]
@@ -46,11 +45,13 @@ impl UdpSocket {
             .map(From::from)
     }
 
-    pub fn send_to<B: Buf>(&self, buf: &mut B, target: &SocketAddr) -> io::Result<Option<()>> {
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
+                   -> io::Result<Option<usize>> {
         self.sys.send_to(buf, target)
     }
 
-    pub fn recv_from<B: MutBuf>(&self, buf: &mut B) -> io::Result<Option<SocketAddr>> {
+    pub fn recv_from(&self, buf: &mut [u8])
+                     -> io::Result<Option<(usize, SocketAddr)>> {
         self.sys.recv_from(buf)
     }
 
@@ -76,16 +77,16 @@ impl UdpSocket {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.sys.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.sys.deregister(poll)
     }
 }
 

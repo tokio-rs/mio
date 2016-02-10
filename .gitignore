@@ -1,4 +1,5 @@
 .cargo
 Cargo.lock
-target
+target*
 libs
+.DS_Store

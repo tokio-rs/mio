@@ -1,7 +1,7 @@
 use mio::*;
-use mio::buf::ByteBuf;
+use bytes::ByteBuf;
 use mio::tcp::*;
-use super::localhost;
+use localhost;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 
@@ -72,7 +72,7 @@ impl TestHandler {
         event_loop.reregister(&self.cli, CLIENT, EventSet::readable() | EventSet::hup(), PollOpt::edge()).unwrap();
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, _: EventSet) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {
@@ -102,8 +102,6 @@ impl Handler for TestHandler {
 
 #[test]
 pub fn test_close_on_drop() {
-    ::env_logger::init().unwrap();
-
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut event_loop = EventLoop::new().unwrap();
 
@@ -111,19 +109,14 @@ pub fn test_close_on_drop() {
     let addr = localhost();
 
     // == Create & setup server socket
-    let srv = TcpSocket::v4().unwrap();
-    srv.set_reuseaddr(true).unwrap();
-    srv.bind(&addr).unwrap();
+    let srv = TcpListener::bind(&addr).unwrap();
 
-    let srv = srv.listen(256).unwrap();
-
-    event_loop.register_opt(&srv, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&srv, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
 
     // == Create & setup client socket
-    let (sock, _) = TcpSocket::v4().unwrap()
-        .connect(&addr).unwrap();
+    let sock = TcpStream::connect(&addr).unwrap();
 
-    event_loop.register_opt(&sock, CLIENT, EventSet::writable(), PollOpt::edge()).unwrap();
+    event_loop.register(&sock, CLIENT, EventSet::writable(), PollOpt::edge()).unwrap();
 
     // == Setup test handler
     let mut handler = TestHandler::new(srv, sock);

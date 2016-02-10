@@ -1,7 +1,6 @@
-use {sleep_ms};
+use {localhost, sleep_ms};
 use mio::*;
 use mio::tcp::*;
-use super::localhost;
 use std::thread;
 
 struct TestHandler {
@@ -47,13 +46,9 @@ pub fn test_notify() {
     let addr = localhost();
 
     // Setup a server socket so that the event loop blocks
-    let srv = TcpSocket::v4().unwrap();
-    srv.set_reuseaddr(true).unwrap();
-    srv.bind(&addr).unwrap();
+    let srv = TcpListener::bind(&addr).unwrap();
 
-    let srv = srv.listen(256).unwrap();
-
-    event_loop.register_opt(&srv, Token(0), EventSet::all(), PollOpt::edge()).unwrap();
+    event_loop.register(&srv, Token(0), EventSet::all(), PollOpt::edge()).unwrap();
 
     let sender = event_loop.channel();
 
@@ -73,7 +68,6 @@ pub fn test_notify() {
 
 #[test]
 pub fn test_notify_capacity() {
-    use std::default::Default;
     use std::sync::mpsc::*;
     use std::thread;
 
@@ -92,13 +86,11 @@ pub fn test_notify_capacity() {
         }
     }
 
-    let config = EventLoopConfig {
-        notify_capacity: 1,
-        .. EventLoopConfig::default()
-    };
+    let mut builder = EventLoopBuilder::new();
+    builder.notify_capacity(1);
 
     let (tx, rx) = channel::<i32>();
-    let mut event_loop = EventLoop::configured(config).unwrap();
+    let mut event_loop = builder.build().unwrap();
     let notify = event_loop.channel();
 
     let handle = thread::spawn(move || {
@@ -181,7 +173,7 @@ pub fn test_notify_drop() {
     notify.send(MessageDrop(tx_notif_2)).unwrap();
 
     // We ensure the message is indeed stuck in the queue
-    thread::sleep_ms(100);
+    sleep_ms(100);
     assert!(rx_notif_2.try_recv().is_err());
 
     // Give the order to drop the event loop

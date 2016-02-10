@@ -26,6 +26,9 @@
 //! // for which socket.
 //! const SERVER: Token = Token(0);
 //! const CLIENT: Token = Token(1);
+//! #
+//! # // level() isn't implemented on windows yet
+//! # if cfg!(windows) { return }
 //!
 //! let addr = "127.0.0.1:13265".parse().unwrap();
 //!
@@ -36,13 +39,15 @@
 //! let mut event_loop = EventLoop::new().unwrap();
 //!
 //! // Start listening for incoming connections
-//! event_loop.register(&server, SERVER).unwrap();
+//! event_loop.register(&server, SERVER, EventSet::readable(),
+//!                     PollOpt::edge()).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
-//! event_loop.register(&sock, CLIENT).unwrap();
+//! event_loop.register(&sock, CLIENT, EventSet::readable(),
+//!                     PollOpt::edge()).unwrap();
 //!
 //! // Define a handler to process the events
 //! struct MyHandler(TcpListener);
@@ -75,21 +80,25 @@
 //! ```
 
 #![crate_name = "mio"]
-#![deny(warnings)]
+#![cfg_attr(unix, deny(warnings))]
 
 extern crate bytes;
-extern crate nix;
-extern crate clock_ticks;
+extern crate time;
 extern crate slab;
 extern crate libc;
+
+#[cfg(unix)]
+extern crate nix;
+
+extern crate winapi;
+extern crate miow;
+extern crate net2;
 
 #[macro_use]
 extern crate log;
 
 #[cfg(test)]
 extern crate env_logger;
-
-pub mod util;
 
 mod event;
 mod event_loop;
@@ -101,18 +110,16 @@ mod poll;
 mod sys;
 mod timer;
 mod token;
+mod util;
 
-pub use buf::{
-    Buf,
-    MutBuf,
-};
 pub use event::{
     PollOpt,
     EventSet,
+    Event,
 };
 pub use event_loop::{
     EventLoop,
-    EventLoopConfig,
+    EventLoopBuilder,
     Sender,
 };
 pub use handler::{
@@ -132,13 +139,26 @@ pub use net::{
     Ipv6Addr,
 };
 #[cfg(unix)]
-pub use net::unix;
+pub mod unix {
+    pub use net::unix::{
+        pipe,
+        PipeReader,
+        PipeWriter,
+        UnixListener,
+        UnixSocket,
+        UnixStream,
+    };
+    pub use sys::{
+        EventedFd,
+    };
+}
 
 pub use notify::{
     NotifyError,
 };
 pub use poll::{
-    Poll
+    Poll,
+    Events,
 };
 pub use timer::{
     Timeout,
@@ -148,28 +168,17 @@ pub use timer::{
 pub use token::{
     Token,
 };
-pub use sys::{
-    Io,
-    Selector,
-};
+#[cfg(unix)]
+pub use sys::Io;
 
-pub mod prelude {
-    pub use super::{
-        EventLoop,
-        TryRead,
-        TryWrite,
-    };
-}
+// Conversion utilities
+mod convert {
+    use std::time::Duration;
 
-// Re-export bytes
-pub mod buf {
-    pub use bytes::{
-        Buf,
-        MutBuf,
-        ByteBuf,
-        MutByteBuf,
-        RingBuf,
-        SliceBuf,
-        MutSliceBuf,
-    };
+    const NANOS_PER_MILLI: u32 = 1_000_000;
+    const MILLIS_PER_SEC: u64 = 1_000;
+
+    pub fn millis(duration: Duration) -> u64 {
+        duration.as_secs() * MILLIS_PER_SEC + ((duration.subsec_nanos() / NANOS_PER_MILLI) as u64)
+    }
 }

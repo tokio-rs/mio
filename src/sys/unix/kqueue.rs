@@ -1,27 +1,50 @@
 use {io, EventSet, PollOpt, Token};
-use event::IoEvent;
-use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent};
-use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ONESHOT};
+use event::{self, Event};
+use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent, kevent_ts};
+use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
+use libc::{timespec, time_t, c_long};
 use std::{fmt, slice};
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+
+/// Each Selector has a globally unique(ish) ID associated with it. This ID
+/// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
+/// registered with the `Selector`. If a type that is previously associatd with
+/// a `Selector` attempts to register itself with a different `Selector`, the
+/// operation will return with an error. This matches windows behavior.
+static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
 #[derive(Debug)]
 pub struct Selector {
+    id: usize,
     kq: RawFd,
     changes: Events
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let kq = try!(kqueue().map_err(super::from_nix_error));
+
         Ok(Selector {
-            kq: try!(kqueue().map_err(super::from_nix_error)),
+            id: id,
+            kq: kq,
             changes: Events::new()
         })
     }
 
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: usize) -> io::Result<()> {
-        let cnt = try!(kevent(self.kq, self.changes.as_slice(), evts.as_mut_slice(), timeout_ms)
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
+    pub fn select(&mut self, evts: &mut Events, timeout_ms: Option<usize>) -> io::Result<()> {
+        let timeout = timeout_ms.map(|x| timespec {
+            tv_sec: (x / 1000) as time_t,
+            tv_nsec: ((x % 1000) * 1_000_000) as c_long
+        });
+
+        let cnt = try!(kevent_ts(self.kq, &[], evts.as_mut_slice(), timeout)
                                   .map_err(super::from_nix_error));
 
         self.changes.sys_events.clear();
@@ -38,10 +61,10 @@ impl Selector {
     pub fn register(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        try!(self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts));
-        try!(self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_WRITE, interests.contains(EventSet::writable()), opts));
+        self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts);
+        self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_WRITE, interests.contains(EventSet::writable()), opts);
 
-        Ok(())
+        self.flush_changes()
     }
 
     pub fn reregister(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
@@ -51,13 +74,13 @@ impl Selector {
     }
 
     pub fn deregister(&mut self, fd: RawFd) -> io::Result<()> {
-        try!(self.ev_push(fd, 0, EventFilter::EVFILT_READ, EV_DELETE));
-        try!(self.ev_push(fd, 0, EventFilter::EVFILT_WRITE, EV_DELETE));
+        self.ev_push(fd, 0, EventFilter::EVFILT_READ, EV_DELETE);
+        self.ev_push(fd, 0, EventFilter::EVFILT_WRITE, EV_DELETE);
 
-        Ok(())
+        self.flush_changes()
     }
 
-    fn ev_register(&mut self, fd: RawFd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) -> io::Result<()> {
+    fn ev_register(&mut self, fd: RawFd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) {
         let mut flags = EV_ADD;
 
         if enable {
@@ -74,12 +97,11 @@ impl Selector {
             flags = flags | EV_ONESHOT;
         }
 
-        self.ev_push(fd, token, filter, flags)
+        self.ev_push(fd, token, filter, flags);
     }
 
-    fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) -> io::Result<()> {
-        try!(self.maybe_flush_changes());
-
+    #[cfg(not(target_os = "netbsd"))]
+    fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
         self.changes.sys_events.push(
             KEvent {
                 ident: fd as ::libc::uintptr_t,
@@ -89,25 +111,33 @@ impl Selector {
                 data: 0,
                 udata: token
             });
-
-        Ok(())
     }
 
-    fn maybe_flush_changes(&mut self) -> io::Result<()> {
-        if self.changes.is_full() {
-            try!(kevent(self.kq, self.changes.as_slice(), &mut [], 0)
-                    .map_err(super::from_nix_error));
+    #[cfg(target_os = "netbsd")]
+    fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
+        self.changes.sys_events.push(
+            KEvent {
+                ident: fd as ::libc::uintptr_t,
+                filter: filter,
+                flags: flags,
+                fflags: FilterFlag::empty(),
+                data: 0,
+                udata: token as i64
+            });
+    }
 
-            self.changes.sys_events.clear();
-        }
+    fn flush_changes(&mut self) -> io::Result<()> {
+        let result = kevent(self.kq, self.changes.as_slice(), &mut [], 0).map(|_| ())
+            .map_err(super::from_nix_error).map(|_| ());
 
-        Ok(())
+        self.changes.sys_events.clear();
+        result
     }
 }
 
 pub struct Events {
     sys_events: Vec<KEvent>,
-    events: Vec<IoEvent>,
+    events: Vec<Event>,
     event_map: HashMap<Token, usize>,
 }
 
@@ -125,15 +155,15 @@ impl Events {
         self.events.len()
     }
 
-    pub fn get(&self, idx: usize) -> IoEvent {
-        self.events[idx]
+    pub fn get(&self, idx: usize) -> Option<Event> {
+        self.events.get(idx).map(|e| *e)
     }
 
     pub fn coalesce(&mut self) {
         self.events.clear();
         self.event_map.clear();
 
-        for e in self.sys_events.iter() {
+        for e in &self.sys_events {
             let token = Token(e.udata as usize);
             let len = self.events.len();
 
@@ -142,31 +172,30 @@ impl Events {
 
             if idx == len {
                 // New entry, insert the default
-                self.events.push(IoEvent::new(EventSet::none(), token));
+                self.events.push(Event::new(EventSet::none(), token));
 
+            }
+
+            if e.flags.contains(EV_ERROR) {
+                event::kind_mut(&mut self.events[idx]).insert(EventSet::error());
             }
 
             if e.filter == EventFilter::EVFILT_READ {
-                self.events[idx].kind.insert(EventSet::readable());
+                event::kind_mut(&mut self.events[idx]).insert(EventSet::readable());
             } else if e.filter == EventFilter::EVFILT_WRITE {
-                self.events[idx].kind.insert(EventSet::writable());
+                event::kind_mut(&mut self.events[idx]).insert(EventSet::writable());
             }
 
             if e.flags.contains(EV_EOF) {
-                self.events[idx].kind.insert(EventSet::hup());
+                event::kind_mut(&mut self.events[idx]).insert(EventSet::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
                 if !e.fflags.is_empty() {
-                    self.events[idx].kind.insert(EventSet::error());
+                    event::kind_mut(&mut self.events[idx]).insert(EventSet::error());
                 }
             }
         }
-    }
-
-    #[inline]
-    fn is_full(&self) -> bool {
-        self.sys_events.len() == self.sys_events.capacity()
     }
 
     fn as_slice(&self) -> &[KEvent] {

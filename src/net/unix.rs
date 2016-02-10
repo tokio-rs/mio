@@ -1,6 +1,8 @@
-use {io, sys, Evented, EventSet, Io, PollOpt, Selector, Token, TryAccept};
+use {io, sys, Evented, EventSet, Io, Poll, PollOpt, Token, TryAccept};
+use io::MapNonBlock;
 use std::io::{Read, Write};
 use std::path::Path;
+use bytes::{Buf, MutBuf};
 
 #[derive(Debug)]
 pub struct UnixSocket {
@@ -38,16 +40,16 @@ impl UnixSocket {
 }
 
 impl Evented for UnixSocket {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.sys.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.sys.deregister(poll)
     }
 }
 
@@ -79,6 +81,38 @@ impl UnixStream {
         self.sys.try_clone()
             .map(From::from)
     }
+
+    pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {
+        self.sys.read_recv_fd(buf)
+    }
+
+    pub fn try_read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<Option<(usize, Option<RawFd>)>> {
+        self.read_recv_fd(buf).map_non_block()
+    }
+
+    pub fn try_read_buf_recv_fd<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<(usize, Option<RawFd>)>> {
+        let res = self.try_read_recv_fd(unsafe { buf.mut_bytes() });
+        if let Ok(Some((cnt, _))) = res {
+            unsafe { buf.advance(cnt); }
+        }
+        res
+    }
+
+    pub fn write_send_fd(&mut self, buf: &[u8], fd: RawFd) -> io::Result<usize> {
+        self.sys.write_send_fd(buf, fd)
+    }
+
+    pub fn try_write_send_fd(&mut self, buf: &[u8], fd: RawFd) -> io::Result<Option<usize>> {
+        self.write_send_fd(buf, fd).map_non_block()
+    }
+
+    pub fn try_write_buf_send_fd<B: Buf>(&mut self, buf: &mut B, fd: RawFd) -> io::Result<Option<usize>> {
+        let res = self.try_write_send_fd(buf.bytes(), fd);
+        if let Ok(Some(cnt)) = res {
+            buf.advance(cnt);
+        }
+        res
+    }
 }
 
 impl Read for UnixStream {
@@ -98,16 +132,16 @@ impl Write for UnixStream {
 }
 
 impl Evented for UnixStream {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.sys.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.sys.deregister(poll)
     }
 }
 
@@ -148,16 +182,16 @@ impl UnixListener {
 }
 
 impl Evented for UnixListener {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.sys.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.sys.deregister(poll)
     }
 }
 
@@ -197,17 +231,23 @@ impl Read for PipeReader {
     }
 }
 
+impl<'a> Read for &'a PipeReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (&self.io).read(buf)
+    }
+}
+
 impl Evented for PipeReader {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.io.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.io.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.io.deregister(poll)
     }
 }
 
@@ -232,17 +272,27 @@ impl Write for PipeWriter {
     }
 }
 
+impl<'a> Write for &'a PipeWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        (&self.io).write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        (&self.io).flush()
+    }
+}
+
 impl Evented for PipeWriter {
-    fn register(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.register(selector, token, interest, opts)
+    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, selector: &mut Selector, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.reregister(selector, token, interest, opts)
+    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.io.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, selector: &mut Selector) -> io::Result<()> {
-        self.io.deregister(selector)
+    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        self.io.deregister(poll)
     }
 }
 
