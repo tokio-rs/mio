@@ -1,6 +1,6 @@
 # Getting Started
 
-This section will serve as an introductory Mio tutorial. It assumes
+This is an introductory Mio tutorial. It assumes
 you have familiarity with the [Rust](http://www.rust-lang.org/)
 programming language and the [Cargo](https://crates.io) tool. It will
 start from generating a new [Rust](http://www.rust-lang.org/) project
@@ -163,7 +163,7 @@ the event loop is shut down.
 The event loop isn't much good if it has no input upon which to act.
 
 Before the event loop is started we must provide the event loop a link to the
-outside world.  In our case, we register the pingpong server socket with the
+outside world.  In our case, we register the `server` socket with the
 event loop
 `event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::level())`
 and associate the socket with a token named `SERVER`, a constant binding in our
@@ -212,13 +212,13 @@ fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: Even
 ```
 
 The socket which caused the notification is identified by the token passed to the
-handler function.  So far we've only created a single socket: the
+handler function.  So far we've only created a single socket, the
 `server` socket.  So we simply ensure that the only token passed to our handler
-is the `server` socket by matching against the `SERVER` `Token` which was
-associated with the `server` socket by the register call.  If we receive
-another token we panic because that would be very, very weird since we haven't
-registered any other tokens.  When there are many sockets, handlers get more
-involved.  We will cover handling more than one sockets later in the guide.
+is the `SERVER` `Token` which was associated with the `server` socket by the
+register call.  If we receive another token we panic because that would be very,
+very weird since we haven't registered any other tokens.  When there are many
+sockets, handlers get more involved.  We will cover handling more than one
+socket later in the guide.
 
 The event loop will also pass a reference to itself allowing us to register
 additional sockets.  This becomes important when we're accepting multiple
@@ -281,7 +281,7 @@ All non-blocking socket types follow a similar pattern of returning
 
 An operation on a non-blocking socket can flat out fail and return an error
 while the socket is still in a good state.  It may be, however, that the socket
-is not be ready to be operated on.  If it were a blocking socket, the operation
+is not ready to be operated on.  If it were a blocking socket, the operation
 would block.  Instead, the non-blocking socket returns immediately with Ok(None)
 when the socket isn't ready to be operated on.  When the socket is in that state
 we must wait for the event loop to notify the handler that the socket is
@@ -323,7 +323,7 @@ struct Connection {
 The `Connection` struct provides a way to store the association between a
 `Token` and socket in a convenient package.  This makes it easy to access when
 we want to read from the socket or write to the socket.  Including the `Token`
-also makes it convenient reregister the socket via the `EventLoop::reregister`
+also makes it convenient to reregister the socket via the `EventLoop::reregister`
 method.
 
 The last field represents the state of a `Connection` at any point while the
@@ -338,7 +338,7 @@ If a new line is found, the `Connection` transitions to a writing state
 until the line has been written back to the client.  Once the write is complete
 the `Connection` transitions back to the reading state.
 
-We'll use and enum to represent the states of a `Connection` and the data
+We'll use an enum to represent the states of a `Connection` and the data
 required by the `Connection` in a particular state.
 
 ```rust
@@ -356,7 +356,7 @@ Now that we have a convenient representation of connections our `Pong` server
 can store all of the connections it is handling.  
 
 A `Slab` is a fixed capacity map of `Token` to `Connection` similar to a HashMap
-but lighter weight and optimized for use with mio.
+but lighter weight and optimized for use with Mio.
 
 Our `Pong` struct looks like this now.
 
@@ -436,8 +436,9 @@ In this case, we register new sockets with
 edge + oneshot `mio::PollOpt::edge() | mio::PollOpt::oneshot()).unwrap();`.
 This means that when a ready notification is fired the socket will be
 "unarmed". In other words, once a notification for the socket is received,
-no further notifications will be fired. When we want to receive another notification,
-we [`reregister`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventLoop.html#method.reregister)
+no further notifications will be created for that socket.
+When we want to receive another notification, we
+[`reregister`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/struct.EventLoop.html#method.reregister)
 the socket with the event loop.
 
 Using this pattern of edge + oneshot makes state management a bit
@@ -477,8 +478,8 @@ We assume any token that is not the server token is a client token.
 We look up the connection in the `Slab` and then forward the
 notification to the specific client connection struct via its `ready` function,
 another notification handler. Once the handler completes its work, we check if
-the handler closed the connection and, if so, remove it from the slab so it will
-no longer be tracked.
+the handler closed the connection and, if so, remove the connection from the
+slab so it will no longer be tracked.
 
 ### Buffers
 
@@ -512,9 +513,9 @@ current position in the buffer, the next accessible byte. That means calling
 each time `try_write_buf` is called, writing starts where the previous write
 finished.
 
-Having a buffer that maintains the cursor and keep track of its current position
+Having a buffer that maintains a cursor, keeping track of its current position,
 is especially useful when working with non blocking sockets since, at any
-point, the socket may not be ready to be operated on the operation will
+point, the socket may not be ready to be operated on and the operation will
 have to be attempted at a later time. For example:
 
 ```rust
@@ -555,9 +556,6 @@ fn ready(&mut self, event_loop: &mut mio::EventLoop<Pong>, events: mio::EventSet
 }
 ```
 
-And the read function which is called from the ready function `self.read(event_loop)`
-follows.
-
 Our `Connection::ready` function handles the two connection states we care
 about for our `Pong` server; `State::Reading` and `State::Writing`.
 
@@ -566,7 +564,7 @@ Lets talk about `State::Reading` first.
 The way our connection handler is structured, when the state is set to
 `State::Reading` it can only receive notifications indicating the socket is
 readable.  We do that by asserting the event is readable `events.is_readable()`.
-Once the handler do receives a notification that the connection is readable it
+Once the handler receives a notification that the connection is readable it
 attempts to read from the socket via the `read` function
 `self.read(event_loop)`. This is done by calling `try_read_buf` and passing in
 our buffer.
@@ -606,15 +604,13 @@ The `read` function is fully annotated in the example
 
 But lets talk about some the nuanced parts.
 
-The only time a read can succeed while pushing 0 bytes into the buffer
-`Ok(Some(0))` is when the socket is closed or the client end of the connection
-shut down its half of the connection using
+The only time a read can succeed while pushing 0 bytes into the buffer,
+`Ok(Some(0))`, is when the socket is closed or the client end of the connection
+shuts down its half of the connection using
 [`shutdown()`](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/master/mio/tcp/enum.Shutdown.html).
 
-We'll come back to how we handle this later.
-
 If the read returns an `Ok(None)`, the event notification is
-a spurious so we reregister the socket with the event loop and wait for another
+spurious so we reregister the socket with the event loop and wait for another
 ready notification.
 
 The most interesting result of a read operation is when the read completes
@@ -626,8 +622,8 @@ into the buffer.
 
 Once the read is complete and data has been pushed into the buffer, the first
 thing to do is check to see if a new line is part of the data in the buffer. If
-a new lined character was sent by the client and pushed into the buffer
-we want to write all of the data up to the new line back to the client.
+a new line character was sent by the client and pushed into the buffer
+we want to write all of the data, up to the new line, back to the client.
 
 The handler transitions the connection into its writing state.
 
@@ -669,9 +665,3 @@ We've finished building a working echo server.
 
 The guide omits a number of utility functions, most of them on
 [`State`](../examples/ping_pong/src/server.rs#L249).
-
-The full source of the echo server in its final form is
-[here](../examples/ping_pong/src/server.rs).
-
-A working client in its final form can be found
-[here](../examples/ping_pong/src/client.rs).
