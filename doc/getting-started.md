@@ -658,13 +658,20 @@ Transitioning to the writing state is done by getting the buffer, which
 for us is a `Vec<u8>`, wrapping it in `Cursor`, which makes the byte vec
 a `Buf`, then transitioning our state field to `State::Writing`.
 
-Now that the state has been transitioned to writing, when
-`self.reregister` is called, we will ask for writable notifications
-instead of readable. So, our `Connection::ready` function will be called
-once the socket is ready to accept writes. Once this happens, we will be
-ready to write back the data that we just read.
+The algorithm for writing to a socket is very similar to the algorithm for
+reading from a socket.  The major difference is that when an event is passed to
+a `Connection` in the writing state, the handler checks that the event means
+the socket is writeable and if so, attempts the write to the socket.
 
-> The guide omits a number of utility functions, most of them on
-> [`State`](../examples/ping_pong/src/server.rs#L249). The full source of
-> the echo server in its final form is
-> [here](../examples/ping_pong/src/server.rs).
+## Some Final Notes.
+
+We've finished building a working echo server.  
+
+The guide omits a number of utility functions, most of them on
+[`State`](../examples/ping_pong/src/server.rs#L249).
+
+The full source of the echo server in its final form is
+[here](../examples/ping_pong/src/server.rs).
+
+A working client in its final form can be found
+[here](../examples/ping_pong/src/client.rs).
