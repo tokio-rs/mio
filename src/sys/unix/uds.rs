@@ -3,7 +3,7 @@ use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::path::Path;
-use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
+use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
 
 #[derive(Debug)]
 pub struct UnixSocket {
@@ -124,6 +124,12 @@ impl From<Io> for UnixSocket {
 impl FromRawFd for UnixSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixSocket {
         UnixSocket { io: Io::from_raw_fd(fd) }
+    }
+}
+
+impl IntoRawFd for UnixSocket {
+    fn into_raw_fd(self) -> RawFd {
+        self.io.into_raw_fd()
     }
 }
 
