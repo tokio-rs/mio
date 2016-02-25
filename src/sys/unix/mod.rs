@@ -63,6 +63,7 @@ mod nix {
         Ipv6Addr,
         ControlMessage,
         CmsgSpace,
+        MsgFlags,
         MSG_DONTWAIT,
         SOCK_NONBLOCK,
         SOCK_CLOEXEC,
