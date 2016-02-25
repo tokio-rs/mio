@@ -103,7 +103,14 @@ impl From<sys::UdpSocket> for UdpSocket {
  */
 
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
+
+#[cfg(unix)]
+impl IntoRawFd for UdpSocket {
+    fn into_raw_fd(self) -> RawFd {
+        self.sys.into_raw_fd()
+    }
+}
 
 #[cfg(unix)]
 impl AsRawFd for UdpSocket {
@@ -118,3 +125,4 @@ impl FromRawFd for UdpSocket {
         UdpSocket { sys: FromRawFd::from_raw_fd(fd) }
     }
 }
+

@@ -3,7 +3,7 @@ use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::cell::Cell;
 use std::net::SocketAddr;
-use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
+use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
 
 #[derive(Debug)]
 pub struct UdpSocket {
@@ -166,6 +166,12 @@ impl FromRawFd for UdpSocket {
             io: Io::from_raw_fd(fd),
             selector_id: Cell::new(None),
         }
+    }
+}
+
+impl IntoRawFd for UdpSocket {
+    fn into_raw_fd(self) -> RawFd {
+        self.io.into_raw_fd()
     }
 }
 
