@@ -120,6 +120,10 @@ impl<'a> Events<'a> {
     pub fn len(&self) -> usize {
         self.poll.events.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.poll.events.is_empty()
+    }
 }
 
 impl<'a> Iterator for Events<'a> {
