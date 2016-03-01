@@ -481,7 +481,7 @@ mod tests {
         let wcount = Arc::new(AtomicIsize::new(0));
         let mut handler = Funtimes::new(rcount.clone(), wcount.clone());
 
-        writer.try_write_buf(&mut SliceBuf::wrap("hello".as_bytes())).unwrap();
+        writer.try_write_buf(&mut SliceBuf::wrap(b"hello")).unwrap();
         event_loop.register(&reader, Token(10), EventSet::readable(),
                             PollOpt::edge()).unwrap();
 

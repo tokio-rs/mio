@@ -147,6 +147,11 @@ impl Events {
     }
 
     #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    #[inline]
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|event| {
             let epoll = event.events;

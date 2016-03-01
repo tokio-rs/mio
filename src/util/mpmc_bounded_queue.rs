@@ -214,7 +214,7 @@ mod tests {
             });
         }
 
-        for rx in completion_rxs.iter_mut() {
+        for rx in &mut completion_rxs {
             assert_eq!(nmsgs, rx.recv().unwrap());
         }
         for _ in 0..nthreads {

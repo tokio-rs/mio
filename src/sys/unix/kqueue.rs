@@ -155,6 +155,11 @@ impl Events {
         self.events.len()
     }
 
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|e| *e)
     }
