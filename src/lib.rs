@@ -104,13 +104,15 @@ mod event;
 mod event_loop;
 mod handler;
 mod io;
+mod lazy;
 mod net;
 mod notify;
 mod poll;
 mod sys;
 mod timer;
 mod token;
-mod util;
+
+pub mod channel;
 
 pub use event::{
     PollOpt,
@@ -160,6 +162,8 @@ pub use notify::{
 pub use poll::{
     Poll,
     Events,
+    Registration,
+    SetReadiness,
 };
 pub use timer::{
     Timeout,

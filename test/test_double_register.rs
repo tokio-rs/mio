@@ -6,7 +6,7 @@ pub fn test_double_register() {
     use mio::*;
     use mio::tcp::*;
 
-    let mut poll = Poll::new().unwrap();
+    let poll = Poll::new().unwrap();
 
     // Create the listener
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();

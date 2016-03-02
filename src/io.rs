@@ -6,11 +6,11 @@ pub use std::io::{Read, Write, Result, Error, ErrorKind};
 
 /// A value that may be registered with an `EventLoop`
 pub trait Evented {
-    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> Result<()>;
+    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> Result<()>;
 
-    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> Result<()>;
+    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> Result<()>;
 
-    fn deregister(&self, poll: &mut Poll) -> Result<()>;
+    fn deregister(&self, poll: &Poll) -> Result<()>;
 }
 
 pub trait TryRead {

@@ -110,18 +110,18 @@ impl Write for TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, poll: &mut Poll, token: Token,
+    fn register(&self, poll: &Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
         try!(self.associate_selector(poll));
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &mut Poll, token: Token,
+    fn reregister(&self, poll: &Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).deregister(poll)
     }
 }
@@ -201,18 +201,18 @@ impl TcpListener {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, poll: &mut Poll, token: Token,
+    fn register(&self, poll: &Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
         try!(self.associate_selector(poll));
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &mut Poll, token: Token,
+    fn reregister(&self, poll: &Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).deregister(poll)
     }
 }

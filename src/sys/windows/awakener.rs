@@ -41,18 +41,18 @@ impl Awakener {
 }
 
 impl Evented for Awakener {
-    fn register(&self, poll: &mut Poll, token: Token, _events: EventSet,
+    fn register(&self, poll: &Poll, token: Token, _events: EventSet,
                 opts: PollOpt) -> io::Result<()> {
-        try!(self.iocp().associate(poll::selector_mut(poll), token, opts));
+        try!(self.iocp().associate(poll::selector(poll), token, opts));
         Ok(())
     }
 
-    fn reregister(&self, poll: &mut Poll, token: Token, events: EventSet,
+    fn reregister(&self, poll: &Poll, token: Token, events: EventSet,
                   opts: PollOpt) -> io::Result<()> {
         self.register(poll, token, events, opts)
     }
 
-    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
         self.iocp().checked_deregister(poll::selector(poll))
     }
 }

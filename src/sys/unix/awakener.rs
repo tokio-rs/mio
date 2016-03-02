@@ -48,15 +48,15 @@ mod pipe {
     }
 
     impl Evented for Awakener {
-        fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
             self.reader().register(poll, token, interest, opts)
         }
 
-        fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
             self.reader().reregister(poll, token, interest, opts)
         }
 
-        fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+        fn deregister(&self, poll: &Poll) -> io::Result<()> {
             self.reader().deregister(poll)
         }
     }

@@ -160,6 +160,12 @@ impl EventSet {
         EventSet(0x008)
     }
 
+    // Private
+    #[inline]
+    fn drop() -> EventSet {
+        EventSet(0x10)
+    }
+
     #[inline]
     pub fn all() -> EventSet {
         EventSet::readable() |
@@ -170,7 +176,7 @@ impl EventSet {
 
     #[inline]
     pub fn is_none(&self) -> bool {
-        self.0 == 0
+        (*self & !EventSet::drop()) == EventSet::none()
     }
 
     #[inline]
@@ -266,7 +272,10 @@ impl fmt::Debug for EventSet {
             (EventSet::readable(), "Readable"),
             (EventSet::writable(), "Writable"),
             (EventSet::error(),    "Error"),
-            (EventSet::hup(),      "Hup")];
+            (EventSet::hup(),      "Hup"),
+            (EventSet::drop(),     "Drop")];
+
+        try!(write!(fmt, "EventSet {{"));
 
         for &(flag, msg) in &flags {
             if self.contains(flag) {
@@ -276,6 +285,8 @@ impl fmt::Debug for EventSet {
                 one = true
             }
         }
+
+        try!(write!(fmt, "}}"));
 
         Ok(())
     }
@@ -310,6 +321,34 @@ impl Event {
     pub fn token(&self) -> Token {
         self.token
     }
+}
+
+/*
+ *
+ * ===== Mio internal helpers =====
+ *
+ */
+
+pub fn as_usize(events: EventSet) -> usize {
+    events.0
+}
+
+pub fn from_usize(events: usize) -> EventSet {
+    EventSet(events)
+}
+
+/// Returns true if the `EventSet` does not have any public OR private flags
+/// set.
+pub fn is_empty(events: EventSet) -> bool {
+    events.0 == 0
+}
+
+pub fn is_drop(events: EventSet) -> bool {
+    events.contains(EventSet::drop())
+}
+
+pub fn drop() -> EventSet {
+    EventSet::drop()
 }
 
 // Used internally to mutate an `Event` in place

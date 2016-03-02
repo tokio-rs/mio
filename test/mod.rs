@@ -16,6 +16,7 @@ mod test_echo_server;
 mod test_multicast;
 mod test_notify;
 mod test_oneshot;
+mod test_poll_channel;
 mod test_register_deregister;
 mod test_register_multiple_event_loops;
 mod test_reregister_without_poll;

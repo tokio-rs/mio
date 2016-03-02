@@ -34,7 +34,7 @@ impl Selector {
     }
 
     /// Wait for events from the OS
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: Option<usize>) -> io::Result<()> {
+    pub fn select(&mut self, evts: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
         use std::{cmp, i32, slice};
 
         let timeout_ms = match timeout_ms {
@@ -54,11 +54,18 @@ impl Selector {
 
         unsafe { evts.events.set_len(cnt); }
 
-        Ok(())
+        for i in 0..cnt {
+            if evts.get(i).map(|e| e.token()) == Some(awakener) {
+                evts.events.remove(i);
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token.as_usize() as u64
@@ -69,7 +76,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: token.as_usize() as u64
@@ -80,7 +87,7 @@ impl Selector {
     }
 
     /// Deregister event interests for the given IO handle with the OS
-    pub fn deregister(&mut self, fd: RawFd) -> io::Result<()> {
+    pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
         // The &info argument should be ignored by the system,
         // but linux < 2.6.9 required it to be not null.
         // For compatibility, we provide a dummy EpollEvent.
@@ -178,5 +185,12 @@ impl Events {
 
             Event::new(kind, Token(token as usize))
         })
+    }
+
+    pub fn push_event(&mut self, event: Event) {
+        self.events.push(EpollEvent {
+            events: ioevent_to_epoll(event.kind(), PollOpt::empty()),
+            data: event.token().as_usize() as u64
+        });
     }
 }

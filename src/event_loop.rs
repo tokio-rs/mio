@@ -1,8 +1,8 @@
-use {convert, Handler, Evented, Poll, NotifyError, Token};
+use {channel, convert, Handler, Evented, Poll, NotifyError, Token};
 use event::{Event, EventSet, PollOpt};
-use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
-use std::{cmp, io, fmt, thread, usize};
+use std::{cmp, io, fmt, usize};
+use std::sync::mpsc;
 use std::default::Default;
 use std::time::Duration;
 
@@ -85,12 +85,12 @@ impl EventLoopBuilder {
 }
 
 /// Single threaded IO event loop.
-#[derive(Debug)]
 pub struct EventLoop<H: Handler> {
     run: bool,
     poll: Poll,
     timer: Timer<H::Timeout>,
-    notify: Notify<H::Message>,
+    notify_tx: channel::Sender<H::Message>,
+    notify_rx: channel::Receiver<H::Message>,
     config: Config,
 }
 
@@ -107,7 +107,7 @@ impl<H: Handler> EventLoop<H> {
 
     fn configured(config: Config) -> io::Result<EventLoop<H>> {
         // Create the IO poller
-        let mut poll = try!(Poll::new());
+        let poll = try!(Poll::new());
 
         // Create the timer
         let mut timer = Timer::new(
@@ -116,10 +116,10 @@ impl<H: Handler> EventLoop<H> {
             config.timer_capacity);
 
         // Create cross thread notification queue
-        let notify = try!(Notify::with_capacity(config.notify_capacity));
+        let (tx, rx) = channel::from_std_sync_channel(mpsc::sync_channel(config.notify_capacity));
 
         // Register the notification wakeup FD with the IO poller
-        try!(poll.register(&notify, NOTIFY, EventSet::readable() | EventSet::writable() , PollOpt::edge()));
+        try!(poll.register(&rx, NOTIFY, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()));
 
         // Set the timer's starting time reference point
         timer.setup();
@@ -128,7 +128,8 @@ impl<H: Handler> EventLoop<H> {
             run: true,
             poll: poll,
             timer: timer,
-            notify: notify,
+            notify_tx: tx,
+            notify_rx: rx,
             config: config,
         })
     }
@@ -182,7 +183,7 @@ impl<H: Handler> EventLoop<H> {
     /// The strategy of setting an atomic flag if the event loop is not already
     /// sleeping allows avoiding an expensive wakeup operation if at all possible.
     pub fn channel(&self) -> Sender<H::Message> {
-        Sender::new(self.notify.clone())
+        Sender::new(self.notify_tx.clone())
     }
 
     /// Schedules a timeout after the requested time interval. When the
@@ -272,20 +273,8 @@ impl<H: Handler> EventLoop<H> {
     /// Spin the event loop once, with a timeout of one second, and notify the
     /// handler if any of the registered handles become ready during that
     /// time.
-    pub fn run_once(&mut self, handler: &mut H, mut timeout: Option<Duration>) -> io::Result<()> {
-        let mut messages;
-
+    pub fn run_once(&mut self, handler: &mut H, timeout: Option<Duration>) -> io::Result<()> {
         trace!("event loop tick");
-
-        // Check the notify channel for any pending messages. If there are any,
-        // avoid blocking when polling for IO events. Messages will be
-        // processed after IO events.
-        messages = self.notify.check(self.config.messages_per_tick, true);
-        let pending = messages > 0;
-
-        if pending {
-            timeout = Some(Duration::from_millis(0));
-        }
 
         // Check the registered IO handles for any new events. Each poll
         // is for one second, so a shutdown request can last as long as
@@ -302,15 +291,7 @@ impl<H: Handler> EventLoop<H> {
             }
         };
 
-        if !pending {
-            // Indicate that the sleep period is over, also grab any additional
-            // messages
-            let remaining = self.config.messages_per_tick - messages;
-            messages += self.notify.check(remaining, false);
-        }
-
         self.io_process(handler, events);
-        self.notify(handler, messages);
         self.timer_process(handler);
         handler.tick(self);
         Ok(())
@@ -347,7 +328,7 @@ impl<H: Handler> EventLoop<H> {
             trace!("event={:?}; idx={:?}", evt, i);
 
             match evt.token() {
-                NOTIFY => self.notify.cleanup(),
+                NOTIFY => self.notify(handler),
                 _ => self.io_event(handler, evt)
             }
 
@@ -359,21 +340,16 @@ impl<H: Handler> EventLoop<H> {
         handler.ready(self, evt.token(), evt.kind());
     }
 
-    fn notify(&mut self, handler: &mut H, mut cnt: usize) {
-        while cnt > 0 {
-            match self.notify.poll() {
-                Some(msg) => {
-                    handler.notify(self, msg);
-                    cnt -= 1;
-                },
-                // If we expect messages, but the queue seems empty, a context
-                // switch has occurred in the queue's push() method between
-                // reserving a slot and marking that slot; let's spin for
-                // what should be a very brief period of time until the push
-                // is done.
-                None => thread::yield_now(),
+    fn notify(&mut self, handler: &mut H) {
+        for _ in 0..self.config.messages_per_tick {
+            match self.notify_rx.try_recv() {
+                Ok(msg) => handler.notify(self, msg),
+                _ => break,
             }
         }
+
+        // Re-register
+        let _ = self.poll.reregister(&self.notify_rx, NOTIFY, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot());
     }
 
     fn timer_process(&mut self, handler: &mut H) {
@@ -388,23 +364,19 @@ impl<H: Handler> EventLoop<H> {
     }
 }
 
-unsafe impl<H: Handler> Sync for EventLoop<H> { }
-
-impl <H: Handler> Drop for EventLoop<H> {
-    fn drop(&mut self) {
-        self.notify.close();
+impl<H: Handler> fmt::Debug for EventLoop<H> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("EventLoop")
+            .field("run", &self.run)
+            .field("poll", &self.poll)
+            .field("config", &self.config)
+            .finish()
     }
 }
 
 /// Sends messages to the EventLoop from other threads.
 pub struct Sender<M> {
-    notify: Notify<M>
-}
-
-impl<M> Clone for Sender<M> {
-    fn clone(&self) -> Sender<M> {
-        Sender { notify: self.notify.clone() }
-    }
+    tx: channel::Sender<M>
 }
 
 impl<M> fmt::Debug for Sender<M> {
@@ -414,12 +386,13 @@ impl<M> fmt::Debug for Sender<M> {
 }
 
 impl<M> Sender<M> {
-    fn new(notify: Notify<M>) -> Sender<M> {
-        Sender { notify: notify }
+    fn new(tx: channel::Sender<M>) -> Sender<M> {
+        Sender { tx: tx }
     }
 
     pub fn send(&self, msg: M) -> Result<(), NotifyError<M>> {
-        self.notify.notify(msg)
+        try!(self.tx.try_send(msg));
+        Ok(())
     }
 }
 

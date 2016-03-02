@@ -55,9 +55,8 @@ impl Selector {
         })
     }
 
-    pub fn select(&mut self,
-                  events: &mut Events,
-                  timeout_ms: Option<usize>) -> io::Result<()> {
+    pub fn select(&mut self, events: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
+        let mut ret = false;
 
         // If we have some deferred events then we only want to poll for I/O
         // events, so clamp the timeout to 0 in that case.
@@ -97,9 +96,14 @@ impl Selector {
 
         for status in events.statuses[..n].iter_mut() {
             if status.overlapped() as usize == 0 {
+                if Token(status.token()) == awakener {
+                    ret = true;
+                    continue;
+                }
+
                 dst.push(Event::new(EventSet::readable(),
                                     Token(status.token())));
-                continue
+                continue;
             }
 
             let callback = unsafe {
@@ -115,12 +119,16 @@ impl Selector {
             trace!("polled event; event={:?}", event);
 
             if !event.is_none() {
-                dst.push(event.as_event());
-
-                if event.is_level() {
-                    pending.push(event);
+                if event.token() == awakener {
+                    ret = true;
                 } else {
-                    event.unset_pending();
+                    dst.push(event.as_event());
+
+                    if event.is_level() {
+                        pending.push(event);
+                    } else {
+                        event.unset_pending();
+                    }
                 }
             } else {
                 event.unset_pending();
@@ -128,7 +136,7 @@ impl Selector {
         }
 
         trace!("returning");
-        Ok(())
+        Ok(ret)
     }
 
     fn should_block(&self) -> bool {
@@ -324,7 +332,7 @@ impl Registration {
         self.event.unset(set);
     }
 
-    pub fn associate(&mut self, selector: &mut Selector, token: Token, opts: PollOpt) -> io::Result<()> {
+    pub fn associate(&mut self, selector: &Selector, token: Token, opts: PollOpt) -> io::Result<()> {
         // Structured like this to make the borrow checker happy
         if self.selector.is_some() {
             if let Some(sa) = self.selector.as_ref() {
@@ -342,7 +350,7 @@ impl Registration {
 
     pub fn register_socket(&mut self,
                            socket: &AsRawSocket,
-                           selector: &mut Selector,
+                           selector: &Selector,
                            token: Token,
                            interest: EventSet,
                            opts: PollOpt) -> io::Result<()> {
@@ -358,7 +366,7 @@ impl Registration {
 
     pub fn reregister_socket(&mut self,
                              _socket: &AsRawSocket,
-                             selector: &mut Selector,
+                             selector: &Selector,
                              token: Token,
                              interest: EventSet,
                              opts: PollOpt) -> io::Result<()> {
@@ -468,6 +476,10 @@ impl Events {
 
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|e| *e)
+    }
+
+    pub fn push_event(&mut self, event: Event) {
+        self.events.push(event);
     }
 }
 

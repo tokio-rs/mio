@@ -5,6 +5,7 @@ use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
 use libc::{timespec, time_t, c_long};
 use std::{fmt, slice};
+use std::cell::UnsafeCell;
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -16,12 +17,17 @@ use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 /// operation will return with an error. This matches windows behavior.
 static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
-#[derive(Debug)]
 pub struct Selector {
     id: usize,
     kq: RawFd,
-    changes: Events
+    changes: UnsafeCell<Vec<KEvent>>,
 }
+
+#[cfg(not(target_os = "netbsd"))]
+type UData = usize;
+
+#[cfg(target_os = "netbsd")]
+type UData = i64;
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
@@ -31,7 +37,7 @@ impl Selector {
         Ok(Selector {
             id: id,
             kq: kq,
-            changes: Events::new()
+            changes: UnsafeCell::new(vec![]),
         })
     }
 
@@ -39,7 +45,7 @@ impl Selector {
         self.id
     }
 
-    pub fn select(&mut self, evts: &mut Events, timeout_ms: Option<usize>) -> io::Result<()> {
+    pub fn select(&mut self, evts: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
         let timeout = timeout_ms.map(|x| timespec {
             tv_sec: (x / 1000) as time_t,
             tv_nsec: ((x % 1000) * 1_000_000) as c_long
@@ -48,18 +54,16 @@ impl Selector {
         let cnt = try!(kevent_ts(self.kq, &[], evts.as_mut_slice(), timeout)
                                   .map_err(super::from_nix_error));
 
-        self.changes.sys_events.clear();
+        self.mut_changes().clear();
 
         unsafe {
             evts.sys_events.set_len(cnt);
         }
 
-        evts.coalesce();
-
-        Ok(())
+        Ok(evts.coalesce(awakener))
     }
 
-    pub fn register(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
         self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts);
@@ -68,20 +72,20 @@ impl Selector {
         self.flush_changes()
     }
 
-    pub fn reregister(&mut self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         // Just need to call register here since EV_ADD is a mod if already
         // registered
         self.register(fd, token, interests, opts)
     }
 
-    pub fn deregister(&mut self, fd: RawFd) -> io::Result<()> {
+    pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
         self.ev_push(fd, 0, EventFilter::EVFILT_READ, EV_DELETE);
         self.ev_push(fd, 0, EventFilter::EVFILT_WRITE, EV_DELETE);
 
         self.flush_changes()
     }
 
-    fn ev_register(&mut self, fd: RawFd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) {
+    fn ev_register(&self, fd: RawFd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) {
         let mut flags = EV_ADD;
 
         if enable {
@@ -101,38 +105,42 @@ impl Selector {
         self.ev_push(fd, token, filter, flags);
     }
 
-    #[cfg(not(target_os = "netbsd"))]
-    fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
-        self.changes.sys_events.push(
+    fn ev_push(&self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
+        self.mut_changes().push(
             KEvent {
                 ident: fd as ::libc::uintptr_t,
                 filter: filter,
                 flags: flags,
                 fflags: FilterFlag::empty(),
                 data: 0,
-                udata: token
+                udata: token as UData,
             });
     }
 
-    #[cfg(target_os = "netbsd")]
-    fn ev_push(&mut self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
-        self.changes.sys_events.push(
-            KEvent {
-                ident: fd as ::libc::uintptr_t,
-                filter: filter,
-                flags: flags,
-                fflags: FilterFlag::empty(),
-                data: 0,
-                udata: token as i64
-            });
-    }
-
-    fn flush_changes(&mut self) -> io::Result<()> {
-        let result = kevent(self.kq, self.changes.as_slice(), &mut [], 0).map(|_| ())
+    fn flush_changes(&self) -> io::Result<()> {
+        let result = kevent(self.kq, self.changes(), &mut [], 0).map(|_| ())
             .map_err(super::from_nix_error).map(|_| ());
 
-        self.changes.sys_events.clear();
+        self.mut_changes().clear();
         result
+    }
+
+    fn changes(&self) -> &[KEvent] {
+        unsafe { &(*self.changes.get())[..] }
+    }
+
+    fn mut_changes(&self) -> &mut Vec<KEvent> {
+        unsafe { &mut *self.changes.get() }
+    }
+}
+
+impl fmt::Debug for Selector {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Selector")
+            .field("id", &self.id)
+            .field("kq", &self.kq)
+            .field("changes", &self.changes().len())
+            .finish()
     }
 }
 
@@ -171,13 +179,21 @@ impl Events {
         self.events.get(idx).map(|e| *e)
     }
 
-    pub fn coalesce(&mut self) {
+    fn coalesce(&mut self, awakener: Token) -> bool {
+        let mut ret = false;
         self.events.clear();
         self.event_map.clear();
 
         for e in &self.sys_events {
             let token = Token(e.udata as usize);
             let len = self.events.len();
+
+            if token == awakener {
+                // TODO: Should this return an error if event is an error. It
+                // is not critical as spurious wakeups are permitted.
+                ret = true;
+                continue;
+            }
 
             let idx = *self.event_map.entry(token)
                 .or_insert(len);
@@ -208,13 +224,12 @@ impl Events {
                 }
             }
         }
+
+        ret
     }
 
-    fn as_slice(&self) -> &[KEvent] {
-        unsafe {
-            let ptr = (&self.sys_events[..]).as_ptr();
-            slice::from_raw_parts(ptr, self.sys_events.len())
-        }
+    pub fn push_event(&mut self, event: Event) {
+        self.events.push(event);
     }
 
     fn as_mut_slice(&mut self) -> &mut [KEvent] {

@@ -143,16 +143,16 @@ impl UdpSocket {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         try!(self.associate_selector(poll));
         self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.io.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
         self.io.deregister(poll)
     }
 }

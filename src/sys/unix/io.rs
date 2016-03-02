@@ -52,16 +52,16 @@ impl AsRawFd for Io {
 }
 
 impl Evented for Io {
-    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        poll::selector_mut(poll).register(self.fd, token, interest, opts)
+    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        poll::selector(poll).register(self.fd, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        poll::selector_mut(poll).reregister(self.fd, token, interest, opts)
+    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        poll::selector(poll).reregister(self.fd, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
-        poll::selector_mut(poll).deregister(self.fd)
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+        poll::selector(poll).deregister(self.fd)
     }
 }
 

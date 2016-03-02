@@ -98,15 +98,15 @@ impl Write for UnixSocket {
 }
 
 impl Evented for UnixSocket {
-    fn register(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &mut Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         self.io.reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &mut Poll) -> io::Result<()> {
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
         self.io.deregister(poll)
     }
 }
