@@ -84,13 +84,19 @@
 
 extern crate bytes;
 extern crate slab;
-extern crate libc;
 
 #[cfg(unix)]
 extern crate nix;
 
-extern crate winapi;
+#[cfg(unix)]
+extern crate libc;
+
+#[cfg(windows)]
 extern crate miow;
+
+#[cfg(windows)]
+extern crate winapi;
+
 extern crate net2;
 
 #[macro_use]
