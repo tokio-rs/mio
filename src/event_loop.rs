@@ -1,4 +1,4 @@
-use {convert, Handler, Evented, Poll, NotifyError, Token};
+use {Handler, Evented, Poll, NotifyError, Token};
 use event::{Event, EventSet, PollOpt};
 use notify::Notify;
 use timer::{Timer, Timeout, TimerResult};
@@ -36,6 +36,8 @@ impl Default for Config {
         }
     }
 }
+
+
 
 impl EventLoopBuilder {
     /// Construct a new `EventLoopBuilder` with the default configuration
@@ -111,7 +113,7 @@ impl<H: Handler> EventLoop<H> {
 
         // Create the timer
         let mut timer = Timer::new(
-            convert::millis(config.timer_tick),
+            config.timer_tick,
             config.timer_wheel_size,
             config.timer_capacity);
 
@@ -216,7 +218,7 @@ impl<H: Handler> EventLoop<H> {
     /// let _ = event_loop.run(&mut MyHandler);
     /// ```
     pub fn timeout(&mut self, token: H::Timeout, delay: Duration) -> TimerResult<Timeout> {
-        self.timer.timeout_ms(token, convert::millis(delay))
+        self.timer.timeout(token, delay)
     }
 
     /// If the supplied timeout has not been triggered, cancel it such that it
@@ -318,13 +320,12 @@ impl<H: Handler> EventLoop<H> {
 
     #[inline]
     fn io_poll(&mut self, timeout: Option<Duration>) -> io::Result<usize> {
-        let next_tick = self.timer.next_tick_in_ms()
-            .map(|ms| cmp::min(ms, usize::MAX as u64));
+        let next_tick = self.timer.next_tick();
 
         let timeout = match (timeout, next_tick) {
-            (Some(a), Some(b)) => Some(cmp::min(a, Duration::from_millis(b))),
+            (Some(a), Some(b)) => Some(cmp::min(a, b)),
             (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(Duration::from_millis(b)),
+            (None, Some(b)) => Some(b),
             _ => None,
         };
 
