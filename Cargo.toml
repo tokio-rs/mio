@@ -17,15 +17,18 @@ exclude       = [
   "test/**/*",
 ]
 
-[dependencies]
-log    = "0.3.1"
+[target.'cfg(unix)'.dependencies]
 nix    = { git = "https://github.com/carllerche/nix-rust", rev = "c4257f8a76" }
 libc   = "0.2.4"
-slab   = "0.1.0"
-time   = "0.1.33"
-bytes  = "0.3.0"
+
+[target.'cfg(windows)'.dependencies]
 winapi = "0.2.1"
 miow   = "0.1.1"
+
+[dependencies]
+log    = "0.3.1"
+slab   = "0.1.0"
+bytes  = "0.3.0"
 net2   = { version = "0.2.19", default-features = false }
 
 [dev-dependencies]

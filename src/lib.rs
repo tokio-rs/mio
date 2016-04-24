@@ -83,15 +83,16 @@
 #![cfg_attr(unix, deny(warnings))]
 
 extern crate bytes;
-extern crate time;
 extern crate slab;
-extern crate libc;
 
 #[cfg(unix)]
 extern crate nix;
 
-extern crate winapi;
-extern crate miow;
+#[cfg(unix)] extern crate libc;
+
+#[cfg(windows)] extern crate miow;
+#[cfg(windows)] extern crate winapi;
+
 extern crate net2;
 
 #[macro_use]
