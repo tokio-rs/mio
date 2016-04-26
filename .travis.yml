@@ -17,20 +17,19 @@ script:
 # a specific tag
 deploy:
   provider: s3
-  access_key_id: AKIAIGFX36YKEFRZJAXA
+  access_key_id: AKIAIXM3KLI7WZS4ZA3Q
   secret_access_key:
-    secure: blFcl9EMlWIiI+x8LZFWpyIxRZRScKWaftSXluFB0HLgbA1oYYX4lo8GgVYGQZ4kP3iIuL+WAlGvf3iCrAULGy0UOxLgvwOxX8XsgfCZpzF/Bw1G6od+IkPzbpNIgMtkceDhzZEmO+yatbAYCdMF0qq485QJ502inB7aeu1G94w=
+    secure: g0E6fBvgTV+5RYecJqEa6qIrQfE6SnwQX9xA1mx2ISkKuIne8qgEfBFSLNeVywmOgl8Kv4gDgrt9OSm5vT8Kb4L2eAb5L7AUsnfpyLZMEPc6KevZEF1awS54vVY3E3ey3FjdZ/4bkMbiwiJTFcToy/MlHauD7oUDRGqz3SSZIt0=
   bucket: rustdoc
-  endpoint: "rustdoc.s3-website-us-east-1.amazonaws.com"
+  endpoint: rust-doc.s3-website-us-east-1.amazonaws.com
   skip_cleanup: true
   local-dir: target/doc
   upload-dir: mio/${TRAVIS_BRANCH}
   acl: public_read
   on:
-    condition: $TRAVIS_RUST_VERSION == "1.1.0" && $TRAVIS_OS_NAME == "linux"
+    condition: $TRAVIS_RUST_VERSION == "1.3.0" && $TRAVIS_OS_NAME == "linux"
     repo: carllerche/mio
     branch:
       - master
       - v0.5.x
       - v0.4.x
-      - v0.3.x
