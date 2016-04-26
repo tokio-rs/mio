@@ -65,6 +65,9 @@ pub fn test_tcp_stream_level_triggered() {
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
     poll.register(&s1, Token(1), EventSet::readable() | EventSet::writable(), PollOpt::level()).unwrap();
 
+    // Sleep a bit to ensure it arrives at dest
+    sleep_ms(250);
+
     let _ = poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events: Vec<Event> = poll.events().collect();
     assert!(events.len() == 2, "actual={:?}", events);
@@ -72,6 +75,9 @@ pub fn test_tcp_stream_level_triggered() {
 
     // Server side of socket
     let (mut s1_tx, _) = l.accept().unwrap().unwrap();
+
+    // Sleep a bit to ensure it arrives at dest
+    sleep_ms(250);
 
     poll.poll(Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&poll, Token(1));
