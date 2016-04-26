@@ -1,6 +1,6 @@
 use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
 use std::io::{Read, Write};
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 
 /*
  *
@@ -28,6 +28,12 @@ impl From<RawFd> for Io {
 impl FromRawFd for Io {
     unsafe fn from_raw_fd(fd: RawFd) -> Io {
         From::from(fd)
+    }
+}
+
+impl IntoRawFd for Io {
+    fn into_raw_fd(self) -> RawFd {
+        self.fd
     }
 }
 

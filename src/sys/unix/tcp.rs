@@ -2,7 +2,7 @@ use io::MapNonBlock;
 use std::cell::Cell;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
-use std::os::unix::io::{RawFd, FromRawFd, AsRawFd};
+use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
 
 use libc;
 use net2::{TcpStreamExt, TcpListenerExt};
@@ -137,6 +137,12 @@ impl FromRawFd for TcpStream {
     }
 }
 
+impl IntoRawFd for TcpStream {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_raw_fd()
+    }
+}
+
 impl AsRawFd for TcpStream {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
@@ -222,8 +228,15 @@ impl FromRawFd for TcpListener {
     }
 }
 
+impl IntoRawFd for TcpListener {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_raw_fd()
+    }
+}
+
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
+
