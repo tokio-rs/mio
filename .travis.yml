@@ -2,7 +2,9 @@ language: rust
 sudo: false
 rust:
   - nightly
-  - 1.1.0
+  - stable
+  # The following Rust version represents the oldest supported version of Mio
+  - 1.6.0
 
 os:
   - linux
@@ -27,7 +29,7 @@ deploy:
   upload-dir: mio/${TRAVIS_BRANCH}
   acl: public_read
   on:
-    condition: $TRAVIS_RUST_VERSION == "1.3.0" && $TRAVIS_OS_NAME == "linux"
+    condition: $TRAVIS_RUST_VERSION == "1.6.0" && $TRAVIS_OS_NAME == "linux"
     repo: carllerche/mio
     branch:
       - master
