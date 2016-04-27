@@ -19,7 +19,7 @@ exclude       = [
 
 [dependencies]
 log    = "0.3.1"
-nix    = { git = "https://github.com/carllerche/nix-rust", rev = "c4257f8a76" }
+nix    = "0.5.0"
 libc   = "0.2.4"
 slab   = "0.1.0"
 time   = "0.1.33"
