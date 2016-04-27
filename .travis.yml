@@ -21,7 +21,7 @@ deploy:
   access_key_id: AKIAIXM3KLI7WZS4ZA3Q
   secret_access_key:
     secure: g0E6fBvgTV+5RYecJqEa6qIrQfE6SnwQX9xA1mx2ISkKuIne8qgEfBFSLNeVywmOgl8Kv4gDgrt9OSm5vT8Kb4L2eAb5L7AUsnfpyLZMEPc6KevZEF1awS54vVY3E3ey3FjdZ/4bkMbiwiJTFcToy/MlHauD7oUDRGqz3SSZIt0=
-  bucket: rustdoc
+  bucket: rust-doc
   endpoint: rust-doc.s3-website-us-east-1.amazonaws.com
   skip_cleanup: true
   local-dir: target/doc
