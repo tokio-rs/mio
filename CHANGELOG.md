@@ -1,6 +1,7 @@
-# 0.5.1 (unreleased)
+# 0.5.1 (April 27, 2015)
 
 * Bump libc version to 0.2.4
+* Bump nix version to 0.5.0
 
 # 0.5.0 (December 3, 2015)
 
