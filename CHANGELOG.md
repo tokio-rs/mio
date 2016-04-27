@@ -1,3 +1,7 @@
+# 0.5.1 (unreleased)
+
+* Bump libc version to 0.2.4
+
 # 0.5.0 (December 3, 2015)
 
 * Windows support (#239)
