@@ -156,7 +156,7 @@ impl<T> Timer<T> {
         // Update the head slot
         self.wheel[slot] = token;
 
-        println!("inserted timout; slot={}; token={:?}", slot, token);
+        trace!("inserted timout; slot={}; token={:?}", slot, token);
 
         // Return the new timeout
         Ok(Timeout {
@@ -198,12 +198,12 @@ impl<T> Timer<T> {
     }
 
     pub fn tick_to(&mut self, now: Tick) -> Option<T> {
-        println!("tick_to; now={}; tick={}", now, self.tick);
+        trace!("tick_to; now={}; tick={}", now, self.tick);
 
         while self.tick.0 <= now.0 {
             let curr = self.next;
 
-            println!("ticking; curr={:?}", curr);
+            trace!("ticking; curr={:?}", curr);
 
             if curr == EMPTY {
                 self.tick = Tick(self.tick.0 + 1);
@@ -212,7 +212,7 @@ impl<T> Timer<T> {
                 let links = self.entries[curr].links;
 
                 if links.tick <= self.tick.0 {
-                    println!("triggering; token={:?}", curr);
+                    trace!("triggering; token={:?}", curr);
 
                     // Unlink will also advance self.next
                     self.unlink(&links, curr);
@@ -415,7 +415,7 @@ mod test {
         t.timeout("d", Duration::from_millis(440)).unwrap();
 
         tick = t.duration_to_tick(Duration::from_millis(100));
-        println!("{}", tick.0);
+        trace!("{}", tick.0);
         assert_eq!(None, t.tick_to(tick));
 
         tick = t.duration_to_tick(Duration::from_millis(200));
