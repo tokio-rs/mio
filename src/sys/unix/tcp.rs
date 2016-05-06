@@ -1,8 +1,9 @@
 use io::MapNonBlock;
-use std::cell::Cell;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::SeqCst;
 
 use libc;
 use net2::TcpStreamExt;
@@ -18,13 +19,13 @@ use sys::unix::io::set_nonblock;
 #[derive(Debug)]
 pub struct TcpStream {
     inner: net::TcpStream,
-    selector_id: Cell<Option<usize>>,
+    selector_id: AtomicUsize,
 }
 
 #[derive(Debug)]
 pub struct TcpListener {
     inner: net::TcpListener,
-    selector_id: Cell<Option<usize>>,
+    selector_id: AtomicUsize,
 }
 
 impl TcpStream {
@@ -39,7 +40,7 @@ impl TcpStream {
 
         Ok(TcpStream {
             inner: stream,
-            selector_id: Cell::new(None),
+            selector_id: AtomicUsize::new(0),
         })
     }
 
@@ -55,7 +56,7 @@ impl TcpStream {
         self.inner.try_clone().map(|s| {
             TcpStream {
                 inner: s,
-                selector_id: self.selector_id.clone(),
+                selector_id: AtomicUsize::new(self.selector_id.load(SeqCst)),
             }
         })
     }
@@ -82,30 +83,30 @@ impl TcpStream {
     }
 
     fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
-        let selector_id = self.selector_id.get();
+        let selector_id = self.selector_id.load(SeqCst);
 
-        if selector_id.is_some() && selector_id != Some(poll::selector(poll).id()) {
+        if selector_id != 0 && selector_id != poll::selector(poll).id() {
             Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
         } else {
-            self.selector_id.set(Some(poll::selector(poll).id()));
+            self.selector_id.store(poll::selector(poll).id(), SeqCst);
             Ok(())
         }
     }
 }
 
-impl Read for TcpStream {
+impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buf)
+        (&self.inner).read(buf)
     }
 }
 
-impl Write for TcpStream {
+impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.write(buf)
+        (&self.inner).write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
+        (&self.inner).flush()
     }
 }
 
@@ -130,7 +131,7 @@ impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream {
             inner: net::TcpStream::from_raw_fd(fd),
-            selector_id: Cell::new(None),
+            selector_id: AtomicUsize::new(0),
         }
     }
 }
@@ -152,7 +153,7 @@ impl TcpListener {
         try!(set_nonblock(&inner));
         Ok(TcpListener {
             inner: inner,
-            selector_id: Cell::new(None),
+            selector_id: AtomicUsize::new(0),
         })
     }
 
@@ -164,7 +165,7 @@ impl TcpListener {
         self.inner.try_clone().map(|s| {
             TcpListener {
                 inner: s,
-                selector_id: self.selector_id.clone(),
+                selector_id: AtomicUsize::new(self.selector_id.load(SeqCst)),
             }
         })
     }
@@ -174,7 +175,7 @@ impl TcpListener {
             try!(set_nonblock(&s));
             Ok((TcpStream {
                 inner: s,
-                selector_id: Cell::new(None),
+                selector_id: AtomicUsize::new(0),
             }, a))
         }).map_non_block()
     }
@@ -189,12 +190,12 @@ impl TcpListener {
     }
 
     fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
-        let selector_id = self.selector_id.get();
+        let selector_id = self.selector_id.load(SeqCst);
 
-        if selector_id.is_some() && selector_id != Some(poll::selector(poll).id()) {
+        if selector_id != 0 && selector_id != poll::selector(poll).id() {
             Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
         } else {
-            self.selector_id.set(Some(poll::selector(poll).id()));
+            self.selector_id.store(poll::selector(poll).id(), SeqCst);
             Ok(())
         }
     }
@@ -221,7 +222,7 @@ impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener {
             inner: net::TcpListener::from_raw_fd(fd),
-            selector_id: Cell::new(None),
+            selector_id: AtomicUsize::new(0),
         }
     }
 }
