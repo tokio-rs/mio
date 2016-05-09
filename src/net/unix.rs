@@ -4,6 +4,8 @@ use std::io::{Read, Write};
 use std::path::Path;
 use bytes::{Buf, MutBuf};
 
+use nix::sys::socket::Shutdown;
+
 #[derive(Debug)]
 pub struct UnixSocket {
     sys: sys::UnixSocket,
@@ -80,6 +82,10 @@ impl UnixStream {
     pub fn try_clone(&self) -> io::Result<UnixStream> {
         self.sys.try_clone()
             .map(From::from)
+    }
+
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<usize> {
+        self.sys.shutdown(how)
     }
 
     pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {

@@ -4,6 +4,7 @@ use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
+use nix::sys::socket::Shutdown;
 
 #[derive(Debug)]
 pub struct UnixSocket {
@@ -45,6 +46,12 @@ impl UnixSocket {
     pub fn try_clone(&self) -> io::Result<UnixSocket> {
         net::dup(&self.io)
             .map(From::from)
+    }
+
+    pub fn shutdown(&self, how : Shutdown) -> io::Result<usize> {
+        try!(nix::shutdown(self.as_raw_fd(), how)
+            .map_err(super::from_nix_error));
+        Ok(0)
     }
 
     pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {
