@@ -147,6 +147,7 @@ pub mod unix {
         UnixListener,
         UnixSocket,
         UnixStream,
+        Shutdown,
     };
     pub use sys::{
         EventedFd,

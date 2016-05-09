@@ -4,7 +4,7 @@ use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
-use nix::sys::socket::Shutdown;
+pub use nix::sys::socket::Shutdown;
 
 #[derive(Debug)]
 pub struct UnixSocket {

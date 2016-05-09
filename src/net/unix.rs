@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use bytes::{Buf, MutBuf};
 
-use nix::sys::socket::Shutdown;
+pub use nix::sys::socket::Shutdown;
 
 #[derive(Debug)]
 pub struct UnixSocket {
