@@ -134,9 +134,6 @@ pub use io::{
 pub use net::{
     tcp,
     udp,
-    IpAddr,
-    Ipv4Addr,
-    Ipv6Addr,
 };
 #[cfg(unix)]
 pub mod unix {
