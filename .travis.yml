@@ -3,7 +3,7 @@ rust:
   - nightly
   - stable
   # The following Rust version represents the oldest supported version of Mio
-  - 1.6.0
+  - 1.7.0
 
 os:
   - linux

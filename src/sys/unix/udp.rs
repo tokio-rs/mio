@@ -1,8 +1,8 @@
-use {io, poll, Evented, EventSet, Io, IpAddr, Poll, PollOpt, Token};
+use {io, poll, Evented, EventSet, Io, Poll, PollOpt, Token};
 use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::cell::Cell;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
 
 #[derive(Debug)]
