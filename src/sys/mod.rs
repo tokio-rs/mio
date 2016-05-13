@@ -10,7 +10,9 @@ pub use self::unix::{
     UdpSocket,
     UnixSocket,
     pipe,
+    set_nonblock,
 };
+
 
 #[cfg(unix)]
 mod unix;

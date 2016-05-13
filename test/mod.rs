@@ -27,6 +27,7 @@ mod test_timer;
 mod test_udp_level;
 mod test_udp_socket;
 mod test_uds_shutdown;
+mod test_subprocess_pipe;
 
 // ===== Unix only tests =====
 #[cfg(unix)]
