@@ -5,11 +5,15 @@ use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
 
 use libc;
-use net2::{TcpStreamExt, TcpListenerExt};
+use net2::TcpStreamExt;
+
+#[allow(unused_imports)]
+use net2::TcpListenerExt;
+
 use nix::fcntl::FcntlArg::F_SETFL;
 use nix::fcntl::{fcntl, O_NONBLOCK};
 
-use {io, poll, Evented, EventSet, Poll, PollOpt, Token, TryAccept};
+use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
 use sys::unix::eventedfd::EventedFd;
 
 #[derive(Debug)]
