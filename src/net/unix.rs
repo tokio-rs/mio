@@ -3,8 +3,8 @@ use io::MapNonBlock;
 use std::io::{Read, Write};
 use std::path::Path;
 use bytes::{Buf, MutBuf};
-
 pub use nix::sys::socket::Shutdown;
+use std::process;
 
 #[derive(Debug)]
 pub struct UnixSocket {
@@ -231,6 +231,23 @@ pub struct PipeReader {
     io: Io,
 }
 
+impl PipeReader {
+    pub fn from_stdout(stdout: process::ChildStdout) -> io::Result<Self> {
+        match sys::set_nonblock(&stdout) {
+            Err(e) => return Err(e),
+            _ => {},
+        }
+        return Ok(PipeReader::from(Io::from_raw_fd(stdout.into_raw_fd())));
+    }
+    pub fn from_stderr(stderr: process::ChildStderr) -> io::Result<Self> {
+        match sys::set_nonblock(&stderr) {
+            Err(e) => return Err(e),
+            _ => {},
+        }
+        return Ok(PipeReader::from(Io::from_raw_fd(stderr.into_raw_fd())));
+    }
+}
+
 impl Read for PipeReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.io.read(buf)
@@ -266,6 +283,16 @@ impl From<Io> for PipeReader {
 #[derive(Debug)]
 pub struct PipeWriter {
     io: Io,
+}
+
+impl PipeWriter {
+    pub fn from_stdin(stdin: process::ChildStdin) -> io::Result<Self> {
+        match sys::set_nonblock(&stdin) {
+            Err(e) => return Err(e),
+            _ => {},
+        }
+        return Ok(PipeWriter::from(Io::from_raw_fd(stdin.into_raw_fd())));
+    }
 }
 
 impl Write for PipeWriter {

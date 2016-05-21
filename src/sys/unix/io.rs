@@ -1,6 +1,14 @@
 use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
 use std::io::{Read, Write};
 use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
+use nix::fcntl::FcntlArg::F_SETFL;
+use nix::fcntl::{fcntl, O_NONBLOCK};
+
+pub fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
+    fcntl(s.as_raw_fd(), F_SETFL(O_NONBLOCK)).map_err(super::from_nix_error)
+                                             .map(|_| ())
+}
+
 
 /*
  *
@@ -101,3 +109,4 @@ impl Drop for Io {
         let _ = close(self.as_raw_fd());
     }
 }
+
