@@ -3,7 +3,8 @@ use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::path::Path;
-use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
+use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
+pub use nix::sys::socket::Shutdown;
 
 #[derive(Debug)]
 pub struct UnixSocket {
@@ -45,6 +46,12 @@ impl UnixSocket {
     pub fn try_clone(&self) -> io::Result<UnixSocket> {
         net::dup(&self.io)
             .map(From::from)
+    }
+
+    pub fn shutdown(&self, how : Shutdown) -> io::Result<usize> {
+        try!(nix::shutdown(self.as_raw_fd(), how)
+            .map_err(super::from_nix_error));
+        Ok(0)
     }
 
     pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {
@@ -124,6 +131,12 @@ impl From<Io> for UnixSocket {
 impl FromRawFd for UnixSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixSocket {
         UnixSocket { io: Io::from_raw_fd(fd) }
+    }
+}
+
+impl IntoRawFd for UnixSocket {
+    fn into_raw_fd(self) -> RawFd {
+        self.io.into_raw_fd()
     }
 }
 

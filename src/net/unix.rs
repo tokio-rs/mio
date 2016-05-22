@@ -4,6 +4,8 @@ use std::io::{Read, Write};
 use std::path::Path;
 use bytes::{Buf, MutBuf};
 
+pub use nix::sys::socket::Shutdown;
+
 #[derive(Debug)]
 pub struct UnixSocket {
     sys: sys::UnixSocket,
@@ -80,6 +82,10 @@ impl UnixStream {
     pub fn try_clone(&self) -> io::Result<UnixStream> {
         self.sys.try_clone()
             .map(From::from)
+    }
+
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<usize> {
+        self.sys.shutdown(how)
     }
 
     pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {
@@ -308,7 +314,13 @@ impl From<Io> for PipeWriter {
  *
  */
 
-use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
+use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
+
+impl IntoRawFd for UnixSocket {
+    fn into_raw_fd(self) -> RawFd {
+        self.sys.into_raw_fd()
+    }
+}
 
 impl AsRawFd for UnixSocket {
     fn as_raw_fd(&self) -> RawFd {
@@ -319,6 +331,12 @@ impl AsRawFd for UnixSocket {
 impl FromRawFd for UnixSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixSocket {
         UnixSocket { sys: FromRawFd::from_raw_fd(fd) }
+    }
+}
+
+impl IntoRawFd for UnixStream {
+    fn into_raw_fd(self) -> RawFd {
+        self.sys.into_raw_fd()
     }
 }
 
@@ -334,6 +352,12 @@ impl FromRawFd for UnixStream {
     }
 }
 
+impl IntoRawFd for UnixListener {
+    fn into_raw_fd(self) -> RawFd {
+        self.sys.into_raw_fd()
+    }
+}
+
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
@@ -346,6 +370,12 @@ impl FromRawFd for UnixListener {
     }
 }
 
+impl IntoRawFd for PipeReader {
+    fn into_raw_fd(self) -> RawFd {
+        self.io.into_raw_fd()
+    }
+}
+
 impl AsRawFd for PipeReader {
     fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
@@ -355,6 +385,12 @@ impl AsRawFd for PipeReader {
 impl FromRawFd for PipeReader {
     unsafe fn from_raw_fd(fd: RawFd) -> PipeReader {
         PipeReader { io: FromRawFd::from_raw_fd(fd) }
+    }
+}
+
+impl IntoRawFd for PipeWriter {
+    fn into_raw_fd(self) -> RawFd {
+        self.io.into_raw_fd()
     }
 }
 

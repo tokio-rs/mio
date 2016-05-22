@@ -2,14 +2,18 @@ use io::MapNonBlock;
 use std::cell::Cell;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
-use std::os::unix::io::{RawFd, FromRawFd, AsRawFd};
+use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
 
 use libc;
-use net2::{TcpStreamExt, TcpListenerExt};
+use net2::TcpStreamExt;
+
+#[allow(unused_imports)]
+use net2::TcpListenerExt;
+
 use nix::fcntl::FcntlArg::F_SETFL;
 use nix::fcntl::{fcntl, O_NONBLOCK};
 
-use {io, poll, Evented, EventSet, Poll, PollOpt, Token, TryAccept};
+use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
 use sys::unix::eventedfd::EventedFd;
 
 #[derive(Debug)]
@@ -137,6 +141,12 @@ impl FromRawFd for TcpStream {
     }
 }
 
+impl IntoRawFd for TcpStream {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_raw_fd()
+    }
+}
+
 impl AsRawFd for TcpStream {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
@@ -222,8 +232,15 @@ impl FromRawFd for TcpListener {
     }
 }
 
+impl IntoRawFd for TcpListener {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_raw_fd()
+    }
+}
+
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
+

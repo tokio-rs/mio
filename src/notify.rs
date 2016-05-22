@@ -101,13 +101,12 @@ impl<M> NotifyInner<M> {
                 } else {
                     nxt = cur - max;
                 }
+            } else if will_sleep {
+                nxt = SLEEP;
             } else {
-                if will_sleep {
-                    nxt = SLEEP;
-                } else {
-                    nxt = 0;
-                }
+                nxt = 0;
             }
+
 
             val = self.state.compare_and_swap(cur, nxt, Relaxed);
 

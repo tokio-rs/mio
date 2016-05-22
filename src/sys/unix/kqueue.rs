@@ -1,5 +1,6 @@
 use {io, EventSet, PollOpt, Token};
 use event::{self, Event};
+use nix::unistd::close;
 use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent, kevent_ts};
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
 use libc::{timespec, time_t, c_long};
@@ -135,6 +136,12 @@ impl Selector {
     }
 }
 
+impl Drop for Selector {
+    fn drop(&mut self) {
+        let _ = close(self.kq);
+    }
+}
+
 pub struct Events {
     sys_events: Vec<KEvent>,
     events: Vec<Event>,
@@ -153,6 +160,11 @@ impl Events {
     #[inline]
     pub fn len(&self) -> usize {
         self.events.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
     }
 
     pub fn get(&self, idx: usize) -> Option<Event> {

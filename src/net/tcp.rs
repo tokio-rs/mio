@@ -254,7 +254,14 @@ impl TryAccept for TcpListener {
  */
 
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
+
+#[cfg(unix)]
+impl IntoRawFd for TcpStream {
+    fn into_raw_fd(self) -> RawFd {
+        self.sys.into_raw_fd()
+    }
+}
 
 #[cfg(unix)]
 impl AsRawFd for TcpStream {
@@ -267,6 +274,13 @@ impl AsRawFd for TcpStream {
 impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream { sys: FromRawFd::from_raw_fd(fd) }
+    }
+}
+
+#[cfg(unix)]
+impl IntoRawFd for TcpListener {
+    fn into_raw_fd(self) -> RawFd {
+        self.sys.into_raw_fd()
     }
 }
 
