@@ -1,6 +1,6 @@
 use {channel, convert, Handler, Evented, Poll, NotifyError, Token};
 use event::{Event, EventSet, PollOpt};
-use timer::{Timer, Timeout, TimerResult};
+use timer::{OldTimer as Timer, OldTimeout as Timeout, OldTimerResult as TimerResult};
 use std::{cmp, io, fmt, usize};
 use std::sync::mpsc;
 use std::default::Default;

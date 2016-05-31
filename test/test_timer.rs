@@ -1,10 +1,259 @@
+use {sleep_ms};
 use mio::*;
+use mio::timer::{Timer};
+
 use mio::tcp::*;
 use bytes::{Buf, ByteBuf, SliceBuf};
 use localhost;
 use std::time::Duration;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
+
+#[test]
+fn test_basic_timer_without_poll() {
+    let mut timer = Timer::default();
+
+    // Set the timeout
+    timer.set_timeout(Duration::from_millis(200), "hello").unwrap();
+
+    // Nothing when polled immediately
+    assert!(timer.poll().is_none());
+
+    // Wait for the timeout
+    sleep_ms(200);
+
+    assert_eq!(Some("hello"), timer.poll());
+    assert!(timer.poll().is_none());
+}
+
+#[test]
+fn test_basic_timer_with_poll_edge_set_timeout_after_register() {
+    let _ = ::env_logger::init();
+
+    let mut poll = Poll::new().unwrap();
+    let mut timer = Timer::default();
+
+    poll.register(&timer, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
+    timer.set_timeout(Duration::from_millis(200), "hello").unwrap();
+
+    let elapsed = elapsed(|| {
+        let num = poll.poll(None).unwrap();
+
+        assert_eq!(num, 1);
+        assert_eq!(Token(0), poll.events().get(0).unwrap().token());
+        assert_eq!(EventSet::readable(), poll.events().get(0).unwrap().kind());
+    });
+
+    assert!(is_about(200, elapsed), "actual={:?}", elapsed);
+    assert_eq!("hello", timer.poll().unwrap());
+    assert_eq!(None, timer.poll());
+}
+
+#[test]
+fn test_basic_timer_with_poll_edge_set_timeout_before_register() {
+    let _ = ::env_logger::init();
+
+    let mut poll = Poll::new().unwrap();
+    let mut timer = Timer::default();
+
+    timer.set_timeout(Duration::from_millis(200), "hello").unwrap();
+    poll.register(&timer, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
+
+    let elapsed = elapsed(|| {
+        let num = poll.poll(None).unwrap();
+
+        assert_eq!(num, 1);
+        assert_eq!(Token(0), poll.events().get(0).unwrap().token());
+        assert_eq!(EventSet::readable(), poll.events().get(0).unwrap().kind());
+    });
+
+    assert!(is_about(200, elapsed), "actual={:?}", elapsed);
+    assert_eq!("hello", timer.poll().unwrap());
+    assert_eq!(None, timer.poll());
+}
+
+#[test]
+fn test_setting_later_timeout_then_earlier_one() {
+    let _ = ::env_logger::init();
+
+    let mut poll = Poll::new().unwrap();
+    let mut timer = Timer::default();
+
+    poll.register(&timer, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
+
+    timer.set_timeout(Duration::from_millis(600), "hello").unwrap();
+    timer.set_timeout(Duration::from_millis(200), "world").unwrap();
+
+    let elapsed = elapsed(|| {
+        let num = poll.poll(None).unwrap();
+
+        assert_eq!(num, 1);
+        assert_eq!(Token(0), poll.events().get(0).unwrap().token());
+        assert_eq!(EventSet::readable(), poll.events().get(0).unwrap().kind());
+    });
+
+    assert!(is_about(200, elapsed), "actual={:?}", elapsed);
+    assert_eq!("world", timer.poll().unwrap());
+    assert_eq!(None, timer.poll());
+
+    let elapsed = self::elapsed(|| {
+        let num = poll.poll(None).unwrap();
+
+        assert_eq!(num, 1);
+        assert_eq!(Token(0), poll.events().get(0).unwrap().token());
+        assert_eq!(EventSet::readable(), poll.events().get(0).unwrap().kind());
+    });
+
+    assert!(is_about(400, elapsed), "actual={:?}", elapsed);
+    assert_eq!("hello", timer.poll().unwrap());
+    assert_eq!(None, timer.poll());
+}
+
+#[test]
+fn test_timer_with_looping_wheel() {
+    let _ = ::env_logger::init();
+
+    let mut poll = Poll::new().unwrap();
+    let mut timer = timer::Builder::default()
+        .num_slots(2)
+        .build();
+
+    poll.register(&timer, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
+
+    const TOKENS: &'static [ &'static str ] = &[ "hello", "world", "some", "thing" ];
+
+    for (i, msg) in TOKENS.iter().enumerate() {
+        timer.set_timeout(Duration::from_millis(100 * (i as u64 + 1)), msg).unwrap();
+    }
+
+    for msg in TOKENS {
+        let elapsed = elapsed(|| {
+            let num = poll.poll(None).unwrap();
+
+            assert_eq!(num, 1);
+            assert_eq!(Token(0), poll.events().get(0).unwrap().token());
+            assert_eq!(EventSet::readable(), poll.events().get(0).unwrap().kind());
+        });
+
+        assert!(is_about(100, elapsed), "actual={:?}; msg={:?}", elapsed, msg);
+        assert_eq!(Some(msg), timer.poll());
+        assert_eq!(None, timer.poll());
+
+    }
+}
+
+#[test]
+fn test_edge_without_polling() {
+    let _ = ::env_logger::init();
+
+    let mut poll = Poll::new().unwrap();
+    let mut timer = Timer::default();
+
+    poll.register(&timer, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
+
+    timer.set_timeout(Duration::from_millis(400), "hello").unwrap();
+
+    let ms = elapsed(|| {
+        let num = poll.poll(None).unwrap();
+        assert_eq!(num, 1);
+        assert_eq!(Token(0), poll.events().get(0).unwrap().token());
+        assert_eq!(EventSet::readable(), poll.events().get(0).unwrap().kind());
+    });
+
+    assert!(is_about(400, ms), "actual={:?}", ms);
+
+    let ms = elapsed(|| {
+        let num = poll.poll(Some(Duration::from_millis(300))).unwrap();
+        assert_eq!(num, 0);
+    });
+
+    assert!(is_about(300, ms), "actual={:?}", ms);
+}
+
+#[test]
+fn test_level_triggered() {
+    let _ = ::env_logger::init();
+
+    let mut poll = Poll::new().unwrap();
+    let mut timer = Timer::default();
+
+    poll.register(&timer, Token(0), EventSet::readable(), PollOpt::level()).unwrap();
+
+    timer.set_timeout(Duration::from_millis(400), "hello").unwrap();
+
+    let ms = elapsed(|| {
+        let num = poll.poll(None).unwrap();
+        assert_eq!(num, 1);
+        assert_eq!(Token(0), poll.events().get(0).unwrap().token());
+        assert_eq!(EventSet::readable(), poll.events().get(0).unwrap().kind());
+    });
+
+    assert!(is_about(400, ms), "actual={:?}", ms);
+
+    let ms = elapsed(|| {
+        let num = poll.poll(None).unwrap();
+        assert_eq!(num, 1);
+        assert_eq!(Token(0), poll.events().get(0).unwrap().token());
+        assert_eq!(EventSet::readable(), poll.events().get(0).unwrap().kind());
+    });
+
+    assert!(is_about(0, ms), "actual={:?}", ms);
+}
+
+#[test]
+fn test_edge_oneshot_triggered() {
+    let _ = ::env_logger::init();
+
+    let mut poll = Poll::new().unwrap();
+    let mut timer = Timer::default();
+
+    poll.register(&timer, Token(0), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+
+    timer.set_timeout(Duration::from_millis(200), "hello").unwrap();
+
+    let ms = elapsed(|| {
+        let num = poll.poll(None).unwrap();
+        assert_eq!(num, 1);
+    });
+
+    assert!(is_about(200, ms), "actual={:?}", ms);
+
+    let ms = elapsed(|| {
+        let num = poll.poll(Some(Duration::from_millis(300))).unwrap();
+        assert_eq!(num, 0);
+    });
+
+    assert!(is_about(300, ms), "actual={:?}", ms);
+
+    poll.reregister(&timer, Token(0), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+
+    let ms = elapsed(|| {
+        let num = poll.poll(None).unwrap();
+        assert_eq!(num, 1);
+    });
+
+    assert!(is_about(0, ms));
+}
+
+fn elapsed<F: FnMut()>(mut f: F) -> u64 {
+    use time;
+
+    let now = time::precise_time_ns();
+
+    f();
+
+    (time::precise_time_ns() - now) / 1_000_000
+}
+
+fn is_about(expect: u64, val: u64) -> bool {
+    ((expect as i64) - (val as i64)).abs() <= 20
+}
+
+/*
+ *
+ * ===== OLD TIMER =====
+ *
+ */
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -126,7 +375,7 @@ impl Handler for TestHandler {
 }
 
 #[test]
-pub fn test_timer() {
+pub fn test_old_timer() {
     let _ = ::env_logger::init();
 
     debug!("Starting TEST_TIMER");

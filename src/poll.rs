@@ -222,6 +222,7 @@ impl Poll {
     /// with the `Poll` instance are ready or the given timeout has elapsed.
     pub fn poll(&mut self, timeout: Option<Duration>) -> io::Result<usize> {
         let timeout = if !self.readiness_queue.is_empty() {
+            trace!("custom readiness queue has pending events");
             // Never block if the readiness queue has pending events
             Some(0)
         } else if !self.readiness_queue.prepare_for_sleep() {

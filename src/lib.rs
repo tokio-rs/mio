@@ -109,10 +109,10 @@ mod net;
 mod notify;
 mod poll;
 mod sys;
-mod timer;
 mod token;
 
 pub mod channel;
+pub mod timer;
 
 pub use event::{
     PollOpt,
@@ -166,9 +166,9 @@ pub use poll::{
     SetReadiness,
 };
 pub use timer::{
-    Timeout,
-    TimerError,
-    TimerResult
+    OldTimeout as Timeout,
+    OldTimerError as TimeoutError,
+    OldTimerResult as TimeoutResult,
 };
 pub use token::{
     Token,
