@@ -73,6 +73,8 @@ impl Handler for TestHandler {
 
 #[test]
 pub fn test_register_deregister() {
+    let _ = ::env_logger::init();
+
     debug!("Starting TEST_REGISTER_DEREGISTER");
     let mut event_loop = EventLoop::new().unwrap();
 

@@ -1,7 +1,7 @@
-use {channel, convert, Handler, Evented, Poll, NotifyError, Token};
+use {channel, Handler, Evented, Poll, NotifyError, Token};
 use event::{Event, EventSet, PollOpt};
-use timer::{OldTimer as Timer, OldTimeout as Timeout, OldTimerResult as TimerResult};
-use std::{cmp, io, fmt, usize};
+use timer::{self, Timer, Timeout};
+use std::{io, fmt, usize};
 use std::sync::mpsc;
 use std::default::Default;
 use std::time::Duration;
@@ -95,7 +95,8 @@ pub struct EventLoop<H: Handler> {
 }
 
 // Token used to represent notifications
-const NOTIFY: Token = Token(usize::MAX);
+const NOTIFY: Token = Token(usize::MAX - 1);
+const TIMER: Token = Token(usize::MAX - 2);
 
 impl<H: Handler> EventLoop<H> {
 
@@ -109,20 +110,18 @@ impl<H: Handler> EventLoop<H> {
         // Create the IO poller
         let poll = try!(Poll::new());
 
-        // Create the timer
-        let mut timer = Timer::new(
-            convert::millis(config.timer_tick),
-            config.timer_wheel_size,
-            config.timer_capacity);
+        let timer = timer::Builder::default()
+            .tick_duration(config.timer_tick)
+            .num_slots(config.timer_wheel_size)
+            .capacity(config.timer_capacity)
+            .build();
 
         // Create cross thread notification queue
         let (tx, rx) = channel::from_std_sync_channel(mpsc::sync_channel(config.notify_capacity));
 
         // Register the notification wakeup FD with the IO poller
         try!(poll.register(&rx, NOTIFY, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()));
-
-        // Set the timer's starting time reference point
-        timer.setup();
+        try!(poll.register(&timer, TIMER, EventSet::readable(), PollOpt::edge()));
 
         Ok(EventLoop {
             run: true,
@@ -216,14 +215,14 @@ impl<H: Handler> EventLoop<H> {
     /// let timeout = event_loop.timeout(123, Duration::from_millis(300)).unwrap();
     /// let _ = event_loop.run(&mut MyHandler);
     /// ```
-    pub fn timeout(&mut self, token: H::Timeout, delay: Duration) -> TimerResult<Timeout> {
-        self.timer.timeout_ms(token, convert::millis(delay))
+    pub fn timeout(&mut self, token: H::Timeout, delay: Duration) -> timer::Result<Timeout> {
+        self.timer.set_timeout(delay, token)
     }
 
     /// If the supplied timeout has not been triggered, cancel it such that it
     /// will not be triggered in the future.
     pub fn clear_timeout(&mut self, timeout: &Timeout) -> bool {
-        self.timer.clear(&timeout)
+        self.timer.cancel_timeout(&timeout).is_some()
     }
 
     /// Tells the event loop to exit after it is done handling all events in the
@@ -292,23 +291,12 @@ impl<H: Handler> EventLoop<H> {
         };
 
         self.io_process(handler, events);
-        self.timer_process(handler);
         handler.tick(self);
         Ok(())
     }
 
     #[inline]
     fn io_poll(&mut self, timeout: Option<Duration>) -> io::Result<usize> {
-        let next_tick = self.timer.next_tick_in_ms()
-            .map(|ms| cmp::min(ms, usize::MAX as u64));
-
-        let timeout = match (timeout, next_tick) {
-            (Some(a), Some(b)) => Some(cmp::min(a, Duration::from_millis(b))),
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(Duration::from_millis(b)),
-            _ => None,
-        };
-
         self.poll.poll(timeout)
     }
 
@@ -329,6 +317,7 @@ impl<H: Handler> EventLoop<H> {
 
             match evt.token() {
                 NOTIFY => self.notify(handler),
+                TIMER => self.timer_process(handler),
                 _ => self.io_event(handler, evt)
             }
 
@@ -353,13 +342,8 @@ impl<H: Handler> EventLoop<H> {
     }
 
     fn timer_process(&mut self, handler: &mut H) {
-        let now = self.timer.now();
-
-        loop {
-            match self.timer.tick_to(now) {
-                Some(t) => handler.timeout(self, t),
-                _ => return
-            }
+        while let Some(t) = self.timer.poll() {
+            handler.timeout(self, t);
         }
     }
 }
@@ -406,12 +390,6 @@ mod tests {
     use std::sync::atomic::AtomicIsize;
     use std::sync::atomic::Ordering::SeqCst;
     use std::time::Duration;
-
-    #[test]
-    pub fn test_event_loop_size() {
-        use std::mem;
-        assert!(512 >= mem::size_of::<EventLoop<Funtimes>>());
-    }
 
     struct Funtimes {
         rcount: Arc<AtomicIsize>,

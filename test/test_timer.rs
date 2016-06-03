@@ -123,7 +123,7 @@ fn test_timer_with_looping_wheel() {
     const TOKENS: &'static [ &'static str ] = &[ "hello", "world", "some", "thing" ];
 
     for (i, msg) in TOKENS.iter().enumerate() {
-        timer.set_timeout(Duration::from_millis(100 * (i as u64 + 1)), msg).unwrap();
+        timer.set_timeout(Duration::from_millis(500 * (i as u64 + 1)), msg).unwrap();
     }
 
     for msg in TOKENS {
@@ -135,7 +135,7 @@ fn test_timer_with_looping_wheel() {
             assert_eq!(EventSet::readable(), poll.events().get(0).unwrap().kind());
         });
 
-        assert!(is_about(100, elapsed), "actual={:?}; msg={:?}", elapsed, msg);
+        assert!(is_about(500, elapsed), "actual={:?}; msg={:?}", elapsed, msg);
         assert_eq!(Some(msg), timer.poll());
         assert_eq!(None, timer.poll());
 
@@ -246,7 +246,9 @@ fn elapsed<F: FnMut()>(mut f: F) -> u64 {
 }
 
 fn is_about(expect: u64, val: u64) -> bool {
-    ((expect as i64) - (val as i64)).abs() <= 20
+    const WINDOW: i64 = 200;
+
+    ((expect as i64) - (val as i64)).abs() <= WINDOW
 }
 
 /*

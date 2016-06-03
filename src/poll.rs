@@ -154,7 +154,7 @@ type Tick = usize;
 
 const NODE_QUEUED_FLAG: usize = 1;
 
-const AWAKEN: Token = Token(usize::MAX - 1);
+const AWAKEN: Token = Token(usize::MAX);
 
 /*
  *
@@ -172,7 +172,7 @@ impl Poll {
         };
 
         // Register the notification wakeup FD with the IO poller
-        try!(poll.register(&poll.readiness_queue.inner().awakener, AWAKEN, EventSet::readable(), PollOpt::edge()));
+        try!(poll.readiness_queue.inner().awakener.register(&poll, AWAKEN, EventSet::readable(), PollOpt::edge()));
 
         Ok(poll)
     }
@@ -181,6 +181,10 @@ impl Poll {
     pub fn register<E: ?Sized>(&self, io: &E, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
+        if token == AWAKEN {
+            return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
+        }
+
         /*
          * Undefined behavior:
          * - Reusing a token with a different `Evented` without deregistering
@@ -198,6 +202,10 @@ impl Poll {
     pub fn reregister<E: ?Sized>(&self, io: &E, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
+        if token == AWAKEN {
+            return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
+        }
+
         trace!("registering with poller");
 
         // Register interests for this socket

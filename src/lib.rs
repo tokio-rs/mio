@@ -165,10 +165,11 @@ pub use poll::{
     Registration,
     SetReadiness,
 };
+// TODO: remove
 pub use timer::{
-    OldTimeout as Timeout,
-    OldTimerError as TimeoutError,
-    OldTimerResult as TimeoutResult,
+    Timeout,
+    TimerError,
+    TimerResult,
 };
 pub use token::{
     Token,
