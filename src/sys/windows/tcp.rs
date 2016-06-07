@@ -573,7 +573,7 @@ fn accept_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
                 State::Ready((socket, remote_addr))
             } else {
                 State::Error(io::Error::new(ErrorKind::Other,
-                                            "Could not obtain remote address"));
+                                            "Could not obtain remote address"))
             }
         }
         Err(e) => State::Error(e),
