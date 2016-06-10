@@ -18,19 +18,19 @@ exclude       = [
 ]
 
 [dependencies]
-log    = "0.3.1"
+log    = "^0.3.1"
 nix    = { git = "https://github.com/carllerche/nix-rust", rev = "c4257f8a76" }
-libc   = "0.2.4"
-slab   = "0.1.0"
-time   = "0.1.33"
-bytes  = "0.3.0"
-winapi = "0.2.1"
-miow   = "0.1.1"
-net2   = { version = "0.2.19", default-features = false }
+libc   = "^0.2.4"
+slab   = "^0.2"
+time   = "^0.1.33"
+bytes  = "^0.3.0"
+winapi = "^0.2.1"
+miow   = "^0.1.1"
+net2   = { version = "^0.2.19", default-features = false }
 
 [dev-dependencies]
-env_logger = "0.3.0"
-tempdir    = "0.3.4"
+env_logger = "^0.3.0"
+tempdir    = "^0.3.4"
 
 [[test]]
 name = "test"
