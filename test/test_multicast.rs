@@ -2,7 +2,7 @@ use mio::*;
 use mio::udp::*;
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use std::str;
-use std::net::{SocketAddr};
+use std::net::{SocketAddr, Ipv4Addr};
 use localhost;
 
 const LISTENER: Token = Token(0);

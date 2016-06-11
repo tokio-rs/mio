@@ -7,7 +7,7 @@ use std::fmt;
 use std::io::prelude::*;
 use std::io;
 use std::mem;
-use std::net::{self, SocketAddr};
+use std::net::{self, IpAddr, SocketAddr};
 use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 
@@ -17,7 +17,7 @@ use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
-use {poll, Evented, EventSet, IpAddr, Poll, PollOpt, Token};
+use {poll, Evented, EventSet, Poll, PollOpt, Token};
 use sys::windows::selector::{EventRef, Overlapped, Registration};
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::{bad_state, Family};

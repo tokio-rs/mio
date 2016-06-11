@@ -1,5 +1,5 @@
-use {io, sys, Evented, EventSet, IpAddr, Poll, PollOpt, Token};
-use std::net::SocketAddr;
+use {io, sys, Evented, EventSet, Poll, PollOpt, Token};
+use std::net::{IpAddr, SocketAddr};
 
 #[derive(Debug)]
 pub struct UdpSocket {
