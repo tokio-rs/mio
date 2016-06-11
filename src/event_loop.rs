@@ -265,6 +265,13 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Deregisters an IO handle with the event loop.
+    ///
+    /// Both kqueue and epoll will automatically clear any pending events when closing a
+    /// file descriptor (socket). In that case, this method does not need to be called
+    /// prior to dropping a connection from the slab.
+    ///
+    /// Warning: kqueue effectively builds in deregister when using edge-triggered mode with
+    /// oneshot. Calling `deregister()` on the socket will cause a TcpStream error.
     pub fn deregister<E: ?Sized>(&mut self, io: &E) -> io::Result<()> where E: Evented {
         self.poll.deregister(io)
     }
