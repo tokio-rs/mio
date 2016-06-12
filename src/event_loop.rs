@@ -376,6 +376,12 @@ impl<M> fmt::Debug for Sender<M> {
     }
 }
 
+impl<M> Clone for Sender <M> {
+    fn clone(&self) -> Sender<M> {
+        Sender { tx: self.tx.clone() }
+    }
+}
+
 impl<M> Sender<M> {
     fn new(tx: channel::Sender<M>) -> Sender<M> {
         Sender { tx: tx }
