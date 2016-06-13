@@ -1,5 +1,5 @@
 use std::fmt;
-use std::io::{self, Read, Write, Cursor};
+use std::io::{self, Read, Write, Cursor, ErrorKind};
 use std::mem;
 use std::net::{self, SocketAddr};
 use std::os::windows::prelude::*;
@@ -563,7 +563,14 @@ fn accept_done(status: &CompletionStatus, dst: &mut Vec<IoEvent>) {
     };
     trace!("finished an accept");
     me.accept = match me.accept_buf.parse(&me.socket) {
-        Ok(buf) => State::Ready((socket, buf.remote().unwrap())),
+        Ok(buf) => {
+            if let Some(remote_addr) = buf.remote() {
+                State::Ready((socket, remote_addr))
+            } else {
+                State::Error(io::Error::new(ErrorKind::Other,
+                                            "Could not obtain remote address"))
+            }
+        }
         Err(e) => State::Error(e),
     };
     me2.push(&mut me, EventSet::readable(), dst);
