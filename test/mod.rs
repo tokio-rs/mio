@@ -63,8 +63,8 @@ mod ports {
     }
 }
 
-#[allow(deprecated)]
 pub fn sleep_ms(ms: u64) {
     use std::thread;
-    thread::sleep_ms(ms as u32);
+    use std::time::Duration;
+    thread::sleep(Duration::from_millis(ms));
 }
