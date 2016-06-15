@@ -83,7 +83,6 @@
 #![cfg_attr(unix, deny(warnings))]
 
 extern crate bytes;
-extern crate time;
 extern crate slab;
 extern crate libc;
 
