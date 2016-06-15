@@ -4,7 +4,7 @@ rust:
   - stable
   # The following Rust version represents the oldest supported version of Mio.
   # This value should not be changed without prior discussion.
-  - 1.7.0
+  - 1.8.0
 
 os:
   - linux

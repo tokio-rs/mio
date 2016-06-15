@@ -4,7 +4,7 @@ use std::io::net::ip::IpAddr;
 use native::NativeTaskBuilder;
 use std::task::TaskBuilder;
 use mio::os::{from_sockaddr};
-use time;
+use time::Instant;
 use std::vec::*;
 use std::io::timer;
 
@@ -18,10 +18,10 @@ mod nix {
 }
 
 fn timed(label: &str, f: ||) {
-    let start = time::precise_time_s();
+    let start = Instant::now();
     f();
-    let end = time::precise_time_s();
-    println!("  {}: {}", label, end - start);
+    let elapsed = start.elapsed();
+    println!("  {}: {}", label, elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1_000_000_000.0);
 }
 
 fn init(saddr: &str) -> (nix::Fd, nix::Fd) {
@@ -34,10 +34,12 @@ fn init(saddr: &str) -> (nix::Fd, nix::Fd) {
 
     let fd = nix::socket(nix::AF_INET, nix::SOCK_STREAM, nix::SOCK_CLOEXEC | nix::SOCK_NONBLOCK).unwrap();
     let res = nix::connect(fd, &from_sockaddr(&addr));
-    println!("connecting : {} - {}", res, time::precise_time_s());
+    let start = Instant::now();
+    println!("connecting : {}", res);
 
     let clifd = nix::accept4(srvfd, nix::SOCK_CLOEXEC | nix::SOCK_NONBLOCK).unwrap();
-    println!("accepted : {} - {}", clifd, time::precise_time_s());
+    let elapsed = start.elapsed();
+    println!("accepted : {} - {}", clifd, elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1_000_000_000.0);
 
     (clifd, srvfd)
 }

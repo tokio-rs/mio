@@ -6,7 +6,6 @@ extern crate log;
 extern crate env_logger;
 extern crate slab;
 extern crate tempdir;
-extern crate time;
 
 pub use ports::localhost;
 

@@ -236,13 +236,14 @@ fn test_edge_oneshot_triggered() {
 }
 
 fn elapsed<F: FnMut()>(mut f: F) -> u64 {
-    use time;
+    use std::time::Instant;
 
-    let now = time::precise_time_ns();
+    let now = Instant::now();
 
     f();
 
-    (time::precise_time_ns() - now) / 1_000_000
+    let elapsed = now.elapsed();
+    elapsed.as_secs() * 1000 + (elapsed.subsec_nanos() / 1_000_000) as u64
 }
 
 fn is_about(expect: u64, val: u64) -> bool {

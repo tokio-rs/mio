@@ -1,10 +1,9 @@
 use {convert, io, Evented, EventSet, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazy::Lazy;
-use time;
 use std::{cmp, error, fmt, u64, usize, iter, thread};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use self::TimerErrorKind::TimerOverflow;
 
@@ -102,7 +101,7 @@ pub type OldTimerResult<T> = Result<T>;
 
 const TERMINATE_THREAD: usize = 0;
 const EMPTY: Token = Token(usize::MAX);
-const NS_PER_MS: u64 = 1_000_000;
+const NS_PER_MS: u32 = 1_000_000;
 
 impl Builder {
     pub fn tick_duration(mut self, duration: Duration) -> Builder {
@@ -452,7 +451,11 @@ fn spawn_wakeup_thread(state: WakeupState, set_readiness: SetReadiness, ticks_st
 }
 
 fn now_ms() -> u64 {
-    time::precise_time_ns() / NS_PER_MS
+    let now = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(dur) => dur,
+        Err(err) => err.duration(),
+    };
+    now.as_secs() * 1000 + (now.subsec_nanos() / NS_PER_MS) as u64
 }
 
 fn now_tick(start: u64, tick_ms: u64) -> Tick {
