@@ -66,8 +66,8 @@ impl Selector {
     pub fn register(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts);
-        self.ev_register(fd, token.as_usize(), EventFilter::EVFILT_WRITE, interests.contains(EventSet::writable()), opts);
+        self.ev_register(fd, usize::from(token), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts);
+        self.ev_register(fd, usize::from(token), EventFilter::EVFILT_WRITE, interests.contains(EventSet::writable()), opts);
 
         self.flush_changes()
     }

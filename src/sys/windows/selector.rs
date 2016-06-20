@@ -357,7 +357,7 @@ impl Registration {
 
         try!(Registration::validate_opts(opts));
         try!(self.associate(selector, token, opts));
-        try!(selector.inner.port.add_socket(token.as_usize(), socket));
+        try!(selector.inner.port.add_socket(usize::from(token), socket));
 
         self.interest = set2mask(interest);
         self.opts = opts;

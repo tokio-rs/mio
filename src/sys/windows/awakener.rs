@@ -24,7 +24,7 @@ impl Awakener {
         // succeed.
         let iocp = self.iocp();
         if let Some(port) = iocp.port() {
-            let status = CompletionStatus::new(0, iocp.token().as_usize(),
+            let status = CompletionStatus::new(0, usize::from(iocp.token()),
                                                0 as *mut _);
             try!(port.post(status));
         }

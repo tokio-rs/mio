@@ -68,7 +68,7 @@ impl Selector {
     pub fn register(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
-            data: token.as_usize() as u64
+            data: usize::from(token) as u64
         };
 
         epoll_ctl(self.epfd, EpollOp::EpollCtlAdd, fd, &info)
@@ -79,7 +79,7 @@ impl Selector {
     pub fn reregister(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
-            data: token.as_usize() as u64
+            data: usize::from(token) as u64
         };
 
         epoll_ctl(self.epfd, EpollOp::EpollCtlMod, fd, &info)
@@ -190,7 +190,7 @@ impl Events {
     pub fn push_event(&mut self, event: Event) {
         self.events.push(EpollEvent {
             events: ioevent_to_epoll(event.kind(), PollOpt::empty()),
-            data: event.token().as_usize() as u64
+            data: usize::from(event.token()) as u64
         });
     }
 }

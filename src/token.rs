@@ -1,22 +1,14 @@
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Token(pub usize);
 
-use slab;
-
-impl Token {
-    #[inline]
-    pub fn as_usize(self) -> usize {
-        let Token(inner) = self;
-        inner
+impl From<usize> for Token {
+    fn from(val: usize) -> Token {
+        Token(val)
     }
 }
 
-impl slab::Index for Token {
-    fn from_usize(i: usize) -> Token {
-        Token(i)
-    }
-
-    fn as_usize(&self) -> usize {
-        Token::as_usize(*self)
+impl From<Token> for usize {
+    fn from(val: Token) -> usize {
+        val.0
     }
 }
