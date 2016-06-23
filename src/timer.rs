@@ -36,7 +36,7 @@ pub struct Builder {
     capacity: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Timeout {
     // Reference into the timer entry slab
     token: Token,
