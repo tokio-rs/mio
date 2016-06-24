@@ -1,7 +1,7 @@
 [package]
 
 name          = "mio"
-version       = "0.5.0"
+version       = "0.5.2-dev"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
@@ -19,7 +19,7 @@ exclude       = [
 
 [dependencies]
 log    = "0.3.1"
-nix    = { git = "https://github.com/carllerche/nix-rust", rev = "c4257f8a76" }
+nix    = "0.6.0"
 libc   = "0.2.4"
 slab   = { git = "https://github.com/carllerche/slab", rev = "5476efcafb"  }
 bytes  = "0.3.0"

@@ -4,6 +4,7 @@ use sys::unix::{net, nix, Socket};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
+use nix::sys::socket::MsgFlags;
 pub use nix::sys::socket::Shutdown;
 
 #[derive(Debug)]
@@ -57,7 +58,7 @@ impl UnixSocket {
     pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {
         let iov = [nix::IoVec::from_mut_slice(buf)];
         let mut cmsgspace: nix::CmsgSpace<[RawFd; 1]> = nix::CmsgSpace::new();
-        let msg = try!(nix::recvmsg(self.io.as_raw_fd(), &iov, Some(&mut cmsgspace), 0)
+        let msg = try!(nix::recvmsg(self.io.as_raw_fd(), &iov, Some(&mut cmsgspace), MsgFlags::empty())
                            .map_err(super::from_nix_error));
         let mut fd = None;
         for cmsg in msg.cmsgs() {
@@ -76,7 +77,7 @@ impl UnixSocket {
         let iov = [nix::IoVec::from_slice(buf)];
         let fds = [fd];
         let cmsg = nix::ControlMessage::ScmRights(&fds);
-        nix::sendmsg(self.io.as_raw_fd(),&iov, &[cmsg], 0, None)
+        nix::sendmsg(self.io.as_raw_fd(),&iov, &[cmsg], MsgFlags::empty(), None)
             .map_err(super::from_nix_error)
     }
 }
