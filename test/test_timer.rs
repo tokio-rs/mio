@@ -19,8 +19,8 @@ fn test_basic_timer_without_poll() {
     // Nothing when polled immediately
     assert!(timer.poll().is_none());
 
-    // Wait for the timeout
-    sleep_ms(200);
+    // Wait for the timeout (plus some buffer)
+    sleep_ms(200 + 50);
 
     assert_eq!(Some("hello"), timer.poll());
     assert!(timer.poll().is_none());
