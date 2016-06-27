@@ -278,9 +278,9 @@ impl<H: Handler> EventLoop<H> {
         self.poll.deregister(io)
     }
 
-    /// Spin the event loop once, with a timeout of one second, and notify the
-    /// handler if any of the registered handles become ready during that
-    /// time.
+    /// Spin the event loop once, with a given timeout (forever if `None`),
+    /// and notify the handler if any of the registered handles become ready
+    /// during that time.
     pub fn run_once(&mut self, handler: &mut H, timeout: Option<Duration>) -> io::Result<()> {
         trace!("event loop tick");
 
