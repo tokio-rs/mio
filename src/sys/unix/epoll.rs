@@ -1,9 +1,10 @@
-use {io, EventSet, PollOpt, Token};
+use {convert, io, EventSet, PollOpt, Token};
 use event::Event;
 use nix::sys::epoll::*;
 use nix::unistd::close;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::time::Duration;
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -35,13 +36,12 @@ impl Selector {
     }
 
     /// Wait for events from the OS
-    pub fn select(&self, evts: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
+    pub fn select(&self, evts: &mut Events, awakener: Token, timeout: Option<Duration>) -> io::Result<bool> {
         use std::{cmp, i32, slice};
 
-        let timeout_ms = match timeout_ms {
-            None => -1 as i32,
-            Some(x) => cmp::min(i32::MAX as usize, x) as i32,
-        };
+        let timeout_ms = timeout
+            .map(|to| cmp::min(convert::millis(to), i32::MAX as u64) as i32)
+            .unwrap_or(-1);
 
         let dst = unsafe {
             slice::from_raw_parts_mut(

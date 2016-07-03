@@ -1,4 +1,4 @@
-use {convert, sys, Evented, Token};
+use {sys, Evented, Token};
 use event::{self, EventSet, Event, PollOpt};
 use std::{fmt, io, mem, ptr, usize};
 use std::cell::UnsafeCell;
@@ -229,11 +229,11 @@ impl Poll {
         let timeout = if !self.readiness_queue.is_empty() {
             trace!("custom readiness queue has pending events");
             // Never block if the readiness queue has pending events
-            Some(0)
+            Some(Duration::from_millis(0))
         } else if !self.readiness_queue.prepare_for_sleep() {
-            Some(0)
+            Some(Duration::from_millis(0))
         } else {
-            timeout.map(|to| convert::millis(to) as usize)
+            timeout
         };
 
         // First get selector events
