@@ -1,8 +1,11 @@
-use std::{fmt, io, mem};
 use std::cell::UnsafeCell;
+use std::u32;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use std::{cmp, fmt, io, mem};
 
+use convert;
 use slab::Index;
 use winapi::*;
 use miow;
@@ -55,7 +58,7 @@ impl Selector {
         })
     }
 
-    pub fn select(&mut self, events: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
+    pub fn select(&mut self, events: &mut Events, awakener: Token, timeout: Option<Duration>) -> io::Result<bool> {
         let mut ret = false;
 
         // If we have some deferred events then we only want to poll for I/O
@@ -63,7 +66,7 @@ impl Selector {
         let timeout = if !self.should_block() {
             Some(0)
         } else {
-            timeout_ms.map(|ms| ms as u32)
+            timeout.map(|to| cmp::min(convert::millis(to), u32::MAX as u64) as u32)
         };
 
         trace!("select; timeout={:?}", timeout);
