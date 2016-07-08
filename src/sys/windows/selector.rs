@@ -54,7 +54,7 @@ impl Selector {
         })
     }
 
-    pub fn select(&mut self, events: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
+    pub fn select(&self, events: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
         let mut ret = false;
 
         // If we have some deferred events then we only want to poll for I/O
