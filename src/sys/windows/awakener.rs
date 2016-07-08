@@ -1,17 +1,22 @@
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Mutex;
 
-use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
-use sys::windows::selector::Registration;
 use miow::iocp::CompletionStatus;
+use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
+use sys::windows::Selector;
 
 pub struct Awakener {
-    iocp: Mutex<Registration>,
+    inner: Mutex<Option<AwakenerInner>>,
+}
+
+struct AwakenerInner {
+    token: Token,
+    selector: Selector,
 }
 
 impl Awakener {
     pub fn new() -> io::Result<Awakener> {
         Ok(Awakener {
-            iocp: Mutex::new(Registration::new()),
+            inner: Mutex::new(None),
         })
     }
 
@@ -22,11 +27,11 @@ impl Awakener {
         //
         // If we haven't been registered with an event loop yet just silently
         // succeed.
-        let iocp = self.iocp();
-        if let Some(port) = iocp.port() {
-            let status = CompletionStatus::new(0, usize::from(iocp.token()),
+        if let Some(inner) = self.inner.lock().unwrap().as_ref() {
+            let status = CompletionStatus::new(0,
+                                               usize::from(inner.token),
                                                0 as *mut _);
-            try!(port.post(status));
+            try!(inner.selector.port().post(status));
         }
         Ok(())
     }
@@ -34,16 +39,17 @@ impl Awakener {
     pub fn cleanup(&self) {
         // noop
     }
-
-    fn iocp(&self) -> MutexGuard<Registration> {
-        self.iocp.lock().unwrap()
-    }
 }
 
 impl Evented for Awakener {
-    fn register(&self, poll: &Poll, token: Token, _events: EventSet,
+    fn register(&self, poll: &Poll, token: Token, events: EventSet,
                 opts: PollOpt) -> io::Result<()> {
-        try!(self.iocp().associate(poll::selector(poll), token, opts));
+        assert_eq!(opts, PollOpt::edge());
+        assert_eq!(events, EventSet::readable());
+        *self.inner.lock().unwrap() = Some(AwakenerInner {
+            selector: poll::selector(poll).clone_ref(),
+            token: token,
+        });
         Ok(())
     }
 
@@ -52,7 +58,8 @@ impl Evented for Awakener {
         self.register(poll, token, events, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.iocp().checked_deregister(poll::selector(poll))
+    fn deregister(&self, _poll: &Poll) -> io::Result<()> {
+        *self.inner.lock().unwrap() = None;
+        Ok(())
     }
 }

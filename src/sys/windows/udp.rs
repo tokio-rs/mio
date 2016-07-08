@@ -11,14 +11,15 @@ use std::net::{self, IpAddr, SocketAddr};
 use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 
+#[allow(unused_imports)]
 use net2::{UdpBuilder, UdpSocketExt};
 use winapi::*;
 use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
-use {poll, Evented, EventSet, Poll, PollOpt, Token};
-use sys::windows::selector::{EventRef, Overlapped, Registration};
+use {Evented, EventSet, Poll, PollOpt, Token};
+use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::{bad_state, Family};
 
@@ -127,11 +128,12 @@ impl UdpSocket {
         }
 
         let s = try!(me.socket.socket());
-        if me.iocp.port().is_none() {
+        if !me.iocp.registered() {
             return Ok(None)
         }
 
-        me.iocp.unset_readiness(EventSet::writable(), true);
+        let interest = me.iocp.readiness();
+        me.iocp.set_readiness(interest & !EventSet::writable());
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = try!(owned_buf.write(buf));
@@ -166,12 +168,12 @@ impl UdpSocket {
                                            "failed to parse socket address"))
                     };
                     me.iocp.put_buffer(data);
-                    self.imp.schedule_read(&mut me, true);
+                    self.imp.schedule_read(&mut me);
                     r
                 }
             }
             State::Error(e) => {
-                self.imp.schedule_read(&mut me, true);
+                self.imp.schedule_read(&mut me);
                 Err(e)
             }
         }
@@ -224,14 +226,12 @@ impl UdpSocket {
 
     fn post_register(&self, interest: EventSet, me: &mut Inner) {
         if interest.is_readable() {
-            self.imp.schedule_read(me, false);
+            self.imp.schedule_read(me);
         }
         // See comments in TcpSocket::post_register for what's going on here
         if interest.is_writable() {
             if let State::Empty = me.write {
-                if let Socket::Bound(..) = me.socket {
-                    me.iocp.defer(EventSet::writable());
-                }
+                self.imp.add_readiness(me, EventSet::writable());
             }
         }
     }
@@ -242,7 +242,7 @@ impl Imp {
         self.inner.inner.lock().unwrap()
     }
 
-    fn schedule_read(&self, me: &mut Inner, need_lock: bool) {
+    fn schedule_read(&self, me: &mut Inner) {
         match me.read {
             State::Empty => {}
             _ => return,
@@ -253,7 +253,8 @@ impl Imp {
             Socket::Bound(ref s) => s,
         };
 
-        me.iocp.unset_readiness(EventSet::readable(), need_lock);
+        let interest = me.iocp.readiness();
+        me.iocp.set_readiness(interest & !EventSet::readable());
 
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
@@ -270,18 +271,18 @@ impl Imp {
             }
             Err(e) => {
                 me.read = State::Error(e);
-                me.iocp.defer(EventSet::readable());
+                self.add_readiness(me, EventSet::readable());
                 me.iocp.put_buffer(buf);
             }
         }
     }
 
     // See comments in tcp::StreamImp::push
-    fn push(&self, me: &mut Inner, set: EventSet, into: &mut Vec<EventRef>) {
+    fn add_readiness(&self, me: &Inner, set: EventSet) {
         if let Socket::Empty = me.socket {
             return
         }
-        me.iocp.push_event(set, into);
+        me.iocp.set_readiness(set | me.iocp.readiness());
     }
 }
 
@@ -296,8 +297,7 @@ impl Evented for UdpSocket {
                 Socket::Building(ref b) => b as &AsRawSocket,
                 Socket::Empty => return Err(bad_state()),
             };
-            try!(me.iocp.register_socket(socket, poll::selector(poll), token, interest,
-                                         opts));
+            try!(me.iocp.register_socket(socket, poll, token, interest, opts));
         }
         self.post_register(interest, &mut me);
         Ok(())
@@ -313,7 +313,7 @@ impl Evented for UdpSocket {
                 Socket::Building(ref b) => b as &AsRawSocket,
                 Socket::Empty => return Err(bad_state()),
             };
-            try!(me.iocp.reregister_socket(socket, poll::selector(poll), token, interest,
+            try!(me.iocp.reregister_socket(socket, poll, token, interest,
                                            opts));
         }
         self.post_register(interest, &mut me);
@@ -321,7 +321,7 @@ impl Evented for UdpSocket {
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner().iocp.checked_deregister(poll::selector(poll))
+        self.inner().iocp.deregister(poll)
     }
 }
 
@@ -338,7 +338,7 @@ impl Drop for UdpSocket {
         inner.socket = Socket::Empty;
 
         // Then run any finalization code including level notifications
-        inner.iocp.deregister(true);
+        inner.iocp.set_readiness(EventSet::none());
     }
 }
 
@@ -358,17 +358,17 @@ impl Socket {
     }
 }
 
-fn send_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
+fn send_done(status: &CompletionStatus) {
     trace!("finished a send {}", status.bytes_transferred());
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, write) },
     };
     let mut me = me2.inner();
     me.write = State::Empty;
-    me2.push(&mut me, EventSet::writable(), dst);
+    me2.add_readiness(&mut me, EventSet::writable());
 }
 
-fn recv_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
+fn recv_done(status: &CompletionStatus) {
     trace!("finished a recv {}", status.bytes_transferred());
     let me2 = Imp {
         inner: unsafe { overlapped2arc!(status.overlapped(), Io, read) },
@@ -382,5 +382,5 @@ fn recv_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
         buf.set_len(status.bytes_transferred() as usize);
     }
     me.read = State::Ready(buf);
-    me2.push(&mut me, EventSet::readable(), dst);
+    me2.add_readiness(&mut me, EventSet::readable());
 }
