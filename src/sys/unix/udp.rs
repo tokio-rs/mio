@@ -3,8 +3,7 @@ use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
 use std::net::{IpAddr, SocketAddr};
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug)]
 pub struct UdpSocket {
@@ -48,7 +47,7 @@ impl UdpSocket {
         net::dup(&self.io).map(|io| {
             UdpSocket {
                 io: io,
-                selector_id: AtomicUsize::new(self.selector_id.load(SeqCst)),
+                selector_id: AtomicUsize::new(self.selector_id.load(Ordering::SeqCst)),
             }
         })
     }
@@ -132,12 +131,12 @@ impl UdpSocket {
     }
 
     fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
-        let selector_id = self.selector_id.load(SeqCst);
+        let selector_id = self.selector_id.load(Ordering::SeqCst);
 
         if selector_id != 0 && selector_id != poll::selector(poll).id() {
             Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
         } else {
-            self.selector_id.store(poll::selector(poll).id(), SeqCst);
+            self.selector_id.store(poll::selector(poll).id(), Ordering::SeqCst);
             Ok(())
         }
     }

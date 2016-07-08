@@ -1,8 +1,9 @@
 use {sys, Evented, Token};
 use event::{self, EventSet, Event, PollOpt};
 use std::{fmt, io, mem, ptr, usize};
-use std::cell::UnsafeCell;
+use std::cell::{UnsafeCell, Cell};
 use std::isize;
+use std::marker;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, AtomicPtr, Ordering};
 use std::time::Duration;
@@ -51,6 +52,9 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 /// poll.poll(&mut events, None).unwrap();
 /// ```
 pub struct Poll {
+    // This type is `Send`, but not `Sync`, so ensure it's exposed as such.
+    _marker: marker::PhantomData<Cell<()>>,
+
     // Platform specific IO selector
     selector: sys::Selector,
 
@@ -168,6 +172,7 @@ impl Poll {
         let poll = Poll {
             selector: try!(sys::Selector::new()),
             readiness_queue: try!(ReadinessQueue::new()),
+            _marker: marker::PhantomData,
         };
 
         // Register the notification wakeup FD with the IO poller
@@ -399,6 +404,8 @@ impl RegistrationInner {
         // will set a `Release` barrier ensuring eventual consistency.
         self.node().events.store(event::as_usize(ready), Ordering::Relaxed);
 
+        trace!("readiness event {:?} {:?}", ready, self.node().token());
+
         // Setting readiness to none doesn't require any processing by the poll
         // instance, so there is no need to enqueue the node. No barrier is
         // needed in this case since it doesn't really matter when the value
@@ -602,6 +609,7 @@ impl ReadinessQueue {
 
                 // TODO: Don't push the event if the capacity of `dst` has
                 // been reached
+                trace!("readiness event {:?} {:?}", events, node_ref.token());
                 dst.push_event(Event::new(events, node_ref.token()));
 
                 // If one-shot, disarm the node

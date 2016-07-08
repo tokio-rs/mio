@@ -1,19 +1,19 @@
+use std::{cmp, io, mem, u32};
 use std::cell::UnsafeCell;
-use std::u32;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use std::{cmp, fmt, io, mem};
 
 use convert;
 use winapi::*;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 
-use {Token, PollOpt};
 use event::{Event, EventSet};
-use sys::windows::from_raw_arc::FromRawArc;
+use poll::{self, Poll};
 use sys::windows::buffer_pool::BufferPool;
+use sys::windows::from_raw_arc::FromRawArc;
+use {Token, PollOpt};
 
 /// The guts of the Windows event loop, this is the struct which actually owns
 /// a completion port.
@@ -30,13 +30,6 @@ struct SelectorInner {
     /// The actual completion port that's used to manage all I/O
     port: CompletionPort,
 
-    /// A list of deferred events to be generated on the next call to `select`.
-    ///
-    /// Events can sometimes be generated without an associated I/O operation
-    /// having completed, and this list is emptied out and returned on each turn
-    /// of the event loop.
-    pending: Mutex<Vec<EventRef>>,
-
     /// A pool of buffers usable by this selector.
     ///
     /// Primitives will take buffers from this pool to perform I/O operations,
@@ -51,60 +44,36 @@ impl Selector {
                 inner: Arc::new(SelectorInner {
                     port: cp,
                     buffers: Mutex::new(BufferPool::new(256)),
-                    pending: Mutex::new(Vec::new()),
                 }),
             }
         })
     }
 
-    pub fn select(&self, events: &mut Events, awakener: Token, timeout: Option<Duration>) -> io::Result<bool> {
-        let mut ret = false;
-
-        // If we have some deferred events then we only want to poll for I/O
-        // events, so clamp the timeout to 0 in that case.
-        let timeout = if !self.should_block() {
-            Some(0)
-        } else {
-            timeout.map(|to| cmp::min(convert::millis(to), u32::MAX as u64) as u32)
-        };
+    pub fn select(&self,
+                  events: &mut Events,
+                  awakener: Token,
+                  timeout: Option<Duration>) -> io::Result<bool> {
+        let timeout = timeout.map(|to| cmp::min(convert::millis(to), u32::MAX as u64) as u32);
 
         trace!("select; timeout={:?}", timeout);
 
         // Clear out the previous list of I/O events and get some more!
         events.events.truncate(0);
-        let inner = &*self.inner;
 
         trace!("polling IOCP");
-        let n = match inner.port.get_many(&mut events.statuses, timeout) {
+        let n = match self.inner.port.get_many(&mut events.statuses, timeout) {
             Ok(statuses) => statuses.len(),
             Err(ref e) if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) => 0,
             Err(e) => return Err(e),
         };
 
-        // First up, process all completed I/O events. Lookup the callback
-        // associated with the I/O and invoke it. Also, carefully don't hold any
-        // locks while we invoke a callback in case more I/O is scheduled to
-        // prevent deadlock.
-        //
-        // Note that if we see an I/O completion with a null OVERLAPPED pointer
-        // then it means it was our awakener, so just generate a readable
-        // notification for it and carry on.
-        let dst = &mut events.events;
-
-        // Clear out the list of pending events and process them all
-        // here.
-        trace!("select; locking mutex");
-        let mut pending = inner.pending.lock().unwrap();
-
-        for status in events.statuses[..n].iter_mut() {
+        let mut ret = false;
+        for status in events.statuses[..n].iter() {
+            // This should only ever happen from the awakener, and we should
+            // only ever have one awakener right not, so assert as such.
             if status.overlapped() as usize == 0 {
-                if Token(status.token()) == awakener {
-                    ret = true;
-                    continue;
-                }
-
-                dst.push(Event::new(EventSet::readable(),
-                                    Token(status.token())));
+                assert_eq!(status.token(), usize::from(awakener));
+                ret = true;
                 continue;
             }
 
@@ -113,37 +82,22 @@ impl Selector {
             };
 
             trace!("select; -> got overlapped");
-            callback(status, &mut *pending);
-        }
-
-        // TODO: improve
-        for event in mem::replace(&mut *pending, Vec::new()) {
-            trace!("polled event; event={:?}", event);
-
-            if !event.is_none() {
-                if event.token() == awakener {
-                    ret = true;
-                } else {
-                    dst.push(event.as_event());
-
-                    if event.is_level() {
-                        pending.push(event);
-                    } else {
-                        event.unset_pending();
-                    }
-                }
-            } else {
-                event.unset_pending();
-            }
+            callback(status);
         }
 
         trace!("returning");
         Ok(ret)
     }
 
-    fn should_block(&self) -> bool {
-        trace!("should_block; locking mutex");
-        self.inner.pending.lock().unwrap().is_empty()
+    /// Gets a reference to the underlying `CompletionPort` structure.
+    pub fn port(&self) -> &CompletionPort {
+        &self.inner.port
+    }
+
+    /// Gets a new reference to this selector, although all underlying data
+    /// structures will refer to the same completion port.
+    pub fn clone_ref(&self) -> Selector {
+        Selector { inner: self.inner.clone() }
     }
 }
 
@@ -153,288 +107,179 @@ impl SelectorInner {
     }
 }
 
-// EventInner because we want access to the inner fields
-struct EventInner {
-    token: Token,
-    kind: EventSet,
-    pending: bool,
-    level: bool,
-}
-
-#[derive(Clone)]
-pub struct EventRef {
-    inner: Arc<UnsafeCell<EventInner>>,
-}
-
-impl EventRef {
-    fn token(&self) -> Token {
-        self.inner().token
-    }
-
-    fn is_pending(&self) -> bool {
-        self.inner().pending
-    }
-
-    fn is_none(&self) -> bool {
-        self.inner().kind.is_none()
-    }
-
-    fn is_level(&self) -> bool {
-        self.inner().level
-    }
-
-    fn associate(&self, token: Token, opts: PollOpt) {
-        let inner = self.mut_inner();
-        inner.token = token;
-        inner.level = opts.is_level();
-    }
-
-    fn set_pending(&self) {
-        self.mut_inner().pending = true;
-    }
-
-    fn unset_pending(&self) {
-        self.mut_inner().pending = false;
-    }
-
-    fn update(&self, interest: EventSet, events: EventSet) -> EventSet {
-        let curr = interest & (self.inner().kind | events);
-        self.mut_inner().kind = curr;
-        curr
-    }
-
-    fn unset(&self, events: EventSet) {
-        let curr = self.inner().kind & !events;
-        self.mut_inner().kind = curr;
-    }
-
-    fn inner(&self) -> &EventInner {
-        unsafe { &*self.inner.get() }
-    }
-
-    fn mut_inner(&self) -> &mut EventInner {
-        unsafe { &mut *self.inner.get() }
-    }
-
-    fn as_event(&self) -> Event {
-        let inner = self.inner();
-        Event::new(inner.kind, inner.token)
-    }
-}
-
-impl fmt::Debug for EventRef {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        let i = self.inner();
-        fmt.debug_struct("EventRef")
-            .field("token", &i.token)
-            .field("kind", &i.kind)
-            .field("pending", &i.pending)
-            .field("level", &i.level)
-            .finish()
-    }
-}
-
-unsafe impl Send for EventRef {}
-unsafe impl Sync for EventRef {}
-
+/// A registration is stored in each I/O object which keeps track of how it is
+/// associated with a `Selector` above.
+///
+/// Once associated with a `Selector`, a registration can never be un-associated
+/// (due to IOCP requirements). This is actually implemented through the
+/// `poll::Registration` and `poll::SetReadiness` APIs to keep track of all the
+/// level/edge/filtering business.
 pub struct Registration {
-    selector: Option<Arc<SelectorInner>>,
-    event: EventRef,
-    opts: PollOpt,
-    interest: EventSet,
+    inner: Option<RegistrationInner>,
+}
+
+struct RegistrationInner {
+    registration: poll::Registration,
+    set_readiness: poll::SetReadiness,
+    selector: Arc<SelectorInner>,
 }
 
 impl Registration {
+    /// Creates a new blank registration ready to be inserted into an I/O object.
+    ///
+    /// Won't actually do anything until associated with an `Selector` loop.
     pub fn new() -> Registration {
         Registration {
-            selector: None,
-            event: EventRef {
-                inner: Arc::new(UnsafeCell::new(EventInner {
-                    token: Token(0),
-                    kind: EventSet::none(),
-                    pending: false,
-                    level: false,
-                }))
-            },
-            opts: PollOpt::empty(),
-            interest: EventSet::none(),
+            inner: None,
         }
     }
 
-    fn validate_opts(opts: PollOpt) -> io::Result<()> {
-        if !opts.contains(PollOpt::edge()) && !opts.contains(PollOpt::level()) {
-            return Err(other("must have edge or level opt"));
-        }
-
-        Ok(())
+    /// Returns whether this registration has been associated with a selector
+    /// yet.
+    pub fn registered(&self) -> bool {
+        self.inner.is_some()
     }
 
-    pub fn port(&self) -> Option<&CompletionPort> {
-        self.selector.as_ref().map(|s| &s.port)
-    }
-
-    pub fn token(&self) -> Token {
-        self.event.token()
-    }
-
+    /// Acquires a buffer with at least `size` capacity.
+    ///
+    /// If associated with a selector, this will attempt to pull a buffer from
+    /// that buffer pool. If not associated with a selector, this will allocate
+    /// a fresh buffer.
     pub fn get_buffer(&self, size: usize) -> Vec<u8> {
-        match self.selector {
-            Some(ref s) => s.buffers.lock().unwrap().get(size),
+        match self.inner {
+            Some(ref i) => i.selector.buffers.lock().unwrap().get(size),
             None => Vec::with_capacity(size),
         }
     }
 
+    /// Returns a buffer to this registration.
+    ///
+    /// If associated with a selector, this will push the buffer back into the
+    /// selector's pool of buffers. Otherwise this will just drop the buffer.
     pub fn put_buffer(&self, buf: Vec<u8>) {
-        if let Some(ref s) = self.selector {
-            s.buffers.lock().unwrap().put(buf);
+        if let Some(ref i) = self.inner {
+            i.selector.buffers.lock().unwrap().put(buf);
         }
     }
 
-    /// Given a handle, token, and an event set describing how its ready,
-    /// translate that to an `Event` and process accordingly.
+    /// Sets the readiness of this I/O object to a particular `set`.
     ///
-    /// This function will mask out all ignored events (e.g. ignore `writable`
-    /// events if they weren't requested) and also handle properties such as
-    /// `oneshot`.
+    /// This is later used to fill out and respond to requests to `poll`. Note
+    /// that this is all implemented through the `SetReadiness` structure in the
+    /// `poll` module.
+    pub fn set_readiness(&self, set: EventSet) {
+        if let Some(ref i) = self.inner {
+            trace!("set readiness to {:?}", set);
+            let s = &i.set_readiness;
+            s.set_readiness(set).expect("event loop disappeared?");
+        }
+    }
+
+    /// Queries what the current readiness of this I/O object is.
     ///
-    /// Eventually this function will probably also be modified to handle the
-    /// `level()` polling option.
-    pub fn push_event(&mut self, set: EventSet, events: &mut Vec<EventRef>) {
-        trace!("push_event; set={:?}; self.event={:?}", set, self.event);
-        // The lock on EventInner is currently held, update interest
-        let curr = self.event.update(self.interest, set);
-
-        if !curr.is_none() {
-            if !self.event.is_pending() {
-                self.event.set_pending();
-                events.push(self.event.clone());
-                trace!("pushing event; event={:?}", self.event);
-            }
-
-            if self.opts.is_oneshot() {
-                trace!("deregistering because of oneshot");
-                self.interest = EventSet::none();
-            }
-        } else {
-            trace!("   -> is_none");
+    /// This is what's being used to generate events returned by `poll`.
+    pub fn readiness(&self) -> EventSet {
+        match self.inner {
+            Some(ref i) => i.set_readiness.readiness(),
+            None => EventSet::none(),
         }
     }
 
-    pub fn unset_readiness(&mut self, set: EventSet, need_lock: bool) {
-        trace!("unset_readiness; locking mutex");
-        // Acquire the lock if needed
-
-        let _lock = if need_lock {
-            Some(self.selector.as_ref()
-                .map(|s| s.pending.lock().unwrap()))
-        } else {
-            None
-        };
-
-        self.event.unset(set);
-    }
-
-    pub fn associate(&mut self, selector: &Selector, token: Token, opts: PollOpt) -> io::Result<()> {
-        // Structured like this to make the borrow checker happy
-        if self.selector.is_some() {
-            if let Some(sa) = self.selector.as_ref() {
-                if !selector.inner.identical(&**sa) {
-                    return Err(other("socket already registered"));
-                }
-            }
-        } else {
-            self.selector = Some(selector.inner.clone());
-        }
-
-        self.event.associate(token, opts);
-        Ok(())
-    }
-
+    /// Implementation of the `Evented::register` function essentially.
+    ///
+    /// Returns an error if we're already registered with another event loop,
+    /// and otherwise just reassociates ourselves with the event loop to
+    /// possible change tokens.
     pub fn register_socket(&mut self,
                            socket: &AsRawSocket,
-                           selector: &Selector,
+                           poll: &Poll,
                            token: Token,
                            interest: EventSet,
                            opts: PollOpt) -> io::Result<()> {
-
-        try!(Registration::validate_opts(opts));
-        try!(self.associate(selector, token, opts));
+        trace!("register {:?} {:?}", token, interest);
+        try!(self.associate(poll, token, interest, opts));
+        let selector = poll::selector(poll);
         try!(selector.inner.port.add_socket(usize::from(token), socket));
-
-        self.interest = set2mask(interest);
-        self.opts = opts;
         Ok(())
     }
 
+    /// Implementation of `Evented::reregister` function.
     pub fn reregister_socket(&mut self,
                              _socket: &AsRawSocket,
-                             selector: &Selector,
+                             poll: &Poll,
                              token: Token,
                              interest: EventSet,
                              opts: PollOpt) -> io::Result<()> {
-
-        if self.selector.is_none() {
-            return Err(other("socket not registered"));
+        trace!("reregister {:?} {:?}", token, interest);
+        if self.inner.is_none() {
+            return Err(other("cannot reregister unregistered socket"))
         }
-
-        try!(Registration::validate_opts(opts));
-        try!(self.associate(selector, token, opts));
-
-        trace!("reregister_socket; interest={:?}", set2mask(interest));
-        self.interest = set2mask(interest);
-        self.unset_readiness(!interest, false);
-
-        self.opts = opts;
+        try!(self.associate(poll, token, interest, opts));
         Ok(())
     }
 
-    pub fn deregister(&mut self, need_lock: bool) {
-        self.unset_readiness(EventSet::all(), need_lock);
-    }
+    fn associate(&mut self,
+                 poll: &Poll,
+                 token: Token,
+                 events: EventSet,
+                 opts: PollOpt) -> io::Result<()> {
+        let selector = poll::selector(poll);
 
-    pub fn checked_deregister(&mut self, selector: &Selector) -> io::Result<()> {
-        match self.selector {
-            Some(ref s) => {
-                if !s.identical(&*selector.inner) {
-                    return Err(other("socket registered with other selector"));
-                }
+        // To keep the same semantics as epoll, if I/O objects are interested in
+        // being readable then they're also interested in listening for hup
+        let events = if events.is_readable() {
+            events | EventSet::hup()
+        }  else {
+            events
+        };
+
+        match self.inner {
+            // Ensure that we're only ever associated with at most one event
+            // loop. IOCP doesn't allow a handle to ever be associated with more
+            // than one event loop.
+            Some(ref i) if !i.selector.identical(&selector.inner) => {
+                return Err(other("socket already registered"));
             }
+
+            // If we're already registered, then just update the existing
+            // registration.
+            Some(ref mut i) => {
+                trace!("updating existing registration node");
+                i.registration.update(poll, token, events, opts)
+            }
+
+            // Create a new registration and we'll soon be added to the
+            // completion port for IOCP as well.
             None => {
-                return Err(super::bad_state());
+                trace!("allocating new registration node");
+                let (r, s) = poll::Registration::new(poll, token, events, opts);
+                self.inner = Some(RegistrationInner {
+                    registration: r,
+                    set_readiness: s,
+                    selector: selector.inner.clone(),
+                });
+                Ok(())
             }
         }
-
-        // This is always called from the event loop thread
-        self.deregister(false);
-        Ok(())
     }
 
-    /// Schedules some events for a handle to be delivered on the next turn of
-    /// the event loop (without an associated I/O event).
+    /// Implementation of the `Evented::deregister` function.
     ///
-    /// This function will discard this if:
-    ///
-    /// * The handle has been de-registered
-    /// * The handle doesn't have an active registration (e.g. its oneshot
-    ///   expired)
-    pub fn defer(&mut self, set: EventSet) {
-        if let Some(s) = self.selector.clone() {
-            trace!("defer; locking mutex");
-            let mut dst = s.pending.lock().unwrap();
-            self.push_event(set, &mut *dst);
+    /// Doesn't allow registration with another event loop, just shuts down
+    /// readiness notifications and such.
+    pub fn deregister(&mut self, poll: &Poll) -> io::Result<()> {
+        trace!("deregistering");
+        let selector = poll::selector(poll);
+        match self.inner {
+            Some(ref mut i) => {
+                if !selector.inner.identical(&i.selector) {
+                    return Err(other("socket already registered"));
+                }
+                try!(i.registration.deregister(poll));
+                Ok(())
+            }
+            None => Err(other("socket not registered")),
         }
-    }
-}
-
-/// From a given interest set return the event set mask used to generate events.
-///
-/// The only currently interesting thing this function does is ensure that hup
-/// events are generated for interests that only include the readable event.
-fn set2mask(e: EventSet) -> EventSet {
-    if e.is_readable() {
-        e | EventSet::hup()
-    } else {
-        e
     }
 }
 
@@ -445,11 +290,13 @@ fn other(s: &str) -> io::Error {
 #[derive(Debug)]
 pub struct Events {
     /// Raw I/O event completions are filled in here by the call to `get_many`
-    /// on the completion port above. These are then postprocessed into the
-    /// vector below.
+    /// on the completion port above. These are then processed to run callbacks
+    /// which figure out what to do after the event is done.
     statuses: Box<[CompletionStatus]>,
 
-    /// Literal events returned by `get` to the upwards `EventLoop`
+    /// Literal events returned by `get` to the upwards `EventLoop`. This file
+    /// doesn't really modify this (except for the awakener), instead almost all
+    /// events are filled in by the `ReadinessQueue` from the `poll` module.
     events: Vec<Event>,
 }
 
@@ -498,7 +345,7 @@ macro_rules! offset_of {
     )
 }
 
-pub type Callback = fn(&CompletionStatus, &mut Vec<EventRef>);
+pub type Callback = fn(&CompletionStatus);
 
 /// See sys::windows module docs for why this exists.
 ///

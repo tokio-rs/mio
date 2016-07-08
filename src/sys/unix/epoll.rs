@@ -22,7 +22,7 @@ pub struct Selector {
 impl Selector {
     pub fn new() -> io::Result<Selector> {
         // offset by 1 to avoid choosing 0 as the id of a selector
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
         let epfd = try!(epoll_create().map_err(super::from_nix_error));
 
         Ok(Selector {
