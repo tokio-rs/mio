@@ -45,7 +45,7 @@ impl Selector {
         self.id
     }
 
-    pub fn select(&mut self, evts: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
+    pub fn select(&self, evts: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
         let timeout = timeout_ms.map(|x| timespec {
             tv_sec: (x / 1000) as time_t,
             tv_nsec: ((x % 1000) * 1_000_000) as c_long

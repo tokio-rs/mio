@@ -1,4 +1,4 @@
-use {channel, Handler, Evented, Poll, NotifyError, Token};
+use {channel, Handler, Evented, Poll, Events, NotifyError, Token};
 use event::{Event, EventSet, PollOpt};
 use timer::{self, Timer, Timeout};
 use std::{io, fmt, usize};
@@ -88,6 +88,7 @@ impl EventLoopBuilder {
 pub struct EventLoop<H: Handler> {
     run: bool,
     poll: Poll,
+    events: Events,
     timer: Timer<H::Timeout>,
     notify_tx: channel::Sender<H::Message>,
     notify_rx: channel::Receiver<H::Message>,
@@ -130,6 +131,7 @@ impl<H: Handler> EventLoop<H> {
             notify_tx: tx,
             notify_rx: rx,
             config: config,
+            events: Events::new(),
         })
     }
 
@@ -297,21 +299,21 @@ impl<H: Handler> EventLoop<H> {
 
     #[inline]
     fn io_poll(&mut self, timeout: Option<Duration>) -> io::Result<usize> {
-        self.poll.poll(timeout)
+        self.poll.poll(&mut self.events, timeout)
     }
 
     // Process IO events that have been previously polled
     fn io_process(&mut self, handler: &mut H, cnt: usize) {
         let mut i = 0;
 
-        trace!("io_process(..); cnt={}; len={}", cnt, self.poll.events().len());
+        trace!("io_process(..); cnt={}; len={}", cnt, self.events.len());
 
         // Iterate over the notifications. Each event provides the token
         // it was registered with (which usually represents, at least, the
         // handle that the event is about) as well as information about
         // what kind of event occurred (readable, writable, signal, etc.)
         while i < cnt {
-            let evt = self.poll.events().get(i).unwrap();
+            let evt = self.events.get(i).unwrap();
 
             trace!("event={:?}; idx={:?}", evt, i);
 

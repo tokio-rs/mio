@@ -34,7 +34,7 @@ impl Selector {
     }
 
     /// Wait for events from the OS
-    pub fn select(&mut self, evts: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
+    pub fn select(&self, evts: &mut Events, awakener: Token, timeout_ms: Option<usize>) -> io::Result<bool> {
         use std::{cmp, i32, slice};
 
         let timeout_ms = match timeout_ms {
