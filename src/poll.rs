@@ -35,8 +35,9 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 /// use mio::*;
 /// use mio::tcp::*;
 ///
-/// // Construct a new `Poll` handle
+/// // Construct a new `Poll` handle as well as the `Events` we'll store into
 /// let mut poll = Poll::new().unwrap();
+/// let mut events = Events::new();
 ///
 /// // Connect the stream
 /// let stream = TcpStream::connect(&"173.194.33.80:80".parse().unwrap()).unwrap();
@@ -45,7 +46,7 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 /// poll.register(&stream, Token(0), EventSet::all(), PollOpt::edge()).unwrap();
 ///
 /// // Wait for the socket to become ready
-/// poll.poll(None).unwrap();
+/// poll.poll(&mut events, None).unwrap();
 /// ```
 pub struct Poll {
     // Platform specific IO selector
@@ -53,9 +54,6 @@ pub struct Poll {
 
     // Custom readiness queue
     readiness_queue: ReadinessQueue,
-
-    // Pending events. TODO: remove this
-    events: sys::Events,
 }
 
 /// Handle to a Poll registration. Used for registering custom types for event
@@ -168,7 +166,6 @@ impl Poll {
         let poll = Poll {
             selector: try!(sys::Selector::new()),
             readiness_queue: try!(ReadinessQueue::new()),
-            events: sys::Events::new(),
         };
 
         // Register the notification wakeup FD with the IO poller
@@ -228,7 +225,9 @@ impl Poll {
 
     /// Block the current thread and wait until any `Evented` values registered
     /// with the `Poll` instance are ready or the given timeout has elapsed.
-    pub fn poll(&mut self, timeout: Option<Duration>) -> io::Result<usize> {
+    pub fn poll(&self,
+                events: &mut Events,
+                timeout: Option<Duration>) -> io::Result<usize> {
         let timeout = if !self.readiness_queue.is_empty() {
             trace!("custom readiness queue has pending events");
             // Never block if the readiness queue has pending events
@@ -240,24 +239,18 @@ impl Poll {
         };
 
         // First get selector events
-        let awoken = try!(self.selector.select(&mut self.events, AWAKEN, timeout));
+        let awoken = try!(self.selector.select(&mut events.inner, AWAKEN,
+                                               timeout));
 
         if awoken {
             self.readiness_queue.inner().awakener.cleanup();
         }
 
         // Poll custom event queue
-        self.readiness_queue.poll(&mut self.events);
+        self.readiness_queue.poll(&mut events.inner);
 
         // Return number of polled events
-        Ok(self.events.len())
-    }
-
-    pub fn events(&self) -> Events {
-        Events {
-            curr: 0,
-            poll: self,
-        }
+        Ok(events.len())
     }
 }
 
@@ -267,36 +260,26 @@ impl fmt::Debug for Poll {
     }
 }
 
-pub struct Events<'a> {
-    curr: usize,
-    poll: &'a Poll,
+pub struct Events {
+    inner: sys::Events,
 }
 
-impl<'a> Events<'a> {
+impl Events {
+    pub fn new() -> Events {
+        Events {
+            inner: sys::Events::new(),
+        }
+    }
     pub fn get(&self, idx: usize) -> Option<Event> {
-        self.poll.events.get(idx)
+        self.inner.get(idx)
     }
 
     pub fn len(&self) -> usize {
-        self.poll.events.len()
+        self.inner.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.poll.events.is_empty()
-    }
-}
-
-impl<'a> Iterator for Events<'a> {
-    type Item = Event;
-
-    fn next(&mut self) -> Option<Event> {
-        if self.curr == self.poll.events.len() {
-            return None;
-        }
-
-        let ret = self.poll.events.get(self.curr).unwrap();
-        self.curr += 1;
-        Some(ret)
+        self.inner.is_empty()
     }
 }
 
@@ -531,7 +514,7 @@ impl ReadinessQueue {
         })
     }
 
-    fn poll(&mut self, dst: &mut sys::Events) {
+    fn poll(&self, dst: &mut sys::Events) {
         let ready = self.take_ready();
 
         // TODO: Cap number of nodes processed
@@ -690,7 +673,7 @@ impl ReadinessQueue {
         }
     }
 
-    fn unlink_node(&mut self, mut node: ReadyRef) -> Box<ReadinessNode> {
+    fn unlink_node(&self, mut node: ReadyRef) -> Box<ReadinessNode> {
         node.as_mut().unwrap().unlink(&mut self.inner_mut().head_all_nodes)
     }
 
@@ -865,7 +848,7 @@ impl fmt::Pointer for ReadyRef {
 
 #[cfg(test)]
 mod test {
-    use {EventSet, Poll, PollOpt, Registration, SetReadiness, Token};
+    use {EventSet, Poll, PollOpt, Registration, SetReadiness, Token, Events};
     use std::time::Duration;
 
     fn ensure_send<T: Send>(_: &T) {}
@@ -893,6 +876,7 @@ mod test {
     #[test]
     pub fn test_nodes_do_not_leak() {
         let mut poll = Poll::new().unwrap();
+        let mut events = Events::new();
         let mut registrations = Vec::with_capacity(1_000);
 
         for _ in 0..3 {
@@ -902,7 +886,7 @@ mod test {
         drop(registrations);
 
         // Poll
-        let num = poll.poll(Some(Duration::from_millis(300))).unwrap();
+        let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
 
         assert_eq!(0, num);
         assert_eq!(0, readiness_node_count(&poll));
