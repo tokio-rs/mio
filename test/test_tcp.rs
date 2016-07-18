@@ -252,8 +252,13 @@ fn listen_then_close() {
 fn assert_send<T: Send>() {
 }
 
+fn assert_sync<T: Sync>() {
+}
+
 #[test]
 fn test_tcp_sockets_are_send() {
     assert_send::<TcpListener>();
     assert_send::<TcpStream>();
+    assert_sync::<TcpListener>();
+    assert_sync::<TcpStream>();
 }
