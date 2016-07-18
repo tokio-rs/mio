@@ -3,7 +3,6 @@ use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
 
-use slab::Index;
 use winapi::*;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
