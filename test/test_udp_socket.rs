@@ -66,6 +66,8 @@ impl Handler for UdpHandler {
 fn assert_send<T: Send>() {
 }
 
+fn is_sync<T: Sync>(_: &T) {}
+
 #[test]
 pub fn test_udp_socket() {
     debug!("Starting TEST_UDP_SOCKETS");
@@ -76,6 +78,8 @@ pub fn test_udp_socket() {
 
     let tx = UdpSocket::bound(&any).unwrap();
     let rx = UdpSocket::bound(&addr).unwrap();
+
+    is_sync(&tx);
 
     assert_send::<UdpSocket>();
 

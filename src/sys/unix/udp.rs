@@ -1,14 +1,15 @@
 use {io, poll, Evented, EventSet, Io, Poll, PollOpt, Token};
 use io::MapNonBlock;
 use sys::unix::{net, nix, Socket};
-use std::cell::Cell;
 use std::net::{IpAddr, SocketAddr};
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::SeqCst;
 
 #[derive(Debug)]
 pub struct UdpSocket {
     io: Io,
-    selector_id: Cell<Option<usize>>,
+    selector_id: AtomicUsize,
 }
 
 impl UdpSocket {
@@ -18,7 +19,7 @@ impl UdpSocket {
             .map(|fd| {
                 UdpSocket {
                     io: Io::from_raw_fd(fd),
-                    selector_id: Cell::new(None),
+                    selector_id: AtomicUsize::new(0),
                 }
             })
     }
@@ -29,7 +30,7 @@ impl UdpSocket {
             .map(|fd| {
                 UdpSocket {
                     io: Io::from_raw_fd(fd),
-                    selector_id: Cell::new(None),
+                    selector_id: AtomicUsize::new(0),
                 }
             })
     }
@@ -47,7 +48,7 @@ impl UdpSocket {
         net::dup(&self.io).map(|io| {
             UdpSocket {
                 io: io,
-                selector_id: self.selector_id.clone(),
+                selector_id: AtomicUsize::new(self.selector_id.load(SeqCst)),
             }
         })
     }
@@ -131,12 +132,12 @@ impl UdpSocket {
     }
 
     fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
-        let selector_id = self.selector_id.get();
+        let selector_id = self.selector_id.load(SeqCst);
 
-        if selector_id.is_some() && selector_id != Some(poll::selector(poll).id()) {
+        if selector_id != 0 && selector_id != poll::selector(poll).id() {
             Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
         } else {
-            self.selector_id.set(Some(poll::selector(poll).id()));
+            self.selector_id.store(poll::selector(poll).id(), SeqCst);
             Ok(())
         }
     }
@@ -164,7 +165,7 @@ impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
         UdpSocket {
             io: Io::from_raw_fd(fd),
-            selector_id: Cell::new(None),
+            selector_id: AtomicUsize::new(0),
         }
     }
 }
