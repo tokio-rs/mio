@@ -159,6 +159,57 @@ impl TcpStream {
             }
         }
     }
+
+    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut me = self.inner();
+
+        match mem::replace(&mut me.read, State::Empty) {
+            State::Empty => Err(wouldblock()),
+            State::Pending(buf) => {
+                me.read = State::Pending(buf);
+                Err(wouldblock())
+            }
+            State::Ready(mut cursor) => {
+                let amt = try!(cursor.read(buf));
+                // Once the entire buffer is written we need to schedule the
+                // next read operation.
+                if cursor.position() as usize == cursor.get_ref().len() {
+                    me.iocp.put_buffer(cursor.into_inner());
+                    self.imp.schedule_read(&mut me, true);
+                } else {
+                    me.read = State::Ready(cursor);
+                }
+                Ok(amt)
+            }
+            State::Error(e) => {
+                self.imp.schedule_read(&mut me, true);
+                Err(e)
+            }
+        }
+    }
+
+    pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        let mut me = self.inner();
+        let me = &mut *me;
+
+        match me.write {
+            State::Empty => {}
+            _ => return Err(wouldblock())
+        }
+
+        if me.iocp.port().is_none() {
+            return Err(wouldblock())
+        }
+
+        let mut intermediate = me.iocp.get_buffer(64 * 1024);
+        let amt = try!(intermediate.write(buf));
+        self.imp.schedule_write(intermediate, 0, me, true);
+        Ok(amt)
+    }
+
+    pub fn flush(&self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 impl StreamImp {
@@ -322,61 +373,6 @@ fn write_done(status: &CompletionStatus, dst: &mut Vec<EventRef>) {
         me2.push(&mut me, EventSet::writable(), dst);
     } else {
         me2.schedule_write(buf, new_pos, &mut me, false);
-    }
-}
-
-impl Read for TcpStream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let mut me = self.inner();
-
-        match mem::replace(&mut me.read, State::Empty) {
-            State::Empty => Err(wouldblock()),
-            State::Pending(buf) => {
-                me.read = State::Pending(buf);
-                Err(wouldblock())
-            }
-            State::Ready(mut cursor) => {
-                let amt = try!(cursor.read(buf));
-                // Once the entire buffer is written we need to schedule the
-                // next read operation.
-                if cursor.position() as usize == cursor.get_ref().len() {
-                    me.iocp.put_buffer(cursor.into_inner());
-                    self.imp.schedule_read(&mut me, true);
-                } else {
-                    me.read = State::Ready(cursor);
-                }
-                Ok(amt)
-            }
-            State::Error(e) => {
-                self.imp.schedule_read(&mut me, true);
-                Err(e)
-            }
-        }
-    }
-}
-
-impl Write for TcpStream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let mut me = self.inner();
-        let me = &mut *me;
-
-        match me.write {
-            State::Empty => {}
-            _ => return Err(wouldblock())
-        }
-
-        if me.iocp.port().is_none() {
-            return Err(wouldblock())
-        }
-
-        let mut intermediate = me.iocp.get_buffer(64 * 1024);
-        let amt = try!(intermediate.write(buf));
-        self.imp.schedule_write(intermediate, 0, me, true);
-        Ok(amt)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
     }
 }
 
