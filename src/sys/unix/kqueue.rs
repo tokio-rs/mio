@@ -27,7 +27,7 @@ pub struct Selector {
 type UData = usize;
 
 #[cfg(target_os = "netbsd")]
-type UData = i64;
+type UData = isize;
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
