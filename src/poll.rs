@@ -180,9 +180,7 @@ impl Poll {
     pub fn register<E: ?Sized>(&self, io: &E, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
-        if token == AWAKEN {
-            return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
-        }
+        try!(validate_args(token, interest));
 
         /*
          * Undefined behavior:
@@ -201,9 +199,7 @@ impl Poll {
     pub fn reregister<E: ?Sized>(&self, io: &E, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
-        if token == AWAKEN {
-            return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
-        }
+        try!(validate_args(token, interest));
 
         trace!("registering with poller");
 
@@ -254,6 +250,18 @@ impl Poll {
         // Return number of polled events
         Ok(events.len())
     }
+}
+
+fn validate_args(token: Token, interest: EventSet) -> io::Result<()> {
+    if token == AWAKEN {
+        return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
+    }
+
+    if !interest.is_readable() && !interest.is_writable() {
+        return Err(io::Error::new(io::ErrorKind::Other, "interest must include readable or writable"));
+    }
+
+    Ok(())
 }
 
 impl fmt::Debug for Poll {

@@ -50,6 +50,7 @@ impl EchoConn {
             Err(e) => debug!("not implemented; client err={:?}", e),
         }
 
+        assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
         event_loop.reregister(&self.sock, self.token.unwrap(), self.interest,
                               PollOpt::edge() | PollOpt::oneshot())
     }
@@ -78,6 +79,7 @@ impl EchoConn {
 
         };
 
+        assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
         event_loop.reregister(&self.sock, self.token.unwrap(), self.interest,
                               PollOpt::edge())
     }
@@ -186,8 +188,13 @@ impl EchoClient {
             }
         };
 
-        event_loop.reregister(&self.sock, self.token, self.interest,
-                              PollOpt::edge() | PollOpt::oneshot())
+        if !self.interest.is_none() {
+            assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
+            try!(event_loop.reregister(&self.sock, self.token, self.interest,
+                                       PollOpt::edge() | PollOpt::oneshot()));
+        }
+
+        Ok(())
     }
 
     fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
@@ -206,6 +213,7 @@ impl EchoClient {
             Err(e) => debug!("not implemented; client err={:?}", e)
         }
 
+        assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
         event_loop.reregister(&self.sock, self.token, self.interest,
                               PollOpt::edge() | PollOpt::oneshot())
     }

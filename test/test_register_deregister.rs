@@ -97,3 +97,17 @@ pub fn test_register_deregister() {
 
     assert!(handler.state == 2, "unexpected final state {}", handler.state);
 }
+
+#[test]
+pub fn test_register_with_no_readable_writable_is_error() {
+    let poll = Poll::new().unwrap();
+    let addr = localhost();
+
+    let sock = TcpListener::bind(&addr).unwrap();
+
+    assert!(poll.register(&sock, Token(0), EventSet::hup(), PollOpt::edge()).is_err());
+
+    poll.register(&sock, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
+
+    assert!(poll.reregister(&sock, Token(0), EventSet::hup(), PollOpt::edge()).is_err());
+}
