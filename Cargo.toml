@@ -23,13 +23,8 @@ slab   = { git = "https://github.com/carllerche/slab", rev = "5476efcafb"  }
 bytes  = "0.3.0"
 net2   = { version = "0.2.19", default-features = false }
 
-[target.'cfg(unix)'.dependencies]
 nix    = "0.6.0"
 libc   = "0.2.4"
-
-[target.'cfg(windows)'.dependencies]
-winapi = "0.2.1"
-miow   = "0.1.1"
 
 [dev-dependencies]
 env_logger = "0.3.0"
