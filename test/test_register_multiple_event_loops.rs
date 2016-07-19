@@ -51,7 +51,7 @@ fn test_tcp_register_multiple_event_loops() {
 #[test]
 fn test_udp_register_multiple_event_loops() {
     let addr = localhost();
-    let socket = UdpSocket::bound(&addr).unwrap();
+    let socket = UdpSocket::bind(&addr).unwrap();
 
     let mut event_loop_1 = EventLoop::<MyHandler>::new().unwrap();
     event_loop_1.register(&socket, Token(0), EventSet::all(), PollOpt::edge()).unwrap();

@@ -1,50 +1,34 @@
-use {io, poll, Evented, EventSet, Io, Poll, PollOpt, Token};
+use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
 use io::MapNonBlock;
-use sys::unix::{net, nix, Socket};
-use std::net::{IpAddr, SocketAddr};
+use unix::EventedFd;
+use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[allow(unused_imports)] // only here for Rust 1.8
+use net2::UdpSocketExt;
+
 #[derive(Debug)]
 pub struct UdpSocket {
-    io: Io,
+    io: net::UdpSocket,
     selector_id: AtomicUsize,
 }
 
 impl UdpSocket {
-    /// Returns a new, unbound, non-blocking, IPv4 UDP socket
-    pub fn v4() -> io::Result<UdpSocket> {
-        net::socket(nix::AddressFamily::Inet, nix::SockType::Datagram, true)
-            .map(|fd| {
-                UdpSocket {
-                    io: Io::from_raw_fd(fd),
-                    selector_id: AtomicUsize::new(0),
-                }
-            })
-    }
-
-    /// Returns a new, unbound, non-blocking, IPv6 UDP socket
-    pub fn v6() -> io::Result<UdpSocket> {
-        net::socket(nix::AddressFamily::Inet6, nix::SockType::Datagram, true)
-            .map(|fd| {
-                UdpSocket {
-                    io: Io::from_raw_fd(fd),
-                    selector_id: AtomicUsize::new(0),
-                }
-            })
-    }
-
-    pub fn bind(&self, addr: &SocketAddr) -> io::Result<()> {
-        net::bind(&self.io, &net::to_nix_addr(addr))
+    pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
+        try!(socket.set_nonblocking(true));
+        Ok(UdpSocket {
+            io: socket,
+            selector_id: AtomicUsize::new(0),
+        })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        net::getsockname(&self.io)
-            .map(net::to_std_addr)
+        self.io.local_addr()
     }
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        net::dup(&self.io).map(|io| {
+        self.io.try_clone().map(|io| {
             UdpSocket {
                 io: io,
                 selector_id: AtomicUsize::new(self.selector_id.load(Ordering::SeqCst)),
@@ -54,81 +38,143 @@ impl UdpSocket {
 
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
                    -> io::Result<Option<usize>> {
-        net::sendto(&self.io, buf, &net::to_nix_addr(target))
+        self.io.send_to(buf, target)
             .map_non_block()
     }
 
     pub fn recv_from(&self, buf: &mut [u8])
                      -> io::Result<Option<(usize, SocketAddr)>> {
-        net::recvfrom(&self.io, buf)
-            .map(|(cnt, addr)| (cnt, net::to_std_addr(addr)))
+        self.io.recv_from(buf)
             .map_non_block()
     }
 
+    pub fn broadcast(&self) -> io::Result<bool> {
+        self.io.broadcast()
+    }
+
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::sockopt::Broadcast, &on)
-            .map_err(super::from_nix_error)
+        self.io.set_broadcast(on)
     }
 
-    pub fn set_multicast_loop(&self, on: bool) -> io::Result<()> {
-        nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpMulticastLoop, &on)
-            .map_err(super::from_nix_error)
+    pub fn multicast_loop_v4(&self) -> io::Result<bool> {
+        self.io.multicast_loop_v4()
     }
 
-    pub fn join_multicast(&self, multi: &IpAddr) -> io::Result<()> {
-        match *multi {
-            IpAddr::V4(ref addr) => {
-                // Create the request
-                let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
-
-                // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpAddMembership, &req)
-                    .map_err(super::from_nix_error)
-            }
-            IpAddr::V6(ref addr) => {
-                // Create the request
-                let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
-
-                // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::sockopt::Ipv6AddMembership, &req)
-                    .map_err(super::from_nix_error)
-            }
-        }
+    pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
+        self.io.set_multicast_loop_v4(on)
     }
 
-    pub fn leave_multicast(&self, multi: &IpAddr) -> io::Result<()> {
-        match *multi {
-            IpAddr::V4(ref addr) => {
-                // Create the request
-                let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
-
-                // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpDropMembership, &req)
-                    .map_err(super::from_nix_error)
-            }
-            IpAddr::V6(ref addr) => {
-                // Create the request
-                let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
-
-                // Set the socket option
-                nix::setsockopt(self.as_raw_fd(), nix::sockopt::Ipv6DropMembership, &req)
-                    .map_err(super::from_nix_error)
-            }
-        }
+    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
+        self.io.multicast_ttl_v4()
     }
 
-    pub fn set_multicast_time_to_live(&self, ttl: i32) -> io::Result<()> {
-        let v = if ttl < 0 {
-            0
-        } else if ttl > 255 {
-            255
-        } else {
-            ttl as u8
-        };
-
-        nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpMulticastTtl, &v)
-            .map_err(super::from_nix_error)
+    pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
+        self.io.set_multicast_ttl_v4(ttl)
     }
+
+    pub fn multicast_loop_v6(&self) -> io::Result<bool> {
+        self.io.multicast_loop_v6()
+    }
+
+    pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
+        self.io.set_multicast_loop_v6(on)
+    }
+
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.io.ttl()
+    }
+
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.io.set_ttl(ttl)
+    }
+
+    pub fn join_multicast_v4(&self,
+                             multiaddr: &Ipv4Addr,
+                             interface: &Ipv4Addr) -> io::Result<()> {
+        self.io.join_multicast_v4(multiaddr, interface)
+    }
+
+    pub fn join_multicast_v6(&self,
+                             multiaddr: &Ipv6Addr,
+                             interface: u32) -> io::Result<()> {
+        self.io.join_multicast_v6(multiaddr, interface)
+    }
+
+    pub fn leave_multicast_v4(&self,
+                              multiaddr: &Ipv4Addr,
+                              interface: &Ipv4Addr) -> io::Result<()> {
+        self.io.leave_multicast_v4(multiaddr, interface)
+    }
+
+    pub fn leave_multicast_v6(&self,
+                              multiaddr: &Ipv6Addr,
+                              interface: u32) -> io::Result<()> {
+        self.io.leave_multicast_v6(multiaddr, interface)
+    }
+
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.io.take_error()
+    }
+
+    // pub fn set_multicast_loop(&self, on: bool) -> io::Result<()> {
+    //     nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpMulticastLoop, &on)
+    //         .map_err(super::from_nix_error)
+    // }
+    //
+    // pub fn join_multicast(&self, multi: &IpAddr) -> io::Result<()> {
+    //     match *multi {
+    //         IpAddr::V4(ref addr) => {
+    //             // Create the request
+    //             let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
+    //
+    //             // Set the socket option
+    //             nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpAddMembership, &req)
+    //                 .map_err(super::from_nix_error)
+    //         }
+    //         IpAddr::V6(ref addr) => {
+    //             // Create the request
+    //             let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
+    //
+    //             // Set the socket option
+    //             nix::setsockopt(self.as_raw_fd(), nix::sockopt::Ipv6AddMembership, &req)
+    //                 .map_err(super::from_nix_error)
+    //         }
+    //     }
+    // }
+    //
+    // pub fn leave_multicast(&self, multi: &IpAddr) -> io::Result<()> {
+    //     match *multi {
+    //         IpAddr::V4(ref addr) => {
+    //             // Create the request
+    //             let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
+    //
+    //             // Set the socket option
+    //             nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpDropMembership, &req)
+    //                 .map_err(super::from_nix_error)
+    //         }
+    //         IpAddr::V6(ref addr) => {
+    //             // Create the request
+    //             let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
+    //
+    //             // Set the socket option
+    //             nix::setsockopt(self.as_raw_fd(), nix::sockopt::Ipv6DropMembership, &req)
+    //                 .map_err(super::from_nix_error)
+    //         }
+    //     }
+    // }
+    //
+    // pub fn set_multicast_time_to_live(&self, ttl: i32) -> io::Result<()> {
+    //     let v = if ttl < 0 {
+    //         0
+    //     } else if ttl > 255 {
+    //         255
+    //     } else {
+    //         ttl as u8
+    //     };
+    //
+    //     nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpMulticastTtl, &v)
+    //         .map_err(super::from_nix_error)
+    // }
 
     fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
         let selector_id = self.selector_id.load(Ordering::SeqCst);
@@ -145,25 +191,22 @@ impl UdpSocket {
 impl Evented for UdpSocket {
     fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
         try!(self.associate_selector(poll));
-        self.io.register(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
     fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.io.reregister(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.io.deregister(poll)
+        EventedFd(&self.as_raw_fd()).deregister(poll)
     }
-}
-
-impl Socket for UdpSocket {
 }
 
 impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
         UdpSocket {
-            io: Io::from_raw_fd(fd),
+            io: net::UdpSocket::from_raw_fd(fd),
             selector_id: AtomicUsize::new(0),
         }
     }

@@ -7,7 +7,7 @@ use std::fmt;
 use std::io::prelude::*;
 use std::io;
 use std::mem;
-use std::net::{self, IpAddr, SocketAddr};
+use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 
@@ -21,7 +21,7 @@ use miow::net::UdpSocketExt as MiowUdpSocketExt;
 use {Evented, EventSet, Poll, PollOpt, Token};
 use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::from_raw_arc::FromRawArc;
-use sys::windows::{bad_state, Family};
+use sys::windows::bad_state;
 
 pub struct UdpSocket {
     imp: Imp,
@@ -40,7 +40,6 @@ struct Io {
 
 struct Inner {
     socket: Socket,
-    family: Family,
     iocp: Registration,
     read: State<Vec<u8>, Vec<u8>>,
     write: State<Vec<u8>, (Vec<u8>, usize)>,
@@ -49,7 +48,6 @@ struct Inner {
 
 enum Socket {
     Empty,
-    Building(UdpBuilder),
     Bound(net::UdpSocket),
 }
 
@@ -61,28 +59,14 @@ enum State<T, U> {
 }
 
 impl UdpSocket {
-    pub fn v4() -> io::Result<UdpSocket> {
-        UdpBuilder::new_v4().map(|u| {
-            UdpSocket::new(Socket::Building(u), Family::V4)
-        })
-    }
-
-    /// Returns a new, unbound, non-blocking, IPv6 UDP socket
-    pub fn v6() -> io::Result<UdpSocket> {
-        UdpBuilder::new_v6().map(|u| {
-            UdpSocket::new(Socket::Building(u), Family::V6)
-        })
-    }
-
-    fn new(socket: Socket, fam: Family) -> UdpSocket {
-        UdpSocket {
+    pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
+        Ok(UdpSocket {
             imp: Imp {
                 inner: FromRawArc::new(Io {
                     read: Overlapped::new(recv_done),
                     write: Overlapped::new(send_done),
                     inner: Mutex::new(Inner {
-                        socket: socket,
-                        family: fam,
+                        socket: Socket::Bound(socket),
                         iocp: Registration::new(),
                         read: State::Empty,
                         write: State::Empty,
@@ -90,14 +74,7 @@ impl UdpSocket {
                     }),
                 }),
             },
-        }
-    }
-
-    pub fn bind(&self, addr: &SocketAddr) -> io::Result<()> {
-        let mut me = self.inner();
-        let socket = try!(try!(me.socket.builder()).bind(addr));
-        me.socket = Socket::Bound(socket);
-        Ok(())
+        })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -106,9 +83,7 @@ impl UdpSocket {
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
         let me = self.inner();
-        try!(me.socket.socket()).try_clone().map(|s| {
-            UdpSocket::new(Socket::Bound(s), me.family)
-        })
+        try!(me.socket.socket()).try_clone().and_then(UdpSocket::new)
     }
 
     /// Note that unlike `TcpStream::write` this function will not attempt to
@@ -179,45 +154,72 @@ impl UdpSocket {
         }
     }
 
+    pub fn broadcast(&self) -> io::Result<bool> {
+        try!(self.inner().socket.socket()).broadcast()
+    }
+
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
         try!(self.inner().socket.socket()).set_broadcast(on)
     }
 
-    pub fn set_multicast_loop(&self, on: bool) -> io::Result<()> {
-        let me = self.inner();
-        let socket = try!(me.socket.socket());
-        match me.family {
-            Family::V4 => socket.set_multicast_loop_v4(on),
-            Family::V6 => socket.set_multicast_loop_v6(on),
-        }
+    pub fn multicast_loop_v4(&self) -> io::Result<bool> {
+        try!(self.inner().socket.socket()).multicast_loop_v4()
     }
 
-    pub fn join_multicast(&self, multi: &IpAddr) -> io::Result<()> {
-        let me = self.inner();
-        let socket = try!(me.socket.socket());
-        match *multi {
-            IpAddr::V4(ref v4) => {
-                socket.join_multicast_v4(v4, &super::ipv4_any())
-            }
-            IpAddr::V6(ref v6) => {
-                socket.join_multicast_v6(v6, 0)
-            }
-        }
+    pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
+        try!(self.inner().socket.socket()).set_multicast_loop_v4(on)
     }
 
-    pub fn leave_multicast(&self, multi: &IpAddr) -> io::Result<()> {
-        let me = self.inner();
-        let socket = try!(me.socket.socket());
-        match *multi {
-            IpAddr::V4(ref v4) => {
-                socket.leave_multicast_v4(v4, &super::ipv4_any())
-            }
-            IpAddr::V6(ref v6) => socket.leave_multicast_v6(v6, 0),
-        }
+    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
+        try!(self.inner().socket.socket()).multicast_ttl_v4()
     }
 
-    pub fn set_multicast_time_to_live(&self, ttl: i32) -> io::Result<()> {
-        try!(self.inner().socket.socket()).set_multicast_ttl_v4(ttl as u32)
+    pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
+        try!(self.inner().socket.socket()).set_multicast_ttl_v4(ttl)
+    }
+
+    pub fn multicast_loop_v6(&self) -> io::Result<bool> {
+        try!(self.inner().socket.socket()).multicast_loop_v6()
+    }
+
+    pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
+        try!(self.inner().socket.socket()).set_multicast_loop_v6(on)
+    }
+
+    pub fn ttl(&self) -> io::Result<u32> {
+        try!(self.inner().socket.socket()).ttl()
+    }
+
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        try!(self.inner().socket.socket()).set_ttl(ttl)
+    }
+
+    pub fn join_multicast_v4(&self,
+                             multiaddr: &Ipv4Addr,
+                             interface: &Ipv4Addr) -> io::Result<()> {
+        try!(self.inner().socket.socket()).join_multicast_v4(multiaddr, interface)
+    }
+
+    pub fn join_multicast_v6(&self,
+                             multiaddr: &Ipv6Addr,
+                             interface: u32) -> io::Result<()> {
+        try!(self.inner().socket.socket()).join_multicast_v6(multiaddr, interface)
+    }
+
+    pub fn leave_multicast_v4(&self,
+                              multiaddr: &Ipv4Addr,
+                              interface: &Ipv4Addr) -> io::Result<()> {
+        try!(self.inner().socket.socket()).leave_multicast_v4(multiaddr, interface)
+    }
+
+    pub fn leave_multicast_v6(&self,
+                              multiaddr: &Ipv6Addr,
+                              interface: u32) -> io::Result<()> {
+        try!(self.inner().socket.socket()).leave_multicast_v6(multiaddr, interface)
+    }
+
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        try!(self.inner().socket.socket()).take_error()
     }
 
     fn inner(&self) -> MutexGuard<Inner> {
@@ -248,8 +250,7 @@ impl Imp {
             _ => return,
         }
         let socket = match me.socket {
-            Socket::Empty |
-            Socket::Building(..) => return,
+            Socket::Empty => return,
             Socket::Bound(ref s) => s,
         };
 
@@ -294,7 +295,6 @@ impl Evented for UdpSocket {
             let me = &mut *me;
             let socket = match me.socket {
                 Socket::Bound(ref s) => s as &AsRawSocket,
-                Socket::Building(ref b) => b as &AsRawSocket,
                 Socket::Empty => return Err(bad_state()),
             };
             try!(me.iocp.register_socket(socket, poll, token, interest, opts));
@@ -310,7 +310,6 @@ impl Evented for UdpSocket {
             let me = &mut *me;
             let socket = match me.socket {
                 Socket::Bound(ref s) => s as &AsRawSocket,
-                Socket::Building(ref b) => b as &AsRawSocket,
                 Socket::Empty => return Err(bad_state()),
             };
             try!(me.iocp.reregister_socket(socket, poll, token, interest,
@@ -343,17 +342,10 @@ impl Drop for UdpSocket {
 }
 
 impl Socket {
-    fn builder(&self) -> io::Result<&UdpBuilder> {
-        match *self {
-            Socket::Building(ref s) => Ok(s),
-            _ => Err(bad_state()),
-        }
-    }
-
     fn socket(&self) -> io::Result<&net::UdpSocket> {
         match *self {
             Socket::Bound(ref s) => Ok(s),
-            _ => Err(bad_state()),
+            Socket::Empty => Err(bad_state()),
         }
     }
 }
