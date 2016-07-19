@@ -257,3 +257,10 @@ fn test_tcp_sockets_are_send() {
     assert_send::<TcpListener>();
     assert_send::<TcpStream>();
 }
+
+#[test]
+fn bind_twice_bad() {
+    let l1 = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = l1.local_addr().unwrap();
+    assert!(TcpListener::bind(&addr).is_err());
+}
