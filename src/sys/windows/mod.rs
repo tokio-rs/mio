@@ -137,7 +137,6 @@
 //!   be some level of buffering of writes probably.
 
 use std::io;
-use std::net::Ipv4Addr;
 
 mod awakener;
 #[macro_use]
@@ -164,5 +163,3 @@ fn bad_state() -> io::Error {
 fn wouldblock() -> io::Error {
     io::Error::new(io::ErrorKind::WouldBlock, "operation would block")
 }
-
-fn ipv4_any() -> Ipv4Addr { Ipv4Addr::new(0, 0, 0, 0) }

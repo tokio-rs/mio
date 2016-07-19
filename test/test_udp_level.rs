@@ -11,8 +11,8 @@ pub fn test_udp_level_triggered() {
     let mut events = Events::new();
 
     // Create the listener
-    let tx = UdpSocket::bound(&"127.0.0.1:0".parse().unwrap()).unwrap();
-    let rx = UdpSocket::bound(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    let tx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    let rx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     poll.register(&tx, Token(0), EventSet::all(), PollOpt::level()).unwrap();
     poll.register(&rx, Token(1), EventSet::all(), PollOpt::level()).unwrap();

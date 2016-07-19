@@ -77,8 +77,8 @@ pub fn test_udp_socket() {
     let addr = localhost();
     let any = str::FromStr::from_str("0.0.0.0:0").unwrap();
 
-    let tx = UdpSocket::bound(&any).unwrap();
-    let rx = UdpSocket::bound(&addr).unwrap();
+    let tx = UdpSocket::bind(&any).unwrap();
+    let rx = UdpSocket::bind(&addr).unwrap();
 
     assert_send::<UdpSocket>();
     assert_sync::<UdpSocket>();
