@@ -147,9 +147,9 @@ pub struct Events {
 }
 
 impl Events {
-    pub fn new() -> Events {
+    pub fn with_capacity(u: usize) -> Events {
         Events {
-            events: Vec::with_capacity(1024),
+            events: Vec::with_capacity(u)
         }
     }
 
