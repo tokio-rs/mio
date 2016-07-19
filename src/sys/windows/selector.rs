@@ -301,17 +301,13 @@ pub struct Events {
 }
 
 impl Events {
-    pub fn new() -> Events {
-        // Use a nice large space for receiving I/O events (currently the same
-        // as unix's 1024) and then also prepare the output vector to have the
-        // same space.
-        //
-        // Note that it's possible for the output `events` to grow beyond 1024
+    pub fn with_capacity(cap: usize) -> Events {
+        // Note that it's possible for the output `events` to grow beyond the
         // capacity as it can also include deferred events, but that's certainly
         // not the end of the world!
         Events {
-            statuses: vec![CompletionStatus::zero(); 1024].into_boxed_slice(),
-            events: Vec::with_capacity(1024),
+            statuses: vec![CompletionStatus::zero(); cap].into_boxed_slice(),
+            events: Vec::with_capacity(cap),
         }
     }
 

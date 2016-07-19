@@ -159,11 +159,11 @@ pub struct Events {
 }
 
 impl Events {
-    pub fn new() -> Events {
+    pub fn with_capacity(cap: usize) -> Events {
         Events {
-            sys_events: Vec::with_capacity(1024),
-            events: Vec::with_capacity(1024),
-            event_map: HashMap::with_capacity(1024)
+            sys_events: Vec::with_capacity(cap),
+            events: Vec::with_capacity(cap),
+            event_map: HashMap::with_capacity(cap)
         }
     }
 

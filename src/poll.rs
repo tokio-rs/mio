@@ -273,24 +273,50 @@ impl fmt::Debug for Poll {
     }
 }
 
+/// A buffer for I/O events to get placed into, passed to `Poll::poll`.
+///
+/// This structure is normally re-used on each turn of the event loop and will
+/// contain any I/O events that happen during a `poll`. After a call to `poll`
+/// returns the various accessor methods on this structure can be used to
+/// iterate over the underlying events that ocurred.
 pub struct Events {
     inner: sys::Events,
 }
 
 impl Events {
+    /// Creates a new blank set of events ready to get passed to `poll`.
+    ///
+    /// Note that this constructor will attempt to select a "reasonable" default
+    /// capacity for the events returned.
     pub fn new() -> Events {
+        Events::with_capacity(1024)
+    }
+
+    /// Create a net blank set of events capable of holding up to `capacity`
+    /// events.
+    ///
+    /// This parameter typically is an indicator on how many events can be
+    /// returned each turn of the event loop, but it is not necessarily a hard
+    /// limit across platforms.
+    pub fn with_capacity(capacity: usize) -> Events {
         Events {
-            inner: sys::Events::new(),
+            inner: sys::Events::with_capacity(capacity),
         }
     }
+
+    /// Returns the `idx`-th event.
+    ///
+    /// Returns `None` if `idx` is greater than the length of this event buffer.
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.inner.get(idx)
     }
 
+    /// Returns how many events this buffer contains.
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
+    /// Returns whether this buffer contains 0 events.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
