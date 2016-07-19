@@ -116,66 +116,6 @@ impl UdpSocket {
         self.io.take_error()
     }
 
-    // pub fn set_multicast_loop(&self, on: bool) -> io::Result<()> {
-    //     nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpMulticastLoop, &on)
-    //         .map_err(super::from_nix_error)
-    // }
-    //
-    // pub fn join_multicast(&self, multi: &IpAddr) -> io::Result<()> {
-    //     match *multi {
-    //         IpAddr::V4(ref addr) => {
-    //             // Create the request
-    //             let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
-    //
-    //             // Set the socket option
-    //             nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpAddMembership, &req)
-    //                 .map_err(super::from_nix_error)
-    //         }
-    //         IpAddr::V6(ref addr) => {
-    //             // Create the request
-    //             let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
-    //
-    //             // Set the socket option
-    //             nix::setsockopt(self.as_raw_fd(), nix::sockopt::Ipv6AddMembership, &req)
-    //                 .map_err(super::from_nix_error)
-    //         }
-    //     }
-    // }
-    //
-    // pub fn leave_multicast(&self, multi: &IpAddr) -> io::Result<()> {
-    //     match *multi {
-    //         IpAddr::V4(ref addr) => {
-    //             // Create the request
-    //             let req = nix::ip_mreq::new(nix::Ipv4Addr::from_std(addr), None);
-    //
-    //             // Set the socket option
-    //             nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpDropMembership, &req)
-    //                 .map_err(super::from_nix_error)
-    //         }
-    //         IpAddr::V6(ref addr) => {
-    //             // Create the request
-    //             let req = nix::ipv6_mreq::new(nix::Ipv6Addr::from_std(addr));
-    //
-    //             // Set the socket option
-    //             nix::setsockopt(self.as_raw_fd(), nix::sockopt::Ipv6DropMembership, &req)
-    //                 .map_err(super::from_nix_error)
-    //         }
-    //     }
-    // }
-    //
-    // pub fn set_multicast_time_to_live(&self, ttl: i32) -> io::Result<()> {
-    //     let v = if ttl < 0 {
-    //         0
-    //     } else if ttl > 255 {
-    //         255
-    //     } else {
-    //         ttl as u8
-    //     };
-    //
-    //     nix::setsockopt(self.as_raw_fd(), nix::sockopt::IpMulticastTtl, &v)
-    //         .map_err(super::from_nix_error)
-    // }
-
     fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
         let selector_id = self.selector_id.load(Ordering::SeqCst);
 
