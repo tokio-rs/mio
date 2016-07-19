@@ -194,8 +194,10 @@ impl TcpListener {
             SocketAddr::V6(..) => TcpBuilder::new_v6(),
         });
 
-        // Set SO_REUSEADDR
-        try!(sock.reuse_address(true));
+        // Set SO_REUSEADDR, but only on Unix (mirrors what libstd does)
+        if cfg!(unix) {
+            try!(sock.reuse_address(true));
+        }
 
         // Bind the socket
         try!(sock.bind(addr));
