@@ -1,6 +1,6 @@
 use {io, Evented, EventSet, Io, Poll, PollOpt, Token, TryAccept};
 use io::MapNonBlock;
-use sys::unix::{net, nix, Socket};
+use sys::unix::{net, nix};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
@@ -120,8 +120,6 @@ impl TryAccept for UnixSocket {
     }
 }
 
-impl Socket for UnixSocket {
-}
 
 impl From<Io> for UnixSocket {
     fn from(io: Io) -> UnixSocket {
