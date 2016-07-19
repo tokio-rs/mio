@@ -1,5 +1,5 @@
 use std::io::{Read, Write};
-use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 
 use net2::TcpBuilder;
 
@@ -28,21 +28,17 @@ impl TcpStream {
     /// `net2::TcpBuilder` to configure a socket and then pass its socket to
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
-    pub fn connect<A: ToSocketAddrs>(addr: &A) -> io::Result<TcpStream> {
-        super::each_addr(addr, |addr| {
-            let sock = try!(match *addr {
-                SocketAddr::V4(..) => TcpBuilder::new_v4(),
-                SocketAddr::V6(..) => TcpBuilder::new_v6(),
-            });
-
-            // Required on Windows for a future `connect_overlapped` operation to be
-            // executed successfully.
-            if cfg!(windows) {
-                try!(sock.bind(&inaddr_any(addr)));
-            }
-
-            TcpStream::connect_stream(try!(sock.to_tcp_stream()), addr)
-        })
+    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
+        let sock = try!(match *addr {
+            SocketAddr::V4(..) => TcpBuilder::new_v4(),
+            SocketAddr::V6(..) => TcpBuilder::new_v6(),
+        });
+        // Required on Windows for a future `connect_overlapped` operation to be
+        // executed successfully.
+        if cfg!(windows) {
+            try!(sock.bind(&inaddr_any(addr)));
+        }
+        TcpStream::connect_stream(try!(sock.to_tcp_stream()), addr)
     }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
