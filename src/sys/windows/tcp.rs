@@ -355,8 +355,17 @@ fn read_done(status: &CompletionStatus) {
 
     // If a read didn't complete, then the connect must have just finished.
     trace!("finished a connect");
-    me2.add_readiness(&mut me, EventSet::writable());
-    me2.schedule_read(&mut me);
+
+    match me.socket.connect_complete() {
+        Ok(()) => {
+            me2.add_readiness(&mut me, EventSet::writable());
+            me2.schedule_read(&mut me);
+        }
+        Err(e) => {
+            me2.add_readiness(&mut me, EventSet::readable());
+            me.read = State::Error(e);
+        }
+    }
 }
 
 fn write_done(status: &CompletionStatus) {
@@ -562,15 +571,15 @@ fn accept_done(status: &CompletionStatus) {
         _ => unreachable!(),
     };
     trace!("finished an accept");
-    me.accept = match me.accept_buf.parse(&me.socket) {
-        Ok(buf) => {
-            if let Some(remote_addr) = buf.remote() {
-                State::Ready((socket, remote_addr))
-            } else {
-                State::Error(io::Error::new(ErrorKind::Other,
-                                            "Could not obtain remote address"))
-            }
-        }
+    let result = me.socket.accept_complete(&socket).and_then(|()| {
+        me.accept_buf.parse(&me.socket)
+    }).and_then(|buf| {
+        buf.remote().ok_or_else(|| {
+            io::Error::new(ErrorKind::Other, "could not obtain remote address")
+        })
+    });
+    me.accept = match result {
+        Ok(remote_addr) => State::Ready((socket, remote_addr)),
         Err(e) => State::Error(e),
     };
     me2.add_readiness(&mut me, EventSet::readable());
