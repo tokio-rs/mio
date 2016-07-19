@@ -1,4 +1,6 @@
 #![cfg(unix)]
+
+use {TryRead, TryWrite};
 use mio::*;
 use mio::unix::*;
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};

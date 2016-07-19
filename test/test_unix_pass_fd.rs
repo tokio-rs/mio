@@ -1,9 +1,10 @@
+use {TryRead, TryWrite};
 use mio::*;
 use mio::unix::*;
-use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
+use bytes::{Buf, ByteBuf, SliceBuf};
 use slab;
 use std::path::PathBuf;
-use std::io;
+use std::io::{self, Read};
 use std::os::unix::io::AsRawFd;
 use tempdir::TempDir;
 
@@ -136,7 +137,6 @@ struct EchoClient {
     msgs: Vec<&'static str>,
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
-    mut_buf: Option<MutByteBuf>,
     token: Token,
     interest: EventSet,
 }
@@ -152,7 +152,6 @@ impl EchoClient {
             msgs: msgs,
             tx: SliceBuf::wrap(curr.as_bytes()),
             rx: SliceBuf::wrap(curr.as_bytes()),
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: tok,
             interest: EventSet::none(),
         }
@@ -161,17 +160,16 @@ impl EchoClient {
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("client socket readable");
 
-        let mut buf = self.mut_buf.take().unwrap();
         let mut pipe: PipeReader;
+        let mut buf = [0; 256];
 
-        match self.sock.try_read_buf_recv_fd(&mut buf) {
-            Ok(None) => {
-                panic!("We just got readable, but were unable to read from the socket?");
-            }
-            Ok(Some((_, None))) => {
+        match self.sock.read_recv_fd(&mut buf) {
+            Ok((_, None)) => {
                 panic!("Did not receive passed file descriptor");
             }
-            Ok(Some((r, Some(fd)))) => {
+            Ok((r, Some(fd))) => {
+                assert_eq!(r, 1);
+                assert_eq!(b'x', buf[0]);
                 debug!("CLIENT : We read {} bytes!", r);
                 pipe = From::<Io>::from(From::from(fd));
             }
@@ -180,36 +178,21 @@ impl EchoClient {
             }
         };
 
-        // read the message accompanying the FD
-        let mut buf = buf.flip();
-        assert_eq!(buf.remaining(), 1);
-        assert_eq!(buf.read_byte(), Some(b'x'));
-
         // read the data out of the FD itself
-        let mut buf = buf.flip();
-        match pipe.try_read_buf(&mut buf) {
-            Ok(None) => {
-                panic!("unimplemented");
-            }
-            Ok(Some(r)) => {
+        let n = match pipe.read(&mut buf) {
+            Ok(r) => {
                 debug!("CLIENT : We read {} bytes from the FD", r);
+                r
             }
             Err(e) => {
                 panic!("not implemented, client err={:?}", e);
             }
-        }
+        };
 
-        let mut buf = buf.flip();
-
-        debug!("CLIENT : buf = {:?} -- rx = {:?}", buf.bytes(), self.rx.bytes());
-        while buf.has_remaining() {
-            let actual = buf.read_byte().unwrap();
+        for &actual in buf[0..n].iter() {
             let expect = self.rx.read_byte().unwrap();
-
             assert!(actual == expect, "actual={}; expect={}", actual, expect);
         }
-
-        self.mut_buf = Some(buf.flip());
 
         self.interest.remove(EventSet::readable());
 

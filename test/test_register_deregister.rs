@@ -1,7 +1,7 @@
+use {localhost, TryWrite};
 use mio::*;
 use mio::tcp::*;
 use bytes::SliceBuf;
-use localhost;
 use std::time::Duration;
 
 const SERVER: Token = Token(0);

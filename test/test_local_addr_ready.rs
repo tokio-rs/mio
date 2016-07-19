@@ -1,3 +1,4 @@
+use {TryWrite};
 use mio::*;
 use mio::tcp::{TcpListener, TcpStream};
 

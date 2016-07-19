@@ -1,4 +1,4 @@
-use {sleep_ms};
+use {sleep_ms, TryRead, TryWrite};
 use mio::*;
 use mio::timer::{Timer};
 

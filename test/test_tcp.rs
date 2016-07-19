@@ -7,7 +7,8 @@ use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
 
-use mio::{EventLoop, Handler, Token, EventSet, PollOpt, TryRead, TryWrite};
+use {TryRead, TryWrite};
+use mio::{EventLoop, Handler, Token, EventSet, PollOpt};
 use mio::tcp::{TcpListener, TcpStream};
 
 #[test]

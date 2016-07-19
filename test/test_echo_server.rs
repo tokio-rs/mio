@@ -1,9 +1,9 @@
+use {localhost, TryRead, TryWrite};
 use mio::*;
 use mio::tcp::*;
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use slab;
 use std::io;
-use localhost;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);

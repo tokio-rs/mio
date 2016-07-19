@@ -82,7 +82,7 @@
 #![crate_name = "mio"]
 #![cfg_attr(unix, deny(warnings))]
 
-extern crate bytes;
+extern crate net2;
 extern crate slab;
 
 #[cfg(unix)]
@@ -96,8 +96,6 @@ extern crate miow;
 
 #[cfg(windows)]
 extern crate winapi;
-
-extern crate net2;
 
 #[macro_use]
 extern crate log;
@@ -133,8 +131,6 @@ pub use handler::{
     Handler,
 };
 pub use io::{
-    TryRead,
-    TryWrite,
     Evented,
     TryAccept,
 };

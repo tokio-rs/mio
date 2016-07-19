@@ -1,7 +1,7 @@
+use {localhost, TryRead};
 use mio::*;
 use bytes::ByteBuf;
 use mio::tcp::*;
-use localhost;
 
 use self::TestState::{Initial, AfterRead, AfterHup};
 

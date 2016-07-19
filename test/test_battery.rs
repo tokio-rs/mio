@@ -1,4 +1,4 @@
-use {localhost, sleep_ms};
+use {localhost, sleep_ms, TryRead, TryWrite};
 use mio::*;
 use mio::tcp::*;
 use std::collections::LinkedList;

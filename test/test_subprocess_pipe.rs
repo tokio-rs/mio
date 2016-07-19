@@ -1,7 +1,6 @@
 #![cfg(unix)]
 
-extern crate mio;
-extern crate bytes;
+use {TryRead, TryWrite};
 use std::mem;
 use mio::*;
 use std::io;

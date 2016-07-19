@@ -2,7 +2,6 @@ use {io, sys, Evented, EventSet, Io, Poll, PollOpt, Token, TryAccept};
 use io::MapNonBlock;
 use std::io::{Read, Write};
 use std::path::Path;
-use bytes::{Buf, MutBuf};
 pub use nix::sys::socket::Shutdown;
 use std::process;
 
@@ -96,28 +95,12 @@ impl UnixStream {
         self.read_recv_fd(buf).map_non_block()
     }
 
-    pub fn try_read_buf_recv_fd<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<(usize, Option<RawFd>)>> {
-        let res = self.try_read_recv_fd(unsafe { buf.mut_bytes() });
-        if let Ok(Some((cnt, _))) = res {
-            unsafe { buf.advance(cnt); }
-        }
-        res
-    }
-
     pub fn write_send_fd(&mut self, buf: &[u8], fd: RawFd) -> io::Result<usize> {
         self.sys.write_send_fd(buf, fd)
     }
 
     pub fn try_write_send_fd(&mut self, buf: &[u8], fd: RawFd) -> io::Result<Option<usize>> {
         self.write_send_fd(buf, fd).map_non_block()
-    }
-
-    pub fn try_write_buf_send_fd<B: Buf>(&mut self, buf: &mut B, fd: RawFd) -> io::Result<Option<usize>> {
-        let res = self.try_write_send_fd(buf.bytes(), fd);
-        if let Ok(Some(cnt)) = res {
-            buf.advance(cnt);
-        }
-        res
     }
 }
 

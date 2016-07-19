@@ -2,8 +2,9 @@ pub use self::pipe::Awakener;
 
 /// Default *nix awakener implementation
 mod pipe {
-    use {io, Evented, EventSet, Poll, PollOpt, Token, TryRead, TryWrite};
+    use {io, Evented, EventSet, Poll, PollOpt, Token};
     use unix::{self, PipeReader, PipeWriter};
+    use std::io::{Read, Write};
 
     /*
      *
@@ -27,7 +28,16 @@ mod pipe {
         }
 
         pub fn wakeup(&self) -> io::Result<()> {
-            (&self.writer).try_write(b"0x01").map(|_| ())
+            match (&self.writer).write(b"0x01") {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    if e.kind() == io::ErrorKind::WouldBlock {
+                        Ok(())
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
         }
 
         pub fn cleanup(&self) {
@@ -35,8 +45,8 @@ mod pipe {
 
             loop {
                 // Consume data until all bytes are purged
-                match (&self.reader).try_read(&mut buf) {
-                    Ok(Some(i)) if i > 0 => {},
+                match (&self.reader).read(&mut buf) {
+                    Ok(i) if i > 0 => {},
                     _ => return,
                 }
             }

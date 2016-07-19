@@ -1,4 +1,4 @@
-use {sleep_ms};
+use {sleep_ms, TryRead};
 use mio::*;
 use mio::tcp::*;
 use std::io::Write;
