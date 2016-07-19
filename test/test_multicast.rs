@@ -81,14 +81,15 @@ pub fn test_multicast() {
     let addr = localhost();
     let any = "0.0.0.0:0".parse().unwrap();
 
-    let tx = UdpSocket::bound(&any).unwrap();
-    let rx = UdpSocket::bound(&addr).unwrap();
+    let tx = UdpSocket::bind(&any).unwrap();
+    let rx = UdpSocket::bind(&addr).unwrap();
 
     info!("Joining group 227.1.1.100");
-    rx.join_multicast(&"227.1.1.100".parse().unwrap()).unwrap();
+    let any = "0.0.0.0".parse().unwrap();
+    rx.join_multicast_v4(&"227.1.1.100".parse().unwrap(), &any).unwrap();
 
     info!("Joining group 227.1.1.101");
-    rx.join_multicast(&"227.1.1.101".parse().unwrap()).unwrap();
+    rx.join_multicast_v4(&"227.1.1.101".parse().unwrap(), &any).unwrap();
 
     info!("Registering SENDER");
     event_loop.register(&tx, SENDER, EventSet::writable(), PollOpt::edge()).unwrap();
