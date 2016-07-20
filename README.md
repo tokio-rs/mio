@@ -38,7 +38,7 @@ extern crate mio;
 
 * Event loop backed by epoll, kqueue.
 * Zero allocations at runtime
-* Non-blocking TCP, UDP and Unix domain sockets
+* Non-blocking TCP and UDP
 * High performance timer system
 * Thread safe message channel for cross thread communication
 

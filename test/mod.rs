@@ -30,13 +30,6 @@ mod test_tick;
 mod test_timer;
 mod test_udp_level;
 mod test_udp_socket;
-mod test_uds_shutdown;
-
-// ===== Unix only tests =====
-#[cfg(unix)]
-mod test_unix_echo_server;
-#[cfg(unix)]
-mod test_unix_pass_fd;
 
 use bytes::{Buf, MutBuf};
 use std::io::{self, Read, Write};
