@@ -159,11 +159,8 @@ impl<T> Timer<T> {
     }
 
     fn set_timeout_at(&mut self, delay_from_start: Duration, state: T) -> Result<Timeout> {
-        // Calculate tick rounding up to the closest one
-        let delay_ms = convert::millis(delay_from_start).saturating_add(self.tick_ms / 2);
-        let mut tick = delay_ms / self.tick_ms;
-
-        trace!("setting timeout; delay={:?}; tick={:?}; current-tick={:?}", delay_ms, tick, self.tick);
+        let mut tick = duration_to_tick(delay_from_start, self.tick_ms);
+        trace!("setting timeout; delay={:?}; tick={:?}; current-tick={:?}", delay_from_start, tick, self.tick);
 
         // Always target at least 1 tick in the future
         if tick <= self.tick {
@@ -433,8 +430,14 @@ fn spawn_wakeup_thread(state: WakeupState, set_readiness: SetReadiness, start: I
     })
 }
 
+fn duration_to_tick(elapsed: Duration, tick_ms: u64) -> Tick {
+    // Calculate tick rounding up to the closest one
+    let elapsed_ms = convert::millis(elapsed);
+    elapsed_ms.saturating_add(tick_ms / 2) / tick_ms
+}
+
 fn current_tick(start: Instant, tick_ms: u64) -> Tick {
-    convert::millis(start.elapsed()) / tick_ms
+    duration_to_tick(start.elapsed(), tick_ms)
 }
 
 impl<T> Entry<T> {
