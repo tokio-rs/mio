@@ -144,9 +144,6 @@ pub mod unix {
         pipe,
         PipeReader,
         PipeWriter,
-        UnixListener,
-        UnixSocket,
-        UnixStream,
         Shutdown,
     };
     pub use sys::{
