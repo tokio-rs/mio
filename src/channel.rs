@@ -48,6 +48,10 @@ struct Inner {
     set_readiness: AtomicLazy<SetReadiness>,
 }
 
+pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
+    from_std_channel(mpsc::channel())
+}
+
 pub fn from_std_channel<T>((tx, rx): (mpsc::Sender<T>, mpsc::Receiver<T>)) -> (Sender<T>, Receiver<T>)
 {
     let (tx_ctl, rx_ctl) = ctl_pair();
