@@ -5,7 +5,6 @@ use lazy::{Lazy, AtomicLazy};
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[derive(Clone)]
 pub struct SenderCtl {
     inner: Arc<Inner>,
 }
@@ -44,7 +43,11 @@ pub enum TrySendError<T> {
 }
 
 struct Inner {
+    // The number of outstanding messages for the receiver to read
     pending: AtomicUsize,
+    // The number of sender handles
+    senders: AtomicUsize,
+    // The set readiness handle
     set_readiness: AtomicLazy<SetReadiness>,
 }
 
@@ -89,6 +92,7 @@ pub fn from_std_sync_channel<T>((tx, rx): (mpsc::SyncSender<T>, mpsc::Receiver<T
 pub fn ctl_pair() -> (SenderCtl, ReceiverCtl) {
     let inner = Arc::new(Inner {
         pending: AtomicUsize::new(0),
+        senders: AtomicUsize::new(1),
         set_readiness: AtomicLazy::new(),
     });
 
@@ -107,7 +111,9 @@ pub fn ctl_pair() -> (SenderCtl, ReceiverCtl) {
 impl SenderCtl {
     /// Call to track that a message has been sent
     pub fn inc(&self) -> io::Result<()> {
-        if 0 == self.inner.pending.fetch_add(1, Ordering::Acquire) {
+        let cnt = self.inner.pending.fetch_add(1, Ordering::Acquire);
+
+        if 0 == cnt {
             // Toggle readiness to readable
             if let Some(set_readiness) = self.inner.set_readiness.as_ref() {
                 try!(set_readiness.set_readiness(EventSet::readable()));
@@ -115,6 +121,21 @@ impl SenderCtl {
         }
 
         Ok(())
+    }
+}
+
+impl Clone for SenderCtl {
+    fn clone(&self) -> SenderCtl {
+        self.inner.senders.fetch_add(1, Ordering::Relaxed);
+        SenderCtl { inner: self.inner.clone() }
+    }
+}
+
+impl Drop for SenderCtl {
+    fn drop(&mut self) {
+        if self.inner.senders.fetch_sub(1, Ordering::Release) == 1 {
+            let _ = self.inc();
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 use {sleep_ms};
 use mio::*;
-use std::sync::mpsc;
+use std::sync::mpsc::{self, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
@@ -48,6 +48,25 @@ pub fn test_poll_channel_edge() {
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
     assert_eq!(event.kind(), EventSet::readable());
+
+    // Read the value
+    rx.try_recv().unwrap();
+
+    // Drop the sender half
+    drop(tx);
+
+    let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
+    assert_eq!(1, num);
+
+    let event = events.get(0).unwrap();
+    assert_eq!(event.token(), Token(123));
+    assert_eq!(event.kind(), EventSet::readable());
+
+    match rx.try_recv() {
+        Err(TryRecvError::Disconnected) => {}
+        no => panic!("unexpected value {:?}", no),
+    }
+
 }
 
 #[test]
