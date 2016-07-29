@@ -2,7 +2,6 @@ use {channel, Handler, Evented, Poll, Events, NotifyError, Token};
 use event::{Event, EventSet, PollOpt};
 use timer::{self, Timer, Timeout};
 use std::{io, fmt, usize};
-use std::sync::mpsc;
 use std::default::Default;
 use std::time::Duration;
 
@@ -90,7 +89,7 @@ pub struct EventLoop<H: Handler> {
     poll: Poll,
     events: Events,
     timer: Timer<H::Timeout>,
-    notify_tx: channel::Sender<H::Message>,
+    notify_tx: channel::SyncSender<H::Message>,
     notify_rx: channel::Receiver<H::Message>,
     config: Config,
 }
@@ -118,7 +117,7 @@ impl<H: Handler> EventLoop<H> {
             .build();
 
         // Create cross thread notification queue
-        let (tx, rx) = channel::from_std_sync_channel(mpsc::sync_channel(config.notify_capacity));
+        let (tx, rx) = channel::sync_channel(config.notify_capacity);
 
         // Register the notification wakeup FD with the IO poller
         try!(poll.register(&rx, NOTIFY, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()));
@@ -369,7 +368,7 @@ impl<H: Handler> fmt::Debug for EventLoop<H> {
 
 /// Sends messages to the EventLoop from other threads.
 pub struct Sender<M> {
-    tx: channel::Sender<M>
+    tx: channel::SyncSender<M>
 }
 
 impl<M> fmt::Debug for Sender<M> {
@@ -385,7 +384,7 @@ impl<M> Clone for Sender <M> {
 }
 
 impl<M> Sender<M> {
-    fn new(tx: channel::Sender<M>) -> Sender<M> {
+    fn new(tx: channel::SyncSender<M>) -> Sender<M> {
         Sender { tx: tx }
     }
 

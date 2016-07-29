@@ -5,62 +5,14 @@ use lazy::{Lazy, AtomicLazy};
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub struct SenderCtl {
-    inner: Arc<Inner>,
-}
-
-pub struct ReceiverCtl {
-    registration: Lazy<Registration>,
-    inner: Arc<Inner>,
-}
-
-pub struct Sender<T> {
-    tx: StdSender<T>,
-    ctl: SenderCtl,
-}
-
-enum StdSender<T> {
-    Bounded(mpsc::SyncSender<T>),
-    Unbounded(mpsc::Sender<T>),
-}
-
-pub struct Receiver<T> {
-    rx: mpsc::Receiver<T>,
-    ctl: ReceiverCtl,
-}
-
-#[derive(Debug)]
-pub enum SendError<T> {
-    Io(io::Error),
-    Disconnected(T),
-}
-
-#[derive(Debug)]
-pub enum TrySendError<T> {
-    Io(io::Error),
-    Full(T),
-    Disconnected(T),
-}
-
-struct Inner {
-    // The number of outstanding messages for the receiver to read
-    pending: AtomicUsize,
-    // The number of sender handles
-    senders: AtomicUsize,
-    // The set readiness handle
-    set_readiness: AtomicLazy<SetReadiness>,
-}
-
+/// Creates a new asynchronous channel, where the `Receiver` can be registered
+/// with `Poll`.
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
-    from_std_channel(mpsc::channel())
-}
-
-pub fn from_std_channel<T>((tx, rx): (mpsc::Sender<T>, mpsc::Receiver<T>)) -> (Sender<T>, Receiver<T>)
-{
     let (tx_ctl, rx_ctl) = ctl_pair();
+    let (tx, rx) = mpsc::channel();
 
     let tx = Sender {
-        tx: StdSender::Unbounded(tx),
+        tx: tx,
         ctl: tx_ctl,
     };
 
@@ -72,12 +24,14 @@ pub fn from_std_channel<T>((tx, rx): (mpsc::Sender<T>, mpsc::Receiver<T>)) -> (S
     (tx, rx)
 }
 
-pub fn from_std_sync_channel<T>((tx, rx): (mpsc::SyncSender<T>, mpsc::Receiver<T>)) -> (Sender<T>, Receiver<T>)
-{
+/// Creates a new synchronous, bounded channel where the `Receiver` can be
+/// registered with `Poll`.
+pub fn sync_channel<T>(bound: usize) -> (SyncSender<T>, Receiver<T>) {
     let (tx_ctl, rx_ctl) = ctl_pair();
+    let (tx, rx) = mpsc::sync_channel(bound);
 
-    let tx = Sender {
-        tx: StdSender::Bounded(tx),
+    let tx = SyncSender {
+        tx: tx,
         ctl: tx_ctl,
     };
 
@@ -107,6 +61,132 @@ pub fn ctl_pair() -> (SenderCtl, ReceiverCtl) {
 
     (tx, rx)
 }
+
+/// Tracks messages sent on a channel in order to update readiness.
+pub struct SenderCtl {
+    inner: Arc<Inner>,
+}
+
+/// Tracks messages received on a channel in order to track readiness.
+pub struct ReceiverCtl {
+    registration: Lazy<Registration>,
+    inner: Arc<Inner>,
+}
+
+pub struct Sender<T> {
+    tx: mpsc::Sender<T>,
+    ctl: SenderCtl,
+}
+
+pub struct SyncSender<T> {
+    tx: mpsc::SyncSender<T>,
+    ctl: SenderCtl,
+}
+
+pub struct Receiver<T> {
+    rx: mpsc::Receiver<T>,
+    ctl: ReceiverCtl,
+}
+
+#[derive(Debug)]
+pub enum SendError<T> {
+    Io(io::Error),
+    Disconnected(T),
+}
+
+#[derive(Debug)]
+pub enum TrySendError<T> {
+    Io(io::Error),
+    Full(T),
+    Disconnected(T),
+}
+
+struct Inner {
+    // The number of outstanding messages for the receiver to read
+    pending: AtomicUsize,
+    // The number of sender handles
+    senders: AtomicUsize,
+    // The set readiness handle
+    set_readiness: AtomicLazy<SetReadiness>,
+}
+
+impl<T> Sender<T> {
+    pub fn send(&self, t: T) -> Result<(), SendError<T>> {
+        self.tx.send(t)
+            .map_err(SendError::from)
+            .and_then(|_| {
+                try!(self.ctl.inc());
+                Ok(())
+            })
+    }
+}
+
+impl<T> Clone for Sender<T> {
+    fn clone(&self) -> Sender<T> {
+        Sender {
+            tx: self.tx.clone(),
+            ctl: self.ctl.clone(),
+        }
+    }
+}
+
+impl<T> SyncSender<T> {
+    pub fn send(&self, t: T) -> Result<(), SendError<T>> {
+        self.tx.send(t)
+            .map_err(From::from)
+            .and_then(|_| {
+                try!(self.ctl.inc());
+                Ok(())
+            })
+    }
+
+    pub fn try_send(&self, t: T) -> Result<(), TrySendError<T>> {
+        self.tx.try_send(t)
+            .map_err(From::from)
+            .and_then(|_| {
+                try!(self.ctl.inc());
+                Ok(())
+            })
+    }
+}
+
+impl<T> Clone for SyncSender<T> {
+    fn clone(&self) -> SyncSender<T> {
+        SyncSender {
+            tx: self.tx.clone(),
+            ctl: self.ctl.clone(),
+        }
+    }
+}
+
+impl<T> Receiver<T> {
+    pub fn try_recv(&self) -> Result<T, mpsc::TryRecvError> {
+        self.rx.try_recv().and_then(|res| {
+            let _ = self.ctl.dec();
+            Ok(res)
+        })
+    }
+}
+
+impl<T> Evented for Receiver<T> {
+    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.ctl.register(poll, token, interest, opts)
+    }
+
+    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        self.ctl.reregister(poll, token, interest, opts)
+    }
+
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+        self.ctl.deregister(poll)
+    }
+}
+
+/*
+ *
+ * ===== SenderCtl / ReceiverCtl =====
+ *
+ */
 
 impl SenderCtl {
     /// Call to track that a message has been sent
@@ -200,78 +280,11 @@ impl Evented for ReceiverCtl {
     }
 }
 
-impl<T> Sender<T> {
-    pub fn send(&self, t: T) -> Result<(), SendError<T>> {
-        self.tx.send(t).and_then(|_| {
-            try!(self.ctl.inc());
-            Ok(())
-        })
-    }
-
-    pub fn try_send(&self, t: T) -> Result<(), TrySendError<T>> {
-        self.tx.try_send(t).and_then(|_| {
-            try!(self.ctl.inc());
-            Ok(())
-        })
-    }
-}
-
-impl<T> Clone for Sender<T> {
-    fn clone(&self) -> Sender<T> {
-        Sender {
-            tx: self.tx.clone(),
-            ctl: self.ctl.clone(),
-        }
-    }
-}
-
-impl<T> StdSender<T> {
-    pub fn send(&self, t: T) -> Result<(), SendError<T>> {
-        match *self {
-            StdSender::Bounded(ref tx) => tx.send(t).map_err(SendError::from),
-            StdSender::Unbounded(ref tx) => tx.send(t).map_err(SendError::from),
-        }
-    }
-
-    pub fn try_send(&self, t: T) -> Result<(), TrySendError<T>> {
-        match *self {
-            StdSender::Bounded(ref tx) => tx.try_send(t).map_err(TrySendError::from),
-            StdSender::Unbounded(ref tx) => tx.send(t).map_err(TrySendError::from),
-        }
-    }
-}
-
-impl<T> Clone for StdSender<T> {
-    fn clone(&self) -> StdSender<T> {
-        match *self {
-            StdSender::Bounded(ref v) => StdSender::Bounded(v.clone()),
-            StdSender::Unbounded(ref v) => StdSender::Unbounded(v.clone()),
-        }
-    }
-}
-
-impl<T> Receiver<T> {
-    pub fn try_recv(&self) -> Result<T, mpsc::TryRecvError> {
-        self.rx.try_recv().and_then(|res| {
-            let _ = self.ctl.dec();
-            Ok(res)
-        })
-    }
-}
-
-impl<T> Evented for Receiver<T> {
-    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.ctl.register(poll, token, interest, opts)
-    }
-
-    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        self.ctl.reregister(poll, token, interest, opts)
-    }
-
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.ctl.deregister(poll)
-    }
-}
+/*
+ *
+ * ===== Error conversions =====
+ *
+ */
 
 impl<T> From<mpsc::SendError<T>> for SendError<T> {
     fn from(src: mpsc::SendError<T>) -> SendError<T> {

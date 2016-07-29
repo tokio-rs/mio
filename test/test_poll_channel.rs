@@ -1,6 +1,6 @@
 use {sleep_ms};
 use mio::*;
-use std::sync::mpsc::{self, TryRecvError};
+use std::sync::mpsc::TryRecvError;
 use std::thread;
 use std::time::Duration;
 
@@ -8,7 +8,7 @@ use std::time::Duration;
 pub fn test_poll_channel_edge() {
     let poll = Poll::new().unwrap();
     let mut events = Events::new();
-    let (tx, rx) = channel::from_std_channel(mpsc::channel());
+    let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), EventSet::readable(), PollOpt::edge()).unwrap();
 
@@ -73,7 +73,7 @@ pub fn test_poll_channel_edge() {
 pub fn test_poll_channel_oneshot() {
     let poll = Poll::new().unwrap();
     let mut events = Events::new();
-    let (tx, rx) = channel::from_std_channel(mpsc::channel());
+    let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
@@ -143,7 +143,7 @@ pub fn test_poll_channel_oneshot() {
 pub fn test_poll_channel_level() {
     let poll = Poll::new().unwrap();
     let mut events = Events::new();
-    let (tx, rx) = channel::from_std_channel(mpsc::channel());
+    let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), EventSet::readable(), PollOpt::level()).unwrap();
 
@@ -176,7 +176,7 @@ pub fn test_poll_channel_level() {
 pub fn test_poll_channel_writable() {
     let poll = Poll::new().unwrap();
     let mut events = Events::new();
-    let (tx, rx) = channel::from_std_channel(mpsc::channel());
+    let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), EventSet::writable(), PollOpt::edge()).unwrap();
 
@@ -196,7 +196,7 @@ pub fn test_poll_channel_writable() {
 pub fn test_dropping_receive_before_poll() {
     let poll = Poll::new().unwrap();
     let mut events = Events::new();
-    let (tx, rx) = channel::from_std_channel(mpsc::channel());
+    let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), EventSet::readable(), PollOpt::edge()).unwrap();
 
@@ -217,7 +217,7 @@ pub fn test_mixing_channel_with_socket() {
 
     let poll = Poll::new().unwrap();
     let mut events = Events::new();
-    let (tx, rx) = channel::from_std_channel(mpsc::channel());
+    let (tx, rx) = channel::channel();
 
     // Create the listener
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
@@ -257,7 +257,7 @@ pub fn test_sending_from_other_thread_while_polling() {
     let mut events = Events::new();
 
     for _ in 0..ITERATIONS {
-        let (tx, rx) = channel::from_std_channel(mpsc::channel());
+        let (tx, rx) = channel::channel();
         poll.register(&rx, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
 
         for _ in 0..THREADS {
