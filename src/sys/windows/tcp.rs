@@ -60,6 +60,7 @@ struct StreamIo {
 struct ListenerIo {
     inner: Mutex<ListenerInner>,
     accept: Overlapped,
+    family: Family,
 }
 
 struct StreamInner {
@@ -72,7 +73,6 @@ struct StreamInner {
 
 struct ListenerInner {
     socket: net::TcpListener,
-    family: Family,
     iocp: Registration,
     accept: State<net::TcpStream, (net::TcpStream, SocketAddr)>,
     accept_buf: AcceptAddrsBuf,
@@ -467,12 +467,12 @@ impl TcpListener {
             imp: ListenerImp {
                 inner: FromRawArc::new(ListenerIo {
                     accept: Overlapped::new(accept_done),
+                    family: family,
                     inner: Mutex::new(ListenerInner {
                         socket: socket,
                         iocp: Registration::new(),
                         accept: State::Empty,
                         accept_buf: AcceptAddrsBuf::new(),
-                        family: family,
                     }),
                 }),
             },
@@ -506,7 +506,7 @@ impl TcpListener {
     pub fn try_clone(&self) -> io::Result<TcpListener> {
         let inner = self.inner();
         inner.socket.try_clone().map(|s| {
-            TcpListener::new_family(s, inner.family)
+            TcpListener::new_family(s, self.imp.inner.family)
         })
     }
 
@@ -537,7 +537,7 @@ impl ListenerImp {
 
         me.iocp.set_readiness(me.iocp.readiness() & !EventSet::readable());
 
-        let res = match me.family {
+        let res = match self.inner.family {
             Family::V4 => TcpBuilder::new_v4(),
             Family::V6 => TcpBuilder::new_v6(),
         }.and_then(|builder| unsafe {
