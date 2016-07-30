@@ -5,6 +5,8 @@ use mio::{Poll, Events, EventSet, PollOpt, Token, Evented};
 
 #[test]
 fn write_then_drop() {
+    drop(::env_logger::init());
+
     let a = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = a.local_addr().unwrap();
     let mut s = TcpStream::connect(&addr).unwrap();
@@ -15,6 +17,10 @@ fn write_then_drop() {
     a.register(&poll,
                Token(1),
                EventSet::readable(),
+               PollOpt::edge()).unwrap();
+    s.register(&poll,
+               Token(3),
+               EventSet::none(),
                PollOpt::edge()).unwrap();
 
     poll.poll(&mut events, None).unwrap();
@@ -35,10 +41,10 @@ fn write_then_drop() {
     s2.write(&[1, 2, 3, 4]).unwrap();
     drop(s2);
 
-    s.register(&poll,
-               Token(3),
-               EventSet::readable(),
-               PollOpt::edge()).unwrap();
+    s.reregister(&poll,
+                 Token(3),
+                 EventSet::readable(),
+                 PollOpt::edge()).unwrap();
     poll.poll(&mut events, None).unwrap();
     assert_eq!(events.len(), 1);
     assert_eq!(events.get(0).unwrap().token(), Token(3));

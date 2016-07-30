@@ -137,6 +137,12 @@
 //!   be some level of buffering of writes probably.
 
 use std::io;
+use std::os::windows::prelude::*;
+
+use kernel32;
+use winapi;
+
+use self::selector::Overlapped;
 
 mod awakener;
 #[macro_use]
@@ -162,4 +168,16 @@ fn bad_state() -> io::Error {
 
 fn wouldblock() -> io::Error {
     io::Error::new(io::ErrorKind::WouldBlock, "operation would block")
+}
+
+unsafe fn cancel(socket: &AsRawSocket,
+                 overlapped: &Overlapped) -> io::Result<()> {
+    let handle = socket.as_raw_socket() as winapi::HANDLE;
+    let overlapped = overlapped.get_mut().raw();
+    let ret = kernel32::CancelIoEx(handle, overlapped);
+    if ret == 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }

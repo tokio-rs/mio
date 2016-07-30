@@ -336,12 +336,22 @@ impl fmt::Debug for UdpSocket {
 
 impl Drop for UdpSocket {
     fn drop(&mut self) {
-        let mut inner = self.inner();
+        let inner = self.inner();
 
-        inner.socket = Socket::Empty;
-
-        // Then run any finalization code including level notifications
-        inner.iocp.set_readiness(EventSet::none());
+        // If we're still internally reading, we're no longer interested. Note
+        // though that we don't cancel any writes which may have been issued to
+        // preserve the same semantics as Unix.
+        unsafe {
+            match inner.read {
+                State::Pending(_) => {
+                    drop(super::cancel(inner.socket.socket().unwrap(),
+                                       &self.imp.inner.read));
+                }
+                State::Empty |
+                State::Ready(_) |
+                State::Error(_) => {}
+            }
+        }
     }
 }
 
