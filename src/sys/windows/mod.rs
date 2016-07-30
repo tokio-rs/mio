@@ -162,10 +162,6 @@ enum Family {
     V4, V6,
 }
 
-fn bad_state() -> io::Error {
-    io::Error::new(io::ErrorKind::Other, "bad state to make this function call")
-}
-
 fn wouldblock() -> io::Error {
     io::Error::new(io::ErrorKind::WouldBlock, "operation would block")
 }
