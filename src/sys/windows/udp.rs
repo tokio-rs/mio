@@ -8,7 +8,6 @@ use std::io::prelude::*;
 use std::io;
 use std::mem;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 
 #[allow(unused_imports)]
@@ -19,12 +18,13 @@ use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
 use {Evented, EventSet, Poll, PollOpt, Token};
-use sys::windows::selector::{Overlapped, Registration};
+use poll;
 use sys::windows::from_raw_arc::FromRawArc;
-use sys::windows::bad_state;
+use sys::windows::selector::{Overlapped, Registration};
 
 pub struct UdpSocket {
     imp: Imp,
+    registration: Mutex<Option<poll::Registration>>,
 }
 
 #[derive(Clone)]
@@ -35,20 +35,15 @@ struct Imp {
 struct Io {
     read: Overlapped,
     write: Overlapped,
+    socket: net::UdpSocket,
     inner: Mutex<Inner>,
 }
 
 struct Inner {
-    socket: Socket,
     iocp: Registration,
     read: State<Vec<u8>, Vec<u8>>,
     write: State<Vec<u8>, (Vec<u8>, usize)>,
     read_buf: SocketAddrBuf,
-}
-
-enum Socket {
-    Empty,
-    Bound(net::UdpSocket),
 }
 
 enum State<T, U> {
@@ -61,12 +56,13 @@ enum State<T, U> {
 impl UdpSocket {
     pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         Ok(UdpSocket {
+            registration: Mutex::new(None),
             imp: Imp {
                 inner: FromRawArc::new(Io {
                     read: Overlapped::new(recv_done),
                     write: Overlapped::new(send_done),
+                    socket: socket,
                     inner: Mutex::new(Inner {
-                        socket: Socket::Bound(socket),
                         iocp: Registration::new(),
                         read: State::Empty,
                         write: State::Empty,
@@ -78,12 +74,11 @@ impl UdpSocket {
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        try!(self.inner().socket.socket()).local_addr()
+        self.imp.inner.socket.local_addr()
     }
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        let me = self.inner();
-        try!(me.socket.socket()).try_clone().and_then(UdpSocket::new)
+        self.imp.inner.socket.try_clone().and_then(UdpSocket::new)
     }
 
     /// Note that unlike `TcpStream::write` this function will not attempt to
@@ -102,7 +97,6 @@ impl UdpSocket {
             _ => return Ok(None),
         }
 
-        let s = try!(me.socket.socket());
         if !me.iocp.registered() {
             return Ok(None)
         }
@@ -114,8 +108,8 @@ impl UdpSocket {
         let amt = try!(owned_buf.write(buf));
         try!(unsafe {
             trace!("scheduling a send");
-            s.send_to_overlapped(&owned_buf, target,
-                                 self.imp.inner.write.get_mut())
+            self.imp.inner.socket.send_to_overlapped(&owned_buf, target,
+                                                     self.imp.inner.write.get_mut())
         });
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
@@ -155,71 +149,71 @@ impl UdpSocket {
     }
 
     pub fn broadcast(&self) -> io::Result<bool> {
-        try!(self.inner().socket.socket()).broadcast()
+        self.imp.inner.socket.broadcast()
     }
 
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
-        try!(self.inner().socket.socket()).set_broadcast(on)
+        self.imp.inner.socket.set_broadcast(on)
     }
 
     pub fn multicast_loop_v4(&self) -> io::Result<bool> {
-        try!(self.inner().socket.socket()).multicast_loop_v4()
+        self.imp.inner.socket.multicast_loop_v4()
     }
 
     pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
-        try!(self.inner().socket.socket()).set_multicast_loop_v4(on)
+        self.imp.inner.socket.set_multicast_loop_v4(on)
     }
 
     pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
-        try!(self.inner().socket.socket()).multicast_ttl_v4()
+        self.imp.inner.socket.multicast_ttl_v4()
     }
 
     pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
-        try!(self.inner().socket.socket()).set_multicast_ttl_v4(ttl)
+        self.imp.inner.socket.set_multicast_ttl_v4(ttl)
     }
 
     pub fn multicast_loop_v6(&self) -> io::Result<bool> {
-        try!(self.inner().socket.socket()).multicast_loop_v6()
+        self.imp.inner.socket.multicast_loop_v6()
     }
 
     pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
-        try!(self.inner().socket.socket()).set_multicast_loop_v6(on)
+        self.imp.inner.socket.set_multicast_loop_v6(on)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
-        try!(self.inner().socket.socket()).ttl()
+        self.imp.inner.socket.ttl()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        try!(self.inner().socket.socket()).set_ttl(ttl)
+        self.imp.inner.socket.set_ttl(ttl)
     }
 
     pub fn join_multicast_v4(&self,
                              multiaddr: &Ipv4Addr,
                              interface: &Ipv4Addr) -> io::Result<()> {
-        try!(self.inner().socket.socket()).join_multicast_v4(multiaddr, interface)
+        self.imp.inner.socket.join_multicast_v4(multiaddr, interface)
     }
 
     pub fn join_multicast_v6(&self,
                              multiaddr: &Ipv6Addr,
                              interface: u32) -> io::Result<()> {
-        try!(self.inner().socket.socket()).join_multicast_v6(multiaddr, interface)
+        self.imp.inner.socket.join_multicast_v6(multiaddr, interface)
     }
 
     pub fn leave_multicast_v4(&self,
                               multiaddr: &Ipv4Addr,
                               interface: &Ipv4Addr) -> io::Result<()> {
-        try!(self.inner().socket.socket()).leave_multicast_v4(multiaddr, interface)
+        self.imp.inner.socket.leave_multicast_v4(multiaddr, interface)
     }
 
     pub fn leave_multicast_v6(&self,
                               multiaddr: &Ipv6Addr,
                               interface: u32) -> io::Result<()> {
-        try!(self.inner().socket.socket()).leave_multicast_v6(multiaddr, interface)
+        self.imp.inner.socket.leave_multicast_v6(multiaddr, interface)
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        try!(self.inner().socket.socket()).take_error()
+        self.imp.inner.socket.take_error()
     }
 
     fn inner(&self) -> MutexGuard<Inner> {
@@ -249,10 +243,6 @@ impl Imp {
             State::Empty => {}
             _ => return,
         }
-        let socket = match me.socket {
-            Socket::Empty => return,
-            Socket::Bound(ref s) => s,
-        };
 
         let interest = me.iocp.readiness();
         me.iocp.set_readiness(interest & !EventSet::readable());
@@ -262,8 +252,8 @@ impl Imp {
             trace!("scheduling a read");
             let cap = buf.capacity();
             buf.set_len(cap);
-            socket.recv_from_overlapped(&mut buf, &mut me.read_buf,
-                                        self.inner.read.get_mut())
+            self.inner.socket.recv_from_overlapped(&mut buf, &mut me.read_buf,
+                                                   self.inner.read.get_mut())
         };
         match res {
             Ok(_) => {
@@ -280,9 +270,6 @@ impl Imp {
 
     // See comments in tcp::StreamImp::push
     fn add_readiness(&self, me: &Inner, set: EventSet) {
-        if let Socket::Empty = me.socket {
-            return
-        }
         me.iocp.set_readiness(set | me.iocp.readiness());
     }
 }
@@ -291,14 +278,9 @@ impl Evented for UdpSocket {
     fn register(&self, poll: &Poll, token: Token,
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        {
-            let me = &mut *me;
-            let socket = match me.socket {
-                Socket::Bound(ref s) => s as &AsRawSocket,
-                Socket::Empty => return Err(bad_state()),
-            };
-            try!(me.iocp.register_socket(socket, poll, token, interest, opts));
-        }
+        try!(me.iocp.register_socket(&self.imp.inner.socket,
+                                     poll, token, interest, opts,
+                                     &self.registration));
         self.post_register(interest, &mut me);
         Ok(())
     }
@@ -306,21 +288,15 @@ impl Evented for UdpSocket {
     fn reregister(&self, poll: &Poll, token: Token,
                   interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        {
-            let me = &mut *me;
-            let socket = match me.socket {
-                Socket::Bound(ref s) => s as &AsRawSocket,
-                Socket::Empty => return Err(bad_state()),
-            };
-            try!(me.iocp.reregister_socket(socket, poll, token, interest,
-                                           opts));
-        }
+        try!(me.iocp.reregister_socket(&self.imp.inner.socket,
+                                       poll, token, interest,
+                                       opts, &self.registration));
         self.post_register(interest, &mut me);
         Ok(())
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner().iocp.deregister(poll)
+        self.inner().iocp.deregister(poll, &self.registration)
     }
 }
 
@@ -332,20 +308,21 @@ impl fmt::Debug for UdpSocket {
 
 impl Drop for UdpSocket {
     fn drop(&mut self) {
-        let mut inner = self.inner();
+        let inner = self.inner();
 
-        inner.socket = Socket::Empty;
-
-        // Then run any finalization code including level notifications
-        inner.iocp.set_readiness(EventSet::none());
-    }
-}
-
-impl Socket {
-    fn socket(&self) -> io::Result<&net::UdpSocket> {
-        match *self {
-            Socket::Bound(ref s) => Ok(s),
-            Socket::Empty => Err(bad_state()),
+        // If we're still internally reading, we're no longer interested. Note
+        // though that we don't cancel any writes which may have been issued to
+        // preserve the same semantics as Unix.
+        unsafe {
+            match inner.read {
+                State::Pending(_) => {
+                    drop(super::cancel(&self.imp.inner.socket,
+                                       &self.imp.inner.read));
+                }
+                State::Empty |
+                State::Ready(_) |
+                State::Error(_) => {}
+            }
         }
     }
 }
