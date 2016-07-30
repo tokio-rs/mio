@@ -12,19 +12,22 @@ use miow::net::*;
 use winapi::*;
 
 use {Evented, EventSet, Poll, PollOpt, Token};
+use poll;
+use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, Registration};
 use sys::windows::{wouldblock, Family};
-use sys::windows::from_raw_arc::FromRawArc;
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`
     /// implementation on this type is only executed when it's actually dropped
     /// (many clones of this `imp` are made).
     imp: StreamImp,
+    registration: Mutex<Option<poll::Registration>>,
 }
 
 pub struct TcpListener {
     imp: ListenerImp,
+    registration: Mutex<Option<poll::Registration>>,
 }
 
 #[derive(Clone)]
@@ -86,6 +89,7 @@ impl TcpStream {
     fn new(socket: net::TcpStream,
            deferred_connect: Option<SocketAddr>) -> TcpStream {
         TcpStream {
+            registration: Mutex::new(None),
             imp: StreamImp {
                 inner: FromRawArc::new(StreamIo {
                     read: Overlapped::new(read_done),
@@ -391,7 +395,8 @@ impl Evented for TcpStream {
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         let me = &mut *me;
-        try!(me.iocp.register_socket(&me.socket, poll, token, interest, opts));
+        try!(me.iocp.register_socket(&me.socket, poll, token, interest, opts,
+                                     &self.registration));
 
         // If we were connected before being registered process that request
         // here and go along our merry ways. Note that the callback for a
@@ -410,14 +415,14 @@ impl Evented for TcpStream {
         {
             let me = &mut *me;
             try!(me.iocp.reregister_socket(&me.socket, poll, token, interest,
-                                           opts));
+                                           opts, &self.registration));
         }
         self.post_register(interest, &mut me);
         Ok(())
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner().iocp.deregister(poll)
+        self.inner().iocp.deregister(poll, &self.registration)
     }
 }
 
@@ -458,6 +463,7 @@ impl TcpListener {
 
     fn new_family(socket: net::TcpListener, family: Family) -> TcpListener {
         TcpListener {
+            registration: Mutex::new(None),
             imp: ListenerImp {
                 inner: FromRawArc::new(ListenerIo {
                     accept: Overlapped::new(accept_done),
@@ -590,7 +596,8 @@ impl Evented for TcpListener {
                 interest: EventSet, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         let me = &mut *me;
-        try!(me.iocp.register_socket(&me.socket, poll, token, interest, opts));
+        try!(me.iocp.register_socket(&me.socket, poll, token, interest, opts,
+                                     &self.registration));
         self.imp.schedule_accept(me);
         Ok(())
     }
@@ -600,13 +607,13 @@ impl Evented for TcpListener {
         let mut me = self.inner();
         let me = &mut *me;
         try!(me.iocp.reregister_socket(&me.socket, poll, token, interest,
-                                       opts));
+                                       opts, &self.registration));
         self.imp.schedule_accept(me);
         Ok(())
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner().iocp.deregister(poll)
+        self.inner().iocp.deregister(poll, &self.registration)
     }
 }
 

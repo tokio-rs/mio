@@ -19,12 +19,14 @@ use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
 use {Evented, EventSet, Poll, PollOpt, Token};
-use sys::windows::selector::{Overlapped, Registration};
-use sys::windows::from_raw_arc::FromRawArc;
+use poll;
 use sys::windows::bad_state;
+use sys::windows::from_raw_arc::FromRawArc;
+use sys::windows::selector::{Overlapped, Registration};
 
 pub struct UdpSocket {
     imp: Imp,
+    registration: Mutex<Option<poll::Registration>>,
 }
 
 #[derive(Clone)]
@@ -61,6 +63,7 @@ enum State<T, U> {
 impl UdpSocket {
     pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         Ok(UdpSocket {
+            registration: Mutex::new(None),
             imp: Imp {
                 inner: FromRawArc::new(Io {
                     read: Overlapped::new(recv_done),
@@ -297,7 +300,8 @@ impl Evented for UdpSocket {
                 Socket::Bound(ref s) => s as &AsRawSocket,
                 Socket::Empty => return Err(bad_state()),
             };
-            try!(me.iocp.register_socket(socket, poll, token, interest, opts));
+            try!(me.iocp.register_socket(socket, poll, token, interest, opts,
+                                         &self.registration));
         }
         self.post_register(interest, &mut me);
         Ok(())
@@ -313,14 +317,14 @@ impl Evented for UdpSocket {
                 Socket::Empty => return Err(bad_state()),
             };
             try!(me.iocp.reregister_socket(socket, poll, token, interest,
-                                           opts));
+                                           opts, &self.registration));
         }
         self.post_register(interest, &mut me);
         Ok(())
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner().iocp.deregister(poll)
+        self.inner().iocp.deregister(poll, &self.registration)
     }
 }
 
