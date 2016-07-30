@@ -119,7 +119,6 @@ pub struct Registration {
 }
 
 struct RegistrationInner {
-    registration: poll::Registration,
     set_readiness: poll::SetReadiness,
     selector: Arc<SelectorInner>,
 }
@@ -195,9 +194,11 @@ impl Registration {
                            poll: &Poll,
                            token: Token,
                            interest: EventSet,
-                           opts: PollOpt) -> io::Result<()> {
+                           opts: PollOpt,
+                           registration: &Mutex<Option<poll::Registration>>)
+                           -> io::Result<()> {
         trace!("register {:?} {:?}", token, interest);
-        try!(self.associate(poll, token, interest, opts));
+        try!(self.associate(poll, token, interest, opts, registration));
         let selector = poll::selector(poll);
         try!(selector.inner.port.add_socket(usize::from(token), socket));
         Ok(())
@@ -209,12 +210,14 @@ impl Registration {
                              poll: &Poll,
                              token: Token,
                              interest: EventSet,
-                             opts: PollOpt) -> io::Result<()> {
+                             opts: PollOpt,
+                             registration: &Mutex<Option<poll::Registration>>)
+                             -> io::Result<()> {
         trace!("reregister {:?} {:?}", token, interest);
         if self.inner.is_none() {
             return Err(other("cannot reregister unregistered socket"))
         }
-        try!(self.associate(poll, token, interest, opts));
+        try!(self.associate(poll, token, interest, opts, registration));
         Ok(())
     }
 
@@ -222,7 +225,9 @@ impl Registration {
                  poll: &Poll,
                  token: Token,
                  events: EventSet,
-                 opts: PollOpt) -> io::Result<()> {
+                 opts: PollOpt,
+                 registration: &Mutex<Option<poll::Registration>>)
+                 -> io::Result<()> {
         let selector = poll::selector(poll);
 
         // To keep the same semantics as epoll, if I/O objects are interested in
@@ -243,9 +248,11 @@ impl Registration {
 
             // If we're already registered, then just update the existing
             // registration.
-            Some(ref mut i) => {
+            Some(_) => {
+                let registration = registration.lock().unwrap();
+                let registration = registration.as_ref().unwrap();
                 trace!("updating existing registration node");
-                i.registration.update(poll, token, events, opts)
+                registration.update(poll, token, events, opts)
             }
 
             // Create a new registration and we'll soon be added to the
@@ -254,10 +261,10 @@ impl Registration {
                 trace!("allocating new registration node");
                 let (r, s) = poll::Registration::new(poll, token, events, opts);
                 self.inner = Some(RegistrationInner {
-                    registration: r,
                     set_readiness: s,
                     selector: selector.inner.clone(),
                 });
+                *registration.lock().unwrap() = Some(r);
                 Ok(())
             }
         }
@@ -267,15 +274,20 @@ impl Registration {
     ///
     /// Doesn't allow registration with another event loop, just shuts down
     /// readiness notifications and such.
-    pub fn deregister(&mut self, poll: &Poll) -> io::Result<()> {
+    pub fn deregister(&mut self,
+                      poll: &Poll,
+                      registration: &Mutex<Option<poll::Registration>>)
+                      -> io::Result<()> {
         trace!("deregistering");
         let selector = poll::selector(poll);
         match self.inner {
             Some(ref mut i) => {
+                let registration = registration.lock().unwrap();
+                let registration = registration.as_ref().unwrap();
                 if !selector.inner.identical(&i.selector) {
                     return Err(other("socket already registered"));
                 }
-                try!(i.registration.deregister(poll));
+                try!(registration.deregister(poll));
                 Ok(())
             }
             None => Err(other("socket not registered")),
