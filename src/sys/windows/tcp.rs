@@ -5,10 +5,10 @@ use std::net::{self, SocketAddr};
 use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 
-use net2::{self, TcpBuilder};
-use net::tcp::Shutdown;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
+use net2::{self, TcpBuilder};
+use net::tcp::Shutdown;
 use winapi::*;
 
 use {Evented, EventSet, Poll, PollOpt, Token};
@@ -434,21 +434,22 @@ impl fmt::Debug for TcpStream {
 
 impl Drop for TcpStream {
     fn drop(&mut self) {
-        let mut inner = self.inner();
-        // When the `TcpSocket` itself is dropped then we close the internal
-        // handle (e.g. call `closesocket`). This will cause all pending I/O
-        // operations to forcibly finish and we'll get notifications for all of
-        // them and clean up the rest of our internal state (yay!).
-        //
-        // This is achieved by replacing our socket with an invalid one, so all
-        // further operations will return an error (but no further operations
-        // should be done anyway).
-        inner.socket = unsafe {
-            net::TcpStream::from_raw_socket(INVALID_SOCKET)
-        };
+        let inner = self.inner();
 
-        // Then run any finalization code including level notifications
-        inner.iocp.set_readiness(EventSet::none());
+        // If we're still internally reading, we're no longer interested. Note
+        // though that we don't cancel any writes which may have been issued to
+        // preserve the same semantics as Unix.
+        //
+        // Note that "Empty" here may mean that a connect is pending, so we
+        // cancel even if that happens as well.
+        unsafe {
+            match inner.read {
+                State::Pending(_) | State::Empty => {
+                    drop(super::cancel(&inner.socket, &self.imp.inner.read));
+                }
+                State::Ready(_) | State::Error(_) => {}
+            }
+        }
     }
 }
 
@@ -625,14 +626,18 @@ impl fmt::Debug for TcpListener {
 
 impl Drop for TcpListener {
     fn drop(&mut self) {
-        let mut inner = self.inner();
+        let inner = self.inner();
 
-        // See comments in TcpStream
-        inner.socket = unsafe {
-            net::TcpListener::from_raw_socket(INVALID_SOCKET)
-        };
-
-        // Then run any finalization code including level notifications
-        inner.iocp.set_readiness(EventSet::none());
+        // If we're still internally reading, we're no longer interested.
+        unsafe {
+            match inner.accept {
+                State::Pending(_) => {
+                    drop(super::cancel(&inner.socket, &self.imp.inner.accept));
+                }
+                State::Empty |
+                State::Ready(_) |
+                State::Error(_) => {}
+            }
+        }
     }
 }

@@ -97,6 +97,9 @@ extern crate miow;
 #[cfg(windows)]
 extern crate winapi;
 
+#[cfg(windows)]
+extern crate kernel32;
+
 #[macro_use]
 extern crate log;
 
