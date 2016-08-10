@@ -136,6 +136,7 @@ pub use handler::{
 pub use io::{
     Evented,
     TryAccept,
+    would_block,
 };
 pub use net::{
     tcp,
