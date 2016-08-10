@@ -505,7 +505,7 @@ impl Clone for RegistrationInner {
         //
         // We abort because such a program is incredibly degenerate, and we
         // don't care to support it.
-        if old_size > MAX_REFCOUNT {
+        if old_size & !MAX_REFCOUNT != 0 {
             panic!("too many outstanding refs");
         }
 
