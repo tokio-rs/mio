@@ -47,7 +47,7 @@ impl<T> MapNonBlock<T> for Result<T> {
 const WOULDBLOCK: i32 = ::libc::EAGAIN;
 
 #[cfg(windows)]
-const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK;
+const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK as i32;
 
 /// Returns a std `WouldBlock` error without allocating
 pub fn would_block() -> ::std::io::Error {
