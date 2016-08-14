@@ -1,9 +1,10 @@
 use {io, EventSet, PollOpt, Token};
 use event::{self, Event};
+use nix::libc::timespec;
 use nix::unistd::close;
 use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent, kevent_ts};
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
-use libc::{timespec, time_t};
+use libc::time_t;
 use std::{cmp, fmt, slice};
 use std::cell::UnsafeCell;
 use std::os::unix::io::RawFd;
