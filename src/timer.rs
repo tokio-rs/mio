@@ -1,5 +1,5 @@
 use {convert, io, Evented, EventSet, Poll, PollOpt, Registration, SetReadiness, Token};
-use lazy::Lazy;
+use lazycell::LazyCell;
 use std::{cmp, error, fmt, u64, usize, iter, thread};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -24,7 +24,7 @@ pub struct Timer<T> {
     // Masks the target tick to get the slot
     mask: u64,
     // Set on registration with Poll
-    inner: Lazy<Inner>,
+    inner: LazyCell<Inner>,
 }
 
 pub struct Builder {
@@ -149,7 +149,7 @@ impl<T> Timer<T> {
             tick: 0,
             next: EMPTY,
             mask: mask,
-            inner: Lazy::new(),
+            inner: LazyCell::new(),
         }
     }
 
@@ -264,7 +264,7 @@ impl<T> Timer<T> {
         }
 
         // No more timeouts to poll
-        if let Some(inner) = self.inner.as_ref() {
+        if let Some(inner) = self.inner.borrow() {
             trace!("unsetting readiness");
             let _ = inner.set_readiness.set_readiness(EventSet::none());
 
@@ -299,7 +299,7 @@ impl<T> Timer<T> {
     }
 
     fn schedule_readiness(&self, tick: Tick) {
-        if let Some(inner) = self.inner.as_ref() {
+        if let Some(inner) = self.inner.borrow() {
             // Coordinate setting readiness w/ the wakeup thread
             let mut curr = inner.wakeup_state.load(Ordering::Acquire);
 
@@ -351,7 +351,7 @@ impl<T> Default for Timer<T> {
 
 impl<T> Evented for Timer<T> {
     fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        if self.inner.is_some() {
+        if self.inner.borrow().is_some() {
             return Err(io::Error::new(io::ErrorKind::Other, "timer already registered"));
         }
 
@@ -362,7 +362,7 @@ impl<T> Evented for Timer<T> {
             set_readiness.clone(),
             self.start, self.tick_ms);
 
-        self.inner.set(Inner {
+        self.inner.fill(Inner {
             registration: registration,
             set_readiness: set_readiness,
             wakeup_state: wakeup_state,
@@ -377,14 +377,14 @@ impl<T> Evented for Timer<T> {
     }
 
     fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        match self.inner.as_ref() {
+        match self.inner.borrow() {
             Some(inner) => inner.registration.update(poll, token, interest, opts),
             None => Err(io::Error::new(io::ErrorKind::Other, "receiver not registered")),
         }
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        match self.inner.as_ref() {
+        match self.inner.borrow() {
             Some(inner) => inner.registration.deregister(poll),
             None => Err(io::Error::new(io::ErrorKind::Other, "receiver not registered")),
         }
