@@ -82,6 +82,7 @@
 #![crate_name = "mio"]
 #![cfg_attr(unix, deny(warnings))]
 
+extern crate lazycell;
 extern crate net2;
 extern crate slab;
 
@@ -110,7 +111,6 @@ mod event;
 mod event_loop;
 mod handler;
 mod io;
-mod lazy;
 mod net;
 mod notify;
 mod poll;
