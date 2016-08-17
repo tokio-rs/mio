@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
 use {io, Evented, EventSet, Poll, PollOpt, Registration, SetReadiness, Token};
-use lazy::{Lazy, AtomicLazy};
+use lazycell::{LazyCell, AtomicLazyCell};
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -47,7 +47,7 @@ pub fn ctl_pair() -> (SenderCtl, ReceiverCtl) {
     let inner = Arc::new(Inner {
         pending: AtomicUsize::new(0),
         senders: AtomicUsize::new(1),
-        set_readiness: AtomicLazy::new(),
+        set_readiness: AtomicLazyCell::new(),
     });
 
     let tx = SenderCtl {
@@ -55,7 +55,7 @@ pub fn ctl_pair() -> (SenderCtl, ReceiverCtl) {
     };
 
     let rx = ReceiverCtl {
-        registration: Lazy::new(),
+        registration: LazyCell::new(),
         inner: inner,
     };
 
@@ -69,7 +69,7 @@ pub struct SenderCtl {
 
 /// Tracks messages received on a channel in order to track readiness.
 pub struct ReceiverCtl {
-    registration: Lazy<Registration>,
+    registration: LazyCell<Registration>,
     inner: Arc<Inner>,
 }
 
@@ -107,7 +107,7 @@ struct Inner {
     // The number of sender handles
     senders: AtomicUsize,
     // The set readiness handle
-    set_readiness: AtomicLazy<SetReadiness>,
+    set_readiness: AtomicLazyCell<SetReadiness>,
 }
 
 impl<T> Sender<T> {
@@ -195,7 +195,7 @@ impl SenderCtl {
 
         if 0 == cnt {
             // Toggle readiness to readable
-            if let Some(set_readiness) = self.inner.set_readiness.as_ref() {
+            if let Some(set_readiness) = self.inner.set_readiness.borrow() {
                 try!(set_readiness.set_readiness(EventSet::readable()));
             }
         }
@@ -225,7 +225,7 @@ impl ReceiverCtl {
 
         if first == 1 {
             // Unset readiness
-            if let Some(set_readiness) = self.inner.set_readiness.as_ref() {
+            if let Some(set_readiness) = self.inner.set_readiness.borrow() {
                 try!(set_readiness.set_readiness(EventSet::none()));
             }
         }
@@ -236,7 +236,7 @@ impl ReceiverCtl {
         if first == 1 && second > 0 {
             // There are still pending messages. Since readiness was
             // previously unset, it must be reset here
-            if let Some(set_readiness) = self.inner.set_readiness.as_ref() {
+            if let Some(set_readiness) = self.inner.set_readiness.borrow() {
                 try!(set_readiness.set_readiness(EventSet::none()));
             }
         }
@@ -247,7 +247,7 @@ impl ReceiverCtl {
 
 impl Evented for ReceiverCtl {
     fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        if self.registration.is_some() {
+        if self.registration.borrow().is_some() {
             return Err(io::Error::new(io::ErrorKind::Other, "receiver already registered"));
         }
 
@@ -259,21 +259,21 @@ impl Evented for ReceiverCtl {
             let _ = set_readiness.set_readiness(EventSet::readable());
         }
 
-        self.registration.set(registration).ok().expect("unexpected state encountered");
-        self.inner.set_readiness.set(set_readiness).ok().expect("unexpected state encountered");
+        self.registration.fill(registration).ok().expect("unexpected state encountered");
+        self.inner.set_readiness.fill(set_readiness).ok().expect("unexpected state encountered");
 
         Ok(())
     }
 
     fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
-        match self.registration.as_ref() {
+        match self.registration.borrow() {
             Some(registration) => registration.update(poll, token, interest, opts),
             None => Err(io::Error::new(io::ErrorKind::Other, "receiver not registered")),
         }
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        match self.registration.as_ref() {
+        match self.registration.borrow() {
             Some(registration) => registration.deregister(poll),
             None => Err(io::Error::new(io::ErrorKind::Other, "receiver not registered")),
         }

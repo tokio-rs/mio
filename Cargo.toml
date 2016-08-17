@@ -18,9 +18,10 @@ exclude       = [
 ]
 
 [dependencies]
-log    = "0.3.1"
-slab   = { git = "https://github.com/carllerche/slab", rev = "5476efcafb"  }
-net2   = { version = "0.2.19", default-features = false }
+lazycell = "0.4.0"
+log      = "0.3.1"
+slab     = { git = "https://github.com/carllerche/slab", rev = "5476efcafb"  }
+net2     = { version = "0.2.19", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
 nix    = "0.6.0"
