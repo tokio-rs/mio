@@ -1,6 +1,7 @@
 #![cfg(unix)]
 
-use mio::*;
+use mio::{Token, EventSet, PollOpt};
+use mio::deprecated::{unix, EventLoop, Handler};
 use std::time::Duration;
 
 pub struct BrokenPipeHandler;

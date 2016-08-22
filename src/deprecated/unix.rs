@@ -1,9 +1,12 @@
-use {io, sys, Evented, EventSet, Io, Poll, PollOpt, Token, TryAccept};
+use {io, sys, Evented, EventSet, Poll, PollOpt, Token};
+use deprecated::TryAccept;
 use io::MapNonBlock;
 use std::io::{Read, Write};
 use std::path::Path;
 pub use nix::sys::socket::Shutdown;
 use std::process;
+
+pub use sys::Io;
 
 #[derive(Debug)]
 pub struct UnixSocket {
@@ -159,14 +162,12 @@ impl UnixListener {
         })
     }
 
-    pub fn accept(&self) -> io::Result<Option<UnixStream>> {
-        self.sys.accept()
-            .map(|opt| opt.map(From::from))
+    pub fn accept(&self) -> io::Result<UnixStream> {
+        self.sys.accept().map(From::from)
     }
 
     pub fn try_clone(&self) -> io::Result<UnixListener> {
-        self.sys.try_clone()
-            .map(From::from)
+        self.sys.try_clone().map(From::from)
     }
 }
 
@@ -188,7 +189,7 @@ impl TryAccept for UnixListener {
     type Output = UnixStream;
 
     fn accept(&self) -> io::Result<Option<UnixStream>> {
-        UnixListener::accept(self)
+        UnixListener::accept(self).map_non_block()
     }
 }
 

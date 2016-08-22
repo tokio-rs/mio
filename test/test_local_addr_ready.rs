@@ -1,5 +1,6 @@
 use {TryWrite};
 use mio::*;
+use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::{TcpListener, TcpStream};
 
 const LISTEN: Token = Token(0);
@@ -22,7 +23,7 @@ impl Handler for MyHandler {
              _: EventSet) {
         match token {
             LISTEN => {
-                let sock = self.listener.accept().unwrap().unwrap().0;
+                let sock = self.listener.accept().unwrap().0;
                 event_loop.register(&sock,
                                     SERVER,
                                     EventSet::writable(),

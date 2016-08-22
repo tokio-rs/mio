@@ -1,4 +1,5 @@
-use {EventLoop, EventSet, Token};
+use {EventSet, Token};
+use deprecated::{EventLoop};
 
 #[allow(unused_variables)]
 pub trait Handler: Sized {

@@ -1,4 +1,3 @@
-use io::MapNonBlock;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
@@ -170,14 +169,14 @@ impl TcpListener {
         })
     }
 
-    pub fn accept(&self) -> io::Result<Option<(TcpStream, SocketAddr)>> {
+    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         self.inner.accept().and_then(|(s, a)| {
             try!(set_nonblock(&s));
             Ok((TcpStream {
                 inner: s,
                 selector_id: AtomicUsize::new(0),
             }, a))
-        }).map_non_block()
+        })
     }
 
     pub fn take_socket_error(&self) -> io::Result<()> {

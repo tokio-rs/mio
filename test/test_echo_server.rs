@@ -1,5 +1,6 @@
 use {localhost, TryRead, TryWrite};
 use mio::*;
+use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::*;
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use slab;
@@ -94,7 +95,7 @@ impl EchoServer {
     fn accept(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("server accepting socket");
 
-        let sock = self.sock.accept().unwrap().unwrap().0;
+        let sock = self.sock.accept().unwrap().0;
         let conn = EchoConn::new(sock,);
         let tok = self.conns.insert(conn)
             .ok().expect("could not add connection to slab");

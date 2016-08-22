@@ -1,4 +1,5 @@
-use {channel, Handler, Evented, Poll, Events, NotifyError, Token};
+use {channel, Evented, Poll, Events, Token};
+use deprecated::{Handler, NotifyError};
 use event::{Event, EventSet, PollOpt};
 use timer::{self, Timer, Timeout};
 use std::{io, fmt, usize};
@@ -140,7 +141,7 @@ impl<H: Handler> EventLoop<H> {
     /// # Example
     /// ```
     /// use std::thread;
-    /// use mio::{EventLoop, Handler};
+    /// use mio::deprecated::{EventLoop, Handler};
     ///
     /// struct MyHandler;
     ///
@@ -196,7 +197,7 @@ impl<H: Handler> EventLoop<H> {
     ///
     /// # Example
     /// ```
-    /// use mio::{EventLoop, Handler};
+    /// use mio::deprecated::{EventLoop, Handler};
     /// use std::time::Duration;
     ///
     /// struct MyHandler;

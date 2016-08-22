@@ -29,7 +29,7 @@ fn write_then_drop() {
     assert_eq!(events.len(), 1);
     assert_eq!(events.get(0).unwrap().token(), Token(1));
 
-    let mut s2 = a.accept().unwrap().unwrap().0;
+    let mut s2 = a.accept().unwrap().0;
 
     s2.register(&poll,
                 Token(2),
@@ -88,7 +88,7 @@ fn write_then_deregister() {
     assert_eq!(events.len(), 1);
     assert_eq!(events.get(0).unwrap().token(), Token(1));
 
-    let mut s2 = a.accept().unwrap().unwrap().0;
+    let mut s2 = a.accept().unwrap().0;
 
     s2.register(&poll,
                 Token(2),

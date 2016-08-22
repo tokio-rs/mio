@@ -1,5 +1,6 @@
 use {localhost, TryRead};
 use mio::*;
+use mio::deprecated::{EventLoop, Handler};
 use bytes::ByteBuf;
 use mio::tcp::*;
 
@@ -36,7 +37,7 @@ impl TestHandler {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
-                let _ = self.srv.accept().unwrap().unwrap();
+                let _ = self.srv.accept().unwrap();
             }
             CLIENT => {
                 debug!("client readable");

@@ -25,7 +25,7 @@ pub fn test_tcp_edge_oneshot() {
     wait_for(&mut poll, &mut events, Token(0));
 
     // Get pair
-    let (mut s2, _) = l.accept().unwrap().unwrap();
+    let (mut s2, _) = l.accept().unwrap();
     poll.register(&s2, Token(2), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     wait_for(&mut poll, &mut events, Token(1));

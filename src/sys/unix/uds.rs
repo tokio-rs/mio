@@ -1,6 +1,5 @@
-use {io, Evented, EventSet, Io, Poll, PollOpt, Token, TryAccept};
-use io::MapNonBlock;
-use sys::unix::{net, nix};
+use {io, Evented, EventSet, Poll, PollOpt, Token};
+use sys::unix::{net, nix, Io};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
@@ -33,10 +32,9 @@ impl UnixSocket {
         net::listen(&self.io, backlog)
     }
 
-    pub fn accept(&self) -> io::Result<Option<UnixSocket>> {
+    pub fn accept(&self) -> io::Result<UnixSocket> {
         net::accept(&self.io, true)
             .map(|fd| From::from(Io::from_raw_fd(fd)))
-            .map_non_block()
     }
 
     /// Bind the socket to the specified address
@@ -109,14 +107,6 @@ impl Evented for UnixSocket {
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
         self.io.deregister(poll)
-    }
-}
-
-impl TryAccept for UnixSocket {
-    type Output = UnixSocket;
-
-    fn accept(&self) -> io::Result<Option<UnixSocket>> {
-        UnixSocket::accept(self)
     }
 }
 

@@ -1,4 +1,5 @@
 use mio::*;
+use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::*;
 use {sleep_ms};
 

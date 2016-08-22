@@ -3,7 +3,7 @@ use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr}
 
 use net2::TcpBuilder;
 
-use {io, sys, Evented, EventSet, Poll, PollOpt, Token, TryAccept};
+use {io, sys, Evented, EventSet, Poll, PollOpt, Token};
 
 /*
  *
@@ -224,8 +224,8 @@ impl TcpListener {
     /// Returns a `Ok(None)` when the socket `WOULDBLOCK`, this means the stream
     /// will be ready at a later point. If an accepted stream is returned, the
     /// address of the peer is returned along with it
-    pub fn accept(&self) -> io::Result<Option<(TcpStream, SocketAddr)>> {
-        self.sys.accept().map(|o| o.map(|(s, a)| (TcpStream { sys: s }, a)))
+    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+        self.sys.accept().map(|(s, a)| (TcpStream { sys: s }, a))
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -254,14 +254,6 @@ impl Evented for TcpListener {
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
         self.sys.deregister(poll)
-    }
-}
-
-impl TryAccept for TcpListener {
-    type Output = TcpStream;
-
-    fn accept(&self) -> io::Result<Option<TcpStream>> {
-        TcpListener::accept(self).map(|a| a.map(|(s, _)| s))
     }
 }
 

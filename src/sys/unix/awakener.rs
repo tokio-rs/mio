@@ -3,7 +3,7 @@ pub use self::pipe::Awakener;
 /// Default *nix awakener implementation
 mod pipe {
     use {io, Evented, EventSet, Poll, PollOpt, Token};
-    use unix::{self, PipeReader, PipeWriter};
+    use deprecated::unix::{self, PipeReader, PipeWriter};
     use std::io::{Read, Write};
 
     /*

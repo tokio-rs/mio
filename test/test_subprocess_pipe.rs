@@ -4,7 +4,8 @@ use {TryRead, TryWrite};
 use std::mem;
 use mio::*;
 use std::io;
-use mio::unix::{PipeReader, PipeWriter};
+use mio::deprecated::{EventLoop, Handler};
+use mio::deprecated::unix::{PipeReader, PipeWriter};
 use std::process::{Command, Stdio, Child};
 
 

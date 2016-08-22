@@ -1,5 +1,6 @@
 use localhost;
 use mio::*;
+use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::*;
 use mio::udp::*;
 use std::io::ErrorKind;

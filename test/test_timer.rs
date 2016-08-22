@@ -1,5 +1,6 @@
 use {sleep_ms, TryRead, TryWrite};
 use mio::*;
+use mio::deprecated::{EventLoop, Handler};
 use mio::timer::{Timer};
 
 use mio::tcp::*;
@@ -296,7 +297,7 @@ impl TestHandler {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
-                let conn = self.srv.accept().unwrap().unwrap().0;
+                let conn = self.srv.accept().unwrap().0;
                 event_loop.register(&conn, CONN, EventSet::all(),
                                         PollOpt::edge()).unwrap();
                 event_loop.timeout(conn, Duration::from_millis(200)).unwrap();

@@ -1,4 +1,5 @@
 use mio::*;
+use mio::deprecated::{EventLoop, Handler};
 use mio::udp::*;
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use std::str;

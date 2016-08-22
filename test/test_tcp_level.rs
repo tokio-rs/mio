@@ -81,7 +81,7 @@ pub fn test_tcp_stream_level_triggered() {
     assert_eq!(filter(&pevents, Token(1))[0], Event::new(EventSet::writable(), Token(1)));
 
     // Server side of socket
-    let (mut s1_tx, _) = l.accept().unwrap().unwrap();
+    let (mut s1_tx, _) = l.accept().unwrap();
 
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);

@@ -4,6 +4,7 @@ use std::mem;
 use std::net::{self, SocketAddr};
 use std::sync::{Mutex, MutexGuard};
 
+use io::would_block;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
 use net2::{self, TcpBuilder};
@@ -475,17 +476,17 @@ impl TcpListener {
         }
     }
 
-    pub fn accept(&self) -> io::Result<Option<(TcpStream, SocketAddr)>> {
+    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         let mut me = self.inner();
 
         let ret = match mem::replace(&mut me.accept, State::Empty) {
-            State::Empty => return Ok(None),
+            State::Empty => return Err(would_block()),
             State::Pending(t) => {
                 me.accept = State::Pending(t);
-                return Ok(None)
+                return Err(would_block());
             }
             State::Ready((s, a)) => {
-                Ok(Some((TcpStream::new(s, None), a)))
+                Ok((TcpStream::new(s, None), a))
             }
             State::Error(e) => Err(e),
         };

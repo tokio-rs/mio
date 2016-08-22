@@ -1,6 +1,7 @@
 use {TryRead, TryWrite};
 use mio::*;
-use mio::unix::*;
+use mio::deprecated::{EventLoop, Handler};
+use mio::deprecated::unix::*;
 use bytes::{Buf, ByteBuf, SliceBuf};
 use slab;
 use std::path::PathBuf;
@@ -104,7 +105,7 @@ impl EchoServer {
     fn accept(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("server accepting socket");
 
-        let sock = self.sock.accept().unwrap().unwrap();
+        let sock = self.sock.accept().unwrap();
         let conn = EchoConn::new(sock);
         let tok = self.conns.insert(conn)
             .ok().expect("could not add connectiont o slab");

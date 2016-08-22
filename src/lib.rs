@@ -20,6 +20,7 @@
 //!
 //! ```
 //! use mio::*;
+//! use mio::deprecated::{EventLoop, Handler};
 //! use mio::tcp::{TcpListener, TcpStream};
 //!
 //! // Setup some tokens to allow us to identify which event is
@@ -108,11 +109,8 @@ extern crate log;
 extern crate env_logger;
 
 mod event;
-mod event_loop;
-mod handler;
 mod io;
 mod net;
-mod notify;
 mod poll;
 mod sys;
 mod token;
@@ -120,46 +118,21 @@ mod token;
 pub mod channel;
 pub mod timer;
 
+/// EventLoop and other deprecated types
+pub mod deprecated;
+
 pub use event::{
     PollOpt,
     EventSet,
     Event,
 };
-pub use event_loop::{
-    EventLoop,
-    EventLoopBuilder,
-    Sender,
-};
-pub use handler::{
-    Handler,
-};
 pub use io::{
     Evented,
-    TryAccept,
     would_block,
 };
 pub use net::{
     tcp,
     udp,
-};
-#[cfg(unix)]
-pub mod unix {
-    pub use net::unix::{
-        pipe,
-        PipeReader,
-        PipeWriter,
-        UnixListener,
-        UnixSocket,
-        UnixStream,
-        Shutdown,
-    };
-    pub use sys::{
-        EventedFd,
-    };
-}
-
-pub use notify::{
-    NotifyError,
 };
 pub use poll::{
     Poll,
@@ -176,8 +149,13 @@ pub use timer::{
 pub use token::{
     Token,
 };
+
 #[cfg(unix)]
-pub use sys::Io;
+pub mod unix {
+    pub use sys::{
+        EventedFd,
+    };
+}
 
 // Conversion utilities
 mod convert {

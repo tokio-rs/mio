@@ -1,5 +1,6 @@
 use {localhost, TryWrite};
 use mio::*;
+use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::*;
 use bytes::SliceBuf;
 use std::time::Duration;
@@ -26,7 +27,7 @@ impl TestHandler {
         match token {
             SERVER => {
                 trace!("handle_read; token=SERVER");
-                let mut sock = self.server.accept().unwrap().unwrap().0;
+                let mut sock = self.server.accept().unwrap().0;
                 sock.try_write_buf(&mut SliceBuf::wrap("foobar".as_bytes())).unwrap();
             }
             CLIENT => {

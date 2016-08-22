@@ -1,6 +1,7 @@
 extern crate mio;
 extern crate env_logger;
 
+use std::io;
 use std::io::prelude::*;
 use std::net;
 use std::sync::mpsc::channel;
@@ -8,7 +9,8 @@ use std::thread;
 use std::time::Duration;
 
 use {TryRead, TryWrite};
-use mio::{EventLoop, Handler, Token, EventSet, PollOpt};
+use mio::{Token, EventSet, PollOpt};
+use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::{TcpListener, TcpStream};
 
 #[test]
@@ -24,7 +26,7 @@ fn accept() {
             self.hit = true;
             assert_eq!(token, Token(1));
             assert!(events.is_readable());
-            assert!(self.listener.accept().unwrap().is_some());
+            assert!(self.listener.accept().is_ok());
             event_loop.shutdown();
         }
     }
@@ -43,7 +45,7 @@ fn accept() {
     let mut h = H { hit: false, listener: l };
     e.run(&mut h).unwrap();
     assert!(h.hit);
-    assert!(h.listener.accept().unwrap().is_none());
+    assert!(h.listener.accept().unwrap_err().kind() == io::ErrorKind::WouldBlock);
     t.join().unwrap();
 }
 
@@ -204,7 +206,7 @@ fn connect_then_close() {
         fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
                  _events: EventSet) {
             if token == Token(1) {
-                let s = self.listener.accept().unwrap().unwrap().0;
+                let s = self.listener.accept().unwrap().0;
                 event_loop.register(&s, Token(3), EventSet::all(),
                                         PollOpt::edge()).unwrap();
                 drop(s);

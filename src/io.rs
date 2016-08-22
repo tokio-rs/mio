@@ -12,12 +12,6 @@ pub trait Evented {
     fn deregister(&self, poll: &Poll) -> Result<()>;
 }
 
-pub trait TryAccept {
-    type Output;
-
-    fn accept(&self) -> Result<Option<Self::Output>>;
-}
-
 // TODO: Delete this
 /// A helper trait to provide the map_non_block function on Results.
 pub trait MapNonBlock<T> {

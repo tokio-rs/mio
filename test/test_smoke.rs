@@ -1,6 +1,7 @@
 extern crate mio;
 
-use mio::{EventLoop, Handler, Token, EventSet, PollOpt};
+use mio::{Token, EventSet, PollOpt};
+use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::TcpListener;
 use std::time::Duration;
 
