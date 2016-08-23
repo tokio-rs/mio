@@ -287,7 +287,5 @@ pub fn test_sending_from_other_thread_while_polling() {
 }
 
 fn filter(events: &Events, token: Token) -> Vec<Event> {
-    (0..events.len()).map(|i| events.get(i).unwrap())
-                     .filter(|e| e.token() == token)
-                     .collect()
+    events.iter().filter(|e| e.token() == token).collect()
 }

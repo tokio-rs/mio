@@ -285,6 +285,12 @@ pub struct Events {
     inner: sys::Events,
 }
 
+/// Iterate an Events structure
+pub struct EventsIter<'a> {
+    inner: &'a Events,
+    pos: usize,
+}
+
 impl Events {
     /// Creates a new blank set of events ready to get passed to `poll`.
     ///
@@ -321,6 +327,32 @@ impl Events {
     /// Returns whether this buffer contains 0 events.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+
+    pub fn iter(&self) -> EventsIter {
+        EventsIter {
+            inner: self,
+            pos: 0
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Events {
+    type Item = Event;
+    type IntoIter = EventsIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> Iterator for EventsIter<'a> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Event> {
+        let ret = self.inner.get(self.pos);
+        self.pos += 1;
+        ret
     }
 }
 

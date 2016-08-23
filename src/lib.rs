@@ -137,6 +137,7 @@ pub use net::{
 pub use poll::{
     Poll,
     Events,
+    EventsIter,
     Registration,
     SetReadiness,
 };
