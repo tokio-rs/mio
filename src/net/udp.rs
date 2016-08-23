@@ -1,3 +1,5 @@
+//! Primitives for working with UDP
+
 use {io, sys, Evented, EventSet, Poll, PollOpt, Token};
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 

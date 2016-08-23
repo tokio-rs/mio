@@ -1,3 +1,5 @@
+//! Primitives for working with TCP
+
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 

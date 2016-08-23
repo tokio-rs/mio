@@ -1,3 +1,5 @@
+//! Thread safe communication channel implementing `Evented`
+
 #![allow(unused_imports)]
 
 use {io, Evented, EventSet, Poll, PollOpt, Registration, SetReadiness, Token};

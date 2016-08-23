@@ -10,6 +10,8 @@ use std::time::Duration;
 
 const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 
+/// Polls for readiness events on all registered values.
+///
 /// The `Poll` type acts as an interface allowing a program to wait on a set of
 /// IO handles until one or more become "ready" to be operated on. An IO handle
 /// is considered ready to operate on when the given operation can complete

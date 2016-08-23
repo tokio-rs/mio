@@ -1,6 +1,7 @@
 use token::Token;
 use std::{fmt, ops};
 
+/// Configures readiness polling behavior for a given `Evented` value.
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct PollOpt(usize);
 
@@ -142,6 +143,7 @@ impl fmt::Debug for PollOpt {
     }
 }
 
+/// A set of readiness events returned by `Poll`.
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct EventSet(usize);
 
@@ -302,19 +304,20 @@ impl fmt::Debug for EventSet {
     }
 }
 
-// Keep this struct internal to mio
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct Event {
-    kind: EventSet,
-    token: Token
-}
-
+/// An readiness event returned by `Poll`.
+///
 /// Event represents the raw event that the OS-specific selector
 /// returned. An event can represent more than one kind (such as
 /// readable or writable) at a time.
 ///
 /// These Event objects are created by the OS-specific concrete
 /// Selector when they have events to report.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Event {
+    kind: EventSet,
+    token: Token
+}
+
 impl Event {
     /// Create a new Event.
     pub fn new(kind: EventSet, token: Token) -> Event {

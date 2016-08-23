@@ -1,3 +1,5 @@
+/// Used to identify which `Evented` value is associated with an `Event`
+/// notification returned by `Poll`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Token(pub usize);
 

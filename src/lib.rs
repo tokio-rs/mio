@@ -140,18 +140,14 @@ pub use poll::{
     Registration,
     SetReadiness,
 };
-// TODO: remove
-pub use timer::{
-    Timeout,
-    TimerError,
-    TimerResult,
-};
 pub use token::{
     Token,
 };
 
 #[cfg(unix)]
 pub mod unix {
+    //! Unix only extensions
+
     pub use sys::{
         EventedFd,
     };

@@ -1,3 +1,5 @@
+//! Timer optimized for I/O related operations
+
 use {convert, io, Evented, EventSet, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::LazyCell;
 use std::{cmp, error, fmt, u64, usize, iter, thread};
