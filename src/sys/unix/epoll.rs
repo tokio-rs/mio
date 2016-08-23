@@ -1,7 +1,12 @@
 use {convert, io, Ready, PollOpt, Token};
 use event::Event;
-use nix::sys::epoll::*;
+use libc::{c_int, c_void};
+use libc;
+use nix::sys::epoll::{EPOLLERR, EPOLLHUP, EPOLLRDHUP, EPOLLONESHOT};
+use nix::sys::epoll::{EPOLLET, EPOLLOUT, EpollEvent, EPOLLIN, EPOLLPRI};
+use nix::sys::epoll::{EpollEventKind, epoll_ctl, EpollOp, epoll_wait};
 use nix::unistd::close;
+use std::mem;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::time::Duration;
@@ -19,11 +24,37 @@ pub struct Selector {
     epfd: RawFd
 }
 
+// Emulate `epoll_create` by using `epoll_create1` if it's available and
+// otherwise falling back to `epoll_create` followed by a call to set the
+// CLOEXEC flag.
+unsafe fn epoll_create() -> io::Result<RawFd> {
+    let name = "epoll_create1\0".as_ptr();
+    let ptr = libc::dlsym(libc::RTLD_DEFAULT, name as *const _);
+    let fd;
+    if ptr.is_null() {
+        fd = libc::epoll_create(1024);
+        if fd > 0 {
+            libc::ioctl(fd, libc::FIOCLEX);
+        }
+    } else {
+        type EpollCreate1 = unsafe extern fn(c_int) -> c_int;
+        let epoll_create1 = mem::transmute::<*mut c_void, EpollCreate1>(ptr);
+        fd = epoll_create1(libc::EPOLL_CLOEXEC);
+    }
+    if fd >= 0 {
+        Ok(fd)
+    } else {
+        Err(io::Error::last_os_error())
+
+    }
+}
+
 impl Selector {
     pub fn new() -> io::Result<Selector> {
+        let epfd = try!(unsafe { epoll_create() });
+
         // offset by 1 to avoid choosing 0 as the id of a selector
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
-        let epfd = try!(epoll_create().map_err(super::from_nix_error));
 
         Ok(Selector {
             id: id,

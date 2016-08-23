@@ -4,7 +4,7 @@ use nix::libc::timespec;
 use nix::unistd::close;
 use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent, kevent_ts};
 use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
-use libc::time_t;
+use libc::{self, time_t};
 use std::{cmp, fmt, slice};
 use std::cell::UnsafeCell;
 use std::os::unix::io::RawFd;
@@ -36,6 +36,10 @@ impl Selector {
         // offset by 1 to avoid choosing 0 as the id of a selector
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
         let kq = try!(kqueue().map_err(super::from_nix_error));
+
+        unsafe {
+            libc::ioctl(kq, libc::FIOCLEX);
+        }
 
         Ok(Selector {
             id: id,
