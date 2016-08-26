@@ -1,6 +1,6 @@
 //! Primitives for working with UDP
 
-use {io, sys, Evented, EventSet, Poll, PollOpt, Token};
+use {io, sys, Evented, Ready, Poll, PollOpt, Token};
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 #[derive(Debug)]
@@ -214,11 +214,11 @@ impl UdpSocket {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)
     }
 

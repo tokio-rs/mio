@@ -2,7 +2,7 @@
 
 #![allow(unused_imports)]
 
-use {io, Evented, EventSet, Poll, PollOpt, Registration, SetReadiness, Token};
+use {io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::{LazyCell, AtomicLazyCell};
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -171,11 +171,11 @@ impl<T> Receiver<T> {
 }
 
 impl<T> Evented for Receiver<T> {
-    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.ctl.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.ctl.reregister(poll, token, interest, opts)
     }
 
@@ -198,7 +198,7 @@ impl SenderCtl {
         if 0 == cnt {
             // Toggle readiness to readable
             if let Some(set_readiness) = self.inner.set_readiness.borrow() {
-                try!(set_readiness.set_readiness(EventSet::readable()));
+                try!(set_readiness.set_readiness(Ready::readable()));
             }
         }
 
@@ -228,7 +228,7 @@ impl ReceiverCtl {
         if first == 1 {
             // Unset readiness
             if let Some(set_readiness) = self.inner.set_readiness.borrow() {
-                try!(set_readiness.set_readiness(EventSet::none()));
+                try!(set_readiness.set_readiness(Ready::none()));
             }
         }
 
@@ -239,7 +239,7 @@ impl ReceiverCtl {
             // There are still pending messages. Since readiness was
             // previously unset, it must be reset here
             if let Some(set_readiness) = self.inner.set_readiness.borrow() {
-                try!(set_readiness.set_readiness(EventSet::none()));
+                try!(set_readiness.set_readiness(Ready::none()));
             }
         }
 
@@ -248,7 +248,7 @@ impl ReceiverCtl {
 }
 
 impl Evented for ReceiverCtl {
-    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         if self.registration.borrow().is_some() {
             return Err(io::Error::new(io::ErrorKind::Other, "receiver already registered"));
         }
@@ -258,7 +258,7 @@ impl Evented for ReceiverCtl {
 
         if self.inner.pending.load(Ordering::Relaxed) > 0 {
             // TODO: Don't drop readiness
-            let _ = set_readiness.set_readiness(EventSet::readable());
+            let _ = set_readiness.set_readiness(Ready::readable());
         }
 
         self.registration.fill(registration).ok().expect("unexpected state encountered");
@@ -267,7 +267,7 @@ impl Evented for ReceiverCtl {
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         match self.registration.borrow() {
             Some(registration) => registration.update(poll, token, interest, opts),
             None => Err(io::Error::new(io::ErrorKind::Other, "receiver not registered")),

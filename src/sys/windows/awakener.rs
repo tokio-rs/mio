@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use miow::iocp::CompletionStatus;
-use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
+use {io, poll, Evented, Ready, Poll, PollOpt, Token};
 use sys::windows::Selector;
 
 pub struct Awakener {
@@ -42,10 +42,10 @@ impl Awakener {
 }
 
 impl Evented for Awakener {
-    fn register(&self, poll: &Poll, token: Token, events: EventSet,
+    fn register(&self, poll: &Poll, token: Token, events: Ready,
                 opts: PollOpt) -> io::Result<()> {
         assert_eq!(opts, PollOpt::edge());
-        assert_eq!(events, EventSet::readable());
+        assert_eq!(events, Ready::readable());
         *self.inner.lock().unwrap() = Some(AwakenerInner {
             selector: poll::selector(poll).clone_ref(),
             token: token,
@@ -53,7 +53,7 @@ impl Evented for Awakener {
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, events: EventSet,
+    fn reregister(&self, poll: &Poll, token: Token, events: Ready,
                   opts: PollOpt) -> io::Result<()> {
         self.register(poll, token, events, opts)
     }

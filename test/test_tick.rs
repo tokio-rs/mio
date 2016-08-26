@@ -29,7 +29,7 @@ impl Handler for TestHandler {
         self.state = 0;
     }
 
-    fn ready(&mut self, _event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
+    fn ready(&mut self, _event_loop: &mut EventLoop<TestHandler>, token: Token, events: Ready) {
         debug!("READY: {:?} - {:?}", token, events);
         if events.is_readable() {
             debug!("Handler::ready() readable event");
@@ -46,10 +46,10 @@ pub fn test_tick() {
     let mut event_loop = EventLoop::new().ok().expect("Couldn't make event loop");
 
     let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
-    event_loop.register(&listener, Token(0), EventSet::readable(), PollOpt::level()).unwrap();
+    event_loop.register(&listener, Token(0), Ready::readable(), PollOpt::level()).unwrap();
 
     let client = TcpStream::connect(&listener.local_addr().unwrap()).unwrap();
-    event_loop.register(&client, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&client, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
 
     sleep_ms(250);
 

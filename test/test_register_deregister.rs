@@ -23,7 +23,7 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: EventSet) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: Ready) {
         match token {
             SERVER => {
                 trace!("handle_read; token=SERVER");
@@ -34,13 +34,13 @@ impl TestHandler {
                 trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                event_loop.reregister(&self.client, CLIENT, EventSet::writable(), PollOpt::level()).unwrap();
+                event_loop.reregister(&self.client, CLIENT, Ready::writable(), PollOpt::level()).unwrap();
             }
             _ => panic!("unexpected token"),
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: EventSet) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: Ready) {
         debug!("handle_write; token={:?}; state={:?}", token, self.state);
 
         assert!(token == CLIENT, "unexpected token {:?}", token);
@@ -56,7 +56,7 @@ impl Handler for TestHandler {
     type Timeout = usize;
     type Message = ();
 
-    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: EventSet) {
+    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: Ready) {
         if events.is_readable() {
             self.handle_read(event_loop, token, events);
         }
@@ -84,12 +84,12 @@ pub fn test_register_deregister() {
     let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
-    event_loop.register(&server, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&server, SERVER, Ready::readable(), PollOpt::edge()).unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
-    event_loop.register(&client, CLIENT, EventSet::readable(), PollOpt::level()).unwrap();
+    event_loop.register(&client, CLIENT, Ready::readable(), PollOpt::level()).unwrap();
 
     let mut handler = TestHandler::new(server, client);
 
@@ -106,9 +106,9 @@ pub fn test_register_with_no_readable_writable_is_error() {
 
     let sock = TcpListener::bind(&addr).unwrap();
 
-    assert!(poll.register(&sock, Token(0), EventSet::hup(), PollOpt::edge()).is_err());
+    assert!(poll.register(&sock, Token(0), Ready::hup(), PollOpt::edge()).is_err());
 
-    poll.register(&sock, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
+    poll.register(&sock, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
 
-    assert!(poll.reregister(&sock, Token(0), EventSet::hup(), PollOpt::edge()).is_err());
+    assert!(poll.reregister(&sock, Token(0), Ready::hup(), PollOpt::edge()).is_err());
 }

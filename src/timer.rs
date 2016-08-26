@@ -1,6 +1,6 @@
 //! Timer optimized for I/O related operations
 
-use {convert, io, Evented, EventSet, Poll, PollOpt, Registration, SetReadiness, Token};
+use {convert, io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::LazyCell;
 use std::{cmp, error, fmt, u64, usize, iter, thread};
 use std::sync::Arc;
@@ -265,7 +265,7 @@ impl<T> Timer<T> {
         // No more timeouts to poll
         if let Some(inner) = self.inner.borrow() {
             trace!("unsetting readiness");
-            let _ = inner.set_readiness.set_readiness(EventSet::none());
+            let _ = inner.set_readiness.set_readiness(Ready::none());
 
             if let Some(tick) = self.next_tick() {
                 self.schedule_readiness(tick);
@@ -349,7 +349,7 @@ impl<T> Default for Timer<T> {
 }
 
 impl<T> Evented for Timer<T> {
-    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         if self.inner.borrow().is_some() {
             return Err(io::Error::new(io::ErrorKind::Other, "timer already registered"));
         }
@@ -375,7 +375,7 @@ impl<T> Evented for Timer<T> {
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         match self.inner.borrow() {
             Some(inner) => inner.registration.update(poll, token, interest, opts),
             None => Err(io::Error::new(io::ErrorKind::Other, "receiver not registered")),
@@ -422,7 +422,7 @@ fn spawn_wakeup_thread(state: WakeupState, set_readiness: SetReadiness, start: I
 
                 if actual == sleep_until_tick {
                     trace!("setting readiness from wakeup thread");
-                    let _ = set_readiness.set_readiness(EventSet::readable());
+                    let _ = set_readiness.set_readiness(Ready::readable());
                     sleep_until_tick = usize::MAX as Tick;
                 } else {
                     sleep_until_tick = actual as Tick;

@@ -1,4 +1,4 @@
-use {io, EventSet, PollOpt, Token};
+use {io, Ready, PollOpt, Token};
 use event::{self, Event};
 use nix::libc::timespec;
 use nix::unistd::close;
@@ -66,16 +66,16 @@ impl Selector {
         Ok(evts.coalesce(awakener))
     }
 
-    pub fn register(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        self.ev_register(fd, usize::from(token), EventFilter::EVFILT_READ, interests.contains(EventSet::readable()), opts);
-        self.ev_register(fd, usize::from(token), EventFilter::EVFILT_WRITE, interests.contains(EventSet::writable()), opts);
+        self.ev_register(fd, usize::from(token), EventFilter::EVFILT_READ, interests.contains(Ready::readable()), opts);
+        self.ev_register(fd, usize::from(token), EventFilter::EVFILT_WRITE, interests.contains(Ready::writable()), opts);
 
         self.flush_changes()
     }
 
-    pub fn reregister(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
         // Just need to call register here since EV_ADD is a mod if already
         // registered
         self.register(fd, token, interests, opts)
@@ -203,27 +203,27 @@ impl Events {
 
             if idx == len {
                 // New entry, insert the default
-                self.events.push(Event::new(EventSet::none(), token));
+                self.events.push(Event::new(Ready::none(), token));
 
             }
 
             if e.flags.contains(EV_ERROR) {
-                event::kind_mut(&mut self.events[idx]).insert(EventSet::error());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::error());
             }
 
             if e.filter == EventFilter::EVFILT_READ {
-                event::kind_mut(&mut self.events[idx]).insert(EventSet::readable());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::readable());
             } else if e.filter == EventFilter::EVFILT_WRITE {
-                event::kind_mut(&mut self.events[idx]).insert(EventSet::writable());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
             }
 
             if e.flags.contains(EV_EOF) {
-                event::kind_mut(&mut self.events[idx]).insert(EventSet::hup());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
                 if !e.fflags.is_empty() {
-                    event::kind_mut(&mut self.events[idx]).insert(EventSet::error());
+                    event::kind_mut(&mut self.events[idx]).insert(Ready::error());
                 }
             }
         }

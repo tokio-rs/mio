@@ -1,4 +1,4 @@
-use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
+use {io, poll, Evented, Ready, Poll, PollOpt, Token};
 use std::io::{Read, Write};
 use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 use nix::fcntl::FcntlArg::F_SETFL;
@@ -52,11 +52,11 @@ impl AsRawFd for Io {
 }
 
 impl Evented for Io {
-    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         poll::selector(poll).register(self.fd, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         poll::selector(poll).reregister(self.fd, token, interest, opts)
     }
 

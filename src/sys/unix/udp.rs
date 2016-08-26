@@ -1,4 +1,4 @@
-use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
+use {io, poll, Evented, Ready, Poll, PollOpt, Token};
 use io::MapNonBlock;
 use unix::EventedFd;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -129,12 +129,12 @@ impl UdpSocket {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         try!(self.associate_selector(poll));
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 

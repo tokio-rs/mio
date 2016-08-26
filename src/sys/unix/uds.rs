@@ -1,4 +1,4 @@
-use {io, Evented, EventSet, Poll, PollOpt, Token};
+use {io, Evented, Ready, Poll, PollOpt, Token};
 use sys::unix::{net, nix, Io};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -97,11 +97,11 @@ impl Write for UnixSocket {
 }
 
 impl Evented for UnixSocket {
-    fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.io.reregister(poll, token, interest, opts)
     }
 

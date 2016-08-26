@@ -1,7 +1,7 @@
 use std::io::{Write, Read};
 
 use mio::tcp::{TcpStream, TcpListener};
-use mio::{Poll, Events, EventSet, PollOpt, Token, Evented};
+use mio::{Poll, Events, Ready, PollOpt, Token, Evented};
 
 #[test]
 fn write_then_drop() {
@@ -15,11 +15,11 @@ fn write_then_drop() {
 
     a.register(&poll,
                Token(1),
-               EventSet::readable(),
+               Ready::readable(),
                PollOpt::edge()).unwrap();
     s.register(&poll,
                Token(3),
-               EventSet::none(),
+               Ready::none(),
                PollOpt::edge()).unwrap();
 
     let mut events = Events::new();
@@ -33,7 +33,7 @@ fn write_then_drop() {
 
     s2.register(&poll,
                 Token(2),
-                EventSet::writable(),
+                Ready::writable(),
                 PollOpt::edge()).unwrap();
 
     let mut events = Events::new();
@@ -48,7 +48,7 @@ fn write_then_drop() {
 
     s.reregister(&poll,
                  Token(3),
-                 EventSet::readable(),
+                 Ready::readable(),
                  PollOpt::edge()).unwrap();
     let mut events = Events::new();
     while events.len() == 0 {
@@ -74,11 +74,11 @@ fn write_then_deregister() {
 
     a.register(&poll,
                Token(1),
-               EventSet::readable(),
+               Ready::readable(),
                PollOpt::edge()).unwrap();
     s.register(&poll,
                Token(3),
-               EventSet::none(),
+               Ready::none(),
                PollOpt::edge()).unwrap();
 
     let mut events = Events::new();
@@ -92,7 +92,7 @@ fn write_then_deregister() {
 
     s2.register(&poll,
                 Token(2),
-                EventSet::writable(),
+                Ready::writable(),
                 PollOpt::edge()).unwrap();
 
     let mut events = Events::new();
@@ -107,7 +107,7 @@ fn write_then_deregister() {
 
     s.reregister(&poll,
                  Token(3),
-                 EventSet::readable(),
+                 Ready::readable(),
                  PollOpt::edge()).unwrap();
     let mut events = Events::new();
     while events.len() == 0 {

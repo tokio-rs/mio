@@ -40,14 +40,14 @@
 //! let mut event_loop = EventLoop::new().unwrap();
 //!
 //! // Start listening for incoming connections
-//! event_loop.register(&server, SERVER, EventSet::readable(),
+//! event_loop.register(&server, SERVER, Ready::readable(),
 //!                     PollOpt::edge()).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
-//! event_loop.register(&sock, CLIENT, EventSet::readable(),
+//! event_loop.register(&sock, CLIENT, Ready::readable(),
 //!                     PollOpt::edge()).unwrap();
 //!
 //! // Define a handler to process the events
@@ -57,7 +57,7 @@
 //!     type Timeout = ();
 //!     type Message = ();
 //!
-//!     fn ready(&mut self, event_loop: &mut EventLoop<MyHandler>, token: Token, _: EventSet) {
+//!     fn ready(&mut self, event_loop: &mut EventLoop<MyHandler>, token: Token, _: Ready) {
 //!         match token {
 //!             SERVER => {
 //!                 let MyHandler(ref mut server) = *self;
@@ -123,7 +123,7 @@ pub mod deprecated;
 
 pub use event::{
     PollOpt,
-    EventSet,
+    Ready,
     Event,
 };
 pub use io::{

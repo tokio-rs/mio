@@ -31,7 +31,7 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Ready) {
         debug!("readable; tok={:?}; hint={:?}", tok, events);
 
         match tok {
@@ -70,15 +70,15 @@ impl TestHandler {
             }
             _ => panic!("received unknown token {:?}", tok)
         }
-        event_loop.reregister(&self.cli, CLIENT, EventSet::readable() | EventSet::hup(), PollOpt::edge()).unwrap();
+        event_loop.reregister(&self.cli, CLIENT, Ready::readable() | Ready::hup(), PollOpt::edge()).unwrap();
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, _: EventSet) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, _: Ready) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {
                 debug!("client connected");
-                event_loop.reregister(&self.cli, CLIENT, EventSet::readable() | EventSet::hup(), PollOpt::edge()).unwrap();
+                event_loop.reregister(&self.cli, CLIENT, Ready::readable() | Ready::hup(), PollOpt::edge()).unwrap();
             }
             _ => panic!("received unknown token {:?}", tok)
         }
@@ -90,7 +90,7 @@ impl Handler for TestHandler {
     type Timeout = ();
     type Message = ();
 
-    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: EventSet) {
+    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Ready) {
         if events.is_readable() {
             self.handle_read(event_loop, tok, events);
         }
@@ -112,12 +112,12 @@ pub fn test_close_on_drop() {
     // == Create & setup server socket
     let srv = TcpListener::bind(&addr).unwrap();
 
-    event_loop.register(&srv, SERVER, EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&srv, SERVER, Ready::readable(), PollOpt::edge()).unwrap();
 
     // == Create & setup client socket
     let sock = TcpStream::connect(&addr).unwrap();
 
-    event_loop.register(&sock, CLIENT, EventSet::writable(), PollOpt::edge()).unwrap();
+    event_loop.register(&sock, CLIENT, Ready::writable(), PollOpt::edge()).unwrap();
 
     // == Setup test handler
     let mut handler = TestHandler::new(srv, sock);

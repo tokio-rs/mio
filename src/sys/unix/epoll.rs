@@ -1,4 +1,4 @@
-use {convert, io, EventSet, PollOpt, Token};
+use {convert, io, Ready, PollOpt, Token};
 use event::Event;
 use nix::sys::epoll::*;
 use nix::unistd::close;
@@ -66,7 +66,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: usize::from(token) as u64
@@ -77,7 +77,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&self, fd: RawFd, token: Token, interests: EventSet, opts: PollOpt) -> io::Result<()> {
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
         let info = EpollEvent {
             events: ioevent_to_epoll(interests, opts),
             data: usize::from(token) as u64
@@ -102,7 +102,7 @@ impl Selector {
     }
 }
 
-fn ioevent_to_epoll(interest: EventSet, opts: PollOpt) -> EpollEventKind {
+fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> EpollEventKind {
     let mut kind = EpollEventKind::empty();
 
     if interest.is_readable() {
@@ -167,23 +167,23 @@ impl Events {
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|event| {
             let epoll = event.events;
-            let mut kind = EventSet::none();
+            let mut kind = Ready::none();
 
             if epoll.contains(EPOLLIN) |  epoll.contains(EPOLLPRI) {
-                kind = kind | EventSet::readable();
+                kind = kind | Ready::readable();
             }
 
             if epoll.contains(EPOLLOUT) {
-                kind = kind | EventSet::writable();
+                kind = kind | Ready::writable();
             }
 
             // EPOLLHUP - Usually means a socket error happened
             if epoll.contains(EPOLLERR) {
-                kind = kind | EventSet::error();
+                kind = kind | Ready::error();
             }
 
             if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
-                kind = kind | EventSet::hup();
+                kind = kind | Ready::hup();
             }
 
             let token = self.events[idx].data;

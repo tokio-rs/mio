@@ -9,7 +9,7 @@ use std::thread;
 use std::time::Duration;
 
 use {TryRead, TryWrite};
-use mio::{Token, EventSet, PollOpt};
+use mio::{Token, Ready, PollOpt};
 use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::{TcpListener, TcpStream};
 
@@ -22,7 +22,7 @@ fn accept() {
         type Message = ();
 
         fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 events: EventSet) {
+                 events: Ready) {
             self.hit = true;
             assert_eq!(token, Token(1));
             assert!(events.is_readable());
@@ -40,7 +40,7 @@ fn accept() {
 
     let mut e = EventLoop::new().unwrap();
 
-    e.register(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
 
     let mut h = H { hit: false, listener: l };
     e.run(&mut h).unwrap();
@@ -58,7 +58,7 @@ fn connect() {
         type Message = ();
 
         fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 events: EventSet) {
+                 events: Ready) {
             assert_eq!(token, Token(1));
             match self.hit {
                 0 => assert!(events.is_writable()),
@@ -85,7 +85,7 @@ fn connect() {
     let mut e = EventLoop::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register(&s, Token(1), EventSet::all(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(1), Ready::all(), PollOpt::edge()).unwrap();
 
     let mut h = H { hit: 0 };
     e.run(&mut h).unwrap();
@@ -107,7 +107,7 @@ fn read() {
         type Message = ();
 
         fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 _events: EventSet) {
+                 _events: Ready) {
             assert_eq!(token, Token(1));
             let mut b = [0; 1024];
             loop {
@@ -139,7 +139,7 @@ fn read() {
     let mut e = EventLoop::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register(&s, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
 
     let mut h = H { amt: 0, socket: s };
     e.run(&mut h).unwrap();
@@ -156,7 +156,7 @@ fn write() {
         type Message = ();
 
         fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 _events: EventSet) {
+                 _events: Ready) {
             assert_eq!(token, Token(1));
             let b = [0; 1024];
             loop {
@@ -188,7 +188,7 @@ fn write() {
     let mut e = EventLoop::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register(&s, Token(1), EventSet::writable(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(1), Ready::writable(), PollOpt::edge()).unwrap();
 
     let mut h = H { amt: 0, socket: s };
     e.run(&mut h).unwrap();
@@ -204,10 +204,10 @@ fn connect_then_close() {
         type Message = ();
 
         fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 _events: EventSet) {
+                 _events: Ready) {
             if token == Token(1) {
                 let s = self.listener.accept().unwrap().0;
-                event_loop.register(&s, Token(3), EventSet::all(),
+                event_loop.register(&s, Token(3), Ready::all(),
                                         PollOpt::edge()).unwrap();
                 drop(s);
             } else if token == Token(2) {
@@ -220,8 +220,8 @@ fn connect_then_close() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let s = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
 
-    e.register(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
-    e.register(&s, Token(2), EventSet::readable(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(2), Ready::readable(), PollOpt::edge()).unwrap();
 
     let mut h = H { listener: l };
     e.run(&mut h).unwrap();
@@ -235,7 +235,7 @@ fn listen_then_close() {
         type Timeout = ();
         type Message = ();
 
-        fn ready(&mut self, _: &mut EventLoop<Self>, token: Token, _: EventSet) {
+        fn ready(&mut self, _: &mut EventLoop<Self>, token: Token, _: Ready) {
             if token == Token(1) {
                 panic!("recieved ready() on a closed TcpListener")
             }
@@ -245,7 +245,7 @@ fn listen_then_close() {
     let mut e = EventLoop::new().unwrap();
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
-    e.register(&l, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
     drop(l);
 
     let mut h = H;

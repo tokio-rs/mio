@@ -1,4 +1,4 @@
-use {EventSet, Token};
+use {Ready, Token};
 use deprecated::{EventLoop};
 
 #[allow(unused_variables)]
@@ -16,7 +16,7 @@ pub trait Handler: Sized {
     ///
     /// This function will only be invoked a single time per socket per event
     /// loop tick.
-    fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
+    fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: Ready) {
     }
 
     /// Invoked when a message has been received via the event loop's channel.

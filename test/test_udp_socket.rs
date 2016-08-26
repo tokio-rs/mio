@@ -32,7 +32,7 @@ impl Handler for UdpHandler {
     type Timeout = usize;
     type Message = ();
 
-    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: EventSet) {
+    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Ready) {
 
         if events.is_readable() {
             match token {
@@ -89,10 +89,10 @@ pub fn test_udp_socket() {
     assert!(rx.recv_from(&mut buf).unwrap().is_none());
 
     info!("Registering SENDER");
-    event_loop.register(&tx, SENDER, EventSet::writable(), PollOpt::edge()).unwrap();
+    event_loop.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
 
     info!("Registering LISTENER");
-    event_loop.register(&rx, LISTENER, EventSet::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
 
     info!("Starting event loop to test with...");
     event_loop.run(&mut UdpHandler::new(tx, rx, "hello world")).unwrap();

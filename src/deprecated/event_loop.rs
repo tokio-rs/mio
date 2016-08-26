@@ -1,6 +1,6 @@
 use {channel, Evented, Poll, Events, Token};
 use deprecated::{Handler, NotifyError};
-use event::{Event, EventSet, PollOpt};
+use event::{Event, Ready, PollOpt};
 use timer::{self, Timer, Timeout};
 use std::{io, fmt, usize};
 use std::default::Default;
@@ -121,8 +121,8 @@ impl<H: Handler> EventLoop<H> {
         let (tx, rx) = channel::sync_channel(config.notify_capacity);
 
         // Register the notification wakeup FD with the IO poller
-        try!(poll.register(&rx, NOTIFY, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()));
-        try!(poll.register(&timer, TIMER, EventSet::readable(), PollOpt::edge()));
+        try!(poll.register(&rx, NOTIFY, Ready::readable(), PollOpt::edge() | PollOpt::oneshot()));
+        try!(poll.register(&timer, TIMER, Ready::readable(), PollOpt::edge()));
 
         Ok(EventLoop {
             run: true,
@@ -240,14 +240,14 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opt: PollOpt) -> io::Result<()>
+    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token, interest: Ready, opt: PollOpt) -> io::Result<()>
         where E: Evented
     {
         self.poll.register(io, token, interest, opt)
     }
 
     /// Re-Registers an IO handle with the event loop.
-    pub fn reregister<E: ?Sized>(&mut self, io: &E, token: Token, interest: EventSet, opt: PollOpt) -> io::Result<()>
+    pub fn reregister<E: ?Sized>(&mut self, io: &E, token: Token, interest: Ready, opt: PollOpt) -> io::Result<()>
         where E: Evented
     {
         self.poll.reregister(io, token, interest, opt)
@@ -347,7 +347,7 @@ impl<H: Handler> EventLoop<H> {
         }
 
         // Re-register
-        let _ = self.poll.reregister(&self.notify_rx, NOTIFY, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot());
+        let _ = self.poll.reregister(&self.notify_rx, NOTIFY, Ready::readable(), PollOpt::edge() | PollOpt::oneshot());
     }
 
     fn timer_process(&mut self, handler: &mut H) {

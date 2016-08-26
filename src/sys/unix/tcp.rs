@@ -10,7 +10,7 @@ use net2::TcpStreamExt;
 #[allow(unused_imports)]
 use net2::TcpListenerExt;
 
-use {io, poll, Evented, EventSet, Poll, PollOpt, Token};
+use {io, poll, Evented, Ready, Poll, PollOpt, Token};
 
 use sys::unix::eventedfd::EventedFd;
 use sys::unix::io::set_nonblock;
@@ -111,13 +111,13 @@ impl<'a> Write for &'a TcpStream {
 
 impl Evented for TcpStream {
     fn register(&self, poll: &Poll, token: Token,
-                interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         try!(self.associate_selector(poll));
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
     fn reregister(&self, poll: &Poll, token: Token,
-                  interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 
@@ -202,13 +202,13 @@ impl TcpListener {
 
 impl Evented for TcpListener {
     fn register(&self, poll: &Poll, token: Token,
-                interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         try!(self.associate_selector(poll));
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
     fn reregister(&self, poll: &Poll, token: Token,
-                  interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 

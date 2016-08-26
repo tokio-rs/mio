@@ -9,7 +9,7 @@ use winapi::*;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 
-use event::{Event, EventSet};
+use event::{Event, Ready};
 use poll::{self, Poll};
 use sys::windows::buffer_pool::BufferPool;
 use sys::windows::from_raw_arc::FromRawArc;
@@ -166,7 +166,7 @@ impl Registration {
     /// This is later used to fill out and respond to requests to `poll`. Note
     /// that this is all implemented through the `SetReadiness` structure in the
     /// `poll` module.
-    pub fn set_readiness(&self, set: EventSet) {
+    pub fn set_readiness(&self, set: Ready) {
         if let Some(ref i) = self.inner {
             trace!("set readiness to {:?}", set);
             let s = &i.set_readiness;
@@ -177,10 +177,10 @@ impl Registration {
     /// Queries what the current readiness of this I/O object is.
     ///
     /// This is what's being used to generate events returned by `poll`.
-    pub fn readiness(&self) -> EventSet {
+    pub fn readiness(&self) -> Ready {
         match self.inner {
             Some(ref i) => i.set_readiness.readiness(),
-            None => EventSet::none(),
+            None => Ready::none(),
         }
     }
 
@@ -193,7 +193,7 @@ impl Registration {
                            socket: &AsRawSocket,
                            poll: &Poll,
                            token: Token,
-                           interest: EventSet,
+                           interest: Ready,
                            opts: PollOpt,
                            registration: &Mutex<Option<poll::Registration>>)
                            -> io::Result<()> {
@@ -209,7 +209,7 @@ impl Registration {
                              _socket: &AsRawSocket,
                              poll: &Poll,
                              token: Token,
-                             interest: EventSet,
+                             interest: Ready,
                              opts: PollOpt,
                              registration: &Mutex<Option<poll::Registration>>)
                              -> io::Result<()> {
@@ -224,7 +224,7 @@ impl Registration {
     fn associate(&mut self,
                  poll: &Poll,
                  token: Token,
-                 events: EventSet,
+                 events: Ready,
                  opts: PollOpt,
                  registration: &Mutex<Option<poll::Registration>>)
                  -> io::Result<()> {
@@ -233,7 +233,7 @@ impl Registration {
         // To keep the same semantics as epoll, if I/O objects are interested in
         // being readable then they're also interested in listening for hup
         let events = if events.is_readable() {
-            events | EventSet::hup()
+            events | Ready::hup()
         }  else {
             events
         };

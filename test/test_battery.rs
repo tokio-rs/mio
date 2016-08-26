@@ -39,7 +39,7 @@ impl EchoConn {
 
     fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         event_loop.reregister(&self.sock, self.token.unwrap(),
-                              EventSet::readable(),
+                              Ready::readable(),
                               PollOpt::edge() | PollOpt::oneshot())
     }
 
@@ -65,7 +65,7 @@ impl EchoConn {
             };
         }
 
-        event_loop.reregister(&self.sock, self.token.unwrap(), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token.unwrap(), Ready::readable(), PollOpt::edge() | PollOpt::oneshot())
     }
 }
 
@@ -85,7 +85,7 @@ impl EchoServer {
 
         // Register the connection
         self.conns[tok].token = Some(tok);
-        event_loop.register(&self.conns[tok].sock, tok, EventSet::readable(),
+        event_loop.register(&self.conns[tok].sock, tok, Ready::readable(),
                             PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
@@ -152,7 +152,7 @@ impl EchoClient {
             }
         }
         if self.backlog.len() > 0 {
-            event_loop.reregister(&self.sock, self.token, EventSet::writable(),
+            event_loop.reregister(&self.sock, self.token, Ready::writable(),
                                   PollOpt::edge() | PollOpt::oneshot()).unwrap();
         }
 
@@ -182,7 +182,7 @@ impl Handler for Echo {
     type Message = String;
 
     fn ready(&mut self, event_loop: &mut EventLoop<Echo>, token: Token,
-             events: EventSet) {
+             events: Ready) {
 
         if events.is_readable() {
             match token {
@@ -214,7 +214,7 @@ impl Handler for Echo {
                 event_loop.reregister(
                     &self.client.sock,
                     self.client.token,
-                    EventSet::writable(),
+                    Ready::writable(),
                     PollOpt::edge() | PollOpt::oneshot()).unwrap();
             }
         }
@@ -238,13 +238,13 @@ pub fn test_echo_server() {
     let srv = TcpListener::bind(&addr).unwrap();
 
     info!("listen for connections");
-    event_loop.register(&srv, SERVER, EventSet::readable(),
+    event_loop.register(&srv, SERVER, Ready::readable(),
                         PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register(&sock, CLIENT, EventSet::writable(),
+    event_loop.register(&sock, CLIENT, Ready::writable(),
                         PollOpt::edge() | PollOpt::oneshot()).unwrap();
     let chan = event_loop.channel();
 

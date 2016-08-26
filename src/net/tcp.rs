@@ -5,7 +5,7 @@ use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr}
 
 use net2::TcpBuilder;
 
-use {io, sys, Evented, EventSet, Poll, PollOpt, Token};
+use {io, sys, Evented, Ready, Poll, PollOpt, Token};
 
 /*
  *
@@ -145,12 +145,12 @@ impl<'a> Write for &'a TcpStream {
 
 impl Evented for TcpStream {
     fn register(&self, poll: &Poll, token: Token,
-                interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.register(poll, token, interest, opts)
     }
 
     fn reregister(&self, poll: &Poll, token: Token,
-                  interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)
     }
 
@@ -245,12 +245,12 @@ impl TcpListener {
 
 impl Evented for TcpListener {
     fn register(&self, poll: &Poll, token: Token,
-                interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.register(poll, token, interest, opts)
     }
 
     fn reregister(&self, poll: &Poll, token: Token,
-                  interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)
     }
 

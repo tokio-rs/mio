@@ -10,7 +10,7 @@ pub fn test_poll_channel_edge() {
     let mut events = Events::new();
     let (tx, rx) = channel::channel();
 
-    poll.register(&rx, Token(123), EventSet::readable(), PollOpt::edge()).unwrap();
+    poll.register(&rx, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
 
     // Wait, but nothing should happen
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -25,7 +25,7 @@ pub fn test_poll_channel_edge() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.kind(), EventSet::readable());
+    assert_eq!(event.kind(), Ready::readable());
 
     // Poll again and there should be no events
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -47,7 +47,7 @@ pub fn test_poll_channel_edge() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.kind(), EventSet::readable());
+    assert_eq!(event.kind(), Ready::readable());
 
     // Read the value
     rx.try_recv().unwrap();
@@ -60,7 +60,7 @@ pub fn test_poll_channel_edge() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.kind(), EventSet::readable());
+    assert_eq!(event.kind(), Ready::readable());
 
     match rx.try_recv() {
         Err(TryRecvError::Disconnected) => {}
@@ -75,7 +75,7 @@ pub fn test_poll_channel_oneshot() {
     let mut events = Events::new();
     let (tx, rx) = channel::channel();
 
-    poll.register(&rx, Token(123), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    poll.register(&rx, Token(123), Ready::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     // Wait, but nothing should happen
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -90,7 +90,7 @@ pub fn test_poll_channel_oneshot() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.kind(), EventSet::readable());
+    assert_eq!(event.kind(), Ready::readable());
 
     // Poll again and there should be no events
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -112,7 +112,7 @@ pub fn test_poll_channel_oneshot() {
 
     // Reregistering will re-trigger the notification
     for _ in 0..3 {
-        poll.reregister(&rx, Token(123), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+        poll.reregister(&rx, Token(123), Ready::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
         // Have an event
         let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -120,19 +120,19 @@ pub fn test_poll_channel_oneshot() {
 
         let event = events.get(0).unwrap();
         assert_eq!(event.token(), Token(123));
-        assert_eq!(event.kind(), EventSet::readable());
+        assert_eq!(event.kind(), Ready::readable());
     }
 
     // Get the value
     assert_eq!("goodbye", rx.try_recv().unwrap());
 
-    poll.reregister(&rx, Token(123), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    poll.reregister(&rx, Token(123), Ready::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     // Have an event
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
     assert_eq!(0, num);
 
-    poll.reregister(&rx, Token(123), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    poll.reregister(&rx, Token(123), Ready::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     // Have an event
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -145,7 +145,7 @@ pub fn test_poll_channel_level() {
     let mut events = Events::new();
     let (tx, rx) = channel::channel();
 
-    poll.register(&rx, Token(123), EventSet::readable(), PollOpt::level()).unwrap();
+    poll.register(&rx, Token(123), Ready::readable(), PollOpt::level()).unwrap();
 
     // Wait, but nothing should happen
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -161,7 +161,7 @@ pub fn test_poll_channel_level() {
 
         let event = events.get(0).unwrap();
         assert_eq!(event.token(), Token(123));
-        assert_eq!(event.kind(), EventSet::readable());
+        assert_eq!(event.kind(), Ready::readable());
     }
 
     // Read the value
@@ -178,7 +178,7 @@ pub fn test_poll_channel_writable() {
     let mut events = Events::new();
     let (tx, rx) = channel::channel();
 
-    poll.register(&rx, Token(123), EventSet::writable(), PollOpt::edge()).unwrap();
+    poll.register(&rx, Token(123), Ready::writable(), PollOpt::edge()).unwrap();
 
     // Wait, but nothing should happen
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -198,7 +198,7 @@ pub fn test_dropping_receive_before_poll() {
     let mut events = Events::new();
     let (tx, rx) = channel::channel();
 
-    poll.register(&rx, Token(123), EventSet::readable(), PollOpt::edge()).unwrap();
+    poll.register(&rx, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
 
     // Push the value
     tx.send("hello").unwrap();
@@ -223,8 +223,8 @@ pub fn test_mixing_channel_with_socket() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
-    poll.register(&rx, Token(1), EventSet::readable(), PollOpt::edge()).unwrap();
+    poll.register(&l, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&rx, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
 
     // Push a value onto the channel
     tx.send("hello").unwrap();
@@ -233,7 +233,7 @@ pub fn test_mixing_channel_with_socket() {
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
 
     // Register the socket
-    poll.register(&s1, Token(2), EventSet::readable(), PollOpt::edge()).unwrap();
+    poll.register(&s1, Token(2), Ready::readable(), PollOpt::edge()).unwrap();
 
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);
@@ -258,7 +258,7 @@ pub fn test_sending_from_other_thread_while_polling() {
 
     for _ in 0..ITERATIONS {
         let (tx, rx) = channel::channel();
-        poll.register(&rx, Token(0), EventSet::readable(), PollOpt::edge()).unwrap();
+        poll.register(&rx, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
 
         for _ in 0..THREADS {
             let tx = tx.clone();

@@ -11,7 +11,7 @@ use net2::{self, TcpBuilder};
 use net::tcp::Shutdown;
 use winapi::*;
 
-use {Evented, EventSet, Poll, PollOpt, Token};
+use {Evented, Ready, Poll, PollOpt, Token};
 use poll;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, Registration};
@@ -149,7 +149,7 @@ impl TcpStream {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: EventSet, me: &mut StreamInner) {
+    fn post_register(&self, interest: Ready, me: &mut StreamInner) {
         if interest.is_readable() {
             self.imp.schedule_read(me);
         }
@@ -159,7 +159,7 @@ impl TcpStream {
         // generated immediately, so do so here.
         if interest.is_writable() {
             if let State::Empty = me.write {
-                self.imp.add_readiness(me, EventSet::writable());
+                self.imp.add_readiness(me, Ready::writable());
             }
         }
     }
@@ -244,13 +244,13 @@ impl StreamImp {
         match me.read {
             State::Empty => {}
             State::Ready(_) | State::Error(_) => {
-                self.add_readiness(me, EventSet::readable());
+                self.add_readiness(me, Ready::readable());
                 return;
             }
             _ => return,
         }
 
-        me.iocp.set_readiness(me.iocp.readiness() & !EventSet::readable());
+        me.iocp.set_readiness(me.iocp.readiness() & !Ready::readable());
 
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
@@ -269,10 +269,10 @@ impl StreamImp {
             Err(e) => {
                 // Like above, be sure to indicate that hup has happened
                 // whenever we get `ECONNRESET`
-                let mut set = EventSet::readable();
+                let mut set = Ready::readable();
                 if e.raw_os_error() == Some(WSAECONNRESET as i32) {
                     trace!("tcp stream at hup: econnreset");
-                    set = set | EventSet::hup();
+                    set = set | Ready::hup();
                 }
                 me.read = State::Error(e);
                 self.add_readiness(me, set);
@@ -296,7 +296,7 @@ impl StreamImp {
                       me: &mut StreamInner) {
 
         // About to write, clear any pending level triggered events
-        me.iocp.set_readiness(me.iocp.readiness() & !EventSet::writable());
+        me.iocp.set_readiness(me.iocp.readiness() & !Ready::writable());
 
         trace!("scheduling a write");
         let err = unsafe {
@@ -311,7 +311,7 @@ impl StreamImp {
             }
             Err(e) => {
                 me.write = State::Error(e);
-                self.add_readiness(me, EventSet::writable());
+                self.add_readiness(me, Ready::writable());
                 me.iocp.put_buffer(buf);
             }
         }
@@ -322,7 +322,7 @@ impl StreamImp {
     /// When an event is generated on this socket, if it happened after the
     /// socket was closed then we don't want to actually push the event onto our
     /// selector as otherwise it's just a spurious notification.
-    fn add_readiness(&self, me: &mut StreamInner, set: EventSet) {
+    fn add_readiness(&self, me: &mut StreamInner, set: Ready) {
         me.iocp.set_readiness(set | me.iocp.readiness());
     }
 }
@@ -345,11 +345,11 @@ fn read_done(status: &CompletionStatus) {
 
             // If we transferred 0 bytes then be sure to indicate that hup
             // happened.
-            let mut e = EventSet::readable();
+            let mut e = Ready::readable();
 
             if status.bytes_transferred() == 0 {
                 trace!("tcp stream at hup: 0-byte read");
-                e = e | EventSet::hup();
+                e = e | Ready::hup();
             }
 
             return me2.add_readiness(&mut me, e)
@@ -362,11 +362,11 @@ fn read_done(status: &CompletionStatus) {
 
     match me2.inner.socket.connect_complete() {
         Ok(()) => {
-            me2.add_readiness(&mut me, EventSet::writable());
+            me2.add_readiness(&mut me, Ready::writable());
             me2.schedule_read(&mut me);
         }
         Err(e) => {
-            me2.add_readiness(&mut me, EventSet::readable());
+            me2.add_readiness(&mut me, Ready::readable());
             me.read = State::Error(e);
         }
     }
@@ -384,7 +384,7 @@ fn write_done(status: &CompletionStatus) {
     };
     let new_pos = pos + (status.bytes_transferred() as usize);
     if new_pos == buf.len() {
-        me2.add_readiness(&mut me, EventSet::writable());
+        me2.add_readiness(&mut me, Ready::writable());
     } else {
         me2.schedule_write(buf, new_pos, &mut me);
     }
@@ -392,7 +392,7 @@ fn write_done(status: &CompletionStatus) {
 
 impl Evented for TcpStream {
     fn register(&self, poll: &Poll, token: Token,
-                interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         try!(me.iocp.register_socket(&self.imp.inner.socket, poll, token,
                                      interest, opts, &self.registration));
@@ -409,7 +409,7 @@ impl Evented for TcpStream {
     }
 
     fn reregister(&self, poll: &Poll, token: Token,
-                  interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         try!(me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
                                        interest, opts, &self.registration));
@@ -531,7 +531,7 @@ impl ListenerImp {
             _ => return
         }
 
-        me.iocp.set_readiness(me.iocp.readiness() & !EventSet::readable());
+        me.iocp.set_readiness(me.iocp.readiness() & !Ready::readable());
 
         let res = match self.inner.family {
             Family::V4 => TcpBuilder::new_v4(),
@@ -549,13 +549,13 @@ impl ListenerImp {
             }
             Err(e) => {
                 me.accept = State::Error(e);
-                self.add_readiness(me, EventSet::readable());
+                self.add_readiness(me, Ready::readable());
             }
         }
     }
 
     // See comments in StreamImp::push
-    fn add_readiness(&self, me: &mut ListenerInner, set: EventSet) {
+    fn add_readiness(&self, me: &mut ListenerInner, set: Ready) {
         me.iocp.set_readiness(set | me.iocp.readiness());
     }
 }
@@ -582,12 +582,12 @@ fn accept_done(status: &CompletionStatus) {
         Ok(remote_addr) => State::Ready((socket, remote_addr)),
         Err(e) => State::Error(e),
     };
-    me2.add_readiness(&mut me, EventSet::readable());
+    me2.add_readiness(&mut me, Ready::readable());
 }
 
 impl Evented for TcpListener {
     fn register(&self, poll: &Poll, token: Token,
-                interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         try!(me.iocp.register_socket(&self.imp.inner.socket, poll, token,
                                      interest, opts, &self.registration));
@@ -596,7 +596,7 @@ impl Evented for TcpListener {
     }
 
     fn reregister(&self, poll: &Poll, token: Token,
-                  interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         try!(me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
                                        interest, opts, &self.registration));

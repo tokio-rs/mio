@@ -1,6 +1,6 @@
 extern crate mio;
 
-use mio::{Token, EventSet, PollOpt};
+use mio::{Token, Ready, PollOpt};
 use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::TcpListener;
 use std::time::Duration;
@@ -17,7 +17,7 @@ fn reregister_before_register() {
     let mut e = EventLoop::<E>::new().unwrap();
 
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
-    let res = e.reregister(&l, Token(1), EventSet::all(), PollOpt::edge());
+    let res = e.reregister(&l, Token(1), Ready::all(), PollOpt::edge());
     if cfg!(target_os = "macos") || cfg!(target_os = "freebsd") || cfg!(target_os = "dragonfly") {
         assert!(res.is_ok());
     } else {
@@ -35,7 +35,7 @@ fn run_once_with_nothing() {
 fn add_then_drop() {
     let mut e = EventLoop::<E>::new().unwrap();
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
-    e.register(&l, Token(1), EventSet::all(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), Ready::all(), PollOpt::edge()).unwrap();
     drop(l);
     e.run_once(&mut E, Some(Duration::from_millis(100))).unwrap();
 }

@@ -17,7 +17,7 @@ use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
-use {Evented, EventSet, Poll, PollOpt, Token};
+use {Evented, Ready, Poll, PollOpt, Token};
 use poll;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, Registration};
@@ -102,7 +102,7 @@ impl UdpSocket {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest & !EventSet::writable());
+        me.iocp.set_readiness(interest & !Ready::writable());
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = try!(owned_buf.write(buf));
@@ -220,14 +220,14 @@ impl UdpSocket {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: EventSet, me: &mut Inner) {
+    fn post_register(&self, interest: Ready, me: &mut Inner) {
         if interest.is_readable() {
             self.imp.schedule_read(me);
         }
         // See comments in TcpSocket::post_register for what's going on here
         if interest.is_writable() {
             if let State::Empty = me.write {
-                self.imp.add_readiness(me, EventSet::writable());
+                self.imp.add_readiness(me, Ready::writable());
             }
         }
     }
@@ -245,7 +245,7 @@ impl Imp {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest & !EventSet::readable());
+        me.iocp.set_readiness(interest & !Ready::readable());
 
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
@@ -262,21 +262,21 @@ impl Imp {
             }
             Err(e) => {
                 me.read = State::Error(e);
-                self.add_readiness(me, EventSet::readable());
+                self.add_readiness(me, Ready::readable());
                 me.iocp.put_buffer(buf);
             }
         }
     }
 
     // See comments in tcp::StreamImp::push
-    fn add_readiness(&self, me: &Inner, set: EventSet) {
+    fn add_readiness(&self, me: &Inner, set: Ready) {
         me.iocp.set_readiness(set | me.iocp.readiness());
     }
 }
 
 impl Evented for UdpSocket {
     fn register(&self, poll: &Poll, token: Token,
-                interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         try!(me.iocp.register_socket(&self.imp.inner.socket,
                                      poll, token, interest, opts,
@@ -286,7 +286,7 @@ impl Evented for UdpSocket {
     }
 
     fn reregister(&self, poll: &Poll, token: Token,
-                  interest: EventSet, opts: PollOpt) -> io::Result<()> {
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         try!(me.iocp.reregister_socket(&self.imp.inner.socket,
                                        poll, token, interest,
@@ -334,7 +334,7 @@ fn send_done(status: &CompletionStatus) {
     };
     let mut me = me2.inner();
     me.write = State::Empty;
-    me2.add_readiness(&mut me, EventSet::writable());
+    me2.add_readiness(&mut me, Ready::writable());
 }
 
 fn recv_done(status: &CompletionStatus) {
@@ -351,5 +351,5 @@ fn recv_done(status: &CompletionStatus) {
         buf.set_len(status.bytes_transferred() as usize);
     }
     me.read = State::Ready(buf);
-    me2.add_readiness(&mut me, EventSet::readable());
+    me2.add_readiness(&mut me, Ready::readable());
 }

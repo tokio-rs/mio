@@ -1,6 +1,6 @@
 #![cfg(unix)]
 
-use mio::{Token, EventSet, PollOpt};
+use mio::{Token, Ready, PollOpt};
 use mio::deprecated::{unix, EventLoop, Handler};
 use std::time::Duration;
 
@@ -9,7 +9,7 @@ pub struct BrokenPipeHandler;
 impl Handler for BrokenPipeHandler {
     type Timeout = ();
     type Message = ();
-    fn ready(&mut self, _: &mut EventLoop<Self>, token: Token, _: EventSet) {
+    fn ready(&mut self, _: &mut EventLoop<Self>, token: Token, _: Ready) {
         if token == Token(1) {
             panic!("Received ready() on a closed pipe.");
         }
@@ -22,7 +22,7 @@ pub fn broken_pipe() {
     let (reader, _) = unix::pipe().unwrap();
 
     // On Darwin this returns a "broken pipe" error.
-    let _ = event_loop.register(&reader, Token(1), EventSet::all(), PollOpt::edge());
+    let _ = event_loop.register(&reader, Token(1), Ready::all(), PollOpt::edge());
 
     let mut handler = BrokenPipeHandler;
     drop(reader);

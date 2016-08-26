@@ -1,5 +1,5 @@
 use {sys, Evented, Token};
-use event::{self, EventSet, Event, PollOpt};
+use event::{self, Ready, Event, PollOpt};
 use std::{fmt, io, mem, ptr, usize};
 use std::cell::{UnsafeCell, Cell};
 use std::isize;
@@ -18,7 +18,7 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 /// without blocking.
 ///
 /// To use `Poll`, an IO handle must first be registered with the `Poll`
-/// instance using the `register()` handle. An `EventSet` representing the
+/// instance using the `register()` handle. An `Ready` representing the
 /// program's interest in the socket is specified as well as an arbitrary
 /// `Token` which is used to identify the IO handle in the future.
 ///
@@ -46,7 +46,7 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 /// let stream = TcpStream::connect(&"173.194.33.80:80".parse().unwrap()).unwrap();
 ///
 /// // Register the stream with `Poll`
-/// poll.register(&stream, Token(0), EventSet::all(), PollOpt::edge()).unwrap();
+/// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge()).unwrap();
 ///
 /// // Wait for the socket to become ready
 /// poll.poll(&mut events, None).unwrap();
@@ -148,7 +148,7 @@ struct RegistrationData {
     token: Token,
 
     // The registration interest
-    interest: EventSet,
+    interest: Ready,
 
     // Poll opts
     opts: PollOpt,
@@ -176,13 +176,13 @@ impl Poll {
         };
 
         // Register the notification wakeup FD with the IO poller
-        try!(poll.readiness_queue.inner().awakener.register(&poll, AWAKEN, EventSet::readable(), PollOpt::edge()));
+        try!(poll.readiness_queue.inner().awakener.register(&poll, AWAKEN, Ready::readable(), PollOpt::edge()));
 
         Ok(poll)
     }
 
     /// Register an `Evented` handle with the `Poll` instance.
-    pub fn register<E: ?Sized>(&self, io: &E, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()>
+    pub fn register<E: ?Sized>(&self, io: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
         try!(validate_args(token, interest));
@@ -201,7 +201,7 @@ impl Poll {
     }
 
     /// Re-register an `Evented` handle with the `Poll` instance.
-    pub fn reregister<E: ?Sized>(&self, io: &E, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()>
+    pub fn reregister<E: ?Sized>(&self, io: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
         try!(validate_args(token, interest));
@@ -257,7 +257,7 @@ impl Poll {
     }
 }
 
-fn validate_args(token: Token, interest: EventSet) -> io::Result<()> {
+fn validate_args(token: Token, interest: Ready) -> io::Result<()> {
     if token == AWAKEN {
         return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
     }
@@ -372,7 +372,7 @@ impl Registration {
     /// Create a new `Registration` associated with the given `Poll` instance.
     /// The returned `Registration` will be associated with this `Poll` for its
     /// entire lifetime.
-    pub fn new(poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> (Registration, SetReadiness) {
+    pub fn new(poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> (Registration, SetReadiness) {
         let inner = RegistrationInner::new(poll, token, interest, opts);
         let registration = Registration { inner: inner.clone() };
         let set_readiness = SetReadiness { inner: inner.clone() };
@@ -380,12 +380,12 @@ impl Registration {
         (registration, set_readiness)
     }
 
-    pub fn update(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    pub fn update(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.inner.update(poll, token, interest, opts)
     }
 
     pub fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner.update(poll, Token(0), EventSet::none(), PollOpt::empty())
+        self.inner.update(poll, Token(0), Ready::none(), PollOpt::empty())
     }
 }
 
@@ -406,11 +406,11 @@ impl fmt::Debug for Registration {
 unsafe impl Send for Registration { }
 
 impl SetReadiness {
-    pub fn readiness(&self) -> EventSet {
+    pub fn readiness(&self) -> Ready {
         self.inner.readiness()
     }
 
-    pub fn set_readiness(&self, ready: EventSet) -> io::Result<()> {
+    pub fn set_readiness(&self, ready: Ready) -> io::Result<()> {
         self.inner.set_readiness(ready)
     }
 }
@@ -419,7 +419,7 @@ unsafe impl Send for SetReadiness { }
 unsafe impl Sync for SetReadiness { }
 
 impl RegistrationInner {
-    fn new(poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> RegistrationInner {
+    fn new(poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> RegistrationInner {
         let queue = poll.readiness_queue.clone();
         let node = queue.new_readiness_node(token, interest, opts, 1);
 
@@ -429,7 +429,7 @@ impl RegistrationInner {
         }
     }
 
-    fn update(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+    fn update(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         // Update the registration data
         try!(self.registration_data_mut(&poll.readiness_queue)).update(token, interest, opts);
 
@@ -449,14 +449,14 @@ impl RegistrationInner {
         Ok(())
     }
 
-    fn readiness(&self) -> EventSet {
+    fn readiness(&self) -> Ready {
         // A relaxed ordering is sufficient here as a call to `readiness` is
         // only meant as a hint to what the current value is. It should not be
         // used for any synchronization.
         event::from_usize(self.node().events.load(Ordering::Relaxed))
     }
 
-    fn set_readiness(&self, ready: EventSet) -> io::Result<()> {
+    fn set_readiness(&self, ready: Ready) -> io::Result<()> {
         // First store in the new readiness using relaxed as this operation is
         // permitted to be visible ad-hoc. The `queue_for_processing` function
         // will set a `Release` barrier ensuring eventual consistency.
@@ -575,7 +575,7 @@ impl Drop for RegistrationInner {
 
 impl ReadinessQueue {
     fn new() -> io::Result<ReadinessQueue> {
-        let sleep_token = Box::new(ReadinessNode::new(Token(0), EventSet::none(), PollOpt::empty(), 0));
+        let sleep_token = Box::new(ReadinessNode::new(Token(0), Ready::none(), PollOpt::empty(), 0));
 
         Ok(ReadinessQueue {
             inner: Arc::new(UnsafeCell::new(ReadinessQueueInner {
@@ -704,7 +704,7 @@ impl ReadinessQueue {
         ReadyList { head: ReadyRef::new(head) }
     }
 
-    fn new_readiness_node(&self, token: Token, interest: EventSet, opts: PollOpt, ref_count: usize) -> ReadyRef {
+    fn new_readiness_node(&self, token: Token, interest: Ready, opts: PollOpt, ref_count: usize) -> ReadyRef {
         let mut node = Box::new(ReadinessNode::new(token, interest, opts, ref_count));
         let ret = ReadyRef::new(&mut *node as *mut ReadinessNode);
 
@@ -777,7 +777,7 @@ impl ReadinessQueue {
 unsafe impl Send for ReadinessQueue { }
 
 impl ReadinessNode {
-    fn new(token: Token, interest: EventSet, opts: PollOpt, ref_count: usize) -> ReadinessNode {
+    fn new(token: Token, interest: Ready, opts: PollOpt, ref_count: usize) -> ReadinessNode {
         ReadinessNode {
             next_all_nodes: None,
             prev_all_nodes: ReadyRef::none(),
@@ -789,7 +789,7 @@ impl ReadinessNode {
         }
     }
 
-    fn poll_events(&self) -> EventSet {
+    fn poll_events(&self) -> Ready {
         (self.interest() | event::drop()) & event::from_usize(self.events.load(Ordering::Relaxed))
     }
 
@@ -797,7 +797,7 @@ impl ReadinessNode {
         unsafe { &*self.registration_data.get() }.token
     }
 
-    fn interest(&self) -> EventSet {
+    fn interest(&self) -> Ready {
         unsafe { &*self.registration_data.get() }.interest
     }
 
@@ -832,7 +832,7 @@ impl ReadinessNode {
 }
 
 impl RegistrationData {
-    fn new(token: Token, interest: EventSet, opts: PollOpt) -> RegistrationData {
+    fn new(token: Token, interest: Ready, opts: PollOpt) -> RegistrationData {
         RegistrationData {
             token: token,
             interest: interest,
@@ -840,14 +840,14 @@ impl RegistrationData {
         }
     }
 
-    fn update(&mut self, token: Token, interest: EventSet, opts: PollOpt) {
+    fn update(&mut self, token: Token, interest: Ready, opts: PollOpt) {
         self.token = token;
         self.interest = interest;
         self.opts = opts;
     }
 
     fn disable(&mut self) {
-        self.interest = EventSet::none();
+        self.interest = Ready::none();
         self.opts = PollOpt::empty();
     }
 }
@@ -924,7 +924,7 @@ impl fmt::Pointer for ReadyRef {
 
 #[cfg(test)]
 mod test {
-    use {EventSet, Poll, PollOpt, Registration, SetReadiness, Token, Events};
+    use {Ready, Poll, PollOpt, Registration, SetReadiness, Token, Events};
     use std::time::Duration;
 
     fn ensure_send<T: Send>(_: &T) {}
@@ -956,7 +956,7 @@ mod test {
         let mut registrations = Vec::with_capacity(1_000);
 
         for _ in 0..3 {
-            registrations.push(Registration::new(&mut poll, Token(0), EventSet::readable(), PollOpt::edge()));
+            registrations.push(Registration::new(&mut poll, Token(0), Ready::readable(), PollOpt::edge()));
         }
 
         drop(registrations);

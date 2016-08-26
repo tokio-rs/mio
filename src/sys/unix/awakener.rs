@@ -2,7 +2,7 @@ pub use self::pipe::Awakener;
 
 /// Default *nix awakener implementation
 mod pipe {
-    use {io, Evented, EventSet, Poll, PollOpt, Token};
+    use {io, Evented, Ready, Poll, PollOpt, Token};
     use deprecated::unix::{self, PipeReader, PipeWriter};
     use std::io::{Read, Write};
 
@@ -58,11 +58,11 @@ mod pipe {
     }
 
     impl Evented for Awakener {
-        fn register(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
             self.reader().register(poll, token, interest, opts)
         }
 
-        fn reregister(&self, poll: &Poll, token: Token, interest: EventSet, opts: PollOpt) -> io::Result<()> {
+        fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
             self.reader().reregister(poll, token, interest, opts)
         }
 
