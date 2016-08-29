@@ -59,6 +59,7 @@ Currently supported platforms:
 * Windows
 * Android
 * NetBSD
+* FreeBSD
 
 There are potentially others. If you find that Mio works on another
 platform, submit a PR to update the list!
