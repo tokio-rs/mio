@@ -88,6 +88,7 @@ enum State<T, U> {
 impl TcpStream {
     fn new(socket: net::TcpStream,
            deferred_connect: Option<SocketAddr>) -> TcpStream {
+
         TcpStream {
             registration: Mutex::new(None),
             imp: StreamImp {

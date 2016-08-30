@@ -1,9 +1,8 @@
-use {io, poll, Evented, Ready, Poll, PollOpt, Token};
+use {io, Evented, Ready, Poll, PollOpt, Token};
 use io::MapNonBlock;
 use unix::EventedFd;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[allow(unused_imports)] // only here for Rust 1.8
 use net2::UdpSocketExt;
@@ -11,7 +10,6 @@ use net2::UdpSocketExt;
 #[derive(Debug)]
 pub struct UdpSocket {
     io: net::UdpSocket,
-    selector_id: AtomicUsize,
 }
 
 impl UdpSocket {
@@ -19,7 +17,6 @@ impl UdpSocket {
         try!(socket.set_nonblocking(true));
         Ok(UdpSocket {
             io: socket,
-            selector_id: AtomicUsize::new(0),
         })
     }
 
@@ -31,7 +28,6 @@ impl UdpSocket {
         self.io.try_clone().map(|io| {
             UdpSocket {
                 io: io,
-                selector_id: AtomicUsize::new(self.selector_id.load(Ordering::SeqCst)),
             }
         })
     }
@@ -115,22 +111,10 @@ impl UdpSocket {
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.io.take_error()
     }
-
-    fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
-        let selector_id = self.selector_id.load(Ordering::SeqCst);
-
-        if selector_id != 0 && selector_id != poll::selector(poll).id() {
-            Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
-        } else {
-            self.selector_id.store(poll::selector(poll).id(), Ordering::SeqCst);
-            Ok(())
-        }
-    }
 }
 
 impl Evented for UdpSocket {
     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        try!(self.associate_selector(poll));
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
@@ -147,7 +131,6 @@ impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
         UdpSocket {
             io: net::UdpSocket::from_raw_fd(fd),
-            selector_id: AtomicUsize::new(0),
         }
     }
 }

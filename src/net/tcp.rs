@@ -6,6 +6,7 @@ use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr}
 use net2::TcpBuilder;
 
 use {io, sys, Evented, Ready, Poll, PollOpt, Token};
+use super::SelectorId;
 
 /*
  *
@@ -16,6 +17,7 @@ use {io, sys, Evented, Ready, Poll, PollOpt, Token};
 #[derive(Debug)]
 pub struct TcpStream {
     sys: sys::TcpStream,
+    selector_id: SelectorId,
 }
 
 pub use std::net::Shutdown;
@@ -65,6 +67,7 @@ impl TcpStream {
                           addr: &SocketAddr) -> io::Result<TcpStream> {
         Ok(TcpStream {
             sys: try!(sys::TcpStream::connect(stream, addr)),
+            selector_id: SelectorId::new(),
         })
     }
 
@@ -77,7 +80,12 @@ impl TcpStream {
     }
 
     pub fn try_clone(&self) -> io::Result<TcpStream> {
-        self.sys.try_clone().map(|s| TcpStream { sys: s })
+        self.sys.try_clone().map(|s| {
+            TcpStream {
+                sys: s,
+                selector_id: self.selector_id.clone(),
+            }
+        })
     }
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.sys.shutdown(how)
@@ -146,6 +154,7 @@ impl<'a> Write for &'a TcpStream {
 impl Evented for TcpStream {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
+        try!(self.selector_id.associate_selector(poll));
         self.sys.register(poll, token, interest, opts)
     }
 
@@ -168,6 +177,7 @@ impl Evented for TcpStream {
 #[derive(Debug)]
 pub struct TcpListener {
     sys: sys::TcpListener,
+    selector_id: SelectorId,
 }
 
 impl TcpListener {
@@ -204,6 +214,7 @@ impl TcpListener {
         let listener = try!(sock.listen(1024));
         Ok(TcpListener {
             sys: try!(sys::TcpListener::new(listener, addr)),
+            selector_id: SelectorId::new(),
         })
     }
 
@@ -218,7 +229,12 @@ impl TcpListener {
     /// The address provided must be the address that the listener is bound to.
     pub fn from_listener(listener: net::TcpListener, addr: &SocketAddr)
                          -> io::Result<TcpListener> {
-        sys::TcpListener::new(listener, addr).map(|s| TcpListener { sys: s })
+        sys::TcpListener::new(listener, addr).map(|s| {
+            TcpListener {
+                sys: s,
+                selector_id: SelectorId::new(),
+            }
+        })
     }
 
     /// Accepts a new `TcpStream`.
@@ -227,7 +243,14 @@ impl TcpListener {
     /// will be ready at a later point. If an accepted stream is returned, the
     /// address of the peer is returned along with it
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.sys.accept().map(|(s, a)| (TcpStream { sys: s }, a))
+        self.sys.accept().map(|(s, a)| {
+            let stream = TcpStream {
+                sys: s,
+                selector_id: SelectorId::new(),
+            };
+
+            (stream, a)
+        })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -235,7 +258,12 @@ impl TcpListener {
     }
 
     pub fn try_clone(&self) -> io::Result<TcpListener> {
-        self.sys.try_clone().map(|s| TcpListener { sys: s })
+        self.sys.try_clone().map(|s| {
+            TcpListener {
+                sys: s,
+                selector_id: self.selector_id.clone(),
+            }
+        })
     }
 
     pub fn take_socket_error(&self) -> io::Result<()> {
@@ -246,6 +274,7 @@ impl TcpListener {
 impl Evented for TcpListener {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
+        try!(self.selector_id.associate_selector(poll));
         self.sys.register(poll, token, interest, opts)
     }
 
@@ -285,7 +314,10 @@ impl AsRawFd for TcpStream {
 #[cfg(unix)]
 impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
-        TcpStream { sys: FromRawFd::from_raw_fd(fd) }
+        TcpStream {
+            sys: FromRawFd::from_raw_fd(fd),
+            selector_id: SelectorId::new(),
+        }
     }
 }
 
@@ -306,6 +338,9 @@ impl AsRawFd for TcpListener {
 #[cfg(unix)]
 impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
-        TcpListener { sys: FromRawFd::from_raw_fd(fd) }
+        TcpListener {
+            sys: FromRawFd::from_raw_fd(fd),
+            selector_id: SelectorId::new(),
+        }
     }
 }

@@ -1,8 +1,6 @@
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::SeqCst;
 
 use libc;
 use net2::TcpStreamExt;
@@ -10,7 +8,7 @@ use net2::TcpStreamExt;
 #[allow(unused_imports)]
 use net2::TcpListenerExt;
 
-use {io, poll, Evented, Ready, Poll, PollOpt, Token};
+use {io, Evented, Ready, Poll, PollOpt, Token};
 
 use sys::unix::eventedfd::EventedFd;
 use sys::unix::io::set_nonblock;
@@ -18,13 +16,11 @@ use sys::unix::io::set_nonblock;
 #[derive(Debug)]
 pub struct TcpStream {
     inner: net::TcpStream,
-    selector_id: AtomicUsize,
 }
 
 #[derive(Debug)]
 pub struct TcpListener {
     inner: net::TcpListener,
-    selector_id: AtomicUsize,
 }
 
 impl TcpStream {
@@ -39,7 +35,6 @@ impl TcpStream {
 
         Ok(TcpStream {
             inner: stream,
-            selector_id: AtomicUsize::new(0),
         })
     }
 
@@ -55,7 +50,6 @@ impl TcpStream {
         self.inner.try_clone().map(|s| {
             TcpStream {
                 inner: s,
-                selector_id: AtomicUsize::new(self.selector_id.load(SeqCst)),
             }
         })
     }
@@ -80,17 +74,6 @@ impl TcpStream {
             }
         })
     }
-
-    fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
-        let selector_id = self.selector_id.load(SeqCst);
-
-        if selector_id != 0 && selector_id != poll::selector(poll).id() {
-            Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
-        } else {
-            self.selector_id.store(poll::selector(poll).id(), SeqCst);
-            Ok(())
-        }
-    }
 }
 
 impl<'a> Read for &'a TcpStream {
@@ -112,7 +95,6 @@ impl<'a> Write for &'a TcpStream {
 impl Evented for TcpStream {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        try!(self.associate_selector(poll));
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
@@ -130,7 +112,6 @@ impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream {
             inner: net::TcpStream::from_raw_fd(fd),
-            selector_id: AtomicUsize::new(0),
         }
     }
 }
@@ -152,7 +133,6 @@ impl TcpListener {
         try!(set_nonblock(&inner));
         Ok(TcpListener {
             inner: inner,
-            selector_id: AtomicUsize::new(0),
         })
     }
 
@@ -164,7 +144,6 @@ impl TcpListener {
         self.inner.try_clone().map(|s| {
             TcpListener {
                 inner: s,
-                selector_id: AtomicUsize::new(self.selector_id.load(SeqCst)),
             }
         })
     }
@@ -174,7 +153,6 @@ impl TcpListener {
             try!(set_nonblock(&s));
             Ok((TcpStream {
                 inner: s,
-                selector_id: AtomicUsize::new(0),
             }, a))
         })
     }
@@ -187,23 +165,11 @@ impl TcpListener {
             }
         })
     }
-
-    fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
-        let selector_id = self.selector_id.load(SeqCst);
-
-        if selector_id != 0 && selector_id != poll::selector(poll).id() {
-            Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
-        } else {
-            self.selector_id.store(poll::selector(poll).id(), SeqCst);
-            Ok(())
-        }
-    }
 }
 
 impl Evented for TcpListener {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        try!(self.associate_selector(poll));
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
@@ -221,7 +187,6 @@ impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener {
             inner: net::TcpListener::from_raw_fd(fd),
-            selector_id: AtomicUsize::new(0),
         }
     }
 }

@@ -1,11 +1,13 @@
 //! Primitives for working with UDP
 
 use {io, sys, Evented, Ready, Poll, PollOpt, Token};
+use super::SelectorId;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 #[derive(Debug)]
 pub struct UdpSocket {
     sys: sys::UdpSocket,
+    selector_id: SelectorId,
 }
 
 impl UdpSocket {
@@ -28,6 +30,7 @@ impl UdpSocket {
     pub fn from_socket(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         Ok(UdpSocket {
             sys: try!(sys::UdpSocket::new(socket)),
+            selector_id: SelectorId::new(),
         })
     }
 
@@ -43,7 +46,12 @@ impl UdpSocket {
     /// options set on one socket will be propagated to the other.
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
         self.sys.try_clone()
-            .map(From::from)
+            .map(|s| {
+                UdpSocket {
+                    sys: s,
+                    selector_id: self.selector_id.clone(),
+                }
+            })
     }
 
     /// Sends data on the socket to the given address. On success, returns the
@@ -215,6 +223,7 @@ impl UdpSocket {
 
 impl Evented for UdpSocket {
     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
+        try!(self.selector_id.associate_selector(poll));
         self.sys.register(poll, token, interest, opts)
     }
 
@@ -224,12 +233,6 @@ impl Evented for UdpSocket {
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
         self.sys.deregister(poll)
-    }
-}
-
-impl From<sys::UdpSocket> for UdpSocket {
-    fn from(sys: sys::UdpSocket) -> UdpSocket {
-        UdpSocket { sys: sys }
     }
 }
 
@@ -259,7 +262,10 @@ impl AsRawFd for UdpSocket {
 #[cfg(unix)]
 impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
-        UdpSocket { sys: FromRawFd::from_raw_fd(fd) }
+        UdpSocket {
+            sys: FromRawFd::from_raw_fd(fd),
+            selector_id: SelectorId::new(),
+        }
     }
 }
 
