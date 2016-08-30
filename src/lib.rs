@@ -20,63 +20,54 @@
 //!
 //! ```
 //! use mio::*;
-//! use mio::deprecated::{EventLoop, Handler};
 //! use mio::tcp::{TcpListener, TcpStream};
 //!
 //! // Setup some tokens to allow us to identify which event is
 //! // for which socket.
 //! const SERVER: Token = Token(0);
 //! const CLIENT: Token = Token(1);
-//! #
-//! # // level() isn't implemented on windows yet
-//! # if cfg!(windows) { return }
 //!
 //! let addr = "127.0.0.1:13265".parse().unwrap();
 //!
 //! // Setup the server socket
 //! let server = TcpListener::bind(&addr).unwrap();
 //!
-//! // Create an event loop
-//! let mut event_loop = EventLoop::new().unwrap();
+//! // Create an poll instance
+//! let mut poll = Poll::new().unwrap();
 //!
 //! // Start listening for incoming connections
-//! event_loop.register(&server, SERVER, Ready::readable(),
-//!                     PollOpt::edge()).unwrap();
+//! poll.register(&server, SERVER, Ready::readable(),
+//!               PollOpt::edge()).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
-//! event_loop.register(&sock, CLIENT, Ready::readable(),
-//!                     PollOpt::edge()).unwrap();
+//! poll.register(&sock, CLIENT, Ready::readable(),
+//!               PollOpt::edge()).unwrap();
 //!
-//! // Define a handler to process the events
-//! struct MyHandler(TcpListener);
+//! // Create storage for events
+//! let mut events = Events::with_capacity(1024);
 //!
-//! impl Handler for MyHandler {
-//!     type Timeout = ();
-//!     type Message = ();
+//! loop {
+//!     poll.poll(&mut events, None).unwrap();
 //!
-//!     fn ready(&mut self, event_loop: &mut EventLoop<MyHandler>, token: Token, _: Ready) {
-//!         match token {
+//!     for event in events.iter() {
+//!         match event.token() {
 //!             SERVER => {
-//!                 let MyHandler(ref mut server) = *self;
 //!                 // Accept and drop the socket immediately, this will close
 //!                 // the socket and notify the client of the EOF.
 //!                 let _ = server.accept();
 //!             }
 //!             CLIENT => {
-//!                 // The server just shuts down the socket, let's just
-//!                 // shutdown the event loop
-//!                 event_loop.shutdown();
+//!                 // The server just shuts down the socket, let's just exit
+//!                 // from our event loop.
+//!                 return;
 //!             }
-//!             _ => panic!("unexpected token"),
+//!             _ => unreachable!(),
 //!         }
 //!     }
 //! }
-//!
-//! // Start handling events
-//! event_loop.run(&mut MyHandler(server)).unwrap();
 //!
 //! ```
 

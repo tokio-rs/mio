@@ -10,7 +10,7 @@ pub fn test_tcp_edge_oneshot() {
     let _ = ::env_logger::init();
 
     let mut poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
 
     // Create the listener
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();

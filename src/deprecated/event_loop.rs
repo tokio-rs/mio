@@ -131,7 +131,7 @@ impl<H: Handler> EventLoop<H> {
             notify_tx: tx,
             notify_rx: rx,
             config: config,
-            events: Events::new(),
+            events: Events::with_capacity(1024),
         })
     }
 

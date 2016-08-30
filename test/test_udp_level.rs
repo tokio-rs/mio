@@ -8,7 +8,7 @@ const MS: u64 = 1_000;
 #[test]
 pub fn test_udp_level_triggered() {
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
 
     // Create the listener
     let tx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();

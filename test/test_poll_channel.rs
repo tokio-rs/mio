@@ -7,7 +7,7 @@ use std::time::Duration;
 #[test]
 pub fn test_poll_channel_edge() {
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
@@ -72,7 +72,7 @@ pub fn test_poll_channel_edge() {
 #[test]
 pub fn test_poll_channel_oneshot() {
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), Ready::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
@@ -142,7 +142,7 @@ pub fn test_poll_channel_oneshot() {
 #[test]
 pub fn test_poll_channel_level() {
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), Ready::readable(), PollOpt::level()).unwrap();
@@ -175,7 +175,7 @@ pub fn test_poll_channel_level() {
 #[test]
 pub fn test_poll_channel_writable() {
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), Ready::writable(), PollOpt::edge()).unwrap();
@@ -195,7 +195,7 @@ pub fn test_poll_channel_writable() {
 #[test]
 pub fn test_dropping_receive_before_poll() {
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
     poll.register(&rx, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
@@ -216,7 +216,7 @@ pub fn test_mixing_channel_with_socket() {
     use mio::tcp::*;
 
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
     // Create the listener
@@ -254,7 +254,7 @@ pub fn test_sending_from_other_thread_while_polling() {
 
     // Make sure to run multiple times
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
 
     for _ in 0..ITERATIONS {
         let (tx, rx) = channel::channel();

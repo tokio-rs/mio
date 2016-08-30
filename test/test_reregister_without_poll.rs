@@ -7,7 +7,7 @@ const MS: u64 = 1_000;
 
 #[test]
 pub fn test_reregister_different_without_poll() {
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let poll = Poll::new().unwrap();
 
     // Create the listener

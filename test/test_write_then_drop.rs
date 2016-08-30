@@ -22,7 +22,7 @@ fn write_then_drop() {
                Ready::none(),
                PollOpt::edge()).unwrap();
 
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     while events.len() == 0 {
         poll.poll(&mut events, None).unwrap();
     }
@@ -36,7 +36,7 @@ fn write_then_drop() {
                 Ready::writable(),
                 PollOpt::edge()).unwrap();
 
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     while events.len() == 0 {
         poll.poll(&mut events, None).unwrap();
     }
@@ -50,7 +50,7 @@ fn write_then_drop() {
                  Token(3),
                  Ready::readable(),
                  PollOpt::edge()).unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     while events.len() == 0 {
         poll.poll(&mut events, None).unwrap();
     }
@@ -81,7 +81,7 @@ fn write_then_deregister() {
                Ready::none(),
                PollOpt::edge()).unwrap();
 
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     while events.len() == 0 {
         poll.poll(&mut events, None).unwrap();
     }
@@ -95,7 +95,7 @@ fn write_then_deregister() {
                 Ready::writable(),
                 PollOpt::edge()).unwrap();
 
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     while events.len() == 0 {
         poll.poll(&mut events, None).unwrap();
     }
@@ -109,7 +109,7 @@ fn write_then_deregister() {
                  Token(3),
                  Ready::readable(),
                  PollOpt::edge()).unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     while events.len() == 0 {
         poll.poll(&mut events, None).unwrap();
     }

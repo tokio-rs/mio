@@ -40,7 +40,7 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 ///
 /// // Construct a new `Poll` handle as well as the `Events` we'll store into
 /// let mut poll = Poll::new().unwrap();
-/// let mut events = Events::new();
+/// let mut events = Events::with_capacity(1024);
 ///
 /// // Connect the stream
 /// let stream = TcpStream::connect(&"173.194.33.80:80".parse().unwrap()).unwrap();
@@ -292,14 +292,6 @@ pub struct EventsIter<'a> {
 }
 
 impl Events {
-    /// Creates a new blank set of events ready to get passed to `poll`.
-    ///
-    /// Note that this constructor will attempt to select a "reasonable" default
-    /// capacity for the events returned.
-    pub fn new() -> Events {
-        Events::with_capacity(1024)
-    }
-
     /// Create a net blank set of events capable of holding up to `capacity`
     /// events.
     ///
@@ -952,7 +944,7 @@ mod test {
     #[test]
     pub fn test_nodes_do_not_leak() {
         let mut poll = Poll::new().unwrap();
-        let mut events = Events::new();
+        let mut events = Events::with_capacity(1024);
         let mut registrations = Vec::with_capacity(1_000);
 
         for _ in 0..3 {

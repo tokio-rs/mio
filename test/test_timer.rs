@@ -32,7 +32,7 @@ fn test_basic_timer_with_poll_edge_set_timeout_after_register() {
     let _ = ::env_logger::init();
 
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
     poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
@@ -56,7 +56,7 @@ fn test_basic_timer_with_poll_edge_set_timeout_before_register() {
     let _ = ::env_logger::init();
 
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
     timer.set_timeout(Duration::from_millis(200), "hello").unwrap();
@@ -80,7 +80,7 @@ fn test_setting_later_timeout_then_earlier_one() {
     let _ = ::env_logger::init();
 
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
     poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
@@ -118,7 +118,7 @@ fn test_timer_with_looping_wheel() {
     let _ = ::env_logger::init();
 
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let mut timer = timer::Builder::default()
         .num_slots(2)
         .build();
@@ -152,7 +152,7 @@ fn test_edge_without_polling() {
     let _ = ::env_logger::init();
 
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
     poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
@@ -181,7 +181,7 @@ fn test_level_triggered() {
     let _ = ::env_logger::init();
 
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
     poll.register(&timer, Token(0), Ready::readable(), PollOpt::level()).unwrap();
@@ -212,7 +212,7 @@ fn test_edge_oneshot_triggered() {
     let _ = ::env_logger::init();
 
     let poll = Poll::new().unwrap();
-    let mut events = Events::new();
+    let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
     poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
