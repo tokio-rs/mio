@@ -1,16 +1,24 @@
 # 0.6.0 (unreleased)
 
+* Shift primary API towards `Poll`
+* `EventLoop` and types to `deprecated` mod
 * Increase minimum supported Rust version to 1.3.0
-* Rename `EventLoopConfig` -> `EventLoopBuilder`
+* Deprecate unix domain socket implementation in favor of using version
+  in `std`
+* Remove various types now included in `std`
+* Updated TCP & UDP APIs to match the versions in `std`
+* Enable implementing `Evented` for any type via `Registration`
 * Rename `IoEvent` -> `Event`
 * Access `Event` data via functions vs. public fields.
-* Polled events are now retrieved via `Events` type.
-* Relax `Send` bound on notify messages.
-* Implement `std::error::Error` for `TimerError`
+* Expose `Events` as a public type that is passed into `Poll`
 * Use `std::time::Duration` for all APIs that require a time duration.
+* Polled events are now retrieved via `Events` type.
+* Implement `std::error::Error` for `TimerError`
+* Relax `Send` bound on notify messages.
 * Remove `Clone` impl for `Timeout` (future proof)
 * Remove `mio::prelude`
 * Remove `mio::util`
+* Remove dependency on bytes
 
 # 0.5.0 (December 3, 2015)
 
