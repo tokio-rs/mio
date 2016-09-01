@@ -1,10 +1,11 @@
 # 0.6.0 (unreleased)
 
 * Shift primary API towards `Poll`
-* `EventLoop` and types to `deprecated` mod
+* `EventLoop` and types to `deprecated` mod. All contents of the
+  `deprecated` mod will be removed by Mio 1.0.
 * Increase minimum supported Rust version to 1.8.0
-* Deprecate unix domain socket implementation in favor of using version
-  in `std`
+* Deprecate unix domain socket implementation in favor of using a
+  version external to Mio. For example: https://github.com/alexcrichton/mio-uds.
 * Remove various types now included in `std`
 * Updated TCP & UDP APIs to match the versions in `std`
 * Enable implementing `Evented` for any type via `Registration`
