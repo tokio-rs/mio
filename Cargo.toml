@@ -20,7 +20,7 @@ exclude       = [
 [dependencies]
 lazycell = "0.4.0"
 log      = "0.3.1"
-slab     = { git = "https://github.com/carllerche/slab" }
+slab     = "0.3.0"
 net2     = { version = "0.2.19", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
