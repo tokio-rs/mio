@@ -2,7 +2,7 @@
 
 * Shift primary API towards `Poll`
 * `EventLoop` and types to `deprecated` mod
-* Increase minimum supported Rust version to 1.3.0
+* Increase minimum supported Rust version to 1.8.0
 * Deprecate unix domain socket implementation in favor of using version
   in `std`
 * Remove various types now included in `std`
