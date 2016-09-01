@@ -35,7 +35,7 @@ kernel32-sys = "0.2"
 [dev-dependencies]
 env_logger = "0.3.0"
 tempdir    = "0.3.4"
-bytes      = { git = "https://github.com/carllerche/bytes", rev = "b10b1cd2e2" }
+bytes      = "0.3.0"
 
 [[test]]
 name = "test"
