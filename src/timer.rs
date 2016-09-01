@@ -145,7 +145,7 @@ impl<T> Timer<T> {
 
         Timer {
             tick_ms: tick_ms,
-            entries: Slab::new(capacity),
+            entries: Slab::with_capacity(capacity),
             wheel: wheel,
             start: start,
             tick: 0,
@@ -655,7 +655,7 @@ mod test {
     const CAPACITY: usize = 32;
 
     fn count<T>(timer: &Timer<T>) -> usize {
-        timer.entries.count()
+        timer.entries.len()
     }
 
     fn timer() -> Timer<&'static str> {

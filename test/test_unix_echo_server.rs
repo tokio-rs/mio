@@ -8,8 +8,8 @@ use std::path::PathBuf;
 use std::io;
 use tempdir::TempDir;
 
-const SERVER: Token = Token(0);
-const CLIENT: Token = Token(1);
+const SERVER: Token = Token(10_000_000);
+const CLIENT: Token = Token(10_000_001);
 
 struct EchoConn {
     sock: UnixStream,
@@ -242,7 +242,7 @@ impl Echo {
         Echo {
             server: EchoServer {
                 sock: srv,
-                conns: Slab::new_starting_at(Token(2), 128)
+                conns: Slab::with_capacity(128)
             },
             client: EchoClient::new(client, CLIENT, msgs)
         }

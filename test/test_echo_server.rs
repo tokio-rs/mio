@@ -6,8 +6,8 @@ use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use slab;
 use std::io;
 
-const SERVER: Token = Token(0);
-const CLIENT: Token = Token(1);
+const SERVER: Token = Token(10_000_000);
+const CLIENT: Token = Token(10_000_001);
 
 struct EchoConn {
     sock: TcpStream,
@@ -247,7 +247,7 @@ impl Echo {
         Echo {
             server: EchoServer {
                 sock: srv,
-                conns: Slab::new_starting_at(Token(2), 128)
+                conns: Slab::with_capacity(128)
             },
             client: EchoClient::new(client, CLIENT, msgs)
         }

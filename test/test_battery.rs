@@ -7,8 +7,9 @@ use slab;
 use std::{io, thread};
 use std::time::Duration;
 
-const SERVER: Token = Token(0);
-const CLIENT: Token = Token(1);
+// Don't touch the connection slab
+const SERVER: Token = Token(10_000_000);
+const CLIENT: Token = Token(10_000_001);
 
 #[cfg(windows)]
 const N: usize = 10_000;
@@ -170,7 +171,7 @@ impl Echo {
         Echo {
             server: EchoServer {
                 sock: srv,
-                conns: Slab::new_starting_at(Token(2), 128),
+                conns: Slab::with_capacity(128),
             },
             client: EchoClient::new(client, CLIENT),
         }
