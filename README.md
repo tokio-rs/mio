@@ -16,8 +16,8 @@ Feedback can be posted on the [PR](https://github.com/carllerche/mio/pull/222).
 **API documentation**
 
 * [master](http://rust-doc.s3-website-us-east-1.amazonaws.com/mio/master/mio/)
-* [v0.5](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.5.x/mio/)
-* [v0.4](http://rustdoc.s3-website-us-east-1.amazonaws.com/mio/v0.4.x/mio/)
+* [v0.6](https://docs.rs/mio/^0.6)
+* [v0.5](https://docs.rs/mio/^0.5)
 
 ## Usage
 
@@ -25,7 +25,7 @@ To use `mio`, first add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mio = "0.5"
+mio = "0.6"
 ```
 
 Then, add this to your crate root:
