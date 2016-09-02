@@ -7,7 +7,7 @@ use std::sync::{Mutex, MutexGuard};
 use io::would_block;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
-use net2::{self, TcpBuilder};
+use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
 use net::tcp::Shutdown;
 use winapi::*;
 
@@ -129,21 +129,31 @@ impl TcpStream {
     }
 
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        net2::TcpStreamExt::set_nodelay(&self.imp.inner.socket, nodelay)
+        self.imp.inner.socket.set_nodelay(nodelay)
     }
 
-    pub fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
-        let dur = seconds.map(|s| s * 1000);
-        net2::TcpStreamExt::set_keepalive_ms(&self.imp.inner.socket, dur)
+    pub fn nodelay(&self) -> io::Result<bool> {
+        self.imp.inner.socket.nodelay()
     }
 
-    pub fn take_socket_error(&self) -> io::Result<()> {
-        net2::TcpStreamExt::take_error(&self.imp.inner.socket).and_then(|e| {
-            match e {
-                Some(e) => Err(e),
-                None => Ok(())
-            }
-        })
+    pub fn set_keepalive_ms(&self, millis: Option<u32>) -> io::Result<()> {
+        self.imp.inner.socket.set_keepalive_ms(millis)
+    }
+
+    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
+        self.imp.inner.socket.keepalive_ms()
+    }
+
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.imp.inner.socket.set_ttl(ttl)
+    }
+
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.imp.inner.socket.ttl()
+    }
+
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.imp.inner.socket.take_error()
     }
 
     fn inner(&self) -> MutexGuard<StreamInner> {
@@ -507,13 +517,24 @@ impl TcpListener {
         })
     }
 
-    pub fn take_socket_error(&self) -> io::Result<()> {
-        net2::TcpListenerExt::take_error(&self.imp.inner.socket).and_then(|e| {
-            match e {
-                Some(e) => Err(e),
-                None => Ok(())
-            }
-        })
+    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
+        self.imp.inner.socket.set_only_v6(only_v6)
+    }
+
+    pub fn only_v6(&self) -> io::Result<bool> {
+        self.imp.inner.socket.only_v6()
+    }
+
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.imp.inner.socket.set_ttl(ttl)
+    }
+
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.imp.inner.socket.ttl()
+    }
+
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.imp.inner.socket.take_error()
     }
 
     fn inner(&self) -> MutexGuard<ListenerInner> {
