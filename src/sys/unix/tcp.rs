@@ -5,9 +5,6 @@ use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
 use libc;
 use net2::TcpStreamExt;
 
-#[allow(unused_imports)]
-use net2::TcpListenerExt;
-
 use {io, Evented, Ready, Poll, PollOpt, Token};
 
 use sys::unix::eventedfd::EventedFd;
@@ -59,20 +56,31 @@ impl TcpStream {
     }
 
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        TcpStreamExt::set_nodelay(&self.inner, nodelay)
+        self.inner.set_nodelay(nodelay)
     }
 
-    pub fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
-        self.inner.set_keepalive_ms(seconds.map(|s| s * 1000))
+    pub fn nodelay(&self) -> io::Result<bool> {
+        self.inner.nodelay()
     }
 
-    pub fn take_socket_error(&self) -> io::Result<()> {
-        self.inner.take_error().and_then(|e| {
-            match e {
-                Some(e) => Err(e),
-                None => Ok(())
-            }
-        })
+    pub fn set_keepalive_ms(&self, millis: Option<u32>) -> io::Result<()> {
+        self.inner.set_keepalive_ms(millis)
+    }
+
+    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
+        self.inner.keepalive_ms()
+    }
+
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.inner.set_ttl(ttl)
+    }
+
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.inner.ttl()
+    }
+
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.inner.take_error()
     }
 }
 
@@ -157,13 +165,24 @@ impl TcpListener {
         })
     }
 
-    pub fn take_socket_error(&self) -> io::Result<()> {
-        self.inner.take_error().and_then(|e| {
-            match e {
-                Some(e) => Err(e),
-                None => Ok(())
-            }
-        })
+    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
+        self.inner.set_only_v6(only_v6)
+    }
+
+    pub fn only_v6(&self) -> io::Result<bool> {
+        self.inner.only_v6()
+    }
+
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.inner.set_ttl(ttl)
+    }
+
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.inner.ttl()
+    }
+
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.inner.take_error()
     }
 }
 
