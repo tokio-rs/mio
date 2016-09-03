@@ -1,4 +1,4 @@
-# 0.6.0 (unreleased)
+# 0.6.0 (September 2, 2016)
 
 * Shift primary API towards `Poll`
 * `EventLoop` and types to `deprecated` mod. All contents of the
