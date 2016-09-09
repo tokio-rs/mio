@@ -25,7 +25,7 @@ net2     = "0.2.19"
 
 [target.'cfg(unix)'.dependencies]
 nix    = "0.6.0"
-libc   = "0.2.4"
+libc   = "0.2.14"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2.1"
