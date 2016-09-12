@@ -1,5 +1,6 @@
 use {io, poll, Evented, Ready, Poll, PollOpt, Token};
 use std::io::{Read, Write};
+use std::mem;
 use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 use nix::fcntl::FcntlArg::F_SETFL;
 use nix::fcntl::{fcntl, O_NONBLOCK};
@@ -41,7 +42,10 @@ impl FromRawFd for Io {
 
 impl IntoRawFd for Io {
     fn into_raw_fd(self) -> RawFd {
-        self.fd
+        // Forget self to prevent drop() from closing self.fd.
+        let fd = self.fd;
+        mem::forget(self);
+        fd
     }
 }
 
