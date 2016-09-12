@@ -221,14 +221,14 @@ impl PipeReader {
             Err(e) => return Err(e),
             _ => {},
         }
-        return Ok(PipeReader::from(Io::from_raw_fd(stdout.into_raw_fd())));
+        return Ok(PipeReader::from(unsafe { Io::from_raw_fd(stdout.into_raw_fd()) }));
     }
     pub fn from_stderr(stderr: process::ChildStderr) -> io::Result<Self> {
         match sys::set_nonblock(&stderr) {
             Err(e) => return Err(e),
             _ => {},
         }
-        return Ok(PipeReader::from(Io::from_raw_fd(stderr.into_raw_fd())));
+        return Ok(PipeReader::from(unsafe { Io::from_raw_fd(stderr.into_raw_fd()) }));
     }
 }
 
@@ -275,7 +275,7 @@ impl PipeWriter {
             Err(e) => return Err(e),
             _ => {},
         }
-        return Ok(PipeWriter::from(Io::from_raw_fd(stdin.into_raw_fd())));
+        return Ok(PipeWriter::from(unsafe { Io::from_raw_fd(stdin.into_raw_fd()) }));
     }
 }
 

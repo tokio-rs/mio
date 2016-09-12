@@ -19,7 +19,7 @@ impl UnixSocket {
 
     fn new(ty: nix::SockType) -> io::Result<UnixSocket> {
         let fd = try!(net::socket(nix::AddressFamily::Unix, ty, true));
-        Ok(From::from(Io::from_raw_fd(fd)))
+        Ok(From::from(unsafe { Io::from_raw_fd(fd) }))
     }
 
     /// Connect the socket to the specified address
@@ -34,7 +34,7 @@ impl UnixSocket {
 
     pub fn accept(&self) -> io::Result<UnixSocket> {
         net::accept(&self.io, true)
-            .map(|fd| From::from(Io::from_raw_fd(fd)))
+            .map(|fd| From::from(unsafe { Io::from_raw_fd(fd) }))
     }
 
     /// Bind the socket to the specified address
