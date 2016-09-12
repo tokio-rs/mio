@@ -1,6 +1,6 @@
 use {io};
 use sys::unix::{nix, Io};
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, RawFd, FromRawFd};
 pub use net::tcp::Shutdown;
 
 pub fn socket(family: nix::AddressFamily, ty: nix::SockType, nonblock: bool) -> io::Result<RawFd> {
@@ -53,5 +53,5 @@ pub fn accept(io: &Io, nonblock: bool) -> io::Result<RawFd> {
 pub fn dup(io: &Io) -> io::Result<Io> {
     nix::dup(io.as_raw_fd())
         .map_err(super::from_nix_error)
-        .map(Io::from_raw_fd)
+        .map(|fd| unsafe { Io::from_raw_fd(fd) })
 }

@@ -21,21 +21,9 @@ pub struct Io {
     fd: RawFd,
 }
 
-impl Io {
-    pub fn from_raw_fd(fd: RawFd) -> Io {
-        Io { fd: fd }
-    }
-}
-
-impl From<RawFd> for Io {
-    fn from(fd: RawFd) -> Io {
-        Io { fd: fd }
-    }
-}
-
 impl FromRawFd for Io {
     unsafe fn from_raw_fd(fd: RawFd) -> Io {
-        From::from(fd)
+        Io { fd: fd }
     }
 }
 

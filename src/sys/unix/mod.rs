@@ -29,6 +29,8 @@ pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 pub use self::uds::UnixSocket;
 
+use std::os::unix::io::FromRawFd;
+
 pub fn pipe() -> ::io::Result<(Io, Io)> {
     use nix::fcntl::{O_NONBLOCK, O_CLOEXEC};
     use nix::unistd::pipe2;
@@ -36,7 +38,9 @@ pub fn pipe() -> ::io::Result<(Io, Io)> {
     let (rd, wr) = try!(pipe2(O_NONBLOCK | O_CLOEXEC)
         .map_err(from_nix_error));
 
-    Ok((Io::from_raw_fd(rd), Io::from_raw_fd(wr)))
+    unsafe {
+        Ok((Io::from_raw_fd(rd), Io::from_raw_fd(wr)))
+    }
 }
 
 pub fn from_nix_error(err: ::nix::Error) -> ::io::Error {

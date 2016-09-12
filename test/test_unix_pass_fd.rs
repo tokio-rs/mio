@@ -6,7 +6,7 @@ use bytes::{Buf, ByteBuf, SliceBuf};
 use slab;
 use std::path::PathBuf;
 use std::io::{self, Read};
-use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{AsRawFd, FromRawFd};
 use tempdir::TempDir;
 
 const SERVER: Token = Token(10_000_000);
@@ -172,7 +172,7 @@ impl EchoClient {
                 assert_eq!(r, 1);
                 assert_eq!(b'x', buf[0]);
                 debug!("CLIENT : We read {} bytes!", r);
-                pipe = From::<Io>::from(From::from(fd));
+                pipe = From::<Io>::from(unsafe { Io::from_raw_fd(fd) });
             }
             Err(e) => {
                 panic!("not implemented; client err={:?}", e);
