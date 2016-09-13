@@ -60,6 +60,7 @@ pub fn test_tcp_listener_level_triggered() {
 
 #[test]
 pub fn test_tcp_stream_level_triggered() {
+    drop(::env_logger::init());
     let poll = Poll::new().unwrap();
     let mut pevents = Events::with_capacity(1024);
 
@@ -94,6 +95,8 @@ pub fn test_tcp_stream_level_triggered() {
     // Register the socket
     poll.register(&s1_tx, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
 
+    debug!("writing some data ----------");
+
     // Write some data
     let res = s1_tx.write(b"hello world!");
     assert!(res.unwrap() > 0);
@@ -101,11 +104,15 @@ pub fn test_tcp_stream_level_triggered() {
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);
 
+    debug!("looking at rx end ----------");
+
     // Poll rx end
     poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&pevents, Token(1));
     assert!(events.len() == 1, "actual={:?}", events);
     assert_eq!(events[0], Event::new(Ready::readable() | Ready::writable(), Token(1)));
+
+    debug!("reading ----------");
 
     // Reading the data should clear it
     let mut res = vec![];
@@ -114,6 +121,8 @@ pub fn test_tcp_stream_level_triggered() {
 
     assert_eq!(res, b"hello world!");
 
+    debug!("checking read is gone ----------");
+
     poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&pevents, Token(1));
     assert!(events.len() == 1);
@@ -121,6 +130,8 @@ pub fn test_tcp_stream_level_triggered() {
 
     // Closing the socket clears all active level events
     drop(s1);
+
+    debug!("checking everything is gone ----------");
 
     poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
     let events = filter(&pevents, Token(1));

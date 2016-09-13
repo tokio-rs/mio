@@ -37,7 +37,7 @@ impl UdpHandler {
                         unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
                         assert_eq!(*addr.ip(), Ipv4Addr::new(127, 0, 0, 1));
                     }
-                    _ => panic!("unexpected result"),
+                    res => panic!("unexpected result: {:?}", res),
                 }
                 assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
                 event_loop.shutdown();
@@ -76,6 +76,7 @@ impl Handler for UdpHandler {
 
 #[test]
 pub fn test_multicast() {
+    drop(::env_logger::init());
     debug!("Starting TEST_UDP_CONNECTIONLESS");
     let mut event_loop = EventLoop::new().unwrap();
 
