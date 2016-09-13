@@ -235,11 +235,11 @@ impl ReceiverCtl {
         // Decrement
         let second = self.inner.pending.fetch_sub(1, Ordering::AcqRel);
 
-        if first == 1 && second > 0 {
+        if first == 1 && second > 1 {
             // There are still pending messages. Since readiness was
             // previously unset, it must be reset here
             if let Some(set_readiness) = self.inner.set_readiness.borrow() {
-                try!(set_readiness.set_readiness(Ready::none()));
+                try!(set_readiness.set_readiness(Ready::readable()));
             }
         }
 
