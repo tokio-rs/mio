@@ -4,7 +4,7 @@ use mio::deprecated::{EventLoop, Handler};
 use bytes::ByteBuf;
 use mio::tcp::*;
 
-use self::TestState::{Initial, AfterRead, AfterHup};
+use self::TestState::{Initial, AfterRead};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -13,7 +13,6 @@ const CLIENT: Token = Token(1);
 enum TestState {
     Initial,
     AfterRead,
-    AfterHup
 }
 
 struct TestHandler {
@@ -46,19 +45,9 @@ impl TestHandler {
                     Initial => {
                         let mut buf = [0; 4096];
                         debug!("GOT={:?}", self.cli.try_read(&mut buf[..]));
-
-                        // Whether or not Hup is included with actual data is platform specific
-                        if events.is_hup() {
-                            self.state = AfterHup;
-                        } else {
-                            self.state = AfterRead;
-                        }
+                        self.state = AfterRead;
                     },
-                    AfterRead => {
-                        //assert_eq!(hint, DATAHINT | HUPHINT);
-                        self.state = AfterHup;
-                    },
-                    AfterHup => panic!("Shouldn't get here")
+                    AfterRead => {}
                 }
 
                 let mut buf = ByteBuf::mut_with_capacity(1024);
@@ -124,5 +113,5 @@ pub fn test_close_on_drop() {
 
     // == Run test
     event_loop.run(&mut handler).unwrap();
-    assert!(handler.state == AfterHup, "actual={:?}", handler.state);
+    assert!(handler.state == AfterRead, "actual={:?}", handler.state);
 }

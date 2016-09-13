@@ -62,7 +62,7 @@ fn connect() {
             assert_eq!(token, Token(1));
             match self.hit {
                 0 => assert!(events.is_writable()),
-                1 => assert!(events.is_hup()),
+                1 => assert!(events.is_readable()),
                 _ => panic!(),
             }
             self.hit += 1;

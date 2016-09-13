@@ -454,7 +454,7 @@ impl RegistrationInner {
         // will set a `Release` barrier ensuring eventual consistency.
         self.node().events.store(event::as_usize(ready), Ordering::Relaxed);
 
-        trace!("readiness event {:?} {:?}", ready, self.node().token());
+        trace!("set_readiness event {:?} {:?}", ready, self.node().token());
 
         // Setting readiness to none doesn't require any processing by the poll
         // instance, so there is no need to enqueue the node. No barrier is
@@ -659,7 +659,8 @@ impl ReadinessQueue {
 
                 // TODO: Don't push the event if the capacity of `dst` has
                 // been reached
-                trace!("readiness event {:?} {:?}", events, node_ref.token());
+                trace!("returning readiness event {:?} {:?}", events,
+                       node_ref.token());
                 dst.push_event(Event::new(events, node_ref.token()));
 
                 // If one-shot, disarm the node

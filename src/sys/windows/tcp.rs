@@ -1,5 +1,5 @@
 use std::fmt;
-use std::io::{self, Read, Write, Cursor, ErrorKind};
+use std::io::{self, Read, Write, ErrorKind};
 use std::mem;
 use std::net::{self, SocketAddr};
 use std::sync::{Mutex, MutexGuard};
@@ -68,7 +68,7 @@ struct ListenerIo {
 struct StreamInner {
     iocp: Registration,
     deferred_connect: Option<SocketAddr>,
-    read: State<Vec<u8>, Cursor<Vec<u8>>>,
+    read: State<(), ()>,
     write: State<(Vec<u8>, usize), (Vec<u8>, usize)>,
 }
 
@@ -88,7 +88,6 @@ enum State<T, U> {
 impl TcpStream {
     fn new(socket: net::TcpStream,
            deferred_connect: Option<SocketAddr>) -> TcpStream {
-
         TcpStream {
             registration: Mutex::new(None),
             imp: StreamImp {
@@ -109,6 +108,7 @@ impl TcpStream {
 
     pub fn connect(socket: net::TcpStream, addr: &SocketAddr)
                    -> io::Result<TcpStream> {
+        try!(socket.set_nonblocking(true));
         Ok(TcpStream::new(socket, Some(*addr)))
     }
 
@@ -178,27 +178,36 @@ impl TcpStream {
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         let mut me = self.inner();
 
-        match mem::replace(&mut me.read, State::Empty) {
-            State::Empty => Err(wouldblock()),
-            State::Pending(buf) => {
-                me.read = State::Pending(buf);
-                Err(wouldblock())
-            }
-            State::Ready(mut cursor) => {
-                let amt = try!(cursor.read(buf));
-                // Once the entire buffer is written we need to schedule the
-                // next read operation.
-                if cursor.position() as usize == cursor.get_ref().len() {
-                    me.iocp.put_buffer(cursor.into_inner());
-                    self.imp.schedule_read(&mut me);
-                } else {
-                    me.read = State::Ready(cursor);
-                }
-                Ok(amt)
-            }
-            State::Error(e) => {
+        match me.read {
+            // Empty == we're not associated yet, and if we're pending then
+            // these are both cases where we return "would block"
+            State::Empty |
+            State::Pending(()) => Err(wouldblock()),
+
+            // If we got a delayed error as part of a `read_overlapped` below,
+            // return that here. Also schedule another read in case it was
+            // transient.
+            State::Error(_) => {
+                let e = match mem::replace(&mut me.read, State::Empty) {
+                    State::Error(e) => e,
+                    _ => panic!(),
+                };
                 self.imp.schedule_read(&mut me);
                 Err(e)
+            }
+
+            // If we're ready for a read then some previous 0-byte read has
+            // completed. In that case the OS's socket buffer has something for
+            // us, so we just keep pulling out bytes while we can. Eventually
+            // once we hit an error (which may include WouldBlock) we schedule
+            // another 0-byte read which moves us to the `Pending` state.
+            State::Ready(()) => {
+                let res = (&self.imp.inner.socket).read(buf);
+                if res.is_err() {
+                    me.read = State::Empty;
+                    self.imp.schedule_read(&mut me);
+                }
+                return res
             }
         }
     }
@@ -243,14 +252,13 @@ impl StreamImp {
         Ok(())
     }
 
-    /// Issues a "read" operation for this socket, if applicable.
+    /// Schedule a read to happen on this socket, enqueuing us to receive a
+    /// notification when a read is ready.
     ///
-    /// This is intended to be invoked from either a completion callback or a
-    /// normal context. The function is infallible because errors are stored
-    /// internally to be returned later.
-    ///
-    /// It is required that this function is only called after the handle has
-    /// been registered with an event loop.
+    /// Note that this does *not* work with a buffer. When reading a TCP stream
+    /// we actually read into a 0-byte buffer so Windows will send us a
+    /// notification when the socket is otherwise ready for reading. This allows
+    /// us to avoid buffer allocations for in-flight reads.
     fn schedule_read(&self, me: &mut StreamInner) {
         match me.read {
             State::Empty => {}
@@ -263,18 +271,36 @@ impl StreamImp {
 
         me.iocp.set_readiness(me.iocp.readiness() & !Ready::readable());
 
-        let mut buf = me.iocp.get_buffer(64 * 1024);
+        trace!("scheduling a read");
         let res = unsafe {
-            trace!("scheduling a read");
-            let cap = buf.capacity();
-            buf.set_len(cap);
-            self.inner.socket.read_overlapped(&mut buf,
+            self.inner.socket.read_overlapped(&mut [],
                                               self.inner.read.get_mut())
         };
         match res {
+            // TODO: investigate better handling `Ok(true)`
+            //
+            // Note that `Ok(true)` means that this completed immediately and
+            // our socket is readable. This typically means that the caller of
+            // this function (likely `read` above) can try again as an
+            // optimization and return bytes quickly.
+            //
+            // Unfortunately, though, although the read completed immediately
+            // there's still an IOCP completion packet enqueued that we're going
+            // to receive. As an ease of implementation for now we just let the
+            // completion packet drive the read completion.
+            //
+            // Apparently you can configure this behavior with
+            // SetFileCompletionNotificationModes to indicate that `Ok(true)`
+            // does **not** enqueue a completion packet. We should test this out
+            // and see if it works for us.
+            //
+            // Note that apparently libuv has scary code to work around bugs in
+            // `WSARecv` for UDP sockets apparently for handles which have had
+            // the `SetFileCompletionNotificationModes` function called on them,
+            // worth looking into!
             Ok(_) => {
                 // see docs above on StreamImp.inner for rationale on forget
-                me.read = State::Pending(buf);
+                me.read = State::Pending(());
                 mem::forget(self.clone());
             }
             Err(e) => {
@@ -287,7 +313,6 @@ impl StreamImp {
                 }
                 me.read = State::Error(e);
                 self.add_readiness(me, set);
-                me.iocp.put_buffer(buf);
             }
         }
     }
@@ -345,25 +370,11 @@ fn read_done(status: &CompletionStatus) {
 
     let mut me = me2.inner();
     match mem::replace(&mut me.read, State::Empty) {
-        State::Pending(mut buf) => {
+        State::Pending(()) => {
             trace!("finished a read: {}", status.bytes_transferred());
-
-            unsafe {
-                buf.set_len(status.bytes_transferred() as usize);
-            }
-
-            me.read = State::Ready(Cursor::new(buf));
-
-            // If we transferred 0 bytes then be sure to indicate that hup
-            // happened.
-            let mut e = Ready::readable();
-
-            if status.bytes_transferred() == 0 {
-                trace!("tcp stream at hup: 0-byte read");
-                e = e | Ready::hup();
-            }
-
-            return me2.add_readiness(&mut me, e)
+            assert_eq!(status.bytes_transferred(), 0);
+            me.read = State::Ready(());
+            return me2.add_readiness(&mut me, Ready::readable())
         }
         s => me.read = s,
     }
@@ -497,6 +508,7 @@ impl TcpListener {
                 return Err(would_block());
             }
             State::Ready((s, a)) => {
+                try!(s.set_nonblocking(true));
                 Ok((TcpStream::new(s, None), a))
             }
             State::Error(e) => Err(e),

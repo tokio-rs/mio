@@ -8,7 +8,7 @@ use bytes::{Buf, ByteBuf, SliceBuf};
 use localhost;
 use std::time::Duration;
 
-use self::TestState::{Initial, AfterRead, AfterHup};
+use self::TestState::{Initial, AfterRead};
 
 #[test]
 fn test_basic_timer_without_poll() {
@@ -311,7 +311,6 @@ const CONN: Token = Token(2);
 enum TestState {
     Initial,
     AfterRead,
-    AfterHup
 }
 
 struct TestHandler {
@@ -330,7 +329,7 @@ impl TestHandler {
     }
 
     fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>,
-                   tok: Token, events: Ready) {
+                   tok: Token, _events: Ready) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
@@ -346,30 +345,14 @@ impl TestHandler {
                 debug!("client readable");
 
                 match self.state {
-                    Initial => {
-                        // Whether or not Hup is included with actual data is
-                        // platform specific
-                        if events.is_hup() {
-                            self.state = AfterHup;
-                        } else {
-                            self.state = AfterRead;
-                        }
-                    }
-                    AfterRead => {
-                        assert_eq!(events, Ready::readable() | Ready::hup());
-                        self.state = AfterHup;
-                    }
-                    AfterHup => panic!("Shouldn't get here"),
-                }
-
-                if self.state == AfterHup {
-                    event_loop.shutdown();
-                    return;
+                    Initial => self.state = AfterRead,
+                    AfterRead => {}
                 }
 
                 let mut buf = ByteBuf::mut_with_capacity(2048);
 
                 match self.cli.try_read_buf(&mut buf) {
+                    Ok(Some(0)) => return event_loop.shutdown(),
                     Ok(n) => {
                         debug!("read {:?} bytes", n);
                         assert!(b"zomg" == buf.flip().bytes());
@@ -447,5 +430,5 @@ pub fn test_old_timer() {
     // Start the event loop
     event_loop.run(&mut handler).unwrap();
 
-    assert!(handler.state == AfterHup, "actual={:?}", handler.state);
+    assert!(handler.state == AfterRead, "actual={:?}", handler.state);
 }
