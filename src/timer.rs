@@ -235,7 +235,18 @@ impl<T> Timer<T> {
 
             if curr == EMPTY {
                 self.tick += 1;
-                self.next = self.wheel[self.slot_for(self.tick)].head;
+
+                let slot = self.slot_for(self.tick);
+                self.next = self.wheel[slot].head;
+
+                // Handle the case when a slot has a single timeout which gets
+                // canceled before the timeout expires. In this case, the
+                // slot's head is EMPTY but there is a value for next_tick. Not
+                // resetting next_tick here causes the timer to get stuck in a
+                // loop.
+                if self.next == EMPTY {
+                    self.wheel[slot].next_tick = TICK_MAX;
+                }
             } else {
                 let slot = self.slot_for(self.tick);
 
@@ -309,6 +320,7 @@ impl<T> Timer<T> {
                 }
 
                 // Attempt to move the wakeup time forward
+                trace!("advancing the wakeup time; target={}; curr={}", tick, curr);
                 let actual = inner.wakeup_state.compare_and_swap(curr, tick as usize, Ordering::Release);
 
                 if actual == curr {

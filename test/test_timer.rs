@@ -243,6 +243,43 @@ fn test_edge_oneshot_triggered() {
     assert!(is_about(0, ms));
 }
 
+#[test]
+fn test_cancel_timeout() {
+    use std::time::Instant;
+
+    let _ = ::env_logger::init();
+
+    let mut timer: Timer<u32> = Default::default();
+    let timeout = timer.set_timeout(Duration::from_millis(200), 1).unwrap();
+    timer.cancel_timeout(&timeout);
+
+    let poll = Poll::new().unwrap();
+    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+
+    let mut events = Events::with_capacity(16);
+
+    let now = Instant::now();
+    let dur = Duration::from_millis(500);
+    let mut i = 0;
+
+    while Instant::now() - now < dur {
+        if i > 10 {
+            panic!("iterated too many times");
+        }
+
+        i += 1;
+
+        let elapsed = Instant::now() - now;
+
+        poll.poll(&mut events, Some(dur - elapsed)).unwrap();
+        println!("Poll returned {} events; {:?}", events.len(), events.get(0));
+
+        while let Some(_) = timer.poll() {
+            panic!("did not expect to receive timeout");
+        }
+    }
+}
+
 fn elapsed<F: FnMut()>(mut f: F) -> u64 {
     use std::time::Instant;
 
