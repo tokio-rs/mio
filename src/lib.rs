@@ -33,7 +33,7 @@
 //! let server = TcpListener::bind(&addr).unwrap();
 //!
 //! // Create an poll instance
-//! let mut poll = Poll::new().unwrap();
+//! let poll = Poll::new().unwrap();
 //!
 //! // Start listening for incoming connections
 //! poll.register(&server, SERVER, Ready::readable(),
