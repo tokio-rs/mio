@@ -39,7 +39,7 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 /// use mio::tcp::*;
 ///
 /// // Construct a new `Poll` handle as well as the `Events` we'll store into
-/// let mut poll = Poll::new().unwrap();
+/// let poll = Poll::new().unwrap();
 /// let mut events = Events::with_capacity(1024);
 ///
 /// // Connect the stream
