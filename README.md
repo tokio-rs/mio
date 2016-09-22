@@ -75,9 +75,8 @@ Please submit PRs containing links to MIO resources.
 
 ### Libraries
 
-* [Eventual IO](//github.com/carllerche/eventual_io) - Proof of
-  concept TCP library built on top of Mio and Eventual's futures &
-  streams.
+* [tokio-core](//github.com/tokio-rs/tokio-core) - Underlying event loop
+  for the [Tokio project](//github.com/tokio-rs/tokio).
 * [mioco](//github.com/dpc/mioco) - Mio COroutines
 * [simplesched](//github.com/zonyitoo/simplesched) - Coroutine I/O with a simple scheduler
 * [coio-rs](//github.com/zonyitoo/coio-rs) - Coroutine I/O with work-stealing scheduler
