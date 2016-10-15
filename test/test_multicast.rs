@@ -50,7 +50,7 @@ impl UdpHandler {
         match token {
             SENDER => {
                 let addr = self.rx.local_addr().unwrap();
-                let cnt = self.tx.send_to(self.buf.bytes(), &addr)
+                let cnt = self.tx.send_to(&[IoVec::from_slice(self.buf.bytes())], &addr)
                                  .unwrap().unwrap();
                 self.buf.advance(cnt);
             },

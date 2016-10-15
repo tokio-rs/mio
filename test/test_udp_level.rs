@@ -29,7 +29,7 @@ pub fn test_udp_level_triggered() {
         assert_eq!(rx_events[0], Event::new(Ready::writable(), Token(1)));
     }
 
-    tx.send_to(b"hello world!", &rx.local_addr().unwrap()).unwrap();
+    tx.send_to(&[IoVec::from_slice(b"hello world!")], &rx.local_addr().unwrap()).unwrap();
 
     sleep_ms(250);
 
@@ -51,7 +51,7 @@ pub fn test_udp_level_triggered() {
         assert_eq!(rx_events[0], Event::new(Ready::writable(), Token(1)));
     }
 
-    tx.send_to(b"hello world!", &rx.local_addr().unwrap()).unwrap();
+    tx.send_to(&[IoVec::from_slice(b"hello world!")], &rx.local_addr().unwrap()).unwrap();
     sleep_ms(250);
 
     poll.poll(&mut events, Some(Duration::from_millis(MS))).unwrap();

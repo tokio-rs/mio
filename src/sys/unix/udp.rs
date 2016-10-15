@@ -1,8 +1,10 @@
-use {io, Evented, Ready, Poll, PollOpt, Token};
+use {io, Evented, Ready, Poll, PollOpt, Token, IoVec};
 use io::MapNonBlock;
 use unix::EventedFd;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
+use nix::sys::socket::MsgFlags;
+use sys::unix::nix;
 
 #[allow(unused_imports)] // only here for Rust 1.8
 use net2::UdpSocketExt;
@@ -32,10 +34,12 @@ impl UdpSocket {
         })
     }
 
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
+    pub fn send_to(&self, buf: &[IoVec<&[u8]>], target: &SocketAddr)
                    -> io::Result<Option<usize>> {
-        self.io.send_to(buf, target)
-            .map_non_block()
+        unsafe {
+            nix::sendmsg(self.io.as_raw_fd(), ::std::mem::transmute(buf), &[], MsgFlags::empty(), Some(&nix::SockAddr::Inet(nix::InetAddr::from_std(target))))
+                .map_err(super::from_nix_error).map_non_block()
+        }
     }
 
     pub fn recv_from(&self, buf: &mut [u8])

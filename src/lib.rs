@@ -135,6 +135,7 @@ pub use poll::{
 pub use token::{
     Token,
 };
+pub use sys::IoVec;
 
 #[cfg(unix)]
 pub mod unix {

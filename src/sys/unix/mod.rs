@@ -95,3 +95,17 @@ mod nix {
         dup,
     };
 }
+
+pub struct IoVec<T>(nix::IoVec<T>);
+
+impl<'a> IoVec<&'a [u8]> {
+    pub fn from_slice(buf: &'a [u8]) -> IoVec<&'a [u8]> {
+        IoVec(nix::IoVec::from_slice(buf))
+    }
+}
+
+impl<'a> IoVec<&'a mut [u8]> {
+    pub fn from_mut(buf: &'a mut [u8]) -> IoVec<&'a mut [u8]> {
+        IoVec(nix::IoVec::from_mut_slice(buf))
+    }
+}
