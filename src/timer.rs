@@ -326,6 +326,7 @@ impl<T> Timer<T> {
                 if actual == curr {
                     // Signal to the wakeup thread that the wakeup time has
                     // been changed.
+                    trace!("unparking wakeup thread");
                     inner.wakeup_thread.thread().unpark();
                     return;
                 }
@@ -425,9 +426,22 @@ fn spawn_wakeup_thread(state: WakeupState, set_readiness: SetReadiness, start: I
             trace!("wakeup thread: sleep_until_tick={:?}; now_tick={:?}", sleep_until_tick, now_tick);
 
             if now_tick < sleep_until_tick {
-                let sleep_duration = tick_ms.checked_mul(sleep_until_tick - now_tick).unwrap_or(u64::MAX);
-                trace!("sleeping; tick_ms={}; now_tick={}; sleep_until_tick={}; duration={:?}", tick_ms, now_tick, sleep_until_tick, sleep_duration);
-                thread::park_timeout(Duration::from_millis(sleep_duration));
+                // Calling park_timeout with u64::MAX leads to undefined
+                // behavior in pthread, causing the park to return immediately
+                // and causing the thread to tightly spin. Instead of u64::MAX
+                // on large values, simply use a blocking park.
+                match tick_ms.checked_mul(sleep_until_tick - now_tick) {
+                    Some(sleep_duration) => {
+                        trace!("sleeping; tick_ms={}; now_tick={}; sleep_until_tick={}; duration={:?}",
+                               tick_ms, now_tick, sleep_until_tick, sleep_duration);
+                        thread::park_timeout(Duration::from_millis(sleep_duration));
+                    }
+                    None => {
+                        trace!("sleeping; tick_ms={}; now_tick={}; blocking sleep",
+                               tick_ms, now_tick);
+                        thread::park();
+                    }
+                }
                 sleep_until_tick = state.load(Ordering::Acquire) as Tick;
             } else {
                 let actual = state.compare_and_swap(sleep_until_tick as usize, usize::MAX, Ordering::AcqRel) as Tick;
