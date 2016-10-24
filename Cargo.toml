@@ -24,7 +24,7 @@ slab     = "0.3.0"
 net2     = "0.2.19"
 
 [target.'cfg(unix)'.dependencies]
-nix    = "0.6.0"
+nix    = { git = "https://github.com/nix-rust/nix" }
 libc   = "0.2.14"
 
 [target.'cfg(windows)'.dependencies]

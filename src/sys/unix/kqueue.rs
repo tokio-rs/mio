@@ -114,14 +114,14 @@ impl Selector {
 
     fn ev_push(&self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
         self.mut_changes().push(
-            KEvent {
-                ident: fd as ::libc::uintptr_t,
-                filter: filter,
-                flags: flags,
-                fflags: FilterFlag::empty(),
-                data: 0,
-                udata: token as UData,
-            });
+            KEvent::new(
+                fd as ::libc::uintptr_t,
+                filter,
+                flags,
+                FilterFlag::empty(),
+                0,
+                token as UData,
+            ));
     }
 
     fn flush_changes(&self) -> io::Result<()> {
@@ -192,7 +192,7 @@ impl Events {
         self.event_map.clear();
 
         for e in &self.sys_events {
-            let token = Token(e.udata as usize);
+            let token = Token(e.udata() as usize);
             let len = self.events.len();
 
             if token == awakener {
@@ -211,22 +211,22 @@ impl Events {
 
             }
 
-            if e.flags.contains(EV_ERROR) {
+            if e.flags().contains(EV_ERROR) {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::error());
             }
 
-            if e.filter == EventFilter::EVFILT_READ {
+            if e.filter() == EventFilter::EVFILT_READ {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::readable());
-            } else if e.filter == EventFilter::EVFILT_WRITE {
+            } else if e.filter() == EventFilter::EVFILT_WRITE {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
             }
 
-            if e.flags.contains(EV_EOF) {
+            if e.flags().contains(EV_EOF) {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
-                if !e.fflags.is_empty() {
+                if !e.fflags().is_empty() {
                     event::kind_mut(&mut self.events[idx]).insert(Ready::error());
                 }
             }
