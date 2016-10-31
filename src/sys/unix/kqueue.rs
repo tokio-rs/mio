@@ -55,7 +55,7 @@ impl Selector {
     pub fn select(&self, evts: &mut Events, awakener: Token, timeout: Option<Duration>) -> io::Result<bool> {
         let timeout = timeout.map(|to| timespec {
             tv_sec: cmp::min(to.as_secs(), time_t::max_value() as u64) as time_t,
-            tv_nsec: to.subsec_nanos() as i64,
+            tv_nsec: to.subsec_nanos() as libc::c_long,
         });
 
         let cnt = try!(kevent_ts(self.kq, &[], evts.as_mut_slice(), timeout)
