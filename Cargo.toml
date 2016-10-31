@@ -1,11 +1,11 @@
 [package]
 
 name          = "mio"
-version       = "0.6.0"
+version       = "0.6.1"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
-documentation = "https://docs.rs/mio/0.6.0/mio/"
+documentation = "https://docs.rs/mio/0.6.1/mio/"
 homepage      = "https://github.com/carllerche/mio"
 repository    = "https://github.com/carllerche/mio"
 readme        = "README.md"

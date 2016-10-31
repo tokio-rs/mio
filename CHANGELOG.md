@@ -1,3 +1,14 @@
+# 0.6.1 (October 30, 2016)
+
+* Update dependency of `libc` to 0.2.16
+* Fix channel `dec` logic
+* Fix a timer bug around timeout cancellation
+* Don't allocate buffers for TCP reads on Windows
+* Touched up documentation in a few places
+* Fix an infinite looping timer thread on OSX
+* Fix compile on 32-bit OSX
+* Fix compile on FreeBSD
+
 # 0.6.0 (September 2, 2016)
 
 * Shift primary API towards `Poll`
