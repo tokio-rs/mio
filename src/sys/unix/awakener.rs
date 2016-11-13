@@ -28,7 +28,7 @@ mod pipe {
         }
 
         pub fn wakeup(&self) -> io::Result<()> {
-            match (&self.writer).write(b"0x01") {
+            match (&self.writer).write(&[1]) {
                 Ok(_) => Ok(()),
                 Err(e) => {
                     if e.kind() == io::ErrorKind::WouldBlock {
