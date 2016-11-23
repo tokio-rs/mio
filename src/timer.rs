@@ -225,8 +225,12 @@ impl<T> Timer<T> {
         self.poll_to(target_tick)
     }
 
-    fn poll_to(&mut self, target_tick: Tick) -> Option<T> {
+    fn poll_to(&mut self, mut target_tick: Tick) -> Option<T> {
         trace!("tick_to; target_tick={}; current_tick={}", target_tick, self.tick);
+
+		if target_tick < self.tick {
+			target_tick = self.tick;
+		}
 
         while self.tick <= target_tick {
             let curr = self.next;
