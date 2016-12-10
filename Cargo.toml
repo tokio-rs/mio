@@ -29,7 +29,7 @@ libc   = "0.2.16"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2.1"
-miow   = "0.1.3"
+miow   = "0.1.4"
 kernel32-sys = "0.2"
 
 [dev-dependencies]

@@ -4,7 +4,7 @@ use std::mem;
 use std::net::{self, SocketAddr};
 use std::sync::{Mutex, MutexGuard};
 
-use io::would_block;
+use miow;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
@@ -12,9 +12,10 @@ use net::tcp::Shutdown;
 use winapi::*;
 
 use {Evented, Ready, Poll, PollOpt, Token};
+use io::would_block;
 use poll;
 use sys::windows::from_raw_arc::FromRawArc;
-use sys::windows::selector::{Overlapped, Registration};
+use sys::windows::selector::{Overlapped, ReadyBinding};
 use sys::windows::{wouldblock, Family};
 
 pub struct TcpStream {
@@ -66,14 +67,14 @@ struct ListenerIo {
 }
 
 struct StreamInner {
-    iocp: Registration,
+    iocp: ReadyBinding,
     deferred_connect: Option<SocketAddr>,
     read: State<(), ()>,
     write: State<(Vec<u8>, usize), (Vec<u8>, usize)>,
 }
 
 struct ListenerInner {
-    iocp: Registration,
+    iocp: ReadyBinding,
     accept: State<net::TcpStream, (net::TcpStream, SocketAddr)>,
     accept_buf: AcceptAddrsBuf,
 }
@@ -96,7 +97,7 @@ impl TcpStream {
                     write: Overlapped::new(write_done),
                     socket: socket,
                     inner: Mutex::new(StreamInner {
-                        iocp: Registration::new(),
+                        iocp: ReadyBinding::new(),
                         deferred_connect: deferred_connect,
                         read: State::Empty,
                         write: State::Empty,
@@ -244,8 +245,8 @@ impl StreamImp {
     fn schedule_connect(&self, addr: &SocketAddr) -> io::Result<()> {
         unsafe {
             trace!("scheduling a connect");
-            try!(self.inner.socket.connect_overlapped(addr,
-                                                      self.inner.read.get_mut()));
+            let overlapped = miow::Overlapped::from_raw(self.inner.read.as_mut_ptr());
+            try!(self.inner.socket.connect_overlapped(addr, overlapped));
         }
         // see docs above on StreamImp.inner for rationale on forget
         mem::forget(self.clone());
@@ -273,8 +274,8 @@ impl StreamImp {
 
         trace!("scheduling a read");
         let res = unsafe {
-            self.inner.socket.read_overlapped(&mut [],
-                                              self.inner.read.get_mut())
+            let overlapped = miow::Overlapped::from_raw(self.inner.read.as_mut_ptr());
+            self.inner.socket.read_overlapped(&mut [], overlapped)
         };
         match res {
             // TODO: investigate better handling `Ok(true)`
@@ -336,8 +337,8 @@ impl StreamImp {
 
         trace!("scheduling a write");
         let err = unsafe {
-            self.inner.socket.write_overlapped(&buf[pos..],
-                                               self.inner.write.get_mut())
+            let overlapped = miow::Overlapped::from_raw(self.inner.write.as_mut_ptr());
+            self.inner.socket.write_overlapped(&buf[pos..], overlapped)
         };
         match err {
             Ok(_) => {
@@ -363,7 +364,8 @@ impl StreamImp {
     }
 }
 
-fn read_done(status: &CompletionStatus) {
+fn read_done(status: &OVERLAPPED_ENTRY) {
+    let status = CompletionStatus::from_entry(status);
     let me2 = StreamImp {
         inner: unsafe { overlapped2arc!(status.overlapped(), StreamIo, read) },
     };
@@ -394,7 +396,8 @@ fn read_done(status: &CompletionStatus) {
     }
 }
 
-fn write_done(status: &CompletionStatus) {
+fn write_done(status: &OVERLAPPED_ENTRY) {
+    let status = CompletionStatus::from_entry(status);
     trace!("finished a write {}", status.bytes_transferred());
     let me2 = StreamImp {
         inner: unsafe { overlapped2arc!(status.overlapped(), StreamIo, write) },
@@ -440,7 +443,8 @@ impl Evented for TcpStream {
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner().iocp.deregister(poll, &self.registration)
+        self.inner().iocp.deregister(&self.imp.inner.socket,
+                                     poll, &self.registration)
     }
 }
 
@@ -489,7 +493,7 @@ impl TcpListener {
                     family: family,
                     socket: socket,
                     inner: Mutex::new(ListenerInner {
-                        iocp: Registration::new(),
+                        iocp: ReadyBinding::new(),
                         accept: State::Empty,
                         accept_buf: AcceptAddrsBuf::new(),
                     }),
@@ -572,8 +576,9 @@ impl ListenerImp {
             Family::V6 => TcpBuilder::new_v6(),
         }.and_then(|builder| unsafe {
             trace!("scheduling an accept");
+            let overlapped = miow::Overlapped::from_raw(self.inner.accept.as_mut_ptr());
             self.inner.socket.accept_overlapped(&builder, &mut me.accept_buf,
-                                                self.inner.accept.get_mut())
+                                                overlapped)
         });
         match res {
             Ok((socket, _)) => {
@@ -594,7 +599,8 @@ impl ListenerImp {
     }
 }
 
-fn accept_done(status: &CompletionStatus) {
+fn accept_done(status: &OVERLAPPED_ENTRY) {
+    let status = CompletionStatus::from_entry(status);
     let me2 = ListenerImp {
         inner: unsafe { overlapped2arc!(status.overlapped(), ListenerIo, accept) },
     };
@@ -639,7 +645,8 @@ impl Evented for TcpListener {
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner().iocp.deregister(poll, &self.registration)
+        self.inner().iocp.deregister(&self.imp.inner.socket,
+                                     poll, &self.registration)
     }
 }
 

@@ -25,6 +25,8 @@ pub use self::windows::{
     TcpStream,
     TcpListener,
     UdpSocket,
+    Overlapped,
+    Binding,
 };
 
 #[cfg(windows)]

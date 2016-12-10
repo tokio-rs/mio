@@ -142,8 +142,6 @@ use std::os::windows::prelude::*;
 use kernel32;
 use winapi;
 
-use self::selector::Overlapped;
-
 mod awakener;
 #[macro_use]
 mod selector;
@@ -153,7 +151,7 @@ mod from_raw_arc;
 mod buffer_pool;
 
 pub use self::awakener::Awakener;
-pub use self::selector::{Events, Selector};
+pub use self::selector::{Events, Selector, Overlapped, Binding};
 pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 
@@ -169,8 +167,7 @@ fn wouldblock() -> io::Error {
 unsafe fn cancel(socket: &AsRawSocket,
                  overlapped: &Overlapped) -> io::Result<()> {
     let handle = socket.as_raw_socket() as winapi::HANDLE;
-    let overlapped = overlapped.get_mut().raw();
-    let ret = kernel32::CancelIoEx(handle, overlapped);
+    let ret = kernel32::CancelIoEx(handle, overlapped.as_mut_ptr());
     if ret == 0 {
         Err(io::Error::last_os_error())
     } else {
