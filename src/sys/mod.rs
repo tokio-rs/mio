@@ -9,6 +9,7 @@ pub use self::unix::{
     TcpListener,
     UdpSocket,
     UnixSocket,
+    IoVec,
     pipe,
     set_nonblock,
 };
@@ -25,6 +26,7 @@ pub use self::windows::{
     TcpStream,
     TcpListener,
     UdpSocket,
+    IoVec,
 };
 
 #[cfg(windows)]

@@ -138,9 +138,12 @@
 
 use std::io;
 use std::os::windows::prelude::*;
+use std::marker::PhantomData;
 
 use kernel32;
 use winapi;
+use winapi::ws2def::WSABUF;
+use winapi::winnt;
 
 use self::selector::Overlapped;
 
@@ -175,5 +178,20 @@ unsafe fn cancel(socket: &AsRawSocket,
         Err(io::Error::last_os_error())
     } else {
         Ok(())
+    }
+}
+
+#[repr(C)]
+pub struct IoVec<T>(WSABUF, PhantomData<T>);
+
+impl<'a> IoVec<&'a [u8]> {
+    pub fn from_slice(buf: &'a [u8]) -> IoVec<&'a [u8]> {
+        IoVec(WSABUF { len: buf.len() as winnt::ULONG, buf: buf.as_ptr() as *mut winnt::CHAR }, PhantomData)
+    }
+}
+
+impl<'a> IoVec<&'a mut [u8]> {
+    pub fn from_mut(buf: &'a mut [u8]) -> IoVec<&'a mut [u8]> {
+        IoVec(WSABUF { len: buf.len() as winnt::ULONG, buf: buf.as_ptr() as *mut winnt::CHAR }, PhantomData)
     }
 }

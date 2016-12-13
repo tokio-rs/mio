@@ -1,6 +1,6 @@
 //! Primitives for working with UDP
 
-use {io, sys, Evented, Ready, Poll, PollOpt, Token};
+use {io, sys, Evented, Ready, Poll, PollOpt, Token, IoVec};
 use super::SelectorId;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 
@@ -56,10 +56,7 @@ impl UdpSocket {
 
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
-    ///
-    /// Address type can be any implementor of `ToSocketAddrs` trait. See its
-    /// documentation for concrete examples.
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
+    pub fn send_to(&self, buf: &[IoVec<&[u8]>], target: &SocketAddr)
                    -> io::Result<Option<usize>> {
         self.sys.send_to(buf, target)
     }
