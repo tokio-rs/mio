@@ -14,9 +14,6 @@ The complete echo server can be found
 [here](../examples/ping_pong/src/server.rs). A client example is
 [here](../examples/ping_pong/src/client.rs).
 
-> **Note:** As of the time of writing, Mio does not support Windows
-> (though support is currently in progress).
-
 Before you get started, setup an empty text file. Write down any
 thoughts, confusions, questions that you have while going through this
 guide. You only have one first impression, and I would like to capture
