@@ -36,6 +36,9 @@ iovec    = "0.1.1"
 fuchsia-zircon = "0.3.2"
 fuchsia-zircon-sys = "0.3.2"
 
+[target.'cfg(target_os = "redox")'.dependencies]
+redox_syscall = "0.1"
+
 [target.'cfg(unix)'.dependencies]
 libc   = "0.2.42"
 

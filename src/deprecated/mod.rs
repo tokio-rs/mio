@@ -5,6 +5,9 @@ mod io;
 mod handler;
 mod notify;
 
+#[cfg(target_os = "redox")]
+pub mod redox;
+
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 pub mod unix;
 

@@ -107,6 +107,9 @@ extern crate fuchsia_zircon as zircon;
 #[cfg(target_os = "fuchsia")]
 extern crate fuchsia_zircon_sys as zircon_sys;
 
+#[cfg(target_os = "redox")]
+extern crate syscall;
+
 #[cfg(unix)]
 extern crate libc;
 
