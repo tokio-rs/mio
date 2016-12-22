@@ -37,6 +37,9 @@ impl<T> MapNonBlock<T> for Result<T> {
     }
 }
 
+#[cfg(target_os = "redox")]
+const WOULDBLOCK: i32 = ::syscall::EWOULDBLOCK;
+
 #[cfg(unix)]
 const WOULDBLOCK: i32 = ::libc::EAGAIN;
 
