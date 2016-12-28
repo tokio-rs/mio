@@ -12,9 +12,9 @@
 //!
 //! # Usage
 //!
-//! Using mio starts by creating an [EventLoop](struct.EventLoop.html), which
-//! handles receiving events from the OS and dispatching them to a supplied
-//! [Handler](handler/trait.Handler.html).
+//! Using mio starts by creating an event loop, represented by [Poll](struct.Poll.html), registering
+//! IO descriptors with the loop, and calling [Poll::poll](struct.Poll.html#method.poll) to wait for [Events](struct.Events.html)
+//! from the OS.
 //!
 //! # Example
 //!
@@ -113,37 +113,17 @@ pub mod timer;
 /// EventLoop and other deprecated types
 pub mod deprecated;
 
-pub use event::{
-    PollOpt,
-    Ready,
-    Event,
-};
-pub use io::{
-    Evented,
-    would_block,
-};
-pub use net::{
-    tcp,
-    udp,
-};
-pub use poll::{
-    Poll,
-    Events,
-    EventsIter,
-    Registration,
-    SetReadiness,
-};
-pub use token::{
-    Token,
-};
+pub use event::{PollOpt, Ready, Event};
+pub use io::{Evented, would_block};
+pub use net::{tcp, udp};
+pub use poll::{Poll, Events, EventsIter, Registration, SetReadiness};
+pub use token::Token;
 
 #[cfg(unix)]
 pub mod unix {
     //! Unix only extensions
 
-    pub use sys::{
-        EventedFd,
-    };
+    pub use sys::EventedFd;
 }
 
 /// Windows-only extensions to the mio crate.
