@@ -154,8 +154,6 @@ struct RegistrationData {
     opts: PollOpt,
 }
 
-type Tick = usize;
-
 const NODE_QUEUED_FLAG: usize = 1;
 
 const AWAKEN: Token = Token(usize::MAX);
