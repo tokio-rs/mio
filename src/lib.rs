@@ -76,8 +76,13 @@
 #![cfg_attr(unix, deny(warnings))]
 
 extern crate lazycell;
-extern crate net2;
 extern crate slab;
+
+#[cfg(target_os = "redox")]
+extern crate syscall;
+
+#[cfg(any(unix, windows))]
+extern crate net2;
 
 #[cfg(unix)]
 extern crate nix;

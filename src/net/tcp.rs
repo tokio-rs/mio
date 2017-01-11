@@ -3,6 +3,7 @@
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 
+#[cfg(any(unix, windows))]
 use net2::TcpBuilder;
 
 use {io, sys, Evented, Ready, Poll, PollOpt, Token};
@@ -32,6 +33,7 @@ impl TcpStream {
     /// `net2::TcpBuilder` to configure a socket and then pass its socket to
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
+    #[cfg(any(unix, windows))]
     pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
         let sock = try!(match *addr {
             SocketAddr::V4(..) => TcpBuilder::new_v4(),
@@ -63,6 +65,7 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
+    #[cfg(any(unix, windows))]
     pub fn connect_stream(stream: net::TcpStream,
                           addr: &SocketAddr) -> io::Result<TcpStream> {
         Ok(TcpStream {
@@ -269,6 +272,7 @@ impl TcpListener {
     /// socket is desired then the `net2::TcpBuilder` methods can be used in
     /// combination with the `TcpListener::from_listener` method to transfer
     /// ownership into mio.
+    #[cfg(any(unix, windows))]
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         // Create the socket
         let sock = try!(match *addr {
