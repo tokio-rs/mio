@@ -102,6 +102,7 @@ extern crate env_logger;
 
 mod event;
 mod io;
+mod iovec;
 mod net;
 mod poll;
 mod sys;
@@ -122,6 +123,7 @@ pub use io::{
     Evented,
     would_block,
 };
+pub use iovec::IoVec;
 pub use net::{
     tcp,
     udp,
