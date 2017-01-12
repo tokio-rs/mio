@@ -1,16 +1,16 @@
-use {io, Ready, PollOpt, Token};
-use event::{self, Event};
-use nix::libc::timespec;
-use nix::unistd::close;
-use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, kqueue, kevent, kevent_ts};
-use nix::sys::event::{EV_ADD, EV_CLEAR, EV_DELETE, EV_DISABLE, EV_ENABLE, EV_EOF, EV_ERROR, EV_ONESHOT};
-use libc::{self, time_t};
-use std::{cmp, fmt, slice};
-use std::cell::UnsafeCell;
+use std::{cmp, fmt};
+use std::cell::RefCell;
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::time::Duration;
+
+use libc::{self, time_t};
+
+use {io, Ready, PollOpt, Token};
+use event::{self, Event};
+use sys::unix::cvt;
+use sys::unix::io::set_cloexec;
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -22,29 +22,20 @@ static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 pub struct Selector {
     id: usize,
     kq: RawFd,
-    changes: UnsafeCell<Vec<KEvent>>,
+    changes: RefCell<KeventList>,
 }
-
-#[cfg(not(target_os = "netbsd"))]
-type UData = usize;
-
-#[cfg(target_os = "netbsd")]
-type UData = isize;
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
         // offset by 1 to avoid choosing 0 as the id of a selector
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
-        let kq = try!(kqueue().map_err(super::from_nix_error));
-
-        unsafe {
-            libc::ioctl(kq, libc::FIOCLEX);
-        }
+        let kq = unsafe { try!(cvt(libc::kqueue())) };
+        drop(set_cloexec(kq));
 
         Ok(Selector {
             id: id,
             kq: kq,
-            changes: UnsafeCell::new(vec![]),
+            changes: RefCell::new(KeventList(Vec::new())),
         })
     }
 
@@ -53,28 +44,42 @@ impl Selector {
     }
 
     pub fn select(&self, evts: &mut Events, awakener: Token, timeout: Option<Duration>) -> io::Result<bool> {
-        let timeout = timeout.map(|to| timespec {
-            tv_sec: cmp::min(to.as_secs(), time_t::max_value() as u64) as time_t,
-            tv_nsec: to.subsec_nanos() as libc::c_long,
+        let timeout = timeout.map(|to| {
+            libc::timespec {
+                tv_sec: cmp::min(to.as_secs(), time_t::max_value() as u64) as time_t,
+                tv_nsec: to.subsec_nanos() as libc::c_long,
+            }
         });
-
-        let cnt = try!(kevent_ts(self.kq, &[], evts.as_mut_slice(), timeout)
-                                  .map_err(super::from_nix_error));
-
-        self.mut_changes().clear();
+        let timeout = timeout.as_ref().map(|s| s as *const _).unwrap_or(0 as *const _);
 
         unsafe {
-            evts.sys_events.set_len(cnt);
-        }
+            let cnt = try!(cvt(libc::kevent(self.kq,
+                                            0 as *const _,
+                                            0,
+                                            evts.sys_events.0.as_mut_ptr(),
+                                            evts.sys_events.0.capacity() as i32,
+                                            timeout)));
 
-        Ok(evts.coalesce(awakener))
+            self.changes.borrow_mut().0.clear();
+            evts.sys_events.0.set_len(cnt as usize);
+
+            Ok(evts.coalesce(awakener))
+        }
     }
 
     pub fn register(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        self.ev_register(fd, usize::from(token), EventFilter::EVFILT_READ, interests.contains(Ready::readable()), opts);
-        self.ev_register(fd, usize::from(token), EventFilter::EVFILT_WRITE, interests.contains(Ready::writable()), opts);
+        self.ev_register(fd,
+                         token.into(),
+                         libc::EVFILT_READ,
+                         interests.contains(Ready::readable()),
+                         opts);
+        self.ev_register(fd,
+                         token.into(),
+                         libc::EVFILT_WRITE,
+                         interests.contains(Ready::writable()),
+                         opts);
 
         self.flush_changes()
     }
@@ -86,58 +91,64 @@ impl Selector {
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        self.ev_push(fd, 0, EventFilter::EVFILT_READ, EV_DELETE);
-        self.ev_push(fd, 0, EventFilter::EVFILT_WRITE, EV_DELETE);
+        self.ev_push(fd, 0, libc::EVFILT_READ, libc::EV_DELETE);
+        self.ev_push(fd, 0, libc::EVFILT_WRITE, libc::EV_DELETE);
 
         self.flush_changes()
     }
 
-    fn ev_register(&self, fd: RawFd, token: usize, filter: EventFilter, enable: bool, opts: PollOpt) {
-        let mut flags = EV_ADD;
+    fn ev_register(&self,
+                   fd: RawFd,
+                   token: usize,
+                   filter: i16,
+                   enable: bool,
+                   opts: PollOpt) {
+        let mut flags = libc::EV_ADD;
 
         if enable {
-            flags = flags | EV_ENABLE;
+            flags = flags | libc::EV_ENABLE;
         } else {
-            flags = flags | EV_DISABLE;
+            flags = flags | libc::EV_DISABLE;
         }
 
         if opts.contains(PollOpt::edge()) {
-            flags = flags | EV_CLEAR;
+            flags = flags | libc::EV_CLEAR;
         }
 
         if opts.contains(PollOpt::oneshot()) {
-            flags = flags | EV_ONESHOT;
+            flags = flags | libc::EV_ONESHOT;
         }
 
         self.ev_push(fd, token, filter, flags);
     }
 
-    fn ev_push(&self, fd: RawFd, token: usize, filter: EventFilter, flags: EventFlag) {
-        self.mut_changes().push(
-            KEvent {
-                ident: fd as ::libc::uintptr_t,
-                filter: filter,
-                flags: flags,
-                fflags: FilterFlag::empty(),
-                data: 0,
-                udata: token as UData,
-            });
+    fn ev_push(&self,
+               fd: RawFd,
+               token: usize,
+               filter: i16,
+               flags: u16) {
+        self.changes.borrow_mut().0.push(libc::kevent {
+            ident: fd as ::libc::uintptr_t,
+            filter: filter,
+            flags: flags,
+            fflags: 0,
+            data: 0,
+            udata: token as *mut _,
+        });
     }
 
     fn flush_changes(&self) -> io::Result<()> {
-        let result = kevent(self.kq, self.changes(), &mut [], 0).map(|_| ())
-            .map_err(super::from_nix_error).map(|_| ());
-
-        self.mut_changes().clear();
-        result
-    }
-
-    fn changes(&self) -> &[KEvent] {
-        unsafe { &(*self.changes.get())[..] }
-    }
-
-    fn mut_changes(&self) -> &mut Vec<KEvent> {
-        unsafe { &mut *self.changes.get() }
+        unsafe {
+            let mut changes = self.changes.borrow_mut();
+            try!(cvt(libc::kevent(self.kq,
+                                  changes.0.as_mut_ptr() as *const _,
+                                  changes.0.len() as i32,
+                                  0 as *mut _,
+                                  0,
+                                  0 as *const _)));
+            changes.0.clear();
+            Ok(())
+        }
     }
 }
 
@@ -146,27 +157,34 @@ impl fmt::Debug for Selector {
         fmt.debug_struct("Selector")
             .field("id", &self.id)
             .field("kq", &self.kq)
-            .field("changes", &self.changes().len())
+            .field("changes", &self.changes.borrow().0.len())
             .finish()
     }
 }
 
 impl Drop for Selector {
     fn drop(&mut self) {
-        let _ = close(self.kq);
+        unsafe {
+            let _ = libc::close(self.kq);
+        }
     }
 }
 
 pub struct Events {
-    sys_events: Vec<KEvent>,
+    sys_events: KeventList,
     events: Vec<Event>,
     event_map: HashMap<Token, usize>,
 }
 
+struct KeventList(Vec<libc::kevent>);
+
+unsafe impl Send for KeventList {}
+unsafe impl Sync for KeventList {}
+
 impl Events {
     pub fn with_capacity(cap: usize) -> Events {
         Events {
-            sys_events: Vec::with_capacity(cap),
+            sys_events: KeventList(Vec::with_capacity(cap)),
             events: Vec::with_capacity(cap),
             event_map: HashMap::with_capacity(cap)
         }
@@ -191,7 +209,7 @@ impl Events {
         self.events.clear();
         self.event_map.clear();
 
-        for e in &self.sys_events {
+        for e in self.sys_events.0.iter() {
             let token = Token(e.udata as usize);
             let len = self.events.len();
 
@@ -211,22 +229,22 @@ impl Events {
 
             }
 
-            if e.flags.contains(EV_ERROR) {
+            if e.flags & libc::EV_ERROR != 0 {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::error());
             }
 
-            if e.filter == EventFilter::EVFILT_READ {
+            if e.filter == libc::EVFILT_READ {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::readable());
-            } else if e.filter == EventFilter::EVFILT_WRITE {
+            } else if e.filter == libc::EVFILT_WRITE {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
             }
 
-            if e.flags.contains(EV_EOF) {
+            if e.flags & libc::EV_EOF != 0 {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
-                if !e.fflags.is_empty() {
+                if e.fflags != 0 {
                     event::kind_mut(&mut self.events[idx]).insert(Ready::error());
                 }
             }
@@ -238,17 +256,10 @@ impl Events {
     pub fn push_event(&mut self, event: Event) {
         self.events.push(event);
     }
-
-    fn as_mut_slice(&mut self) -> &mut [KEvent] {
-        unsafe {
-            let ptr = (&mut self.sys_events[..]).as_mut_ptr();
-            slice::from_raw_parts_mut(ptr, self.sys_events.capacity())
-        }
-    }
 }
 
 impl fmt::Debug for Events {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Events {{ len: {} }}", self.sys_events.len())
+        write!(fmt, "Events {{ len: {} }}", self.sys_events.0.len())
     }
 }

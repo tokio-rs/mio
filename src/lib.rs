@@ -80,9 +80,6 @@ extern crate net2;
 extern crate slab;
 
 #[cfg(unix)]
-extern crate nix;
-
-#[cfg(unix)]
 extern crate libc;
 
 #[cfg(windows)]

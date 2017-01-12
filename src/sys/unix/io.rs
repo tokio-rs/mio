@@ -1,15 +1,25 @@
-use {io, poll, Evented, Ready, Poll, PollOpt, Token};
+use std::fs::File;
 use std::io::{Read, Write};
-use std::mem;
 use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
-use nix::fcntl::FcntlArg::F_SETFL;
-use nix::fcntl::{fcntl, O_NONBLOCK};
 
-pub fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
-    fcntl(s.as_raw_fd(), F_SETFL(O_NONBLOCK)).map_err(super::from_nix_error)
-                                             .map(|_| ())
+use libc;
+
+use {io, Evented, Ready, Poll, PollOpt, Token};
+use unix::EventedFd;
+use sys::unix::cvt;
+
+pub fn set_nonblock(fd: libc::c_int) -> io::Result<()> {
+    unsafe {
+        let mut nonblocking = 1 as libc::c_ulong;
+        cvt(libc::ioctl(fd, libc::FIONBIO, &mut nonblocking)).map(|_| ())
+    }
 }
 
+pub fn set_cloexec(fd: libc::c_int) -> io::Result<()> {
+    unsafe {
+        cvt(libc::ioctl(fd, libc::FIOCLEX)).map(|_| ())
+    }
+}
 
 /*
  *
@@ -19,86 +29,75 @@ pub fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
 
 #[derive(Debug)]
 pub struct Io {
-    fd: RawFd,
+    fd: File,
+}
+
+impl Io {
+    pub fn try_clone(&self) -> io::Result<Io> {
+        Ok(Io { fd: try!(self.fd.try_clone()) })
+    }
 }
 
 impl FromRawFd for Io {
     unsafe fn from_raw_fd(fd: RawFd) -> Io {
-        Io { fd: fd }
+        Io { fd: File::from_raw_fd(fd) }
     }
 }
 
 impl IntoRawFd for Io {
     fn into_raw_fd(self) -> RawFd {
-        // Forget self to prevent drop() from closing self.fd.
-        let fd = self.fd;
-        mem::forget(self);
-        fd
+        self.fd.into_raw_fd()
     }
 }
 
 impl AsRawFd for Io {
     fn as_raw_fd(&self) -> RawFd {
-        self.fd
+        self.fd.as_raw_fd()
     }
 }
 
 impl Evented for Io {
     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        poll::selector(poll).register(self.fd, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
     fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        poll::selector(poll).reregister(self.fd, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        poll::selector(poll).deregister(self.fd)
+        EventedFd(&self.as_raw_fd()).deregister(poll)
     }
 }
 
 impl Read for Io {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
-        <&Io as Read>::read(&mut &*self, dst)
+        (&self.fd).read(dst)
     }
 }
 
 impl<'a> Read for &'a Io {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
-        use nix::unistd::read;
-
-        read(self.as_raw_fd(), dst)
-            .map_err(super::from_nix_error)
+        (&self.fd).read(dst)
     }
 }
 
 impl Write for Io {
     fn write(&mut self, src: &[u8]) -> io::Result<usize> {
-        <&Io as Write>::write(&mut &*self, src)
+        (&self.fd).write(src)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+        (&self.fd).flush()
     }
 }
 
 impl<'a> Write for &'a Io {
     fn write(&mut self, src: &[u8]) -> io::Result<usize> {
-        use nix::unistd::write;
-
-        write(self.as_raw_fd(), src)
-            .map_err(super::from_nix_error)
+        (&self.fd).write(src)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+        (&self.fd).flush()
     }
 }
-
-impl Drop for Io {
-    fn drop(&mut self) {
-        use nix::unistd::close;
-        let _ = close(self.as_raw_fd());
-    }
-}
-
