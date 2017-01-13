@@ -1,3 +1,8 @@
+use libc::{self, c_int};
+
+#[macro_use]
+pub mod dlsym;
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod epoll;
 
@@ -17,7 +22,6 @@ pub use self::kqueue::{Events, Selector};
 mod awakener;
 mod eventedfd;
 mod io;
-mod net;
 mod tcp;
 mod udp;
 mod uds;
@@ -34,66 +38,47 @@ pub use self::uds::UnixSocket;
 use std::os::unix::io::FromRawFd;
 
 pub fn pipe() -> ::io::Result<(Io, Io)> {
-    use nix::fcntl::{O_NONBLOCK, O_CLOEXEC};
-    use nix::unistd::pipe2;
+    // Use pipe2 for atomically seetting O_CLOEXEC if we can, but otherwise
+    // just fall back to using `pipe`.
+    dlsym!(fn pipe2(*mut c_int, c_int) -> c_int);
 
-    let (rd, wr) = try!(pipe2(O_NONBLOCK | O_CLOEXEC)
-        .map_err(from_nix_error));
+    let mut pipes = [0; 2];
+    let flags = libc::O_NONBLOCK | libc::O_CLOEXEC;
+    unsafe {
+        match pipe2.get() {
+            Some(pipe2_fn) => {
+                try!(cvt(pipe2_fn(pipes.as_mut_ptr(), flags)));
+            }
+            None => {
+                try!(cvt(libc::pipe(pipes.as_mut_ptr())));
+                libc::fcntl(pipes[0], libc::F_SETFL, flags);
+                libc::fcntl(pipes[1], libc::F_SETFL, flags);
+            }
+        }
+    }
 
     unsafe {
-        Ok((Io::from_raw_fd(rd), Io::from_raw_fd(wr)))
+        Ok((Io::from_raw_fd(pipes[0]), Io::from_raw_fd(pipes[1])))
     }
 }
 
-pub fn from_nix_error(err: ::nix::Error) -> ::io::Error {
-    ::io::Error::from_raw_os_error(err.errno() as i32)
+trait IsMinusOne {
+    fn is_minus_one(&self) -> bool;
 }
 
-mod nix {
-    pub use nix::{
-        c_int,
-        Error,
-    };
-    pub use nix::errno::{EINPROGRESS, EAGAIN};
-    pub use nix::fcntl::{fcntl, FcntlArg, O_NONBLOCK};
-    pub use nix::sys::socket::{
-        sockopt,
-        AddressFamily,
-        SockAddr,
-        SockType,
-        SockLevel,
-        InetAddr,
-        Ipv4Addr,
-        Ipv6Addr,
-        ControlMessage,
-        CmsgSpace,
-        MSG_DONTWAIT,
-        SOCK_NONBLOCK,
-        SOCK_CLOEXEC,
-        accept4,
-        bind,
-        connect,
-        getpeername,
-        getsockname,
-        getsockopt,
-        ip_mreq,
-        ipv6_mreq,
-        linger,
-        listen,
-        recvfrom,
-        recvmsg,
-        sendto,
-        sendmsg,
-        setsockopt,
-        socket,
-        shutdown,
-        Shutdown,
-    };
-    pub use nix::sys::time::TimeVal;
-    pub use nix::sys::uio::IoVec;
-    pub use nix::unistd::{
-        read,
-        write,
-        dup,
-    };
+impl IsMinusOne for i32 {
+    fn is_minus_one(&self) -> bool { *self == -1 }
+}
+impl IsMinusOne for isize {
+    fn is_minus_one(&self) -> bool { *self == -1 }
+}
+
+fn cvt<T: IsMinusOne>(t: T) -> ::io::Result<T> {
+    use std::io;
+
+    if t.is_minus_one() {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(t)
+    }
 }

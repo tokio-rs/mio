@@ -3,7 +3,7 @@ use deprecated::TryAccept;
 use io::MapNonBlock;
 use std::io::{Read, Write};
 use std::path::Path;
-pub use nix::sys::socket::Shutdown;
+pub use std::net::Shutdown;
 use std::process;
 
 pub use sys::Io;
@@ -22,7 +22,11 @@ impl UnixSocket {
 
     /// Connect the socket to the specified address
     pub fn connect<P: AsRef<Path> + ?Sized>(self, addr: &P) -> io::Result<(UnixStream, bool)> {
-        let complete = try!(self.sys.connect(addr));
+        let complete = match self.sys.connect(addr) {
+            Ok(()) => true,
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => false,
+            Err(e) => return Err(e),
+        };
         Ok((From::from(self.sys), complete))
     }
 
@@ -87,7 +91,7 @@ impl UnixStream {
     }
 
     pub fn shutdown(&self, how: Shutdown) -> io::Result<usize> {
-        self.sys.shutdown(how)
+        self.sys.shutdown(how).map(|_| 0)
     }
 
     pub fn read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<(usize, Option<RawFd>)> {
@@ -217,14 +221,14 @@ pub struct PipeReader {
 
 impl PipeReader {
     pub fn from_stdout(stdout: process::ChildStdout) -> io::Result<Self> {
-        match sys::set_nonblock(&stdout) {
+        match sys::set_nonblock(stdout.as_raw_fd()) {
             Err(e) => return Err(e),
             _ => {},
         }
         return Ok(PipeReader::from(unsafe { Io::from_raw_fd(stdout.into_raw_fd()) }));
     }
     pub fn from_stderr(stderr: process::ChildStderr) -> io::Result<Self> {
-        match sys::set_nonblock(&stderr) {
+        match sys::set_nonblock(stderr.as_raw_fd()) {
             Err(e) => return Err(e),
             _ => {},
         }
@@ -271,7 +275,7 @@ pub struct PipeWriter {
 
 impl PipeWriter {
     pub fn from_stdin(stdin: process::ChildStdin) -> io::Result<Self> {
-        match sys::set_nonblock(&stdin) {
+        match sys::set_nonblock(stdin.as_raw_fd()) {
             Err(e) => return Err(e),
             _ => {},
         }

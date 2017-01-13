@@ -1,15 +1,17 @@
-use {convert, io, Ready, PollOpt, Token};
-use event::Event;
-use libc::{c_int, c_void};
-use libc;
-use nix::sys::epoll::{EPOLLERR, EPOLLHUP, EPOLLRDHUP, EPOLLONESHOT};
-use nix::sys::epoll::{EPOLLET, EPOLLOUT, EpollEvent, EPOLLIN, EPOLLPRI};
-use nix::sys::epoll::{EpollEventKind, epoll_ctl, EpollOp, epoll_wait};
-use nix::unistd::close;
-use std::mem;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::time::Duration;
+use std::{cmp, i32};
+
+use libc::c_int;
+use libc;
+use libc::{EPOLLERR, EPOLLHUP, EPOLLRDHUP, EPOLLONESHOT};
+use libc::{EPOLLET, EPOLLOUT, EPOLLIN, EPOLLPRI};
+
+use {convert, io, Ready, PollOpt, Token};
+use event::Event;
+use sys::unix::cvt;
+use sys::unix::io::set_cloexec;
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -21,37 +23,28 @@ static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 #[derive(Debug)]
 pub struct Selector {
     id: usize,
-    epfd: RawFd
-}
-
-// Emulate `epoll_create` by using `epoll_create1` if it's available and
-// otherwise falling back to `epoll_create` followed by a call to set the
-// CLOEXEC flag.
-unsafe fn epoll_create() -> io::Result<RawFd> {
-    let name = "epoll_create1\0".as_ptr();
-    let ptr = libc::dlsym(libc::RTLD_DEFAULT, name as *const _);
-    let fd;
-    if ptr.is_null() {
-        fd = libc::epoll_create(1024);
-        if fd > 0 {
-            libc::ioctl(fd, libc::FIOCLEX);
-        }
-    } else {
-        type EpollCreate1 = unsafe extern fn(c_int) -> c_int;
-        let epoll_create1 = mem::transmute::<*mut c_void, EpollCreate1>(ptr);
-        fd = epoll_create1(libc::EPOLL_CLOEXEC);
-    }
-    if fd >= 0 {
-        Ok(fd)
-    } else {
-        Err(io::Error::last_os_error())
-
-    }
+    epfd: RawFd,
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        let epfd = try!(unsafe { epoll_create() });
+        let epfd = unsafe {
+            // Emulate `epoll_create` by using `epoll_create1` if it's available
+            // and otherwise falling back to `epoll_create` followed by a call to
+            // set the CLOEXEC flag.
+            dlsym!(fn epoll_create1(c_int) -> c_int);
+
+            match epoll_create1.get() {
+                Some(epoll_create1_fn) => {
+                    try!(cvt(epoll_create1_fn(libc::EPOLL_CLOEXEC)))
+                }
+                None => {
+                    let fd = try!(cvt(libc::epoll_create(1024)));
+                    drop(set_cloexec(fd));
+                    fd
+                }
+            }
+        };
 
         // offset by 1 to avoid choosing 0 as the id of a selector
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
@@ -68,28 +61,25 @@ impl Selector {
 
     /// Wait for events from the OS
     pub fn select(&self, evts: &mut Events, awakener: Token, timeout: Option<Duration>) -> io::Result<bool> {
-        use std::{cmp, i32, slice};
-
         let timeout_ms = timeout
             .map(|to| cmp::min(convert::millis(to), i32::MAX as u64) as i32)
             .unwrap_or(-1);
 
-        let dst = unsafe {
-            slice::from_raw_parts_mut(
-                evts.events.as_mut_ptr(),
-                evts.events.capacity())
-        };
-
         // Wait for epoll events for at most timeout_ms milliseconds
-        let cnt = try!(epoll_wait(self.epfd, dst, timeout_ms as isize)
-                           .map_err(super::from_nix_error));
+        unsafe {
+            evts.events.set_len(0);
+            let cnt = try!(cvt(libc::epoll_wait(self.epfd,
+                                                evts.events.as_mut_ptr(),
+                                                evts.events.capacity() as i32,
+                                                timeout_ms)));
+            let cnt = cnt as usize;
+            evts.events.set_len(cnt);
 
-        unsafe { evts.events.set_len(cnt); }
-
-        for i in 0..cnt {
-            if evts.get(i).map(|e| e.token()) == Some(awakener) {
-                evts.events.remove(i);
-                return Ok(true);
+            for i in 0..cnt {
+                if evts.events[i].u64 as usize == awakener.into() {
+                    evts.events.remove(i);
+                    return Ok(true);
+                }
             }
         }
 
@@ -98,24 +88,28 @@ impl Selector {
 
     /// Register event interests for the given IO handle with the OS
     pub fn register(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
-        let info = EpollEvent {
+        let mut info = libc::epoll_event {
             events: ioevent_to_epoll(interests, opts),
-            data: usize::from(token) as u64
+            u64: usize::from(token) as u64
         };
 
-        epoll_ctl(self.epfd, EpollOp::EpollCtlAdd, fd, &info)
-            .map_err(super::from_nix_error)
+        unsafe {
+            try!(cvt(libc::epoll_ctl(self.epfd, libc::EPOLL_CTL_ADD, fd, &mut info)));
+            Ok(())
+        }
     }
 
     /// Register event interests for the given IO handle with the OS
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
-        let info = EpollEvent {
+        let mut info = libc::epoll_event {
             events: ioevent_to_epoll(interests, opts),
-            data: usize::from(token) as u64
+            u64: usize::from(token) as u64
         };
 
-        epoll_ctl(self.epfd, EpollOp::EpollCtlMod, fd, &info)
-            .map_err(super::from_nix_error)
+        unsafe {
+            try!(cvt(libc::epoll_ctl(self.epfd, libc::EPOLL_CTL_MOD, fd, &mut info)));
+            Ok(())
+        }
     }
 
     /// Deregister event interests for the given IO handle with the OS
@@ -123,58 +117,62 @@ impl Selector {
         // The &info argument should be ignored by the system,
         // but linux < 2.6.9 required it to be not null.
         // For compatibility, we provide a dummy EpollEvent.
-        let info = EpollEvent {
-            events: EpollEventKind::empty(),
-            data: 0
+        let mut info = libc::epoll_event {
+            events: 0,
+            u64: 0,
         };
 
-        epoll_ctl(self.epfd, EpollOp::EpollCtlDel, fd, &info)
-            .map_err(super::from_nix_error)
+        unsafe {
+            try!(cvt(libc::epoll_ctl(self.epfd, libc::EPOLL_CTL_DEL, fd, &mut info)));
+            Ok(())
+        }
     }
 }
 
-fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> EpollEventKind {
-    let mut kind = EpollEventKind::empty();
+fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
+    let mut kind = 0;
 
     if interest.is_readable() {
         if opts.is_urgent() {
-            kind.insert(EPOLLPRI);
+            kind |= EPOLLPRI;
         } else {
-            kind.insert(EPOLLIN);
+            kind |= EPOLLIN;
         }
     }
 
     if interest.is_writable() {
-        kind.insert(EPOLLOUT);
+        kind |= EPOLLOUT;
     }
 
     if interest.is_hup() {
-        kind.insert(EPOLLRDHUP);
+        kind |= EPOLLRDHUP;
     }
 
     if opts.is_edge() {
-        kind.insert(EPOLLET);
+        kind |= EPOLLET;
     }
 
     if opts.is_oneshot() {
-        kind.insert(EPOLLONESHOT);
+        kind |= EPOLLONESHOT;
     }
 
     if opts.is_level() {
-        kind.remove(EPOLLET);
+        kind &= !EPOLLET;
     }
 
-    kind
+    kind as u32
 }
 
 impl Drop for Selector {
     fn drop(&mut self) {
-        let _ = close(self.epfd);
+        unsafe {
+            let _ = libc::close(self.epfd);
+        }
     }
 }
 
 pub struct Events {
-    events: Vec<EpollEvent>,
+    events: Vec<libc::epoll_event>,
 }
 
 impl Events {
@@ -197,36 +195,36 @@ impl Events {
     #[inline]
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|event| {
-            let epoll = event.events;
+            let epoll = event.events as c_int;
             let mut kind = Ready::none();
 
-            if epoll.contains(EPOLLIN) |  epoll.contains(EPOLLPRI) {
+            if (epoll & EPOLLIN) != 0 || (epoll & EPOLLPRI) != 0 {
                 kind = kind | Ready::readable();
             }
 
-            if epoll.contains(EPOLLOUT) {
+            if (epoll & EPOLLOUT) != 0 {
                 kind = kind | Ready::writable();
             }
 
             // EPOLLHUP - Usually means a socket error happened
-            if epoll.contains(EPOLLERR) {
+            if (epoll & EPOLLERR) != 0 {
                 kind = kind | Ready::error();
             }
 
-            if epoll.contains(EPOLLRDHUP) | epoll.contains(EPOLLHUP) {
+            if (epoll & EPOLLRDHUP) != 0 || (epoll & EPOLLHUP) != 0 {
                 kind = kind | Ready::hup();
             }
 
-            let token = self.events[idx].data;
+            let token = self.events[idx].u64;
 
             Event::new(kind, Token(token as usize))
         })
     }
 
     pub fn push_event(&mut self, event: Event) {
-        self.events.push(EpollEvent {
+        self.events.push(libc::epoll_event {
             events: ioevent_to_epoll(event.kind(), PollOpt::empty()),
-            data: usize::from(event.token()) as u64
+            u64: usize::from(event.token()) as u64
         });
     }
 }
