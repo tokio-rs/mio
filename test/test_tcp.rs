@@ -1,15 +1,16 @@
 extern crate mio;
 extern crate env_logger;
 
-use std::io;
+use std::cmp;
 use std::io::prelude::*;
+use std::io;
 use std::net;
 use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
 
 use {TryRead, TryWrite};
-use mio::{Token, Ready, PollOpt};
+use mio::{Token, Ready, PollOpt, Poll, Events, IoVec};
 use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::{TcpListener, TcpStream};
 
@@ -147,6 +148,78 @@ fn read() {
 }
 
 #[test]
+fn read_bufs() {
+    const N: usize = 16 * 1024 * 1024;
+
+    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = l.local_addr().unwrap();
+
+    let t = thread::spawn(move || {
+        let mut s = l.accept().unwrap().0;
+        let b = [1; 1024];
+        let mut amt = 0;
+        while amt < N {
+            amt += s.write(&b).unwrap();
+        }
+    });
+
+    let poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(128);
+
+    let s = TcpStream::connect(&addr).unwrap();
+
+    poll.register(&s, Token(1), Ready::readable(), PollOpt::level()).unwrap();
+
+    let mut b1 = &mut [0; 10][..];
+    let mut b2 = &mut [0; 383][..];
+    let mut b3 = &mut [0; 28][..];
+    let mut b4 = &mut [0; 8][..];
+    let mut b5 = &mut [0; 128][..];
+    let mut b: [&mut IoVec; 5] = [
+        b1.into(),
+        b2.into(),
+        b3.into(),
+        b4.into(),
+        b5.into(),
+    ];
+
+    let mut so_far = 0;
+    loop {
+        for buf in b.iter_mut() {
+            for byte in buf.as_mut_bytes() {
+                *byte = 0;
+            }
+        }
+
+        poll.poll(&mut events, None).unwrap();
+
+        match s.read_bufs(&mut b) {
+            Ok(0) => {
+                assert_eq!(so_far, N);
+                break
+            }
+            Ok(mut n) => {
+                so_far += n;
+                for buf in b.iter() {
+                    let buf = buf.as_bytes();
+                    for byte in buf[..cmp::min(n, buf.len())].iter() {
+                        assert_eq!(*byte, 1);
+                    }
+                    n = n.saturating_sub(buf.len());
+                    if n == 0 {
+                        break
+                    }
+                }
+                assert_eq!(n, 0);
+            }
+            Err(e) => assert_eq!(e.kind(), io::ErrorKind::WouldBlock),
+        }
+    }
+
+    t.join().unwrap();
+}
+
+#[test]
 fn write() {
     const N: usize = 16 * 1024 * 1024;
     struct H { amt: usize, socket: TcpStream }
@@ -192,6 +265,60 @@ fn write() {
 
     let mut h = H { amt: 0, socket: s };
     e.run(&mut h).unwrap();
+    t.join().unwrap();
+}
+
+#[test]
+fn write_bufs() {
+    const N: usize = 16 * 1024 * 1024;
+
+    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = l.local_addr().unwrap();
+
+    let t = thread::spawn(move || {
+        let mut s = l.accept().unwrap().0;
+        let mut b = [0; 1024];
+        let mut amt = 0;
+        while amt < N {
+            for byte in b.iter_mut() {
+                *byte = 0;
+            }
+            let n = s.read(&mut b).unwrap();
+            amt += n;
+            for byte in b[..n].iter() {
+                assert_eq!(*byte, 1);
+            }
+        }
+    });
+
+    let poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(128);
+    let s = TcpStream::connect(&addr).unwrap();
+    poll.register(&s, Token(1), Ready::writable(), PollOpt::level()).unwrap();
+
+    let b1 = &[1; 10][..];
+    let b2 = &[1; 383][..];
+    let b3 = &[1; 28][..];
+    let b4 = &[1; 8][..];
+    let b5 = &[1; 128][..];
+    let b: [&IoVec; 5] = [
+        b1.into(),
+        b2.into(),
+        b3.into(),
+        b4.into(),
+        b5.into(),
+    ];
+
+    let mut so_far = 0;
+    while so_far < N {
+        poll.poll(&mut events, None).unwrap();
+
+        match s.write_bufs(&b) {
+            Ok(n) => so_far += n,
+            Err(e) => assert_eq!(e.kind(), io::ErrorKind::WouldBlock),
+        }
+    }
+
     t.join().unwrap();
 }
 

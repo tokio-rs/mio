@@ -11,6 +11,7 @@ pub use self::unix::{
     UnixSocket,
     pipe,
     set_nonblock,
+    IoVec,
 };
 
 
@@ -27,6 +28,7 @@ pub use self::windows::{
     UdpSocket,
     Overlapped,
     Binding,
+    IoVec,
 };
 
 #[cfg(windows)]

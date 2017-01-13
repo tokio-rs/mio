@@ -1,5 +1,5 @@
 use std::fmt;
-use std::io::{self, Read, Write, ErrorKind};
+use std::io::{self, Read, ErrorKind};
 use std::mem;
 use std::net::{self, SocketAddr};
 use std::sync::{Mutex, MutexGuard};
@@ -11,7 +11,7 @@ use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
 use net::tcp::Shutdown;
 use winapi::*;
 
-use {Evented, Ready, Poll, PollOpt, Token};
+use {Evented, Ready, Poll, PollOpt, Token, IoVec};
 use io::would_block;
 use poll;
 use sys::windows::from_raw_arc::FromRawArc;
@@ -177,13 +177,17 @@ impl TcpStream {
     }
 
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.readv(&mut [buf.into()])
+    }
+
+    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         let mut me = self.inner();
 
         match me.read {
             // Empty == we're not associated yet, and if we're pending then
             // these are both cases where we return "would block"
             State::Empty |
-            State::Pending(()) => Err(wouldblock()),
+            State::Pending(()) => return Err(wouldblock()),
 
             // If we got a delayed error as part of a `read_overlapped` below,
             // return that here. Also schedule another read in case it was
@@ -194,26 +198,71 @@ impl TcpStream {
                     _ => panic!(),
                 };
                 self.imp.schedule_read(&mut me);
-                Err(e)
+                return Err(e)
             }
 
             // If we're ready for a read then some previous 0-byte read has
             // completed. In that case the OS's socket buffer has something for
-            // us, so we just keep pulling out bytes while we can. Eventually
-            // once we hit an error (which may include WouldBlock) we schedule
-            // another 0-byte read which moves us to the `Pending` state.
-            State::Ready(()) => {
-                let res = (&self.imp.inner.socket).read(buf);
-                if res.is_err() {
-                    me.read = State::Empty;
-                    self.imp.schedule_read(&mut me);
+            // us, so we just keep pulling out bytes while we can in the loop
+            // below.
+            State::Ready(()) => {}
+        }
+
+        // TODO: Does WSARecv work on a nonblocking sockets? We ideally want to
+        //       call that instead of looping over all the buffers and calling
+        //       `recv` on each buffer. I'm not sure though if an overlapped
+        //       socket in nonblocking mode would work with that use case,
+        //       however, so for now we just call `recv`.
+
+        let mut amt = 0;
+        for buf in bufs {
+            let buf = buf.as_mut_bytes();
+
+            match (&self.imp.inner.socket).read(buf) {
+                // If we did a partial read, then return what we've read so far
+                Ok(n) if n < buf.len() => return Ok(amt + n),
+
+                // Otherwise filled this buffer entirely, so try to fill the
+                // next one as well.
+                Ok(n) => amt += n,
+
+                // If we hit an error then things get tricky if we've already
+                // read some data. If the error is "would block" then we just
+                // return the data we've read so far while scheduling another
+                // 0-byte read.
+                //
+                // If we've read data and the error kind is not "would block",
+                // then we stash away the error to get returned later and return
+                // the data that we've read.
+                //
+                // Finally if we haven't actually read any data we just
+                // reschedule a 0-byte read to happen again and then return the
+                // error upwards.
+                Err(e) => {
+                    if amt > 0 && e.kind() == io::ErrorKind::WouldBlock {
+                        me.read = State::Empty;
+                        self.imp.schedule_read(&mut me);
+                        return Ok(amt)
+                    } else if amt > 0 {
+                        me.read = State::Error(e);
+                        return Ok(amt)
+                    } else {
+                        me.read = State::Empty;
+                        self.imp.schedule_read(&mut me);
+                        return Err(e)
+                    }
                 }
-                return res
             }
         }
+
+        Ok(amt)
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        self.writev(&[buf.into()])
+    }
+
+    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
 
@@ -226,10 +275,17 @@ impl TcpStream {
             return Err(wouldblock())
         }
 
-        let mut intermediate = me.iocp.get_buffer(64 * 1024);
-        let amt = try!(intermediate.write(buf));
+        if bufs.len() == 0 {
+            return Ok(0)
+        }
+
+        let len = bufs.iter().map(|b| b.as_bytes().len()).fold(0, |a, b| a + b);
+        let mut intermediate = me.iocp.get_buffer(len);
+        for buf in bufs {
+            intermediate.extend_from_slice(buf.as_bytes());
+        }
         self.imp.schedule_write(intermediate, 0, me);
-        Ok(amt)
+        Ok(len)
     }
 
     pub fn flush(&self) -> io::Result<()> {
