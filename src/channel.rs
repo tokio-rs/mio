@@ -4,6 +4,7 @@
 
 use {io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::{LazyCell, AtomicLazyCell};
+use std::fmt;
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -318,5 +319,24 @@ impl<T> From<mpsc::SendError<T>> for TrySendError<T> {
 impl<T> From<io::Error> for TrySendError<T> {
     fn from(src: io::Error) -> TrySendError<T> {
         TrySendError::Io(src)
+    }
+}
+
+impl<T> fmt::Display for SendError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &SendError::Io(ref io_err) => write!(f, "{}", io_err),
+            &SendError::Disconnected(..) => write!(f, "Disconnected"),
+        }
+    }
+}
+
+impl<T> fmt::Display for TrySendError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &TrySendError::Io(ref io_err) => write!(f, "{}", io_err),
+            &TrySendError::Full(..) => write!(f, "Full"),
+            &TrySendError::Disconnected(..) => write!(f, "Disconnected"),
+        }
     }
 }
