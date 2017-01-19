@@ -48,11 +48,11 @@
 //! addresses. These pointers all have to remain valid **for the entire I/O
 //! operation's duration**.
 //!
-//! There's 0-cost way to define a safe lifetime for these pointers/buffers over
+//! There's no way to define a safe lifetime for these pointers/buffers over
 //! the span of an I/O operation, so we're forced to add a layer of abstraction
 //! (not 0-cost) to make these APIs safe. Currently this implementation
 //! basically just boxes everything up on the heap to give it a stable address
-//! and then keys of that most of the time.
+//! and then keys off that most of the time.
 //!
 //! ## From completion to readiness
 //!
@@ -80,7 +80,7 @@
 //!
 //! As there's lots of I/O operations in flight at any one point in time,
 //! there's lots of live buffers that need to be juggled around (e.g. this
-//! implementaiton's own internal buffers).
+//! implementation's own internal buffers).
 //!
 //! Currently all buffers are created for the I/O operation at hand and are then
 //! discarded when it completes (this is listed as future work below).
@@ -103,7 +103,7 @@
 //! The callback for each I/O operation doesn't have any environment, so it
 //! relies on memory layout and unsafe casting to translate an `OVERLAPPED`
 //! pointer (or in this case a `selector::Overlapped` pointer) to a type of
-//! `FromRawArc<T>` (see module docs the for why this type exists).
+//! `FromRawArc<T>` (see module docs for why this type exists).
 //!
 //! ## Thread Safety
 //!
