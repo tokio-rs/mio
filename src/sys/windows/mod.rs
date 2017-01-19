@@ -176,3 +176,18 @@ unsafe fn cancel(socket: &AsRawSocket,
         Ok(())
     }
 }
+
+unsafe fn no_notify_on_instant_completion(handle: winapi::HANDLE) -> io::Result<()> {
+    // TODO: move those to winapi
+    const FILE_SKIP_COMPLETION_PORT_ON_SUCCESS: winapi::UCHAR = 1;
+    const FILE_SKIP_SET_EVENT_ON_HANDLE: winapi::UCHAR = 2;
+
+    let flags = FILE_SKIP_COMPLETION_PORT_ON_SUCCESS | FILE_SKIP_SET_EVENT_ON_HANDLE;
+
+    let r = kernel32::SetFileCompletionNotificationModes(handle, flags);
+    if r == winapi::TRUE {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}

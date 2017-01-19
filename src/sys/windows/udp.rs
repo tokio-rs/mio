@@ -109,9 +109,8 @@ impl UdpSocket {
         let amt = try!(owned_buf.write(buf));
         try!(unsafe {
             trace!("scheduling a send");
-            let overlapped = miow::Overlapped::from_raw(self.imp.inner.write.as_mut_ptr());
             self.imp.inner.socket.send_to_overlapped(&owned_buf, target,
-                                                     overlapped)
+                                                     self.imp.inner.write.as_mut_ptr())
         });
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
@@ -254,9 +253,8 @@ impl Imp {
             trace!("scheduling a read");
             let cap = buf.capacity();
             buf.set_len(cap);
-            let overlapped = miow::Overlapped::from_raw(self.inner.read.as_mut_ptr());
             self.inner.socket.recv_from_overlapped(&mut buf, &mut me.read_buf,
-                                                   overlapped)
+                                                   self.inner.read.as_mut_ptr())
         };
         match res {
             Ok(_) => {
