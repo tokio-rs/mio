@@ -399,3 +399,37 @@ fn bind_twice_bad() {
     let addr = l1.local_addr().unwrap();
     assert!(TcpListener::bind(&addr).is_err());
 }
+
+#[test]
+fn multiple_writes_immediate_success() {
+    const N: usize = 16;
+    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = l.local_addr().unwrap();
+
+    let t = thread::spawn(move || {
+        let mut s = l.accept().unwrap().0;
+        let mut b = [0; 1024];
+        let mut amt = 0;
+        while amt < 1024*N {
+            for byte in b.iter_mut() {
+                *byte = 0;
+            }
+            let n = s.read(&mut b).unwrap();
+            amt += n;
+            for byte in b[..n].iter() {
+                assert_eq!(*byte, 1);
+            }
+        }
+    });
+
+    let poll = Poll::new().unwrap();
+    let events = Events::with_capacity(128);
+    let mut s = TcpStream::connect(&addr).unwrap();
+    poll.register(&s, Token(1), Ready::writable(), PollOpt::level()).unwrap();
+
+    for _ in 0..N {
+        s.write(&[1; 1024]).unwrap();
+    }
+
+    t.join().unwrap();
+}

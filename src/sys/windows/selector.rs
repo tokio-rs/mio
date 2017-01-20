@@ -69,8 +69,6 @@ impl Selector {
                   events: &mut Events,
                   awakener: Token,
                   timeout: Option<Duration>) -> io::Result<bool> {
-        let timeout = timeout.map(|to| cmp::min(convert::millis(to), u32::MAX as u64) as u32);
-
         trace!("select; timeout={:?}", timeout);
 
         // Clear out the previous list of I/O events and get some more!

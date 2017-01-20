@@ -2,6 +2,7 @@ use std::fmt;
 use std::io::{self, Read, ErrorKind};
 use std::mem;
 use std::net::{self, SocketAddr};
+use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 
 use miow;
@@ -71,12 +72,17 @@ struct StreamInner {
     deferred_connect: Option<SocketAddr>,
     read: State<(), ()>,
     write: State<(Vec<u8>, usize), (Vec<u8>, usize)>,
+    /// whether we are instantly notified of success
+    /// (FILE_SKIP_COMPLETION_PORT_ON_SUCCESS,
+    ///  without a roundtrip through the event loop)
+    instant_notify: bool,
 }
 
 struct ListenerInner {
     iocp: ReadyBinding,
     accept: State<net::TcpStream, (net::TcpStream, SocketAddr)>,
     accept_buf: AcceptAddrsBuf,
+    instant_notify: bool,
 }
 
 enum State<T, U> {
@@ -101,6 +107,7 @@ impl TcpStream {
                         deferred_connect: deferred_connect,
                         read: State::Empty,
                         write: State::Empty,
+                        instant_notify: false,
                     }),
                 }),
             },
@@ -301,8 +308,7 @@ impl StreamImp {
     fn schedule_connect(&self, addr: &SocketAddr) -> io::Result<()> {
         unsafe {
             trace!("scheduling a connect");
-            let overlapped = miow::Overlapped::from_raw(self.inner.read.as_mut_ptr());
-            try!(self.inner.socket.connect_overlapped(addr, overlapped));
+            try!(self.inner.socket.connect_overlapped(addr, &[], self.inner.read.as_mut_ptr()));
         }
         // see docs above on StreamImp.inner for rationale on forget
         mem::forget(self.clone());
@@ -330,31 +336,31 @@ impl StreamImp {
 
         trace!("scheduling a read");
         let res = unsafe {
-            let overlapped = miow::Overlapped::from_raw(self.inner.read.as_mut_ptr());
-            self.inner.socket.read_overlapped(&mut [], overlapped)
+            self.inner.socket.read_overlapped(&mut [], self.inner.read.as_mut_ptr())
         };
         match res {
-            // TODO: investigate better handling `Ok(true)`
-            //
             // Note that `Ok(true)` means that this completed immediately and
             // our socket is readable. This typically means that the caller of
             // this function (likely `read` above) can try again as an
             // optimization and return bytes quickly.
             //
-            // Unfortunately, though, although the read completed immediately
+            // Normally, though, although the read completed immediately
             // there's still an IOCP completion packet enqueued that we're going
-            // to receive. As an ease of implementation for now we just let the
-            // completion packet drive the read completion.
+            // to receive.
             //
-            // Apparently you can configure this behavior with
+            // You can configure this behavior (miow) with
             // SetFileCompletionNotificationModes to indicate that `Ok(true)`
-            // does **not** enqueue a completion packet. We should test this out
-            // and see if it works for us.
+            // does **not** enqueue a completion packet. (This is the case
+            // for me.instant_notify)
             //
             // Note that apparently libuv has scary code to work around bugs in
             // `WSARecv` for UDP sockets apparently for handles which have had
             // the `SetFileCompletionNotificationModes` function called on them,
             // worth looking into!
+            Ok(Some(_)) if me.instant_notify => {
+                me.read = State::Ready(());
+                self.add_readiness(me, Ready::readable());
+            }
             Ok(_) => {
                 // see docs above on StreamImp.inner for rationale on forget
                 me.read = State::Pending(());
@@ -385,27 +391,38 @@ impl StreamImp {
     /// the buffer has been written completely (or hit an error).
     fn schedule_write(&self,
                       buf: Vec<u8>,
-                      pos: usize,
+                      mut pos: usize,
                       me: &mut StreamInner) {
 
         // About to write, clear any pending level triggered events
         me.iocp.set_readiness(me.iocp.readiness() & !Ready::writable());
 
         trace!("scheduling a write");
-        let err = unsafe {
-            let overlapped = miow::Overlapped::from_raw(self.inner.write.as_mut_ptr());
-            self.inner.socket.write_overlapped(&buf[pos..], overlapped)
-        };
-        match err {
-            Ok(_) => {
-                // see docs above on StreamImp.inner for rationale on forget
-                me.write = State::Pending((buf, pos));
-                mem::forget(self.clone());
-            }
-            Err(e) => {
-                me.write = State::Error(e);
-                self.add_readiness(me, Ready::writable());
-                me.iocp.put_buffer(buf);
+        loop {
+            let ret = unsafe {
+                self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr())
+            };
+            match ret {
+                Ok(Some(transfered_bytes)) if me.instant_notify => {
+                    if transfered_bytes == buf.len() - pos {
+                        self.add_readiness(me, Ready::writable());
+                        me.write = State::Empty;
+                        break;
+                    }
+                    pos += transfered_bytes;
+                }
+                Ok(_) => {
+                    // see docs above on StreamImp.inner for rationale on forget
+                    me.write = State::Pending((buf, pos));
+                    mem::forget(self.clone());
+                    break;
+                }
+                Err(e) => {
+                    me.write = State::Error(e);
+                    self.add_readiness(me, Ready::writable());
+                    me.iocp.put_buffer(buf);
+                    break;
+                }
             }
         }
     }
@@ -477,6 +494,11 @@ impl Evented for TcpStream {
         let mut me = self.inner();
         try!(me.iocp.register_socket(&self.imp.inner.socket, poll, token,
                                      interest, opts, &self.registration));
+
+        unsafe {
+            try!(super::no_notify_on_instant_completion(self.imp.inner.socket.as_raw_socket() as HANDLE));
+            me.instant_notify = true;
+        }
 
         // If we were connected before being registered process that request
         // here and go along our merry ways. Note that the callback for a
@@ -552,6 +574,7 @@ impl TcpListener {
                         iocp: ReadyBinding::new(),
                         accept: State::Empty,
                         accept_buf: AcceptAddrsBuf::new(),
+                        instant_notify: false,
                     }),
                 }),
             },
@@ -632,9 +655,8 @@ impl ListenerImp {
             Family::V6 => TcpBuilder::new_v6(),
         }.and_then(|builder| unsafe {
             trace!("scheduling an accept");
-            let overlapped = miow::Overlapped::from_raw(self.inner.accept.as_mut_ptr());
             self.inner.socket.accept_overlapped(&builder, &mut me.accept_buf,
-                                                overlapped)
+                                                self.inner.accept.as_mut_ptr())
         });
         match res {
             Ok((socket, _)) => {
@@ -687,6 +709,12 @@ impl Evented for TcpListener {
         let mut me = self.inner();
         try!(me.iocp.register_socket(&self.imp.inner.socket, poll, token,
                                      interest, opts, &self.registration));
+
+        unsafe {
+            try!(super::no_notify_on_instant_completion(self.imp.inner.socket.as_raw_socket() as HANDLE));
+            me.instant_notify = true;
+        }
+
         self.imp.schedule_accept(&mut me);
         Ok(())
     }
