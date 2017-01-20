@@ -4,6 +4,7 @@
 
 use {io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::{LazyCell, AtomicLazyCell};
+use std::any::Any;
 use std::fmt;
 use std::error;
 use std::sync::{mpsc, Arc};
@@ -327,7 +328,7 @@ impl<T> From<io::Error> for TrySendError<T> {
  *
  */
 
-impl<T> error::Error for SendError<T> {
+impl<T: Any> error::Error for SendError<T> {
     fn description(&self) -> &str {
         match self {
             &SendError::Io(ref io_err) => io_err.description(),
@@ -336,7 +337,7 @@ impl<T> error::Error for SendError<T> {
     }
 }
 
-impl<T> error::Error for TrySendError<T> {
+impl<T: Any> error::Error for TrySendError<T> {
     fn description(&self) -> &str {
         match self {
             &TrySendError::Io(ref io_err) => io_err.description(),

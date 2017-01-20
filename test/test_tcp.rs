@@ -423,9 +423,19 @@ fn multiple_writes_immediate_success() {
     });
 
     let poll = Poll::new().unwrap();
-    let events = Events::with_capacity(128);
     let mut s = TcpStream::connect(&addr).unwrap();
     poll.register(&s, Token(1), Ready::writable(), PollOpt::level()).unwrap();
+    let mut events = Events::with_capacity(16);
+
+    // Wait for our TCP stream to connect
+    'outer: loop {
+        poll.poll(&mut events, None).unwrap();
+        for event in events.iter() {
+            if event.token() == Token(1) && event.kind().is_writable() {
+                break 'outer
+            }
+        }
+    }
 
     for _ in 0..N {
         s.write(&[1; 1024]).unwrap();
