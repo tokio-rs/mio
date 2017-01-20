@@ -4,6 +4,8 @@
 
 use {io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::{LazyCell, AtomicLazyCell};
+use std::fmt;
+use std::error;
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -90,13 +92,11 @@ pub struct Receiver<T> {
     ctl: ReceiverCtl,
 }
 
-#[derive(Debug)]
 pub enum SendError<T> {
     Io(io::Error),
     Disconnected(T),
 }
 
-#[derive(Debug)]
 pub enum TrySendError<T> {
     Io(io::Error),
     Full(T),
@@ -318,5 +318,71 @@ impl<T> From<mpsc::SendError<T>> for TrySendError<T> {
 impl<T> From<io::Error> for TrySendError<T> {
     fn from(src: io::Error) -> TrySendError<T> {
         TrySendError::Io(src)
+    }
+}
+
+/*
+ *
+ * ===== Implement Error, Debug and Display for Errors =====
+ *
+ */
+
+impl<T> error::Error for SendError<T> {
+    fn description(&self) -> &str {
+        match self {
+            &SendError::Io(ref io_err) => io_err.description(),
+            &SendError::Disconnected(..) => "Disconnected",
+        }
+    }
+}
+
+impl<T> error::Error for TrySendError<T> {
+    fn description(&self) -> &str {
+        match self {
+            &TrySendError::Io(ref io_err) => io_err.description(),
+            &TrySendError::Full(..) => "Full",
+            &TrySendError::Disconnected(..) => "Disconnected",
+        }
+    }
+}
+
+impl<T> fmt::Debug for SendError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        format_send_error(self, f)
+    }
+}
+
+impl<T> fmt::Display for SendError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        format_send_error(self, f)
+    }
+}
+
+impl<T> fmt::Debug for TrySendError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        format_try_send_errror(self, f)
+    }
+}
+
+impl<T> fmt::Display for TrySendError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        format_try_send_errror(self, f)
+    }
+}
+
+#[inline]
+fn format_send_error<T>(e: &SendError<T>, f: &mut fmt::Formatter) -> fmt::Result {
+    match e {
+        &SendError::Io(ref io_err) => write!(f, "{}", io_err),
+        &SendError::Disconnected(..) => write!(f, "Disconnected"),
+    }
+}
+
+#[inline]
+fn format_try_send_errror<T>(e: &TrySendError<T>, f: &mut fmt::Formatter) -> fmt::Result {
+    match e {
+        &TrySendError::Io(ref io_err) => write!(f, "{}", io_err),
+        &TrySendError::Full(..) => write!(f, "Full"),
+        &TrySendError::Disconnected(..) => write!(f, "Disconnected"),
     }
 }
