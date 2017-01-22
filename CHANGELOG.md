@@ -1,3 +1,17 @@
+# 0.6.3 (January 22, 2017)
+
+* Implement readv/writev for `TcpStream`, allowing vectored reads/writes to
+  work across platforms
+* Remove `nix` dependency
+* Implement `Display` and `Error` for some channel error types.
+* Optimize TCP on Windows through `SetFileCompletionNotificationModes`
+
+# 0.6.2 (December 18, 2016)
+
+* Allow registration of custom handles on Windows (like `EventedFd` on Unix)
+* Send only one byte for the awakener on Unix instead of four
+* Fix a bug in the timer implementation which caused an infinite loop
+
 # 0.6.1 (October 30, 2016)
 
 * Update dependency of `libc` to 0.2.16
