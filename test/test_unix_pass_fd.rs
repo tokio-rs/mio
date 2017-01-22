@@ -108,7 +108,7 @@ impl EchoServer {
         let sock = self.sock.accept().unwrap();
         let conn = EchoConn::new(sock);
         let tok = self.conns.insert(conn)
-            .ok().expect("could not add connectiont o slab");
+            .ok().expect("could not add connection to slab");
 
         // Register the connection
         self.conns[tok].token = Some(tok);

@@ -361,13 +361,13 @@ impl<T> fmt::Display for SendError<T> {
 
 impl<T> fmt::Debug for TrySendError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        format_try_send_errror(self, f)
+        format_try_send_error(self, f)
     }
 }
 
 impl<T> fmt::Display for TrySendError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        format_try_send_errror(self, f)
+        format_try_send_error(self, f)
     }
 }
 
@@ -380,7 +380,7 @@ fn format_send_error<T>(e: &SendError<T>, f: &mut fmt::Formatter) -> fmt::Result
 }
 
 #[inline]
-fn format_try_send_errror<T>(e: &TrySendError<T>, f: &mut fmt::Formatter) -> fmt::Result {
+fn format_try_send_error<T>(e: &TrySendError<T>, f: &mut fmt::Formatter) -> fmt::Result {
     match e {
         &TrySendError::Io(ref io_err) => write!(f, "{}", io_err),
         &TrySendError::Full(..) => write!(f, "Full"),

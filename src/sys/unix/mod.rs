@@ -38,7 +38,7 @@ pub use self::uds::UnixSocket;
 use std::os::unix::io::FromRawFd;
 
 pub fn pipe() -> ::io::Result<(Io, Io)> {
-    // Use pipe2 for atomically seetting O_CLOEXEC if we can, but otherwise
+    // Use pipe2 for atomically setting O_CLOEXEC if we can, but otherwise
     // just fall back to using `pipe`.
     dlsym!(fn pipe2(*mut c_int, c_int) -> c_int);
 

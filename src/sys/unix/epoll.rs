@@ -15,7 +15,7 @@ use sys::unix::io::set_cloexec;
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
-/// registered with the `Selector`. If a type that is previously associatd with
+/// registered with the `Selector`. If a type that is previously associated with
 /// a `Selector` attempts to register itself with a different `Selector`, the
 /// operation will return with an error. This matches windows behavior.
 static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;

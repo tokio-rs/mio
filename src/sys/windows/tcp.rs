@@ -403,13 +403,13 @@ impl StreamImp {
                 self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr())
             };
             match ret {
-                Ok(Some(transfered_bytes)) if me.instant_notify => {
-                    if transfered_bytes == buf.len() - pos {
+                Ok(Some(transferred_bytes)) if me.instant_notify => {
+                    if transferred_bytes == buf.len() - pos {
                         self.add_readiness(me, Ready::writable());
                         me.write = State::Empty;
                         break;
                     }
-                    pos += transfered_bytes;
+                    pos += transferred_bytes;
                 }
                 Ok(_) => {
                     // see docs above on StreamImp.inner for rationale on forget

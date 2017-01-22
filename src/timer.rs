@@ -42,7 +42,7 @@ pub struct Builder {
 pub struct Timeout {
     // Reference into the timer entry slab
     token: Token,
-    // Tick that it should matchup with
+    // Tick that it should match up with
     tick: u64,
 }
 

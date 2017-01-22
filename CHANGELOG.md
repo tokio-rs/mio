@@ -47,7 +47,7 @@
 * The `UdpSocket::{send_to, recv_from}` methods are no longer generic over `Buf`
   or `MutBuf` but instead take slices directly. The return types have also been
   updated to return the number of bytes transferred. (#260)
-* Fix bug with kqueue wher ean error on registration prevented the
+* Fix bug with kqueue where an error on registration prevented the
   changelist from getting flushed (#276)
 * Support sending/receiving FDs over UNIX sockets (#291)
 * Mio's socket types are permanently associated with an EventLoop (#308)
