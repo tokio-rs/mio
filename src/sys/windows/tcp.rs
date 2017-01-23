@@ -120,6 +120,10 @@ impl TcpStream {
         Ok(TcpStream::new(socket, Some(*addr)))
     }
 
+    pub fn from_stream(stream: net::TcpStream) -> TcpStream {
+        TcpStream::new(stream, None)
+    }
+
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.imp.inner.socket.peer_addr()
     }

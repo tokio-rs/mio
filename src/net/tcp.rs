@@ -71,6 +71,15 @@ impl TcpStream {
         })
     }
 
+    /// Creates a new `TcpStream` from a standard `net::TcpStream`.
+    pub fn from_stream(stream: net::TcpStream) -> io::Result<TcpStream> {
+        try!(stream.set_nonblocking(true));
+        Ok(TcpStream {
+            sys: sys::TcpStream::from_stream(stream),
+            selector_id: SelectorId::new(),
+        })
+    }
+
     /// Returns the socket address of the remote peer of this TCP connection.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.sys.peer_addr()
