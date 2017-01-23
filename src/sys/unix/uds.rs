@@ -159,15 +159,11 @@ impl UnixSocket {
                 data: [libc::c_int; 1],
             }
             let mut cmsg: Cmsg = mem::zeroed();
-            let mut msg = libc::msghdr {
-                msg_name: 0 as *mut _,
-                msg_namelen: 0,
-                msg_iov: &mut iov,
-                msg_iovlen: 1,
-                msg_control: &mut cmsg as *mut _ as *mut _,
-                msg_controllen: mem::size_of_val(&cmsg).my_into(),
-                msg_flags: 0,
-            };
+            let mut msg: libc::msghdr = mem::zeroed();
+            msg.msg_iov = &mut iov;
+            msg.msg_iovlen = 1;
+            msg.msg_control = &mut cmsg as *mut _ as *mut _;
+            msg.msg_controllen = mem::size_of_val(&cmsg).my_into();
             let bytes = try!(cvt(libc::recvmsg(self.as_raw_fd(), &mut msg, 0)));
 
             const SCM_RIGHTS: libc::c_int = 1;
@@ -197,15 +193,11 @@ impl UnixSocket {
             cmsg.hdr.cmsg_level = libc::SOL_SOCKET;
             cmsg.hdr.cmsg_type = 1; // SCM_RIGHTS
             cmsg.data[0] = fd;
-            let msg = libc::msghdr {
-                msg_name: 0 as *mut _,
-                msg_namelen: 0,
-                msg_iov: &mut iov,
-                msg_iovlen: 1,
-                msg_control: &mut cmsg as *mut _ as *mut _,
-                msg_controllen: mem::size_of_val(&cmsg).my_into(),
-                msg_flags: 0,
-            };
+            let mut msg: libc::msghdr = mem::zeroed();
+            msg.msg_iov = &mut iov;
+            msg.msg_iovlen = 1;
+            msg.msg_control = &mut cmsg as *mut _ as *mut _;
+            msg.msg_controllen = mem::size_of_val(&cmsg).my_into();
             let bytes = try!(cvt(libc::sendmsg(self.as_raw_fd(), &msg, 0)));
             Ok(bytes as usize)
         }
