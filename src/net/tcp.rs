@@ -72,6 +72,15 @@ impl TcpStream {
     }
 
     /// Creates a new `TcpStream` from a standard `net::TcpStream`.
+    ///
+    /// This function is intended to be used to wrap a TCP stream from the
+    /// standard library in the mio equivalent. The conversion here will
+    /// automatically set `stream` to nonblocking and the returned object should
+    /// be ready to get associated with an event loop.
+    ///
+    /// Note that the TCP stream here will not have `connect` called on it, so
+    /// it should already be connected via some other means (be it manually, the
+    /// net2 crate, or the standard library).
     pub fn from_stream(stream: net::TcpStream) -> io::Result<TcpStream> {
         try!(stream.set_nonblocking(true));
         Ok(TcpStream {
