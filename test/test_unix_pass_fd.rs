@@ -291,7 +291,7 @@ pub fn test_unix_pass_fd() {
     debug!("Starting TEST_UNIX_PASS_FD");
     let mut event_loop = EventLoop::new().unwrap();
 
-    let tmp_dir = TempDir::new("test_unix_pass_fd").unwrap();
+    let tmp_dir = TempDir::new("mio").unwrap();
     let addr = tmp_dir.path().join(&PathBuf::from("sock"));
 
     let srv = UnixListener::bind(&addr).unwrap();

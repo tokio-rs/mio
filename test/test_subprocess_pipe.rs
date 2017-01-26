@@ -1,5 +1,3 @@
-#![cfg(unix)]
-
 use {TryRead, TryWrite};
 use std::mem;
 use mio::*;
@@ -13,7 +11,7 @@ struct SubprocessClient {
     stdin: Option<PipeWriter>,
     stdout: Option<PipeReader>,
     stderr: Option<PipeReader>,
-    stdin_token : Token, 
+    stdin_token : Token,
     stdout_token : Token,
     stderr_token : Token,
     output : Vec<u8>,

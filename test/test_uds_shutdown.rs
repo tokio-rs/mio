@@ -1,5 +1,3 @@
-#![cfg(unix)]
-
 use {TryRead, TryWrite};
 use mio::*;
 use mio::deprecated::{EventLoop, Handler};
@@ -7,8 +5,8 @@ use mio::deprecated::unix::*;
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use slab;
 use std::io;
-use std::io::Read;
-use std::fs;
+use std::path::PathBuf;
+use tempdir::TempDir;
 
 const SERVER: Token = Token(10_000_000);
 const CLIENT: Token = Token(10_000_001);
@@ -280,30 +278,21 @@ impl Handler for Echo {
         }
     }
 }
-pub fn to_hex_string(bytes: &[u8]) -> String {
-  let strs: Vec<String> = bytes.iter()
-                               .map(|b| format!("{:02X}", b))
-                               .collect();
-  strs.join("")
-}
 
 #[test]
 pub fn test_echo_server() {
     debug!("Starting TEST_ECHO_SERVER");
     let mut event_loop = EventLoop::new().unwrap();
-    let mut buffer = [0u8; 16];
-    let mut file = fs::File::open("/dev/urandom").unwrap();
-    file.read(&mut buffer[..]).unwrap();
-    let local_addr = to_hex_string(&buffer[..]);
-    let addr = &local_addr;
 
-    let srv = UnixListener::bind(addr).unwrap();
+    let tmp_dir = TempDir::new("mio").unwrap();
+    let addr = tmp_dir.path().join(&PathBuf::from("sock"));
 
-    info!("listen for connections {:}",addr);
+    let srv = UnixListener::bind(&addr).unwrap();
+
     event_loop.register(&srv, SERVER, Ready::readable(),
                             PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
-    let sock = UnixStream::connect(addr).unwrap();
+    let sock = UnixStream::connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register(&sock, CLIENT, Ready::writable(),
@@ -311,5 +300,4 @@ pub fn test_echo_server() {
 
     // Start the event loop
     event_loop.run(&mut Echo::new(srv, sock, vec!["foo", "bar"])).unwrap();
-    fs::remove_file(addr).unwrap();
 }

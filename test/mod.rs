@@ -10,7 +10,6 @@ extern crate tempdir;
 pub use ports::localhost;
 
 mod test_battery;
-mod test_broken_pipe;
 mod test_close_on_drop;
 mod test_double_register;
 mod test_echo_server;
@@ -23,21 +22,27 @@ mod test_register_deregister;
 mod test_register_multiple_event_loops;
 mod test_reregister_without_poll;
 mod test_smoke;
-mod test_subprocess_pipe;
 mod test_tcp;
 mod test_tcp_level;
 mod test_tick;
 mod test_timer;
 mod test_udp_level;
 mod test_udp_socket;
-mod test_uds_shutdown;
 mod test_write_then_drop;
 
-// ===== Unix only tests =====
-#[cfg(unix)]
+// The following tests are for deprecated features. Only run these tests on
+// platforms that were supported from before the features were deprecated
+// any(target_os = "macos", target_os = "linux")
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 mod test_unix_echo_server;
-#[cfg(unix)]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 mod test_unix_pass_fd;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod test_uds_shutdown;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod test_subprocess_pipe;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod test_broken_pipe;
 
 use bytes::{Buf, MutBuf};
 use std::io::{self, Read, Write};

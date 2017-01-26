@@ -1,5 +1,3 @@
-#![cfg(unix)]
-
 use mio::{Token, Ready, PollOpt};
 use mio::deprecated::{unix, EventLoop, Handler};
 use std::time::Duration;
