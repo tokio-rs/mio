@@ -9,7 +9,6 @@ extern crate tempdir;
 
 pub use ports::localhost;
 
-mod test_battery;
 mod test_close_on_drop;
 mod test_double_register;
 mod test_echo_server;
@@ -25,14 +24,17 @@ mod test_smoke;
 mod test_tcp;
 mod test_tcp_level;
 mod test_tick;
-mod test_timer;
 mod test_udp_level;
 mod test_udp_socket;
 mod test_write_then_drop;
 
 // The following tests are for deprecated features. Only run these tests on
 // platforms that were supported from before the features were deprecated
-// any(target_os = "macos", target_os = "linux")
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+mod test_timer;
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+mod test_battery;
+
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod test_unix_echo_server;
 #[cfg(any(target_os = "macos", target_os = "linux"))]

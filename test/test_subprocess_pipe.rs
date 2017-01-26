@@ -41,16 +41,13 @@ impl SubprocessClient {
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<SubprocessClient>) -> io::Result<()> {
-        println!("client socket readable");
         let mut eof = false;
         match self.stdout {
             None => unreachable!(),
             Some (ref mut stdout) => match stdout.try_read(&mut self.buf[..]) {
                 Ok(None) => {
-                    println!("CLIENT : spurious read wakeup");
                 }
                 Ok(Some(r)) => {
-                    println!("CLIENT : We read {} bytes!", r);
                     if r == 0 {
                         eof = true;
                     } else {
@@ -73,16 +70,13 @@ impl SubprocessClient {
     }
 
     fn readable_stderr(&mut self, event_loop: &mut EventLoop<SubprocessClient>) -> io::Result<()> {
-        println!("client socket readable");
         let mut eof = false;
         match self.stderr {
             None => unreachable!(),
             Some(ref mut stderr) => match stderr.try_read(&mut self.buf[..]) {
                 Ok(None) => {
-                    println!("CLIENT : spurious read wakeup");
                 }
                 Ok(Some(r)) => {
-                    println!("CLIENT : We read {} bytes!", r);
                     if r == 0 {
                         eof = true;
                     } else {
@@ -105,24 +99,20 @@ impl SubprocessClient {
     }
 
     fn writable(&mut self, event_loop: &mut EventLoop<SubprocessClient>) -> io::Result<()> {
-        println!("client socket writable");
         let mut ok = true;
         match self.stdin {
             None => unreachable!(),
             Some(ref mut stdin) => match stdin.try_write(&(&self.input)[self.input_offset..]) {
                 Ok(None) => {
-                     println!("client flushing buf; WOULDBLOCK");
                 },
                 Ok(Some(r)) => {
                     if r == 0 {
-                        println!("CLIENT : we wrote {} bytes!", r);
                         ok = false;
                     } else {
                         self.input_offset += r;
                     }
                 },
                 Err(e) => {
-                    println!("not implemented; client err={:?}", e);
                     ok = false;
                 },
             }
@@ -148,7 +138,6 @@ impl Handler for SubprocessClient {
 
     fn ready(&mut self, event_loop: &mut EventLoop<SubprocessClient>, token: Token,
              events: Ready) {
-        println!("ready {:?} {:?} {:}", token, events, events.is_readable());
         if token == self.stderr_token {
             let _x = self.readable_stderr(event_loop);
         } else {
@@ -208,7 +197,7 @@ pub fn subprocess_communicate(mut process : Child, input : &[u8]) -> (Vec<u8>, V
     } else {
         stderr = None
     }
-    //println!("listen for connections {:?} {:?}", , process.stdout.unwrap().as_raw_fd());
+
     let mut subprocess = SubprocessClient::new(stdin,
                                                stdout,
                                                stderr,
@@ -235,7 +224,6 @@ pub fn subprocess_communicate(mut process : Child, input : &[u8]) -> (Vec<u8>, V
     // Start the event loop
     event_loop.run(&mut subprocess).unwrap();
     let res = process.wait();
-    println!("Final output was {:} {:} {:?}\n", subprocess.output.len(), subprocess.output_stderr.len(), res);
 
     let ret_stdout = mem::replace(&mut subprocess.output, Vec::<u8>::new());
     let ret_stderr = mem::replace(&mut subprocess.output_stderr, Vec::<u8>::new());

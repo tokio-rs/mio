@@ -1,22 +1,65 @@
 language: rust
-rust:
-  - nightly
-  - stable
-  # The following Rust version represents the oldest supported version of Mio.
-  # This value should not be changed without prior discussion.
-  - 1.9.0
 
-os:
-  - linux
-  - osx
+sudo: required
 
-matrix:
-    allow_failures:
-        - rust: nightly
+dist: trusty
+
+install:
+  - curl https://static.rust-lang.org/rustup.sh |
+    sh -s -- --add-target=$TARGET --disable-sudo -y --prefix=`rustc --print sysroot`
 
 script:
-  - cargo test
-  - cargo doc --no-deps
+  - cargo build
+  - if [[ $TRAVIS_OS_NAME = "linux" ]]; then
+      sh ci/run-docker.sh $TARGET;
+    else
+      export CARGO_TARGET_DIR=`pwd`/target;
+      sh ci/run.sh $TARGET;
+    fi
+
+cache: cargo
+
+matrix:
+  include:
+
+    # Test compatibility
+    #
+    # 1.9.0 is the oldest supported version of Rust. This value should NOT be
+    # changed without prior discussion.
+    - os: linux
+      rust: 1.9.0
+      script:
+        - cargo test
+      install:
+
+    # Test on latest stable
+    - os: linux
+      rust: stable
+      script:
+        - cargo test
+      install:
+
+    # OS X
+    - os: osx
+      rust: stable
+      script:
+        - cargo test
+      install:
+
+    # iOS
+    - os: osx
+      osx_image: xcode8.2
+      env: TARGET=x86_64-apple-ios
+      rust: stable
+
+    # Android
+    - os: linux
+      env: TARGET=arm-linux-androideabi
+      rust: stable
+
+notifications:
+  email:
+    on_success: never
 
 # Deploy documentation to S3 for specific branches. At some
 # point, it would be nice to also support building docs for
@@ -32,7 +75,7 @@ deploy:
   upload-dir: mio/${TRAVIS_BRANCH}
   acl: public_read
   on:
-    condition: $TRAVIS_RUST_VERSION == "1.8.0" && $TRAVIS_OS_NAME == "linux"
+    condition: $TRAVIS_RUST_VERSION == "1.9.0" && $TRAVIS_OS_NAME == "linux"
     repo: carllerche/mio
     branch:
       - master

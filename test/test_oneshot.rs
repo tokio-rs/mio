@@ -51,7 +51,6 @@ pub fn test_tcp_edge_oneshot() {
 
 fn wait_for(poll: &mut Poll, events: &mut Events, token: Token) {
     loop {
-        println!("~~~~~~ WAITING FOR: {:?}", token);
         poll.poll(events, Some(Duration::from_millis(MS))).unwrap();
 
         let cnt = (0..events.len()).map(|i| events.get(i).unwrap())

@@ -5,8 +5,17 @@ use std::{cmp, i32};
 
 use libc::c_int;
 use libc;
-use libc::{EPOLLERR, EPOLLHUP, EPOLLRDHUP, EPOLLONESHOT};
+use libc::{EPOLLERR, EPOLLHUP};
 use libc::{EPOLLET, EPOLLOUT, EPOLLIN, EPOLLPRI};
+
+#[cfg(not(target_os = "android"))]
+use libc::{EPOLLRDHUP, EPOLLONESHOT};
+
+// libc doesn't define these constants on android, but they are supported.
+#[cfg(target_os = "android")]
+const EPOLLRDHUP: libc::c_int = 0x00002000;
+#[cfg(target_os = "android")]
+const EPOLLONESHOT: libc::c_int = 0x40000000;
 
 use {convert, io, Ready, PollOpt, Token};
 use event::Event;

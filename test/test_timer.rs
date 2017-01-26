@@ -272,7 +272,6 @@ fn test_cancel_timeout() {
         let elapsed = Instant::now() - now;
 
         poll.poll(&mut events, Some(dur - elapsed)).unwrap();
-        println!("Poll returned {} events; {:?}", events.len(), events.get(0));
 
         while let Some(_) = timer.poll() {
             panic!("did not expect to receive timeout");
