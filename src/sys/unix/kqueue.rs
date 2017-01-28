@@ -1,5 +1,6 @@
-use std::{cmp, fmt};
+use std::{cmp, fmt, ptr};
 use std::cell::RefCell;
+use std::os::raw::c_int;
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -70,16 +71,18 @@ impl Selector {
     pub fn register(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        self.ev_register(fd,
-                         token.into(),
-                         libc::EVFILT_READ,
-                         interests.contains(Ready::readable()),
-                         opts);
-        self.ev_register(fd,
-                         token.into(),
-                         libc::EVFILT_WRITE,
-                         interests.contains(Ready::writable()),
-                         opts);
+        if interests.contains(Ready::readable()) {
+            self.ev_register(fd,
+                             token.into(),
+                             libc::EVFILT_READ,
+                             opts);
+        }
+        if interests.contains(Ready::writable()) {
+            self.ev_register(fd,
+                             token.into(),
+                             libc::EVFILT_WRITE,
+                             opts);
+        }
 
         self.flush_changes()
     }
@@ -101,15 +104,8 @@ impl Selector {
                    fd: RawFd,
                    token: usize,
                    filter: i16,
-                   enable: bool,
                    opts: PollOpt) {
         let mut flags = libc::EV_ADD;
-
-        if enable {
-            flags = flags | libc::EV_ENABLE;
-        } else {
-            flags = flags | libc::EV_DISABLE;
-        }
 
         if opts.contains(PollOpt::edge()) {
             flags = flags | libc::EV_CLEAR;
