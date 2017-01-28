@@ -12,9 +12,8 @@
 //!
 //! # Usage
 //!
-//! Using mio starts by creating an [EventLoop](struct.EventLoop.html), which
-//! handles receiving events from the OS and dispatching them to a supplied
-//! [Handler](handler/trait.Handler.html).
+//! Using mio starts by creating an [Poll](struct.Poll.html), which reads events from the OS and
+//! put them into [Events](struct.Events.html). You can handle IO events from the OS with it.
 //!
 //! # Example
 //!
