@@ -1,5 +1,4 @@
 use std::{cmp, fmt, ptr};
-use std::cell::RefCell;
 use std::os::raw::c_int;
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
@@ -20,10 +19,22 @@ use sys::unix::io::set_cloexec;
 /// operation will return with an error. This matches windows behavior.
 static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
+macro_rules! kevent {
+    ($id: expr, $filter: expr, $flags: expr, $data: expr) => {
+        libc::kevent {
+            ident: $id as ::libc::uintptr_t,
+            filter: $filter,
+            flags: $flags,
+            fflags: 0,
+            data: 0,
+            udata: $data as *mut _,
+        }
+    }
+}
+
 pub struct Selector {
     id: usize,
     kq: RawFd,
-    changes: RefCell<KeventList>,
 }
 
 impl Selector {
@@ -36,7 +47,6 @@ impl Selector {
         Ok(Selector {
             id: id,
             kq: kq,
-            changes: RefCell::new(KeventList(Vec::new())),
         })
     }
 
@@ -51,19 +61,17 @@ impl Selector {
                 tv_nsec: to.subsec_nanos() as libc::c_long,
             }
         });
-        let timeout = timeout.as_ref().map(|s| s as *const _).unwrap_or(0 as *const _);
+        let timeout = timeout.as_ref().map(|s| s as *const _).unwrap_or(ptr::null_mut());
 
         unsafe {
             let cnt = try!(cvt(libc::kevent(self.kq,
-                                            0 as *const _,
+                                            ptr::null(),
                                             0,
                                             evts.sys_events.0.as_mut_ptr(),
-                                            evts.sys_events.0.capacity() as i32,
+            // FIXME: needs a saturating cast here.
+                                            evts.sys_events.0.capacity() as c_int,
                                             timeout)));
-
-            self.changes.borrow_mut().0.clear();
             evts.sys_events.0.set_len(cnt as usize);
-
             Ok(evts.coalesce(awakener))
         }
     }
@@ -71,20 +79,32 @@ impl Selector {
     pub fn register(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        if interests.contains(Ready::readable()) {
-            self.ev_register(fd,
-                             token.into(),
-                             libc::EVFILT_READ,
-                             opts);
-        }
-        if interests.contains(Ready::writable()) {
-            self.ev_register(fd,
-                             token.into(),
-                             libc::EVFILT_WRITE,
-                             opts);
-        }
+        let flags = if opts.contains(PollOpt::edge()) { libc::EV_CLEAR } else { 0 } |
+                    if opts.contains(PollOpt::oneshot()) { libc::EV_ONESHOT } else { 0 } |
+                    libc::EV_RECEIPT;
 
-        self.flush_changes()
+        unsafe {
+            let r = if interests.contains(Ready::readable()) { libc::EV_ADD } else { libc::EV_DELETE };
+            let w = if interests.contains(Ready::writable()) { libc::EV_ADD } else { libc::EV_DELETE };
+            let mut changes = [
+                kevent!(fd, libc::EVFILT_READ, flags | r, usize::from(token)),
+                kevent!(fd, libc::EVFILT_WRITE, flags | w, usize::from(token)),
+            ];
+            try!(cvt(libc::kevent(self.kq, changes.as_ptr(), changes.len() as c_int,
+                                           changes.as_mut_ptr(), changes.len() as c_int,
+                                           ::std::ptr::null())));
+            for change in changes.iter() {
+                debug_assert_eq!(change.flags & libc::EV_ERROR, libc::EV_ERROR);
+                if change.data != 0 {
+                    // there’s some error, but we want to ignore ENOENT error for EV_DELETE
+                    let orig_flags = if change.filter == libc::EVFILT_READ { r } else { w };
+                    if !(change.data as i32 == libc::ENOENT && orig_flags & libc::EV_DELETE != 0) {
+                        return Err(::std::io::Error::from_raw_os_error(change.data as i32));
+                    }
+                }
+            }
+            Ok(())
+        }
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
@@ -94,55 +114,26 @@ impl Selector {
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        self.ev_push(fd, 0, libc::EVFILT_READ, libc::EV_DELETE);
-        self.ev_push(fd, 0, libc::EVFILT_WRITE, libc::EV_DELETE);
-
-        self.flush_changes()
-    }
-
-    fn ev_register(&self,
-                   fd: RawFd,
-                   token: usize,
-                   filter: i16,
-                   opts: PollOpt) {
-        let mut flags = libc::EV_ADD;
-
-        if opts.contains(PollOpt::edge()) {
-            flags = flags | libc::EV_CLEAR;
-        }
-
-        if opts.contains(PollOpt::oneshot()) {
-            flags = flags | libc::EV_ONESHOT;
-        }
-
-        self.ev_push(fd, token, filter, flags);
-    }
-
-    fn ev_push(&self,
-               fd: RawFd,
-               token: usize,
-               filter: i16,
-               flags: u16) {
-        self.changes.borrow_mut().0.push(libc::kevent {
-            ident: fd as ::libc::uintptr_t,
-            filter: filter,
-            flags: flags,
-            fflags: 0,
-            data: 0,
-            udata: token as *mut _,
-        });
-    }
-
-    fn flush_changes(&self) -> io::Result<()> {
         unsafe {
-            let mut changes = self.changes.borrow_mut();
-            try!(cvt(libc::kevent(self.kq,
-                                  changes.0.as_mut_ptr() as *const _,
-                                  changes.0.len() as i32,
-                                  0 as *mut _,
-                                  0,
-                                  0 as *const _)));
-            changes.0.clear();
+            // EV_RECEIPT is a nice way to apply changes and get back per-event results while not
+            // draining the actual changes.
+            let filter = libc::EV_DELETE | libc::EV_RECEIPT;
+            let mut changes = [
+                kevent!(fd, libc::EVFILT_READ, filter, ptr::null_mut()),
+                kevent!(fd, libc::EVFILT_WRITE, filter, ptr::null_mut()),
+            ];
+            try!(cvt(libc::kevent(self.kq, changes.as_ptr(), changes.len() as c_int,
+                                           changes.as_mut_ptr(), changes.len() as c_int,
+                                           ::std::ptr::null())).map(|_| ()));
+            if changes[0].data as i32 == libc::ENOENT && changes[1].data as i32 == libc::ENOENT {
+                return Err(::std::io::Error::from_raw_os_error(changes[0].data as i32));
+            }
+            for change in changes.iter() {
+                debug_assert_eq!(libc::EV_ERROR & change.flags, libc::EV_ERROR);
+                if change.data != 0 && change.data as i32 != libc::ENOENT {
+                    return Err(::std::io::Error::from_raw_os_error(changes[0].data as i32));
+                }
+            }
             Ok(())
         }
     }
@@ -153,7 +144,6 @@ impl fmt::Debug for Selector {
         fmt.debug_struct("Selector")
             .field("id", &self.id)
             .field("kq", &self.kq)
-            .field("changes", &self.changes.borrow().0.len())
             .finish()
     }
 }
@@ -258,4 +248,26 @@ impl fmt::Debug for Events {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Events {{ len: {} }}", self.sys_events.0.len())
     }
+}
+
+#[test]
+fn does_not_register_rw() {
+    use ::deprecated::{EventLoopBuilder, Handler};
+    use ::unix::EventedFd;
+    struct Nop;
+    impl Handler for Nop {
+        type Timeout = ();
+        type Message = ();
+    }
+
+
+    // registering kqueue fd will fail if write is requested
+    let kq = unsafe { libc::kqueue() };
+    let kqf = EventedFd(&kq);
+    let mut evtloop = EventLoopBuilder::new().build::<Nop>().expect("evt loop builds");
+    evtloop.register(&kqf, Token(1234), Ready::readable() | Ready::writable(),
+                     PollOpt::edge() | PollOpt::oneshot()).unwrap_err();
+    evtloop.deregister(&kqf).unwrap();
+    evtloop.register(&kqf, Token(1234), Ready::readable(),
+                     PollOpt::edge() | PollOpt::oneshot()).unwrap();
 }
