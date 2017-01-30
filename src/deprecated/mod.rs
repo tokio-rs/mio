@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 mod event_loop;
 mod io;
 mod handler;

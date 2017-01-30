@@ -12,7 +12,6 @@ use net::tcp::Shutdown;
 use winapi::*;
 
 use {Evented, Ready, Poll, PollOpt, Token, IoVec};
-use io::would_block;
 use poll;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
@@ -759,4 +758,12 @@ impl Drop for TcpListener {
             }
         }
     }
+}
+
+// TODO: Use std's allocation free io::Error
+const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK as i32;
+
+/// Returns a std `WouldBlock` error without allocating
+pub fn would_block() -> ::std::io::Error {
+    ::std::io::Error::from_raw_os_error(WOULDBLOCK)
 }

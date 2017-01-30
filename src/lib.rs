@@ -104,10 +104,19 @@ mod poll;
 mod sys;
 mod token;
 
+#[deprecated(since = "0.6.5", note = "use mio-more instead")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
 pub mod channel;
+
+#[deprecated(since = "0.6.5", note = "use mio-more instead")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
 pub mod timer;
 
-/// EventLoop and other deprecated types
+#[deprecated(since = "0.6.5", note = "update to use `Poll`")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
 pub mod deprecated;
 
 pub use event::{
@@ -115,10 +124,7 @@ pub use event::{
     Ready,
     Event,
 };
-pub use io::{
-    Evented,
-    would_block,
-};
+pub use io::Evented;
 pub use iovec::IoVec;
 pub use net::{
     tcp,
@@ -134,6 +140,11 @@ pub use poll::{
 pub use token::{
     Token,
 };
+
+#[deprecated(since = "0.6.5", note = "std::io::Error can avoid the allocation now")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
+pub use io::deprecated::would_block;
 
 #[cfg(unix)]
 pub mod unix {
@@ -200,7 +211,7 @@ pub mod windows {
     pub use sys::{Overlapped, Binding};
 }
 
-// Conversion utilities
+#[cfg(feature = "with-deprecated")]
 mod convert {
     use std::time::Duration;
 

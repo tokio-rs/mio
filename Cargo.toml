@@ -18,6 +18,10 @@ exclude       = [
   "test/**/*",
 ]
 
+[features]
+with-deprecated = []
+default = ["with-deprecated"]
+
 [dependencies]
 lazycell = "0.4.0"
 log      = "0.3.1"

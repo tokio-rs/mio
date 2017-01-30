@@ -1,9 +1,9 @@
 pub use self::pipe::Awakener;
 
-/// Default *nix awakener implementation
+/// Default awakener backed by a pipe
 mod pipe {
+    use sys::unix;
     use {io, Evented, Ready, Poll, PollOpt, Token};
-    use deprecated::unix::{self, PipeReader, PipeWriter};
     use std::io::{Read, Write};
 
     /*
@@ -13,8 +13,8 @@ mod pipe {
      */
 
     pub struct Awakener {
-        reader: PipeReader,
-        writer: PipeWriter,
+        reader: unix::Io,
+        writer: unix::Io,
     }
 
     impl Awakener {
@@ -52,7 +52,7 @@ mod pipe {
             }
         }
 
-        fn reader(&self) -> &PipeReader {
+        fn reader(&self) -> &unix::Io {
             &self.reader
         }
     }

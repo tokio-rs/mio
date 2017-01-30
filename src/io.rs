@@ -37,13 +37,16 @@ impl<T> MapNonBlock<T> for Result<T> {
     }
 }
 
-#[cfg(unix)]
-const WOULDBLOCK: i32 = ::libc::EAGAIN;
+#[cfg(feature = "with-deprecated")]
+pub mod deprecated {
+    #[cfg(unix)]
+    const WOULDBLOCK: i32 = ::libc::EAGAIN;
 
-#[cfg(windows)]
-const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK as i32;
+    #[cfg(windows)]
+    const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK as i32;
 
-/// Returns a std `WouldBlock` error without allocating
-pub fn would_block() -> ::std::io::Error {
-    ::std::io::Error::from_raw_os_error(WOULDBLOCK)
+    /// Returns a std `WouldBlock` error without allocating
+    pub fn would_block() -> ::std::io::Error {
+        ::std::io::Error::from_raw_os_error(WOULDBLOCK)
+    }
 }

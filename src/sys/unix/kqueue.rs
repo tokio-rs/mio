@@ -257,6 +257,8 @@ impl fmt::Debug for Events {
 
 #[test]
 fn does_not_register_rw() {
+    #![allow(deprecated)]
+
     use ::deprecated::{EventLoopBuilder, Handler};
     use ::unix::EventedFd;
     struct Nop;
