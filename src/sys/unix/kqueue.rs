@@ -260,14 +260,11 @@ fn does_not_register_rw() {
         type Message = ();
     }
 
-
-    // registering kqueue fd will fail if write is requested
+    // registering kqueue fd will fail if write is requested (On anything but some versions of OS
+    // X)
     let kq = unsafe { libc::kqueue() };
     let kqf = EventedFd(&kq);
     let mut evtloop = EventLoopBuilder::new().build::<Nop>().expect("evt loop builds");
-    evtloop.register(&kqf, Token(1234), Ready::readable() | Ready::writable(),
-                     PollOpt::edge() | PollOpt::oneshot()).unwrap_err();
-    evtloop.deregister(&kqf).unwrap();
     evtloop.register(&kqf, Token(1234), Ready::readable(),
                      PollOpt::edge() | PollOpt::oneshot()).unwrap();
 }
