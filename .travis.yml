@@ -26,10 +26,13 @@ matrix:
     #
     # 1.9.0 is the oldest supported version of Rust. This value should NOT be
     # changed without prior discussion.
+    #
+    # This build also deploys docs
     - os: linux
       rust: 1.9.0
       script:
         - cargo test
+        - cargo doc --no-deps
       install:
 
     # Test on latest stable
