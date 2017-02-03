@@ -172,12 +172,6 @@ impl Ready {
         Ready(0x008)
     }
 
-    // Private
-    #[inline]
-    fn drop() -> Ready {
-        Ready(0x10)
-    }
-
     #[inline]
     pub fn all() -> Ready {
         Ready::readable() |
@@ -188,7 +182,7 @@ impl Ready {
 
     #[inline]
     pub fn is_none(&self) -> bool {
-        (*self & !Ready::drop()) == Ready::none()
+        *self == Ready::none()
     }
 
     #[inline]
@@ -284,8 +278,7 @@ impl fmt::Debug for Ready {
             (Ready::readable(), "Readable"),
             (Ready::writable(), "Writable"),
             (Ready::error(),    "Error"),
-            (Ready::hup(),      "Hup"),
-            (Ready::drop(),     "Drop")];
+            (Ready::hup(),      "Hup")];
 
         try!(write!(fmt, "Ready {{"));
 
@@ -354,14 +347,6 @@ pub fn from_usize(events: usize) -> Ready {
 /// set.
 pub fn is_empty(events: Ready) -> bool {
     events.0 == 0
-}
-
-pub fn is_drop(events: Ready) -> bool {
-    events.contains(Ready::drop())
-}
-
-pub fn drop() -> Ready {
-    Ready::drop()
 }
 
 // Used internally to mutate an `Event` in place
