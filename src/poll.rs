@@ -5,7 +5,7 @@ use std::cell::{UnsafeCell, Cell};
 use std::isize;
 use std::marker;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 const MAX_REFCOUNT: usize = (isize::MAX) as usize;
@@ -98,16 +98,14 @@ struct ReadinessQueueInner {
     head_all_nodes: Option<Box<ReadinessNode>>,
 
     // linked list of nodes that are pending some processing
-    head_readiness: AtomicPtr<ReadinessNode>,
-
-    // A fake readiness node used to indicate that `Poll::poll` will block.
-    sleep_token: Box<ReadinessNode>,
+    head_readiness: AtomicUsize,
 }
 
 struct ReadyList {
-    head: ReadyRef,
+    head: ReadyLink,
 }
 
+#[derive(Eq, PartialEq)]
 struct ReadyRef {
     ptr: *mut ReadinessNode,
 }
@@ -130,13 +128,12 @@ struct ReadinessNode {
     //
     // Used when the node is queued in the readiness linked list. Accessing
     // this field requires winning the "queue" lock
-    next_readiness: ReadyRef,
+    next_readiness: ReadyLink,
 
     // The set of events to include in the notification on next poll
     events: AtomicUsize,
 
-    // Tracks if the node is queued for readiness using the MSB, the
-    // rest of the usize is the readiness delay.
+    // Tracks if the node is queued for readiness using the MSB
     queued: AtomicUsize,
 
     // Tracks the number of `ReadyRef` pointers
@@ -154,7 +151,15 @@ struct RegistrationData {
     opts: PollOpt,
 }
 
+#[derive(Eq, PartialEq)]
+enum ReadyLink {
+    Node(ReadyRef, bool),
+    Sleep,
+    Empty,
+}
+
 const NODE_QUEUED_FLAG: usize = 1;
+const NODE_DROPPED_FLAG: usize = 2;
 
 const AWAKEN: Token = Token(usize::MAX);
 
@@ -432,7 +437,7 @@ impl RegistrationInner {
             // the node was dequeued in `poll` and then has the interest
             // changed, which means that the "newest" readiness value is
             // already known by the current thread.
-            let needs_wakeup = self.queue_for_processing();
+            let needs_wakeup = self.queue_for_processing(false);
             debug_assert!(!needs_wakeup, "something funky is going on");
         }
 
@@ -462,7 +467,7 @@ impl RegistrationInner {
             return Ok(());
         }
 
-        if self.queue_for_processing() {
+        if self.queue_for_processing(false) {
             try!(self.queue.wakeup());
         }
 
@@ -470,18 +475,36 @@ impl RegistrationInner {
     }
 
     /// Returns true if `Poll` needs to be woken up
-    fn queue_for_processing(&self) -> bool {
-        // `Release` ensures that the `events` mutation is visible if this
-        // mutation is visible.
-        //
-        // `Acquire` ensures that a change to `head_readiness` made in the
-        // poll thread is visible if `queued` has been reset to zero.
-        let prev = self.node().queued.compare_and_swap(0, NODE_QUEUED_FLAG, Ordering::AcqRel);
+    fn queue_for_processing(&self, drop: bool) -> bool {
+        let mut curr = self.node().queued.load(Ordering::Acquire);
+
+        loop {
+            let next = if curr == 0 {
+                NODE_QUEUED_FLAG
+            } else if drop {
+                NODE_QUEUED_FLAG | NODE_DROPPED_FLAG
+            } else {
+                return false;
+            };
+
+            // `Release` ensures that the `events` mutation is visible if this
+            // mutation is visible.
+            //
+            // `Acquire` ensures that a change to `head_readiness` made in the
+            // poll thread is visible if `queued` has been reset to zero.
+            let actual = self.node().queued.compare_and_swap(curr, next, Ordering::AcqRel);
+
+            if actual == curr {
+                break;
+            }
+
+            curr = actual;
+        }
 
         // If the queued flag was not initially set, then the current thread
         // is assigned the responsibility of enqueuing the node for processing.
-        if prev == 0 {
-            self.queue.prepend_readiness_node(self.node.clone())
+        if curr == 0 {
+            self.queue.prepend_readiness_node(self.node.clone(), drop)
         } else {
             false
         }
@@ -553,7 +576,7 @@ impl Drop for RegistrationInner {
 
         // Signal to the queue that the node is not referenced anymore and can
         // be released / reused
-        let _ = self.set_readiness(event::drop());
+        self.queue_for_processing(true);
     }
 }
 
@@ -565,16 +588,11 @@ impl Drop for RegistrationInner {
 
 impl ReadinessQueue {
     fn new() -> io::Result<ReadinessQueue> {
-        let sleep_token = Box::new(ReadinessNode::new(Token(0), Ready::none(), PollOpt::empty(), 0));
-
         Ok(ReadinessQueue {
             inner: Arc::new(UnsafeCell::new(ReadinessQueueInner {
                 awakener: try!(sys::Awakener::new()),
                 head_all_nodes: None,
-                head_readiness: AtomicPtr::new(ptr::null_mut()),
-                // Arguments here don't matter, the node is only used for the
-                // pointer value.
-                sleep_token: sleep_token,
+                head_readiness: AtomicUsize::new(ReadyLink::Empty.as_usize()),
             }))
         })
     }
@@ -583,7 +601,7 @@ impl ReadinessQueue {
         let ready = self.take_ready();
 
         // TODO: Cap number of nodes processed
-        for node in ready {
+        for (node, mut drop) in ready {
             let mut events;
             let opts;
 
@@ -610,10 +628,11 @@ impl ReadinessQueue {
                     //
                     // If the drop flag is set though, the node is never queued
                     // again.
-                    if event::is_drop(events) {
+                    if drop || queued & NODE_DROPPED_FLAG == NODE_DROPPED_FLAG {
                         // dropped nodes are always processed immediately. There is
                         // also no need to unset the queued bit as the node should
                         // not change anymore.
+                        drop = true;
                         break;
                     } else if opts.is_edge() || event::is_empty(events) {
                         // An acquire barrier is set in order to re-read the
@@ -641,7 +660,7 @@ impl ReadinessQueue {
                         // requires a single CAS. Also, `Relaxed` ordering would be
                         // OK here as the prepend only needs to be visible by the
                         // current thread.
-                        let needs_wakeup = self.prepend_readiness_node(node.clone());
+                        let needs_wakeup = self.prepend_readiness_node(node.clone(), false);
                         debug_assert!(!needs_wakeup, "something funky is going on");
                         break;
                     }
@@ -649,8 +668,7 @@ impl ReadinessQueue {
             }
 
             // Process the node.
-            if event::is_drop(events) {
-                // Release the node
+            if drop {
                 let _ = self.unlink_node(node);
             } else if !events.is_none() {
                 let node_ref = node.as_ref().unwrap();
@@ -676,23 +694,22 @@ impl ReadinessQueue {
     // Attempts to state to sleeping. This involves changing `head_readiness`
     // to `sleep_token`. Returns true if `poll` can sleep.
     fn prepare_for_sleep(&self) -> bool {
+        let expect = ReadyLink::Empty.as_usize();
         // Use relaxed as no memory besides the pointer is being sent across
         // threads. Ordering doesn't matter, only the current value of
         // `head_readiness`.
-        ptr::null_mut() == self.inner().head_readiness
-            .compare_and_swap(ptr::null_mut(), self.sleep_token(), Ordering::Relaxed)
+        expect == self.inner().head_readiness
+            .compare_and_swap(expect, ReadyLink::Sleep.as_usize(), Ordering::Relaxed)
     }
 
     fn take_ready(&self) -> ReadyList {
         // Use `Acquire` ordering to ensure being able to read the latest
         // values of all other atomic mutations.
-        let mut head = self.inner().head_readiness.swap(ptr::null_mut(), Ordering::Acquire);
+        let head = self.inner().head_readiness
+            .swap(ReadyLink::Empty.as_usize(), Ordering::Acquire)
+            .into();
 
-        if head == self.sleep_token() {
-            head = ptr::null_mut();
-        }
-
-        ReadyList { head: ReadyRef::new(head) }
+        ReadyList { head: head }
     }
 
     fn new_readiness_node(&self, token: Token, interest: Ready, opts: PollOpt, ref_count: usize) -> ReadyRef {
@@ -714,26 +731,29 @@ impl ReadinessQueue {
 
     /// Prepend the given node to the head of the readiness queue. This is done
     /// with relaxed ordering. Returns true if `Poll` needs to be woken up.
-    fn prepend_readiness_node(&self, mut node: ReadyRef) -> bool {
+    fn prepend_readiness_node(&self, mut node: ReadyRef, drop: bool) -> bool {
         let mut curr_head = self.inner().head_readiness.load(Ordering::Relaxed);
 
         loop {
-            let node_next = if curr_head == self.sleep_token() {
-                ptr::null_mut()
-            } else {
-                curr_head
+            let node_next = match curr_head.into() {
+                ReadyLink::Sleep => ReadyLink::Empty,
+                other => other,
             };
 
             // Update next pointer
-            node.as_mut().unwrap().next_readiness = ReadyRef::new(node_next);
+            node.as_mut().unwrap().next_readiness = node_next;
 
             // Update the ref, use release ordering to ensure that mutations to
             // previous atomics are visible if the mutation to the head pointer
             // is.
-            let next_head = self.inner().head_readiness.compare_and_swap(curr_head, node.ptr, Ordering::Release);
+            let next_head = self.inner().head_readiness
+                .compare_and_swap(
+                    curr_head,
+                    ReadyLink::Node(node.clone(), drop).as_usize(),
+                    Ordering::Release);
 
             if curr_head == next_head {
-                return curr_head == self.sleep_token();
+                return curr_head == ReadyLink::Sleep.as_usize();
             }
 
             curr_head = next_head;
@@ -745,11 +765,7 @@ impl ReadinessQueue {
     }
 
     fn is_empty(&self) -> bool {
-        self.inner().head_readiness.load(Ordering::Relaxed).is_null()
-    }
-
-    fn sleep_token(&self) -> *mut ReadinessNode {
-        &*self.inner().sleep_token as *const ReadinessNode as *mut ReadinessNode
+        self.inner().head_readiness.load(Ordering::Relaxed) == ReadyLink::Empty.as_usize()
     }
 
     fn identical(&self, other: &ReadinessQueue) -> bool {
@@ -773,7 +789,7 @@ impl ReadinessNode {
             next_all_nodes: None,
             prev_all_nodes: ReadyRef::none(),
             registration_data: UnsafeCell::new(RegistrationData::new(token, interest, opts)),
-            next_readiness: ReadyRef::none(),
+            next_readiness: ReadyLink::Empty,
             events: AtomicUsize::new(0),
             queued: AtomicUsize::new(0),
             ref_count: AtomicUsize::new(ref_count),
@@ -781,7 +797,7 @@ impl ReadinessNode {
     }
 
     fn poll_events(&self) -> Ready {
-        (self.interest() | event::drop()) & event::from_usize(self.events.load(Ordering::Relaxed))
+        self.interest() & event::from_usize(self.events.load(Ordering::Relaxed))
     }
 
     fn token(&self) -> Token {
@@ -844,14 +860,17 @@ impl RegistrationData {
 }
 
 impl Iterator for ReadyList {
-    type Item = ReadyRef;
+    type Item = (ReadyRef, bool);
 
-    fn next(&mut self) -> Option<ReadyRef> {
-        let mut next = self.head.take();
+    fn next(&mut self) -> Option<(ReadyRef, bool)> {
+        let (mut next, drop) = match self.head.take() {
+            ReadyLink::Node(n, drop) => (n, drop),
+            _ => (ReadyRef::none(), false),
+        };
 
         if next.is_some() {
             next.as_mut().map(|n| self.head = n.next_readiness.take());
-            Some(next)
+            Some((next, drop))
         } else {
             None
         }
@@ -909,6 +928,42 @@ impl fmt::Pointer for ReadyRef {
         match self.as_ref() {
             Some(r) => fmt::Pointer::fmt(&r, fmt),
             None => fmt::Pointer::fmt(&ptr::null::<ReadinessNode>(), fmt),
+        }
+    }
+}
+
+const DROP_MASK: usize = 1;
+
+impl ReadyLink {
+    fn take(&mut self) -> ReadyLink {
+        mem::replace(self, ReadyLink::Empty)
+    }
+
+    fn as_usize(&self) -> usize {
+        match *self {
+            ReadyLink::Empty => 0,
+            ReadyLink::Sleep => 1,
+            ReadyLink::Node(ref ptr, drop) => {
+                let mut val = ptr.ptr as usize;
+                if drop {
+                    val |= DROP_MASK
+                }
+                val
+            }
+        }
+    }
+}
+
+impl From<usize> for ReadyLink {
+    fn from(val: usize) -> ReadyLink {
+        if val == 0 {
+            ReadyLink::Empty
+        } else if val == 1 {
+            ReadyLink::Sleep
+        } else {
+            let ptr = val &(!DROP_MASK);
+            let drop = val & DROP_MASK == DROP_MASK;
+            ReadyLink::Node(ReadyRef::new(ptr as *mut ReadinessNode), drop)
         }
     }
 }
