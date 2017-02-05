@@ -182,6 +182,11 @@ impl Events {
     }
 
     #[inline]
+    pub fn capacity(&self) -> usize {
+        self.events.capacity()
+    }
+
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }

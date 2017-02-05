@@ -10,6 +10,7 @@ extern crate tempdir;
 
 pub use ports::localhost;
 
+mod test_custom_evented;
 mod test_close_on_drop;
 mod test_double_register;
 mod test_echo_server;
