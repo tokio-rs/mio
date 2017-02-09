@@ -9,6 +9,8 @@ use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
 
+use net2::{self, TcpStreamExt};
+
 use {TryRead, TryWrite};
 use mio::{Token, Ready, PollOpt, Poll, Events, IoVec};
 use mio::deprecated::{EventLoop, Handler};
@@ -442,4 +444,75 @@ fn multiple_writes_immediate_success() {
     }
 
     t.join().unwrap();
+}
+
+#[test]
+fn connection_reset_by_peer() {
+    let poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(16);
+    let mut buf = [0u8; 16];
+
+    // Create listener
+    let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = l.local_addr().unwrap();
+
+    // Connect client
+    let client = net2::TcpBuilder::new_v4().unwrap()
+        .to_tcp_stream().unwrap();
+
+    client.set_linger(Some(Duration::from_millis(0))).unwrap();
+    client.connect(&addr).unwrap();
+
+    // Convert to Mio stream
+    let client = TcpStream::from_stream(client).unwrap();
+
+    // Register server
+    poll.register(&l, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+
+    // Register interest in the client
+    poll.register(&client, Token(1), Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
+
+    // Wait for listener to be ready
+    let mut server;
+    'outer:
+    loop {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            if event.token() == Token(0) {
+                match l.accept() {
+                    Ok((sock, _)) => {
+                        server = sock;
+                        break 'outer;
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                    Err(e) => panic!("unexpected error {:?}", e),
+                }
+            }
+        }
+    }
+
+    // Close the connection
+    drop(client);
+
+    // Wait a moment
+    thread::sleep(Duration::from_millis(100));
+
+    // Register interest in the server socket
+    poll.register(&server, Token(3), Ready::readable(), PollOpt::edge()).unwrap();
+
+
+    loop {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            if event.token() == Token(3) {
+                assert!(event.kind().is_readable());
+
+                server.read(&mut buf).unwrap_err();
+                return;
+            }
+        }
+    }
+
 }
