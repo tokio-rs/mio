@@ -93,16 +93,7 @@ if [ "$QEMU" != "" ]; then
   exec grep "^PASSED .* tests" $CARGO_TARGET_DIR/out.log
 fi
 
-case "$TARGET" in
-  *-apple-ios)
-    cargo rustc --test test --target $TARGET -- \
-        -C link-args=-mios-simulator-version-min=7.0
-    ;;
-
-  *)
-    cargo build --test test --target $TARGET
-    ;;
-esac
+cargo build --test test --target $TARGET
 
 # Find the file to run
 TEST_FILE="$(find target/$TARGET/debug -maxdepth 1 -type f -name test-* | head -1)"
@@ -115,16 +106,6 @@ case "$TARGET" in
     adb push $TEST_FILE /data/mio-test
     adb shell /data/mio-test 2>&1 | tee /tmp/out
     grep "^test result.* 0 failed" /tmp/out
-    ;;
-
-  i386-apple-ios)
-    rustc -O ./ci/ios/deploy_and_run_on_ios_simulator.rs
-    ./deploy_and_run_on_ios_simulator $TEST_FILE
-    ;;
-
-  x86_64-apple-ios)
-    rustc -O ./ci/ios/deploy_and_run_on_ios_simulator.rs
-    ./deploy_and_run_on_ios_simulator $TEST_FILE
     ;;
 
   arm-unknown-linux-gnueabihf)

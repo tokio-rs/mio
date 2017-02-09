@@ -123,9 +123,6 @@ fn run_app_on_simulator() {
                     .arg("com.rust.unittests")
                     .arg("--color")
                     .arg("never")
-                    .arg("--test-threads")
-                    .arg("1")
-                    .arg("--nocapture")
                     .output());
 
     println!("stdout --\n{}\n", String::from_utf8_lossy(&output.stdout));
