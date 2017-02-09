@@ -112,7 +112,7 @@ impl SubprocessClient {
                         self.input_offset += r;
                     }
                 },
-                Err(e) => {
+                Err(_) => {
                     ok = false;
                 },
             }
@@ -137,7 +137,7 @@ impl Handler for SubprocessClient {
     type Message = ();
 
     fn ready(&mut self, event_loop: &mut EventLoop<SubprocessClient>, token: Token,
-             events: Ready) {
+             _: Ready) {
         if token == self.stderr_token {
             let _x = self.readable_stderr(event_loop);
         } else {
@@ -223,7 +223,7 @@ pub fn subprocess_communicate(mut process : Child, input : &[u8]) -> (Vec<u8>, V
 
     // Start the event loop
     event_loop.run(&mut subprocess).unwrap();
-    let res = process.wait();
+    let _ = process.wait();
 
     let ret_stdout = mem::replace(&mut subprocess.output, Vec::<u8>::new());
     let ret_stderr = mem::replace(&mut subprocess.output_stderr, Vec::<u8>::new());

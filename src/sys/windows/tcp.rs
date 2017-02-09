@@ -5,7 +5,6 @@ use std::net::{self, SocketAddr};
 use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 
-use miow;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};

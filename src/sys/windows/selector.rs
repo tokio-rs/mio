@@ -1,4 +1,4 @@
-use std::{cmp, io, u32};
+use std::{io, u32};
 use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
@@ -7,7 +7,6 @@ use std::time::Duration;
 
 use lazycell::AtomicLazyCell;
 
-use convert;
 use winapi::*;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
