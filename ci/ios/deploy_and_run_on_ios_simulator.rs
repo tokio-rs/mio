@@ -20,8 +20,8 @@ use std::env;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
-use std::process;
-use std::process::Command;
+use std::thread;
+use std::process::{self, Command, Stdio};
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -114,8 +114,10 @@ fn install_app_to_simulator() {
 
 // Step four: Run the app
 fn run_app_on_simulator() {
+    use std::io::{self, Read, Write};
+
     println!("Running app");
-    let output = t!(Command::new("xcrun")
+    let mut child = t!(Command::new("xcrun")
                     .arg("simctl")
                     .arg("launch")
                     .arg("--console")
@@ -123,12 +125,39 @@ fn run_app_on_simulator() {
                     .arg("com.rust.unittests")
                     .arg("--color")
                     .arg("never")
-                    .output());
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn());
 
-    println!("stdout --\n{}\n", String::from_utf8_lossy(&output.stdout));
-    println!("stderr --\n{}\n", String::from_utf8_lossy(&output.stderr));
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let th = thread::spawn(move || {
+        let mut out = vec![];
+
+        for b in stdout.bytes() {
+            let b = b.unwrap();
+            out.push(b);
+            let out = [b];
+            io::stdout().write(&out[..]).unwrap();
+        }
+
+        out
+    });
+
+    thread::spawn(move || {
+        for b in stderr.bytes() {
+            let out = [b.unwrap()];
+            io::stderr().write(&out[..]).unwrap();
+        }
+    });
+
+    println!("Waiting for cmd to finish");
+    child.wait().unwrap();
+
+    println!("Waiting for stdout");
+    let stdout = th.join().unwrap();
+    let stdout = String::from_utf8_lossy(&stdout);
     let passed = stdout.lines()
                        .find(|l| l.contains("test result"))
                        .map(|l| l.contains(" 0 failed"))
