@@ -538,13 +538,34 @@ impl fmt::Debug for PollOpt {
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Ready(usize);
 
-const READABLE: usize = 0b0001;
-const WRITABLE: usize = 0b0010;
-const ERROR: usize    = 0b0100;
-const HUP: usize      = 0b1000;
-const READY_ALL: usize = READABLE | WRITABLE | ERROR | HUP;
+const READABLE: usize = 0b00001;
+const WRITABLE: usize = 0b00010;
+const ERROR: usize    = 0b00100;
+const HUP: usize      = 0b01000;
+const AIO: usize      = 0b10000;
+const READY_ALL: usize = READABLE | WRITABLE | ERROR | HUP | AIO;
 
 impl Ready {
+    /// Returns a `Ready` representing AIO completion readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::aio();
+    ///
+    /// assert!(ready.is_aio());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    #[inline]
+    pub fn aio() -> Ready {
+        Ready(AIO)
+    }
+
     /// Returns the empty `Ready` set.
     ///
     /// See [`Poll`] for more documentation on polling.
@@ -673,6 +694,24 @@ impl Ready {
     pub fn all() -> Ready {
         Ready::readable() |
             Ready::writable()
+    }
+
+    /// Returns true if `Ready` contains AIO readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::aio();
+    ///
+    /// assert!(ready.is_aio());
+    /// ```
+    #[inline]
+    pub fn is_aio(&self) -> bool {
+        self.contains(Ready::aio())
     }
 
     /// Returns true if `Ready` is the empty set
@@ -936,7 +975,8 @@ impl fmt::Debug for Ready {
             (Ready::readable(), "Readable"),
             (Ready::writable(), "Writable"),
             (Ready(ERROR), "Error"),
-            (Ready(HUP), "Hup")];
+            (Ready(HUP), "Hup"),
+            (Ready::aio(), "AIO")];
 
         try!(write!(fmt, "Ready {{"));
 

@@ -1,4 +1,5 @@
 #![allow(deprecated)]
+use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::time::Duration;
@@ -171,6 +172,12 @@ fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
     }
 
     kind as u32
+}
+
+impl AsRawFd for Selector {
+    fn as_raw_fd(&self) -> RawFd {
+        self.epfd
+    }
 }
 
 impl Drop for Selector {
