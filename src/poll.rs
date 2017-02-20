@@ -4,7 +4,7 @@ use std::{fmt, io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::{ops, isize};
 use std::sync::{Arc, Mutex, Condvar};
-use std::sync::atomic::{self, AtomicUsize, AtomicPtr, AtomicBool};
+use std::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool};
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed, SeqCst};
 use std::time::{Duration, Instant};
 
@@ -1289,7 +1289,7 @@ fn release_node(ptr: *mut ReadinessNode) {
         // Because `fetch_sub` is already atomic, we do not need to synchronize
         // with other threads unless we are going to delete the object. This
         // same logic applies to the below `fetch_sub` to the `weak` count.
-        if (*ptr).ref_count.fetch_sub(1, Release) != 1 {
+        if (*ptr).ref_count.fetch_sub(1, AcqRel) != 1 {
             return;
         }
 
@@ -1310,7 +1310,7 @@ fn release_node(ptr: *mut ReadinessNode) {
         // > "acquire" operation before deleting the object.
         //
         // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
-        atomic::fence(Acquire);
+        // atomic::fence(Acquire);
 
         let _ = Box::from_raw(ptr);
     }
