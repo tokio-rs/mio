@@ -367,9 +367,12 @@ impl TcpListener {
 
     /// Accepts a new `TcpStream`.
     ///
-    /// Returns a `Ok(None)` when the socket `WOULDBLOCK`, this means the stream
-    /// will be ready at a later point. If an accepted stream is returned, the
-    /// address of the peer is returned along with it
+    /// This may return an `Err(e)` where `e.kind()` is
+    /// `io::ErrorKind::WouldBlock`. This means a stream may be ready at a
+    /// later point and one may wait for a new event to call `accept` again.
+    ///
+    /// If an accepted stream is returned, the remote address of the peer is
+    /// returned along with it.
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         self.sys.accept().map(|(s, a)| {
             let stream = TcpStream {
