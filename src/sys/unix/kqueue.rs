@@ -8,7 +8,7 @@ use std::time::Duration;
 use libc::{self, time_t};
 
 use {io, Ready, PollOpt, Token};
-use event::{self, Event};
+use event_imp::{self as event, Event};
 use sys::unix::cvt;
 use sys::unix::io::set_cloexec;
 
@@ -216,7 +216,7 @@ impl Events {
 
             if idx == len {
                 // New entry, insert the default
-                self.events.push(Event::new(Ready::none(), token));
+                self.events.push(Event::new(Ready::empty(), token));
 
             }
 

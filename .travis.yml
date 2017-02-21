@@ -10,6 +10,7 @@ install:
 
 script:
   - cargo build
+  - cargo build --no-default-features
   - if [[ $TRAVIS_OS_NAME = "linux" ]]; then
       sh ci/run-docker.sh $TARGET;
     else

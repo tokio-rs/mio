@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::time::Duration;
@@ -18,7 +19,7 @@ const EPOLLRDHUP: libc::c_int = 0x00002000;
 const EPOLLONESHOT: libc::c_int = 0x40000000;
 
 use {io, Ready, PollOpt, Token};
-use event::Event;
+use event_imp::Event;
 use sys::unix::cvt;
 use sys::unix::io::set_cloexec;
 
@@ -210,7 +211,7 @@ impl Events {
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|event| {
             let epoll = event.events as c_int;
-            let mut kind = Ready::none();
+            let mut kind = Ready::empty();
 
             if (epoll & EPOLLIN) != 0 || (epoll & EPOLLPRI) != 0 {
                 kind = kind | Ready::readable();
@@ -237,7 +238,7 @@ impl Events {
 
     pub fn push_event(&mut self, event: Event) {
         self.events.push(libc::epoll_event {
-            events: ioevent_to_epoll(event.kind(), PollOpt::empty()),
+            events: ioevent_to_epoll(event.readiness(), PollOpt::empty()),
             u64: usize::from(event.token()) as u64
         });
     }

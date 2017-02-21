@@ -11,8 +11,8 @@ use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
 use net::tcp::Shutdown;
 use winapi::*;
 
-use {Evented, Ready, Poll, PollOpt, Token, IoVec};
-use poll;
+use {poll, Ready, Poll, PollOpt, Token, IoVec};
+use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
 use sys::windows::{wouldblock, Family};
