@@ -1,5 +1,5 @@
 use {sys, Evented, Token};
-use event::{self, Ready, Event, PollOpt};
+use event_imp::{self as event, Ready, Event, PollOpt};
 use std::{fmt, io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::{ops, isize};
@@ -61,14 +61,19 @@ use std::time::{Duration, Instant};
 /// Polls for readiness events on all registered values.
 ///
 /// The `Poll` type acts as an interface allowing a program to wait on a set of
-/// IO handles until one or more become "ready" to be operated on. An IO handle
-/// is considered ready to operate on when the given operation can complete
-/// without blocking.
+/// evented types until one or more become "ready" to be operated on. An evented
+/// type is considered ready to operate on when the given operation can complete
+/// without blocking. Using `Poll` enables handling a large number of evented
+/// types on a single thread without blocking.
 ///
-/// To use `Poll`, an IO handle must first be registered with the `Poll`
-/// instance using the `register()` handle. An `Ready` representing the
-/// program's interest in the socket is specified as well as an arbitrary
-/// `Token` which is used to identify the IO handle in the future.
+/// To use `Poll`, an evented type must first be registered with the `Poll`
+/// instance using the [`register`] method and supplying readiness interest. The
+/// readiness interest tells `Poll` which specific operations on the handle to
+/// monitor for readiness. All platforms supported by Mio can watch for read and
+/// write interest. A `Token` is also passed to the [`register`] function. When
+/// `Poll` provides a readiness event, it will include this token with the
+/// event. This associates the event with the `Evented` handle that the
+/// readiness event is representing.
 ///
 /// ## Edge-triggered and level-triggered
 ///
@@ -99,6 +104,8 @@ use std::time::{Duration, Instant};
 /// // Wait for the socket to become ready
 /// poll.poll(&mut events, None).unwrap();
 /// ```
+///
+/// [`register`]: #method.register
 pub struct Poll {
     // Platform specific IO selector
     selector: sys::Selector,
@@ -556,7 +563,7 @@ pub struct Events {
 }
 
 /// Iterate an Events structure
-pub struct EventsIter<'a> {
+pub struct Iter<'a> {
     inner: &'a Events,
     pos: usize,
 }
@@ -591,8 +598,8 @@ impl Events {
         self.inner.is_empty()
     }
 
-    pub fn iter(&self) -> EventsIter {
-        EventsIter {
+    pub fn iter(&self) -> Iter {
+        Iter {
             inner: self,
             pos: 0
         }
@@ -601,14 +608,14 @@ impl Events {
 
 impl<'a> IntoIterator for &'a Events {
     type Item = Event;
-    type IntoIter = EventsIter<'a>;
+    type IntoIter = Iter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> Iterator for EventsIter<'a> {
+impl<'a> Iterator for Iter<'a> {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {

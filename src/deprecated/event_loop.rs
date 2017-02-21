@@ -1,6 +1,6 @@
 use {channel, Evented, Poll, Events, Token};
 use deprecated::{Handler, NotifyError};
-use event::{Event, Ready, PollOpt};
+use event_imp::{Event, Ready, PollOpt};
 use timer::{self, Timer, Timeout};
 use std::{io, fmt, usize};
 use std::default::Default;

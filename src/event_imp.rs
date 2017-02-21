@@ -31,6 +31,9 @@ impl PollOpt {
         PollOpt(0b1000)
     }
 
+    #[deprecated(since = "0.6.5", note = "removed")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn all() -> PollOpt {
         PollOpt::edge() | PollOpt::level() | PollOpt::oneshot()
@@ -56,6 +59,9 @@ impl PollOpt {
         self.contains(PollOpt::urgent())
     }
 
+    #[deprecated(since = "0.6.5", note = "removed")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn bits(&self) -> usize {
         self.0
@@ -82,7 +88,7 @@ impl ops::BitOr for PollOpt {
 
     #[inline]
     fn bitor(self, other: PollOpt) -> PollOpt {
-        PollOpt(self.bits() | other.bits())
+        PollOpt(self.0 | other.0)
     }
 }
 
@@ -91,7 +97,7 @@ impl ops::BitXor for PollOpt {
 
     #[inline]
     fn bitxor(self, other: PollOpt) -> PollOpt {
-        PollOpt(self.bits() ^ other.bits())
+        PollOpt(self.0 ^ other.0)
     }
 }
 
@@ -100,7 +106,7 @@ impl ops::BitAnd for PollOpt {
 
     #[inline]
     fn bitand(self, other: PollOpt) -> PollOpt {
-        PollOpt(self.bits() & other.bits())
+        PollOpt(self.0 & other.0)
     }
 }
 
@@ -109,7 +115,7 @@ impl ops::Sub for PollOpt {
 
     #[inline]
     fn sub(self, other: PollOpt) -> PollOpt {
-        PollOpt(self.bits() & !other.bits())
+        PollOpt(self.0 & !other.0)
     }
 }
 
@@ -118,7 +124,7 @@ impl ops::Not for PollOpt {
 
     #[inline]
     fn not(self) -> PollOpt {
-        PollOpt(!self.bits() & PollOpt::all().bits())
+        PollOpt(!self.0)
     }
 }
 
@@ -147,6 +153,23 @@ impl fmt::Debug for PollOpt {
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Ready(usize);
 
+const READABLE: usize = 0b0001;
+const WRITABLE: usize = 0b0010;
+const ERROR: usize    = 0b0100;
+const HUP: usize      = 0b1000;
+const READY_ALL: usize = READABLE | WRITABLE | ERROR | HUP;
+
+pub trait ReadyUnix {
+    fn error() -> Self;
+
+    fn hup() -> Self;
+
+    fn is_error(&self) -> bool;
+
+    #[inline]
+    fn is_hup(&self) -> bool;
+}
+
 impl Ready {
     pub fn none() -> Ready {
         Ready(0)
@@ -154,30 +177,34 @@ impl Ready {
 
     #[inline]
     pub fn readable() -> Ready {
-        Ready(0b0001)
+        Ready(READABLE)
     }
 
     #[inline]
     pub fn writable() -> Ready {
-        Ready(0b0010)
+        Ready(WRITABLE)
     }
 
+    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn error() -> Ready {
-        Ready(0b0100)
+        Ready(ERROR)
     }
 
+    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn hup() -> Ready {
-        Ready(0b1000)
+        Ready(HUP)
     }
 
     #[inline]
     pub fn all() -> Ready {
         Ready::readable() |
-            Ready::writable() |
-            Ready::hup() |
-            Ready::error()
+            Ready::writable()
     }
 
     #[inline]
@@ -200,14 +227,20 @@ impl Ready {
         self.contains(Ready::writable())
     }
 
+    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn is_error(&self) -> bool {
-        self.contains(Ready::error())
+        self.contains(Ready(ERROR))
     }
 
+    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn is_hup(&self) -> bool {
-        self.contains(Ready::hup())
+        self.contains(Ready(HUP))
     }
 
     #[inline]
@@ -220,6 +253,9 @@ impl Ready {
         self.0 &= !other.0;
     }
 
+    #[deprecated(since = "0.6.5", note = "removed")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn bits(&self) -> usize {
         self.0
@@ -231,12 +267,34 @@ impl Ready {
     }
 }
 
+impl ReadyUnix for Ready {
+    #[inline]
+    fn error() -> Self {
+        Ready(ERROR)
+    }
+
+    #[inline]
+    fn hup() -> Self {
+        Ready(HUP)
+    }
+
+    #[inline]
+    fn is_error(&self) -> bool {
+        self.contains(Ready(ERROR))
+    }
+
+    #[inline]
+    fn is_hup(&self) -> bool {
+        self.contains(Ready(HUP))
+    }
+}
+
 impl ops::BitOr for Ready {
     type Output = Ready;
 
     #[inline]
     fn bitor(self, other: Ready) -> Ready {
-        Ready(self.bits() | other.bits())
+        Ready(self.0 | other.0)
     }
 }
 
@@ -245,7 +303,7 @@ impl ops::BitXor for Ready {
 
     #[inline]
     fn bitxor(self, other: Ready) -> Ready {
-        Ready(self.bits() ^ other.bits())
+        Ready(self.0 ^ other.0)
     }
 }
 
@@ -254,7 +312,7 @@ impl ops::BitAnd for Ready {
 
     #[inline]
     fn bitand(self, other: Ready) -> Ready {
-        Ready(self.bits() & other.bits())
+        Ready(self.0 & other.0)
     }
 }
 
@@ -263,7 +321,7 @@ impl ops::Sub for Ready {
 
     #[inline]
     fn sub(self, other: Ready) -> Ready {
-        Ready(self.bits() & !other.bits())
+        Ready(self.0 & !other.0)
     }
 }
 
@@ -272,7 +330,7 @@ impl ops::Not for Ready {
 
     #[inline]
     fn not(self) -> Ready {
-        Ready(!self.bits() & Ready::all().bits())
+        Ready(!self.0 & READY_ALL)
     }
 }
 
@@ -282,8 +340,8 @@ impl fmt::Debug for Ready {
         let flags = [
             (Ready::readable(), "Readable"),
             (Ready::writable(), "Writable"),
-            (Ready::error(),    "Error"),
-            (Ready::hup(),      "Hup")];
+            (Ready(ERROR), "Error"),
+            (Ready(HUP), "Hup")];
 
         try!(write!(fmt, "Ready {{"));
 
@@ -325,6 +383,13 @@ impl Event {
         }
     }
 
+    pub fn readiness(&self) -> Ready {
+        self.kind
+    }
+
+    #[deprecated(since = "0.6.5", note = "use Event::readiness()")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     pub fn kind(&self) -> Ready {
         self.kind
     }

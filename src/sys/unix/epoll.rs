@@ -18,7 +18,7 @@ const EPOLLRDHUP: libc::c_int = 0x00002000;
 const EPOLLONESHOT: libc::c_int = 0x40000000;
 
 use {io, Ready, PollOpt, Token};
-use event::Event;
+use event_imp::Event;
 use sys::unix::cvt;
 use sys::unix::io::set_cloexec;
 
