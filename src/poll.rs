@@ -9,10 +9,10 @@ use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed, SeqCs
 use std::time::{Duration, Instant};
 
 // Poll is backed by two readiness queues. The first is a system readiness queue
-// represented by `sys::Selector`. The system readiness queue handles
-// notifications provided by the system, such as TCP and UDP. The second
-// readiness queue is implemented in user space by `ReadinessQueue`. It provides
-// a way to implement purely userspace `Evented` types.
+// represented by `sys::Selector`. The system readiness queue handles events
+// provided by the system, such as TCP and UDP. The second readiness queue is
+// implemented in user space by `ReadinessQueue`. It provides a way to implement
+// purely userspace `Evented` types.
 //
 // `ReadinessQueue` is is backed by a MPSC queue that supports reuse of linked
 // list nodes. This significantly reduces the number of required allocations.
@@ -60,52 +60,204 @@ use std::time::{Duration, Instant};
 
 /// Polls for readiness events on all registered values.
 ///
-/// The `Poll` type acts as an interface allowing a program to wait on a set of
-/// evented types until one or more become "ready" to be operated on. An evented
-/// type is considered ready to operate on when the given operation can complete
-/// without blocking. Using `Poll` enables handling a large number of evented
-/// types on a single thread without blocking.
+/// `Poll` allows a program to monitor a large number of `Evented` types,
+/// waiting until one or more become "ready" for some class of operations; e.g.
+/// reading and writing. An `Evented` type is considered ready if it is possible
+/// to immediately perform a corresponding operation; e.g. [`read`] or
+/// [`write`].
 ///
-/// To use `Poll`, an evented type must first be registered with the `Poll`
-/// instance using the [`register`] method and supplying readiness interest. The
+/// To use `Poll`, an `Evented` type must first be registered with the `Poll`
+/// instance using the [`register`] method, supplying readiness interest. The
 /// readiness interest tells `Poll` which specific operations on the handle to
-/// monitor for readiness. All platforms supported by Mio can watch for read and
-/// write interest. A `Token` is also passed to the [`register`] function. When
-/// `Poll` provides a readiness event, it will include this token with the
-/// event. This associates the event with the `Evented` handle that the
-/// readiness event is representing.
+/// monitor for readiness. A `Token` is also passed to the [`register`]
+/// function. When `Poll` returns a readiness event, it will include this token.
+/// This associates the event with the `Evented` handle that generated the
+/// event.
 ///
-/// ## Edge-triggered and level-triggered
+/// [`read`]: tcp/struct.TcpStream.html#method.read
+/// [`write`]: tcp/struct.TcpStream.html#method.write
+/// [`register`]: #method.register
 ///
-/// An IO handle registration may request edge-triggered notifications or
-/// level-triggered notifications. This is done by specifying the `PollOpt`
-/// argument to `register()` and `reregister()`.
+/// # Examples
 ///
-/// ## Portability
+/// A basic example -- establishing a `TcpStream` connection.
 ///
-/// Cross platform portability is provided for Mio's TCP & UDP implementations.
+/// ```
+/// use mio::{Events, Poll, Ready, PollOpt, Token};
+/// use mio::tcp::TcpStream;
 ///
-/// ## Examples
+/// use std::net::{TcpListener, SocketAddr};
 ///
-/// ```no_run
-/// use mio::*;
-/// use mio::tcp::*;
+/// // Bind a server socket to connect to.
+/// let addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
+/// let server = TcpListener::bind(&addr).unwrap();
 ///
 /// // Construct a new `Poll` handle as well as the `Events` we'll store into
 /// let poll = Poll::new().unwrap();
 /// let mut events = Events::with_capacity(1024);
 ///
 /// // Connect the stream
-/// let stream = TcpStream::connect(&"173.194.33.80:80".parse().unwrap()).unwrap();
+/// let stream = TcpStream::connect(&server.local_addr().unwrap()).unwrap();
 ///
 /// // Register the stream with `Poll`
 /// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge()).unwrap();
 ///
-/// // Wait for the socket to become ready
-/// poll.poll(&mut events, None).unwrap();
+/// // Wait for the socket to become ready. This has to happens in a loop to
+/// // handle spurious wakeups.
+/// loop {
+///     poll.poll(&mut events, None).unwrap();
+///
+///     for event in &events {
+///         if event.token() == Token(0) && event.readiness().is_writable() {
+///             // The socket connected (probably, it could still be a spurious
+///             // wakeup)
+///             return;
+///         }
+///     }
+/// }
 /// ```
 ///
-/// [`register`]: #method.register
+/// # Edge-triggered and level-triggered
+///
+/// An [`Evented`] registration may request edge-triggered events or
+/// level-triggered events. This is done by setting `register`'s
+/// [`PollOpt`] argument to either [`edge`] or [`level`].
+///
+/// The difference between the two can be described as follows. Supposed that
+/// this scenario happens:
+///
+/// 1. A [`TcpStream`] is registered with `Poll`.
+/// 2. The socket receives 2kb of data.
+/// 3. A call to [`Poll::poll`] returns the token associated with the socket
+///    indicating readable readiness.
+/// 4. 1kb is read from the socket.
+/// 5. Another call to [`Poll::poll`] is made.
+///
+/// If when the socket was registered with `Poll`, edge triggered events were
+/// requested, then the call to [`Poll::poll`] done in step **5** will
+/// (probably) hang despite there being another 1kb still present in the socket
+/// read buffer. The reason for this is that edge-triggered mode delivers events
+/// only when changes occur on the monitored [`Evented`]. So, in step *5* the
+/// caller might end up waiting for some data that is already present inside the
+/// socket buffer.
+///
+/// With edge-triggered events, operations **must** be performed on the
+/// `Evented` type until [`WouldBlock`] is returned. In other words, after
+/// receiving an event indicating readiness for a certain operation, one should
+/// assume that [`Poll::poll`] may never return another event for the same token
+/// and readiness until the operation returns [`WouldBlock`].
+///
+/// By contrast, when level-triggered notfications was requested, each call to
+/// [`Poll::poll`] will return an event for the socket as long as data remains
+/// in the socket buffer. Generally, level-triggered events should be avoided if
+/// high performance is a concern.
+///
+/// Since even with edge-triggered events, multiple events can be generated upon
+/// receipt of multiple chunks of data, the caller has the option to set the
+/// [`oneshot`] flag. This tells `Poll` to disable the associated [`Evented`]
+/// after the event is returned from [`Poll::poll`]. The subsequent calls to
+/// [`Poll::poll`] will no longer include events for [`Evented`] handles that
+/// are disabled even if the readiness state changes. The handle can be
+/// re-enabled by calling [`reregster`].
+///
+/// [`PollOpt`]: struct.PollOpt.html
+/// [`edge`]: struct.PollOpt.html#method.edge
+/// [`level`]: struct.PollOpt.html#method.level
+/// [`Poll::poll`]: struct.Poll.html#method.poll
+/// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock
+/// [`Evented`]: event/trait.Evented.html
+/// [`TcpStream`]: tcp/struct.TcpStream.html
+/// [`reregister`]: #method.reregister
+///
+/// # Portability
+///
+/// Using `Poll` provides a portable interface across supported platforms as
+/// long as the caller takes the following into consideration:
+///
+/// ### Spurious events
+///
+/// `Poll::poll` may return readiness events even if the associated `Evented`
+/// handle is not actually ready. Given the same code, this may happen more on
+/// some platforms than others. It is important to never assume that, just
+/// because a readiness notification was received, that the associated operation
+/// will as well.
+///
+/// If operation fails with [`WouldBlock`], then the caller should not treat
+/// this as an error and wait until another readiness event is received.
+///
+/// ### Draining readiness
+///
+/// When using edge-triggered mode, once a readiness event is received, the
+/// corresponding operation must be performed repeatedly until it returns
+/// [`WouldBlock`]. Unless this is done, there is no guarantee that another
+/// readiness event will be delivered, even if further data is received for the
+/// `Evented` handle.
+///
+/// For example, in the 5 step scenario described above, after step 5, even if
+/// the socket receives more data there is no guarantee that another readiness
+/// event will be delivered.
+///
+/// ### Registering handles
+///
+/// Unless otherwise noted, it should be assumed that types implementing
+/// `Evented` will never be become ready unless they are registered with `Poll`.
+///
+/// For example:
+///
+/// ```
+/// use mio::{Poll, Ready, PollOpt, Token};
+/// use mio::tcp::TcpStream;
+/// use std::time::Duration;
+/// use std::thread;
+///
+/// let sock = TcpStream::connect(&"216.58.193.100:80".parse().unwrap()).unwrap();
+///
+/// thread::sleep(Duration::from_secs(1));
+///
+/// let poll = Poll::new().unwrap();
+///
+/// // The connect is not guaranteed to have started until it is registered at
+/// // this point
+/// poll.register(&sock, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+/// ```
+///
+/// # Implementation notes
+///
+/// `Poll` is backed by the selector provided by the operating system.
+///
+/// |      OS    |  Selector |
+/// |------------|-----------|
+/// | Linux      | [epoll]   |
+/// | OS X, iOS  | [kqueue]  |
+/// | Windows    | [IOCP]    |
+/// | FreeBSD    | [kqueue]  |
+/// | Android    | [epoll]   |
+///
+/// On all supported platforms, socket operations are handled by using the
+/// system selector. Platform specific extensions (e.g. [`EventedFd`]) allow
+/// accessing other features provided by individual system selectors. For
+/// example, Linux's [`signalfd`] feature can be used by registering the FD with
+/// `Poll` via [`EventedFd`].
+///
+/// On all platforms except windows, a call to [`Poll::poll`] is mostly just a
+/// direct call to the system selector. However, [IOCP] uses a completion model
+/// instead of a readiness model. In this case, `Poll` must adapt the completion
+/// model Mio's API. While non-trivial, the bridge layer is still quite
+/// efficient. The most expensive part being calls to `read` and `write` require
+/// data to be copied into an intermediate buffer before it is passed to the
+/// kernel.
+///
+/// Notifications generated by [`SetReadiness`] are handled by an internal
+/// readiness queue. A single call to [`Poll::poll`] will collect events from
+/// both from the system selector and the internal readiness queue.
+///
+/// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
+/// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
+/// [IOCP]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365198(v=vs.85).aspx
+/// [`signalfd`]: http://man7.org/linux/man-pages/man2/signalfd.2.html
+/// [`EventedFd`]: unix/struct.EventedFd.html
+/// [`SetReadiness`]: struct.SetReadiness.html
+/// [`Poll::poll`]: struct.Poll.html#method.poll
 pub struct Poll {
     // Platform specific IO selector
     selector: sys::Selector,
