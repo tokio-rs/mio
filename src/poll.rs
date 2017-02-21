@@ -1,5 +1,5 @@
-use {sys, Evented, Token};
-use event_imp::{self as event, Ready, Event, PollOpt};
+use {sys, Token};
+use event_imp::{self as event, Ready, Event, Evented, PollOpt};
 use std::{fmt, io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::{ops, isize};

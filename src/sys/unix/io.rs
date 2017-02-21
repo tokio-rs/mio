@@ -4,7 +4,8 @@ use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 
 use libc;
 
-use {io, Evented, Ready, Poll, PollOpt, Token};
+use {io, Ready, Poll, PollOpt, Token};
+use event::Evented;
 use unix::EventedFd;
 use sys::unix::cvt;
 

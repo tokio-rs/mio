@@ -137,8 +137,7 @@ pub use token::Token;
 
 pub mod event {
     pub use super::poll::{Events, Iter};
-    pub use super::event_imp::{Event};
-    pub use super::io::Evented;
+    pub use super::event_imp::{Event, Evented};
 }
 
 pub use event::{

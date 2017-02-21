@@ -6,7 +6,8 @@ use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
 use libc;
 use net2::TcpStreamExt;
 
-use {io, Evented, Ready, Poll, PollOpt, Token, IoVec};
+use {io, Ready, Poll, PollOpt, Token, IoVec};
+use event::Evented;
 
 use sys::unix::eventedfd::EventedFd;
 use sys::unix::io::set_nonblock;

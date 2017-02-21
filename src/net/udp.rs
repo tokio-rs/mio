@@ -1,6 +1,7 @@
 //! Primitives for working with UDP
 
-use {io, sys, Evented, Ready, Poll, PollOpt, Token};
+use {io, sys, Ready, Poll, PollOpt, Token};
+use event::Evented;
 use super::SelectorId;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 

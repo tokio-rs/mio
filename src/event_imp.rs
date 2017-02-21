@@ -1,5 +1,14 @@
-use token::Token;
-use std::{fmt, ops};
+use {Poll, Token};
+use std::{fmt, io, ops};
+
+/// A value that may be registered with `Poll`
+pub trait Evented {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>;
+
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>;
+
+    fn deregister(&self, poll: &Poll) -> io::Result<()>;
+}
 
 /// Configures readiness polling behavior for a given `Evented` value.
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]

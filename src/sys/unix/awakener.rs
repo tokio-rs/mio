@@ -3,7 +3,8 @@ pub use self::pipe::Awakener;
 /// Default awakener backed by a pipe
 mod pipe {
     use sys::unix;
-    use {io, Evented, Ready, Poll, PollOpt, Token};
+    use {io, Ready, Poll, PollOpt, Token};
+    use event::Evented;
     use std::io::{Read, Write};
 
     /*
