@@ -158,7 +158,29 @@ use std::time::{Duration, Instant};
 /// after the event is returned from [`Poll::poll`]. The subsequent calls to
 /// [`Poll::poll`] will no longer include events for [`Evented`] handles that
 /// are disabled even if the readiness state changes. The handle can be
-/// re-enabled by calling [`reregster`].
+/// re-enabled by calling [`reregister`]. When handles are disabled, internal
+/// resources used to monitor the handle are maintained until the handle is
+/// dropped or deregistered. This makes re-registering the handle a fast
+/// operation.
+///
+/// For example, in the following scenario:
+///
+/// 1. A [`TcpStream`] is registered with `Poll`.
+/// 2. The socket receives 2kb of data.
+/// 3. A call to [`Poll::poll`] returns the token associated with the socket
+///    indicating readable readiness.
+/// 4. 2kb is read from the socket.
+/// 5. Another call to read is issued and [`WouldBlock`] is returned
+/// 6. The socket receives another 2kb of data.
+/// 7. Another call to [`Poll::poll`] is made.
+///
+/// Assuming the socket was registered with `Poll` with the [`edge`] and
+/// [`oneshot`] options, then the call to [`Poll::poll`] in step 7 would block. This
+/// is because, [`oneshot`] tells `Poll` to disable events for the socket after
+/// returning an event.
+///
+/// In order to receive the event for the data received in step 6, the socket
+/// would need to be reregistered using [`reregister`].
 ///
 /// [`PollOpt`]: struct.PollOpt.html
 /// [`edge`]: struct.PollOpt.html#method.edge
@@ -168,6 +190,7 @@ use std::time::{Duration, Instant};
 /// [`Evented`]: event/trait.Evented.html
 /// [`TcpStream`]: tcp/struct.TcpStream.html
 /// [`reregister`]: #method.reregister
+/// [`oneshot`]: struct.PollOpt.html#method.oneshot
 ///
 /// # Portability
 ///
@@ -193,7 +216,7 @@ use std::time::{Duration, Instant};
 /// readiness event will be delivered, even if further data is received for the
 /// `Evented` handle.
 ///
-/// For example, in the 5 step scenario described above, after step 5, even if
+/// For example, in the first scenario described above, after step 5, even if
 /// the socket receives more data there is no guarantee that another readiness
 /// event will be delivered.
 ///
@@ -436,7 +459,35 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
  */
 
 impl Poll {
-    /// Return a new `Poll` handle using a default configuration.
+    /// Return a new `Poll` handle.
+    ///
+    /// This function will make a syscall to the operating system to create the
+    /// system selector. If this syscall fails, `Poll::new` will return with the
+    /// error.
+    ///
+    /// See [struct] level docs for more details.
+    ///
+    /// [struct]: struct.Poll.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Poll, Events};
+    /// use std::time::Duration;
+    ///
+    /// let poll = match Poll::new() {
+    ///     Ok(poll) => poll,
+    ///     Err(e) => panic!("failed to create Poll instance; err={:?}", e),
+    /// };
+    ///
+    /// // Create a structure to receive polled events
+    /// let mut events = Events::with_capacity(1024);
+    ///
+    /// // Wait for events, but none will be received because no `Evented`
+    /// // handles have been registered with this `Poll` instance.
+    /// let n = poll.poll(&mut events, Some(Duration::from_millis(500))).unwrap();
+    /// assert_eq!(n, 0);
+    /// ```
     pub fn new() -> io::Result<Poll> {
         is_send::<Poll>();
         is_sync::<Poll>();
@@ -456,7 +507,98 @@ impl Poll {
     }
 
     /// Register an `Evented` handle with the `Poll` instance.
-    pub fn register<E: ?Sized>(&self, io: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
+    ///
+    /// Once registerd, the `Poll` instance will monitor the `Evented` handle
+    /// for readiness state changes. When it notices a state change, it will
+    /// return a readiness event for the handle the next time [`poll`] is
+    /// called.
+    ///
+    /// See the [`struct`] docs for a high level overview.
+    ///
+    /// # Arguments
+    ///
+    /// `handle: &E: Evented`: This is the handle that the `Poll` instance
+    /// should monitor for readiness state changes.
+    ///
+    /// `token: Token`: The caller picks a token to associate with the socket.
+    /// When [`poll`] returns an event for the handle, this token is included.
+    /// This allows the caller to map the event to its handle. The token
+    /// associated with the `Evented` handle can be changed at any time by
+    /// calling [`reregister`].
+    ///
+    /// `interest: Ready`: Specifies which operations `Poll` should monitor for
+    /// readiness. `Poll` will only return readiness events for operations
+    /// specified by this argument.
+    ///
+    /// If a socket is registered with [`readable`] interest and the socket
+    /// becomes writable, no event will be returned from [`poll`].
+    ///
+    /// The readiness interest for an `Evented` handle can be changed at any
+    /// time by calling [`reregister`].
+    ///
+    /// `opts: PollOpt`: Specifies the registration options. The most common
+    /// options being [`level`] for level-triggered events, [`edge`] for
+    /// edge-triggered events, and [`oneshot`].
+    ///
+    /// The registration options for an `Evented` handle can be changed at any
+    /// time by calling [`reregister`].
+    ///
+    /// # Notes
+    ///
+    /// Unless otherwise specified, the caller should assume that once an
+    /// `Evented` handle is registered with a `Poll` instance, it is bound to
+    /// that `Poll` instance for the lifetime of the `Evented` handle. This
+    /// remains true even if the `Evented` handle is deregistered from the poll
+    /// instance using [`deregister`].
+    ///
+    /// This function is **thread safe**. It can be called concurrently from
+    /// multiple threads.
+    ///
+    /// [`struct`]: #
+    /// [`reregister`]: #method.reregister
+    /// [`deregister`]: #method.deregister
+    /// [`poll`]: #method.poll
+    /// [`level`]: struct.PollOpt.html#method.level
+    /// [`edge`]: struct.PollOpt.html#method.edge
+    /// [`oneshot`]: struct.PollOpt.html#method.oneshot
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Events, Poll, Ready, PollOpt, Token};
+    /// use mio::tcp::TcpStream;
+    /// use std::time::{Duration, Instant};
+    ///
+    /// let poll = Poll::new().unwrap();
+    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse().unwrap()).unwrap();
+    ///
+    /// // Register the socket with `poll`
+    /// poll.register(&socket, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+    ///
+    /// let mut events = Events::with_capacity(1024);
+    /// let start = Instant::now();
+    /// let timeout = Duration::from_millis(500);
+    ///
+    /// loop {
+    ///     let elapsed = start.elapsed();
+    ///
+    ///     if elapsed >= timeout {
+    ///         // Connection timed out
+    ///         return;
+    ///     }
+    ///
+    ///     let remaining = timeout - elapsed;
+    ///     poll.poll(&mut events, Some(remaining)).unwrap();
+    ///
+    ///     for event in &events {
+    ///         if event.token() == Token(0) {
+    ///             // Something (probably) happened on the socket.
+    ///             return;
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn register<E: ?Sized>(&self, handle: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
         try!(validate_args(token, interest));
@@ -469,13 +611,54 @@ impl Poll {
         trace!("registering with poller");
 
         // Register interests for this socket
-        try!(io.register(self, token, interest, opts));
+        try!(handle.register(self, token, interest, opts));
 
         Ok(())
     }
 
     /// Re-register an `Evented` handle with the `Poll` instance.
-    pub fn reregister<E: ?Sized>(&self, io: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
+    ///
+    /// Re-registering an `Evented` handle allows changing the details of the
+    /// registration. Specifically, it allows updating the associated `token`,
+    /// interest`, and `opts` specified in previous `register` and `reregister`
+    /// calls.
+    ///
+    /// The `reregister` arguments fully override the previous values. In other
+    /// words, if a socket is registered with [`readable`] interest and the call
+    /// to `reregister` specifies [`writable`], then read interest is no longer
+    /// requested for the handle.
+    ///
+    /// The `Evented` handle must have previously been registered with this
+    /// instance of `Poll` otherwise the call to `reregister` will return with
+    /// an error.
+    ///
+    /// See the [`register`] documentation for details about the function
+    /// arguments and see the [`struct`] docs for a high level overview of
+    /// polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Poll, Ready, PollOpt, Token};
+    /// use mio::tcp::TcpStream;
+    ///
+    /// let poll = Poll::new().unwrap();
+    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse().unwrap()).unwrap();
+    ///
+    /// // Register the socket with `poll`, requesting readable
+    /// poll.register(&socket, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    ///
+    /// // Reregister the socket specifying a different token and write interest
+    /// // instead. `PollOpt::edge()` must be specified even though that value
+    /// // is not being changed.
+    /// poll.reregister(&socket, Token(2), Ready::writable(), PollOpt::edge()).unwrap();
+    /// ```
+    ///
+    /// [`struct`]: #
+    /// [`register`]: #method.register
+    /// [`readable`]: struct.Ready.html#method.readable
+    /// [`writable`]: struct.Ready.html#method.writable
+    pub fn reregister<E: ?Sized>(&self, handle: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
         try!(validate_args(token, interest));
@@ -483,19 +666,53 @@ impl Poll {
         trace!("registering with poller");
 
         // Register interests for this socket
-        try!(io.reregister(self, token, interest, opts));
+        try!(handle.reregister(self, token, interest, opts));
 
         Ok(())
     }
 
     /// Deregister an `Evented` handle with the `Poll` instance.
-    pub fn deregister<E: ?Sized>(&self, io: &E) -> io::Result<()>
+    ///
+    /// When an `Evented` handle is deregistered, the `Poll` instance will
+    /// no longer monitor it for readiness state changes. Unlike disabiling
+    /// handles with [`oneshot`], deregistering clears up any internal resources
+    /// needed to track the handle.
+    ///
+    /// A handle can be passed back to `register` after it has been
+    /// deregistered; however, it must be passed back to the **same** `Poll`
+    /// instance.
+    ///
+    /// `Evented` handles are automatically deregistered when they are dropped.
+    /// It is common to never need to explicitly call `deregister`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Events, Poll, Ready, PollOpt, Token};
+    /// use mio::tcp::TcpStream;
+    /// use std::time::Duration;
+    ///
+    /// let poll = Poll::new().unwrap();
+    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse().unwrap()).unwrap();
+    ///
+    /// // Register the socket with `poll`
+    /// poll.register(&socket, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    ///
+    /// poll.deregister(&socket).unwrap();
+    ///
+    /// let mut events = Events::with_capacity(1024);
+    ///
+    /// // Set a timeout because this poll should never receive any events.
+    /// let n = poll.poll(&mut events, Some(Duration::from_secs(1))).unwrap();
+    /// assert_eq!(0, n);
+    /// ```
+    pub fn deregister<E: ?Sized>(&self, handle: &E) -> io::Result<()>
         where E: Evented
     {
-        trace!("deregistering IO with poller");
+        trace!("deregistering handle with poller");
 
         // Deregister interests for this socket
-        try!(io.deregister(self));
+        try!(handle.deregister(self));
 
         Ok(())
     }
