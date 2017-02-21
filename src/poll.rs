@@ -717,8 +717,70 @@ impl Poll {
         Ok(())
     }
 
-    /// Block the current thread and wait until any `Evented` values registered
-    /// with the `Poll` instance are ready or the given timeout has elapsed.
+    /// Wait for readiness events
+    ///
+    /// Blocks the current thread and waits for readiness events for any of the
+    /// `Evented` handles that have been registered with this `Poll` instance.
+    /// The function will block until either at least one readiness event has
+    /// been received or `timeout` has elapsed. A `timeout` of `None` means that
+    /// `poll` will block until a readiness event has been received.
+    ///
+    /// The supplied `events` will be cleared and newly received readinss events
+    /// will be pushed onto the end. At most `events.capacity()` events will be
+    /// returned. If there are further pending readiness events, they will be
+    /// returned on the next call to `poll`.
+    ///
+    /// Note that the `timeout` will be rounded up to the system clock
+    /// granularity (usually 1ms), and kernel scheduling delays mean that
+    /// the blocking interval may be overrun by a small amount.
+    ///
+    /// `poll` returns the number of readiness events that have been pushed into
+    /// `events` or `Err` when an error has been encountered with the system
+    /// selector.
+    ///
+    /// See the [struct] level documentation for a higher level discussion of
+    /// polling.
+    ///
+    /// # Examples
+    ///
+    /// A basic example -- establishing a `TcpStream` connection.
+    ///
+    /// ```
+    /// use mio::{Events, Poll, Ready, PollOpt, Token};
+    /// use mio::tcp::TcpStream;
+    ///
+    /// use std::net::{TcpListener, SocketAddr};
+    ///
+    /// // Bind a server socket to connect to.
+    /// let addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
+    /// let server = TcpListener::bind(&addr).unwrap();
+    ///
+    /// // Construct a new `Poll` handle as well as the `Events` we'll store into
+    /// let poll = Poll::new().unwrap();
+    /// let mut events = Events::with_capacity(1024);
+    ///
+    /// // Connect the stream
+    /// let stream = TcpStream::connect(&server.local_addr().unwrap()).unwrap();
+    ///
+    /// // Register the stream with `Poll`
+    /// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+    ///
+    /// // Wait for the socket to become ready. This has to happens in a loop to
+    /// // handle spurious wakeups.
+    /// loop {
+    ///     poll.poll(&mut events, None).unwrap();
+    ///
+    ///     for event in &events {
+    ///         if event.token() == Token(0) && event.readiness().is_writable() {
+    ///             // The socket connected (probably, it could still be a spurious
+    ///             // wakeup)
+    ///             return;
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// [struct]: #
     pub fn poll(&self, events: &mut Events, mut timeout: Option<Duration>) -> io::Result<usize> {
         let zero = Some(Duration::from_millis(0));
 
