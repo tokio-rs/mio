@@ -162,9 +162,6 @@ pub use io::deprecated::would_block;
 #[cfg(unix)]
 pub mod unix {
     //! Unix only extensions
-
-    pub use event_imp::ReadyUnix as ReadyExt;
-
     pub use sys::{
         EventedFd,
     };

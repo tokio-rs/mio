@@ -549,17 +549,6 @@ const ERROR: usize    = 0b0100;
 const HUP: usize      = 0b1000;
 const READY_ALL: usize = READABLE | WRITABLE | ERROR | HUP;
 
-pub trait ReadyUnix {
-    fn error() -> Self;
-
-    fn hup() -> Self;
-
-    fn is_error(&self) -> bool;
-
-    #[inline]
-    fn is_hup(&self) -> bool;
-}
-
 impl Ready {
     /// Returns the empty `Ready` set.
     ///
@@ -627,23 +616,17 @@ impl Ready {
         Ready(WRITABLE)
     }
 
-    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
     #[inline]
     pub fn error() -> Ready {
         Ready(ERROR)
     }
 
-    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
     #[inline]
     pub fn hup() -> Ready {
         Ready(HUP)
     }
 
-    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
+    #[deprecated(since = "0.6.5", note = "removed")]
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     #[inline]
@@ -687,17 +670,11 @@ impl Ready {
         self.contains(Ready::writable())
     }
 
-    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
     #[inline]
     pub fn is_error(&self) -> bool {
         self.contains(Ready(ERROR))
     }
 
-    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
     #[inline]
     pub fn is_hup(&self) -> bool {
         self.contains(Ready(HUP))
@@ -724,28 +701,6 @@ impl Ready {
     #[inline]
     pub fn contains(&self, other: Ready) -> bool {
         (*self & other) == other
-    }
-}
-
-impl ReadyUnix for Ready {
-    #[inline]
-    fn error() -> Self {
-        Ready(ERROR)
-    }
-
-    #[inline]
-    fn hup() -> Self {
-        Ready(HUP)
-    }
-
-    #[inline]
-    fn is_error(&self) -> bool {
-        self.contains(Ready(ERROR))
-    }
-
-    #[inline]
-    fn is_hup(&self) -> bool {
-        self.contains(Ready(HUP))
     }
 }
 

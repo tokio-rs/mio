@@ -730,6 +730,13 @@ impl Poll {
     /// returned. If there are further pending readiness events, they will be
     /// returned on the next call to `poll`.
     ///
+    /// A single call to `poll` may result in multiple readiness events being
+    /// returned for a single `Evented` handle. For example, if a TCP socket
+    /// becomes both readable and writable, it may be possible for a single
+    /// readiness event to be returned with both [`readable`] and [`writable`]
+    /// readiness **OR** two separate events may be returned, one with
+    /// [`readable`] set and one with [`writable`] set.
+    ///
     /// Note that the `timeout` will be rounded up to the system clock
     /// granularity (usually 1ms), and kernel scheduling delays mean that
     /// the blocking interval may be overrun by a small amount.

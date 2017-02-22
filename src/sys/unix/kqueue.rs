@@ -8,7 +8,6 @@ use std::time::Duration;
 use libc::{self, time_t};
 
 use {io, Ready, PollOpt, Token};
-use unix::ReadyExt;
 use event_imp::{self as event, Event};
 use sys::unix::cvt;
 use sys::unix::io::set_cloexec;
@@ -222,7 +221,7 @@ impl Events {
             }
 
             if e.flags & libc::EV_ERROR != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(ReadyExt::error());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::error());
             }
 
             if e.filter == libc::EVFILT_READ {
@@ -232,12 +231,12 @@ impl Events {
             }
 
             if e.flags & libc::EV_EOF != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(ReadyExt::hup());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
                 if e.fflags != 0 {
-                    event::kind_mut(&mut self.events[idx]).insert(ReadyExt::error());
+                    event::kind_mut(&mut self.events[idx]).insert(Ready::error());
                 }
             }
         }
