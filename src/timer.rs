@@ -282,7 +282,7 @@ impl<T> Timer<T> {
         // No more timeouts to poll
         if let Some(inner) = self.inner.borrow() {
             trace!("unsetting readiness");
-            let _ = inner.set_readiness.set_readiness(Ready::none());
+            let _ = inner.set_readiness.set_readiness(Ready::empty());
 
             if let Some(tick) = self.next_tick() {
                 self.schedule_readiness(tick);

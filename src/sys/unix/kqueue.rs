@@ -217,7 +217,7 @@ impl Events {
 
             if idx == len {
                 // New entry, insert the default
-                self.events.push(Event::new(Ready::none(), token));
+                self.events.push(Event::new(Ready::empty(), token));
 
             }
 

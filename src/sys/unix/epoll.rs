@@ -211,7 +211,7 @@ impl Events {
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|event| {
             let epoll = event.events as c_int;
-            let mut kind = Ready::none();
+            let mut kind = Ready::empty();
 
             if (epoll & EPOLLIN) != 0 || (epoll & EPOLLPRI) != 0 {
                 kind = kind | Ready::readable();

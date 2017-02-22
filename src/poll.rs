@@ -1124,7 +1124,7 @@ impl Registration {
     /// `deregister` does not guarantee to establish any memory ordering. Any
     /// concurrent data access must be synchronized using another strategy.
     pub fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner.update(poll, Token(0), Ready::none(), PollOpt::empty())
+        self.inner.update(poll, Token(0), Ready::empty(), PollOpt::empty())
     }
 }
 
@@ -1197,7 +1197,7 @@ impl RegistrationInner {
 
             // If the readiness is not blank, try to obtain permission to
             // push the node into the readiness queue.
-            if next.effective_readiness().is_some() {
+            if !next.effective_readiness().is_empty() {
                 next.set_queued();
             }
 
@@ -1297,7 +1297,7 @@ impl RegistrationInner {
             // conservative for now and always fire.
             //
             // See https://github.com/carllerche/mio/issues/535.
-            if next.effective_readiness().is_some() {
+            if !next.effective_readiness().is_empty() {
                 next.set_queued();
             }
 
@@ -1462,10 +1462,10 @@ impl ReadinessQueue {
                     // Mark the node as dequeued
                     next.set_dequeued();
 
-                    if opt.is_oneshot() && readiness.is_some() {
+                    if opt.is_oneshot() && !readiness.is_empty() {
                         next.disarm();
                     }
-                } else if readiness.is_none() {
+                } else if readiness.is_empty() {
                     next.set_dequeued();
                 }
 
@@ -1498,7 +1498,7 @@ impl ReadinessQueue {
                 self.inner.enqueue_node(node);
             }
 
-            if readiness.is_some() {
+            if !readiness.is_empty() {
                 // Get the token
                 let token = unsafe { token(node, next.token_read_pos()) };
 
@@ -1702,7 +1702,7 @@ impl ReadinessNode {
 
     fn marker() -> ReadinessNode {
         ReadinessNode {
-            state: AtomicState::new(Ready::none(), PollOpt::empty()),
+            state: AtomicState::new(Ready::empty(), PollOpt::empty()),
             token_0: UnsafeCell::new(Token(0)),
             token_1: UnsafeCell::new(Token(0)),
             token_2: UnsafeCell::new(Token(0)),
@@ -1842,7 +1842,7 @@ impl ReadinessState {
 
     #[inline]
     fn disarm(&mut self) {
-        self.set_interest(Ready::none());
+        self.set_interest(Ready::empty());
     }
 
     /// Get the poll options

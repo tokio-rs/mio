@@ -112,13 +112,14 @@ use std::{fmt, io, ops};
 ///         -> io::Result<()>
 ///     {
 ///         match *self.registration.lock().unwrap() {
-///             Some(ref registration) => registration.update(token, interest, opts),
+///             Some(ref registration) => registration.update(poll, token, interest, opts),
 ///             None => Err(io::Error::new(io::ErrorKind::Other, "not registered")),
 ///         }
 ///     }
 ///
 ///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
 ///         let _ = self.registration.lock().unwrap().take();
+///         Ok(())
 ///     }
 /// }
 /// ```
@@ -174,31 +175,112 @@ pub trait Evented {
     fn deregister(&self, poll: &Poll) -> io::Result<()>;
 }
 
-/// Configures readiness polling behavior for a given `Evented` value.
+/// Options supplied when registering an `Evented` handle with `Poll`
+///
+/// `PollOpt` values can be combined together using the various bitwise
+/// operators.
+///
+/// For high level documentation on polling and poll options, see [`Poll`].
+///
+/// # Examples
+///
+/// ```
+/// use mio::PollOpt;
+///
+/// let opts = PollOpt::edge() | PollOpt::oneshot();
+///
+/// assert!(opts.is_edge());
+/// assert!(opts.is_oneshot());
+/// assert!(!opts.is_level());
+/// ```
+///
+/// [`Poll`]: struct.Poll.html
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct PollOpt(usize);
 
 impl PollOpt {
+    /// Return a `PollOpt` representing no set options.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::empty();
+    ///
+    /// assert!(!opt.is_level());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn empty() -> PollOpt {
         PollOpt(0)
     }
 
+    /// Return a `PollOpt` representing edge-triggered notifications.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::edge();
+    ///
+    /// assert!(opt.is_edge());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn edge() -> PollOpt {
         PollOpt(0b0001)
     }
 
+    /// Return a `PollOpt` representing level-triggered notifications.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::level();
+    ///
+    /// assert!(opt.is_level());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn level() -> PollOpt {
         PollOpt(0b0010)
     }
 
+    /// Return a `PollOpt` representing oneshot notifications.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::oneshot();
+    ///
+    /// assert!(opt.is_oneshot());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn oneshot() -> PollOpt {
         PollOpt(0b0100)
     }
 
+    // TODO: Figure out if this should be deprecated or not
+    #[doc(hidden)]
     #[inline]
     pub fn urgent() -> PollOpt {
         PollOpt(0b1000)
@@ -212,21 +294,68 @@ impl PollOpt {
         PollOpt::edge() | PollOpt::level() | PollOpt::oneshot()
     }
 
+    /// Returns true if the options include edge-triggered notifications.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::edge();
+    ///
+    /// assert!(opt.is_edge());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_edge(&self) -> bool {
         self.contains(PollOpt::edge())
     }
 
+    /// Returns true if the options include level-triggered notifications.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::level();
+    ///
+    /// assert!(opt.is_level());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_level(&self) -> bool {
         self.contains(PollOpt::level())
     }
 
+    /// Returns true if the options includes oneshot.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::oneshot();
+    ///
+    /// assert!(opt.is_oneshot());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_oneshot(&self) -> bool {
         self.contains(PollOpt::oneshot())
     }
 
+    // TODO: Should this be deprecated?
+    #[doc(hidden)]
     #[inline]
     pub fn is_urgent(&self) -> bool {
         self.contains(PollOpt::urgent())
@@ -240,16 +369,83 @@ impl PollOpt {
         self.0
     }
 
+    /// Returns true if `self` is a superset of `other`.
+    ///
+    /// `other` may represent more than one option, in which case the function
+    /// only returns true if `self` contains all of the options specified in
+    /// `other`.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::oneshot();
+    ///
+    /// assert!(opt.contains(PollOpt::oneshot()));
+    /// assert!(!opt.contains(PollOpt::edge()));
+    /// ```
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::oneshot() | PollOpt::edge();
+    ///
+    /// assert!(opt.contains(PollOpt::oneshot()));
+    /// assert!(opt.contains(PollOpt::edge()));
+    /// ```
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opt = PollOpt::oneshot() | PollOpt::edge();
+    ///
+    /// assert!(!PollOpt::oneshot().contains(opt));
+    /// assert!(opt.contains(opt));
+    /// assert!((opt | PollOpt::level()).contains(opt));
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn contains(&self, other: PollOpt) -> bool {
         (*self & other) == other
     }
 
+    /// Adds all options represented by `other` into `self`.
+    ///
+    /// This is equivalent to `*self = *self | other`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let mut opt = PollOpt::empty();
+    /// opt.insert(PollOpt::oneshot());
+    ///
+    /// assert!(opt.is_oneshot());
+    /// ```
     #[inline]
     pub fn insert(&mut self, other: PollOpt) {
         self.0 |= other.0;
     }
 
+    /// Removes all options represented by `other` from `self`.
+    ///
+    /// This is equivalent to `*self = *self & !other`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let mut opt = PollOpt::oneshot();
+    /// opt.remove(PollOpt::oneshot());
+    ///
+    /// assert!(!opt.is_oneshot());
+    /// ```
     #[inline]
     pub fn remove(&mut self, other: PollOpt) {
         self.0 &= !other.0;
@@ -322,7 +518,28 @@ impl fmt::Debug for PollOpt {
     }
 }
 
-/// A set of readiness events returned by `Poll`.
+/// A set of readiness events
+///
+/// `Ready` is a set of operation descriptors indicating that an operation is
+/// ready to be performed. For example, `Ready::readable()` indicates that the
+/// associated `Evented` handle is ready to perform a `read` operation.
+///
+/// `Ready` values can be combined together using the various bitwise operators.
+///
+/// For high level documentation on polling and readiness, see [`Poll`].
+///
+/// # Examples
+///
+/// ```
+/// use mio::Ready;
+///
+/// let ready = Ready::readable() | Ready::writable();
+///
+/// assert!(ready.is_readable());
+/// assert!(ready.is_writable());
+/// ```
+///
+/// [`Poll`]: struct.Poll.html
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Ready(usize);
 
@@ -344,15 +561,67 @@ pub trait ReadyUnix {
 }
 
 impl Ready {
-    pub fn none() -> Ready {
+    /// Returns the empty `Ready` set.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::empty();
+    ///
+    /// assert!(!ready.is_readable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    pub fn empty() -> Ready {
         Ready(0)
     }
 
+    #[deprecated(since = "0.6.5", note = "use Ready::empty instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
+    pub fn none() -> Ready {
+        Ready::empty()
+    }
+
+    /// Returns a `Ready` representing readable readiness.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::readable();
+    ///
+    /// assert!(ready.is_readable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn readable() -> Ready {
         Ready(READABLE)
     }
 
+    /// Returns a `Ready` representing writable readiness.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::writable();
+    ///
+    /// assert!(ready.is_writable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn writable() -> Ready {
         Ready(WRITABLE)
@@ -374,20 +643,38 @@ impl Ready {
         Ready(HUP)
     }
 
+    #[deprecated(since = "0.6.5", note = "use unix::ReadyExt instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn all() -> Ready {
         Ready::readable() |
             Ready::writable()
     }
 
+    /// Returns true if `Ready` is the empty set
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::empty();
+    /// assert!(ready.is_empty());
+    /// ```
     #[inline]
-    pub fn is_none(&self) -> bool {
-        *self == Ready::none()
+    pub fn is_empty(&self) -> bool {
+        *self == Ready::empty()
     }
 
+    #[deprecated(since = "0.6.5", note = "use Ready::is_empty instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
-    pub fn is_some(&self) -> bool {
-        !self.is_none()
+    pub fn is_none(&self) -> bool {
+        self.is_empty()
     }
 
     #[inline]
