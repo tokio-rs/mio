@@ -546,6 +546,12 @@ impl Poll {
     /// associated with the `Evented` handle can be changed at any time by
     /// calling [`reregister`].
     ///
+    /// `token` cannot be `Token(usize::MAX)` as it is reserved for internal
+    /// usage.
+    ///
+    /// See documentation on [`Token`] for an example showing how to pick
+    /// [`Token`] values.
+    ///
     /// `interest: Ready`: Specifies which operations `Poll` should monitor for
     /// readiness. `Poll` will only return readiness events for operations
     /// specified by this argument.
@@ -581,6 +587,7 @@ impl Poll {
     /// [`level`]: struct.PollOpt.html#method.level
     /// [`edge`]: struct.PollOpt.html#method.edge
     /// [`oneshot`]: struct.PollOpt.html#method.oneshot
+    /// [`Token`]: struct.Token.html
     ///
     /// # Examples
     ///
@@ -651,6 +658,9 @@ impl Poll {
     /// The `Evented` handle must have previously been registered with this
     /// instance of `Poll` otherwise the call to `reregister` will return with
     /// an error.
+    ///
+    /// `token` cannot be `Token(usize::MAX)` as it is reserved for internal
+    /// usage.
     ///
     /// See the [`register`] documentation for details about the function
     /// arguments and see the [`struct`] docs for a high level overview of
