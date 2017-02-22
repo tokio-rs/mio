@@ -12,8 +12,13 @@
 //!
 //! # Usage
 //!
-//! Using mio starts by creating an [Poll](struct.Poll.html), which reads events from the OS and
-//! put them into [Events](struct.Events.html). You can handle IO events from the OS with it.
+//! Using mio starts by creating an [Poll], which reads events from the OS and
+//! put them into [`Events`]. You can handle IO events from the OS with it.
+//!
+//! For more detail, see [`Poll`].
+//!
+//! [`Poll`]: struct.Poll.html
+//! [`Events`]: struct.Events.html
 //!
 //! # Example
 //!
@@ -136,6 +141,8 @@ pub use event_imp::{
 pub use token::Token;
 
 pub mod event {
+    //! Readiness event types and utilities.
+
     pub use super::poll::{Events, Iter};
     pub use super::event_imp::{Event, Evented};
 }

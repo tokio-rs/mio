@@ -21,6 +21,10 @@ use std::{fmt, io, ops};
 /// [`Registration`] and [`SetReadiness`]. In this case, the implementer takes
 /// responsibility for driving the readiness state changes.
 ///
+/// [`Poll`]: struct.Poll.html
+/// [`Registration`]: struct.Registration.html
+/// [`SetReadiness`]: struct.SetReadiness.html
+///
 /// # Examples
 ///
 /// Implementing `Evented` on a struct containing a socket:
@@ -65,35 +69,17 @@ use std::{fmt, io, ops};
 /// use mio::event::Evented;
 ///
 /// use std::io;
-/// use std::sync::Mutex;
 /// use std::time::Instant;
 /// use std::thread;
 ///
 /// pub struct Deadline {
 ///     when: Instant,
-///     registration: Mutex<Option<Registration>>,
+///     registration: Registration,
 /// }
 ///
 /// impl Deadline {
-///     pub fn is_elapsed(&self) -> bool {
-///         Instant::now() >= self.when
-///     }
-/// }
-///
-/// impl Evented for Deadline {
-///     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
-///         -> io::Result<()>
-///     {
-///         let mut registration = self.registration.lock().unwrap();
-///
-///         if registration.is_some() {
-///             return Err(io::Error::new(io::ErrorKind::Other, "already registered"));
-///         }
-///
-///         let (r, set_readiness) = Registration::new(poll, token, interest, opts);
-///         *registration = Some(r);
-///
-///         let when = self.when;
+///     pub fn new(when: Instant) -> Deadline {
+///         let (registration, set_readiness) = Registration::new2();
 ///
 ///         thread::spawn(move || {
 ///             let now = Instant::now();
@@ -105,36 +91,41 @@ use std::{fmt, io, ops};
 ///             set_readiness.set_readiness(Ready::readable());
 ///         });
 ///
-///         Ok(())
+///         Deadline {
+///             when: when,
+///             registration: registration,
+///         }
+///     }
+///
+///     pub fn is_elapsed(&self) -> bool {
+///         Instant::now() >= self.when
+///     }
+/// }
+///
+/// impl Evented for Deadline {
+///     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///         -> io::Result<()>
+///     {
+///         self.registration.register(poll, token, interest, opts)
 ///     }
 ///
 ///     fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         match *self.registration.lock().unwrap() {
-///             Some(ref registration) => registration.update(poll, token, interest, opts),
-///             None => Err(io::Error::new(io::ErrorKind::Other, "not registered")),
-///         }
+///         self.registration.reregister(poll, token, interest, opts)
 ///     }
 ///
 ///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-///         let _ = self.registration.lock().unwrap().take();
-///         Ok(())
+///         self.registration.deregister(poll)
 ///     }
 /// }
 /// ```
-///
-/// [`Poll`]: struct.Poll.html
-/// [`Registration`]: struct.Registration.html
-/// [`SetReadiness`]: struct.SetReadiness.html
 pub trait Evented {
     /// Register `self` with the given `Poll` instance.
     ///
     /// This function should not be called directly. Use [`Poll::register`]
-    /// instead.
-    ///
-    /// Implementors should handle registration by either delegating the call to
-    /// another `Evented` type or creating a [`Registration`].
+    /// instead. Implementors should handle registration by either delegating
+    /// the call to another `Evented` type or creating a [`Registration`].
     ///
     /// See [struct] documentation for more details.
     ///
@@ -146,10 +137,8 @@ pub trait Evented {
     /// Re-register `self` with the given `Poll` instance.
     ///
     /// This function should not be called directly. Use [`Poll::reregister`]
-    /// instead.
-    ///
-    /// Implementors should handle re-registration by either delegating the call to
-    /// another `Evented` type or calling [`Registration::update`].
+    /// instead. Implementors should handle re-registration by either delegating
+    /// the call to another `Evented` type or calling [`Registration::update`].
     ///
     /// See [struct] documentation for more details.
     ///
@@ -161,11 +150,9 @@ pub trait Evented {
     /// Deregister `self` from the given `Poll` instance
     ///
     /// This function should not be called directly. Use [`Poll::deregister`]
-    /// instead.
-    ///
-    /// Implementors shuld handle deregistration by either delegating the call
-    /// to another `Evented` type or by dropping the [`Registration`] associated
-    /// with `self`.
+    /// instead. Implementors shuld handle deregistration by either delegating
+    /// the call to another `Evented` type or by dropping the [`Registration`]
+    /// associated with `self`.
     ///
     /// See [struct] documentation for more details.
     ///
@@ -968,14 +955,28 @@ impl fmt::Debug for Ready {
     }
 }
 
-/// An readiness event returned by `Poll`.
+/// An readiness event returned by [`Poll::poll`].
 ///
-/// Event represents the raw event that the OS-specific selector
-/// returned. An event can represent more than one kind (such as
-/// readable or writable) at a time.
+/// `Event` is a [readiness state] paired with a [`Token`]. It is returned by
+/// [`Poll::poll`].
 ///
-/// These Event objects are created by the OS-specific concrete
-/// Selector when they have events to report.
+/// For more documentation on polling and events, see [`Poll`].
+///
+/// # Examples
+///
+/// ```
+/// use mio::{Event, Ready, Token};
+///
+/// let event = Event::new(Ready::all(), Token(0));
+///
+/// assert_eq!(event.readiness(), Ready::all());
+/// assert_eq!(event.token(), Token(0));
+/// ```
+///
+/// [`Poll::poll`]: struct.Poll.html#method.poll
+/// [`Poll`]: struct.Poll.html
+/// [readiness state ]: struct.Ready.html
+/// [`Token`]: struct.Token.html
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Event {
     kind: Ready,
@@ -983,14 +984,36 @@ pub struct Event {
 }
 
 impl Event {
-    /// Create a new Event.
-    pub fn new(kind: Ready, token: Token) -> Event {
+    /// Creates a new `Event` containing `readiness` and `token`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Event, Ready, Token};
+    ///
+    /// let event = Event::new(Ready::all(), Token(0));
+    ///
+    /// assert_eq!(event.readiness(), Ready::all());
+    /// assert_eq!(event.token(), Token(0));
+    /// ```
+    pub fn new(readiness: Ready, token: Token) -> Event {
         Event {
-            kind: kind,
+            kind: readiness,
             token: token,
         }
     }
 
+    /// Returns the event's readiness.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Event, Ready, Token};
+    ///
+    /// let event = Event::new(Ready::all(), Token(0));
+    ///
+    /// assert_eq!(event.readiness(), Ready::all());
+    /// ```
     pub fn readiness(&self) -> Ready {
         self.kind
     }
@@ -1002,6 +1025,17 @@ impl Event {
         self.kind
     }
 
+    /// Returns the event's token.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Event, Ready, Token};
+    ///
+    /// let event = Event::new(Ready::all(), Token(0));
+    ///
+    /// assert_eq!(event.token(), Token(0));
+    /// ```
     pub fn token(&self) -> Token {
         self.token
     }

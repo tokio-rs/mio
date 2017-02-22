@@ -94,7 +94,7 @@
 ///                         }
 ///                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
 ///                             // Socket is not ready anymore, stop accepting
-///                             continue;
+///                             break;
 ///                         }
 ///                         e => panic!("err={:?}", e), // Unexpected error
 ///                     }
@@ -107,6 +107,7 @@
 ///                         Ok(0) => {
 ///                             // Socket is closed, remove it from the map
 ///                             sockets.remove(&token);
+///                             break;
 ///                         }
 ///                         // Data is not actually sent in this example
 ///                         Ok(_) => unreachable!(),

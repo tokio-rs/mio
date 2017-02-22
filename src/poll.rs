@@ -199,11 +199,11 @@ use std::time::{Duration, Instant};
 ///
 /// ### Spurious events
 ///
-/// `Poll::poll` may return readiness events even if the associated `Evented`
-/// handle is not actually ready. Given the same code, this may happen more on
-/// some platforms than others. It is important to never assume that, just
-/// because a readiness notification was received, that the associated operation
-/// will as well.
+/// [`Poll::poll`] may return readiness events even if the associated
+/// [`Evented`] handle is not actually ready. Given the same code, this may
+/// happen more on some platforms than others. It is important to never assume
+/// that, just because a readiness notification was received, that the
+/// associated operation will as well.
 ///
 /// If operation fails with [`WouldBlock`], then the caller should not treat
 /// this as an error and wait until another readiness event is received.
@@ -214,7 +214,7 @@ use std::time::{Duration, Instant};
 /// corresponding operation must be performed repeatedly until it returns
 /// [`WouldBlock`]. Unless this is done, there is no guarantee that another
 /// readiness event will be delivered, even if further data is received for the
-/// `Evented` handle.
+/// [`Evented`] handle.
 ///
 /// For example, in the first scenario described above, after step 5, even if
 /// the socket receives more data there is no guarantee that another readiness
@@ -225,25 +225,28 @@ use std::time::{Duration, Instant};
 /// The only readiness operations that are guaranteed to be present on all
 /// supported platforms are [`readable`] and [`writable`]. All other readiness
 /// operations may have false negatives and as such should be considered
-/// **hints**. This means that if a socket is registered with `readable`,
-/// `error`, and `hup` interest, and either an error or hup is received, a
+/// **hints**. This means that if a socket is registered with [`readable`],
+/// [`error`], and [`hup`] interest, and either an error or hup is received, a
 /// readiness event will be generated for the socket, but it **may** only
 /// include `readable` readiness. Also note that, given the potential for
 /// spurious events, receiving a readiness event with `hup` or `error` doesn't
 /// actually mean that a `read` on the socket will return a result matching the
 /// readiness event.
 ///
-/// In other words, portable programs that explicitly check for `hup` or `error`
-/// readiness should be doing so as an **optimization** and always be able to
-/// handle an error or HUP situation when performing the actual read operation.
+/// In other words, portable programs that explicitly check for [`hup`] or
+/// [`error`] readiness should be doing so as an **optimization** and always be
+/// able to handle an error or HUP situation when performing the actual read
+/// operation.
 ///
 /// [`readable`]: struct.Ready.html#method.readable
 /// [`writable`]: struct.Ready.html#method.writable
+/// [`error`]: struct.Ready.html#method.error
+/// [`hup`]: struct.Ready.html#method.hup
 ///
 /// ### Registering handles
 ///
 /// Unless otherwise noted, it should be assumed that types implementing
-/// `Evented` will never be become ready unless they are registered with `Poll`.
+/// [`Evented`] will never be become ready unless they are registered with `Poll`.
 ///
 /// For example:
 ///
@@ -322,9 +325,92 @@ pub struct Poll {
 /// Handle to a user space `Poll` registration.
 ///
 /// `Registration` allows implementing [`Evented`] for types that cannot work
-/// with the [system selector].
+/// with the [system selector]. A `Registration` is always paired with a
+/// `SetReadiness`, which allows updating the registration's readiness state.
+/// When [`set_readiness`] is called and the `Registration` is associated with a
+/// [`Poll`] instance, a readiness event will be created and eventually returned
+/// by [`poll`].
+///
+/// A `Registration` / `SetReadiness` pair is created by calling
+/// [`Registration::new2`]. At this point, the registration is not being
+/// monitored by a [`Poll`] instance, so calls to `set_readiness` will not
+/// result in any readiness notifications.
+///
+/// `Registration` implements [`Evented`], so it can be used with [`Poll`] using
+/// the same [`register`], [`reregister`], and [`deregister`] functions used
+/// with TCP, UDP, etc... types. Once registered with [`Poll`], readiness state
+/// changes result in readiness events being dispatched to the [`Poll`] instance
+/// with which `Registration` is registered.
+///
+/// **Note**, before using `Registration` be sure to read the
+/// [`set_readiness`] documentation and the [portability] notes. The
+/// guarantees offered by `Registration` may be weaker than expected.
+///
+/// For high level documentation, see [`Poll`].
+///
+/// # Examples
+///
+/// ```
+/// use mio::{Ready, Registration, Poll, PollOpt, Token};
+/// use mio::event::Evented;
+///
+/// use std::io;
+/// use std::time::Instant;
+/// use std::thread;
+///
+/// pub struct Deadline {
+///     when: Instant,
+///     registration: Registration,
+/// }
+///
+/// impl Deadline {
+///     pub fn new(when: Instant) -> Deadline {
+///         let (registration, set_readiness) = Registration::new2();
+///
+///         thread::spawn(move || {
+///             let now = Instant::now();
+///
+///             if now < when {
+///                 thread::sleep(when - now);
+///             }
+///
+///             set_readiness.set_readiness(Ready::readable());
+///         });
+///
+///         Deadline {
+///             when: when,
+///             registration: registration,
+///         }
+///     }
+///
+///     pub fn is_elapsed(&self) -> bool {
+///         Instant::now() >= self.when
+///     }
+/// }
+///
+/// impl Evented for Deadline {
+///     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///         -> io::Result<()>
+///     {
+///         self.registration.register(poll, token, interest, opts)
+///     }
+///
+///     fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///         -> io::Result<()>
+///     {
+///         self.registration.reregister(poll, token, interest, opts)
+///     }
+///
+///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
+///         self.registration.deregister(poll)
+///     }
+/// }
+/// ```
 ///
 /// [system selector]: struct.Poll.html#implementation-notes
+/// [`Poll`]: struct.Poll.html
+/// [`Registration::new2`]: struct.Registration.html#method.new2
+/// [`Evented`]: event/trait.Evented.html
 pub struct Registration {
     inner: RegistrationInner,
 }
@@ -334,7 +420,8 @@ unsafe impl Sync for Registration {}
 
 /// Updates the readiness state of the associated [`Registration`].
 ///
-/// See [`Registration`] for more documentation on using `SetReadiness`.
+/// See [`Registration`] for more documentation on using `SetReadiness` and
+/// [`Poll`] for high level polling documentation.
 ///
 /// [`Registration`]
 #[derive(Clone)]
@@ -1038,52 +1125,175 @@ impl fmt::Debug for Poll {
     }
 }
 
-/// A buffer for I/O events to get placed into, passed to `Poll::poll`.
+/// A collection of readiness events.
 ///
-/// This structure is normally re-used on each turn of the event loop and will
-/// contain any I/O events that happen during a `poll`. After a call to `poll`
-/// returns the various accessor methods on this structure can be used to
-/// iterate over the underlying events that ocurred.
+/// `Events` is passed as an argument to [`Poll::poll`] and will be used to
+/// receive any new readiness events received since the last call to [`poll`].
+/// Usually, a single `Events` instance is created at the same time as the
+/// [`Poll`] and the single instance is reused for each call to [`poll`].
+///
+/// See [`Poll`] for more documentation on polling.
+///
+/// # Examples
+///
+/// ```
+/// use mio::{Events, Poll};
+/// use std::time::Duration;
+///
+/// let mut events = Events::with_capacity(1024);
+/// let poll = Poll::new().unwrap();
+///
+/// assert_eq!(0, events.len());
+///
+/// // Register `Evented` handles with `poll`
+///
+/// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+///
+/// for event in &events {
+///     println!("event={:?}", event);
+/// }
+/// ```
+///
+/// [`Poll::poll`]: struct.Poll.html#method.poll
+/// [`poll`]: struct.Poll.html#method.poll
+/// [`Poll`]: struct.Poll.html
 pub struct Events {
     inner: sys::Events,
 }
 
-/// Iterate an Events structure
+/// [`Events`] iterator.
+///
+/// This struct is created by the [`iter`] method on [`Events`].
+///
+/// # Examples
+///
+/// ```
+/// use mio::{Events, Poll};
+/// use std::time::Duration;
+///
+/// let mut events = Events::with_capacity(1024);
+/// let poll = Poll::new().unwrap();
+///
+/// // Register handles with `poll`
+///
+/// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+///
+/// for event in events.iter() {
+///     println!("event={:?}", event);
+/// }
+/// ```
+///
+/// [`Events`]: struct.Events.html
+/// [`iter`]: struct.Events.html#method.iter
 pub struct Iter<'a> {
     inner: &'a Events,
     pos: usize,
 }
 
 impl Events {
-    /// Create a net blank set of events capable of holding up to `capacity`
-    /// events.
+    /// Return a new `Events` capable of holding up to `capacity` events.
     ///
-    /// This parameter typically is an indicator on how many events can be
-    /// returned each turn of the event loop, but it is not necessarily a hard
-    /// limit across platforms.
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Events;
+    ///
+    /// let events = Events::with_capacity(1024);
+    ///
+    /// assert_eq!(1024, events.capacity());
+    /// ```
     pub fn with_capacity(capacity: usize) -> Events {
         Events {
             inner: sys::Events::with_capacity(capacity),
         }
     }
 
-    /// Returns the `idx`-th event.
+    /// Returns the `Event` at the given index, or `None` if the index is out of
+    /// bounds.
     ///
-    /// Returns `None` if `idx` is greater than the length of this event buffer.
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Events, Poll};
+    /// use std::time::Duration;
+    ///
+    /// let mut events = Events::with_capacity(1024);
+    /// let poll = Poll::new().unwrap();
+    ///
+    /// // Register handles with `poll`
+    ///
+    /// let n = poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+    ///
+    /// for i in 0..n {
+    ///     println!("event={:?}", events.get(i).unwrap());
+    /// }
+    /// ```
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.inner.get(idx)
     }
 
-    /// Returns how many events this buffer contains.
+    /// Returns the number of `Event` values currently in `self`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Events;
+    ///
+    /// let events = Events::with_capacity(1024);
+    ///
+    /// assert_eq!(0, events.len());
+    /// ```
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
-    /// Returns whether this buffer contains 0 events.
+    /// Returns the number of `Event` values that `self` can hold.
+    ///
+    /// ```
+    /// use mio::Events;
+    ///
+    /// let events = Events::with_capacity(1024);
+    ///
+    /// assert_eq!(1024, events.capacity());
+    /// ```
+    pub fn capacity(&self) -> usize {
+        self.inner.capacity()
+    }
+
+    /// Returns `true` if `self` contains no `Event` values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Events;
+    ///
+    /// let events = Events::with_capacity(1024);
+    ///
+    /// assert!(events.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
+    /// Returns an iterator over the `Event` values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Events, Poll};
+    /// use std::time::Duration;
+    ///
+    /// let mut events = Events::with_capacity(1024);
+    /// let poll = Poll::new().unwrap();
+    ///
+    /// // Register handles with `poll`
+    ///
+    /// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+    ///
+    /// for event in events.iter() {
+    ///     println!("event={:?}", event);
+    /// }
+    /// ```
     pub fn iter(&self) -> Iter {
         Iter {
             inner: self,
@@ -1124,7 +1334,45 @@ pub fn selector(poll: &Poll) -> &sys::Selector {
  */
 
 impl Registration {
-    /// Unbound `Registration` handle
+    /// Create and return a new `Registration` and the associated
+    /// `SetReadiness`.
+    ///
+    /// See [struct] documentation for more detail and [`Poll`]
+    /// for high level documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Events, Ready, Registration, Poll, PollOpt, Token};
+    /// use std::thread;
+    ///
+    /// let (registration, set_readiness) = Registration::new2();
+    ///
+    /// thread::spawn(move || {
+    ///     use std::time::Duration;
+    ///     thread::sleep(Duration::from_millis(500));
+    ///
+    ///     set_readiness.set_readiness(Ready::readable());
+    /// });
+    ///
+    /// let poll = Poll::new().unwrap();
+    /// poll.register(&registration, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+    ///
+    /// let mut events = Events::with_capacity(256);
+    ///
+    /// loop {
+    ///     poll.poll(&mut events, None);
+    ///
+    ///     for event in &events {
+    ///         if event.token() == Token(0) && event.readiness().is_readable() {
+    ///             return;
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// ```
+    /// [struct]: #
+    /// [`Poll`]: struct.Poll.html
     pub fn new2() -> (Registration, SetReadiness) {
         // Allocate the registration node. The new node will have `ref_count`
         // set to 2: one SetReadiness, one Registration.
@@ -1146,21 +1394,10 @@ impl Registration {
         (registration, set_readiness)
     }
 
-    #[deprecated(since = "0.6.5", note = "use `bound` or `new2` instead")]
+    #[deprecated(since = "0.6.5", note = "use `new2` instead")]
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     pub fn new(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
-        -> (Registration, SetReadiness)
-    {
-        Registration::bound(poll, token, interest, opt)
-    }
-
-    /// Create a new `Registration` associated with the given `Poll` instance.
-    ///
-    /// The returned `Registration` will be associated with this `Poll` for its
-    /// entire lifetime. Dropping the `Registration` will prevent any further
-    /// notifications to be polled.
-    pub fn bound(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
         -> (Registration, SetReadiness)
     {
         is_send::<Registration>();
@@ -1247,18 +1484,88 @@ impl SetReadiness {
     ///
     /// # Note
     ///
-    /// `readiness` does not guarantee to establish any memory ordering. Any
-    /// concurrent data access must be synchronized using another strategy.
+    /// There is no guarantee that `readiness` establishes any sort of memory
+    /// ordering. Any concurrent data access must be synchronized using another
+    /// strategy.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Registration, Ready};
+    ///
+    /// let (registration, set_readiness) = Registration::new2();
+    ///
+    /// assert!(set_readiness.readiness().is_empty());
+    ///
+    /// set_readiness.set_readiness(Ready::readable()).unwrap();
+    /// assert!(set_readiness.readiness().is_readable());
+    /// ```
     pub fn readiness(&self) -> Ready {
         self.inner.readiness()
     }
 
-    /// Update the registration's readiness
+    /// Set the registration's readiness
+    ///
+    /// If the associated `Registration` is registered with a [`Poll`] instance
+    /// and has requested readiness events that include `ready`, then a call
+    /// [`poll`] will receive a readiness event representing the readiness
+    /// state change.
     ///
     /// # Note
     ///
-    /// `set_readiness` does not guarantee to establish any memory ordering. Any
-    /// concurrent data access must be synchronized using another strategy.
+    /// There is no guarantee that `readiness` establishes any sort of memory
+    /// ordering. Any concurrent data access must be synchronized using another
+    /// strategy.
+    ///
+    /// There is also no guarantee as to when the readiness event will be
+    /// delivered to poll. A best attempt will be made to make the delivery in a
+    /// "timely" fashion. For example, the following is **not** guaranteed to
+    /// work:
+    ///
+    /// ```
+    /// use mio::{Events, Registration, Ready, Poll, PollOpt, Token};
+    ///
+    /// let poll = Poll::new().unwrap();
+    /// let (registration, set_readiness) = Registration::new2();
+    ///
+    /// poll.register(&registration,
+    ///               Token(0),
+    ///               Ready::readable(),
+    ///               PollOpt::edge()).unwrap();
+    ///
+    /// // Set the readiness, then immediately poll to try to get the readiness
+    /// // event
+    /// set_readiness.set_readiness(Ready::readable()).unwrap();
+    ///
+    /// let mut events = Events::with_capacity(1024);
+    /// poll.poll(&mut events, None).unwrap();
+    ///
+    /// // There is NO guarantee that the following will work. It is possible
+    /// // that the readiness event will be delivered at a later time.
+    /// let event = events.get(0).unwrap();
+    /// assert_eq!(event.token(), Token(0));
+    /// assert!(event.readiness().is_readable());
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// A simple example, for a more elaborate example, see the [`Evented`]
+    /// documentation.
+    ///
+    /// ```
+    /// use mio::{Registration, Ready};
+    ///
+    /// let (registration, set_readiness) = Registration::new2();
+    ///
+    /// assert!(set_readiness.readiness().is_empty());
+    ///
+    /// set_readiness.set_readiness(Ready::readable()).unwrap();
+    /// assert!(set_readiness.readiness().is_readable());
+    /// ```
+    ///
+    /// [`Registration`]: struct.Registration.html
+    /// [`Poll`]: struct.Poll.html
+    /// [`poll`]: struct.Poll.html#method.poll
     pub fn set_readiness(&self, ready: Ready) -> io::Result<()> {
         self.inner.set_readiness(ready)
     }
