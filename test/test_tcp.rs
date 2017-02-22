@@ -516,3 +516,10 @@ fn connection_reset_by_peer() {
     }
 
 }
+
+#[test]
+fn bind_twice_bad() {
+    let l1 = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = l1.local_addr().unwrap();
+    assert!(TcpListener::bind(&addr).is_err());
+}
