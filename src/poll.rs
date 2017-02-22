@@ -798,17 +798,24 @@ impl Poll {
     /// use mio::tcp::TcpStream;
     ///
     /// use std::net::{TcpListener, SocketAddr};
+    /// use std::thread;
     ///
     /// // Bind a server socket to connect to.
-    /// let addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
+    /// let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
     /// let server = TcpListener::bind(&addr).unwrap();
+    /// let addr = server.local_addr().unwrap().clone();
+    ///
+    /// // Spawn a thread to accept the socket
+    /// thread::spawn(move || {
+    ///     let _ = server.accept();
+    /// });
     ///
     /// // Construct a new `Poll` handle as well as the `Events` we'll store into
     /// let poll = Poll::new().unwrap();
     /// let mut events = Events::with_capacity(1024);
     ///
     /// // Connect the stream
-    /// let stream = TcpStream::connect(&server.local_addr().unwrap()).unwrap();
+    /// let stream = TcpStream::connect(&addr).unwrap();
     ///
     /// // Register the stream with `Poll`
     /// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge()).unwrap();

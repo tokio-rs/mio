@@ -19,7 +19,7 @@
 /// use std::collections::HashMap;
 ///
 /// // After this number of sockets is accepted, the server will shutdown.
-/// const MAX_SOCKETS: usize = 1024;
+/// const MAX_SOCKETS: usize = 32;
 ///
 /// // Pick a token that will not be used by any other socket and use that one
 /// // for the listener.
@@ -96,7 +96,7 @@
 ///                             // Socket is not ready anymore, stop accepting
 ///                             continue;
 ///                         }
-///                         _ => panic!(), // Unexpected error
+///                         e => panic!("err={:?}", e), // Unexpected error
 ///                     }
 ///                 }
 ///             }
@@ -114,14 +114,13 @@
 ///                             // Socket is not ready anymore, stop reading
 ///                             continue;
 ///                         }
-///                         _ => panic!(), // Unexpected error
+///                         e => panic!("err={:?}", e), // Unexpected error
 ///                     }
 ///                 }
 ///             }
 ///         }
 ///     }
 /// }
-///
 /// ```
 ///
 /// [`Evented`]: event/trait.Evented.html
