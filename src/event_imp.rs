@@ -524,6 +524,11 @@ impl fmt::Debug for PollOpt {
 /// ready to be performed. For example, `Ready::readable()` indicates that the
 /// associated `Evented` handle is ready to perform a `read` operation.
 ///
+/// **Note that only readable and writable readiness is guaranteed to be
+/// supported on all platforms**. This means that `error` and `hup` readiness
+/// should be treated as hints. For more details, see [readiness] in the poll
+/// documentation.
+///
 /// `Ready` values can be combined together using the various bitwise operators.
 ///
 /// For high level documentation on polling and readiness, see [`Poll`].
@@ -540,6 +545,9 @@ impl fmt::Debug for PollOpt {
 /// ```
 ///
 /// [`Poll`]: struct.Poll.html
+/// [`readable`]: #method.readable
+/// [`writable`]: #method.writable
+/// [readiness]: struct.Poll.html#readiness-operations
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Ready(usize);
 
@@ -616,11 +624,56 @@ impl Ready {
         Ready(WRITABLE)
     }
 
+    /// Returns a `Ready` representing error readiness.
+    ///
+    /// **Note that only readable and writable readiness is guaranteed to be
+    /// supported on all platforms**. This means that `error` readiness
+    /// should be treated as a hint. For more details, see [readiness] in the
+    /// poll documentation.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::error();
+    ///
+    /// assert!(ready.is_error());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    /// [readiness]: struct.Poll.html#readiness-operations
     #[inline]
     pub fn error() -> Ready {
         Ready(ERROR)
     }
 
+    /// Returns a `Ready` representing HUP readiness.
+    ///
+    /// A HUP (or hang-up) signifies that a stream socket **peer** closed the
+    /// connection, or shut down the writing half of the connection.
+    ///
+    /// **Note that only readable and writable readiness is guaranteed to be
+    /// supported on all platforms**. This means that `hup` readiness
+    /// should be treated as a hint. For more details, see [readiness] in the
+    /// poll documentation.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::hup();
+    ///
+    /// assert!(ready.is_hup());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    /// [readiness]: struct.Poll.html#readiness-operations
     #[inline]
     pub fn hup() -> Ready {
         Ready(HUP)
@@ -660,31 +713,132 @@ impl Ready {
         self.is_empty()
     }
 
+    /// Returns true if the value includes readable readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::readable();
+    ///
+    /// assert!(ready.is_readable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_readable(&self) -> bool {
         self.contains(Ready::readable())
     }
 
+    /// Returns true if the value includes writable readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::writable();
+    ///
+    /// assert!(ready.is_writable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_writable(&self) -> bool {
         self.contains(Ready::writable())
     }
 
+    /// Returns true if the value includes error readiness
+    ///
+    /// **Note that only readable and writable readiness is guaranteed to be
+    /// supported on all platforms**. This means that `error` readiness should
+    /// be treated as a hint. For more details, see [readiness] in the poll
+    /// documentation.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::error();
+    ///
+    /// assert!(ready.is_error());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_error(&self) -> bool {
         self.contains(Ready(ERROR))
     }
 
+    /// Returns true if the value includes HUP readiness
+    ///
+    /// A HUP (or hang-up) signifies that a stream socket **peer** closed the
+    /// connection, or shut down the writing half of the connection.
+    ///
+    /// **Note that only readable and writable readiness is guaranteed to be
+    /// supported on all platforms**. This means that `hup` readiness
+    /// should be treated as a hint. For more details, see [readiness] in the
+    /// poll documentation.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::hup();
+    ///
+    /// assert!(ready.is_hup());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_hup(&self) -> bool {
         self.contains(Ready(HUP))
     }
 
+    /// Adds all readiness represented by `other` into `self`.
+    ///
+    /// This is equivalent to `*self = *self | other`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let mut readiness = Ready::empty();
+    /// readiness.insert(Ready::readable());
+    ///
+    /// assert!(readiness.is_readable());
+    /// ```
     #[inline]
     pub fn insert(&mut self, other: Ready) {
         self.0 |= other.0;
     }
 
+    /// Removes all options represented by `other` from `self`.
+    ///
+    /// This is equivalent to `*self = *self & !other`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let mut readiness = Ready::readable();
+    /// readiness.remove(Ready::readable());
+    ///
+    /// assert!(!readiness.is_readable());
+    /// ```
     #[inline]
     pub fn remove(&mut self, other: Ready) {
         self.0 &= !other.0;
@@ -698,6 +852,45 @@ impl Ready {
         self.0
     }
 
+    /// Returns true if `self` is a superset of `other`.
+    ///
+    /// `other` may represent more than one readiness operations, in which case
+    /// the function only returns true if `self` contains all readiness
+    /// specified in `other`.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let readiness = Ready::readable();
+    ///
+    /// assert!(readiness.contains(Ready::readable()));
+    /// assert!(!readiness.contains(Ready::writable()));
+    /// ```
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let readiness = Ready::readable() | Ready::writable();
+    ///
+    /// assert!(readiness.contains(Ready::readable()));
+    /// assert!(readiness.contains(Ready::writable()));
+    /// ```
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let readiness = Ready::readable() | Ready::writable();
+    ///
+    /// assert!(!Ready::readable().contains(readiness));
+    /// assert!(readiness.contains(readiness));
+    /// assert!((readiness | Ready::hup()).contains(readiness));
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn contains(&self, other: Ready) -> bool {
         (*self & other) == other

@@ -238,7 +238,7 @@ impl Events {
 
     pub fn push_event(&mut self, event: Event) {
         self.events.push(libc::epoll_event {
-            events: ioevent_to_epoll(event.kind(), PollOpt::empty()),
+            events: ioevent_to_epoll(event.readiness(), PollOpt::empty()),
             u64: usize::from(event.token()) as u64
         });
     }
