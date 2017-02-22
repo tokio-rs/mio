@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::time::Duration;
@@ -17,8 +18,8 @@ const EPOLLRDHUP: libc::c_int = 0x00002000;
 #[cfg(target_os = "android")]
 const EPOLLONESHOT: libc::c_int = 0x40000000;
 
-use {convert, io, Ready, PollOpt, Token};
-use event::Event;
+use {io, Ready, PollOpt, Token};
+use event_imp::Event;
 use sys::unix::cvt;
 use sys::unix::io::set_cloexec;
 
@@ -71,7 +72,7 @@ impl Selector {
     /// Wait for events from the OS
     pub fn select(&self, evts: &mut Events, awakener: Token, timeout: Option<Duration>) -> io::Result<bool> {
         let timeout_ms = timeout
-            .map(|to| cmp::min(convert::millis(to), i32::MAX as u64) as i32)
+            .map(|to| cmp::min(millis(to), i32::MAX as u64) as i32)
             .unwrap_or(-1);
 
         // Wait for epoll events for at most timeout_ms milliseconds
@@ -210,7 +211,7 @@ impl Events {
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|event| {
             let epoll = event.events as c_int;
-            let mut kind = Ready::none();
+            let mut kind = Ready::empty();
 
             if (epoll & EPOLLIN) != 0 || (epoll & EPOLLPRI) != 0 {
                 kind = kind | Ready::readable();
@@ -237,8 +238,22 @@ impl Events {
 
     pub fn push_event(&mut self, event: Event) {
         self.events.push(libc::epoll_event {
-            events: ioevent_to_epoll(event.kind(), PollOpt::empty()),
+            events: ioevent_to_epoll(event.readiness(), PollOpt::empty()),
             u64: usize::from(event.token()) as u64
         });
     }
+}
+
+const NANOS_PER_MILLI: u32 = 1_000_000;
+const MILLIS_PER_SEC: u64 = 1_000;
+
+/// Convert a `Duration` to milliseconds, rounding up and saturating at
+/// `u64::MAX`.
+///
+/// The saturating is fine because `u64::MAX` milliseconds are still many
+/// million years.
+pub fn millis(duration: Duration) -> u64 {
+    // Round up.
+    let millis = (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
+    duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
 }

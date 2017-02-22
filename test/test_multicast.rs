@@ -3,7 +3,7 @@ use mio::deprecated::{EventLoop, Handler};
 use mio::udp::*;
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use std::str;
-use std::net::{SocketAddr, Ipv4Addr};
+use std::net::IpAddr;
 use localhost;
 
 const LISTENER: Token = Token(0);
@@ -14,17 +14,20 @@ pub struct UdpHandler {
     rx: UdpSocket,
     msg: &'static str,
     buf: SliceBuf<'static>,
-    rx_buf: RingBuf
+    rx_buf: RingBuf,
+    localhost: IpAddr
 }
 
 impl UdpHandler {
     fn new(tx: UdpSocket, rx: UdpSocket, msg: &'static str) -> UdpHandler {
+        let sock = UdpSocket::bind(&"127.0.0.1:12345".parse().unwrap()).unwrap();
         UdpHandler {
             tx: tx,
             rx: rx,
             msg: msg,
             buf: SliceBuf::wrap(msg.as_bytes()),
-            rx_buf: RingBuf::new(1024)
+            rx_buf: RingBuf::new(1024),
+            localhost: sock.local_addr().unwrap().ip()
         }
     }
 
@@ -33,9 +36,9 @@ impl UdpHandler {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
                 match unsafe { self.rx.recv_from(self.rx_buf.mut_bytes()) } {
-                    Ok(Some((cnt, SocketAddr::V4(addr)))) => {
+                    Ok(Some((cnt, addr))) => {
                         unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
-                        assert_eq!(*addr.ip(), Ipv4Addr::new(127, 0, 0, 1));
+                        assert_eq!(addr.ip(), self.localhost);
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }

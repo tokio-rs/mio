@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 extern crate mio;
 extern crate bytes;
 extern crate net2;

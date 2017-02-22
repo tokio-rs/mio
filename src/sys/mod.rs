@@ -8,12 +8,14 @@ pub use self::unix::{
     TcpStream,
     TcpListener,
     UdpSocket,
-    UnixSocket,
     pipe,
     set_nonblock,
     IoVec,
 };
 
+#[cfg(unix)]
+#[cfg(feature = "with-deprecated")]
+pub use self::unix::UnixSocket;
 
 #[cfg(unix)]
 mod unix;

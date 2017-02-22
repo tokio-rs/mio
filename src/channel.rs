@@ -1,6 +1,6 @@
 //! Thread safe communication channel implementing `Evented`
 
-#![allow(unused_imports)]
+#![allow(unused_imports, deprecated)]
 
 use {io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::{LazyCell, AtomicLazyCell};
@@ -229,7 +229,7 @@ impl ReceiverCtl {
         if first == 1 {
             // Unset readiness
             if let Some(set_readiness) = self.inner.set_readiness.borrow() {
-                try!(set_readiness.set_readiness(Ready::none()));
+                try!(set_readiness.set_readiness(Ready::empty()));
             }
         }
 

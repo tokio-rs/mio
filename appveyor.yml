@@ -3,6 +3,7 @@ environment:
   - TARGET: x86_64-pc-windows-msvc
   - TARGET: i686-pc-windows-msvc
   - TARGET: i686-pc-windows-gnu
+
 install:
   - ps: Start-FileDownload "https://static.rust-lang.org/dist/rust-nightly-${env:TARGET}.exe"
   - rust-nightly-%TARGET%.exe /VERYSILENT /NORESTART /DIR="C:\Program Files (x86)\Rust"
@@ -14,4 +15,6 @@ install:
 build: false
 
 test_script:
+  # Ensure that the build works without default features
+  - cargo build --no-default-features
   - cargo test

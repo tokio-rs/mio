@@ -24,8 +24,10 @@ mod eventedfd;
 mod io;
 mod tcp;
 mod udp;
-mod uds;
 mod iovec;
+
+#[cfg(feature = "with-deprecated")]
+mod uds;
 
 pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
@@ -33,6 +35,8 @@ pub use self::io::{Io, set_nonblock};
 pub use self::iovec::IoVec;
 pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
+
+#[cfg(feature = "with-deprecated")]
 pub use self::uds::UnixSocket;
 
 use std::os::unix::io::FromRawFd;

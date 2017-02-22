@@ -1,4 +1,5 @@
-use {io, Evented, Ready, Poll, PollOpt, Token};
+use {io, Ready, Poll, PollOpt, Token};
+use event::Evented;
 use io::MapNonBlock;
 use unix::EventedFd;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};

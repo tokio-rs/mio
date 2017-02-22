@@ -1,5 +1,7 @@
 //! Timer optimized for I/O related operations
 
+#![allow(deprecated)]
+
 use {convert, io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::LazyCell;
 use std::{cmp, error, fmt, u64, usize, iter, thread};
@@ -280,7 +282,7 @@ impl<T> Timer<T> {
         // No more timeouts to poll
         if let Some(inner) = self.inner.borrow() {
             trace!("unsetting readiness");
-            let _ = inner.set_readiness.set_readiness(Ready::none());
+            let _ = inner.set_readiness.set_readiness(Ready::empty());
 
             if let Some(tick) = self.next_tick() {
                 self.schedule_readiness(tick);
@@ -512,188 +514,4 @@ impl fmt::Display for TimerErrorKind {
             TimerOverflow => write!(fmt, "TimerOverflow"),
         }
     }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use std::time::{Duration, Instant};
-
-    #[test]
-    pub fn test_timeout_next_tick() {
-        let mut t = timer();
-        let mut tick;
-
-        t.set_timeout_at(Duration::from_millis(100), "a").unwrap();
-
-        tick = ms_to_tick(&t, 50);
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 100);
-        assert_eq!(Some("a"), t.poll_to(tick));
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 150);
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 200);
-        assert_eq!(None, t.poll_to(tick));
-
-        assert_eq!(count(&t), 0);
-    }
-
-    #[test]
-    pub fn test_clearing_timeout() {
-        let mut t = timer();
-        let mut tick;
-
-        let to = t.set_timeout_at(Duration::from_millis(100), "a").unwrap();
-        assert_eq!("a", t.cancel_timeout(&to).unwrap());
-
-        tick = ms_to_tick(&t, 100);
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 200);
-        assert_eq!(None, t.poll_to(tick));
-
-        assert_eq!(count(&t), 0);
-    }
-
-    #[test]
-    pub fn test_multiple_timeouts_same_tick() {
-        let mut t = timer();
-        let mut tick;
-
-        t.set_timeout_at(Duration::from_millis(100), "a").unwrap();
-        t.set_timeout_at(Duration::from_millis(100), "b").unwrap();
-
-        let mut rcv = vec![];
-
-        tick = ms_to_tick(&t, 100);
-        rcv.push(t.poll_to(tick).unwrap());
-        rcv.push(t.poll_to(tick).unwrap());
-
-        assert_eq!(None, t.poll_to(tick));
-
-        rcv.sort();
-        assert!(rcv == ["a", "b"], "actual={:?}", rcv);
-
-        tick = ms_to_tick(&t, 200);
-        assert_eq!(None, t.poll_to(tick));
-
-        assert_eq!(count(&t), 0);
-    }
-
-    #[test]
-    pub fn test_multiple_timeouts_diff_tick() {
-        let mut t = timer();
-        let mut tick;
-
-        t.set_timeout_at(Duration::from_millis(110), "a").unwrap();
-        t.set_timeout_at(Duration::from_millis(220), "b").unwrap();
-        t.set_timeout_at(Duration::from_millis(230), "c").unwrap();
-        t.set_timeout_at(Duration::from_millis(440), "d").unwrap();
-        t.set_timeout_at(Duration::from_millis(560), "e").unwrap();
-
-        tick = ms_to_tick(&t, 100);
-        assert_eq!(Some("a"), t.poll_to(tick));
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 200);
-        assert_eq!(Some("c"), t.poll_to(tick));
-        assert_eq!(Some("b"), t.poll_to(tick));
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 300);
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 400);
-        assert_eq!(Some("d"), t.poll_to(tick));
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 500);
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 600);
-        assert_eq!(Some("e"), t.poll_to(tick));
-        assert_eq!(None, t.poll_to(tick));
-    }
-
-    #[test]
-    pub fn test_catching_up() {
-        let mut t = timer();
-
-        t.set_timeout_at(Duration::from_millis(110), "a").unwrap();
-        t.set_timeout_at(Duration::from_millis(220), "b").unwrap();
-        t.set_timeout_at(Duration::from_millis(230), "c").unwrap();
-        t.set_timeout_at(Duration::from_millis(440), "d").unwrap();
-
-        let tick = ms_to_tick(&t, 600);
-        assert_eq!(Some("a"), t.poll_to(tick));
-        assert_eq!(Some("c"), t.poll_to(tick));
-        assert_eq!(Some("b"), t.poll_to(tick));
-        assert_eq!(Some("d"), t.poll_to(tick));
-        assert_eq!(None, t.poll_to(tick));
-    }
-
-    #[test]
-    pub fn test_timeout_hash_collision() {
-        let mut t = timer();
-        let mut tick;
-
-        t.set_timeout_at(Duration::from_millis(100), "a").unwrap();
-        t.set_timeout_at(Duration::from_millis(100 + TICK * SLOTS as u64), "b").unwrap();
-
-        tick = ms_to_tick(&t, 100);
-        assert_eq!(Some("a"), t.poll_to(tick));
-        assert_eq!(1, count(&t));
-
-        tick = ms_to_tick(&t, 200);
-        assert_eq!(None, t.poll_to(tick));
-        assert_eq!(1, count(&t));
-
-        tick = ms_to_tick(&t, 100 + TICK * SLOTS as u64);
-        assert_eq!(Some("b"), t.poll_to(tick));
-        assert_eq!(0, count(&t));
-    }
-
-    #[test]
-    pub fn test_clearing_timeout_between_triggers() {
-        let mut t = timer();
-        let mut tick;
-
-        let a = t.set_timeout_at(Duration::from_millis(100), "a").unwrap();
-        let _ = t.set_timeout_at(Duration::from_millis(100), "b").unwrap();
-        let _ = t.set_timeout_at(Duration::from_millis(200), "c").unwrap();
-
-        tick = ms_to_tick(&t, 100);
-        assert_eq!(Some("b"), t.poll_to(tick));
-        assert_eq!(2, count(&t));
-
-        t.cancel_timeout(&a);
-        assert_eq!(1, count(&t));
-
-        assert_eq!(None, t.poll_to(tick));
-
-        tick = ms_to_tick(&t, 200);
-        assert_eq!(Some("c"), t.poll_to(tick));
-        assert_eq!(0, count(&t));
-    }
-
-    const TICK: u64 = 100;
-    const SLOTS: usize = 16;
-    const CAPACITY: usize = 32;
-
-    fn count<T>(timer: &Timer<T>) -> usize {
-        timer.entries.len()
-    }
-
-    fn timer() -> Timer<&'static str> {
-        Timer::new(TICK, SLOTS, CAPACITY, Instant::now())
-    }
-
-    fn ms_to_tick<T>(timer: &Timer<T>, ms: u64) -> u64 {
-        ms / timer.tick_ms
-    }
-
 }

@@ -17,8 +17,8 @@ use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
-use {Evented, Ready, Poll, PollOpt, Token};
-use poll;
+use {poll, Ready, Poll, PollOpt, Token};
+use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
 

@@ -5,7 +5,8 @@ use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr}
 
 use net2::TcpBuilder;
 
-use {io, sys, Evented, Ready, Poll, PollOpt, Token, IoVec};
+use {io, sys, Ready, Poll, PollOpt, Token, IoVec};
+use event::Evented;
 use super::SelectorId;
 
 /*

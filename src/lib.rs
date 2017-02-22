@@ -96,7 +96,7 @@ extern crate log;
 #[cfg(test)]
 extern crate env_logger;
 
-mod event;
+mod event_imp;
 mod io;
 mod iovec;
 mod net;
@@ -104,21 +104,21 @@ mod poll;
 mod sys;
 mod token;
 
+#[deprecated(since = "0.6.5", note = "use mio-more instead")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
 pub mod channel;
+
+#[deprecated(since = "0.6.5", note = "use mio-more instead")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
 pub mod timer;
 
-/// EventLoop and other deprecated types
+#[deprecated(since = "0.6.5", note = "update to use `Poll`")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
 pub mod deprecated;
 
-pub use event::{
-    PollOpt,
-    Ready,
-    Event,
-};
-pub use io::{
-    Evented,
-    would_block,
-};
 pub use iovec::IoVec;
 pub use net::{
     tcp,
@@ -126,19 +126,42 @@ pub use net::{
 };
 pub use poll::{
     Poll,
-    Events,
-    EventsIter,
     Registration,
     SetReadiness,
 };
-pub use token::{
-    Token,
+pub use event_imp::{
+    PollOpt,
+    Ready,
 };
+pub use token::Token;
+
+pub mod event {
+    pub use super::poll::{Events, Iter};
+    pub use super::event_imp::{Event, Evented};
+}
+
+pub use event::{
+    Events,
+};
+
+#[deprecated(since = "0.6.5", note = "use events:: instead")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
+pub use event::{Event, Evented};
+
+#[deprecated(since = "0.6.5", note = "use events::Iter instead")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
+pub use poll::Iter as EventsIter;
+
+#[deprecated(since = "0.6.5", note = "std::io::Error can avoid the allocation now")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
+pub use io::deprecated::would_block;
 
 #[cfg(unix)]
 pub mod unix {
     //! Unix only extensions
-
     pub use sys::{
         EventedFd,
     };
@@ -200,7 +223,7 @@ pub mod windows {
     pub use sys::{Overlapped, Binding};
 }
 
-// Conversion utilities
+#[cfg(feature = "with-deprecated")]
 mod convert {
     use std::time::Duration;
 
