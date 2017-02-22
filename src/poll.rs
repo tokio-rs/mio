@@ -2,7 +2,7 @@ use {sys, Token};
 use event_imp::{self as event, Ready, Event, Evented, PollOpt};
 use std::{fmt, io, ptr, usize};
 use std::cell::UnsafeCell;
-use std::{ops, isize};
+use std::{mem, ops, isize};
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool};
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed, SeqCst};
@@ -346,9 +346,6 @@ unsafe impl Send for SetReadiness {}
 unsafe impl Sync for SetReadiness {}
 
 struct RegistrationInner {
-    // ARC pointer to the Poll's readiness queue
-    queue: ReadinessQueue,
-
     // Unsafe pointer to the registration's node. The node is ref counted. This
     // cannot "simply" be tracked by an Arc because `Poll::poll` has an implicit
     // handle though it isn't stored anywhere. In other words, `Poll::poll`
@@ -431,6 +428,9 @@ struct ReadinessNode {
     // the CAS fails, then the `update` call returns immediately and the update
     // is discarded.
     update_lock: AtomicBool,
+
+    // Pointer to Arc<ReadinessQueueInner>
+    readiness_queue: AtomicPtr<()>,
 
     // Tracks the number of `ReadyRef` pointers
     ref_count: AtomicUsize,
@@ -1124,12 +1124,45 @@ pub fn selector(poll: &Poll) -> &sys::Selector {
  */
 
 impl Registration {
+    /// Unbound `Registration` handle
+    pub fn new2() -> (Registration, SetReadiness) {
+        // Allocate the registration node. The new node will have `ref_count`
+        // set to 2: one SetReadiness, one Registration.
+        let node = Box::into_raw(Box::new(ReadinessNode::new(
+                    ptr::null_mut(), Token(0), Ready::empty(), PollOpt::empty(), 2)));
+
+        let registration = Registration {
+            inner: RegistrationInner {
+                node: node,
+            },
+        };
+
+        let set_readiness = SetReadiness {
+            inner: RegistrationInner {
+                node: node,
+            },
+        };
+
+        (registration, set_readiness)
+    }
+
+    #[deprecated(since = "0.6.5", note = "use `bound` or `new2` instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
+    pub fn new(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
+        -> (Registration, SetReadiness)
+    {
+        Registration::bound(poll, token, interest, opt)
+    }
+
     /// Create a new `Registration` associated with the given `Poll` instance.
     ///
     /// The returned `Registration` will be associated with this `Poll` for its
     /// entire lifetime. Dropping the `Registration` will prevent any further
     /// notifications to be polled.
-    pub fn new(poll: &Poll, token: Token, interest: Ready, opt: PollOpt) -> (Registration, SetReadiness) {
+    pub fn bound(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
+        -> (Registration, SetReadiness)
+    {
         is_send::<Registration>();
         is_sync::<Registration>();
         is_send::<SetReadiness>();
@@ -1138,47 +1171,54 @@ impl Registration {
         // Clone handle to the readiness queue, this bumps the ref count
         let queue = poll.readiness_queue.clone();
 
+        // Convert to a *mut () pointer
+        let queue: *mut () = unsafe { mem::transmute(queue) };
+
         // Allocate the registration node. The new node will have `ref_count`
         // set to 3: one SetReadiness, one Registration, and one Poll handle.
-        let node = Box::into_raw(Box::new(ReadinessNode::new(token, interest, opt)));
+        let node = Box::into_raw(Box::new(ReadinessNode::new(
+                    queue, token, interest, opt, 3)));
 
         let registration = Registration {
             inner: RegistrationInner {
                 node: node,
-                queue: queue.clone(),
             },
         };
 
         let set_readiness = SetReadiness {
             inner: RegistrationInner {
                 node: node,
-                queue: queue.clone(),
             },
         };
 
         (registration, set_readiness)
     }
 
-    /// Update the registration details
-    ///
-    /// # Note
-    ///
-    /// `update` does not guarantee to establish any memory ordering. Any
-    /// concurrent data access must be synchronized using another strategy.
+    #[deprecated(since = "0.6.5", note = "use `Evented` impl")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     pub fn update(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.inner.update(poll, token, interest, opts)
     }
 
-    /// Disable the registration.
-    ///
-    /// No further notifcations for this registration will be polled until the
-    /// registration details are updated with `update`.
-    ///
-    /// # Note
-    ///
-    /// `deregister` does not guarantee to establish any memory ordering. Any
-    /// concurrent data access must be synchronized using another strategy.
+    #[deprecated(since = "0.6.5", note = "use `Evented` impl")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     pub fn deregister(&self, poll: &Poll) -> io::Result<()> {
+        self.inner.update(poll, Token(0), Ready::empty(), PollOpt::empty())
+    }
+}
+
+impl Evented for Registration {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
+        self.inner.update(poll, token, interest, opts)
+    }
+
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
+        self.inner.update(poll, token, interest, opts)
+    }
+
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
         self.inner.update(poll, Token(0), Ready::empty(), PollOpt::empty())
     }
 }
@@ -1190,7 +1230,7 @@ impl Drop for Registration {
         // the ref count).
         if self.inner.state.flag_as_dropped() {
             // Can't do anything if the queuing fails
-            let _ = self.inner.queue.enqueue_node_with_wakeup(&self.inner);
+            let _ = self.inner.enqueue_with_wakeup();
         }
     }
 }
@@ -1268,7 +1308,7 @@ impl RegistrationInner {
         if !state.is_queued() && next.is_queued() {
             // We toggled the queued flag, making us responsible for queuing the
             // node in the MPSC readiness queue.
-            try!(self.queue.enqueue_node_with_wakeup(self));
+            try!(self.enqueue_with_wakeup());
         }
 
         Ok(())
@@ -1276,9 +1316,32 @@ impl RegistrationInner {
 
     /// Update the registration details associated with the node
     fn update(&self, poll: &Poll, token: Token, interest: Ready, opt: PollOpt) -> io::Result<()> {
-        // Ensure poll instances match
-        if !self.queue.identical(&poll.readiness_queue) {
-            return Err(io::Error::new(io::ErrorKind::Other, "registration registered with another instance of Poll"));
+        // First, ensure poll instances match
+        //
+        // Load the queue pointer, `Relaxed` is sufficient here as only the
+        // pointer is being operated on. The actual memory is guaranteed to be
+        // visible the `poll: &Poll` ref passed as an argument to the function.
+        let mut queue = self.readiness_queue.load(Relaxed);
+        let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue.inner) };
+        let other = *other;
+
+        if queue.is_null() {
+            // Attempt to set the queue pointer. `Release` ordering synchronizes
+            // with `Acquire` in `ensure_with_wakeup`.
+            let actual = self.readiness_queue.compare_and_swap(
+                queue, other as *mut (), Release);
+
+            if !actual.is_null() {
+                // The CAS failed, another thread set the queue pointer, so ensure
+                // that the pointer and `other` match
+                if actual != other {
+                    return Err(io::Error::new(io::ErrorKind::Other, "registration handle associated with another `Poll` instance"));
+                }
+            }
+
+            queue = other;
+        } else if queue != other {
+            return Err(io::Error::new(io::ErrorKind::Other, "registration handle associated with another `Poll` instance"));
         }
 
         // The `update_lock` atomic is used as a flag ensuring only a single
@@ -1378,7 +1441,7 @@ impl RegistrationInner {
 
         if !state.is_queued() && next.is_queued() {
             // We are responsible for enqueing the node.
-            try!(self.queue.enqueue_node_with_wakeup(self));
+            try!(enqueue_with_wakeup(queue, self));
         }
 
         Ok(())
@@ -1423,7 +1486,6 @@ impl Clone for RegistrationInner {
         }
 
         RegistrationInner {
-            queue: self.queue.clone(),
             node: self.node.clone(),
         }
     }
@@ -1623,13 +1685,6 @@ impl ReadinessQueue {
 
         unsafe { *self.inner.tail_readiness.get() = end_marker; }
     }
-
-    fn identical(&self, other: &ReadinessQueue) -> bool {
-        let a = &*self.inner as *const ReadinessQueueInner;
-        let b = &*other.inner as *const ReadinessQueueInner;
-
-        a == b
-    }
 }
 
 impl ReadinessQueueInner {
@@ -1742,7 +1797,12 @@ impl Drop for ReadinessQueueInner {
 
 impl ReadinessNode {
     /// Return a new `ReadinessNode`, initialized with a ref_count of 3.
-    fn new(token: Token, interest: Ready, opt: PollOpt) -> ReadinessNode {
+    fn new(queue: *mut (),
+           token: Token,
+           interest: Ready,
+           opt: PollOpt,
+           ref_count: usize) -> ReadinessNode
+    {
         ReadinessNode {
             state: AtomicState::new(interest, opt),
             // Only the first token is set, the others are initialized to 0
@@ -1751,7 +1811,8 @@ impl ReadinessNode {
             token_2: UnsafeCell::new(Token(0)),
             next_readiness: AtomicPtr::new(ptr::null_mut()),
             update_lock: AtomicBool::new(false),
-            ref_count: AtomicUsize::new(3),
+            readiness_queue: AtomicPtr::new(queue),
+            ref_count: AtomicUsize::new(ref_count),
         }
     }
 
@@ -1763,9 +1824,28 @@ impl ReadinessNode {
             token_2: UnsafeCell::new(Token(0)),
             next_readiness: AtomicPtr::new(ptr::null_mut()),
             update_lock: AtomicBool::new(false),
+            readiness_queue: AtomicPtr::new(ptr::null_mut()),
             ref_count: AtomicUsize::new(0),
         }
     }
+
+    fn enqueue_with_wakeup(&self) -> io::Result<()> {
+        let queue = self.readiness_queue.load(Acquire);
+
+        if queue.is_null() {
+            // Not associated with a queue, nothing to do
+            return Ok(());
+        }
+
+        enqueue_with_wakeup(queue, self)
+    }
+}
+
+fn enqueue_with_wakeup(queue: *mut (), node: &ReadinessNode) -> io::Result<()> {
+    debug_assert!(!queue.is_null());
+    // This is ugly... but we don't want to bump the ref count.
+    let queue: &ReadinessQueue = unsafe { mem::transmute(&queue) };
+    queue.enqueue_node_with_wakeup(node)
 }
 
 unsafe fn token(node: &ReadinessNode, pos: usize) -> Token {
@@ -1785,7 +1865,16 @@ fn release_node(ptr: *mut ReadinessNode) {
             return;
         }
 
-        let _ = Box::from_raw(ptr);
+        let node = Box::from_raw(ptr);
+
+        // Decrement the readiness_queue Arc
+        let queue = node.readiness_queue.load(Acquire);
+
+        if queue.is_null() {
+            return;
+        }
+
+        let _: Arc<ReadinessQueueInner> = mem::transmute(queue);
     }
 }
 
