@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 // represented by `sys::Selector`. The system readiness queue handles events
 // provided by the system, such as TCP and UDP. The second readiness queue is
 // implemented in user space by `ReadinessQueue`. It provides a way to implement
-// purely userspace `Evented` types.
+// purely user space `Evented` types.
 //
 // `ReadinessQueue` is is backed by a MPSC queue that supports reuse of linked
 // list nodes. This significantly reduces the number of required allocations.
@@ -319,8 +319,12 @@ pub struct Poll {
     condvar: Condvar,
 }
 
-/// Handle to a Poll registration. Used for registering custom types for event
-/// notifications.
+/// Handle to a user space `Poll` registration.
+///
+/// `Registration` allows implementing [`Evented`] for types that cannot work
+/// with the [system selector].
+///
+/// [system selector]: struct.Poll.html#implementation-notes
 pub struct Registration {
     inner: RegistrationInner,
 }
@@ -328,8 +332,11 @@ pub struct Registration {
 unsafe impl Send for Registration {}
 unsafe impl Sync for Registration {}
 
-/// Used to update readiness for an associated `Registration`. `SetReadiness`
-/// is `Sync` which allows it to be updated across threads.
+/// Updates the readiness state of the associated [`Registration`].
+///
+/// See [`Registration`] for more documentation on using `SetReadiness`.
+///
+/// [`Registration`]
 #[derive(Clone)]
 pub struct SetReadiness {
     inner: RegistrationInner,
@@ -777,6 +784,10 @@ impl Poll {
     ///
     /// See the [struct] level documentation for a higher level discussion of
     /// polling.
+    ///
+    /// [`readable`]: struct.Ready.html#method.readable
+    /// [`writable`]: struct.Ready.html#method.writable
+    /// [struct]: #
     ///
     /// # Examples
     ///
