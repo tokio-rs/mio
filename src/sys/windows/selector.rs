@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use std::{io, u32};
 use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
@@ -11,7 +13,7 @@ use winapi::*;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 
-use event_imp::{Event, Ready};
+use event_imp::{Event, Evented, Ready};
 use poll::{self, Poll};
 use sys::windows::buffer_pool::BufferPool;
 use {Token, PollOpt};
@@ -359,7 +361,7 @@ impl ReadyBinding {
         }  else {
             events
         };
-        let (r, s) = poll::Registration::new(poll, token, events, opts);
+        let (r, s) = poll::new_registration(poll, token, events, opts);
         self.readiness = Some(s);
         *registration.lock().unwrap() = Some(r);
         Ok(())
@@ -388,7 +390,7 @@ impl ReadyBinding {
         };
         registration.lock().unwrap()
                     .as_mut().unwrap()
-                    .update(poll, token, events, opts)
+                    .reregister(poll, token, events, opts)
     }
 
     /// Implementation of the `Evented::deregister` function.

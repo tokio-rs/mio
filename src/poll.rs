@@ -1333,6 +1333,14 @@ pub fn selector(poll: &Poll) -> &sys::Selector {
  *
  */
 
+// TODO: get rid of this, windows depends on it for now
+#[allow(dead_code)]
+pub fn new_registration(poll: &Poll, token: Token, ready: Ready, opt: PollOpt)
+        -> (Registration, SetReadiness)
+{
+    Registration::new_priv(poll, token, ready, opt)
+}
+
 impl Registration {
     /// Create and return a new `Registration` and the associated
     /// `SetReadiness`.
@@ -1398,6 +1406,13 @@ impl Registration {
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     pub fn new(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
+        -> (Registration, SetReadiness)
+    {
+        Registration::new_priv(poll, token, interest, opt)
+    }
+
+    // TODO: Get rid of this (windows depends on it for now)
+    fn new_priv(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
         -> (Registration, SetReadiness)
     {
         is_send::<Registration>();
