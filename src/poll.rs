@@ -1644,16 +1644,27 @@ impl RegistrationInner {
         // pointer is being operated on. The actual memory is guaranteed to be
         // visible the `poll: &Poll` ref passed as an argument to the function.
         let mut queue = self.readiness_queue.load(Relaxed);
-        let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue.inner) };
+        let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue) };
         let other = *other;
+
+        debug_assert_eq!(other as usize, unsafe { mem::transmute(poll.readiness_queue.inner.clone()) });
+        debug_assert!(mem::size_of::<ReadinessQueue>() == mem::size_of::<*mut ()>());
 
         if queue.is_null() {
             // Attempt to set the queue pointer. `Release` ordering synchronizes
             // with `Acquire` in `ensure_with_wakeup`.
             let actual = self.readiness_queue.compare_and_swap(
-                queue, other as *mut (), Release);
+                queue, other, Release);
 
-            if !actual.is_null() {
+            if actual.is_null() {
+                // The CAS succeeded, this means that the node's ref count
+                // should be incremented to reflect that the `poll` function
+                // effectively owns the node as well.
+                //
+                // `Relaxed` ordering used for the same reason as in
+                // RegistrationInner::clone
+                self.ref_count.fetch_add(1, Relaxed);
+            } else {
                 // The CAS failed, another thread set the queue pointer, so ensure
                 // that the pointer and `other` match
                 if actual != other {
@@ -1665,6 +1676,8 @@ impl RegistrationInner {
         } else if queue != other {
             return Err(io::Error::new(io::ErrorKind::Other, "registration handle associated with another `Poll` instance"));
         }
+
+        debug_assert_eq!(queue as usize, unsafe { mem::transmute(poll.readiness_queue.inner.clone()) });
 
         // The `update_lock` atomic is used as a flag ensuring only a single
         // thread concurrently enters the `update` critical section. Any
@@ -2013,7 +2026,6 @@ impl ReadinessQueueInner {
     /// Push the node into the readiness queue
     fn enqueue_node(&self, node: &ReadinessNode) -> bool {
         // This is the 1024cores.net intrusive MPSC queue [1] "push" function.
-
         let node_ptr = node as *const _ as *mut _;
 
         // Relaxed used as the ordering is "released" when swapping

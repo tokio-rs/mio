@@ -20,6 +20,45 @@ fn smoke() {
 }
 
 #[test]
+fn set_readiness_before_register() {
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    let poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(128);
+
+    for i in 0..5_000 {
+        let (r, set) = Registration::new2();
+
+        let b1 = Arc::new(Barrier::new(2));
+        let b2 = b1.clone();
+
+        let th = thread::spawn(move || {
+            b2.wait();
+            set.set_readiness(Ready::readable()).unwrap();
+        });
+
+        b1.wait();
+
+        poll.register(&r, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+
+        loop {
+            let n = poll.poll(&mut events, None).unwrap();
+
+            if n == 0 {
+                continue;
+            }
+
+            assert_eq!(n, 1);
+            assert_eq!(events.get(0).unwrap().token(), Token(0));
+            break;
+        }
+
+        th.join().unwrap();
+    }
+}
+
+#[test]
 fn stress_single_threaded_poll() {
     use std::sync::Arc;
     use std::sync::atomic::AtomicUsize;
