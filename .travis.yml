@@ -39,7 +39,7 @@ matrix:
         - cargo test
         - cargo doc --no-deps
       after_success:
-        - travis-cargo --only nightly doc-upload
+        - travis-cargo doc-upload
       install:
 
     # Test on latest stable
