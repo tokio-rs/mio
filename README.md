@@ -1,23 +1,20 @@
-# MIO - Metal IO
+# Mio - Metal IO
 
-MIO is a lightweight IO library for Rust with a focus on adding as
-little overhead as possible over the OS abstractions.
+Mio is a lightweight I/O library for Rust with a focus on adding as little
+overhead as possible over the OS abstractions.
 
 [![crates.io](http://meritbadge.herokuapp.com/mio)](https://crates.io/crates/mio)
 [![Build Status](https://travis-ci.org/carllerche/mio.svg?branch=master)](https://travis-ci.org/carllerche/mio)
 [![Build status](https://ci.appveyor.com/api/projects/status/ok90r1tcgkyndnvw/branch/master?svg=true)](https://ci.appveyor.com/project/carllerche/mio/branch/master)
 
-**Getting started guide**
-
-Currently a work in progress: [Getting
-Started](https://github.com/carllerche/mio/blob/getting-started/doc/getting-started.md).
-Feedback can be posted on the [PR](https://github.com/carllerche/mio/pull/222).
-
 **API documentation**
 
-* [master](http://rust-doc.s3-website-us-east-1.amazonaws.com/mio/master/mio/)
+* [master](http://carllerche.github.io/mio)
 * [v0.6](https://docs.rs/mio/^0.6)
 * [v0.5](https://docs.rs/mio/^0.5)
+
+This is a low level library, if you are looking for something easier to get
+started with, see [Tokio](https://tokio.rs).
 
 ## Usage
 
@@ -57,21 +54,12 @@ Currently supported platforms:
 * Linux
 * OS X
 * Windows
-* Android
 * NetBSD
+* Android
+* iOS
 
 There are potentially others. If you find that Mio works on another
 platform, submit a PR to update the list!
-
-## Resources
-
-Please submit PRs containing links to MIO resources.
-
-* [Mio Rustcamp talk](http://confreaks.tv/videos/rustcamp2015-writing-high-performance-async-io-apps)
-* [My Basic Understanding of mio and Asynchronous IO](http://hermanradtke.com/2015/07/12/my-basic-understanding-of-mio-and-async-io.html)
-* [Creating A Multi-echo Server using Rust and mio](http://hermanradtke.com/2015/07/22/creating-a-multi-echo-server-using-rust-and-mio.html)
-* [Writing Scalable Chat Service from Scratch](http://nbaksalyar.github.io/2015/07/10/writing-chat-in-rust.html)
-* [Design Notes About Rotor Library](https://medium.com/@paulcolomiets/asynchronous-io-in-rust-36b623e7b965)
 
 ### Libraries
 
