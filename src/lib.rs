@@ -83,6 +83,7 @@
 extern crate lazycell;
 extern crate net2;
 extern crate slab;
+extern crate iovec;
 
 #[cfg(unix)]
 extern crate libc;
@@ -104,7 +105,6 @@ extern crate env_logger;
 
 mod event_imp;
 mod io;
-mod iovec;
 mod net;
 mod poll;
 mod sys;
@@ -125,7 +125,11 @@ pub mod timer;
 #[doc(hidden)]
 pub mod deprecated;
 
+#[deprecated(since = "0.6.5", note = "use iovec crate directly")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
 pub use iovec::IoVec;
+
 pub use net::{
     tcp,
     udp,
