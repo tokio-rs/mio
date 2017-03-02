@@ -516,3 +516,27 @@ fn connection_reset_by_peer() {
     }
 
 }
+
+ #[test]
+ fn connect_error() {
+     let poll = Poll::new().unwrap();
+     let mut events = Events::with_capacity(16);
+
+     // Pick a "random" port that shouldn't be in use.
+     let l = TcpStream::connect(&"127.0.0.1:38381".parse().unwrap()).unwrap();
+     poll.register(&l, Token(0), Ready::writable(), PollOpt::edge()).unwrap();
+
+     'outer:
+     loop {
+         poll.poll(&mut events, None).unwrap();
+
+         for event in &events {
+             if event.token() == Token(0) {
+                 assert!(event.kind().is_writable());
+                 break 'outer
+             }
+         }
+     }
+
+     assert!(l.take_error().unwrap().is_some());
+ }

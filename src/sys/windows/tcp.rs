@@ -163,7 +163,34 @@ impl TcpStream {
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.imp.inner.socket.take_error()
+        if let Some(e) = try!(self.imp.inner.socket.take_error()) {
+            return Ok(Some(e))
+        }
+
+        // If the syscall didn't return anything then also check to see if we've
+        // squirreled away an error elsewhere for example as part of a connect
+        // operation.
+        //
+        // Typically this is used like so:
+        //
+        // 1. A `connect` is issued
+        // 2. Wait for the socket to be writable
+        // 3. Call `take_error` to see if the connect succeeded.
+        //
+        // Right now the `connect` operation finishes in `read_done` below and
+        // fill will in `State::Error` in the `read` slot if it fails, so we
+        // extract that here.
+        let mut me = self.inner();
+        match mem::replace(&mut me.read, State::Empty) {
+            State::Error(e) => {
+                self.imp.schedule_read(&mut me);
+                Ok(Some(e))
+            }
+            other => {
+                me.read = other;
+                Ok(None)
+            }
+        }
     }
 
     fn inner(&self) -> MutexGuard<StreamInner> {
@@ -465,7 +492,7 @@ fn read_done(status: &OVERLAPPED_ENTRY) {
             me2.schedule_read(&mut me);
         }
         Err(e) => {
-            me2.add_readiness(&mut me, Ready::readable());
+            me2.add_readiness(&mut me, Ready::readable() | Ready::writable());
             me.read = State::Error(e);
         }
     }
