@@ -27,7 +27,7 @@ fn set_readiness_before_register() {
     let poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(128);
 
-    for i in 0..5_000 {
+    for _ in 0..5_000 {
         let (r, set) = Registration::new2();
 
         let b1 = Arc::new(Barrier::new(2));
@@ -40,7 +40,7 @@ fn set_readiness_before_register() {
 
         b1.wait();
 
-        poll.register(&r, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+        poll.register(&r, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
 
         loop {
             let n = poll.poll(&mut events, None).unwrap();
@@ -50,7 +50,7 @@ fn set_readiness_before_register() {
             }
 
             assert_eq!(n, 1);
-            assert_eq!(events.get(0).unwrap().token(), Token(0));
+            assert_eq!(events.get(0).unwrap().token(), Token(123));
             break;
         }
 
