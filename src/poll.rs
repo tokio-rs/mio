@@ -2392,7 +2392,7 @@ impl ReadinessState {
     #[inline]
     fn update_token_read_pos(&mut self) {
         let val = self.token_write_pos();
-        self.set(val, MASK_2, TOKEN_WR_SHIFT);
+        self.set(val, MASK_2, TOKEN_RD_SHIFT);
     }
 }
 
