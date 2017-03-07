@@ -252,8 +252,6 @@ impl TcpStream {
 
         let mut amt = 0;
         for buf in bufs {
-            let buf = buf.as_mut_bytes();
-
             match (&self.imp.inner.socket).read(buf) {
                 // If we did a partial read, then return what we've read so far
                 Ok(n) if n < buf.len() => return Ok(amt + n),
@@ -315,10 +313,10 @@ impl TcpStream {
             return Ok(0)
         }
 
-        let len = bufs.iter().map(|b| b.as_bytes().len()).fold(0, |a, b| a + b);
+        let len = bufs.iter().map(|b| b.len()).fold(0, |a, b| a + b);
         let mut intermediate = me.iocp.get_buffer(len);
         for buf in bufs {
-            intermediate.extend_from_slice(buf.as_bytes());
+            intermediate.extend_from_slice(buf);
         }
         self.imp.schedule_write(intermediate, 0, me);
         Ok(len)
