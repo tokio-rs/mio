@@ -31,7 +31,7 @@ use std::time::{Duration, Instant};
 //
 // The readiness node is ref counted using the `ref_count` field. On creation,
 // the ref_count is initialized to 3: one `Registration` handle, one
-// `SetReadiness` handle, and for the readiness queue. Since the readiness queue
+// `SetReadiness` handle, and one for the readiness queue. Since the readiness queue
 // doesn't *always* hold a handle to the node, we don't use the Arc type for
 // managing ref counts (this is to avoid constantly incrementing and
 // decrementing the ref count when pushing & popping from the queue). When the
