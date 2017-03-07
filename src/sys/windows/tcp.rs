@@ -640,10 +640,12 @@ impl TcpListener {
         })
     }
 
+    #[allow(deprecated)]
     pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
         self.imp.inner.socket.set_only_v6(only_v6)
     }
 
+    #[allow(deprecated)]
     pub fn only_v6(&self) -> io::Result<bool> {
         self.imp.inner.socket.only_v6()
     }
