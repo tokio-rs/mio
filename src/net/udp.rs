@@ -1,10 +1,22 @@
 //! Primitives for working with UDP
+//!
+//! The types provided in this module are non-blocking by default and are
+//! designed to be portable across all supported Mio platforms. As long as the
+//! [portability guidelines] are followed, the behavior should be identical no
+//! matter the target platform.
+//!
+/// [portability guidelines]: ../struct.Poll.html#portability
 
 use {io, sys, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use super::SelectorId;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 
+/// A User Datagram Protocol socket.
+///
+/// This is an implementation of a bound UDP socket. This supports both IPv4 and
+/// IPv6 addresses, and there is no corresponding notion of a server because UDP
+/// is a datagram protocol.
 #[derive(Debug)]
 pub struct UdpSocket {
     sys: sys::UdpSocket,
