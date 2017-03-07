@@ -28,12 +28,14 @@ pub fn set_cloexec(fd: libc::c_int) -> io::Result<()> {
  *
  */
 
+/// Manages a FD
 #[derive(Debug)]
 pub struct Io {
     fd: File,
 }
 
 impl Io {
+    /// Try to clone the FD
     pub fn try_clone(&self) -> io::Result<Io> {
         Ok(Io { fd: try!(self.fd.try_clone()) })
     }

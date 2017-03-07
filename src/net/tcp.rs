@@ -1,4 +1,12 @@
 //! Primitives for working with TCP
+//!
+//! The types provided in this module are non-blocking by default and are
+//! designed to be portable across all supported Mio platforms. As long as the
+//! [portability guidelines] are followed, the behavior should be identical no
+//! matter the target platform.
+//!
+/// [portability guidelines]: ../struct.Poll.html#portability
+
 
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
@@ -15,6 +23,32 @@ use super::SelectorId;
  *
  */
 
+/// A non-blocking TCP stream between a local socket and a remote socket.
+///
+/// The socket will be closed when the value is dropped.
+///
+/// # Examples
+///
+/// ```
+/// # use std::net::TcpListener;
+/// # let _listener = TcpListener::bind("127.0.0.1:3454").unwrap();
+/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use mio::tcp::TcpStream;
+/// use std::time::Duration;
+///
+/// let stream = TcpStream::connect(&"127.0.0.1:34254".parse().unwrap()).unwrap();
+///
+/// let poll = Poll::new().unwrap();
+/// let mut events = Events::with_capacity(128);
+///
+/// // Register the socket with `Poll`
+/// poll.register(&stream, Token(0), Ready::writable(),
+///               PollOpt::edge()).unwrap();
+///
+/// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+///
+/// // The socket might be ready at this point
+/// ```
 #[derive(Debug)]
 pub struct TcpStream {
     sys: sys::TcpStream,
@@ -303,6 +337,28 @@ impl Evented for TcpStream {
  *
  */
 
+/// A structure representing a socket server
+///
+/// # Examples
+///
+/// ```
+/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use mio::tcp::TcpListener;
+/// use std::time::Duration;
+///
+/// let listener = TcpListener::bind(&"127.0.0.1:34254".parse().unwrap()).unwrap();
+///
+/// let poll = Poll::new().unwrap();
+/// let mut events = Events::with_capacity(128);
+///
+/// // Register the socket with `Poll`
+/// poll.register(&listener, Token(0), Ready::writable(),
+///               PollOpt::edge()).unwrap();
+///
+/// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+///
+/// // There may be a socket ready to be accepted
+/// ```
 #[derive(Debug)]
 pub struct TcpListener {
     sys: sys::TcpListener,

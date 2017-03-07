@@ -78,7 +78,7 @@
 #![doc(html_root_url = "https://docs.rs/mio/0.6.1")]
 #![crate_name = "mio"]
 
-#![deny(warnings)]
+#![deny(warnings, missing_docs)]
 
 extern crate lazycell;
 extern crate net2;
