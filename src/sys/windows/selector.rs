@@ -360,13 +360,6 @@ impl ReadyBinding {
             try!(self.binding.register_socket(socket, token, poll));
         }
 
-        // To keep the same semantics as epoll, if I/O objects are interested in
-        // being readable then they're also interested in listening for hup
-        let events = if events.is_readable() {
-            events | Ready::hup()
-        }  else {
-            events
-        };
         let (r, s) = poll::new_registration(poll, token, events, opts);
         self.readiness = Some(s);
         *registration.lock().unwrap() = Some(r);
@@ -387,13 +380,6 @@ impl ReadyBinding {
             try!(self.binding.reregister_socket(socket, token, poll));
         }
 
-        // To keep the same semantics as epoll, if I/O objects are interested in
-        // being readable then they're also interested in listening for hup
-        let events = if events.is_readable() {
-            events | Ready::hup()
-        }  else {
-            events
-        };
         registration.lock().unwrap()
                     .as_mut().unwrap()
                     .reregister(poll, token, events, opts)

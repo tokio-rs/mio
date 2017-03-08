@@ -395,15 +395,8 @@ impl StreamImp {
                 mem::forget(self.clone());
             }
             Err(e) => {
-                // Like above, be sure to indicate that hup has happened
-                // whenever we get `ECONNRESET`
-                let mut set = Ready::readable();
-                if e.raw_os_error() == Some(WSAECONNRESET as i32) {
-                    trace!("tcp stream at hup: econnreset");
-                    set = set | Ready::hup();
-                }
                 me.read = State::Error(e);
-                self.add_readiness(me, set);
+                self.add_readiness(me, Ready::readable());
             }
         }
     }

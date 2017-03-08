@@ -22,6 +22,7 @@ pub use self::kqueue::{Events, Selector};
 mod awakener;
 mod eventedfd;
 mod io;
+mod ready;
 mod tcp;
 mod udp;
 
@@ -31,6 +32,7 @@ mod uds;
 pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
 pub use self::io::{Io, set_nonblock};
+pub use self::ready::UnixReady;
 pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 

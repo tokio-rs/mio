@@ -20,7 +20,7 @@ const EPOLLONESHOT: libc::c_int = 0x40000000;
 
 use {io, Ready, PollOpt, Token};
 use event_imp::Event;
-use sys::unix::cvt;
+use sys::unix::{cvt, UnixReady};
 use sys::unix::io::set_cloexec;
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
@@ -139,11 +139,22 @@ impl Selector {
     }
 }
 
+#[cfg(feature = "with-deprecated")]
+#[allow(deprecated)]
+fn is_urgent(opts: PollOpt) -> bool {
+    opts.is_urgent()
+}
+
+#[cfg(not(feature = "with-deprecated"))]
+fn is_urgent(_: PollOpt) -> bool {
+    false
+}
+
 fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
     let mut kind = 0;
 
     if interest.is_readable() {
-        if opts.is_urgent() {
+        if is_urgent(opts) {
             kind |= EPOLLPRI;
         } else {
             kind |= EPOLLIN;
@@ -154,7 +165,7 @@ fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
         kind |= EPOLLOUT;
     }
 
-    if interest.is_hup() {
+    if UnixReady::from(interest).is_hup() {
         kind |= EPOLLRDHUP;
     }
 
@@ -223,11 +234,11 @@ impl Events {
 
             // EPOLLHUP - Usually means a socket error happened
             if (epoll & EPOLLERR) != 0 {
-                kind = kind | Ready::error();
+                kind = kind | UnixReady::error();
             }
 
             if (epoll & EPOLLRDHUP) != 0 || (epoll & EPOLLHUP) != 0 {
-                kind = kind | Ready::hup();
+                kind = kind | UnixReady::hup();
             }
 
             let token = self.events[idx].u64;
