@@ -1185,6 +1185,7 @@ pub struct Events {
 ///
 /// [`Events`]: struct.Events.html
 /// [`iter`]: struct.Events.html#method.iter
+#[derive(Debug)]
 pub struct Iter<'a> {
     inner: &'a Events,
     pos: usize,
@@ -1318,6 +1319,15 @@ impl<'a> Iterator for Iter<'a> {
         let ret = self.inner.get(self.pos);
         self.pos += 1;
         ret
+    }
+}
+
+impl fmt::Debug for Events {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Events")
+            .field("len", &self.len())
+            .field("capacity", &self.capacity())
+            .finish()
     }
 }
 
@@ -1583,6 +1593,12 @@ impl SetReadiness {
     /// [`poll`]: struct.Poll.html#method.poll
     pub fn set_readiness(&self, ready: Ready) -> io::Result<()> {
         self.inner.set_readiness(ready)
+    }
+}
+
+impl fmt::Debug for SetReadiness {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "SetReadiness")
     }
 }
 

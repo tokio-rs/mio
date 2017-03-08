@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use std::{io, u32};
+use std::{fmt, io, u32};
 use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
@@ -268,6 +268,12 @@ impl Binding {
     }
 }
 
+impl fmt::Debug for Binding {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Binding")
+    }
+}
+
 /// Helper struct used for TCP and UDP which bundles a `binding` with a
 /// `SetReadiness` handle.
 pub struct ReadyBinding {
@@ -520,6 +526,12 @@ impl Overlapped {
         unsafe {
             (*self.inner.get()).raw()
         }
+    }
+}
+
+impl fmt::Debug for Overlapped {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Overlapped")
     }
 }
 

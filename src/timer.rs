@@ -1,6 +1,6 @@
 //! Timer optimized for I/O related operations
 
-#![allow(deprecated)]
+#![allow(deprecated, missing_debug_implementations)]
 
 use {convert, io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::LazyCell;
