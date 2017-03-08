@@ -17,7 +17,7 @@ pub use self::unix::{
 pub use self::unix::UnixSocket;
 
 #[cfg(unix)]
-mod unix;
+pub mod unix;
 
 #[cfg(windows)]
 pub use self::windows::{

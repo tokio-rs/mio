@@ -177,6 +177,7 @@ pub mod unix {
     pub use sys::{
         EventedFd,
     };
+    pub use sys::unix::UnixReady;
 }
 
 /// Windows-only extensions to the mio crate.

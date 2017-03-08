@@ -9,7 +9,7 @@ use libc::{self, time_t};
 
 use {io, Ready, PollOpt, Token};
 use event_imp::{self as event, Event};
-use sys::unix::cvt;
+use sys::unix::{cvt, UnixReady};
 use sys::unix::io::set_cloexec;
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
@@ -221,7 +221,7 @@ impl Events {
             }
 
             if e.flags & libc::EV_ERROR != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::error());
+                event::kind_mut(&mut self.events[idx]).insert(*UnixReady::error());
             }
 
             if e.filter == libc::EVFILT_READ {
@@ -231,12 +231,12 @@ impl Events {
             }
 
             if e.flags & libc::EV_EOF != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::hup());
+                event::kind_mut(&mut self.events[idx]).insert(UnixReady::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
                 if e.fflags != 0 {
-                    event::kind_mut(&mut self.events[idx]).insert(Ready::error());
+                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::error());
                 }
             }
         }
