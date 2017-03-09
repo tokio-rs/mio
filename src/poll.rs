@@ -1647,7 +1647,6 @@ impl RegistrationInner {
         let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue) };
         let other = *other;
 
-        debug_assert_eq!(other as usize, unsafe { mem::transmute(poll.readiness_queue.inner.clone()) });
         debug_assert!(mem::size_of::<ReadinessQueue>() == mem::size_of::<*mut ()>());
 
         if queue.is_null() {
@@ -1687,7 +1686,10 @@ impl RegistrationInner {
             return Err(io::Error::new(io::ErrorKind::Other, "registration handle associated with another `Poll` instance"));
         }
 
-        debug_assert_eq!(queue as usize, unsafe { mem::transmute(poll.readiness_queue.inner.clone()) });
+        unsafe {
+            let actual = &poll.readiness_queue.inner as *const _ as *const usize;
+            debug_assert_eq!(queue as usize, *actual);
+        }
 
         // The `update_lock` atomic is used as a flag ensuring only a single
         // thread concurrently enters the `update` critical section. Any
