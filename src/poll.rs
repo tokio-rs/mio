@@ -1664,6 +1664,16 @@ impl RegistrationInner {
                 // `Relaxed` ordering used for the same reason as in
                 // RegistrationInner::clone
                 self.ref_count.fetch_add(1, Relaxed);
+
+                // Note that the `queue` reference stored in our
+                // `readiness_queue` field is intended to be a strong reference,
+                // so now that we've successfully claimed the reference we bump
+                // the refcount here.
+                //
+                // Down below in `release_node` when we deallocate this
+                // `RegistrationInner` is where we'll transmute this back to an
+                // arc and decrement the reference count.
+                mem::forget(poll.readiness_queue.clone());
             } else {
                 // The CAS failed, another thread set the queue pointer, so ensure
                 // that the pointer and `other` match
