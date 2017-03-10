@@ -505,11 +505,12 @@ impl fmt::Debug for PollOpt {
     }
 }
 
-/// A set of readiness events
+/// A set of readiness event kinds
 ///
-/// `Ready` is a set of operation descriptors indicating that an operation is
-/// ready to be performed. For example, `Ready::readable()` indicates that the
-/// associated `Evented` handle is ready to perform a `read` operation.
+/// `Ready` is a set of operation descriptors indicating which kind of an
+/// operation is ready to be performed. For example, `Ready::readable()`
+/// indicates that the associated `Evented` handle is ready to perform a
+/// `read` operation.
 ///
 /// **Note that only readable and writable readiness is guaranteed to be
 /// supported on all platforms**. This means that `error` and `hup` readiness

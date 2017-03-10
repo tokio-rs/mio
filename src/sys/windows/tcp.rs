@@ -10,8 +10,9 @@ use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
 use net::tcp::Shutdown;
 use winapi::*;
+use iovec::IoVec;
 
-use {poll, Ready, Poll, PollOpt, Token, IoVec};
+use {poll, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
@@ -252,8 +253,6 @@ impl TcpStream {
 
         let mut amt = 0;
         for buf in bufs {
-            let buf = buf.as_mut_bytes();
-
             match (&self.imp.inner.socket).read(buf) {
                 // If we did a partial read, then return what we've read so far
                 Ok(n) if n < buf.len() => return Ok(amt + n),
@@ -315,10 +314,10 @@ impl TcpStream {
             return Ok(0)
         }
 
-        let len = bufs.iter().map(|b| b.as_bytes().len()).fold(0, |a, b| a + b);
+        let len = bufs.iter().map(|b| b.len()).fold(0, |a, b| a + b);
         let mut intermediate = me.iocp.get_buffer(len);
         for buf in bufs {
-            intermediate.extend_from_slice(buf.as_bytes());
+            intermediate.extend_from_slice(buf);
         }
         self.imp.schedule_write(intermediate, 0, me);
         Ok(len)
@@ -641,10 +640,12 @@ impl TcpListener {
         })
     }
 
+    #[allow(deprecated)]
     pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
         self.imp.inner.socket.set_only_v6(only_v6)
     }
 
+    #[allow(deprecated)]
     pub fn only_v6(&self) -> io::Result<bool> {
         self.imp.inner.socket.only_v6()
     }

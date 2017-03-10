@@ -149,13 +149,11 @@ mod tcp;
 mod udp;
 mod from_raw_arc;
 mod buffer_pool;
-mod iovec;
 
 pub use self::awakener::Awakener;
 pub use self::selector::{Events, Selector, Overlapped, Binding};
 pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
-pub use self::iovec::IoVec;
 
 #[derive(Copy, Clone)]
 enum Family {
