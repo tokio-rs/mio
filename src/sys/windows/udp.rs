@@ -116,6 +116,41 @@ impl UdpSocket {
         Ok(Some(amt))
     }
 
+    /// Note that unlike `TcpStream::write` this function will not attempt to
+    /// continue writing `buf` until its entirely written.
+    ///
+    /// TODO: This... may be wrong in the long run. We're reporting that we
+    ///       successfully wrote all of the bytes in `buf` but it's possible
+    ///       that we don't actually end up writing all of them!
+    pub fn send(&self, buf: &[u8])
+                   -> io::Result<Option<usize>> {
+        let mut me = self.inner();
+        let me = &mut *me;
+
+        match me.write {
+            State::Empty => {}
+            _ => return Ok(None),
+        }
+
+        if !me.iocp.registered() {
+            return Ok(None)
+        }
+
+        let interest = me.iocp.readiness();
+        me.iocp.set_readiness(interest & !Ready::writable());
+
+        let mut owned_buf = me.iocp.get_buffer(64 * 1024);
+        let amt = try!(owned_buf.write(buf));
+        try!(unsafe {
+            trace!("scheduling a send");
+            self.imp.inner.socket.send_overlapped(&owned_buf, self.imp.inner.write.as_mut_ptr())
+
+        });
+        me.write = State::Pending(owned_buf);
+        mem::forget(self.imp.clone());
+        Ok(Some(amt))
+    }
+
     pub fn recv_from(&self, mut buf: &mut [u8])
                      -> io::Result<Option<(usize, SocketAddr)>> {
         let mut me = self.inner();
@@ -137,15 +172,50 @@ impl UdpSocket {
                                            "failed to parse socket address"))
                     };
                     me.iocp.put_buffer(data);
-                    self.imp.schedule_read(&mut me);
+                    self.imp.schedule_read_from(&mut me);
                     r
                 }
             }
             State::Error(e) => {
-                self.imp.schedule_read(&mut me);
+                self.imp.schedule_read_from(&mut me);
                 Err(e)
             }
         }
+    }
+
+    pub fn recv(&self, mut buf: &mut [u8])
+                     -> io::Result<Option<usize>> {
+        let mut me = self.inner();
+        match mem::replace(&mut me.read, State::Empty) {
+            State::Empty => Ok(None),
+            State::Pending(b) => { me.read = State::Pending(b); Ok(None) }
+            State::Ready(data) => {
+                // If we weren't provided enough space to receive the message
+                // then don't actually read any data, just return an error.
+                if buf.len() < data.len() {
+                    me.read = State::Ready(data);
+                    Err(io::Error::from_raw_os_error(WSAEMSGSIZE as i32))
+                } else {
+                    buf.write(&data).unwrap();
+                    let r = Ok(Some(data.len()));
+                    me.iocp.put_buffer(data);
+
+                    //Even though we're calling recv we can use recv_from since
+                    //it's well specified to work on connected sockets and we
+                    //don't know if a client will call recv or recv_from ahead of time.
+                    self.imp.schedule_read_from(&mut me);
+                    r
+                }
+            }
+            State::Error(e) => {
+                self.imp.schedule_read_from(&mut me);
+                Err(e)
+            }
+        }
+    }
+
+    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
+        self.imp.inner.socket.connect(addr)
     }
 
     pub fn broadcast(&self) -> io::Result<bool> {
@@ -222,7 +292,10 @@ impl UdpSocket {
 
     fn post_register(&self, interest: Ready, me: &mut Inner) {
         if interest.is_readable() {
-            self.imp.schedule_read(me);
+            //We use recv_from here since it is well specified for both
+            //connected and non-connected sockets and we can discard the address
+            //when calling recv().
+            self.imp.schedule_read_from(me);
         }
         // See comments in TcpSocket::post_register for what's going on here
         if interest.is_writable() {
@@ -238,7 +311,7 @@ impl Imp {
         self.inner.inner.lock().unwrap()
     }
 
-    fn schedule_read(&self, me: &mut Inner) {
+    fn schedule_read_from(&self, me: &mut Inner) {
         match me.read {
             State::Empty => {}
             _ => return,

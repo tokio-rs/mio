@@ -84,6 +84,31 @@ impl UdpSocket {
         self.sys.recv_from(buf)
     }
 
+    /// Sends data on the socket to the address previously bound via connect(). On success,
+    /// returns the number of bytes written.
+    ///
+    /// Address type can be any implementor of `ToSocketAddrs` trait. See its
+    /// documentation for concrete examples.
+    pub fn send(&self, buf: &[u8])
+                   -> io::Result<Option<usize>> {
+        self.sys.send(buf)
+    }
+
+    /// Receives data from the socket previously bound with connect(). On success, returns
+    /// the number of bytes read and the address from whence the data came.
+    pub fn recv(&self, buf: &mut [u8])
+                     -> io::Result<Option<usize>> {
+        self.sys.recv(buf)
+    }
+
+    /// Connects the UDP socket setting the default destination for `send()` 
+    /// and limiting packets that are read via `recv` from the address specified
+    /// in `addr`.
+    pub fn connect(&self, addr: SocketAddr)
+                 -> io::Result<()> {
+        self.sys.connect(addr)
+    }
+
     /// Gets the value of the `SO_BROADCAST` option for this socket.
     ///
     /// For more information about this option, see

@@ -45,6 +45,23 @@ impl UdpSocket {
             .map_non_block()
     }
 
+    pub fn send(&self, buf: &[u8])
+                   -> io::Result<Option<usize>> {
+        self.io.send(buf)
+            .map_non_block()
+    }
+
+    pub fn recv(&self, buf: &mut [u8])
+                     -> io::Result<Option<usize>> {
+        self.io.recv(buf)
+            .map_non_block()
+    }
+
+    pub fn connect(&self, addr: SocketAddr) 
+                     -> io::Result<()> {
+        self.io.connect(addr)
+    }
+
     pub fn broadcast(&self) -> io::Result<bool> {
         self.io.broadcast()
     }
