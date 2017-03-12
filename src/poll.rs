@@ -1647,7 +1647,6 @@ impl RegistrationInner {
         let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue) };
         let other = *other;
 
-        debug_assert_eq!(other as usize, unsafe { mem::transmute(poll.readiness_queue.inner.clone()) });
         debug_assert!(mem::size_of::<ReadinessQueue>() == mem::size_of::<*mut ()>());
 
         if queue.is_null() {
@@ -1664,6 +1663,16 @@ impl RegistrationInner {
                 // `Relaxed` ordering used for the same reason as in
                 // RegistrationInner::clone
                 self.ref_count.fetch_add(1, Relaxed);
+
+                // Note that the `queue` reference stored in our
+                // `readiness_queue` field is intended to be a strong reference,
+                // so now that we've successfully claimed the reference we bump
+                // the refcount here.
+                //
+                // Down below in `release_node` when we deallocate this
+                // `RegistrationInner` is where we'll transmute this back to an
+                // arc and decrement the reference count.
+                mem::forget(poll.readiness_queue.clone());
             } else {
                 // The CAS failed, another thread set the queue pointer, so ensure
                 // that the pointer and `other` match
@@ -1677,7 +1686,10 @@ impl RegistrationInner {
             return Err(io::Error::new(io::ErrorKind::Other, "registration handle associated with another `Poll` instance"));
         }
 
-        debug_assert_eq!(queue as usize, unsafe { mem::transmute(poll.readiness_queue.inner.clone()) });
+        unsafe {
+            let actual = &poll.readiness_queue.inner as *const _ as *const usize;
+            debug_assert_eq!(queue as usize, *actual);
+        }
 
         // The `update_lock` atomic is used as a flag ensuring only a single
         // thread concurrently enters the `update` critical section. Any
