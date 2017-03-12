@@ -3,6 +3,7 @@ use mio::deprecated::{Handler, EventLoop};
 use mio::udp::*;
 use bytes::{Buf, RingBuf, SliceBuf, MutBuf};
 use std::str;
+use localhost;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
@@ -106,8 +107,8 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
 #[test]
 pub fn test_udp_socket() {
-    let addr = str::FromStr::from_str("[::1]:0").unwrap();
-    let any = str::FromStr::from_str("[::1]:0").unwrap();
+    let addr = localhost();
+    let any = localhost();
 
     let tx = UdpSocket::bind(&any).unwrap();
     let rx = UdpSocket::bind(&addr).unwrap();
@@ -117,8 +118,8 @@ pub fn test_udp_socket() {
 
 #[test]
 pub fn test_udp_socket_send_recv() {
-    let addr = str::FromStr::from_str("[::1]:0").unwrap();
-    let any = str::FromStr::from_str("[::1]:0").unwrap();
+    let addr = localhost();
+    let any = localhost();
 
     let tx = UdpSocket::bind(&any).unwrap();
     let rx = UdpSocket::bind(&addr).unwrap();
