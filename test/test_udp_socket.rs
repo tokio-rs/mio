@@ -3,12 +3,13 @@ use mio::deprecated::{Handler, EventLoop};
 use mio::udp::*;
 use bytes::{Buf, RingBuf, SliceBuf, MutBuf};
 use std::str;
+use std::time;
 use localhost;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
 
-pub struct UdpHandler {
+pub struct UdpHandlerSendRecv {
     tx: UdpSocket,
     rx: UdpSocket,
     msg: &'static str,
@@ -17,9 +18,9 @@ pub struct UdpHandler {
     connected: bool
 }
 
-impl UdpHandler {
-    fn new(tx: UdpSocket, rx: UdpSocket, connected: bool, msg : &'static str) -> UdpHandler {
-        UdpHandler {
+impl UdpHandlerSendRecv {
+    fn new(tx: UdpSocket, rx: UdpSocket, connected: bool, msg : &'static str) -> UdpHandlerSendRecv {
+        UdpHandlerSendRecv {
             tx: tx,
             rx: rx,
             msg: msg,
@@ -30,11 +31,11 @@ impl UdpHandler {
     }
 }
 
-impl Handler for UdpHandler {
+impl Handler for UdpHandlerSendRecv {
     type Timeout = usize;
     type Message = ();
 
-    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Ready) {
+    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandlerSendRecv>, token: Token, events: Ready) {
 
         if events.is_readable() {
             match token {
@@ -49,6 +50,7 @@ impl Handler for UdpHandler {
                                                                     .unwrap()
                         }
                     };
+
                     unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
                     assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
                     event_loop.shutdown();
@@ -77,6 +79,30 @@ impl Handler for UdpHandler {
     }
 }
 
+pub struct UdpHandlerTimeout {
+}
+
+impl Handler for UdpHandlerTimeout {
+    type Timeout = usize;
+    type Message = ();
+
+    fn ready(&mut self, _event_loop: &mut EventLoop<UdpHandlerTimeout>, token: Token, events: Ready) {
+        if events.is_readable() {
+            match token {
+                LISTENER => {
+                    assert!(false, "Expected to no receive a packet but got something")
+                },
+                _ => ()
+            }
+        }
+   }
+
+    /// Invoked when a timeout has completed.
+    fn timeout(&mut self, event_loop: &mut EventLoop<Self>, _timeout: Self::Timeout) {
+        event_loop.shutdown();
+    }
+}
+
 fn assert_send<T: Send>() {
 }
 
@@ -102,7 +128,7 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     event_loop.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
 
     info!("Starting event loop to test with...");
-    event_loop.run(&mut UdpHandler::new(tx, rx, connected, "hello world")).unwrap();
+    event_loop.run(&mut UdpHandlerSendRecv::new(tx, rx, connected, "hello world")).unwrap();
 }
 
 #[test]
@@ -132,4 +158,30 @@ pub fn test_udp_socket_send_recv() {
     test_send_recv_udp(tx, rx, true);
 }
 
+#[test]
+pub fn test_udp_socket_discard() {
+    let addr = localhost();
+    let any = localhost();
+    let outside = localhost();
 
+    let tx = UdpSocket::bind(&any).unwrap();
+    let rx = UdpSocket::bind(&addr).unwrap();
+    let udp_outside = UdpSocket::bind(&outside).unwrap();
+
+    let tx_addr = tx.local_addr().unwrap();
+    let rx_addr = rx.local_addr().unwrap();
+ 
+    assert!(tx.connect(rx_addr).is_ok());
+    assert!(udp_outside.connect(rx_addr).is_ok());
+    assert!(rx.connect(tx_addr).is_ok());
+
+    let mut event_loop = EventLoop::new().unwrap();
+
+    assert!(udp_outside.send("hello world".as_bytes()).is_ok());
+
+    event_loop.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
+
+    event_loop.timeout(5000, time::Duration::from_secs(5)).unwrap();
+    event_loop.run(&mut UdpHandlerTimeout {}).unwrap();
+}

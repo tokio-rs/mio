@@ -185,33 +185,8 @@ impl UdpSocket {
 
     pub fn recv(&self, mut buf: &mut [u8])
                      -> io::Result<Option<usize>> {
-        let mut me = self.inner();
-        match mem::replace(&mut me.read, State::Empty) {
-            State::Empty => Ok(None),
-            State::Pending(b) => { me.read = State::Pending(b); Ok(None) }
-            State::Ready(data) => {
-                // If we weren't provided enough space to receive the message
-                // then don't actually read any data, just return an error.
-                if buf.len() < data.len() {
-                    me.read = State::Ready(data);
-                    Err(io::Error::from_raw_os_error(WSAEMSGSIZE as i32))
-                } else {
-                    buf.write(&data).unwrap();
-                    let r = Ok(Some(data.len()));
-                    me.iocp.put_buffer(data);
-
-                    //Even though we're calling recv we can use recv_from since
-                    //it's well specified to work on connected sockets and we
-                    //don't know if a client will call recv or recv_from ahead of time.
-                    self.imp.schedule_read_from(&mut me);
-                    r
-                }
-            }
-            State::Error(e) => {
-                self.imp.schedule_read_from(&mut me);
-                Err(e)
-            }
-        }
+        //Since recv_from can be used on connected sockets just call it and drop the address.
+        self.recv_from(buf).map(|r| r.map(|(size,_)| size))
     }
 
     pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
