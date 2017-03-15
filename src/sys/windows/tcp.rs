@@ -333,9 +333,13 @@ impl TcpStream {
         let mut me = self.inner();
         let me = &mut *me;
 
-        match me.write {
+        match mem::replace(&mut me.write, State::Empty) {
             State::Empty => {}
-            _ => return Err(io::ErrorKind::WouldBlock.into())
+            State::Error(e) => return Err(e),
+            other => {
+                me.write = other;
+                return Err(io::ErrorKind::WouldBlock.into())
+            }
         }
 
         if !me.iocp.registered() {
@@ -450,13 +454,14 @@ impl StreamImp {
         // About to write, clear any pending level triggered events
         me.iocp.set_readiness(me.iocp.readiness() - Ready::writable());
 
-        trace!("scheduling a write");
         loop {
+            trace!("scheduling a write of {} bytes", buf[pos..].len());
             let ret = unsafe {
                 self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr())
             };
             match ret {
                 Ok(Some(transferred_bytes)) if me.instant_notify => {
+                    trace!("done immediately with {} bytes", transferred_bytes);
                     if transferred_bytes == buf.len() - pos {
                         self.add_readiness(me, Ready::writable());
                         me.write = State::Empty;
@@ -465,12 +470,14 @@ impl StreamImp {
                     pos += transferred_bytes;
                 }
                 Ok(_) => {
+                    trace!("scheduled for later");
                     // see docs above on StreamImp.inner for rationale on forget
                     me.write = State::Pending((buf, pos));
                     mem::forget(self.clone());
                     break;
                 }
                 Err(e) => {
+                    trace!("write error: {}", e);
                     me.write = State::Error(e);
                     self.add_readiness(me, Ready::writable());
                     me.iocp.put_buffer(buf);

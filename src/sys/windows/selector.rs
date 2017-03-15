@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use std::{fmt, io, u32};
+use std::{fmt, io};
 use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
