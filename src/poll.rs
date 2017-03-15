@@ -1057,8 +1057,6 @@ impl Poll {
 
     #[inline]
     fn poll2(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
-        let mut sleep = false;
-
         // Compute the timeout value passed to the system selector. If the
         // readiness queue has pending nodes, we still want to poll the system
         // selector for new events, but we don't want to block the thread to
@@ -1072,7 +1070,6 @@ impl Poll {
             // inserts `sleep_marker` into the queue. This signals to any
             // threads setting readiness that the `Poll::poll` is going to
             // sleep, so the awakener should be used.
-            sleep = true;
             timeout
         } else {
             // The readiness queue is not empty, so do not block the thread.
@@ -1081,18 +1078,6 @@ impl Poll {
 
         // First get selector events
         let res = self.selector.select(&mut events.inner, AWAKEN, timeout);
-
-        if sleep {
-            // Cleanup the sleep marker. Removing `sleep_marker` avoids
-            // unnecessary syscalls to the awakener. It also needs to be removed
-            // from the queue before it can be inserted again.
-            //
-            // Note, that this won't *guarantee* that the sleep marker is
-            // removed. If the sleep marker cannot be removed, it is no longer
-            // at the head of the queue, which still achieves the goal of
-            // avoiding extra awakener syscalls.
-            self.readiness_queue.try_remove_sleep_marker();
-        }
 
         if try!(res) {
             // Some awakeners require reading from a FD.
@@ -2009,6 +1994,22 @@ impl ReadinessQueue {
         let end_marker = self.inner.end_marker();
         let sleep_marker = self.inner.sleep_marker();
 
+        let tail = unsafe { *self.inner.tail_readiness.get() };
+
+        // If the tail is currently set to the sleep_marker, then check if the
+        // head is as well. If it is, then the queue is currently ready to
+        // sleep. If it is not, then the queue is not empty and there should be
+        // no sleeping.
+        if tail == sleep_marker {
+            return self.inner.head_readiness.load(Acquire) == sleep_marker;
+        }
+
+        // If the tail is not currently set to `end_marker`, then the queue is
+        // not empty.
+        if tail != end_marker {
+            return false;
+        }
+
         self.inner.sleep_marker.next_readiness.store(ptr::null_mut(), Relaxed);
 
         let actual = self.inner.head_readiness.compare_and_swap(
@@ -2029,24 +2030,6 @@ impl ReadinessQueue {
         // Update tail pointer.
         unsafe { *self.inner.tail_readiness.get() = sleep_marker; }
         true
-    }
-
-    fn try_remove_sleep_marker(&self) {
-        let end_marker = self.inner.end_marker();
-        let sleep_marker = self.inner.sleep_marker();
-
-        // Set the next ptr to null
-        self.inner.end_marker.next_readiness.store(ptr::null_mut(), Relaxed);
-
-        let actual = self.inner.head_readiness.compare_and_swap(
-            sleep_marker, end_marker, AcqRel);
-
-        // If the swap is successful, then the queue is still empty.
-        if actual != sleep_marker {
-            return;
-        }
-
-        unsafe { *self.inner.tail_readiness.get() = end_marker; }
     }
 }
 
