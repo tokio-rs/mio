@@ -1,3 +1,8 @@
+# 0.6.4 (January 24, 2017)
+
+* Fix compilation on musl
+* Add `TcpStream::from_stream` which conversts a std TCP stream to Mio.
+
 # 0.6.3 (January 22, 2017)
 
 * Implement readv/writev for `TcpStream`, allowing vectored reads/writes to
