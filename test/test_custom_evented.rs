@@ -308,3 +308,70 @@ fn drop_registration_from_non_main_thread() {
         }
     }
 }
+
+#[test]
+fn stress_with_small_events_collection() {
+    const N: usize = 8;
+    const ITER: usize = 1_000;
+
+    use std::sync::{Arc, Barrier};
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering::{Acquire, Release};
+    use std::thread;
+
+    let poll = Poll::new().unwrap();
+    let mut registrations = vec![];
+
+    let barrier = Arc::new(Barrier::new(N + 1));
+    let done = Arc::new(AtomicBool::new(false));
+
+    for i in 0..N {
+        let (registration, set_readiness) = Registration::new2();
+        poll.register(&registration, Token(i), Ready::readable(), PollOpt::edge()).unwrap();
+
+        registrations.push(registration);
+
+        let barrier = barrier.clone();
+        let done = done.clone();
+
+        thread::spawn(move || {
+            barrier.wait();
+
+            while !done.load(Acquire) {
+                set_readiness.set_readiness(Ready::readable()).unwrap();
+            }
+
+            // Set one last time
+            set_readiness.set_readiness(Ready::readable()).unwrap();
+        });
+    }
+
+    let mut events = Events::with_capacity(4);
+
+    barrier.wait();
+
+    for _ in 0..ITER {
+        poll.poll(&mut events, None).unwrap();
+    }
+
+    done.store(true, Release);
+
+    let mut final_ready = vec![false; N];
+
+
+    for i in 0..5 {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            final_ready[event.token().0] = true;
+        }
+
+        if final_ready.iter().all(|v| *v) {
+            return;
+        }
+
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    panic!("dead lock?");
+}
