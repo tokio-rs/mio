@@ -78,7 +78,7 @@
 #![doc(html_root_url = "https://docs.rs/mio/0.6.1")]
 #![crate_name = "mio"]
 
-#![deny(warnings, missing_docs)]
+#![deny(warnings, missing_docs, missing_debug_implementations)]
 
 extern crate lazycell;
 extern crate net2;
@@ -177,6 +177,7 @@ pub mod unix {
     pub use sys::{
         EventedFd,
     };
+    pub use sys::unix::UnixReady;
 }
 
 /// Windows-only extensions to the mio crate.

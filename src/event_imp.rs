@@ -266,7 +266,8 @@ impl PollOpt {
         PollOpt(0b0100)
     }
 
-    // TODO: Figure out if this should be deprecated or not
+    #[deprecated(since = "0.6.5", note = "removed")]
+    #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     #[inline]
     pub fn urgent() -> PollOpt {
@@ -341,8 +342,10 @@ impl PollOpt {
         self.contains(PollOpt::oneshot())
     }
 
-    // TODO: Should this be deprecated?
+    #[deprecated(since = "0.6.5", note = "removed")]
+    #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
+    #[allow(deprecated)]
     #[inline]
     pub fn is_urgent(&self) -> bool {
         self.contains(PollOpt::urgent())
@@ -512,10 +515,11 @@ impl fmt::Debug for PollOpt {
 /// indicates that the associated `Evented` handle is ready to perform a
 /// `read` operation.
 ///
-/// **Note that only readable and writable readiness is guaranteed to be
-/// supported on all platforms**. This means that `error` and `hup` readiness
-/// should be treated as hints. For more details, see [readiness] in the poll
-/// documentation.
+/// This struct only represents portable event kinds. Since only readable and
+/// writable events are guaranteed to be raised on all systems, those are the
+/// only ones available via the `Ready` struct. There are also platform specific
+/// extensions to `Ready`, i.e. `UnixReady`, which provide additional readiness
+/// event kinds only available on unix platforms.
 ///
 /// `Ready` values can be combined together using the various bitwise operators.
 ///
@@ -543,7 +547,6 @@ const READABLE: usize = 0b0001;
 const WRITABLE: usize = 0b0010;
 const ERROR: usize    = 0b0100;
 const HUP: usize      = 0b1000;
-const READY_ALL: usize = READABLE | WRITABLE | ERROR | HUP;
 
 impl Ready {
     /// Returns the empty `Ready` set.
@@ -612,56 +615,17 @@ impl Ready {
         Ready(WRITABLE)
     }
 
-    /// Returns a `Ready` representing error readiness.
-    ///
-    /// **Note that only readable and writable readiness is guaranteed to be
-    /// supported on all platforms**. This means that `error` readiness
-    /// should be treated as a hint. For more details, see [readiness] in the
-    /// poll documentation.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::error();
-    ///
-    /// assert!(ready.is_error());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    /// [readiness]: struct.Poll.html#readiness-operations
+    #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn error() -> Ready {
         Ready(ERROR)
     }
 
-    /// Returns a `Ready` representing HUP readiness.
-    ///
-    /// A HUP (or hang-up) signifies that a stream socket **peer** closed the
-    /// connection, or shut down the writing half of the connection.
-    ///
-    /// **Note that only readable and writable readiness is guaranteed to be
-    /// supported on all platforms**. This means that `hup` readiness
-    /// should be treated as a hint. For more details, see [readiness] in the
-    /// poll documentation.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::hup();
-    ///
-    /// assert!(ready.is_hup());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    /// [readiness]: struct.Poll.html#readiness-operations
+    #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn hup() -> Ready {
         Ready(HUP)
@@ -741,54 +705,17 @@ impl Ready {
         self.contains(Ready::writable())
     }
 
-    /// Returns true if the value includes error readiness
-    ///
-    /// **Note that only readable and writable readiness is guaranteed to be
-    /// supported on all platforms**. This means that `error` readiness should
-    /// be treated as a hint. For more details, see [readiness] in the poll
-    /// documentation.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::error();
-    ///
-    /// assert!(ready.is_error());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
+    #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn is_error(&self) -> bool {
         self.contains(Ready(ERROR))
     }
 
-    /// Returns true if the value includes HUP readiness
-    ///
-    /// A HUP (or hang-up) signifies that a stream socket **peer** closed the
-    /// connection, or shut down the writing half of the connection.
-    ///
-    /// **Note that only readable and writable readiness is guaranteed to be
-    /// supported on all platforms**. This means that `hup` readiness
-    /// should be treated as a hint. For more details, see [readiness] in the
-    /// poll documentation.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::hup();
-    ///
-    /// assert!(ready.is_hup());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
+    #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn is_hup(&self) -> bool {
         self.contains(Ready(HUP))
@@ -809,7 +736,8 @@ impl Ready {
     /// assert!(readiness.is_readable());
     /// ```
     #[inline]
-    pub fn insert(&mut self, other: Ready) {
+    pub fn insert<T: Into<Self>>(&mut self, other: T) {
+        let other = other.into();
         self.0 |= other.0;
     }
 
@@ -828,7 +756,8 @@ impl Ready {
     /// assert!(!readiness.is_readable());
     /// ```
     #[inline]
-    pub fn remove(&mut self, other: Ready) {
+    pub fn remove<T: Into<Self>>(&mut self, other: T) {
+        let other = other.into();
         self.0 &= !other.0;
     }
 
@@ -880,44 +809,45 @@ impl Ready {
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
-    pub fn contains(&self, other: Ready) -> bool {
+    pub fn contains<T: Into<Self>>(&self, other: T) -> bool {
+        let other = other.into();
         (*self & other) == other
     }
 }
 
-impl ops::BitOr for Ready {
+impl<T: Into<Ready>> ops::BitOr<T> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitor(self, other: Ready) -> Ready {
-        Ready(self.0 | other.0)
+    fn bitor(self, other: T) -> Ready {
+        Ready(self.0 | other.into().0)
     }
 }
 
-impl ops::BitXor for Ready {
+impl<T: Into<Ready>> ops::BitXor<T> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitxor(self, other: Ready) -> Ready {
-        Ready(self.0 ^ other.0)
+    fn bitxor(self, other: T) -> Ready {
+        Ready(self.0 ^ other.into().0)
     }
 }
 
-impl ops::BitAnd for Ready {
+impl<T: Into<Ready>> ops::BitAnd<T> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitand(self, other: Ready) -> Ready {
-        Ready(self.0 & other.0)
+    fn bitand(self, other: T) -> Ready {
+        Ready(self.0 & other.into().0)
     }
 }
 
-impl ops::Sub for Ready {
+impl<T: Into<Ready>> ops::Sub<T> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn sub(self, other: Ready) -> Ready {
-        Ready(self.0 & !other.0)
+    fn sub(self, other: T) -> Ready {
+        Ready(self.0 & !other.into().0)
     }
 }
 
@@ -926,7 +856,7 @@ impl ops::Not for Ready {
 
     #[inline]
     fn not(self) -> Ready {
-        Ready(!self.0 & READY_ALL)
+        Ready(!self.0)
     }
 }
 

@@ -1,6 +1,6 @@
 //! Thread safe communication channel implementing `Evented`
 
-#![allow(unused_imports, deprecated)]
+#![allow(unused_imports, deprecated, missing_debug_implementations)]
 
 use {io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use lazycell::{LazyCell, AtomicLazyCell};

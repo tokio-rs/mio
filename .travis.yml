@@ -1,24 +1,18 @@
+---
 language: rust
-
-sudo: required
-
 dist: trusty
+sudo: required
+services: docker
+cache: cargo
 
-install:
-  - curl https://static.rust-lang.org/rustup.sh |
-    sh -s -- --add-target=$TARGET --disable-sudo -y --prefix=`rustc --print sysroot`
+before_cache:
+  # Travis can't cache files that are not readable by "others"
+  - chmod -R a+r $HOME/.cargo
 
 script:
   - cargo build
   - cargo build --no-default-features
-  - if [[ $TRAVIS_OS_NAME = "linux" ]]; then
-      sh ci/run-docker.sh $TARGET;
-    else
-      export CARGO_TARGET_DIR=`pwd`/target;
-      sh ci/run.sh $TARGET;
-    fi
-
-cache: cargo
+  - cargo test
 
 matrix:
   include:
@@ -35,21 +29,21 @@ matrix:
         - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
       script:
         # Ensure that the build works without default features
+        - cargo build
         - cargo build --no-default-features
         - cargo test
         - cargo doc --no-deps
       after_success:
         - travis-cargo doc-upload
-      install:
 
     # Test on latest stable
     - os: linux
       rust: stable
       script:
         # Ensure that the build works without default features
+        - cargo build
         - cargo build --no-default-features
         - cargo test
-      install:
 
     # OS X
     - os: osx
@@ -58,7 +52,6 @@ matrix:
         # Ensure that the build works without default features
         - cargo build --no-default-features
         - cargo test
-      install:
 
     # iOS
     - os: osx
@@ -68,14 +61,34 @@ matrix:
       script:
         - cargo build
         - CARGO_TARGET_DIR=`pwd` sh ci/run-ios.sh $TARGET
+      install:
+        - curl https://static.rust-lang.org/rustup.sh |
+          sh -s -- --add-target=$TARGET --disable-sudo -y --prefix=`rustc --print sysroot`
 
     # Android
     - os: linux
       env: TARGET=arm-linux-androideabi
       rust: stable
+      script:
+        - cargo build
+        - cargo build --no-default-features
+        - sh ci/run-docker.sh $TARGET;
+      install:
+        - curl https://static.rust-lang.org/rustup.sh |
+          sh -s -- --add-target=$TARGET --disable-sudo -y --prefix=`rustc --print sysroot`
+
+    # FreeBSD
+    - os: linux
+      env: TARGET=x86_64-unknown-freebsd DISABLE_TESTS=1
+      install:
+        - sh ci/trust/install.sh
+        - source ~/.cargo/env || true
+      script:
+        - bash ci/trust/script.sh
 
 env:
   global:
+    - CRATE_NAME=mio
     - secure: "B/5BSBwUX1r+99YJba421+x7eGgm8J+Cuy7nOAenkRsCP+h5JiOFP4IWyoRgmGQoF1dgGwlHuOLBYvcBj1r8p2i3b8akLk/L83iOBbYNkhub6TpDjltTOZ30brrM++LayazAKHg8mixsTiu72cSJr1BiELQae/ABq9QHTj4v3m4="
 
 notifications:

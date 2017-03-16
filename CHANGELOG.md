@@ -1,3 +1,21 @@
+# 0.6.5 (March 14, 2017)
+
+* Misc improvements to kqueue bindings
+* Add official support for iOS, Android, BSD
+* Reimplement custom readiness queue
+* `Poll` is now `Sync`
+* Officially deprecate non-core functionality (timers, channel, etc...)
+* `Registration` now implements `Evented`
+* Fix bug around error conditions with `connect` on windows.
+* Use iovec crate for scatter / gather operations
+* Only support readable and writable readiness on all platforms
+* Expose additional readiness in a platform specific capacity
+
+# 0.6.4 (January 24, 2017)
+
+* Fix compilation on musl
+* Add `TcpStream::from_stream` which conversts a std TCP stream to Mio.
+
 # 0.6.3 (January 22, 2017)
 
 * Implement readv/writev for `TcpStream`, allowing vectored reads/writes to

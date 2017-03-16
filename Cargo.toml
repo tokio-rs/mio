@@ -27,7 +27,7 @@ lazycell = "0.4.0"
 log      = "0.3.1"
 slab     = "0.3.0"
 net2     = "0.2.19"
-iovec    = { git = "https://github.com/carllerche/iovec" }
+iovec    = "0.1.0"
 
 [target.'cfg(unix)'.dependencies]
 libc   = "0.2.19"
