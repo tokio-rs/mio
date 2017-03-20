@@ -432,6 +432,12 @@ pub struct SetReadiness {
 unsafe impl Send for SetReadiness {}
 unsafe impl Sync for SetReadiness {}
 
+/// Used to associate an IO type with a Selector
+#[derive(Debug)]
+pub struct SelectorId {
+    id: AtomicUsize,
+}
+
 struct RegistrationInner {
     // Unsafe pointer to the registration's node. The node is ref counted. This
     // cannot "simply" be tracked by an Arc because `Poll::poll` has an implicit
@@ -2421,3 +2427,30 @@ impl From<usize> for ReadinessState {
 
 fn is_send<T: Send>() {}
 fn is_sync<T: Sync>() {}
+
+impl SelectorId {
+    pub fn new() -> SelectorId {
+        SelectorId {
+            id: AtomicUsize::new(0),
+        }
+    }
+
+    pub fn associate_selector(&self, poll: &Poll) -> io::Result<()> {
+        let selector_id = self.id.load(Ordering::SeqCst);
+
+        if selector_id != 0 && selector_id != poll.selector.id() {
+            Err(io::Error::new(io::ErrorKind::Other, "socket already registered"))
+        } else {
+            self.id.store(poll.selector.id(), Ordering::SeqCst);
+            Ok(())
+        }
+    }
+}
+
+impl Clone for SelectorId {
+    fn clone(&self) -> SelectorId {
+        SelectorId {
+            id: AtomicUsize::new(self.id.load(Ordering::SeqCst)),
+        }
+    }
+}

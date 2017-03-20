@@ -7,7 +7,8 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
-use {io, sys, Ready, Poll, PollOpt, Token};
+use {sys, Ready, Poll, PollOpt, Token};
+use io::{self, MapNonBlock};
 use event::Evented;
 use poll::SelectorId;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -72,14 +73,16 @@ impl UdpSocket {
     ///
     /// Address type can be any implementor of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        self.sys.send_to(buf, target)
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
+                   -> io::Result<Option<usize>> {
+        self.sys.send_to(buf, target).map_non_block()
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
-    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.sys.recv_from(buf)
+    pub fn recv_from(&self, buf: &mut [u8])
+                     -> io::Result<Option<(usize, SocketAddr)>> {
+        self.sys.recv_from(buf).map_non_block()
     }
 
     /// Sends data on the socket to the address previously bound via connect(). On success,
@@ -87,20 +90,23 @@ impl UdpSocket {
     ///
     /// Address type can be any implementor of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
-    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.sys.send(buf)
+    pub fn send(&self, buf: &[u8])
+                   -> io::Result<Option<usize>> {
+        self.sys.send(buf).map_non_block()
     }
 
     /// Receives data from the socket previously bound with connect(). On success, returns
     /// the number of bytes read and the address from whence the data came.
-    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.sys.recv(buf)
+    pub fn recv(&self, buf: &mut [u8])
+                     -> io::Result<Option<usize>> {
+        self.sys.recv(buf).map_non_block()
     }
 
-    /// Connects the UDP socket setting the default destination for `send()`
+    /// Connects the UDP socket setting the default destination for `send()` 
     /// and limiting packets that are read via `recv` from the address specified
     /// in `addr`.
-    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
+    pub fn connect(&self, addr: SocketAddr)
+                 -> io::Result<()> {
         self.sys.connect(addr)
     }
 
@@ -301,4 +307,3 @@ impl FromRawFd for UdpSocket {
         }
     }
 }
-

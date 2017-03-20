@@ -16,7 +16,7 @@ use iovec::IoVec;
 
 use {io, sys, Ready, Poll, PollOpt, Token};
 use event::Evented;
-use super::SelectorId;
+use poll::SelectorId;
 
 /*
  *
