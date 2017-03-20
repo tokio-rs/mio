@@ -135,7 +135,8 @@ pub use iovec::IoVec;
 #[cfg(feature = "with-deprecated")]
 #[doc(hidden)]
 pub mod tcp {
-    pub use net::{TcpListener, TcpStream, Shutdown};
+    pub use net::{TcpListener, TcpStream};
+    pub use std::net::Shutdown;
 }
 
 #[deprecated(since = "0.6.6", note = "use net module instead")]

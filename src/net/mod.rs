@@ -10,5 +10,5 @@
 mod tcp;
 mod udp;
 
-pub use self::tcp::{TcpListener, TcpStream, Shutdown};
+pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
