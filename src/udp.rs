@@ -7,6 +7,8 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
+#![allow(deprecated)]
+
 use {sys, Ready, Poll, PollOpt, Token};
 use io::{self, MapNonBlock};
 use event::Evented;
