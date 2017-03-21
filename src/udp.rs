@@ -5,7 +5,7 @@
 //! [portability guidelines] are followed, the behavior should be identical no
 //! matter the target platform.
 //!
-/// [portability guidelines]: ../struct.Poll.html#portability
+//! [portability guidelines]: ../struct.Poll.html#portability
 
 #![allow(deprecated)]
 
