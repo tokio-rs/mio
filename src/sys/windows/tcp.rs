@@ -1,14 +1,13 @@
 use std::fmt;
 use std::io::{self, Read, ErrorKind};
 use std::mem;
-use std::net::{self, SocketAddr};
+use std::net::{self, SocketAddr, Shutdown};
 use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 
 use miow::iocp::CompletionStatus;
 use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
-use net::tcp::Shutdown;
 use winapi::*;
 use iovec::IoVec;
 

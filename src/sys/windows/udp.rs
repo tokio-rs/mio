@@ -88,17 +88,17 @@ impl UdpSocket {
     ///       successfully wrote all of the bytes in `buf` but it's possible
     ///       that we don't actually end up writing all of them!
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
-                   -> io::Result<Option<usize>> {
+                   -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
 
         match me.write {
             State::Empty => {}
-            _ => return Ok(None),
+            _ => return Err(would_block()),
         }
 
         if !me.iocp.registered() {
-            return Ok(None)
+            return Err(would_block())
         }
 
         let interest = me.iocp.readiness();
@@ -113,7 +113,7 @@ impl UdpSocket {
         });
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
-        Ok(Some(amt))
+        Ok(amt)
     }
 
     /// Note that unlike `TcpStream::write` this function will not attempt to
@@ -122,18 +122,17 @@ impl UdpSocket {
     /// TODO: This... may be wrong in the long run. We're reporting that we
     ///       successfully wrote all of the bytes in `buf` but it's possible
     ///       that we don't actually end up writing all of them!
-    pub fn send(&self, buf: &[u8])
-                   -> io::Result<Option<usize>> {
+    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
 
         match me.write {
             State::Empty => {}
-            _ => return Ok(None),
+            _ => return Err(would_block()),
         }
 
         if !me.iocp.registered() {
-            return Ok(None)
+            return Err(would_block())
         }
 
         let interest = me.iocp.readiness();
@@ -148,15 +147,14 @@ impl UdpSocket {
         });
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
-        Ok(Some(amt))
+        Ok(amt)
     }
 
-    pub fn recv_from(&self, mut buf: &mut [u8])
-                     -> io::Result<Option<(usize, SocketAddr)>> {
+    pub fn recv_from(&self, mut buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         let mut me = self.inner();
         match mem::replace(&mut me.read, State::Empty) {
-            State::Empty => Ok(None),
-            State::Pending(b) => { me.read = State::Pending(b); Ok(None) }
+            State::Empty => Err(would_block()),
+            State::Pending(b) => { me.read = State::Pending(b); Err(would_block()) }
             State::Ready(data) => {
                 // If we weren't provided enough space to receive the message
                 // then don't actually read any data, just return an error.
@@ -166,7 +164,7 @@ impl UdpSocket {
                 } else {
                     let r = if let Some(addr) = me.read_buf.to_socket_addr() {
                         buf.write(&data).unwrap();
-                        Ok(Some((data.len(), addr)))
+                        Ok((data.len(), addr))
                     } else {
                         Err(io::Error::new(io::ErrorKind::Other,
                                            "failed to parse socket address"))
@@ -184,9 +182,9 @@ impl UdpSocket {
     }
 
     pub fn recv(&self, mut buf: &mut [u8])
-                     -> io::Result<Option<usize>> {
+                     -> io::Result<usize> {
         //Since recv_from can be used on connected sockets just call it and drop the address.
-        self.recv_from(buf).map(|r| r.map(|(size,_)| size))
+        self.recv_from(buf).map(|(size,_)| size)
     }
 
     pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
@@ -403,4 +401,12 @@ fn recv_done(status: &OVERLAPPED_ENTRY) {
     }
     me.read = State::Ready(buf);
     me2.add_readiness(&mut me, Ready::readable());
+}
+
+// TODO: Use std's allocation free io::Error
+const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK as i32;
+
+/// Returns a std `WouldBlock` error without allocating
+pub fn would_block() -> ::std::io::Error {
+    ::std::io::Error::from_raw_os_error(WOULDBLOCK)
 }

@@ -105,10 +105,11 @@ extern crate env_logger;
 
 mod event_imp;
 mod io;
-mod net;
 mod poll;
 mod sys;
 mod token;
+
+pub mod net;
 
 #[deprecated(since = "0.6.5", note = "use mio-more instead")]
 #[cfg(feature = "with-deprecated")]
@@ -130,10 +131,19 @@ pub mod deprecated;
 #[doc(hidden)]
 pub use iovec::IoVec;
 
-pub use net::{
-    tcp,
-    udp,
-};
+#[deprecated(since = "0.6.6", note = "use net module instead")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
+pub mod tcp {
+    pub use net::{TcpListener, TcpStream};
+    pub use std::net::Shutdown;
+}
+
+#[deprecated(since = "0.6.6", note = "use net module instead")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
+pub mod udp;
+
 pub use poll::{
     Poll,
     Registration,

@@ -16,7 +16,7 @@ use iovec::IoVec;
 
 use {io, sys, Ready, Poll, PollOpt, Token};
 use event::Evented;
-use super::SelectorId;
+use poll::SelectorId;
 
 /*
  *
@@ -56,7 +56,7 @@ pub struct TcpStream {
     selector_id: SelectorId,
 }
 
-pub use std::net::Shutdown;
+use std::net::Shutdown;
 
 impl TcpStream {
     /// Create a new TCP stream and issue a non-blocking connect to the
