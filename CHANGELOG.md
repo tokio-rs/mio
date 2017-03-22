@@ -1,3 +1,9 @@
+# 0.6.6 (March 22, 2017)
+
+* Add send(), recv() and connect() to UDPSocket.
+* Fix bug in custom readiness queue
+* Move net types into `net` module
+
 # 0.6.5 (March 14, 2017)
 
 * Misc improvements to kqueue bindings
