@@ -747,7 +747,7 @@ impl Poll {
     ///
     /// Re-registering an `Evented` handle allows changing the details of the
     /// registration. Specifically, it allows updating the associated `token`,
-    /// interest`, and `opts` specified in previous `register` and `reregister`
+    /// `interest`, and `opts` specified in previous `register` and `reregister`
     /// calls.
     ///
     /// The `reregister` arguments fully override the previous values. In other
