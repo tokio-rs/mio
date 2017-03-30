@@ -62,8 +62,7 @@ matrix:
         - cargo build
         - CARGO_TARGET_DIR=`pwd` sh ci/run-ios.sh $TARGET
       install:
-        - curl https://static.rust-lang.org/rustup.sh |
-          sh -s -- --add-target=$TARGET --disable-sudo -y --prefix=`rustc --print sysroot`
+        - rustup target add $TARGET
 
     # Android
     - os: linux
@@ -74,8 +73,7 @@ matrix:
         - cargo build --no-default-features
         - sh ci/run-docker.sh $TARGET;
       install:
-        - curl https://static.rust-lang.org/rustup.sh |
-          sh -s -- --add-target=$TARGET --disable-sudo -y --prefix=`rustc --print sysroot`
+        - rustup target add $TARGET
 
     # FreeBSD
     - os: linux
