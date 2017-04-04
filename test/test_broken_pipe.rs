@@ -19,8 +19,8 @@ pub fn broken_pipe() {
     let mut event_loop: EventLoop<BrokenPipeHandler> = EventLoop::new().unwrap();
     let (reader, _) = unix::pipe().unwrap();
 
-    // On Darwin this returns a "broken pipe" error.
-    let _ = event_loop.register(&reader, Token(1), Ready::all(), PollOpt::edge());
+    event_loop.register(&reader, Token(1), Ready::all(), PollOpt::edge())
+              .unwrap();
 
     let mut handler = BrokenPipeHandler;
     drop(reader);

@@ -95,13 +95,37 @@ impl Selector {
                                            ::std::ptr::null())));
             for change in changes.iter() {
                 debug_assert_eq!(change.flags & libc::EV_ERROR, libc::EV_ERROR);
-                if change.data != 0 {
-                    // there’s some error, but we want to ignore ENOENT error for EV_DELETE
-                    let orig_flags = if change.filter == libc::EVFILT_READ { r } else { w };
-                    if !(change.data as i32 == libc::ENOENT && orig_flags & libc::EV_DELETE != 0) {
-                        return Err(::std::io::Error::from_raw_os_error(change.data as i32));
-                    }
+
+                // Test to see if an error happened
+                if change.data == 0 {
+                    continue
                 }
+
+                // Older versions of OSX (10.11 and 10.10 have been witnessed)
+                // can return EPIPE when registering a pipe file descriptor
+                // where the other end has already disappeared. For example code
+                // that creates a pipe, closes a file descriptor, and then
+                // registers the other end will see an EPIPE returned from
+                // `register`.
+                //
+                // It also turns out that kevent will still report events on the
+                // file descriptor, telling us that it's readable/hup at least
+                // after we've done this registration. As a result we just
+                // ignore `EPIPE` here instead of propagating it.
+                //
+                // More info can be found at carllerche/mio#582
+                if change.data as i32 == libc::EPIPE &&
+                   change.filter == libc::EVFILT_WRITE {
+                    continue
+                }
+
+                // ignore ENOENT error for EV_DELETE
+                let orig_flags = if change.filter == libc::EVFILT_READ { r } else { w };
+                if change.data as i32 == libc::ENOENT && orig_flags & libc::EV_DELETE != 0 {
+                    continue
+                }
+
+                return Err(::std::io::Error::from_raw_os_error(change.data as i32));
             }
             Ok(())
         }
