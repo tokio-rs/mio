@@ -1,5 +1,6 @@
 use std::{cmp, fmt, ptr};
 use std::os::raw::c_int;
+use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -172,6 +173,12 @@ impl fmt::Debug for Selector {
     }
 }
 
+impl AsRawFd for Selector {
+    fn as_raw_fd(&self) -> RawFd {
+        self.kq
+    }
+}
+
 impl Drop for Selector {
     fn drop(&mut self) {
         unsafe {
@@ -252,6 +259,13 @@ impl Events {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::readable());
             } else if e.filter == libc::EVFILT_WRITE {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
+            }
+#[cfg(any(target_os = "dragonfly",
+    target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            {
+                if e.filter == libc::EVFILT_AIO {
+                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::aio());
+                }
             }
 
             if e.flags & libc::EV_EOF != 0 {

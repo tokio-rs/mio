@@ -3,10 +3,16 @@ use event_imp::{self as event, Ready, Event, Evented, PollOpt};
 use std::{fmt, io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::{mem, ops, isize};
+#[cfg(unix)]
+use std::os::unix::io::AsRawFd;
+#[cfg(unix)]
+use std::os::unix::io::RawFd;
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool};
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed, SeqCst};
 use std::time::{Duration, Instant};
+#[cfg(unix)]
+use sys::unix::UnixReady;
 
 // Poll is backed by two readiness queues. The first is a system readiness queue
 // represented by `sys::Selector`. The system readiness queue handles events
@@ -537,22 +543,23 @@ struct AtomicState {
 
 const MASK_2: usize = 4 - 1;
 const MASK_4: usize = 16 - 1;
+const MASK_8: usize = 256 - 1;
 const QUEUED_MASK: usize = 1 << QUEUED_SHIFT;
 const DROPPED_MASK: usize = 1 << DROPPED_SHIFT;
 
 const READINESS_SHIFT: usize = 0;
-const INTEREST_SHIFT: usize = 4;
-const POLL_OPT_SHIFT: usize = 8;
-const TOKEN_RD_SHIFT: usize = 12;
-const TOKEN_WR_SHIFT: usize = 14;
-const QUEUED_SHIFT: usize = 16;
-const DROPPED_SHIFT: usize = 17;
+const INTEREST_SHIFT: usize = 8;
+const POLL_OPT_SHIFT: usize = 16;
+const TOKEN_RD_SHIFT: usize = 20;
+const TOKEN_WR_SHIFT: usize = 22;
+const QUEUED_SHIFT: usize = 24;
+const DROPPED_SHIFT: usize = 25;
 
 /// Tracks all state for a single `ReadinessNode`. The state is packed into a
 /// `usize` variable from low to high bit as follows:
 ///
-/// 4 bits: Registration current readiness
-/// 4 bits: Registration interest
+/// 8 bits: Registration current readiness
+/// 8 bits: Registration interest
 /// 4 bits: Poll options
 /// 2 bits: Token position currently being read from by `poll`
 /// 2 bits: Token position last written to by `update`
@@ -1098,13 +1105,24 @@ impl Poll {
     }
 }
 
+#[cfg(unix)]
+fn registerable(interest: Ready) -> bool {
+    let unixinterest = UnixReady::from(interest);
+    unixinterest.is_readable() || unixinterest.is_writable() || unixinterest.is_aio()
+}
+
+#[cfg(not(unix))]
+fn registerable(interest: Ready) -> bool {
+    interest.is_readable() || interest.is_writable()
+}
+
 fn validate_args(token: Token, interest: Ready) -> io::Result<()> {
     if token == AWAKEN {
         return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
     }
 
-    if !interest.is_readable() && !interest.is_writable() {
-        return Err(io::Error::new(io::ErrorKind::Other, "interest must include readable or writable"));
+    if !registerable(interest) {
+        return Err(io::Error::new(io::ErrorKind::Other, "interest must include readable or writable or aio"));
     }
 
     Ok(())
@@ -1113,6 +1131,13 @@ fn validate_args(token: Token, interest: Ready) -> io::Result<()> {
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Poll")
+    }
+}
+
+#[cfg(unix)]
+impl AsRawFd for Poll {
+    fn as_raw_fd(&self) -> RawFd {
+        self.selector.as_raw_fd()
     }
 }
 
@@ -2265,7 +2290,7 @@ impl ReadinessState {
         let interest = event::ready_as_usize(interest);
         let opt = event::opt_as_usize(opt);
 
-        debug_assert!(interest <= MASK_4);
+        debug_assert!(interest <= MASK_8);
         debug_assert!(opt <= MASK_4);
 
         let mut val = interest << INTEREST_SHIFT;
@@ -2287,7 +2312,7 @@ impl ReadinessState {
     /// Get the readiness
     #[inline]
     fn readiness(&self) -> Ready {
-        let v = self.get(MASK_4, READINESS_SHIFT);
+        let v = self.get(MASK_8, READINESS_SHIFT);
         event::ready_from_usize(v)
     }
 
@@ -2299,20 +2324,20 @@ impl ReadinessState {
     /// Set the readiness
     #[inline]
     fn set_readiness(&mut self, v: Ready) {
-        self.set(event::ready_as_usize(v), MASK_4, READINESS_SHIFT);
+        self.set(event::ready_as_usize(v), MASK_8, READINESS_SHIFT);
     }
 
     /// Get the interest
     #[inline]
     fn interest(&self) -> Ready {
-        let v = self.get(MASK_4, INTEREST_SHIFT);
+        let v = self.get(MASK_8, INTEREST_SHIFT);
         event::ready_from_usize(v)
     }
 
     /// Set the interest
     #[inline]
     fn set_interest(&mut self, v: Ready) {
-        self.set(event::ready_as_usize(v), MASK_4, INTEREST_SHIFT);
+        self.set(event::ready_as_usize(v), MASK_8, INTEREST_SHIFT);
     }
 
     #[inline]
