@@ -155,7 +155,7 @@ impl Binding {
     /// Creates a new blank binding ready to be inserted into an I/O
     /// object.
     ///
-    /// Won't actually do anything until associated with an `Poll` loop.
+    /// Won't actually do anything until associated with a `Poll` loop.
     pub fn new() -> Binding {
         Binding { selector: AtomicLazyCell::new() }
     }
