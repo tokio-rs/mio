@@ -393,6 +393,13 @@ impl TcpListener {
             try!(sock.reuse_address(true));
         }
 
+        // Set SO_REUSEPORT, but only on Unix
+        // And on Linux, this socket option is only available on kernel 3.9+
+        if cfg!(unix) && cfg!(feature = "reuse_port") {
+            use net2::unix::UnixTcpBuilderExt;
+            try!(sock.reuse_port(true));
+        }
+
         // Bind the socket
         try!(sock.bind(addr));
 

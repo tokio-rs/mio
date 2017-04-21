@@ -396,10 +396,14 @@ fn test_tcp_sockets_are_send() {
 }
 
 #[test]
-fn bind_twice_bad() {
+fn bind_twice() {
     let l1 = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = l1.local_addr().unwrap();
-    assert!(TcpListener::bind(&addr).is_err());
+    if cfg!(feature = "reuse_port") {
+        assert!(TcpListener::bind(&addr).is_ok());
+    } else {
+        assert!(TcpListener::bind(&addr).is_err());
+    }
 }
 
 #[test]

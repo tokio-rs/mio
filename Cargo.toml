@@ -42,6 +42,10 @@ env_logger = { version = "0.3.0", default-features = false }
 tempdir    = "0.3.4"
 bytes      = "0.3.0"
 
+[features]
+default = []
+reuse_port = []
+
 [[test]]
 name = "test"
 path = "test/mod.rs"
