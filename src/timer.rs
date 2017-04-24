@@ -55,6 +55,15 @@ struct Inner {
     wakeup_thread: thread::JoinHandle<()>,
 }
 
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // 1. Set wakeup state to TERMINATE_THREAD (https://github.com/carllerche/mio/blob/master/src/timer.rs#L451)
+        self.wakeup_state.store(TERMINATE_THREAD, Ordering::Release);
+        // 2. Wake him up
+        self.wakeup_thread.thread().unpark();
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 struct WheelEntry {
     next_tick: Tick,
