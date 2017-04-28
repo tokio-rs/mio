@@ -3,20 +3,20 @@ use libc::{self, c_int};
 #[macro_use]
 pub mod dlsym;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "fuchsia"))]
 mod epoll;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "fuchsia"))]
 pub use self::epoll::{Events, Selector};
 
 #[cfg(any(target_os = "bitrig", target_os = "dragonfly",
-    target_os = "freebsd", target_os = "ios", target_os = "macos",
-    target_os = "netbsd", target_os = "openbsd"))]
+          target_os = "freebsd", target_os = "ios", target_os = "macos",
+          target_os = "netbsd", target_os = "openbsd"))]
 mod kqueue;
 
 #[cfg(any(target_os = "bitrig", target_os = "dragonfly",
-    target_os = "freebsd", target_os = "ios", target_os = "macos",
-    target_os = "netbsd", target_os = "openbsd"))]
+          target_os = "freebsd", target_os = "ios", target_os = "macos",
+          target_os = "netbsd", target_os = "openbsd"))]
 pub use self::kqueue::{Events, Selector};
 
 mod awakener;
