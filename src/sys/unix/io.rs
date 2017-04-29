@@ -18,8 +18,8 @@ pub fn set_nonblock(fd: libc::c_int) -> io::Result<()> {
 
 pub fn set_cloexec(fd: libc::c_int) -> io::Result<()> {
     unsafe {
-        let flags = libc::fcntl(fd, libc::F_GETFL);
-        cvt(libc::fcntl(fd, libc::F_SETFL, flags | libc::O_CLOEXEC)).map(|_| ())
+        let flags = libc::fcntl(fd, libc::F_GETFD);
+        cvt(libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC)).map(|_| ())
     }
 }
 
