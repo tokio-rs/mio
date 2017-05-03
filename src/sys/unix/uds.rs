@@ -122,12 +122,25 @@ impl UnixSocket {
     }
 
     /// Bind the socket to the specified address
+    #[cfg(not(all(target_arch = "aarch64",target_os = "android")))]
     pub fn bind<P: AsRef<Path> + ?Sized>(&self, addr: &P) -> io::Result<()> {
         unsafe {
             let (addr, len) = try!(sockaddr_un(addr.as_ref()));
             try!(cvt(libc::bind(self.as_raw_fd(),
                                 &addr as *const _ as *const _,
                                 len)));
+            Ok(())
+        }
+    }
+
+    #[cfg(all(target_arch = "aarch64",target_os = "android"))]
+    pub fn bind<P: AsRef<Path> + ?Sized>(&self, addr: &P) -> io::Result<()> {
+        unsafe {
+            let (addr, len) = try!(sockaddr_un(addr.as_ref()));
+            let len_i32 = len as i32;
+            try!(cvt(libc::bind(self.as_raw_fd(),
+                                &addr as *const _ as *const _,
+                                len_i32)));
             Ok(())
         }
     }
