@@ -1,6 +1,6 @@
 # 0.6.7 (April 27, 2017)
 
-* Ignore EPIPE coming out of `kevent
+* Ignore EPIPE coming out of `kevent`
 * Timer thread should exit when timer is dropped.
 
 # 0.6.6 (March 22, 2017)
