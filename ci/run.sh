@@ -22,6 +22,15 @@ case "$TARGET" in
     grep "^test result.* 0 failed" /tmp/out
     ;;
 
+  aarch64-linux-android)
+    # Use the 64bit emulator
+    emulator64-arm @arm64-24 -no-window &
+    adb wait-for-device
+    adb push $TEST_FILE /data/mio-test
+    adb shell /data/mio-test 2>&1 | tee /tmp/out
+    grep "^test result.* 0 failed" /tmp/out
+    ;;
+
   *)
     exit 1;
     ;;
