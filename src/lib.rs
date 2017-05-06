@@ -12,7 +12,7 @@
 //!
 //! # Usage
 //!
-//! Using mio starts by creating a [Poll], which reads events from the OS and
+//! Using mio starts by creating a [`Poll`], which reads events from the OS and
 //! put them into [`Events`]. You can handle IO events from the OS with it.
 //!
 //! For more detail, see [`Poll`].
