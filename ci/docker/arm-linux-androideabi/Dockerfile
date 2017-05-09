@@ -14,6 +14,9 @@ RUN dpkg --add-architecture i386 && \
   gcc \
   libc6-dev
 
+
+COPY cargo_config /etc/cargo_config
+
 WORKDIR /android/
 
 COPY install-ndk.sh /android/
@@ -28,7 +31,7 @@ ENV PATH=$PATH:/rust/bin \
     CARGO_TARGET_ARM_LINUX_ANDROIDEABI_LINKER=arm-linux-androideabi-gcc \
     ANDROID_EMULATOR_FORCE_32BIT=1 \
     HOME=/tmp
-RUN chmod 755 /android/sdk/tools/*
+RUN chmod 755 /android/sdk/tools/* /android/sdk/tools/qemu/linux-x86_64/* /android/sdk/tools/qemu/linux-x86/*
 
 RUN cp -r /root/.android /tmp
 RUN chmod 777 -R /tmp/.android
