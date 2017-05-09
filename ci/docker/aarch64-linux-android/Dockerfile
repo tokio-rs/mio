@@ -12,7 +12,10 @@ RUN dpkg --add-architecture amd64 && \
   openjdk-9-jre \
   libstdc++6:amd64 \
   gcc \
-  libc6-dev
+  libc6-dev \
+  libpulse0:amd64
+
+COPY cargo_config /etc/cargo_config
 
 WORKDIR /android/
 
@@ -28,7 +31,7 @@ ENV PATH=$PATH:/rust/bin \
     CARGO_TARGET_ARM_LINUX_ANDROIDEABI_LINKER=aarch64-linux-android-gcc \
     ANDROID_EMULATOR_FORCE_32BIT=0 \
     HOME=/tmp
-RUN chmod 755 /android/sdk/tools/*
+RUN chmod 755 /android/sdk/tools/* /android/sdk/tools/qemu/linux-x86_64/* /android/sdk/tools/qemu/linux-x86/*
 
 RUN cp -r /root/.android /tmp
 RUN chmod 777 -R /tmp/.android
