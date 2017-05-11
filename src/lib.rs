@@ -12,7 +12,7 @@
 //!
 //! # Usage
 //!
-//! Using mio starts by creating an [Poll], which reads events from the OS and
+//! Using mio starts by creating a [Poll], which reads events from the OS and
 //! put them into [`Events`]. You can handle IO events from the OS with it.
 //!
 //! For more detail, see [`Poll`].
@@ -36,7 +36,7 @@
 //! // Setup the server socket
 //! let server = TcpListener::bind(&addr).unwrap();
 //!
-//! // Create an poll instance
+//! // Create a poll instance
 //! let poll = Poll::new().unwrap();
 //!
 //! // Start listening for incoming connections

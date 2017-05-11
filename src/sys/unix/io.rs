@@ -11,14 +11,15 @@ use sys::unix::cvt;
 
 pub fn set_nonblock(fd: libc::c_int) -> io::Result<()> {
     unsafe {
-        let mut nonblocking = 1 as libc::c_ulong;
-        cvt(libc::ioctl(fd, libc::FIONBIO, &mut nonblocking)).map(|_| ())
+        let flags = libc::fcntl(fd, libc::F_GETFL);
+        cvt(libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK)).map(|_|())
     }
 }
 
 pub fn set_cloexec(fd: libc::c_int) -> io::Result<()> {
     unsafe {
-        cvt(libc::ioctl(fd, libc::FIOCLEX)).map(|_| ())
+        let flags = libc::fcntl(fd, libc::F_GETFD);
+        cvt(libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC)).map(|_| ())
     }
 }
 
