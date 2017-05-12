@@ -31,7 +31,8 @@ case "$TARGET" in
     adb root
     adb push $TEST_FILE /data/mio-test
     #adb unroot
-    adb shell chmod 755 /data/mio-test; /data/mio-test 2>&1 | tee /tmp/out
+    adb shell chmod 755 /data/mio-test
+    adb shell /data/mio-test 2>&1 | tee /tmp/out
     grep "^test result.* 0 failed" /tmp/out
     ;;
 
