@@ -7,7 +7,7 @@ set licenses [lindex $argv 1]
 
 spawn {*}$cmd
 expect {
-  "Do you accept the license '*'*" {
+  "Accept? (y/N):*" {
         exp_send "y\r"
         exp_continue
   }
