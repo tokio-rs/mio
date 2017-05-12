@@ -30,7 +30,7 @@ case "$TARGET" in
     adb wait-for-device
     adb root
     adb push $TEST_FILE /data/mio-test
-    adb unroot
+    #adb unroot
     adb shell /data/mio-test 2>&1 | tee /tmp/out
     grep "^test result.* 0 failed" /tmp/out
     ;;
