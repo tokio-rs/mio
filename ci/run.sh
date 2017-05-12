@@ -11,7 +11,7 @@ if [ -f /etc/cargo_config ] && [ -d /cargo ]; then cp -f /etc/cargo_config /carg
 cargo build --target=$TARGET --test test --verbose
 
 # Find the file to run
-TEST_FILE="$(find target/$TARGET/debug -maxdepth 1 -type f -name test-* | head -1)"
+TEST_FILE=$(find target/$TARGET/debug -maxdepth 1 -type f -perm -111 -name "test-*" | head -1)
 
 case "$TARGET" in
   arm-linux-androideabi)
