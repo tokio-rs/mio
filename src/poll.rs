@@ -815,7 +815,7 @@ impl Poll {
     /// Deregister an `Evented` handle with the `Poll` instance.
     ///
     /// When an `Evented` handle is deregistered, the `Poll` instance will
-    /// no longer monitor it for readiness state changes. Unlike disabiling
+    /// no longer monitor it for readiness state changes. Unlike disabling
     /// handles with [`oneshot`], deregistering clears up any internal resources
     /// needed to track the handle.
     ///
