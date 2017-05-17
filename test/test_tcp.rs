@@ -538,5 +538,5 @@ fn connection_reset_by_peer() {
          }
      }
 
-     assert!(l.take_error().unwrap().is_some());
+     assert_eq!(l.take_error().unwrap().unwrap().kind(), io::ErrorKind::ConnectionRefused);
  }

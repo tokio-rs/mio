@@ -477,7 +477,12 @@ fn read_done(status: &OVERLAPPED_ENTRY) {
     // If a read didn't complete, then the connect must have just finished.
     trace!("finished a connect");
 
-    match me2.inner.socket.connect_complete() {
+    // By guarding with socket.result(), we ensure that a connection
+    // was successfully made before performing operations requiring a
+    // connected socket.
+    match unsafe { me2.inner.socket.result(status.overlapped()) }
+        .and_then(|_| me2.inner.socket.connect_complete())
+    {
         Ok(()) => {
             me2.add_readiness(&mut me, Ready::writable());
             me2.schedule_read(&mut me);
