@@ -3,10 +3,16 @@ use event_imp::{self as event, Ready, Event, Evented, PollOpt};
 use std::{fmt, io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::{mem, ops, isize};
+#[cfg(unix)]
+use std::os::unix::io::AsRawFd;
+#[cfg(unix)]
+use std::os::unix::io::RawFd;
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool};
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed, SeqCst};
 use std::time::{Duration, Instant};
+#[cfg(unix)]
+use sys::unix::UnixReady;
 
 // Poll is backed by two readiness queues. The first is a system readiness queue
 // represented by `sys::Selector`. The system readiness queue handles events
@@ -1098,13 +1104,24 @@ impl Poll {
     }
 }
 
+#[cfg(unix)]
+fn registerable(interest: Ready) -> bool {
+    let unixinterest = UnixReady::from(interest);
+    unixinterest.is_readable() || unixinterest.is_writable() || unixinterest.is_aio()
+}
+
+#[cfg(not(unix))]
+fn registerable(interest: Ready) -> bool {
+    interest.is_readable() || interest.is_writable()
+}
+
 fn validate_args(token: Token, interest: Ready) -> io::Result<()> {
     if token == AWAKEN {
         return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
     }
 
-    if !interest.is_readable() && !interest.is_writable() {
-        return Err(io::Error::new(io::ErrorKind::Other, "interest must include readable or writable"));
+    if !registerable(interest) {
+        return Err(io::Error::new(io::ErrorKind::Other, "interest must include readable or writable or aio"));
     }
 
     Ok(())
@@ -1113,6 +1130,13 @@ fn validate_args(token: Token, interest: Ready) -> io::Result<()> {
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Poll")
+    }
+}
+
+#[cfg(unix)]
+impl AsRawFd for Poll {
+    fn as_raw_fd(&self) -> RawFd {
+        self.selector.as_raw_fd()
     }
 }
 
@@ -2453,4 +2477,11 @@ impl Clone for SelectorId {
             id: AtomicUsize::new(self.id.load(Ordering::SeqCst)),
         }
     }
+}
+
+#[test]
+#[cfg(unix)]
+pub fn as_raw_fd() {
+    let poll = Poll::new().unwrap();
+    assert!(poll.as_raw_fd() > 0);
 }
