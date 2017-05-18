@@ -481,6 +481,11 @@ struct ReadinessQueueInner {
     // Similar to `end_marker`, but this node signals to producers that `Poll`
     // has gone to sleep and must be woken up.
     sleep_marker: Box<ReadinessNode>,
+
+    // Similar to `end_marker`, but the node signals that the queue is closed.
+    // This happens when `ReadyQueue` is dropped and signals to producers that
+    // the nodes should no longer be pushed into the queue.
+    closed_marker: Box<ReadinessNode>,
 }
 
 /// Node shared by a `Registration` / `SetReadiness` pair as well as the node
@@ -1891,6 +1896,7 @@ impl ReadinessQueue {
 
         let end_marker = Box::new(ReadinessNode::marker());
         let sleep_marker = Box::new(ReadinessNode::marker());
+        let closed_marker = Box::new(ReadinessNode::marker());
 
         let ptr = &*end_marker as *const _ as *mut _;
 
@@ -1901,6 +1907,7 @@ impl ReadinessQueue {
                 tail_readiness: UnsafeCell::new(ptr),
                 end_marker: end_marker,
                 sleep_marker: sleep_marker,
+                closed_marker: closed_marker,
             })
         })
     }
@@ -2063,6 +2070,35 @@ impl ReadinessQueue {
     }
 }
 
+impl Drop for ReadinessQueue {
+    fn drop(&mut self) {
+        // Close the queue by enqueuing the closed node
+        self.inner.enqueue_node(&*self.inner.closed_marker);
+
+        loop {
+            // Free any nodes that happen to be left in the readiness queue
+            let ptr = match unsafe { self.inner.dequeue_node(ptr::null_mut()) } {
+                Dequeue::Empty => break,
+                Dequeue::Inconsistent => {
+                    // This really shouldn't be possible as all other handles to
+                    // `ReadinessQueueInner` are dropped, but handle this by
+                    // spinning I guess?
+                    continue;
+                }
+                Dequeue::Data(ptr) => ptr,
+            };
+
+            let node = unsafe { &*ptr };
+
+            let state = node.state.load(Acquire);
+
+            debug_assert!(state.is_queued());
+
+            release_node(ptr);
+        }
+    }
+}
+
 impl ReadinessQueueInner {
     /// Push the node into the readiness queue
     fn enqueue_node(&self, node: &ReadinessNode) -> bool {
@@ -2074,7 +2110,33 @@ impl ReadinessQueueInner {
         node.next_readiness.store(ptr::null_mut(), Relaxed);
 
         unsafe {
-            let prev = self.head_readiness.swap(node_ptr, AcqRel);
+            let mut prev = self.head_readiness.load(Acquire);
+
+            loop {
+                if prev == self.closed_marker() {
+                    debug_assert!(node_ptr != self.closed_marker());
+                    // debug_assert!(node_ptr != self.end_marker());
+                    debug_assert!(node_ptr != self.sleep_marker());
+
+                    if node_ptr != self.end_marker() {
+                        // The readiness queue is shutdown, but the enqueue flag was
+                        // set. This means that we are responsible for decrementing
+                        // the ready queue's ref count
+                        debug_assert!(node.ref_count.load(Relaxed) >= 2);
+                        release_node(node_ptr);
+                    }
+
+                    return false;
+                }
+
+                let act = self.head_readiness.compare_and_swap(prev, node_ptr, AcqRel);
+
+                if prev == act {
+                    break;
+                }
+
+                prev = act;
+            }
 
             debug_assert!((*prev).next_readiness.load(Relaxed).is_null());
 
@@ -2091,7 +2153,7 @@ impl ReadinessQueueInner {
         let mut tail = *self.tail_readiness.get();
         let mut next = (*tail).next_readiness.load(Acquire);
 
-        if tail == self.end_marker() || tail == self.sleep_marker() {
+        if tail == self.end_marker() || tail == self.sleep_marker() || tail == self.closed_marker() {
             if next.is_null() {
                 return Dequeue::Empty;
             }
@@ -2141,32 +2203,9 @@ impl ReadinessQueueInner {
     fn sleep_marker(&self) -> *mut ReadinessNode {
         &*self.sleep_marker as *const ReadinessNode as *mut ReadinessNode
     }
-}
 
-impl Drop for ReadinessQueueInner {
-    fn drop(&mut self) {
-        loop {
-            // Free any nodes that happen to be left in the readiness queue
-            let ptr = match unsafe { self.dequeue_node(ptr::null_mut()) } {
-                Dequeue::Empty => break,
-                Dequeue::Inconsistent => {
-                    // This really shouldn't be possible as all other handles to
-                    // `ReadinessQueueInner` are dropped, but handle this by
-                    // spinning I guess?
-                    continue;
-                }
-                Dequeue::Data(ptr) => ptr,
-            };
-
-            let node = unsafe { &*ptr };
-
-            let state = node.state.load(Acquire);
-
-            debug_assert!(state.is_queued());
-            debug_assert!(state.is_dropped());
-
-            release_node(ptr);
-        }
+    fn closed_marker(&self) -> *mut ReadinessNode {
+        &*self.closed_marker as *const ReadinessNode as *mut ReadinessNode
     }
 }
 
