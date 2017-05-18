@@ -2,12 +2,12 @@ use {sys, Token};
 use event_imp::{self as event, Ready, Event, Evented, PollOpt};
 use std::{fmt, io, ptr, usize};
 use std::cell::UnsafeCell;
-use std::{mem, ops, isize};
+use std::{mem, isize};
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
-use std::sync::{Arc, Mutex, Condvar};
+use std::sync::{Arc, Weak, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool};
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed, SeqCst};
 use std::time::{Duration, Instant};
@@ -418,7 +418,7 @@ pub struct Poll {
 /// [`Registration::new2`]: struct.Registration.html#method.new2
 /// [`Evented`]: event/trait.Evented.html
 pub struct Registration {
-    inner: RegistrationInner,
+    inner: Arc<ReadinessNode>,
 }
 
 unsafe impl Send for Registration {}
@@ -432,7 +432,7 @@ unsafe impl Sync for Registration {}
 /// [`Registration`]
 #[derive(Clone)]
 pub struct SetReadiness {
-    inner: RegistrationInner,
+    inner: Arc<ReadinessNode>,
 }
 
 unsafe impl Send for SetReadiness {}
@@ -444,15 +444,6 @@ pub struct SelectorId {
     id: AtomicUsize,
 }
 
-struct RegistrationInner {
-    // Unsafe pointer to the registration's node. The node is ref counted. This
-    // cannot "simply" be tracked by an Arc because `Poll::poll` has an implicit
-    // handle though it isn't stored anywhere. In other words, `Poll::poll`
-    // needs to decrement the ref count before the node is freed.
-    node: *mut ReadinessNode,
-}
-
-#[derive(Clone)]
 struct ReadinessQueue {
     inner: Arc<ReadinessQueueInner>,
 }
@@ -476,16 +467,11 @@ struct ReadinessQueueInner {
     // Before attempting to read from the queue, this node is inserted in order
     // to partition the queue between nodes that are "owned" by the dequeue end
     // and nodes that will be pushed on by producers.
-    end_marker: Box<ReadinessNode>,
+    end_marker: Arc<ReadinessNode>,
 
     // Similar to `end_marker`, but this node signals to producers that `Poll`
     // has gone to sleep and must be woken up.
-    sleep_marker: Box<ReadinessNode>,
-
-    // Similar to `end_marker`, but the node signals that the queue is closed.
-    // This happens when `ReadyQueue` is dropped and signals to producers that
-    // the nodes should no longer be pushed into the queue.
-    closed_marker: Box<ReadinessNode>,
+    sleep_marker: Arc<ReadinessNode>,
 }
 
 /// Node shared by a `Registration` / `SetReadiness` pair as well as the node
@@ -533,11 +519,8 @@ struct ReadinessNode {
     // is discarded.
     update_lock: AtomicBool,
 
-    // Pointer to Arc<ReadinessQueueInner>
+    // Pointer to Weak<ReadinessQueueInner>
     readiness_queue: AtomicPtr<()>,
-
-    // Tracks the number of `ReadyRef` pointers
-    ref_count: AtomicUsize,
 }
 
 /// Stores the ReadinessNode state in an AtomicUsize. This wrapper around the
@@ -575,13 +558,12 @@ struct ReadinessState(usize);
 /// Returned by `dequeue_node`. Represents the different states as described by
 /// the queue documentation on 1024cores.net.
 enum Dequeue {
-    Data(*mut ReadinessNode),
+    Data(Arc<ReadinessNode>),
     Empty,
     Inconsistent,
 }
 
 const AWAKEN: Token = Token(usize::MAX);
-const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 
 /*
  *
@@ -1414,19 +1396,15 @@ impl Registration {
     pub fn new2() -> (Registration, SetReadiness) {
         // Allocate the registration node. The new node will have `ref_count`
         // set to 2: one SetReadiness, one Registration.
-        let node = Box::into_raw(Box::new(ReadinessNode::new(
-                    ptr::null_mut(), Token(0), Ready::empty(), PollOpt::empty(), 2)));
+        let node = Arc::new(ReadinessNode::new(
+                    ptr::null_mut(), Token(0), Ready::empty(), PollOpt::empty()));
 
         let registration = Registration {
-            inner: RegistrationInner {
-                node: node,
-            },
+            inner: node.clone(),
         };
 
         let set_readiness = SetReadiness {
-            inner: RegistrationInner {
-                node: node,
-            },
+            inner: node,
         };
 
         (registration, set_readiness)
@@ -1451,27 +1429,17 @@ impl Registration {
         is_sync::<SetReadiness>();
 
         // Clone handle to the readiness queue, this bumps the ref count
-        let queue = poll.readiness_queue.inner.clone();
+        let queue = Arc::downgrade(&poll.readiness_queue.inner);
 
         // Convert to a *mut () pointer
         let queue: *mut () = unsafe { mem::transmute(queue) };
 
         // Allocate the registration node. The new node will have `ref_count`
         // set to 3: one SetReadiness, one Registration, and one Poll handle.
-        let node = Box::into_raw(Box::new(ReadinessNode::new(
-                    queue, token, interest, opt, 3)));
+        let node = Arc::new(ReadinessNode::new(queue, token, interest, opt));
 
-        let registration = Registration {
-            inner: RegistrationInner {
-                node: node,
-            },
-        };
-
-        let set_readiness = SetReadiness {
-            inner: RegistrationInner {
-                node: node,
-            },
-        };
+        let registration = Registration { inner: node.clone() };
+        let set_readiness = SetReadiness { inner: node };
 
         (registration, set_readiness)
     }
@@ -1480,40 +1448,28 @@ impl Registration {
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     pub fn update(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.inner.update(poll, token, interest, opts)
+        ReadinessNode::update(&self.inner, poll, token, interest, opts)
     }
 
     #[deprecated(since = "0.6.5", note = "use `Evented` impl")]
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     pub fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner.update(poll, Token(0), Ready::empty(), PollOpt::empty())
+        ReadinessNode::update(&self.inner, poll, Token(0), Ready::empty(), PollOpt::empty())
     }
 }
 
 impl Evented for Registration {
     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.inner.update(poll, token, interest, opts)
+        ReadinessNode::update(&self.inner, poll, token, interest, opts)
     }
 
     fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.inner.update(poll, token, interest, opts)
+        ReadinessNode::update(&self.inner, poll, token, interest, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner.update(poll, Token(0), Ready::empty(), PollOpt::empty())
-    }
-}
-
-impl Drop for Registration {
-    fn drop(&mut self) {
-        // `flag_as_dropped` toggles the `dropped` flag and notifies
-        // `Poll::poll` to release its handle (which is just decrementing
-        // the ref count).
-        if self.inner.state.flag_as_dropped() {
-            // Can't do anything if the queuing fails
-            let _ = self.inner.enqueue_with_wakeup();
-        }
+        ReadinessNode::update(&self.inner, poll, Token(0), Ready::empty(), PollOpt::empty())
     }
 }
 
@@ -1521,6 +1477,12 @@ impl fmt::Debug for Registration {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Registration")
             .finish()
+    }
+}
+
+impl Drop for Registration {
+    fn drop(&mut self) {
+        self.inner.state.flag_as_dropped();
     }
 }
 
@@ -1612,273 +1574,13 @@ impl SetReadiness {
     /// [`Poll`]: struct.Poll.html
     /// [`poll`]: struct.Poll.html#method.poll
     pub fn set_readiness(&self, ready: Ready) -> io::Result<()> {
-        self.inner.set_readiness(ready)
+        ReadinessNode::set_readiness(&self.inner, ready)
     }
 }
 
 impl fmt::Debug for SetReadiness {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "SetReadiness")
-    }
-}
-
-impl RegistrationInner {
-    /// Get the registration's readiness.
-    fn readiness(&self) -> Ready {
-        self.state.load(Relaxed).readiness()
-    }
-
-    /// Set the registration's readiness.
-    ///
-    /// This function can be called concurrently by an arbitrary number of
-    /// SetReadiness handles.
-    fn set_readiness(&self, ready: Ready) -> io::Result<()> {
-        // Load the current atomic state.
-        let mut state = self.state.load(Acquire);
-        let mut next;
-
-        loop {
-            next = state;
-
-            if state.is_dropped() {
-                // Node is dropped, no more notifications
-                return Ok(());
-            }
-
-            // Update the readiness
-            next.set_readiness(ready);
-
-            // If the readiness is not blank, try to obtain permission to
-            // push the node into the readiness queue.
-            if !next.effective_readiness().is_empty() {
-                next.set_queued();
-            }
-
-            let actual = self.state.compare_and_swap(state, next, AcqRel);
-
-            if state == actual {
-                break;
-            }
-
-            state = actual;
-        }
-
-        if !state.is_queued() && next.is_queued() {
-            // We toggled the queued flag, making us responsible for queuing the
-            // node in the MPSC readiness queue.
-            try!(self.enqueue_with_wakeup());
-        }
-
-        Ok(())
-    }
-
-    /// Update the registration details associated with the node
-    fn update(&self, poll: &Poll, token: Token, interest: Ready, opt: PollOpt) -> io::Result<()> {
-        // First, ensure poll instances match
-        //
-        // Load the queue pointer, `Relaxed` is sufficient here as only the
-        // pointer is being operated on. The actual memory is guaranteed to be
-        // visible the `poll: &Poll` ref passed as an argument to the function.
-        let mut queue = self.readiness_queue.load(Relaxed);
-        let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue.inner) };
-        let other = *other;
-
-        debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
-
-        if queue.is_null() {
-            // Attempt to set the queue pointer. `Release` ordering synchronizes
-            // with `Acquire` in `ensure_with_wakeup`.
-            let actual = self.readiness_queue.compare_and_swap(
-                queue, other, Release);
-
-            if actual.is_null() {
-                // The CAS succeeded, this means that the node's ref count
-                // should be incremented to reflect that the `poll` function
-                // effectively owns the node as well.
-                //
-                // `Relaxed` ordering used for the same reason as in
-                // RegistrationInner::clone
-                self.ref_count.fetch_add(1, Relaxed);
-
-                // Note that the `queue` reference stored in our
-                // `readiness_queue` field is intended to be a strong reference,
-                // so now that we've successfully claimed the reference we bump
-                // the refcount here.
-                //
-                // Down below in `release_node` when we deallocate this
-                // `RegistrationInner` is where we'll transmute this back to an
-                // arc and decrement the reference count.
-                mem::forget(poll.readiness_queue.clone());
-            } else {
-                // The CAS failed, another thread set the queue pointer, so ensure
-                // that the pointer and `other` match
-                if actual != other {
-                    return Err(io::Error::new(io::ErrorKind::Other, "registration handle associated with another `Poll` instance"));
-                }
-            }
-
-            queue = other;
-        } else if queue != other {
-            return Err(io::Error::new(io::ErrorKind::Other, "registration handle associated with another `Poll` instance"));
-        }
-
-        unsafe {
-            let actual = &poll.readiness_queue.inner as *const _ as *const usize;
-            debug_assert_eq!(queue as usize, *actual);
-        }
-
-        // The `update_lock` atomic is used as a flag ensuring only a single
-        // thread concurrently enters the `update` critical section. Any
-        // concurrent calls to update are discarded. If coordinated updates are
-        // required, the Mio user is responsible for handling that.
-        //
-        // Acquire / Release ordering is used on `update_lock` to ensure that
-        // data access to the `token_*` variables are scoped to the critical
-        // section.
-
-        // Acquire the update lock.
-        if self.update_lock.compare_and_swap(false, true, Acquire) {
-            // The lock is already held. Discard the update
-            return Ok(());
-        }
-
-        // Relaxed ordering is acceptable here as the only memory that needs to
-        // be visible as part of the update are the `token_*` variables, and
-        // ordering has already been handled by the `update_lock` access.
-        let mut state = self.state.load(Relaxed);
-        let mut next;
-
-        // Read the current token, again this memory has been ordered by the
-        // acquire on `update_lock`.
-        let curr_token_pos = state.token_write_pos();
-        let curr_token = unsafe { self::token(self, curr_token_pos) };
-
-        let mut next_token_pos = curr_token_pos;
-
-        // If the `update` call is changing the token, then compute the next
-        // available token slot and write the token there.
-        //
-        // Note that this computation is happening *outside* of the
-        // compare-and-swap loop. The update lock ensures that only a single
-        // thread could be mutating the write_token_position, so the
-        // `next_token_pos` will never need to be recomputed even if
-        // `token_read_pos` concurrently changes. This is because
-        // `token_read_pos` can ONLY concurrently change to the current value of
-        // `token_write_pos`, so `next_token_pos` will always remain valid.
-        if token != curr_token {
-            next_token_pos = state.next_token_pos();
-
-            // Update the token
-            match next_token_pos {
-                0 => unsafe { *self.token_0.get() = token },
-                1 => unsafe { *self.token_1.get() = token },
-                2 => unsafe { *self.token_2.get() = token },
-                _ => unreachable!(),
-            }
-        }
-
-        // Now enter the compare-and-swap loop
-        loop {
-            next = state;
-
-            // The node is only dropped once all `Registration` handles are
-            // dropped. Only `Registration` can call `update`.
-            debug_assert!(!state.is_dropped());
-
-            // Update the write token position, this will also release the token
-            // to Poll::poll.
-            next.set_token_write_pos(next_token_pos);
-
-            // Update readiness and poll opts
-            next.set_interest(interest);
-            next.set_poll_opt(opt);
-
-            // If there is effective readiness, the node will need to be queued
-            // for processing. This exact behavior is still TBD, so we are
-            // conservative for now and always fire.
-            //
-            // See https://github.com/carllerche/mio/issues/535.
-            if !next.effective_readiness().is_empty() {
-                next.set_queued();
-            }
-
-            // compare-and-swap the state values. Only `Release` is needed here.
-            // The `Release` ensures that `Poll::poll` will see the token
-            // update and the update function doesn't care about any other
-            // memory visibility.
-            let actual = self.state.compare_and_swap(state, next, Release);
-
-            if actual == state {
-                break;
-            }
-
-            // CAS failed, but `curr_token_pos` should not have changed given
-            // that we still hold the update lock.
-            debug_assert_eq!(curr_token_pos, actual.token_write_pos());
-
-            state = actual;
-        }
-
-        // Release the lock
-        self.update_lock.store(false, Release);
-
-        if !state.is_queued() && next.is_queued() {
-            // We are responsible for enqueing the node.
-            try!(enqueue_with_wakeup(queue, self));
-        }
-
-        Ok(())
-    }
-}
-
-impl ops::Deref for RegistrationInner {
-    type Target = ReadinessNode;
-
-    fn deref(&self) -> &ReadinessNode {
-        unsafe { &*self.node }
-    }
-}
-
-impl Clone for RegistrationInner {
-    fn clone(&self) -> RegistrationInner {
-        // Using a relaxed ordering is alright here, as knowledge of the
-        // original reference prevents other threads from erroneously deleting
-        // the object.
-        //
-        // As explained in the [Boost documentation][1], Increasing the
-        // reference counter can always be done with memory_order_relaxed: New
-        // references to an object can only be formed from an existing
-        // reference, and passing an existing reference from one thread to
-        // another must already provide any required synchronization.
-        //
-        // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
-        let old_size = self.ref_count.fetch_add(1, Relaxed);
-
-        // However we need to guard against massive refcounts in case someone
-        // is `mem::forget`ing Arcs. If we don't do this the count can overflow
-        // and users will use-after free. We racily saturate to `isize::MAX` on
-        // the assumption that there aren't ~2 billion threads incrementing
-        // the reference count at once. This branch will never be taken in
-        // any realistic program.
-        //
-        // We abort because such a program is incredibly degenerate, and we
-        // don't care to support it.
-        if old_size & !MAX_REFCOUNT != 0 {
-            // TODO: This should really abort the process
-            panic!();
-        }
-
-        RegistrationInner {
-            node: self.node.clone(),
-        }
-    }
-}
-
-impl Drop for RegistrationInner {
-    fn drop(&mut self) {
-        // Only handles releasing from `Registration` and `SetReadiness`
-        // handles. Poll has to call this itself.
-        release_node(self.node);
     }
 }
 
@@ -1894,9 +1596,8 @@ impl ReadinessQueue {
         is_send::<Self>();
         is_sync::<Self>();
 
-        let end_marker = Box::new(ReadinessNode::marker());
-        let sleep_marker = Box::new(ReadinessNode::marker());
-        let closed_marker = Box::new(ReadinessNode::marker());
+        let end_marker = Arc::new(ReadinessNode::marker());
+        let sleep_marker = Arc::new(ReadinessNode::marker());
 
         let ptr = &*end_marker as *const _ as *mut _;
 
@@ -1907,7 +1608,6 @@ impl ReadinessQueue {
                 tail_readiness: UnsafeCell::new(ptr),
                 end_marker: end_marker,
                 sleep_marker: sleep_marker,
-                closed_marker: closed_marker,
             })
         })
     }
@@ -1925,12 +1625,10 @@ impl ReadinessQueue {
             // stop polling. `Poll::poll` will be called again shortly and enter
             // a syscall, which should be enough to enable the other thread to
             // finish the queuing process.
-            let ptr = match unsafe { self.inner.dequeue_node(until) } {
+            let node = match unsafe { self.inner.dequeue_node(until) } {
                 Dequeue::Empty | Dequeue::Inconsistent => break,
                 Dequeue::Data(ptr) => ptr,
             };
-
-            let node = unsafe { &*ptr };
 
             // Read the node state with Acquire ordering. This allows reading
             // the token variables.
@@ -1948,12 +1646,10 @@ impl ReadinessQueue {
                 // `queued` flag should still be set.
                 debug_assert!(state.is_queued());
 
-                // The dropped flag means we need to release the node and
-                // perform no further processing on it.
+                // The dropped flag means we don't need to do any further
+                // processing here, the I/O object is gone.
                 if state.is_dropped() {
-                    // Release the node and continue
-                    release_node(ptr);
-                    continue 'outer;
+                    continue 'outer
                 }
 
                 // Process the node
@@ -1993,21 +1689,37 @@ impl ReadinessQueue {
             if next.is_queued() {
                 if until.is_null() {
                     // We never want to see the node again
-                    until = ptr;
+                    until = &*node as *const ReadinessNode as *mut ReadinessNode;
                 }
 
                 // Requeue the node
-                self.inner.enqueue_node(node);
+                self.inner.enqueue_node(&node);
             }
 
             if !readiness.is_empty() {
                 // Get the token
-                let token = unsafe { token(node, next.token_read_pos()) };
+                let token = unsafe { token(&node, next.token_read_pos()) };
 
                 // Push the event
                 dst.push_event(Event::new(readiness, token));
             }
         }
+    }
+
+    fn wakeup(&self) -> io::Result<()> {
+        self.inner.awakener.wakeup()
+    }
+
+    /// Prepend the given node to the head of the readiness queue. This is done
+    /// with relaxed ordering. Returns true if `Poll` needs to be woken up.
+    fn enqueue_node_with_wakeup(&self, node: &Arc<ReadinessNode>)
+                                -> io::Result<()>
+    {
+        if self.inner.enqueue_node(node) {
+            try!(self.wakeup());
+        }
+
+        Ok(())
     }
 
     /// Prepare the queue for the `Poll::poll` thread to block in the system
@@ -2056,94 +1768,30 @@ impl ReadinessQueue {
     }
 }
 
-impl Drop for ReadinessQueue {
-    fn drop(&mut self) {
-        // Close the queue by enqueuing the closed node
-        self.inner.enqueue_node(&*self.inner.closed_marker);
-
-        loop {
-            // Free any nodes that happen to be left in the readiness queue
-            let ptr = match unsafe { self.inner.dequeue_node(ptr::null_mut()) } {
-                Dequeue::Empty => break,
-                Dequeue::Inconsistent => {
-                    // This really shouldn't be possible as all other handles to
-                    // `ReadinessQueueInner` are dropped, but handle this by
-                    // spinning I guess?
-                    continue;
-                }
-                Dequeue::Data(ptr) => ptr,
-            };
-
-            let node = unsafe { &*ptr };
-
-            let state = node.state.load(Acquire);
-
-            debug_assert!(state.is_queued());
-
-            release_node(ptr);
-        }
-    }
-}
-
 impl ReadinessQueueInner {
-    fn wakeup(&self) -> io::Result<()> {
-        self.awakener.wakeup()
-    }
-
-    /// Prepend the given node to the head of the readiness queue. This is done
-    /// with relaxed ordering. Returns true if `Poll` needs to be woken up.
-    fn enqueue_node_with_wakeup(&self, node: &ReadinessNode) -> io::Result<()> {
-        if self.enqueue_node(node) {
-            try!(self.wakeup());
-        }
-
-        Ok(())
-    }
-
     /// Push the node into the readiness queue
-    fn enqueue_node(&self, node: &ReadinessNode) -> bool {
+    fn enqueue_node(&self, node: &Arc<ReadinessNode>) -> bool {
+        let node = node.clone();
+        let node_ptr = &*node as *const ReadinessNode as *mut ReadinessNode;
+        mem::forget(node);
+        unsafe {
+            self.enqueue_raw(node_ptr)
+        }
+    }
+
+    unsafe fn enqueue_raw(&self, node: *mut ReadinessNode) -> bool {
         // This is the 1024cores.net intrusive MPSC queue [1] "push" function.
-        let node_ptr = node as *const _ as *mut _;
+        // let node_ptr = node as *const _ as *mut _;
 
         // Relaxed used as the ordering is "released" when swapping
         // `head_readiness`
-        node.next_readiness.store(ptr::null_mut(), Relaxed);
+        (*node).next_readiness.store(ptr::null_mut(), Relaxed);
 
-        unsafe {
-            let mut prev = self.head_readiness.load(Acquire);
+        let prev = self.head_readiness.swap(node, AcqRel);
+        debug_assert!((*prev).next_readiness.load(Relaxed).is_null());
+        (*prev).next_readiness.store(node, Release);
 
-            loop {
-                if prev == self.closed_marker() {
-                    debug_assert!(node_ptr != self.closed_marker());
-                    // debug_assert!(node_ptr != self.end_marker());
-                    debug_assert!(node_ptr != self.sleep_marker());
-
-                    if node_ptr != self.end_marker() {
-                        // The readiness queue is shutdown, but the enqueue flag was
-                        // set. This means that we are responsible for decrementing
-                        // the ready queue's ref count
-                        debug_assert!(node.ref_count.load(Relaxed) >= 2);
-                        release_node(node_ptr);
-                    }
-
-                    return false;
-                }
-
-                let act = self.head_readiness.compare_and_swap(prev, node_ptr, AcqRel);
-
-                if prev == act {
-                    break;
-                }
-
-                prev = act;
-            }
-
-            debug_assert!((*prev).next_readiness.load(Relaxed).is_null());
-
-            (*prev).next_readiness.store(node_ptr, Release);
-
-            prev == self.sleep_marker()
-        }
+        prev == self.sleep_marker()
     }
 
     /// Must only be called in `poll` or `drop`
@@ -2153,7 +1801,7 @@ impl ReadinessQueueInner {
         let mut tail = *self.tail_readiness.get();
         let mut next = (*tail).next_readiness.load(Acquire);
 
-        if tail == self.end_marker() || tail == self.sleep_marker() || tail == self.closed_marker() {
+        if tail == self.end_marker() || tail == self.sleep_marker() {
             if next.is_null() {
                 return Dequeue::Empty;
             }
@@ -2176,7 +1824,7 @@ impl ReadinessQueueInner {
 
         if !next.is_null() {
             *self.tail_readiness.get() = next;
-            return Dequeue::Data(tail);
+            return Dequeue::Data(ptr2arc(tail));
         }
 
         if self.head_readiness.load(Acquire) != tail {
@@ -2184,16 +1832,24 @@ impl ReadinessQueueInner {
         }
 
         // Push the stub node
-        self.enqueue_node(&*self.end_marker);
+        self.enqueue_raw(&*self.end_marker as *const ReadinessNode as *mut _);
 
         next = (*tail).next_readiness.load(Acquire);
 
         if !next.is_null() {
             *self.tail_readiness.get() = next;
-            return Dequeue::Data(tail);
+            return Dequeue::Data(ptr2arc(tail));
         }
 
-        Dequeue::Inconsistent
+        return Dequeue::Inconsistent;
+
+        unsafe fn ptr2arc(ptr: *mut ReadinessNode) -> Arc<ReadinessNode> {
+            let anchor = mem::transmute::<usize, Arc<ReadinessNode>>(0x10);
+            let addr = &*anchor as *const ReadinessNode;
+            mem::forget(anchor);
+            let offset = addr as isize - 0x10;
+            mem::transmute::<isize, Arc<ReadinessNode>>(ptr as isize - offset)
+        }
     }
 
     fn end_marker(&self) -> *mut ReadinessNode {
@@ -2203,9 +1859,26 @@ impl ReadinessQueueInner {
     fn sleep_marker(&self) -> *mut ReadinessNode {
         &*self.sleep_marker as *const ReadinessNode as *mut ReadinessNode
     }
+}
 
-    fn closed_marker(&self) -> *mut ReadinessNode {
-        &*self.closed_marker as *const ReadinessNode as *mut ReadinessNode
+impl Drop for ReadinessQueueInner {
+    fn drop(&mut self) {
+        loop {
+            // Free any nodes that happen to be left in the readiness queue
+            let node = match unsafe { self.dequeue_node(ptr::null_mut()) } {
+                Dequeue::Empty => break,
+                Dequeue::Inconsistent => {
+                    // This really shouldn't be possible as all other handles to
+                    // `ReadinessQueueInner` are dropped, but handle this by
+                    // spinning I guess?
+                    continue;
+                }
+                Dequeue::Data(ptr) => ptr,
+            };
+
+            let state = node.state.load(Acquire);
+            debug_assert!(state.is_queued());
+        }
     }
 }
 
@@ -2214,8 +1887,7 @@ impl ReadinessNode {
     fn new(queue: *mut (),
            token: Token,
            interest: Ready,
-           opt: PollOpt,
-           ref_count: usize) -> ReadinessNode
+           opt: PollOpt) -> ReadinessNode
     {
         ReadinessNode {
             state: AtomicState::new(interest, opt),
@@ -2226,7 +1898,6 @@ impl ReadinessNode {
             next_readiness: AtomicPtr::new(ptr::null_mut()),
             update_lock: AtomicBool::new(false),
             readiness_queue: AtomicPtr::new(queue),
-            ref_count: AtomicUsize::new(ref_count),
         }
     }
 
@@ -2239,27 +1910,233 @@ impl ReadinessNode {
             next_readiness: AtomicPtr::new(ptr::null_mut()),
             update_lock: AtomicBool::new(false),
             readiness_queue: AtomicPtr::new(ptr::null_mut()),
-            ref_count: AtomicUsize::new(0),
         }
     }
 
-    fn enqueue_with_wakeup(&self) -> io::Result<()> {
-        let queue = self.readiness_queue.load(Acquire);
+    fn enqueue_with_wakeup(me: &Arc<Self>) -> io::Result<()> {
+        let queue = me.readiness_queue.load(Acquire);
 
         if queue.is_null() {
             // Not associated with a queue, nothing to do
             return Ok(());
         }
 
-        enqueue_with_wakeup(queue, self)
+        enqueue_with_wakeup(queue, me)
+    }
+
+    /// Get the registration's readiness.
+    fn readiness(&self) -> Ready {
+        self.state.load(Relaxed).readiness()
+    }
+
+    /// Set the registration's readiness.
+    ///
+    /// This function can be called concurrently by an arbitrary number of
+    /// SetReadiness handles.
+    fn set_readiness(me: &Arc<Self>, ready: Ready) -> io::Result<()> {
+        // Load the current atomic state.
+        let mut state = me.state.load(Acquire);
+        let mut next;
+
+        loop {
+            next = state;
+
+            // Update the readiness
+            next.set_readiness(ready);
+
+            // If the readiness is not blank, try to obtain permission to
+            // push the node into the readiness queue.
+            if !next.effective_readiness().is_empty() {
+                next.set_queued();
+            }
+
+            let actual = me.state.compare_and_swap(state, next, AcqRel);
+
+            if state == actual {
+                break;
+            }
+
+            state = actual;
+        }
+
+        if !state.is_queued() && next.is_queued() {
+            // We toggled the queued flag, making us responsible for queuing the
+            // node in the MPSC readiness queue.
+            try!(ReadinessNode::enqueue_with_wakeup(me));
+        }
+
+        Ok(())
+    }
+
+    /// Update the registration details associated with the node
+    fn update(me: &Arc<Self>, poll: &Poll, token: Token, interest: Ready, opt: PollOpt) -> io::Result<()> {
+        // First, ensure poll instances match
+        //
+        // Load the queue pointer, `Relaxed` is sufficient here as only the
+        // pointer is being operated on. The actual memory is guaranteed to be
+        // visible the `poll: &Poll` ref passed as an argument to the function.
+        let mut queue = me.readiness_queue.load(Relaxed);
+        let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue) };
+        let other = *other;
+
+        debug_assert!(mem::size_of::<ReadinessQueue>() == mem::size_of::<*mut ()>());
+
+        if queue.is_null() {
+            // Attempt to set the queue pointer. `Release` ordering synchronizes
+            // with `Acquire` in `ensure_with_wakeup`.
+            let actual = me.readiness_queue.compare_and_swap(
+                queue, other, Release);
+
+            if actual.is_null() {
+                // Note that the `queue` reference stored in our
+                // `readiness_queue` field is intended to be a strong reference,
+                // so now that we've successfully claimed the reference we bump
+                // the refcount here.
+                //
+                // Down below in `release_node` when we deallocate this
+                // `RegistrationInner` is where we'll transmute this back to an
+                // arc and decrement the reference count.
+                mem::forget(Arc::downgrade(&poll.readiness_queue.inner));
+            } else {
+                // The CAS failed, another thread set the queue pointer, so ensure
+                // that the pointer and `other` match
+                if actual != other {
+                    return Err(io::Error::new(io::ErrorKind::Other, "registration handle associated with another `Poll` instance"));
+                }
+            }
+
+            queue = other;
+        } else if queue != other {
+            return Err(io::Error::new(io::ErrorKind::Other, "registration handle associated with another `Poll` instance"));
+        }
+
+        unsafe {
+            let actual = &poll.readiness_queue.inner as *const _ as *const usize;
+            debug_assert_eq!(queue as usize, *actual);
+        }
+
+        // The `update_lock` atomic is used as a flag ensuring only a single
+        // thread concurrently enters the `update` critical section. Any
+        // concurrent calls to update are discarded. If coordinated updates are
+        // required, the Mio user is responsible for handling that.
+        //
+        // Acquire / Release ordering is used on `update_lock` to ensure that
+        // data access to the `token_*` variables are scoped to the critical
+        // section.
+
+        // Acquire the update lock.
+        if me.update_lock.compare_and_swap(false, true, Acquire) {
+            // The lock is already held. Discard the update
+            return Ok(());
+        }
+
+        // Relaxed ordering is acceptable here as the only memory that needs to
+        // be visible as part of the update are the `token_*` variables, and
+        // ordering has already been handled by the `update_lock` access.
+        let mut state = me.state.load(Relaxed);
+        let mut next;
+
+        // Read the current token, again this memory has been ordered by the
+        // acquire on `update_lock`.
+        let curr_token_pos = state.token_write_pos();
+        let curr_token = unsafe { self::token(me, curr_token_pos) };
+
+        let mut next_token_pos = curr_token_pos;
+
+        // If the `update` call is changing the token, then compute the next
+        // available token slot and write the token there.
+        //
+        // Note that this computation is happening *outside* of the
+        // compare-and-swap loop. The update lock ensures that only a single
+        // thread could be mutating the write_token_position, so the
+        // `next_token_pos` will never need to be recomputed even if
+        // `token_read_pos` concurrently changes. This is because
+        // `token_read_pos` can ONLY concurrently change to the current value of
+        // `token_write_pos`, so `next_token_pos` will always remain valid.
+        if token != curr_token {
+            next_token_pos = state.next_token_pos();
+
+            // Update the token
+            match next_token_pos {
+                0 => unsafe { *me.token_0.get() = token },
+                1 => unsafe { *me.token_1.get() = token },
+                2 => unsafe { *me.token_2.get() = token },
+                _ => unreachable!(),
+            }
+        }
+
+        // Now enter the compare-and-swap loop
+        loop {
+            next = state;
+
+            // Update the write token position, this will also release the token
+            // to Poll::poll.
+            next.set_token_write_pos(next_token_pos);
+
+            // Update readiness and poll opts
+            next.set_interest(interest);
+            next.set_poll_opt(opt);
+
+            // If there is effective readiness, the node will need to be queued
+            // for processing. This exact behavior is still TBD, so we are
+            // conservative for now and always fire.
+            //
+            // See https://github.com/carllerche/mio/issues/535.
+            if !next.effective_readiness().is_empty() {
+                next.set_queued();
+            }
+
+            // compare-and-swap the state values. Only `Release` is needed here.
+            // The `Release` ensures that `Poll::poll` will see the token
+            // update and the update function doesn't care about any other
+            // memory visibility.
+            let actual = me.state.compare_and_swap(state, next, Release);
+
+            if actual == state {
+                break;
+            }
+
+            // CAS failed, but `curr_token_pos` should not have changed given
+            // that we still hold the update lock.
+            debug_assert_eq!(curr_token_pos, actual.token_write_pos());
+
+            state = actual;
+        }
+
+        // Release the lock
+        me.update_lock.store(false, Release);
+
+        if !state.is_queued() && next.is_queued() {
+            // We are responsible for enqueing the node.
+            try!(enqueue_with_wakeup(queue, me));
+        }
+
+        Ok(())
     }
 }
 
-fn enqueue_with_wakeup(queue: *mut (), node: &ReadinessNode) -> io::Result<()> {
+impl Drop for ReadinessNode {
+    fn drop(&mut self) {
+        unsafe {
+            // Decrement the readiness_queue Arc
+            let queue = self.readiness_queue.load(Acquire);
+
+            if !queue.is_null() {
+                let _: Weak<ReadinessQueueInner> = mem::transmute(queue);
+            }
+        }
+    }
+}
+
+fn enqueue_with_wakeup(queue: *mut (), node: &Arc<ReadinessNode>) -> io::Result<()> {
     debug_assert!(!queue.is_null());
     // This is ugly... but we don't want to bump the ref count.
-    let queue: &Arc<ReadinessQueueInner> = unsafe { mem::transmute(&queue) };
-    queue.enqueue_node_with_wakeup(node)
+    let queue: &Weak<ReadinessQueueInner> = unsafe { mem::transmute(&queue) };
+    if let Some(queue) = queue.upgrade() {
+        ReadinessQueue { inner: queue }.enqueue_node_with_wakeup(node)
+    } else {
+        Ok(())
+    }
 }
 
 unsafe fn token(node: &ReadinessNode, pos: usize) -> Token {
@@ -2268,27 +2145,6 @@ unsafe fn token(node: &ReadinessNode, pos: usize) -> Token {
         1 => *node.token_1.get(),
         2 => *node.token_2.get(),
         _ => unreachable!(),
-    }
-}
-
-fn release_node(ptr: *mut ReadinessNode) {
-    unsafe {
-        // `AcqRel` synchronizes with other `release_node` functions and ensures
-        // that the drop happens after any reads / writes on other threads.
-        if (*ptr).ref_count.fetch_sub(1, AcqRel) != 1 {
-            return;
-        }
-
-        let node = Box::from_raw(ptr);
-
-        // Decrement the readiness_queue Arc
-        let queue = node.readiness_queue.load(Acquire);
-
-        if queue.is_null() {
-            return;
-        }
-
-        let _: Arc<ReadinessQueueInner> = mem::transmute(queue);
     }
 }
 
@@ -2404,8 +2260,6 @@ impl ReadinessState {
     /// Set the queued flag
     #[inline]
     fn set_queued(&mut self) {
-        // Dropped nodes should never be queued
-        debug_assert!(!self.is_dropped());
         self.0 |= QUEUED_MASK;
     }
 
