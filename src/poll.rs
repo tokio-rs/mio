@@ -1683,7 +1683,7 @@ impl RegistrationInner {
         let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue.inner) };
         let other = *other;
 
-        debug_assert!(mem::size_of::<ReadinessQueue>() == mem::size_of::<*mut ()>());
+        debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
 
         if queue.is_null() {
             // Attempt to set the queue pointer. `Release` ordering synchronizes
