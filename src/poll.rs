@@ -1451,7 +1451,7 @@ impl Registration {
         is_sync::<SetReadiness>();
 
         // Clone handle to the readiness queue, this bumps the ref count
-        let queue = poll.readiness_queue.clone();
+        let queue = poll.readiness_queue.inner.clone();
 
         // Convert to a *mut () pointer
         let queue: *mut () = unsafe { mem::transmute(queue) };
@@ -1680,7 +1680,7 @@ impl RegistrationInner {
         // pointer is being operated on. The actual memory is guaranteed to be
         // visible the `poll: &Poll` ref passed as an argument to the function.
         let mut queue = self.readiness_queue.load(Relaxed);
-        let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue) };
+        let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue.inner) };
         let other = *other;
 
         debug_assert!(mem::size_of::<ReadinessQueue>() == mem::size_of::<*mut ()>());
@@ -2010,20 +2010,6 @@ impl ReadinessQueue {
         }
     }
 
-    fn wakeup(&self) -> io::Result<()> {
-        self.inner.awakener.wakeup()
-    }
-
-    /// Prepend the given node to the head of the readiness queue. This is done
-    /// with relaxed ordering. Returns true if `Poll` needs to be woken up.
-    fn enqueue_node_with_wakeup(&self, node: &ReadinessNode) -> io::Result<()> {
-        if self.inner.enqueue_node(node) {
-            try!(self.wakeup());
-        }
-
-        Ok(())
-    }
-
     /// Prepare the queue for the `Poll::poll` thread to block in the system
     /// selector. This involves changing `head_readiness` to `sleep_marker`.
     /// Returns true if successfull and `poll` can block.
@@ -2100,6 +2086,20 @@ impl Drop for ReadinessQueue {
 }
 
 impl ReadinessQueueInner {
+    fn wakeup(&self) -> io::Result<()> {
+        self.awakener.wakeup()
+    }
+
+    /// Prepend the given node to the head of the readiness queue. This is done
+    /// with relaxed ordering. Returns true if `Poll` needs to be woken up.
+    fn enqueue_node_with_wakeup(&self, node: &ReadinessNode) -> io::Result<()> {
+        if self.enqueue_node(node) {
+            try!(self.wakeup());
+        }
+
+        Ok(())
+    }
+
     /// Push the node into the readiness queue
     fn enqueue_node(&self, node: &ReadinessNode) -> bool {
         // This is the 1024cores.net intrusive MPSC queue [1] "push" function.
@@ -2258,7 +2258,7 @@ impl ReadinessNode {
 fn enqueue_with_wakeup(queue: *mut (), node: &ReadinessNode) -> io::Result<()> {
     debug_assert!(!queue.is_null());
     // This is ugly... but we don't want to bump the ref count.
-    let queue: &ReadinessQueue = unsafe { mem::transmute(&queue) };
+    let queue: &Arc<ReadinessQueueInner> = unsafe { mem::transmute(&queue) };
     queue.enqueue_node_with_wakeup(node)
 }
 
