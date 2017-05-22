@@ -543,10 +543,10 @@ impl fmt::Debug for PollOpt {
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Ready(usize);
 
-const READABLE: usize = 0b0001;
-const WRITABLE: usize = 0b0010;
-const ERROR: usize    = 0b0100;
-const HUP: usize      = 0b1000;
+const READABLE: usize = 0b00001;
+const WRITABLE: usize = 0b00010;
+const ERROR: usize    = 0b00100;
+const HUP: usize      = 0b01000;
 
 impl Ready {
     /// Returns the empty `Ready` set.
@@ -860,6 +860,7 @@ impl ops::Not for Ready {
     }
 }
 
+// TODO: impl Debug for UnixReady
 impl fmt::Debug for Ready {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
