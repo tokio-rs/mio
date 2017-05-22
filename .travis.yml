@@ -64,9 +64,20 @@ matrix:
       install:
         - rustup target add $TARGET
 
-    # Android
+    # Android arm-linux-androideabi
     - os: linux
       env: TARGET=arm-linux-androideabi
+      rust: stable
+      script:
+        - cargo build
+        - cargo build --no-default-features
+        - sh ci/run-docker.sh $TARGET;
+      install:
+        - rustup target add $TARGET
+
+    # Android aarch64-linux-android
+    - os: linux
+      env: TARGET=aarch64-linux-android
       rust: stable
       script:
         - cargo build
