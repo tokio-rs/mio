@@ -8,8 +8,12 @@ pub use self::unix::{
     TcpStream,
     TcpListener,
     UdpSocket,
-    pipe,
     set_nonblock,
+};
+
+#[cfg(all(unix, not(target_os="emscripten")))]
+pub use self::unix::{
+    pipe,
 };
 
 #[cfg(unix)]
