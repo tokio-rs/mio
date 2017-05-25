@@ -32,6 +32,9 @@ iovec    = "0.1.0"
 [target.'cfg(unix)'.dependencies]
 libc   = "0.2.19"
 
+[target.'cfg(target_os="emscripten")'.dependencies]
+lazy_static = "0.2"
+
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2.1"
 miow   = "0.2.1"

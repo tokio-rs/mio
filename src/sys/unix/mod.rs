@@ -21,6 +21,12 @@ mod kqueue;
           target_os = "netbsd", target_os = "openbsd"))]
 pub use self::kqueue::{Events, Selector};
 
+#[cfg(target_os = "emscripten")]
+mod emscripten;
+
+#[cfg(target_os = "emscripten")]
+pub use self::emscripten::{Events, Selector};
+
 mod awakener;
 mod eventedfd;
 mod io;
