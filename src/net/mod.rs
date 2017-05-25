@@ -8,7 +8,11 @@
 //! [portability guidelines]: ../struct.Poll.html#portability
 
 mod tcp;
+
+#[cfg(not(target_os="emscripten"))]
 mod udp;
 
 pub use self::tcp::{TcpListener, TcpStream};
+
+#[cfg(not(target_os="emscripten"))]
 pub use self::udp::UdpSocket;
