@@ -1,5 +1,7 @@
+#[cfg(not(target_os="emscripten"))]
 use libc::{self, c_int};
 
+#[cfg(not(target_os="emscripten"))]
 #[macro_use]
 pub mod dlsym;
 
@@ -41,8 +43,10 @@ pub use self::uds::UnixSocket;
 
 pub use iovec::IoVec;
 
+#[cfg(not(target_os="emscripten"))]
 use std::os::unix::io::FromRawFd;
 
+#[cfg(not(target_os="emscripten"))]
 pub fn pipe() -> ::io::Result<(Io, Io)> {
     // Use pipe2 for atomically setting O_CLOEXEC if we can, but otherwise
     // just fall back to using `pipe`.

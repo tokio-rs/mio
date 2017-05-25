@@ -1,6 +1,8 @@
+#[cfg(not(target_os="emscripten"))]
 pub use self::pipe::Awakener;
 
 /// Default awakener backed by a pipe
+#[cfg(not(target_os="emscripten"))]
 mod pipe {
     use sys::unix;
     use {io, Ready, Poll, PollOpt, Token};
@@ -69,6 +71,44 @@ mod pipe {
 
         fn deregister(&self, poll: &Poll) -> io::Result<()> {
             self.reader().deregister(poll)
+        }
+    }
+}
+
+#[cfg(target_os="emscripten")]
+pub use self::stub::Awakener;
+
+#[cfg(target_os="emscripten")]
+mod stub {
+    use {io, Ready, Poll, PollOpt, Token};
+    use event::Evented;
+
+    pub struct Awakener {}
+
+    impl Awakener {
+        pub fn new() -> io::Result<Awakener> {
+            Ok(Awakener{})
+        }
+
+        pub fn wakeup(&self) -> io::Result<()> {
+            Ok(())
+        }
+
+        pub fn cleanup(&self) {
+        }
+    }
+
+    impl Evented for Awakener {
+        fn register(&self, _poll: &Poll, _token: Token, _interest: Ready, _opts: PollOpt) -> io::Result<()> {
+            Ok(())
+        }
+
+        fn reregister(&self, _poll: &Poll, _token: Token, _interest: Ready, _opts: PollOpt) -> io::Result<()> {
+            Ok(())
+        }
+
+        fn deregister(&self, _poll: &Poll) -> io::Result<()> {
+            Ok(())
         }
     }
 }
