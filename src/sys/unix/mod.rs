@@ -26,6 +26,8 @@ mod eventedfd;
 mod io;
 mod ready;
 mod tcp;
+
+#[cfg(not(target_os="emscripten"))]
 mod udp;
 
 #[cfg(feature = "with-deprecated")]
@@ -36,6 +38,8 @@ pub use self::eventedfd::EventedFd;
 pub use self::io::{Io, set_nonblock};
 pub use self::ready::UnixReady;
 pub use self::tcp::{TcpStream, TcpListener};
+
+#[cfg(not(target_os="emscripten"))]
 pub use self::udp::UdpSocket;
 
 #[cfg(feature = "with-deprecated")]
