@@ -1,3 +1,12 @@
+#0.6.8 (May 26, 2017)
+
+* Support Fuchia
+* POSIX AIO support
+* Fix memory leak caused by Register::new2
+* Windows: fix handling failed TCP connections
+* Fix build on aarch64-linux-android
+* Fix usage of `O_CLOEXEC` with `SETFL`
+
 # 0.6.7 (April 27, 2017)
 
 * Ignore EPIPE coming out of `kevent`
