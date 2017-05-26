@@ -2,6 +2,7 @@ use std::cmp;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
+use std::time::Duration;
 
 use libc;
 use net2::TcpStreamExt;
@@ -73,12 +74,44 @@ impl TcpStream {
         self.inner.nodelay()
     }
 
-    pub fn set_keepalive_ms(&self, millis: Option<u32>) -> io::Result<()> {
-        self.inner.set_keepalive_ms(millis)
+    pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
+        self.inner.set_recv_buffer_size(size)
     }
 
-    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
-        self.inner.keepalive_ms()
+    pub fn recv_buffer_size(&self) -> io::Result<usize> {
+        self.inner.recv_buffer_size()
+    }
+
+    pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
+        self.inner.set_send_buffer_size(size)
+    }
+
+    pub fn send_buffer_size(&self) -> io::Result<usize> {
+        self.inner.send_buffer_size()
+    }
+
+    pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
+        self.inner.set_keepalive(keepalive)
+    }
+
+    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
+        self.inner.keepalive()
+    }
+
+    pub fn set_read_timeout(&self, val: Option<Duration>) -> io::Result<()> {
+        self.inner.set_read_timeout(val)
+    }
+
+    pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
+        self.inner.read_timeout()
+    }
+
+    pub fn set_write_timeout(&self, val: Option<Duration>) -> io::Result<()> {
+        self.inner.set_write_timeout(val)
+    }
+
+    pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
+        self.inner.write_timeout()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
@@ -87,6 +120,22 @@ impl TcpStream {
 
     pub fn ttl(&self) -> io::Result<u32> {
         self.inner.ttl()
+    }
+
+    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
+        self.inner.set_only_v6(only_v6)
+    }
+
+    pub fn only_v6(&self) -> io::Result<bool> {
+        self.inner.only_v6()
+    }
+
+    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+        self.inner.set_linger(dur)
+    }
+
+    pub fn linger(&self) -> io::Result<Option<Duration>> {
+        self.inner.linger()
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {

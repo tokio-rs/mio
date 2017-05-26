@@ -10,6 +10,7 @@
 
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
+use std::time::Duration;
 
 use net2::TcpBuilder;
 use iovec::IoVec;
@@ -179,6 +180,41 @@ impl TcpStream {
         self.sys.nodelay()
     }
 
+    /// Sets the value of the `SO_RCVBUF` option on this socket.
+    ///
+    /// Changes the size of the operating system's receive buffer associated
+    /// with the socket.
+    pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
+        self.sys.set_recv_buffer_size(size)
+    }
+
+    /// Gets the value of the `SO_RCVBUF` option on this socket.
+    ///
+    /// For more information about this option, see
+    /// [`set_recv_buffer_size`][link].
+    ///
+    /// [link]: #tymethod.set_recv_buffer_size
+    pub fn recv_buffer_size(&self) -> io::Result<usize> {
+        self.sys.recv_buffer_size()
+    }
+
+    /// Sets the value of the `SO_SNDBUF` option on this socket.
+    ///
+    /// Changes the size of the operating system's send buffer associated with
+    /// the socket.
+    pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
+        self.sys.set_send_buffer_size(size)
+    }
+
+    /// Gets the value of the `SO_SNDBUF` option on this socket.
+    ///
+    /// For more information about this option, see [`set_send_buffer`][link].
+    ///
+    /// [link]: #tymethod.set_send_buffer
+    pub fn send_buffer_size(&self) -> io::Result<usize> {
+        self.sys.send_buffer_size()
+    }
+
     /// Sets whether keepalive messages are enabled to be sent on this socket.
     ///
     /// On Unix, this option will set the `SO_KEEPALIVE` as well as the
@@ -186,23 +222,61 @@ impl TcpStream {
     /// On Windows, this will set the `SIO_KEEPALIVE_VALS` option.
     ///
     /// If `None` is specified then keepalive messages are disabled, otherwise
-    /// the number of milliseconds specified will be the time to remain idle
-    /// before sending a TCP keepalive probe.
+    /// the duration specified will be the time to remain idle before sending a
+    /// TCP keepalive probe.
     ///
-    /// Some platforms specify this value in seconds, so sub-second millisecond
+    /// Some platforms specify this value in seconds, so sub-second
     /// specifications may be omitted.
-    pub fn set_keepalive_ms(&self, keepalive: Option<u32>) -> io::Result<()> {
-        self.sys.set_keepalive_ms(keepalive)
+    pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
+        self.sys.set_keepalive(keepalive)
     }
 
     /// Returns whether keepalive messages are enabled on this socket, and if so
-    /// the amount of milliseconds between them.
+    /// the duration of time between them.
     ///
-    /// For more information about this option, see [`set_keepalive_ms`][link].
+    /// For more information about this option, see [`set_keepalive`][link].
     ///
-    /// [link]: #method.set_keepalive_ms
-    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
-        self.sys.keepalive_ms()
+    /// [link]: #tymethod.set_keepalive
+    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
+        self.sys.keepalive()
+    }
+
+    /// Sets the `SO_RCVTIMEO` option for this socket.
+    ///
+    /// This option specifies the timeout of how long calls to this socket's
+    /// `read` function will wait before returning a timeout. A value of `None`
+    /// means that no read timeout should be specified and otherwise `Some`
+    /// indicates the number of duration of the timeout.
+    pub fn set_read_timeout(&self, val: Option<Duration>) -> io::Result<()> {
+        self.sys.set_read_timeout(val)
+    }
+
+    /// Gets the value of the `SO_RCVTIMEO` option for this socket.
+    ///
+    /// For more information about this option, see [`set_read_timeout`][link].
+    ///
+    /// [link]: #tymethod.set_read_timeout
+    pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
+        self.sys.read_timeout()
+    }
+
+    /// Sets the `SO_SNDTIMEO` option for this socket.
+    ///
+    /// This option specifies the timeout of how long calls to this socket's
+    /// `write` function will wait before returning a timeout. A value of `None`
+    /// means that no read timeout should be specified and otherwise `Some`
+    /// indicates the duration of the timeout.
+    pub fn set_write_timeout(&self, val: Option<Duration>) -> io::Result<()> {
+        self.sys.set_write_timeout(val)
+    }
+
+    /// Gets the value of the `SO_SNDTIMEO` option for this socket.
+    ///
+    /// For more information about this option, see [`set_write_timeout`][link].
+    ///
+    /// [link]: #tymethod.set_write_timeout
+    pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
+        self.sys.write_timeout()
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -217,9 +291,58 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_ttl`][link].
     ///
-    /// [link]: #method.set_ttl
+    /// [link]: #tymethod.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
         self.sys.ttl()
+    }
+
+    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
+    ///
+    /// If this is set to `true` then the socket is restricted to sending and
+    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
+    /// can bind the same port at the same time.
+    ///
+    /// If this is set to `false` then the socket can be used to send and
+    /// receive packets from an IPv4-mapped IPv6 address.
+    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
+        self.sys.set_only_v6(only_v6)
+    }
+
+    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
+    ///
+    /// For more information about this option, see [`set_only_v6`][link].
+    ///
+    /// [link]: #tymethod.set_only_v6
+    pub fn only_v6(&self) -> io::Result<bool> {
+        self.sys.only_v6()
+    }
+
+    /// Sets the linger duration of this socket by setting the SO_LINGER option
+    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+        self.sys.set_linger(dur)
+    }
+
+    /// reads the linger duration for this socket by getting the SO_LINGER option
+    pub fn linger(&self) -> io::Result<Option<Duration>> {
+        self.sys.linger()
+    }
+
+    #[deprecated(since = "0.6.9", note = "use set_keepalive")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
+    pub fn set_keepalive_ms(&self, keepalive: Option<u32>) -> io::Result<()> {
+        self.set_keepalive(keepalive.map(|v| Duration::from_millis(v as u64)))
+    }
+
+    #[deprecated(since = "0.6.9", note = "use keepalive")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
+    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
+        self.keepalive().map(|v| {
+            v.map(|v| {
+                ::convert::millis(v) as u32
+            })
+        })
     }
 
     /// Get the value of the `SO_ERROR` option on this socket.
