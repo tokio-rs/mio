@@ -241,44 +241,6 @@ impl TcpStream {
         self.sys.keepalive()
     }
 
-    /// Sets the `SO_RCVTIMEO` option for this socket.
-    ///
-    /// This option specifies the timeout of how long calls to this socket's
-    /// `read` function will wait before returning a timeout. A value of `None`
-    /// means that no read timeout should be specified and otherwise `Some`
-    /// indicates the number of duration of the timeout.
-    pub fn set_read_timeout(&self, val: Option<Duration>) -> io::Result<()> {
-        self.sys.set_read_timeout(val)
-    }
-
-    /// Gets the value of the `SO_RCVTIMEO` option for this socket.
-    ///
-    /// For more information about this option, see [`set_read_timeout`][link].
-    ///
-    /// [link]: #tymethod.set_read_timeout
-    pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
-        self.sys.read_timeout()
-    }
-
-    /// Sets the `SO_SNDTIMEO` option for this socket.
-    ///
-    /// This option specifies the timeout of how long calls to this socket's
-    /// `write` function will wait before returning a timeout. A value of `None`
-    /// means that no read timeout should be specified and otherwise `Some`
-    /// indicates the duration of the timeout.
-    pub fn set_write_timeout(&self, val: Option<Duration>) -> io::Result<()> {
-        self.sys.set_write_timeout(val)
-    }
-
-    /// Gets the value of the `SO_SNDTIMEO` option for this socket.
-    ///
-    /// For more information about this option, see [`set_write_timeout`][link].
-    ///
-    /// [link]: #tymethod.set_write_timeout
-    pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
-        self.sys.write_timeout()
-    }
-
     /// Sets the value for the `IP_TTL` option on this socket.
     ///
     /// This value sets the time-to-live field that is used in every packet sent

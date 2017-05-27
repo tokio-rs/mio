@@ -98,22 +98,6 @@ impl TcpStream {
         self.inner.keepalive()
     }
 
-    pub fn set_read_timeout(&self, val: Option<Duration>) -> io::Result<()> {
-        self.inner.set_read_timeout(val)
-    }
-
-    pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
-        self.inner.read_timeout()
-    }
-
-    pub fn set_write_timeout(&self, val: Option<Duration>) -> io::Result<()> {
-        self.inner.set_write_timeout(val)
-    }
-
-    pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
-        self.inner.write_timeout()
-    }
-
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.set_ttl(ttl)
     }
