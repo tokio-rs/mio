@@ -6,13 +6,13 @@ pub use self::unix::{
     Io,
     Selector,
     TcpStream,
-    TcpListener,
     set_nonblock,
 };
 
 #[cfg(all(unix, not(target_os="emscripten")))]
 pub use self::unix::{
     pipe,
+    TcpListener,
     UdpSocket,
 };
 

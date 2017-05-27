@@ -37,7 +37,10 @@ pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
 pub use self::io::{Io, set_nonblock};
 pub use self::ready::UnixReady;
-pub use self::tcp::{TcpStream, TcpListener};
+pub use self::tcp::TcpStream;
+
+#[cfg(not(target_os="emscripten"))]
+pub use self::tcp::TcpListener;
 
 #[cfg(not(target_os="emscripten"))]
 pub use self::udp::UdpSocket;
