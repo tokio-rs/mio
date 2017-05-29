@@ -3,8 +3,8 @@ use std::collections::vec_deque::VecDeque;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_void};
 use std::os::unix::io::RawFd;
+use std::sync::{Arc, Mutex, Once, ONCE_INIT};
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-use std::sync::Mutex;
 use std::time::Duration;
 
 use {io, Ready, PollOpt, Token};
@@ -17,44 +17,43 @@ struct EmRegistration {
     token: Token,
     interests: Ready,
     opts: PollOpt,
+    queue: Arc<Mutex<VecDeque<Event>>>,
 }
 
 #[derive(Debug)]
 pub struct Selector {
     id: usize,
-    // Note: can't have any references
+    events: Arc<Mutex<VecDeque<Event>>>,
 }
 
+static REG_CALLBACKS: Once = ONCE_INIT;
+
 lazy_static! {
-    static ref EM_REGS   : Mutex<Vec<Option<EmRegistration>>> = Mutex::new(Vec::new());
-    static ref EM_EVENTS : Mutex<Option<VecDeque<Event>>> = Mutex::new(None);
+    static ref EM_REGS : Mutex<Vec<Option<EmRegistration>>> = Mutex::new(Vec::new());
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        // Create a queue to receive events for registered fds
-        let mut events = EM_EVENTS.lock().unwrap();
-        if events.is_some() {
-            // TODO: support multiple Selector queues
-            return Err(io::Error::new(io::ErrorKind::AlreadyExists, "Only 1 Selector supported"));
-        }
-        *events = Some(VecDeque::new());
-
         // Register socket callback handlers with Emscripten runtime
         // Note: Only one set of handlers can be registered at a time
         // https://kripken.github.io/emscripten-site/docs/api_reference/emscripten.h.html#socket-event-registration
-        let data_ptr = std::ptr::null();
-        unsafe {
-            emscripten_set_socket_error_callback(data_ptr, error_callback);
-            emscripten_set_socket_open_callback(data_ptr, open_callback);
-            //emscripten_set_socket_listen_callback(data_ptr, listen_callback);
-            //emscripten_set_socket_connection_callback(data_ptr, connection_callback);
-            emscripten_set_socket_message_callback(data_ptr, message_callback);
-            //emscripten_set_socket_close_callback(data_ptr, close_callback);
-        }
+        REG_CALLBACKS.call_once(|| {
+            let data_ptr = std::ptr::null();
+            unsafe {
+                emscripten_set_socket_error_callback(data_ptr, error_callback);
+                emscripten_set_socket_open_callback(data_ptr, open_callback);
+                //emscripten_set_socket_listen_callback(data_ptr, listen_callback);
+                //emscripten_set_socket_connection_callback(data_ptr, connection_callback);
+                emscripten_set_socket_message_callback(data_ptr, message_callback);
+                //emscripten_set_socket_close_callback(data_ptr, close_callback);
+            }
+        });
 
         // offset by 1 to avoid choosing 0 as the id of a selector
-        Ok(Selector { id: NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1 })
+        Ok(Selector {
+               id: NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1,
+               events: Arc::new(Mutex::new(VecDeque::new())),
+           })
     }
 
     pub fn id(&self) -> usize {
@@ -75,7 +74,7 @@ impl Selector {
             evts.events.set_len(0);
         }
 
-        if let Some(ref mut events) = *EM_EVENTS.lock().unwrap() {
+        if let Ok(ref mut events) = self.events.lock() {
             let num_events = std::cmp::min(events.len(), evts.capacity());
             for e in events.drain(..num_events) {
                 evts.push_event(e);
@@ -92,7 +91,6 @@ impl Selector {
                     interests: Ready,
                     opts: PollOpt)
                     -> io::Result<()> {
-
         // Note: Emscripten reuses file descriptors, so a vector to record registration
         // details is a reasonable choice.
         let i = fd as usize;
@@ -104,6 +102,7 @@ impl Selector {
                            token: token,
                            interests: interests,
                            opts: opts,
+                           queue: self.events.clone(),
                        });
         Ok(())
     }
@@ -131,7 +130,19 @@ impl Selector {
 
 impl Drop for Selector {
     fn drop(&mut self) {
-        // TODO: if this is the last selector, unregister emscripten callbacks
+        // Remove any remaining registrations made on this selector.
+        let mut regs = EM_REGS.lock().unwrap();
+        for reg in regs.iter_mut() {
+            match *reg {
+                None => continue,
+                Some(ref r) => {
+                    if !Arc::ptr_eq(&r.queue, &self.events) {
+                        continue;
+                    }
+                }
+            }
+            *reg = None;
+        }
     }
 }
 
@@ -200,20 +211,12 @@ extern "C" fn error_callback(fd: c_int, err: c_int, msg: *const c_char, _data: *
 
 // Triggered when the WebSocket has opened
 extern "C" fn open_callback(fd: c_int, _data: *mut userData) {
-    let mut token = None;
-    let mut writable = false;
-    {
-        let regs = EM_REGS.lock().unwrap();
-        if let Some(ref reg) = regs[fd as usize] {
-            token = Some(reg.token);
-            writable = reg.interests.is_writable();
-        }
-    }
-
-    if writable {
-        let mut queue = EM_EVENTS.lock().unwrap();
-        if let Some(ref mut queue) = *queue {
-            queue.push_back(Event::new(Ready::writable(), token.unwrap()));
+    let regs = EM_REGS.lock().unwrap();
+    if let Some(ref reg) = regs[fd as usize] {
+        if reg.interests.is_writable() {
+            if let Ok(mut queue) = reg.queue.lock() {
+                queue.push_back(Event::new(Ready::writable(), reg.token));
+            }
         }
     }
 }
@@ -230,20 +233,12 @@ extern "C" fn open_callback(fd: c_int, _data: *mut userData) {
 
 // Triggered when data is available to be read from the socket
 extern "C" fn message_callback(fd: c_int, _data: *mut userData) {
-    let mut token = None;
-    let mut readable = false;
-    {
-        let regs = EM_REGS.lock().unwrap();
-        if let Some(ref reg) = regs[fd as usize] {
-            token = Some(reg.token);
-            readable = reg.interests.is_readable();
-        }
-    }
-
-    if readable {
-        let mut queue = EM_EVENTS.lock().unwrap();
-        if let Some(ref mut queue) = *queue {
-            queue.push_back(Event::new(Ready::readable(), token.unwrap()));
+    let regs = EM_REGS.lock().unwrap();
+    if let Some(ref reg) = regs[fd as usize] {
+        if reg.interests.is_readable() {
+            if let Ok(mut queue) = reg.queue.lock() {
+                queue.push_back(Event::new(Ready::readable(), reg.token));
+            }
         }
     }
 }
