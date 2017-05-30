@@ -1,4 +1,4 @@
-#0.6.8 (May 26, 2017)
+# 0.6.8 (May 26, 2017)
 
 * Support Fuchia
 * POSIX AIO support
