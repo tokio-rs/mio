@@ -1,3 +1,8 @@
+# 0.6.9 (June 7, 2017)
+
+* More socket options are exposed through the TCP types, brought in through the
+  `net2` crate.
+
 # 0.6.8 (May 26, 2017)
 
 * Support Fuchia
