@@ -89,9 +89,6 @@ impl UdpSocket {
 
     /// Sends data on the socket to the address previously bound via connect(). On success,
     /// returns the number of bytes written.
-    ///
-    /// Address type can be any implementor of `ToSocketAddrs` trait. See its
-    /// documentation for concrete examples.
     pub fn send(&self, buf: &[u8])
                    -> io::Result<Option<usize>> {
         self.sys.send(buf).map_non_block()
