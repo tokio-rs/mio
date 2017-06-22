@@ -550,10 +550,10 @@ fn test_debug_pollopt() {
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Ready(usize);
 
-const READABLE: usize = 0b00001;
-const WRITABLE: usize = 0b00010;
-const ERROR: usize    = 0b00100;
-const HUP: usize      = 0b01000;
+const READABLE: usize = 0b000001;
+const WRITABLE: usize = 0b000010;
+const ERROR: usize    = 0b000100;
+const HUP: usize      = 0b001000;
 
 impl Ready {
     /// Returns the empty `Ready` set.
