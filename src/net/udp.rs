@@ -272,24 +272,24 @@ impl Evented for UdpSocket {
  *
  */
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 impl IntoRawFd for UdpSocket {
     fn into_raw_fd(self) -> RawFd {
         self.sys.into_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 impl AsRawFd for UdpSocket {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
         UdpSocket {

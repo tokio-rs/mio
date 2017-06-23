@@ -85,6 +85,9 @@ extern crate net2;
 extern crate slab;
 extern crate iovec;
 
+#[cfg(fuchsia)]
+extern crate magenta;
+
 #[cfg(unix)]
 extern crate libc;
 
@@ -181,7 +184,7 @@ pub use poll::Iter as EventsIter;
 #[doc(hidden)]
 pub use io::deprecated::would_block;
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 pub mod unix {
     //! Unix only extensions
     pub use sys::{
