@@ -482,11 +482,34 @@ impl TcpListener {
         try!(sock.bind(addr));
 
         // listen
-        let listener = try!(sock.listen(1024));
+        let backlog = TcpListener::get_listen_backlog();
+        let listener = try!(sock.listen(backlog));
         Ok(TcpListener {
             sys: try!(sys::TcpListener::new(listener, addr)),
             selector_id: SelectorId::new(),
         })
+    }
+
+    #[cfg(target_os = "linux")]
+    fn get_listen_backlog() -> i32 {
+        use std::fs::File;
+
+        let mut file = match File::open("/proc/sys/net/core/somaxconn") {
+            Ok(val) => val,
+            Err(_) => { return 1024 },
+        };
+
+        let mut buffer = String::new();
+        let _ = file.read_to_string(&mut buffer);
+        match buffer.trim_right().parse::<i32>() {
+            Ok(backlog) => backlog,
+            Err(_) => 1024,
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn get_listen_backlog() -> i32 {
+        1024
     }
 
     /// Creates a new `TcpListener` from an instance of a
