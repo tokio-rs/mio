@@ -445,12 +445,14 @@ impl Evented for TcpStream {
 ///
 /// // There may be a socket ready to be accepted
 /// ```
+#[cfg(not(target_os="emscripten"))]
 #[derive(Debug)]
 pub struct TcpListener {
     sys: sys::TcpListener,
     selector_id: SelectorId,
 }
 
+#[cfg(not(target_os="emscripten"))]
 impl TcpListener {
     /// Convenience method to bind a new TCP listener to the specified address
     /// to receive new connections.
@@ -595,6 +597,7 @@ impl TcpListener {
     }
 }
 
+#[cfg(not(target_os="emscripten"))]
 impl Evented for TcpListener {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
@@ -645,21 +648,21 @@ impl FromRawFd for TcpStream {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os="emscripten")))]
 impl IntoRawFd for TcpListener {
     fn into_raw_fd(self) -> RawFd {
         self.sys.into_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os="emscripten")))]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os="emscripten")))]
 impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener {

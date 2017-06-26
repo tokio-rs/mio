@@ -16,6 +16,7 @@ pub fn set_nonblock(fd: libc::c_int) -> io::Result<()> {
     }
 }
 
+#[cfg(not(target_os="emscripten"))]
 pub fn set_cloexec(fd: libc::c_int) -> io::Result<()> {
     unsafe {
         let flags = libc::fcntl(fd, libc::F_GETFD);

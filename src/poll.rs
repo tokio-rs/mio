@@ -3,9 +3,9 @@ use event_imp::{self as event, Ready, Event, Evented, PollOpt};
 use std::{fmt, io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::{mem, ops, isize};
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os="emscripten")))]
 use std::os::unix::io::AsRawFd;
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os="emscripten")))]
 use std::os::unix::io::RawFd;
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool};
@@ -1138,7 +1138,7 @@ impl fmt::Debug for Poll {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os="emscripten")))]
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
         self.selector.as_raw_fd()
@@ -2519,7 +2519,7 @@ impl Clone for SelectorId {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os="emscripten")))]
 pub fn as_raw_fd() {
     let poll = Poll::new().unwrap();
     assert!(poll.as_raw_fd() > 0);

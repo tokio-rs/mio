@@ -1,5 +1,7 @@
+#[cfg(not(target_os="emscripten"))]
 use libc::{self, c_int};
 
+#[cfg(not(target_os="emscripten"))]
 #[macro_use]
 pub mod dlsym;
 
@@ -19,11 +21,19 @@ mod kqueue;
           target_os = "netbsd", target_os = "openbsd"))]
 pub use self::kqueue::{Events, Selector};
 
+#[cfg(target_os = "emscripten")]
+mod emscripten;
+
+#[cfg(target_os = "emscripten")]
+pub use self::emscripten::{Events, Selector};
+
 mod awakener;
 mod eventedfd;
 mod io;
 mod ready;
 mod tcp;
+
+#[cfg(not(target_os="emscripten"))]
 mod udp;
 
 #[cfg(feature = "with-deprecated")]
@@ -33,7 +43,12 @@ pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
 pub use self::io::{Io, set_nonblock};
 pub use self::ready::UnixReady;
-pub use self::tcp::{TcpStream, TcpListener};
+pub use self::tcp::TcpStream;
+
+#[cfg(not(target_os="emscripten"))]
+pub use self::tcp::TcpListener;
+
+#[cfg(not(target_os="emscripten"))]
 pub use self::udp::UdpSocket;
 
 #[cfg(feature = "with-deprecated")]
@@ -41,8 +56,10 @@ pub use self::uds::UnixSocket;
 
 pub use iovec::IoVec;
 
+#[cfg(not(target_os="emscripten"))]
 use std::os::unix::io::FromRawFd;
 
+#[cfg(not(target_os="emscripten"))]
 pub fn pipe() -> ::io::Result<(Io, Io)> {
     // Use pipe2 for atomically setting O_CLOEXEC if we can, but otherwise
     // just fall back to using `pipe`.
