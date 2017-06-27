@@ -105,12 +105,12 @@ impl UdpSocket {
         me.iocp.set_readiness(interest & !Ready::writable());
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
-        let amt = try!(owned_buf.write(buf));
-        try!(unsafe {
+        let amt = owned_buf.write(buf)?;
+        unsafe {
             trace!("scheduling a send");
             self.imp.inner.socket.send_to_overlapped(&owned_buf, target,
                                                      self.imp.inner.write.as_mut_ptr())
-        });
+        }?;
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
         Ok(amt)
@@ -139,12 +139,12 @@ impl UdpSocket {
         me.iocp.set_readiness(interest & !Ready::writable());
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
-        let amt = try!(owned_buf.write(buf));
-        try!(unsafe {
+        let amt = owned_buf.write(buf)?;
+        unsafe {
             trace!("scheduling a send");
             self.imp.inner.socket.send_overlapped(&owned_buf, self.imp.inner.write.as_mut_ptr())
 
-        });
+        }?;
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
         Ok(amt)
@@ -332,9 +332,9 @@ impl Evented for UdpSocket {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        try!(me.iocp.register_socket(&self.imp.inner.socket,
+        me.iocp.register_socket(&self.imp.inner.socket,
                                      poll, token, interest, opts,
-                                     &self.registration));
+                                     &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }
@@ -342,9 +342,9 @@ impl Evented for UdpSocket {
     fn reregister(&self, poll: &Poll, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        try!(me.iocp.reregister_socket(&self.imp.inner.socket,
+        me.iocp.reregister_socket(&self.imp.inner.socket,
                                        poll, token, interest,
-                                       opts, &self.registration));
+                                       opts, &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }

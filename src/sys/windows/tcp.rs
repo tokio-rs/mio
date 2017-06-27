@@ -115,7 +115,7 @@ impl TcpStream {
 
     pub fn connect(socket: net::TcpStream, addr: &SocketAddr)
                    -> io::Result<TcpStream> {
-        try!(socket.set_nonblocking(true));
+        socket.set_nonblocking(true)?;
         Ok(TcpStream::new(socket, Some(*addr)))
     }
 
@@ -196,7 +196,7 @@ impl TcpStream {
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        if let Some(e) = try!(self.imp.inner.socket.take_error()) {
+        if let Some(e) = self.imp.inner.socket.take_error()? {
             return Ok(Some(e))
         }
 
@@ -368,7 +368,7 @@ impl StreamImp {
     fn schedule_connect(&self, addr: &SocketAddr) -> io::Result<()> {
         unsafe {
             trace!("scheduling a connect");
-            try!(self.inner.socket.connect_overlapped(addr, &[], self.inner.read.as_mut_ptr()));
+            self.inner.socket.connect_overlapped(addr, &[], self.inner.read.as_mut_ptr())?;
         }
         // see docs above on StreamImp.inner for rationale on forget
         mem::forget(self.clone());
@@ -550,11 +550,11 @@ impl Evented for TcpStream {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        try!(me.iocp.register_socket(&self.imp.inner.socket, poll, token,
-                                     interest, opts, &self.registration));
+        me.iocp.register_socket(&self.imp.inner.socket, poll, token,
+                                     interest, opts, &self.registration)?;
 
         unsafe {
-            try!(super::no_notify_on_instant_completion(self.imp.inner.socket.as_raw_socket() as HANDLE));
+            super::no_notify_on_instant_completion(self.imp.inner.socket.as_raw_socket() as HANDLE)?;
             me.instant_notify = true;
         }
 
@@ -572,8 +572,8 @@ impl Evented for TcpStream {
     fn reregister(&self, poll: &Poll, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        try!(me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
-                                       interest, opts, &self.registration));
+        me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
+                                       interest, opts, &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }
@@ -649,7 +649,7 @@ impl TcpListener {
                 return Err(would_block());
             }
             State::Ready((s, a)) => {
-                try!(s.set_nonblocking(true));
+                s.set_nonblocking(true)?;
                 Ok((TcpStream::new(s, None), a))
             }
             State::Error(e) => Err(e),
@@ -767,11 +767,11 @@ impl Evented for TcpListener {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        try!(me.iocp.register_socket(&self.imp.inner.socket, poll, token,
-                                     interest, opts, &self.registration));
+        me.iocp.register_socket(&self.imp.inner.socket, poll, token,
+                                     interest, opts, &self.registration)?;
 
         unsafe {
-            try!(super::no_notify_on_instant_completion(self.imp.inner.socket.as_raw_socket() as HANDLE));
+            super::no_notify_on_instant_completion(self.imp.inner.socket.as_raw_socket() as HANDLE)?;
             me.instant_notify = true;
         }
 
@@ -782,8 +782,8 @@ impl Evented for TcpListener {
     fn reregister(&self, poll: &Poll, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        try!(me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
-                                       interest, opts, &self.registration));
+        me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
+                                       interest, opts, &self.registration)?;
         self.imp.schedule_accept(&mut me);
         Ok(())
     }

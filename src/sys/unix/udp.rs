@@ -14,7 +14,7 @@ pub struct UdpSocket {
 
 impl UdpSocket {
     pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        try!(socket.set_nonblocking(true));
+        socket.set_nonblocking(true)?;
         Ok(UdpSocket {
             io: socket,
         })
