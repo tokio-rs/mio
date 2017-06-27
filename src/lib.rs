@@ -85,7 +85,7 @@ extern crate net2;
 extern crate slab;
 extern crate iovec;
 
-#[cfg(fuchsia)]
+#[cfg(target_os = "fuchsia")]
 extern crate magenta;
 
 #[cfg(unix)]
