@@ -824,12 +824,26 @@ impl<T: Into<Ready>> ops::BitOr<T> for Ready {
     }
 }
 
+impl<T: Into<Ready>> ops::BitOrAssign<T> for Ready {
+    #[inline]
+    fn bitor_assign(&mut self, other: T) {
+        self.0 |= other.into().0;
+    }
+}
+
 impl<T: Into<Ready>> ops::BitXor<T> for Ready {
     type Output = Ready;
 
     #[inline]
     fn bitxor(self, other: T) -> Ready {
         Ready(self.0 ^ other.into().0)
+    }
+}
+
+impl<T: Into<Ready>> ops::BitXorAssign<T> for Ready {
+    #[inline]
+    fn bitxor_assign(&mut self, other: T) {
+        self.0 ^= other.into().0;
     }
 }
 
@@ -842,12 +856,26 @@ impl<T: Into<Ready>> ops::BitAnd<T> for Ready {
     }
 }
 
+impl<T: Into<Ready>> ops::BitAndAssign<T> for Ready {
+    #[inline]
+    fn bitand_assign(&mut self, other: T) {
+        self.0 &= other.into().0
+    }
+}
+
 impl<T: Into<Ready>> ops::Sub<T> for Ready {
     type Output = Ready;
 
     #[inline]
     fn sub(self, other: T) -> Ready {
         Ready(self.0 & !other.into().0)
+    }
+}
+
+impl<T: Into<Ready>> ops::SubAssign<T> for Ready {
+    #[inline]
+    fn sub_assign(&mut self, other: T) {
+        self.0 &= !other.into().0;
     }
 }
 
