@@ -31,6 +31,8 @@ iovec    = "0.1.0"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
 magenta = { path = "../fuchsia/rust/magenta-rs" }
+magenta-sys = { path = "../fuchsia/rust/magenta-rs/magenta-sys" }
+concurrent-hashmap = { version = "0.2.2", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
 libc   = "0.2.19"

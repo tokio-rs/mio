@@ -1,78 +1,83 @@
 #![allow(warnings)]
 
 use {io, poll, Event, Evented, Ready, Registration, Poll, PollOpt, Token};
+use concurrent_hashmap::ConcHashMap;
+use libc;
 use magenta;
+use magenta_sys;
+use magenta::HandleBase;
 use iovec::IoVec;
+use std::collections::hash_map::RandomState;
 use std::fmt;
 use std::io::{Read, Write};
+use std::mem;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+use std::os::unix::io::RawFd;
+use std::sync::atomic::{AtomicBool, AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
 pub struct Awakener {
-    reader: magenta::Channel,
-    writer: magenta::Channel,
+    inner: Mutex<Option<(Token, Weak<magenta::Port>)>>,
 }
 
 impl Awakener {
     pub fn new() -> io::Result<Awakener> {
-        let (reader, writer) =
-            magenta::Channel::create(magenta::ChannelOpts::Normal).map_err(status_to_io_err)?;
-
-        let message_buf = magenta::MessageBuf::new();
-
         Ok(Awakener {
-            reader,
-            writer,
+            inner: Mutex::new(None)
         })
     }
 
     pub fn wakeup(&self) -> io::Result<()> {
-        let opts = 0;
-        match self.writer.write(&[1], &mut Vec::new(), opts).map_err(status_to_io_err) {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    Ok(())
-                } else {
-                    Err(e)
-                }
-            }
-        }
+        let inner_locked = self.inner.lock().unwrap();
+        let &(token, ref weak_port) =
+            inner_locked.as_ref().expect("Called wakeup on unregistered awakener.");
+
+        let port = weak_port.upgrade().expect("Tried to wakeup a closed port.");
+
+        let status = 0; // arbitrary
+        let packet = magenta::Packet::from_user_packet(
+                        token.0 as u64, status, magenta::UserPacket::from_u8_array([0; 32]));
+
+        port.queue(&packet).map_err(status_to_io_err)
     }
 
-    pub fn cleanup(&self) {
-        let opts = 0;
-        let mut message_buf = magenta::MessageBuf::new();
-
-        // TODO: allow passing slices in Channel::read so that we can avoid the allocation here
-        message_buf.ensure_capacity_bytes(1);
-        let _res = self.reader.read(opts, &mut message_buf);
-    }
+    pub fn cleanup(&self) {}
 }
 
 impl Evented for Awakener {
     fn register(&self,
                 poll: &Poll,
                 token: Token,
-                events: Ready,
+                _events: Ready,
                 opts: PollOpt) -> io::Result<()>
     {
-        poll::selector(poll).register(&self.reader, token, events, opts)
+        let mut inner_locked = self.inner.lock().unwrap();
+        if inner_locked.is_some() {
+            panic!("Called register on already-registered Awakener.");
+        }
+        *inner_locked = Some((token, Arc::downgrade(&poll::selector(poll).port)));
+
+        Ok(())
     }
 
     fn reregister(&self,
                   poll: &Poll,
                   token: Token,
-                  events: Ready,
+                  _events: Ready,
                   opts: PollOpt) -> io::Result<()>
     {
-        self.register(poll, token, events, opts)
+        let mut inner_locked = self.inner.lock().unwrap();
+        *inner_locked = Some((token, Arc::downgrade(&poll::selector(poll).port)));
+
+        Ok(())
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()>
     {
-        // TODO: what to obout missing token?
+        let mut inner_locked = self.inner.lock().unwrap();
+        *inner_locked = None;
+
         Ok(())
     }
 }
@@ -118,19 +123,32 @@ static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
 pub struct Selector {
     id: usize,
-    port: magenta::Port,
+    port: Arc<magenta::Port>,
+    has_tokens_to_rereg: AtomicBool,
+    tokens_to_rereg: Mutex<Vec<Token>>,
+    token_to_handle: ConcHashMap<Token, Weak<EventedFdInner>>,
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        let port = magenta::Port::create(magenta::PortOpts::V2).map_err(status_to_io_err)?;
+        let port = Arc::new(
+            magenta::Port::create(magenta::PortOpts::V2)
+                .map_err(status_to_io_err)?
+        );
 
         // offset by 1 to avoid choosing 0 as the id of a selector
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
 
+        let has_tokens_to_rereg = AtomicBool::new(false);
+        let tokens_to_rereg = Mutex::new(Vec::new());
+        let token_to_handle = ConcHashMap::<_, _, RandomState>::new();
+
         Ok(Selector {
             id,
             port,
+            has_tokens_to_rereg,
+            tokens_to_rereg,
+            token_to_handle,
         })
     }
 
@@ -138,12 +156,27 @@ impl Selector {
         self.id
     }
 
+    fn reregister_handles(&self) -> io::Result<()> {
+        if self.has_tokens_to_rereg.load(Ordering::Relaxed) {
+            let mut tokens = self.tokens_to_rereg.lock().unwrap();
+            for token in tokens.drain(0..) {
+                if let Some(handle) = self.token_to_handle.find(&token).and_then(|h| h.get().upgrade()) {
+                    // TODO: reregister the handle
+                }
+            }
+            self.has_tokens_to_rereg.store(false, Ordering::Relaxed);
+        }
+        Ok(())
+    }
+
     pub fn select(&self,
                   evts: &mut Events,
-                  awakener: Token,
+                  _awakener: Token,
                   timeout: Option<Duration>) -> io::Result<bool>
     {
         evts.event_opt = None;
+
+        self.reregister_handles()?;
 
         let deadline = match timeout {
             Some(duration) => {
@@ -161,12 +194,6 @@ impl Selector {
             Err(e) => return Err(status_to_io_err(e)),
         };
 
-        let key = packet.key();
-
-        if key == awakener.0 as u64 {
-            return Ok(true);
-        }
-
         let observed_signals = match packet.contents() {
             magenta::PacketContents::SignalOne(signal_packet) => {
                 signal_packet.observed()
@@ -175,50 +202,67 @@ impl Selector {
                 signal_packet.observed()
             },
             magenta::PacketContents::User(_user_packet) => {
-                panic!("User packets should not be sent to mio ports");
+                // User packets are only ever sent by an Awakener
+                return Ok(true);
             },
         };
 
-        let readable = if magenta::MX_SIGNAL_NONE != (observed_signals & (
-            magenta::MX_CHANNEL_READABLE |
-            magenta::MX_SOCKET_READABLE
-        )) {
-            Ready::readable()
-        } else {
-            Ready::none()
+        let key = packet.key();
+        let token = Token(key as usize);
+
+        // Convert the signals to epoll events using __mxio_wait_end, and add to reregistration list
+        // if necessary.
+        let events = {
+            let handle = if let Some(handle) =
+                self.token_to_handle
+                    .find(&Token(key as usize))
+                    .and_then(|h| h.get().upgrade()) {
+                handle
+            } else {
+                // This handle is apparently in the process of removal-- it has been removed from
+                // the list, but port_cancel has not yet been called
+                return Ok(false);
+            };
+
+            let events = unsafe {
+                let mut events: u32 = mem::uninitialized();
+                sys::__mxio_wait_end(handle.mxio, observed_signals, &mut events);
+                events
+            };
+
+            // If necessary, queue to be reregistered before next port_await
+            let needs_to_rereg = {
+                let registration_lock = handle.registration.lock().unwrap();
+
+                registration_lock
+                    .as_ref()
+                    .map(|r| &r.rereg_signals)
+                    .is_some()
+            };
+
+            if needs_to_rereg {
+                let mut tokens_to_rereg_lock = self.tokens_to_rereg.lock().unwrap();
+                tokens_to_rereg_lock.push(token);
+                self.has_tokens_to_rereg.store(true, Ordering::Relaxed);
+            }
+
+            events
         };
 
-        let writable = if magenta::MX_SIGNAL_NONE != (observed_signals & (
-            magenta::MX_CHANNEL_WRITABLE |
-            magenta::MX_SOCKET_WRITABLE
-        )) {
-            Ready::writable()
-        } else {
-            Ready::none()
-        };
-
-        evts.event_opt = Some(Event::new(readable | writable, Token(key as usize)));
+        evts.event_opt = Some(Event::new(epoll_event_to_ready(events), token));
 
         Ok(false)
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register<H: magenta::HandleBase>(&self,
-                                            handle: &H,
-                                            token: Token,
-                                            interest: Ready,
-                                            poll_opts: PollOpt) -> io::Result<()>
+    pub fn register(&self,
+                    handle: &magenta::Handle,
+                    fd: &EventedFd,
+                    token: Token,
+                    signals: magenta::Signals,
+                    poll_opts: PollOpt)-> io::Result<()>
     {
-        let signals =
-            (if interest.is_readable() {
-                magenta::MX_CHANNEL_READABLE |
-                magenta::MX_SOCKET_READABLE
-                } else { magenta::MX_SIGNAL_NONE })
-                |
-            (if interest.is_writable() {
-                magenta::MX_CHANNEL_WRITABLE |
-                magenta::MX_SOCKET_WRITABLE
-                } else { magenta::MX_SIGNAL_NONE });
+        self.token_to_handle.insert(token, Arc::downgrade(&fd.inner));
 
         let wait_async_opts = if poll_opts.is_oneshot() {
             magenta::WaitAsyncOpts::Once
@@ -226,14 +270,19 @@ impl Selector {
             magenta::WaitAsyncOpts::Repeating
         };
 
-        // TODO: correctly handle level-triggered repeating events
+        let wait_res = handle.wait_async(&self.port, token.0 as u64, signals, wait_async_opts)
+            .map_err(status_to_io_err);
 
-        handle.wait_async(&self.port, token.0 as u64, signals, wait_async_opts)
-            .map_err(status_to_io_err)
+        if wait_res.is_err() {
+            self.token_to_handle.remove(&token);
+        }
+
+        wait_res
     }
 
     /// Deregister event interests for the given IO handle with the OS
-    pub fn deregister<H: magenta::HandleBase>(&self, handle: &H, token: Token) -> io::Result<()> {
+    pub fn deregister(&self, handle: &magenta::Handle, token: Token) -> io::Result<()> {
+        self.token_to_handle.remove(&token);
         self.port.cancel(&*handle, token.0 as u64)
             .map_err(status_to_io_err)
     }
@@ -438,11 +487,16 @@ impl Evented for TcpListener {
 }
 
 #[derive(Debug)]
-pub struct UdpSocket;
+pub struct UdpSocket {
+    io: net::UdpSocket,
+}
 
 impl UdpSocket {
     pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        unimplemented!()
+        socket.set_nonblocking(true)?;
+        Ok(UdpSocket {
+            io: socket,
+        })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -566,6 +620,153 @@ impl Evented for UdpSocket {
     }
 }
 
+struct EventedFdRegistration {
+    token: Token,
+    handle: DontDrop<magenta::Handle>,
+    rereg_signals: Option<magenta::Signals>,
+}
+
+// An evented file descriptor. The file descriptor is owned by this structure.
+struct EventedFdInner {
+    registration: Mutex<Option<EventedFdRegistration>>,
+    fd: RawFd,
+    mxio: *const sys::mxio_t,
+}
+
+impl Drop for EventedFdInner {
+    fn drop(&mut self) {
+        unsafe {
+            sys::__mxio_release(self.mxio);
+            let _ = libc::close(self.fd);
+        }
+    }
+}
+
+unsafe impl Sync for EventedFdInner {}
+unsafe impl Send for EventedFdInner {}
+
+struct EventedFd {
+    pub inner: Arc<EventedFdInner>
+}
+
+impl EventedFd {
+    unsafe fn new(fd: RawFd) -> Self {
+        let mxio = sys::__mxio_fd_to_io(fd);
+        assert!(mxio != ::std::ptr::null(), "FileDescriptor given to EventedFd must be valid.");
+
+        EventedFd {
+            inner: Arc::new(EventedFdInner {
+                registration: Mutex::new(None),
+                fd: fd,
+                mxio: mxio,
+            })
+        }
+    }
+}
+
+impl Evented for EventedFd {
+     fn register(&self,
+                poll: &Poll,
+                token: Token,
+                interest: Ready,
+                opts: PollOpt) -> io::Result<()>
+    {
+        let epoll_events = ioevent_to_epoll(interest, opts);
+
+        let (handle, raw_handle, signals) = unsafe {
+            let mut raw_handle: sys::mx_handle_t = mem::uninitialized();
+            let mut signals: sys::mx_signals_t = mem::uninitialized();
+            sys::__mxio_wait_begin(self.inner.mxio, epoll_events, &mut raw_handle, &mut signals);
+
+            // We don't have ownership of the handle, so we can't drop it
+            let handle = DontDrop::new(magenta::Handle::from_raw(raw_handle));
+            (handle, raw_handle, signals)
+        };
+
+
+        let needs_rereg = opts.is_level() && !opts.is_oneshot();
+
+        {
+            let mut registration_lock = self.inner.registration.lock().unwrap();
+            if registration_lock.is_some() {
+                panic!("Called register on an already registered file descriptor.");
+            }
+            *registration_lock = Some(EventedFdRegistration {
+                token: token,
+                handle: DontDrop::new(unsafe { magenta::Handle::from_raw(raw_handle) }),
+                rereg_signals: if needs_rereg { Some(signals) } else { None },
+            })
+        }
+
+        let registered = poll::selector(poll)
+            .register(handle.inner_ref(), self, token, signals, opts);
+
+        if registered.is_err() {
+            let mut registration_lock = self.inner.registration.lock().unwrap();
+            *registration_lock = None;
+        }
+
+        registered
+    }
+
+    fn reregister(&self,
+                  poll: &Poll,
+                  token: Token,
+                  interest: Ready,
+                  opts: PollOpt) -> io::Result<()>
+    {
+        self.deregister(poll)?;
+        self.register(poll, token, interest, opts)
+    }
+
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+        let mut registration_lock = self.inner.registration.lock().unwrap();
+        let old_registration = registration_lock.take()
+            .expect("Tried to deregister on unregistered handle.");
+
+        poll::selector(poll)
+            .deregister(old_registration.handle.inner_ref(), old_registration.token)
+    }
+}
+
+mod sys {
+    use libc;
+    use std::os::unix::io::RawFd;
+    pub use magenta_sys::{mx_handle_t, mx_signals_t};
+
+    // 17 fn pointers we don't need for mio :)
+    pub type mxio_ops_t = [usize; 17];
+
+    pub type atomic_int_fast32_t = usize; // TODO: https://github.com/rust-lang/libc/issues/631
+
+    #[repr(C)]
+    pub struct mxio_t {
+        pub ops: *const mxio_ops_t,
+        pub magic: u32,
+        pub refcount: atomic_int_fast32_t,
+        pub dupcount: u32,
+        pub flags: u32,
+    }
+
+    #[link(name="mxio")]
+    extern {
+        pub fn __mxio_fd_to_io(fd: RawFd) -> *const mxio_t;
+        pub fn __mxio_release(io: *const mxio_t);
+
+        pub fn __mxio_wait_begin(
+            io: *const mxio_t,
+            events: u32,
+            handle_out: &mut mx_handle_t,
+            signals_out: &mut mx_signals_t,
+        );
+        pub fn __mxio_wait_end(
+            io: *const mxio_t,
+            signals: mx_signals_t,
+            events_out: &mut u32,
+        );
+    }
+}
+
 /*
 // Unix only:
 EventedFd
@@ -596,6 +797,29 @@ Io
 Overlapped
 Binding
 */
+
+struct DontDrop<T: Drop>(Option<T>);
+
+impl<T: Drop> DontDrop<T> {
+    fn new(t: T) -> DontDrop<T> {
+        DontDrop(Some(t))
+    }
+
+    fn inner_ref(&self) -> &T {
+        self.0.as_ref().unwrap()
+    }
+
+    fn inner_mut(&mut self) -> &mut T {
+        self.0.as_mut().unwrap()
+    }
+}
+
+impl<T: Drop> Drop for DontDrop<T> {
+    fn drop(&mut self) {
+        let inner = self.0.take();
+        mem::forget(inner);
+    }
+}
 
 /// Convert from magenta::Status to io::Error.
 ///
@@ -644,4 +868,63 @@ fn status_to_io_err(status: magenta::Status) -> io::Error {
         Status::ErrCallFailed
         => io::ErrorKind::Other
     }.into()
+}
+
+fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
+    use event_imp::ready_from_usize;
+    const HUP: usize   = 0b01000;
+
+    let mut kind = 0;
+
+    if interest.is_readable() {
+        kind |= libc::EPOLLIN;
+    }
+
+    if interest.is_writable() {
+        kind |= libc::EPOLLOUT;
+    }
+
+    if interest.contains(ready_from_usize(HUP)) {
+        kind |= libc::EPOLLRDHUP;
+    }
+
+    if opts.is_edge() {
+        kind |= libc::EPOLLET;
+    }
+
+    if opts.is_oneshot() {
+        kind |= libc::EPOLLONESHOT;
+    }
+
+    if opts.is_level() {
+        kind &= !libc::EPOLLET;
+    }
+
+    kind as u32
+}
+
+fn epoll_event_to_ready(epoll: u32) -> Ready {
+    let epoll = epoll as i32; // casts the bits directly
+    let mut kind = Ready::empty();
+
+    if (epoll & libc::EPOLLIN) != 0 || (epoll & libc::EPOLLPRI) != 0 {
+        kind = kind | Ready::readable();
+    }
+
+    if (epoll & libc::EPOLLOUT) != 0 {
+        kind = kind | Ready::writable();
+    }
+
+    kind
+
+    /* TODO:: support?
+    // EPOLLHUP - Usually means a socket error happened
+    if (epoll & libc::EPOLLERR) != 0 {
+        kind = kind | UnixReady::error();
+    }
+
+    if (epoll & libc::EPOLLRDHUP) != 0 || (epoll & libc::EPOLLHUP) != 0 {
+        kind = kind | UnixReady::hup();
+    }
+    */
 }
