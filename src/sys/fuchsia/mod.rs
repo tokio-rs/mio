@@ -12,22 +12,28 @@ use std::fmt;
 use std::io::{Read, Write};
 use std::mem;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::os::unix::io::RawFd;
+use std::ops::{Deref, DerefMut};
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
 pub struct Awakener {
+    /// Token and weak reference to the port on which Awakener was registered.
+    ///
+    /// When `Awakener::wakeup` is called, these are used to send a wakeup message to the port.
     inner: Mutex<Option<(Token, Weak<magenta::Port>)>>,
 }
 
 impl Awakener {
+    /// Create a new `Awakener`.
     pub fn new() -> io::Result<Awakener> {
         Ok(Awakener {
             inner: Mutex::new(None)
         })
     }
 
+    /// Send a wakeup signal to the `Selector` on which the `Awakener` was registered.
     pub fn wakeup(&self) -> io::Result<()> {
         let inner_locked = self.inner.lock().unwrap();
         let &(token, ref weak_port) =
@@ -82,9 +88,9 @@ impl Evented for Awakener {
     }
 }
 
-/// The Fuchsia selector only handles one event at a time, so there's no reason to
-/// provide storage for multiple events.
 pub struct Events {
+    /// The Fuchsia selector only handles one event at a time, so there's no reason to
+    /// provide storage for multiple events.
     event_opt: Option<Event>
 }
 
@@ -123,10 +129,26 @@ static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
 pub struct Selector {
     id: usize,
+
+    /// Magenta object on which the handles have been registered, and on which events occur
     port: Arc<magenta::Port>,
+
+    /// Whether or not `tokens_to_rereg` contains any elements. This is a best-effort attempt
+    /// used to prevent having to lock `tokens_to_rereg` when it is empty.
     has_tokens_to_rereg: AtomicBool,
+
+    /// List of `Token`s corresponding to registrations that need to be reregistered before the
+    /// next `port::wait`. This is necessary to provide level-triggered behavior for
+    /// `Async::repeating` registrations.
+    ///
+    /// When a level-triggered `Async::repeating` event is seen, its token is added to this list so
+    /// that it will be reregistered before the next `port::wait` call, making `port::wait` return
+    /// immediately if the signal was high during the reregistration.
     tokens_to_rereg: Mutex<Vec<Token>>,
-    token_to_handle: ConcHashMap<Token, Weak<EventedFdInner>>,
+
+    /// Map from tokens to weak references to `EventedFdInner`-- a structure describing a
+    /// file handle, its associated `mxio` object, and its current registration.
+    token_to_fd: ConcHashMap<Token, Weak<EventedFdInner>>,
 }
 
 impl Selector {
@@ -141,14 +163,14 @@ impl Selector {
 
         let has_tokens_to_rereg = AtomicBool::new(false);
         let tokens_to_rereg = Mutex::new(Vec::new());
-        let token_to_handle = ConcHashMap::<_, _, RandomState>::new();
+        let token_to_fd = ConcHashMap::<_, _, RandomState>::new();
 
         Ok(Selector {
             id,
             port,
             has_tokens_to_rereg,
             tokens_to_rereg,
-            token_to_handle,
+            token_to_fd,
         })
     }
 
@@ -156,12 +178,15 @@ impl Selector {
         self.id
     }
 
+    /// Reregisters all registrations pointed to by the `tokens_to_rereg` list
+    /// if `has_tokens_to_rereg`.
     fn reregister_handles(&self) -> io::Result<()> {
         if self.has_tokens_to_rereg.load(Ordering::Relaxed) {
             let mut tokens = self.tokens_to_rereg.lock().unwrap();
             for token in tokens.drain(0..) {
-                if let Some(handle) = self.token_to_handle.find(&token).and_then(|h| h.get().upgrade()) {
-                    // TODO: reregister the handle
+                if let Some(eventedfd) = self.token_to_fd.find(&token)
+                                        .and_then(|h| h.get().upgrade()) {
+                    eventedfd.rereg_for_level(&self.port);
                 }
             }
             self.has_tokens_to_rereg.store(false, Ordering::Relaxed);
@@ -212,9 +237,10 @@ impl Selector {
 
         // Convert the signals to epoll events using __mxio_wait_end, and add to reregistration list
         // if necessary.
-        let events = {
+        let events: u32;
+        {
             let handle = if let Some(handle) =
-                self.token_to_handle
+                self.token_to_fd
                     .find(&Token(key as usize))
                     .and_then(|h| h.get().upgrade()) {
                 handle
@@ -224,7 +250,7 @@ impl Selector {
                 return Ok(false);
             };
 
-            let events = unsafe {
+            events = unsafe {
                 let mut events: u32 = mem::uninitialized();
                 sys::__mxio_wait_end(handle.mxio, observed_signals, &mut events);
                 events
@@ -245,9 +271,7 @@ impl Selector {
                 tokens_to_rereg_lock.push(token);
                 self.has_tokens_to_rereg.store(true, Ordering::Relaxed);
             }
-
-            events
-        };
+        }
 
         evts.event_opt = Some(Event::new(epoll_event_to_ready(events), token));
 
@@ -262,19 +286,15 @@ impl Selector {
                     signals: magenta::Signals,
                     poll_opts: PollOpt)-> io::Result<()>
     {
-        self.token_to_handle.insert(token, Arc::downgrade(&fd.inner));
+        self.token_to_fd.insert(token, Arc::downgrade(&fd.inner));
 
-        let wait_async_opts = if poll_opts.is_oneshot() {
-            magenta::WaitAsyncOpts::Once
-        } else {
-            magenta::WaitAsyncOpts::Repeating
-        };
+        let wait_async_opts = poll_opts_to_wait_async(poll_opts);
 
         let wait_res = handle.wait_async(&self.port, token.0 as u64, signals, wait_async_opts)
             .map_err(status_to_io_err);
 
         if wait_res.is_err() {
-            self.token_to_handle.remove(&token);
+            self.token_to_fd.remove(&token);
         }
 
         wait_res
@@ -282,7 +302,7 @@ impl Selector {
 
     /// Deregister event interests for the given IO handle with the OS
     pub fn deregister(&self, handle: &magenta::Handle, token: Token) -> io::Result<()> {
-        self.token_to_handle.remove(&token);
+        self.token_to_fd.remove(&token);
         self.port.cancel(&*handle, token.0 as u64)
             .map_err(status_to_io_err)
     }
@@ -488,111 +508,118 @@ impl Evented for TcpListener {
 
 #[derive(Debug)]
 pub struct UdpSocket {
-    io: net::UdpSocket,
+    io: DontDrop<net::UdpSocket>,
+    evented_fd: EventedFd,
 }
 
 impl UdpSocket {
     pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        socket.set_nonblocking(true)?;
+        try!(socket.set_nonblocking(true));
+        let evented_fd = unsafe { EventedFd::new(socket.as_raw_fd()) };
+
         Ok(UdpSocket {
-            io: socket,
+            io: DontDrop::new(socket),
+            evented_fd: evented_fd,
         })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        unimplemented!()
+        self.io.local_addr()
     }
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        unimplemented!()
+        self.io.try_clone().and_then(|io| {
+            UdpSocket::new(io)
+        })
     }
 
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        unimplemented!()
+        self.io.send_to(buf, target)
     }
 
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        unimplemented!()
+        self.io.recv_from(buf)
     }
 
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        unimplemented!()
+        self.io.send(buf)
     }
 
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        unimplemented!()
+        self.io.recv(buf)
     }
 
-    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
-        unimplemented!()
+    pub fn connect(&self, addr: SocketAddr)
+                     -> io::Result<()> {
+        self.io.connect(addr)
     }
 
     pub fn broadcast(&self) -> io::Result<bool> {
-        unimplemented!()
+        self.io.broadcast()
     }
 
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_broadcast(on)
     }
 
     pub fn multicast_loop_v4(&self) -> io::Result<bool> {
-        unimplemented!()
+        self.io.multicast_loop_v4()
     }
 
     pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_multicast_loop_v4(on)
     }
 
     pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
-        unimplemented!()
+        self.io.multicast_ttl_v4()
     }
 
     pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_multicast_ttl_v4(ttl)
     }
 
     pub fn multicast_loop_v6(&self) -> io::Result<bool> {
-        unimplemented!()
+        self.io.multicast_loop_v6()
     }
 
     pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_multicast_loop_v6(on)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
-        unimplemented!()
+        self.io.ttl()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_ttl(ttl)
     }
 
     pub fn join_multicast_v4(&self,
                              multiaddr: &Ipv4Addr,
                              interface: &Ipv4Addr) -> io::Result<()> {
-        unimplemented!()
+        self.io.join_multicast_v4(multiaddr, interface)
     }
 
     pub fn join_multicast_v6(&self,
                              multiaddr: &Ipv6Addr,
                              interface: u32) -> io::Result<()> {
-        unimplemented!()
+        self.io.join_multicast_v6(multiaddr, interface)
     }
 
     pub fn leave_multicast_v4(&self,
                               multiaddr: &Ipv4Addr,
                               interface: &Ipv4Addr) -> io::Result<()> {
-        unimplemented!()
+        self.io.leave_multicast_v4(multiaddr, interface)
     }
 
     pub fn leave_multicast_v6(&self,
                               multiaddr: &Ipv6Addr,
                               interface: u32) -> io::Result<()> {
-        unimplemented!()
+        self.io.leave_multicast_v6(multiaddr, interface)
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        unimplemented!()
+        self.io.take_error()
     }
 }
 
@@ -620,17 +647,42 @@ impl Evented for UdpSocket {
     }
 }
 
+/// Properties of an `EventedFd`'s current registration
+#[derive(Debug)]
 struct EventedFdRegistration {
     token: Token,
     handle: DontDrop<magenta::Handle>,
-    rereg_signals: Option<magenta::Signals>,
+    rereg_signals: Option<(magenta::Signals, magenta::WaitAsyncOpts)>,
 }
 
-// An evented file descriptor. The file descriptor is owned by this structure.
+/// An event-ed file descriptor. The file descriptor is owned by this structure.
+#[derive(Debug)]
 struct EventedFdInner {
+    /// Properties of the current registration.
     registration: Mutex<Option<EventedFdRegistration>>,
+
+    /// Owned file descriptor.
     fd: RawFd,
+
+    /// Owned `mxio_t` ponter.
     mxio: *const sys::mxio_t,
+}
+
+impl EventedFdInner {
+   pub fn rereg_for_level(&self, port: &magenta::Port) {
+       let registration_opt = self.registration.lock().unwrap();
+       if let Some(ref registration) = *registration_opt {
+           if let Some((rereg_signals, rereg_opts)) = registration.rereg_signals {
+               let _res =
+                   registration
+                       .handle.inner_ref()
+                       .wait_async(port,
+                                   registration.token.0 as u64,
+                                   rereg_signals,
+                                   rereg_opts);
+           }
+       }
+   }
 }
 
 impl Drop for EventedFdInner {
@@ -642,9 +694,17 @@ impl Drop for EventedFdInner {
     }
 }
 
+// `EventedInner` must be manually declared `Send + Sync` because it contains a `RawFd` and a
+// `*const sys::mxio_t`. These are only used to make thread-safe system calls, so accessing
+// them is entirely thread-safe.
+//
+// Note: one minor exception to this are the calls to `libc::close` and `__mxio_release`, which
+// happen on `Drop`. These accesses are safe because `drop` can only be called at most once from
+// a single thread, and after it is called no other functions can be called on the `EventedFdInner`.
 unsafe impl Sync for EventedFdInner {}
 unsafe impl Send for EventedFdInner {}
 
+#[derive(Clone, Debug)]
 struct EventedFd {
     pub inner: Arc<EventedFdInner>
 }
@@ -694,7 +754,11 @@ impl Evented for EventedFd {
             *registration_lock = Some(EventedFdRegistration {
                 token: token,
                 handle: DontDrop::new(unsafe { magenta::Handle::from_raw(raw_handle) }),
-                rereg_signals: if needs_rereg { Some(signals) } else { None },
+                rereg_signals: if needs_rereg {
+                    Some((signals, poll_opts_to_wait_async(opts)))
+                } else {
+                    None
+                },
             })
         }
 
@@ -730,6 +794,7 @@ impl Evented for EventedFd {
 }
 
 mod sys {
+    #![allow(non_camel_case_types)]
     use libc;
     use std::os::unix::io::RawFd;
     pub use magenta_sys::{mx_handle_t, mx_signals_t};
@@ -798,9 +863,11 @@ Overlapped
 Binding
 */
 
-struct DontDrop<T: Drop>(Option<T>);
+/// Utility type to prevent the type inside of it from being dropped.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+struct DontDrop<T>(Option<T>);
 
-impl<T: Drop> DontDrop<T> {
+impl<T> DontDrop<T> {
     fn new(t: T) -> DontDrop<T> {
         DontDrop(Some(t))
     }
@@ -814,7 +881,20 @@ impl<T: Drop> DontDrop<T> {
     }
 }
 
-impl<T: Drop> Drop for DontDrop<T> {
+impl<T> Deref for DontDrop<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.inner_ref()
+    }
+}
+
+impl<T> DerefMut for DontDrop<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.inner_mut()
+    }
+}
+
+impl<T> Drop for DontDrop<T> {
     fn drop(&mut self) {
         let inner = self.0.take();
         mem::forget(inner);
@@ -927,4 +1007,12 @@ fn epoll_event_to_ready(epoll: u32) -> Ready {
         kind = kind | UnixReady::hup();
     }
     */
+}
+
+fn poll_opts_to_wait_async(poll_opts: PollOpt) -> magenta::WaitAsyncOpts {
+    if poll_opts.is_oneshot() {
+        magenta::WaitAsyncOpts::Once
+    } else {
+        magenta::WaitAsyncOpts::Repeating
+    }
 }
