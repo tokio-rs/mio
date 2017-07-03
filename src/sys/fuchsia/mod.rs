@@ -514,7 +514,9 @@ pub struct UdpSocket {
 
 impl UdpSocket {
     pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        try!(socket.set_nonblocking(true));
+        // Set non-blocking (workaround since the std version doesn't work?)
+        try!(cvt(unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) }));
+
         let evented_fd = unsafe { EventedFd::new(socket.as_raw_fd()) };
 
         Ok(UdpSocket {
@@ -630,7 +632,7 @@ impl Evented for UdpSocket {
                 interest: Ready,
                 opts: PollOpt) -> io::Result<()>
     {
-        unimplemented!()
+        self.evented_fd.register(poll, token, interest, opts)
     }
 
     fn reregister(&self,
@@ -639,11 +641,11 @@ impl Evented for UdpSocket {
                   interest: Ready,
                   opts: PollOpt) -> io::Result<()>
     {
-        unimplemented!()
+        self.evented_fd.reregister(poll, token, interest, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        unimplemented!()
+        self.evented_fd.deregister(poll)
     }
 }
 
@@ -950,6 +952,8 @@ fn status_to_io_err(status: magenta::Status) -> io::Error {
     }.into()
 }
 
+// Everything below is copied from sys::unix:
+
 fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
     use event_imp::ready_from_usize;
     const HUP: usize   = 0b01000;
@@ -1014,5 +1018,27 @@ fn poll_opts_to_wait_async(poll_opts: PollOpt) -> magenta::WaitAsyncOpts {
         magenta::WaitAsyncOpts::Once
     } else {
         magenta::WaitAsyncOpts::Repeating
+    }
+}
+
+trait IsMinusOne {
+    fn is_minus_one(&self) -> bool;
+}
+
+impl IsMinusOne for i32 {
+    fn is_minus_one(&self) -> bool { *self == -1 }
+}
+
+impl IsMinusOne for isize {
+    fn is_minus_one(&self) -> bool { *self == -1 }
+}
+
+fn cvt<T: IsMinusOne>(t: T) -> ::io::Result<T> {
+    use std::io;
+
+    if t.is_minus_one() {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(t)
     }
 }
