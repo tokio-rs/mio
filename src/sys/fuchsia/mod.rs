@@ -2,16 +2,19 @@
 
 use {io, poll, Event, Evented, Ready, Registration, Poll, PollOpt, Token};
 use concurrent_hashmap::ConcHashMap;
+use iovec::IoVec;
+use iovec::unix as iovec;
 use libc;
 use magenta;
 use magenta_sys;
 use magenta::HandleBase;
-use iovec::IoVec;
+use net2::TcpStreamExt;
 use std::collections::hash_map::RandomState;
+use std::cmp;
 use std::fmt;
 use std::io::{Read, Write};
 use std::mem;
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{self, IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::ops::{Deref, DerefMut};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
@@ -309,113 +312,163 @@ impl Selector {
 }
 
 #[derive(Debug)]
-pub struct TcpStream;
+pub struct TcpStream {
+    io: DontDrop<net::TcpStream>,
+    evented_fd: EventedFd,
+}
+
 impl TcpStream {
     pub fn connect(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
-        unimplemented!()
+        try!(set_nonblock(stream.as_raw_fd()));
+
+        match stream.connect(addr) {
+            Ok(..) => {}
+            Err(ref e) if e.raw_os_error() == Some(libc::EINPROGRESS) => {}
+            Err(e) => return Err(e),
+        }
+
+        let evented_fd = unsafe { EventedFd::new(stream.as_raw_fd()) };
+
+        Ok(TcpStream {
+            io: DontDrop::new(stream),
+            evented_fd: evented_fd,
+        })
     }
 
-    pub fn from_stream(stream: net::TcpStream) -> TcpStream {
-        unimplemented!()
+   pub fn from_stream(stream: net::TcpStream) -> TcpStream {
+       let evented_fd = unsafe { EventedFd::new(stream.as_raw_fd()) };
+
+        TcpStream {
+            io: DontDrop::new(stream),
+            evented_fd: evented_fd,
+        }
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        unimplemented!()
+        self.io.peer_addr()
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        unimplemented!()
+        self.io.local_addr()
     }
 
     pub fn try_clone(&self) -> io::Result<TcpStream> {
-        unimplemented!()
+        self.io.try_clone().map(|s| {
+            let evented_fd = unsafe { EventedFd::new(s.as_raw_fd()) };
+            TcpStream {
+                io: DontDrop::new(s),
+                evented_fd: evented_fd,
+            }
+        })
     }
 
     pub fn shutdown(&self, how: net::Shutdown) -> io::Result<()> {
-        unimplemented!()
+        self.io.shutdown(how)
     }
 
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_nodelay(nodelay)
     }
 
     pub fn nodelay(&self) -> io::Result<bool> {
-        unimplemented!()
+        self.io.nodelay()
     }
 
     pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_recv_buffer_size(size)
     }
 
     pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        unimplemented!()
+        self.io.recv_buffer_size()
     }
 
     pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_send_buffer_size(size)
     }
 
     pub fn send_buffer_size(&self) -> io::Result<usize> {
-        unimplemented!()
+        self.io.send_buffer_size()
     }
 
     pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_keepalive(keepalive)
     }
 
     pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        unimplemented!()
+        self.io.keepalive()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_ttl(ttl)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
-        unimplemented!()
+        self.io.ttl()
     }
 
     pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_only_v6(only_v6)
     }
 
     pub fn only_v6(&self) -> io::Result<bool> {
-        unimplemented!()
+        self.io.only_v6()
     }
 
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_linger(dur)
     }
 
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        unimplemented!()
+        self.io.linger()
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        unimplemented!()
+        self.io.take_error()
     }
 
     pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
-        unimplemented!()
+        unsafe {
+            let slice = iovec::as_os_slice_mut(bufs);
+            let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());
+            let rc = libc::readv(self.io.as_raw_fd(),
+                                 slice.as_ptr(),
+                                 len as libc::c_int);
+            if rc < 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(rc as usize)
+            }
+        }
     }
 
     pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
-        unimplemented!()
+        unsafe {
+            let slice = iovec::as_os_slice(bufs);
+            let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());
+            let rc = libc::writev(self.io.as_raw_fd(),
+                                  slice.as_ptr(),
+                                  len as libc::c_int);
+            if rc < 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(rc as usize)
+            }
+        }
     }
 }
 
 impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        unimplemented!()
+        self.io.inner_ref().read(buf)
     }
 }
 
 impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        unimplemented!()
+        self.io.inner_ref().write(buf)
     }
-    fn flush(&mut self,) -> io::Result<()> {
-        unimplemented!()
+    fn flush(&mut self) -> io::Result<()> {
+        self.io.inner_ref().flush()
     }
 }
 
@@ -426,61 +479,87 @@ impl Evented for TcpStream {
                 interest: Ready,
                 opts: PollOpt) -> io::Result<()>
     {
-        unimplemented!()
+        self.evented_fd.register(poll, token, interest, opts)
     }
 
     fn reregister(&self,
-                poll: &Poll,
-                token: Token,
-                interest: Ready,
-                opts: PollOpt) -> io::Result<()>
+                  poll: &Poll,
+                  token: Token,
+                  interest: Ready,
+                  opts: PollOpt) -> io::Result<()>
     {
-        unimplemented!()
+        self.evented_fd.reregister(poll, token, interest, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        unimplemented!()
+        self.evented_fd.deregister(poll)
     }
 }
 
 #[derive(Debug)]
-pub struct TcpListener;
+pub struct TcpListener {
+    io: DontDrop<net::TcpListener>,
+    evented_fd: EventedFd,
+}
 
 impl TcpListener {
     pub fn new(inner: net::TcpListener, _addr: &SocketAddr) -> io::Result<TcpListener> {
-        unimplemented!()
+        // TODO: replace
+        try!(cvt(unsafe { libc::fcntl(inner.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) }));
+
+        let evented_fd = unsafe { EventedFd::new(inner.as_raw_fd()) };
+
+        Ok(TcpListener {
+            io: DontDrop::new(inner),
+            evented_fd: evented_fd,
+        })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        unimplemented!()
+        self.io.local_addr()
     }
 
     pub fn try_clone(&self) -> io::Result<TcpListener> {
-        unimplemented!()
+        self.io.try_clone().map(|io| {
+            let evented_fd = unsafe { EventedFd::new(io.as_raw_fd()) };
+            TcpListener {
+                io: DontDrop::new(io),
+                evented_fd: evented_fd,
+            }
+        })
     }
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        unimplemented!()
+        self.io.accept().and_then(|(s, a)| {
+            set_nonblock(s.as_raw_fd())?;
+            let evented_fd = unsafe { EventedFd::new(s.as_raw_fd()) };
+            Ok((TcpStream {
+                io: DontDrop::new(s),
+                evented_fd: evented_fd,
+            }, a))
+        })
     }
 
+    #[allow(deprecated)]
     pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_only_v6(only_v6)
     }
 
+    #[allow(deprecated)]
     pub fn only_v6(&self) -> io::Result<bool> {
-        unimplemented!()
+        self.io.only_v6()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        unimplemented!()
+        self.io.set_ttl(ttl)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
-        unimplemented!()
+        self.io.ttl()
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        unimplemented!()
+        self.io.take_error()
     }
 }
 
@@ -489,20 +568,22 @@ impl Evented for TcpListener {
                 poll: &Poll,
                 token: Token,
                 interest: Ready,
-                opts: PollOpt) -> io::Result<()> {
-        unimplemented!()
+                opts: PollOpt) -> io::Result<()>
+    {
+        self.evented_fd.register(poll, token, interest, opts)
     }
 
     fn reregister(&self,
-                poll: &Poll,
-                token: Token,
-                interest: Ready,
-                opts: PollOpt) -> io::Result<()> {
-        unimplemented!()
+                  poll: &Poll,
+                  token: Token,
+                  interest: Ready,
+                  opts: PollOpt) -> io::Result<()>
+    {
+        self.evented_fd.reregister(poll, token, interest, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        unimplemented!()
+        self.evented_fd.deregister(poll)
     }
 }
 
@@ -514,8 +595,8 @@ pub struct UdpSocket {
 
 impl UdpSocket {
     pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        // Set non-blocking (workaround since the std version doesn't work?)
-        try!(cvt(unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) }));
+        // Set non-blocking (workaround since the std version doesn't work due to a temporary bug in fuchsia-- TODO replace this
+        set_nonblock(socket.as_raw_fd())?;
 
         let evented_fd = unsafe { EventedFd::new(socket.as_raw_fd()) };
 
@@ -540,7 +621,7 @@ impl UdpSocket {
     }
 
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.io.recv_from(buf)
+        recv_from(unsafe { self.io.as_raw_fd() }, buf)
     }
 
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
@@ -950,6 +1031,27 @@ fn status_to_io_err(status: magenta::Status) -> io::Error {
         Status::ErrCallFailed
         => io::ErrorKind::Other
     }.into()
+}
+
+
+/// Workaround until fuchsia's recv_from is fixed
+fn recv_from(fd: RawFd, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    let flags = 0;
+
+    let n = cvt(unsafe {
+        libc::recv(fd,
+                   buf.as_mut_ptr() as *mut libc::c_void,
+                   buf.len(),
+                   flags)
+    })?;
+
+    // random address-- we don't use it
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+    Ok((n as usize, addr))
+}
+
+fn set_nonblock(fd: RawFd) -> io::Result<()> {
+    cvt(unsafe { libc::fcntl(fd, libc::F_SETFL, libc::O_NONBLOCK) }).map(|_| ())
 }
 
 // Everything below is copied from sys::unix:
