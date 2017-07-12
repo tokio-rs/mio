@@ -90,7 +90,7 @@ impl UdpSocket {
         -> io::Result<(&'d [u8], SocketAddr)>
     {
         unsafe {
-            let (received, from) = self.recv_from(buf.uninitialized_mut())?;
+            let (received, from) = try!(self.recv_from(buf.uninitialized_mut()));
             buf.advance(received);
             Ok((buf.initialized(), from))
         }
@@ -124,7 +124,7 @@ impl UdpSocket {
         -> io::Result<&'d [u8]>
     {
         unsafe {
-            let received = self.recv(buf.uninitialized_mut())?;
+            let received = try!(self.recv(buf.uninitialized_mut()));
             buf.advance(received);
             Ok(buf.initialized())
         }
