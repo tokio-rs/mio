@@ -80,10 +80,11 @@
 
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
+extern crate buffer;
+extern crate iovec;
 extern crate lazycell;
 extern crate net2;
 extern crate slab;
-extern crate iovec;
 
 #[cfg(unix)]
 extern crate libc;

@@ -8,6 +8,7 @@
 /// [portability guidelines]: ../struct.Poll.html#portability
 
 use {io, sys, Ready, Poll, PollOpt, Token};
+use buffer::{with_buffer, Buffer, BufferRef};
 use event::Evented;
 use poll::SelectorId;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -82,6 +83,28 @@ impl UdpSocket {
         self.sys.recv_from(buf)
     }
 
+    /// See `recv_buffer_from` and `recv_from` instead.
+    ///
+    /// Receives data from a socket into a `BufferRef`.
+    pub fn recv_buffer_ref_from<'d, 's>(&mut self, mut buf: BufferRef<'d, 's>)
+        -> io::Result<(&'d [u8], SocketAddr)>
+    {
+        unsafe {
+            let (received, from) = self.recv_from(buf.uninitialized_mut())?;
+            buf.advance(received);
+            Ok((buf.initialized(), from))
+        }
+    }
+
+    /// Receives data from a socket into a `Buffer`.
+    ///
+    /// The received data is additionally returned as a slice.
+    pub fn recv_buffer_from<'d, B: Buffer<'d>>(&mut self, buf: B)
+        -> io::Result<(&'d [u8], SocketAddr)>
+    {
+        with_buffer(buf, |buf| self.recv_buffer_ref_from(buf))
+    }
+
     /// Sends data on the socket to the address previously bound via connect(). On success,
     /// returns the number of bytes written.
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
@@ -92,6 +115,26 @@ impl UdpSocket {
     /// the number of bytes read and the address from whence the data came.
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.recv(buf)
+    }
+
+    /// See `recv_buffer` and `recv` instead.
+    ///
+    /// Receives data from a socket into a `BufferRef`.
+    pub fn recv_buffer_ref<'d, 's>(&mut self, mut buf: BufferRef<'d, 's>)
+        -> io::Result<&'d [u8]>
+    {
+        unsafe {
+            let received = self.recv(buf.uninitialized_mut())?;
+            buf.advance(received);
+            Ok(buf.initialized())
+        }
+    }
+
+    /// Receives data from a socket into a `Buffer`.
+    ///
+    /// The received data is additionally returned as a slice.
+    pub fn recv_buffer<'d, B: Buffer<'d>>(&mut self, buf: B) -> io::Result<&'d [u8]> {
+        with_buffer(buf, |buf| self.recv_buffer_ref(buf))
     }
 
     /// Connects the UDP socket setting the default destination for `send()`
