@@ -1,4 +1,6 @@
 #![allow(deprecated)]
+// TODO: remove
+#![feature(asm)]
 
 extern crate mio;
 extern crate bytes;
@@ -53,6 +55,8 @@ mod test_broken_pipe;
 
 use bytes::{Buf, MutBuf};
 use std::io::{self, Read, Write};
+use std::time::Duration;
+use mio::{Event, Events, Poll};
 
 pub trait TryRead {
     fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
@@ -165,3 +169,45 @@ pub fn sleep_ms(ms: u64) {
     use std::time::Duration;
     thread::sleep(Duration::from_millis(ms));
 }
+
+// TODO: remove
+#[cfg(all(target_os = "fuchsia", target_arch = "x86_64"))]
+pub fn install_panic_backtrace_hook() {
+    let old_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |arg| {
+        unsafe {
+            // constant comes from CRASHLOGGER_RESUME_MAGIC in crashlogger.h
+            asm!("mov $$0xee726573756d65ee, %rax; int3" : : : "rax" : "volatile");
+        }
+        old_hook(arg)
+    }));
+}
+
+pub fn expect_events(poll: &Poll,
+                     event_buffer: &mut Events,
+                     poll_try_count: usize,
+                     mut expected: Vec<Event>)
+{
+    const MS: u64 = 1_000;
+
+    for _ in 0..poll_try_count {
+        poll.poll(event_buffer, Some(Duration::from_millis(MS))).unwrap();
+        for event in event_buffer.iter() {
+            let pos_opt = match expected.iter().position(|exp_event| {
+                (event.token() == exp_event.token()) &&
+                event.kind().contains(exp_event.kind())
+            }) {
+                Some(x) => Some(x),
+                None => None,
+            };
+            if let Some(pos) = pos_opt { expected.remove(pos); }
+        }
+
+        if expected.len() == 0 {
+            break;
+        }
+    }
+
+    assert!(expected.len() == 0, "The following expected events were not found: {:?}", expected);
+}
+

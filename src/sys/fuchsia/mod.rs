@@ -157,7 +157,7 @@ pub struct Selector {
 impl Selector {
     pub fn new() -> io::Result<Selector> {
         let port = Arc::new(
-            magenta::Port::create(magenta::PortOpts::V2)
+            magenta::Port::create(magenta::PortOpts::Default)
                 .map_err(status_to_io_err)?
         );
 
@@ -306,8 +306,16 @@ impl Selector {
     /// Deregister event interests for the given IO handle with the OS
     pub fn deregister(&self, handle: &magenta::Handle, token: Token) -> io::Result<()> {
         self.token_to_fd.remove(&token);
+
+        // We ignore NotFound errors since oneshots are automatically deregistered,
+        // but mio will attempt to deregister them manually.
         self.port.cancel(&*handle, token.0 as u64)
             .map_err(status_to_io_err)
+            .or_else(|e| if e.kind() == io::ErrorKind::NotFound {
+                Ok(())
+            } else {
+                Err(e)
+            })
     }
 }
 
@@ -321,7 +329,8 @@ impl TcpStream {
     pub fn connect(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
         try!(set_nonblock(stream.as_raw_fd()));
 
-        match stream.connect(addr) {
+        let connected = stream.connect(addr);
+        match connected {
             Ok(..) => {}
             Err(ref e) if e.raw_os_error() == Some(libc::EINPROGRESS) => {}
             Err(e) => return Err(e),
@@ -329,7 +338,7 @@ impl TcpStream {
 
         let evented_fd = unsafe { EventedFd::new(stream.as_raw_fd()) };
 
-        Ok(TcpStream {
+        return Ok(TcpStream {
             io: DontDrop::new(stream),
             evented_fd: evented_fd,
         })
@@ -338,10 +347,10 @@ impl TcpStream {
    pub fn from_stream(stream: net::TcpStream) -> TcpStream {
        let evented_fd = unsafe { EventedFd::new(stream.as_raw_fd()) };
 
-        TcpStream {
-            io: DontDrop::new(stream),
-            evented_fd: evented_fd,
-        }
+       TcpStream {
+           io: DontDrop::new(stream),
+           evented_fd: evented_fd,
+       }
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
@@ -533,7 +542,7 @@ impl TcpListener {
         self.io.accept().and_then(|(s, a)| {
             set_nonblock(s.as_raw_fd())?;
             let evented_fd = unsafe { EventedFd::new(s.as_raw_fd()) };
-            Ok((TcpStream {
+            return Ok((TcpStream {
                 io: DontDrop::new(s),
                 evented_fd: evented_fd,
             }, a))
@@ -991,7 +1000,7 @@ impl<T> Drop for DontDrop<T> {
 fn status_to_io_err(status: magenta::Status) -> io::Error {
     use magenta::Status;
 
-    match status {
+    let err_kind = match status {
         Status::ErrInterruptedRetry => io::ErrorKind::Interrupted,
         Status::ErrBadHandle => io::ErrorKind::BrokenPipe,
         Status::ErrTimedOut => io::ErrorKind::TimedOut,
@@ -1030,7 +1039,9 @@ fn status_to_io_err(status: magenta::Status) -> io::Error {
         Status::ErrNoMemory |
         Status::ErrCallFailed
         => io::ErrorKind::Other
-    }.into()
+    };
+
+    io::Error::new(err_kind, format!("{:?}", status))
 }
 
 
@@ -1050,7 +1061,7 @@ fn recv_from(fd: RawFd, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
     Ok((n as usize, addr))
 }
 
-fn set_nonblock(fd: RawFd) -> io::Result<()> {
+pub fn set_nonblock(fd: RawFd) -> io::Result<()> {
     cvt(unsafe { libc::fcntl(fd, libc::F_SETFL, libc::O_NONBLOCK) }).map(|_| ())
 }
 

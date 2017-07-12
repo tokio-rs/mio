@@ -1,4 +1,4 @@
-use {sleep_ms, TryRead};
+use {expect_events, sleep_ms, TryRead};
 use mio::*;
 use mio::tcp::*;
 use std::io::Write;
@@ -76,10 +76,10 @@ pub fn test_tcp_stream_level_triggered() {
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);
 
-    let _ = poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
-    let events: Vec<Event> = (0..pevents.len()).map(|i| pevents.get(i).unwrap()).collect();
-    assert!(events.len() == 2, "actual={:?}", events);
-    assert_eq!(filter(&pevents, Token(1))[0], Event::new(Ready::writable(), Token(1)));
+    expect_events(&poll, &mut pevents, 2, vec![
+        Event::new(Ready::readable(), Token(0)),
+        Event::new(Ready::writable(), Token(1)),
+    ]);
 
     // Server side of socket
     let (mut s1_tx, _) = l.accept().unwrap();
@@ -87,10 +87,9 @@ pub fn test_tcp_stream_level_triggered() {
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);
 
-    poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
-    let events = filter(&pevents, Token(1));
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0], Event::new(Ready::writable(), Token(1)));
+    expect_events(&poll, &mut pevents, 2, vec![
+        Event::new(Ready::writable(), Token(1))
+    ]);
 
     // Register the socket
     poll.register(&s1_tx, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
@@ -107,10 +106,9 @@ pub fn test_tcp_stream_level_triggered() {
     debug!("looking at rx end ----------");
 
     // Poll rx end
-    poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
-    let events = filter(&pevents, Token(1));
-    assert!(events.len() == 1, "actual={:?}", events);
-    assert_eq!(events[0], Event::new(Ready::readable() | Ready::writable(), Token(1)));
+    expect_events(&poll, &mut pevents, 2, vec![
+        Event::new(Ready::readable() | Ready::writable(), Token(1))
+    ]);
 
     debug!("reading ----------");
 
@@ -121,12 +119,10 @@ pub fn test_tcp_stream_level_triggered() {
 
     assert_eq!(res, b"hello world!");
 
-    debug!("checking read is gone ----------");
+    debug!("checking just read ----------");
 
-    poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
-    let events = filter(&pevents, Token(1));
-    assert!(events.len() == 1);
-    assert_eq!(events[0], Event::new(Ready::writable(), Token(1)));
+    expect_events(&poll, &mut pevents, 1, vec![
+        Event::new(Ready::writable(), Token(1))]);
 
     // Closing the socket clears all active level events
     drop(s1);

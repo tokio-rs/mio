@@ -1,3 +1,5 @@
+#![allow(unreachable_code, unused_variables)]
+// TODO: remove
 //! Primitives for working with TCP
 //!
 //! The types provided in this module are non-blocking by default and are
@@ -119,7 +121,8 @@ impl TcpStream {
     /// it should already be connected via some other means (be it manually, the
     /// net2 crate, or the standard library).
     pub fn from_stream(stream: net::TcpStream) -> io::Result<TcpStream> {
-        try!(stream.set_nonblocking(true));
+        // TODO: replace
+        //try!(stream.set_nonblocking(true));
         Ok(TcpStream {
             sys: sys::TcpStream::from_stream(stream),
             selector_id: SelectorId::new(),

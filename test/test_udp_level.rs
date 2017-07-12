@@ -1,9 +1,6 @@
 use mio::*;
 use mio::udp::*;
-use sleep_ms;
-use std::time::Duration;
-
-const MS: u64 = 1_000;
+use {expect_events, sleep_ms};
 
 #[test]
 pub fn test_udp_level_triggered() {
@@ -51,32 +48,4 @@ pub fn test_udp_level_triggered() {
                   vec![Event::new(Ready::readable() | Ready::writable(), Token(1))]);
 
     drop(rx);
-}
-
-fn expect_events(poll: &Poll,
-                 event_buffer: &mut Events,
-                 poll_try_count: usize,
-                 mut expected: Vec<Event>)
-{
-    for _ in 0..poll_try_count {
-        poll.poll(event_buffer, Some(Duration::from_millis(MS))).unwrap();
-        for event in event_buffer.iter() {
-            remove_item(&mut expected, &event);
-        }
-
-        if expected.len() == 0 {
-            break;
-        }
-    }
-
-    assert!(expected.len() == 0, "The following expected events were not found: {:?}", expected);
-}
-
-// Temporarily copied from std until stabilization of "vec_remove_item"
-fn remove_item<T: PartialEq>(vec: &mut Vec<T>, item: &T) -> Option<T> {
-    let pos = match vec.iter().position(|x| *x == *item) {
-        Some(x) => x,
-        None => return None,
-    };
-    Some(vec.remove(pos))
 }
