@@ -121,8 +121,16 @@ impl TcpStream {
     /// it should already be connected via some other means (be it manually, the
     /// net2 crate, or the standard library).
     pub fn from_stream(stream: net::TcpStream) -> io::Result<TcpStream> {
-        // TODO: replace
-        //try!(stream.set_nonblocking(true));
+
+        #[cfg(not(target_os = "fuchsia"))]
+        { try!(stream.set_nonblocking(true)); }
+
+        #[cfg(target_os = "fuchsia")]
+        {
+            try!(sys::set_nonblock(
+                ::std::os::unix::io::AsRawFd::as_raw_fd(&stream)));
+        }
+
         Ok(TcpStream {
             sys: sys::TcpStream::from_stream(stream),
             selector_id: SelectorId::new(),

@@ -42,6 +42,7 @@ pub use self::fuchsia::{
     TcpStream,
     TcpListener,
     UdpSocket,
+    set_nonblock,
 };
 
 #[cfg(target_os = "fuchsia")]

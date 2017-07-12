@@ -1,12 +1,9 @@
-#![allow(warnings)]
-
-use {io, poll, Event, Evented, Ready, Registration, Poll, PollOpt, Token};
+use {io, poll, Event, Evented, Ready, Poll, PollOpt, Token};
 use concurrent_hashmap::ConcHashMap;
 use iovec::IoVec;
 use iovec::unix as iovec;
 use libc;
 use magenta;
-use magenta_sys;
 use magenta::HandleBase;
 use net2::TcpStreamExt;
 use std::collections::hash_map::RandomState;
@@ -59,7 +56,7 @@ impl Evented for Awakener {
                 poll: &Poll,
                 token: Token,
                 _events: Ready,
-                opts: PollOpt) -> io::Result<()>
+                _opts: PollOpt) -> io::Result<()>
     {
         let mut inner_locked = self.inner.lock().unwrap();
         if inner_locked.is_some() {
@@ -74,7 +71,7 @@ impl Evented for Awakener {
                   poll: &Poll,
                   token: Token,
                   _events: Ready,
-                  opts: PollOpt) -> io::Result<()>
+                  _opts: PollOpt) -> io::Result<()>
     {
         let mut inner_locked = self.inner.lock().unwrap();
         *inner_locked = Some((token, Arc::downgrade(&poll::selector(poll).port)));
@@ -82,7 +79,7 @@ impl Evented for Awakener {
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()>
+    fn deregister(&self, _poll: &Poll) -> io::Result<()>
     {
         let mut inner_locked = self.inner.lock().unwrap();
         *inner_locked = None;
@@ -121,7 +118,6 @@ impl fmt::Debug for Events {
         write!(fmt, "Events {{ len: {} }}", self.len())
     }
 }
-
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -282,7 +278,7 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&self,
+    fn register(&self,
                     handle: &magenta::Handle,
                     fd: &EventedFd,
                     token: Token,
@@ -513,8 +509,7 @@ pub struct TcpListener {
 
 impl TcpListener {
     pub fn new(inner: net::TcpListener, _addr: &SocketAddr) -> io::Result<TcpListener> {
-        // TODO: replace
-        try!(cvt(unsafe { libc::fcntl(inner.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) }));
+        set_nonblock(inner.as_raw_fd())?;
 
         let evented_fd = unsafe { EventedFd::new(inner.as_raw_fd()) };
 
@@ -604,7 +599,6 @@ pub struct UdpSocket {
 
 impl UdpSocket {
     pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        // Set non-blocking (workaround since the std version doesn't work due to a temporary bug in fuchsia-- TODO replace this
         set_nonblock(socket.as_raw_fd())?;
 
         let evented_fd = unsafe { EventedFd::new(socket.as_raw_fd()) };
@@ -630,7 +624,7 @@ impl UdpSocket {
     }
 
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        recv_from(unsafe { self.io.as_raw_fd() }, buf)
+        unsafe { recv_from(self.io.as_raw_fd(), buf) }
     }
 
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
@@ -887,7 +881,6 @@ impl Evented for EventedFd {
 
 mod sys {
     #![allow(non_camel_case_types)]
-    use libc;
     use std::os::unix::io::RawFd;
     pub use magenta_sys::{mx_handle_t, mx_signals_t};
 
@@ -923,37 +916,6 @@ mod sys {
         );
     }
 }
-
-/*
-// Unix only:
-EventedFd
-    register
-    reregister
-    deregister
-pipe -> ::io::Result<(Io, Io)>
-set_nonblock(fd: libc::c_int)
-Io
-    pub fn try_clone(&self) -> io::Result<Io>
-    From FromRawFd:
-        unsafe fn from_raw_fd(fd: RawFd) -> Io
-    From IntoRawFd:
-        fn into_raw_fd(self) -> RawFd
-    From AsRawFd:
-        fn as_raw_fd(&self) -> RawFd
-    From Evented:
-        register
-        reregeister
-        deregister
-    From Read:
-        fn read(&mut self, dst: &mut [u8]) -> io:Result<usize>
-    From Write:
-        fn write(&mut self, src: &[u8]) -> io::Result<usize>
-        fn flush(&mut self) -> io::Result<()>
-
-// Windows only:
-Overlapped
-Binding
-*/
 
 /// Utility type to prevent the type inside of it from being dropped.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -1046,21 +1008,23 @@ fn status_to_io_err(status: magenta::Status) -> io::Error {
 
 
 /// Workaround until fuchsia's recv_from is fixed
-fn recv_from(fd: RawFd, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+unsafe fn recv_from(fd: RawFd, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
     let flags = 0;
 
-    let n = cvt(unsafe {
+    let n = cvt(
         libc::recv(fd,
                    buf.as_mut_ptr() as *mut libc::c_void,
                    buf.len(),
                    flags)
-    })?;
+    )?;
 
     // random address-- we don't use it
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
     Ok((n as usize, addr))
 }
 
+// Set non-blocking (workaround since the std version doesn't work in fuchsia
+// TODO: fix the std version and replace this
 pub fn set_nonblock(fd: RawFd) -> io::Result<()> {
     cvt(unsafe { libc::fcntl(fd, libc::F_SETFL, libc::O_NONBLOCK) }).map(|_| ())
 }
@@ -1114,7 +1078,7 @@ fn epoll_event_to_ready(epoll: u32) -> Ready {
 
     kind
 
-    /* TODO:: support?
+    /* TODO: support?
     // EPOLLHUP - Usually means a socket error happened
     if (epoll & libc::EPOLLERR) != 0 {
         kind = kind | UnixReady::error();
