@@ -197,6 +197,12 @@ pub mod unix {
     pub use sys::unix::UnixReady;
 }
 
+#[cfg(target_os = "fuchsia")]
+pub mod fuchsia {
+    //! Fuchsia-only extensions
+    pub use sys::EventedHandle;
+}
+
 /// Windows-only extensions to the mio crate.
 ///
 /// Mio on windows is currently implemented with IOCP for a high-performance

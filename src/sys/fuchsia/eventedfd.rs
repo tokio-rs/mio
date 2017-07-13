@@ -123,7 +123,7 @@ impl Evented for EventedFd {
         }
 
         let registered = poll::selector(poll)
-            .register(handle.inner_ref(), self, token, signals, opts);
+            .register_fd(handle.inner_ref(), self, token, signals, opts);
 
         if registered.is_err() {
             let mut registration_lock = self.inner.registration.lock().unwrap();
@@ -149,7 +149,7 @@ impl Evented for EventedFd {
             .expect("Tried to deregister on unregistered handle.");
 
         poll::selector(poll)
-            .deregister(old_registration.handle.inner_ref(), old_registration.token)
+            .deregister_fd(old_registration.handle.inner_ref(), old_registration.token)
     }
 }
 

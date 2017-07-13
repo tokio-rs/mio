@@ -1,4 +1,4 @@
-use {io, Event, PollOpt, Token};
+use {io, Event, PollOpt, Ready, Token};
 use sys::fuchsia::{
     epoll_event_to_ready,
     poll_opts_to_wait_async,
@@ -8,6 +8,7 @@ use sys::fuchsia::{
 };
 use concurrent_hashmap::ConcHashMap;
 use magenta;
+use magenta_sys;
 use magenta::HandleBase;
 use std::collections::hash_map::RandomState;
 use std::fmt;
@@ -16,6 +17,40 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use sys;
+
+/// The kind of registration-- file descriptor or handle.
+///
+/// The last bit of a token is set to indicate the type of the registration.
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum RegType {
+    Fd,
+    Handle,
+}
+
+fn key_from_token_and_type(token: Token, reg_type: RegType) -> u64 {
+    let key = token.0 as u64;
+    let msb = 1u64 << 63;
+    if (key & msb) != 0 {
+        panic!("Most-significant bit of token must remain unset.");
+    }
+
+    match reg_type {
+        RegType::Fd => key,
+        RegType::Handle => key | msb,
+    }
+}
+
+fn token_and_type_from_key(key: u64) -> (Token, RegType) {
+    let msb = 1u64 << 63;
+    (
+        Token((key & !msb) as usize),
+        if (key & msb) == 0 {
+            RegType::Fd
+        } else {
+            RegType::Handle
+        }
+    )
+}
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -109,7 +144,7 @@ impl Selector {
                     (duration.subsec_nanos() as u64);
 
                 magenta::deadline_after(nanos)
-            },
+            }
             None => magenta::MX_TIME_INFINITE,
         };
 
@@ -122,69 +157,77 @@ impl Selector {
         let observed_signals = match packet.contents() {
             magenta::PacketContents::SignalOne(signal_packet) => {
                 signal_packet.observed()
-            },
+            }
             magenta::PacketContents::SignalRep(signal_packet) => {
                 signal_packet.observed()
-            },
+            }
             magenta::PacketContents::User(_user_packet) => {
                 // User packets are only ever sent by an Awakener
                 return Ok(true);
-            },
+            }
         };
 
         let key = packet.key();
-        let token = Token(key as usize);
+        let (token, reg_type) = token_and_type_from_key(key);
 
-        // Convert the signals to epoll events using __mxio_wait_end, and add to reregistration list
-        // if necessary.
-        let events: u32;
-        {
-            let handle = if let Some(handle) =
-            self.token_to_fd
-                .find(&Token(key as usize))
-                .and_then(|h| h.get().upgrade()) {
-                handle
-            } else {
-                // This handle is apparently in the process of removal-- it has been removed from
-                // the list, but port_cancel has not yet been called
-                return Ok(false);
-            };
+        match reg_type {
+            RegType::Handle => {
+                // We can return immediately-- no lookup or registration necessary.
+                evts.event_opt = Some(Event::new(signals_to_ready(observed_signals), token));
+                Ok(false)
+            },
+            RegType::Fd => {
+                // Convert the signals to epoll events using __mxio_wait_end,
+                // and add to reregistration list if necessary.
+                let events: u32;
+                {
+                    let handle = if let Some(handle) =
+                    self.token_to_fd
+                        .find(&Token(key as usize))
+                        .and_then(|h| h.get().upgrade()) {
+                        handle
+                    } else {
+                        // This handle is apparently in the process of removal.
+                        // It has been removed from the list, but port_cancel has not been called.
+                        return Ok(false);
+                    };
 
-            events = unsafe {
-                let mut events: u32 = mem::uninitialized();
-                sys::fuchsia::sys::__mxio_wait_end(handle.mxio, observed_signals, &mut events);
-                events
-            };
+                    events = unsafe {
+                        let mut events: u32 = mem::uninitialized();
+                        sys::fuchsia::sys::__mxio_wait_end(handle.mxio, observed_signals, &mut events);
+                        events
+                    };
 
-            // If necessary, queue to be reregistered before next port_await
-            let needs_to_rereg = {
-                let registration_lock = handle.registration.lock().unwrap();
+                    // If necessary, queue to be reregistered before next port_await
+                    let needs_to_rereg = {
+                        let registration_lock = handle.registration.lock().unwrap();
 
-                registration_lock
-                    .as_ref()
-                    .map(|r| &r.rereg_signals)
-                    .is_some()
-            };
+                        registration_lock
+                            .as_ref()
+                            .map(|r| &r.rereg_signals)
+                            .is_some()
+                    };
 
-            if needs_to_rereg {
-                let mut tokens_to_rereg_lock = self.tokens_to_rereg.lock().unwrap();
-                tokens_to_rereg_lock.push(token);
-                self.has_tokens_to_rereg.store(true, Ordering::Relaxed);
-            }
+                    if needs_to_rereg {
+                        let mut tokens_to_rereg_lock = self.tokens_to_rereg.lock().unwrap();
+                        tokens_to_rereg_lock.push(token);
+                        self.has_tokens_to_rereg.store(true, Ordering::Relaxed);
+                    }
+                }
+
+                evts.event_opt = Some(Event::new(epoll_event_to_ready(events), token));
+                Ok(false)
+            },
         }
-
-        evts.event_opt = Some(Event::new(epoll_event_to_ready(events), token));
-
-        Ok(false)
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub(in sys::fuchsia) fn register(&self,
-                                     handle: &magenta::Handle,
-                                     fd: &EventedFd,
-                                     token: Token,
-                                     signals: magenta::Signals,
-                                     poll_opts: PollOpt)-> io::Result<()>
+    pub ( in sys::fuchsia) fn register_fd(&self,
+                                          handle: &magenta::Handle,
+                                          fd: &EventedFd,
+                                          token: Token,
+                                          signals: magenta::Signals,
+                                          poll_opts: PollOpt) -> io::Result<()>
     {
         self.token_to_fd.insert(token, Arc::downgrade(&fd.inner));
 
@@ -201,9 +244,9 @@ impl Selector {
     }
 
     /// Deregister event interests for the given IO handle with the OS
-    pub(in sys::fuchsia) fn deregister(&self,
-                                       handle: &magenta::Handle,
-                                       token: Token) -> io::Result<()> {
+    pub ( in sys::fuchsia) fn deregister_fd(&self,
+                                            handle: &magenta::Handle,
+                                            token: Token) -> io::Result<()> {
         self.token_to_fd.remove(&token);
 
         // We ignore NotFound errors since oneshots are automatically deregistered,
@@ -216,6 +259,67 @@ impl Selector {
                 Err(e)
             })
     }
+
+    pub ( in sys::fuchsia) fn register_handle<H>(&self,
+                                                 handle: &H,
+                                                 token: Token,
+                                                 interests: Ready,
+                                                 poll_opts: PollOpt) -> io::Result<()>
+        where H: magenta::HandleBase
+    {
+        if poll_opts.is_level() && !poll_opts.is_oneshot() {
+            panic!("Repeated level-triggered events are not supported on Fuchsia handles.");
+        }
+
+        handle.wait_async(&self.port,
+                          key_from_token_and_type(token, RegType::Handle),
+                          ready_to_signals(interests),
+                          poll_opts_to_wait_async(poll_opts))
+              .map_err(status_to_io_err)
+    }
+
+
+    pub ( in sys::fuchsia) fn deregister_handle<H>(&self,
+                                                   handle: &H,
+                                                   token: Token) -> io::Result<()>
+        where H: magenta::HandleBase
+    {
+        self.port.cancel(handle,
+                         key_from_token_and_type(token, RegType::Handle))
+                 .map_err(status_to_io_err)
+    }
+}
+
+fn ready_to_signals(ready: Ready) -> magenta::Signals {
+    // Get empty notifications for peer closing or other miscellaneous signals:
+    magenta_sys::MX_OBJECT_PEER_CLOSED |
+    magenta::MX_EVENT_SIGNALED |
+
+    if ready.is_writable() {
+        magenta_sys::MX_OBJECT_WRITABLE
+    } else {
+        magenta::MX_SIGNAL_NONE
+    } |
+
+    if ready.is_readable() {
+        magenta_sys::MX_OBJECT_READABLE
+    } else {
+        magenta::MX_SIGNAL_NONE
+    }
+}
+
+fn signals_to_ready(signals: magenta::Signals) -> Ready {
+    (if signals.contains(magenta_sys::MX_OBJECT_WRITABLE) {
+        Ready::writable()
+    } else {
+        Ready::empty()
+    }) |
+
+    (if signals.contains(magenta_sys::MX_OBJECT_READABLE) {
+        Ready::readable()
+    } else {
+        Ready::empty()
+    })
 }
 
 pub struct Events {
@@ -240,9 +344,10 @@ impl Events {
     }
     pub fn push_event(&mut self, event: Event) {
         assert!(::std::mem::replace(&mut self.event_opt, Some(event)).is_none(),
-            "Only one event at a time can be pushed to Fuchsia `Events`.");
+        "Only one event at a time can be pushed to Fuchsia `Events`.");
     }
 }
+
 impl fmt::Debug for Events {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Events {{ len: {} }}", self.len())

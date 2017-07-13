@@ -12,6 +12,9 @@ extern crate env_logger;
 extern crate slab;
 extern crate tempdir;
 
+#[cfg(target_os = "fuchsia")]
+extern crate magenta;
+
 pub use ports::localhost;
 
 mod test_custom_evented;
@@ -52,6 +55,9 @@ mod test_uds_shutdown;
 mod test_subprocess_pipe;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod test_broken_pipe;
+
+#[cfg(any(target_os = "fuchsia"))]
+mod test_fuchsia_handles;
 
 use bytes::{Buf, MutBuf};
 use std::io::{self, Read, Write};
@@ -168,19 +174,6 @@ pub fn sleep_ms(ms: u64) {
     use std::thread;
     use std::time::Duration;
     thread::sleep(Duration::from_millis(ms));
-}
-
-// TODO: remove
-#[cfg(all(target_os = "fuchsia", target_arch = "x86_64"))]
-pub fn install_panic_backtrace_hook() {
-    let old_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |arg| {
-        unsafe {
-            // constant comes from CRASHLOGGER_RESUME_MAGIC in crashlogger.h
-            asm!("mov $$0xee726573756d65ee, %rax; int3" : : : "rax" : "volatile");
-        }
-        old_hook(arg)
-    }));
 }
 
 pub fn expect_events(poll: &Poll,

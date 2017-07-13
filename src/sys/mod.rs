@@ -38,6 +38,7 @@ mod windows;
 pub use self::fuchsia::{
     Awakener,
     Events,
+    EventedHandle,
     Selector,
     TcpStream,
     TcpListener,

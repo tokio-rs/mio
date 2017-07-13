@@ -7,6 +7,7 @@ use std::ops::{Deref, DerefMut};
 use std::os::unix::io::RawFd;
 
 mod awakener;
+mod handles;
 mod eventedfd;
 mod net;
 mod selector;
@@ -14,6 +15,7 @@ mod selector;
 use self::eventedfd::{EventedFd, EventedFdInner};
 
 pub use self::awakener::Awakener;
+pub use self::handles::EventedHandle;
 pub use self::net::{TcpListener, TcpStream, UdpSocket};
 pub use self::selector::{Events, Selector};
 
@@ -84,7 +86,7 @@ mod sys {
 fn status_to_io_err(status: magenta::Status) -> io::Error {
     use magenta::Status;
 
-    let err_kind = match status {
+    let err_kind: io::ErrorKind = match status {
         Status::ErrInterruptedRetry => io::ErrorKind::Interrupted,
         Status::ErrBadHandle => io::ErrorKind::BrokenPipe,
         Status::ErrTimedOut => io::ErrorKind::TimedOut,
@@ -123,9 +125,9 @@ fn status_to_io_err(status: magenta::Status) -> io::Error {
         Status::ErrNoMemory |
         Status::ErrCallFailed
         => io::ErrorKind::Other
-    };
+    }.into();
 
-    io::Error::new(err_kind, format!("{:?}", status))
+    err_kind.into()
 }
 
 fn epoll_event_to_ready(epoll: u32) -> Ready {
