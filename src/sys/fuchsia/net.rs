@@ -3,6 +3,8 @@ use iovec::IoVec;
 use iovec::unix as iovec;
 use libc;
 use net2::TcpStreamExt;
+#[allow(unused_imports)] // only here for Rust 1.8
+use net2::UdpSocketExt;
 use sys::fuchsia::{recv_from, set_nonblock, EventedFd, DontDrop};
 use std::cmp;
 use std::io::{Read, Write};
@@ -398,6 +400,15 @@ impl UdpSocket {
                               interface: u32) -> io::Result<()> {
         self.io.leave_multicast_v6(multiaddr, interface)
     }
+
+    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
+        self.io.set_only_v6(only_v6)
+    }
+
+    pub fn only_v6(&self) -> io::Result<bool> {
+        self.io.only_v6()
+    }
+
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.io.take_error()
