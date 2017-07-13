@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 /// Properties of an `EventedFd`'s current registration
 #[derive(Debug)]
-pub(in sys::fuchsia) struct EventedFdRegistration {
+pub struct EventedFdRegistration {
     pub token: Token,
     pub handle: DontDrop<magenta::Handle>,
     pub rereg_signals: Option<(magenta::Signals, magenta::WaitAsyncOpts)>,
@@ -17,11 +17,14 @@ pub(in sys::fuchsia) struct EventedFdRegistration {
 
 /// An event-ed file descriptor. The file descriptor is owned by this structure.
 #[derive(Debug)]
-pub(in sys::fuchsia) struct EventedFdInner {
+pub struct EventedFdInner {
     /// Properties of the current registration.
     pub registration: Mutex<Option<EventedFdRegistration>>,
 
     /// Owned file descriptor.
+    ///
+    /// Note that, while this is public, it should not be exported from the crate, as
+    /// `fd` is closed on `Drop`, so modifying `fd` is a memory-unsafe operation.
     pub fd: RawFd,
 
     /// Owned `mxio_t` ponter.
@@ -65,7 +68,7 @@ unsafe impl Sync for EventedFdInner {}
 unsafe impl Send for EventedFdInner {}
 
 #[derive(Clone, Debug)]
-pub(in sys::fuchsia) struct EventedFd {
+pub struct EventedFd {
     pub inner: Arc<EventedFdInner>
 }
 
