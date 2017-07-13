@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 #[derive(Debug)]
 pub struct EventedFdRegistration {
     pub token: Token,
-    pub handle: DontDrop<magenta::Handle>,
+    pub (in sys::fuchsia) handle: DontDrop<magenta::Handle>,
     pub rereg_signals: Option<(magenta::Signals, magenta::WaitAsyncOpts)>,
 }
 

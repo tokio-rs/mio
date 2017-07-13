@@ -26,17 +26,19 @@ enum RegType {
     Handle,
 }
 
-fn key_from_token_and_type(token: Token, reg_type: RegType) -> u64 {
+fn key_from_token_and_type(token: Token, reg_type: RegType) -> io::Result<u64> {
     let key = token.0 as u64;
     let msb = 1u64 << 63;
     if (key & msb) != 0 {
-        panic!("Most-significant bit of token must remain unset.");
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Most-significant bit of token must remain unset."));
     }
 
-    match reg_type {
+    Ok(match reg_type {
         RegType::Fd => key,
         RegType::Handle => key | msb,
-    }
+    })
 }
 
 fn token_and_type_from_key(key: u64) -> (Token, RegType) {
@@ -284,7 +286,7 @@ impl Selector {
         }
 
         handle.wait_async(&self.port,
-                          key_from_token_and_type(token, RegType::Handle),
+                          key_from_token_and_type(token, RegType::Handle)?,
                           ready_to_signals(interests),
                           poll_opts_to_wait_async(poll_opts))
               .map_err(status_to_io_err)
@@ -297,7 +299,7 @@ impl Selector {
         where H: magenta::HandleBase
     {
         self.port.cancel(handle,
-                         key_from_token_and_type(token, RegType::Handle))
+                         key_from_token_and_type(token, RegType::Handle)?)
                  .map_err(status_to_io_err)
     }
 }
