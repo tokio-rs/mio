@@ -279,7 +279,8 @@ impl Selector {
         where H: magenta::HandleBase
     {
         if poll_opts.is_level() && !poll_opts.is_oneshot() {
-            panic!("Repeated level-triggered events are not supported on Fuchsia handles.");
+            return Err(io::Error::new(io::ErrorKind::InvalidInput,
+                      "Repeated level-triggered events are not supported on Fuchsia handles."));
         }
 
         handle.wait_async(&self.port,
