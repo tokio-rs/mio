@@ -9,7 +9,7 @@ use sys::fuchsia::{
 use magenta;
 use magenta_sys;
 use magenta::HandleBase;
-use std::collections::HashMap;
+use std::collections::hash_map;
 use std::fmt;
 use std::mem;
 use std::sync::atomic::{AtomicBool, AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
@@ -82,7 +82,7 @@ pub struct Selector {
 
     /// Map from tokens to weak references to `EventedFdInner`-- a structure describing a
     /// file handle, its associated `mxio` object, and its current registration.
-    token_to_fd: Mutex<HashMap<Token, Weak<EventedFdInner>>>,
+    token_to_fd: Mutex<hash_map::HashMap<Token, Weak<EventedFdInner>>>,
 }
 
 impl Selector {
@@ -97,7 +97,7 @@ impl Selector {
 
         let has_tokens_to_rereg = AtomicBool::new(false);
         let tokens_to_rereg = Mutex::new(Vec::new());
-        let token_to_fd = Mutex::new(HashMap::new());
+        let token_to_fd = Mutex::new(hash_map::HashMap::new());
 
         Ok(Selector {
             id,
@@ -232,7 +232,15 @@ impl Selector {
                                           signals: magenta::Signals,
                                           poll_opts: PollOpt) -> io::Result<()>
     {
-        self.token_to_fd.lock().unwrap().insert(token, Arc::downgrade(&fd.inner));
+        {
+            let mut token_to_fd = self.token_to_fd.lock().unwrap();
+            match token_to_fd.entry(token) {
+                hash_map::Entry::Occupied(_) =>
+                    return Err(io::Error::new(io::ErrorKind::AlreadyExists,
+                               "Attempted to register a filedescriptor on an existing token.")),
+                hash_map::Entry::Vacant(slot) => slot.insert(Arc::downgrade(&fd.inner)),
+            };
+        }
 
         let wait_async_opts = poll_opts_to_wait_async(poll_opts);
 
