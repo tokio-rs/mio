@@ -1,6 +1,4 @@
 #![allow(deprecated)]
-// TODO: remove
-#![feature(asm)]
 
 extern crate mio;
 extern crate bytes;
