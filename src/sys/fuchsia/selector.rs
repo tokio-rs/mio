@@ -145,8 +145,8 @@ impl Selector {
 
         let deadline = match timeout {
             Some(duration) => {
-                let nanos = (duration.as_secs() * 1_000_000_000) +
-                    (duration.subsec_nanos() as u64);
+                let nanos = duration.as_secs().saturating_mul(1_000_000_000)
+                                .saturating_add(duration.subsec_nanos() as u64);
 
                 magenta::deadline_after(nanos)
             }
