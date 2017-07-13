@@ -107,7 +107,7 @@ pub fn test_tcp_stream_level_triggered() {
 
     // Poll rx end
     expect_events(&poll, &mut pevents, 2, vec![
-        Event::new(Ready::readable() | Ready::writable(), Token(1))
+        Event::new(Ready::readable(), Token(1))
     ]);
 
     debug!("reading ----------");

@@ -6,11 +6,10 @@ use sys::fuchsia::{
     EventedFd,
     EventedFdInner,
 };
-use concurrent_hashmap::ConcHashMap;
 use magenta;
 use magenta_sys;
 use magenta::HandleBase;
-use std::collections::hash_map::RandomState;
+use std::collections::HashMap;
 use std::fmt;
 use std::mem;
 use std::sync::atomic::{AtomicBool, AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
@@ -76,11 +75,14 @@ pub struct Selector {
     /// When a level-triggered `Async::repeating` event is seen, its token is added to this list so
     /// that it will be reregistered before the next `port::wait` call, making `port::wait` return
     /// immediately if the signal was high during the reregistration.
+    ///
+    /// Note: when used at the same time, the `tokens_to_rereg` lock should be taken out _before_
+    /// `token_to_fd`.
     tokens_to_rereg: Mutex<Vec<Token>>,
 
     /// Map from tokens to weak references to `EventedFdInner`-- a structure describing a
     /// file handle, its associated `mxio` object, and its current registration.
-    token_to_fd: ConcHashMap<Token, Weak<EventedFdInner>>,
+    token_to_fd: Mutex<HashMap<Token, Weak<EventedFdInner>>>,
 }
 
 impl Selector {
@@ -95,7 +97,7 @@ impl Selector {
 
         let has_tokens_to_rereg = AtomicBool::new(false);
         let tokens_to_rereg = Mutex::new(Vec::new());
-        let token_to_fd = ConcHashMap::<_, _, RandomState>::new();
+        let token_to_fd = Mutex::new(HashMap::new());
 
         Ok(Selector {
             id,
@@ -118,9 +120,10 @@ impl Selector {
     fn reregister_handles(&self) -> io::Result<()> {
         if self.has_tokens_to_rereg.load(Ordering::Relaxed) {
             let mut tokens = self.tokens_to_rereg.lock().unwrap();
+            let token_to_fd = self.token_to_fd.lock().unwrap();
             for token in tokens.drain(0..) {
-                if let Some(eventedfd) = self.token_to_fd.find(&token)
-                    .and_then(|h| h.get().upgrade()) {
+                if let Some(eventedfd) = token_to_fd.get(&token)
+                    .and_then(|h| h.upgrade()) {
                     eventedfd.rereg_for_level(&self.port);
                 }
             }
@@ -182,9 +185,9 @@ impl Selector {
                 let events: u32;
                 {
                     let handle = if let Some(handle) =
-                    self.token_to_fd
-                        .find(&Token(key as usize))
-                        .and_then(|h| h.get().upgrade()) {
+                    self.token_to_fd.lock().unwrap()
+                        .get(&token)
+                        .and_then(|h| h.upgrade()) {
                         handle
                     } else {
                         // This handle is apparently in the process of removal.
@@ -229,7 +232,7 @@ impl Selector {
                                           signals: magenta::Signals,
                                           poll_opts: PollOpt) -> io::Result<()>
     {
-        self.token_to_fd.insert(token, Arc::downgrade(&fd.inner));
+        self.token_to_fd.lock().unwrap().insert(token, Arc::downgrade(&fd.inner));
 
         let wait_async_opts = poll_opts_to_wait_async(poll_opts);
 
@@ -237,7 +240,7 @@ impl Selector {
             .map_err(status_to_io_err);
 
         if wait_res.is_err() {
-            self.token_to_fd.remove(&token);
+            self.token_to_fd.lock().unwrap().remove(&token);
         }
 
         wait_res
@@ -247,7 +250,7 @@ impl Selector {
     pub ( in sys::fuchsia) fn deregister_fd(&self,
                                             handle: &magenta::Handle,
                                             token: Token) -> io::Result<()> {
-        self.token_to_fd.remove(&token);
+        self.token_to_fd.lock().unwrap().remove(&token);
 
         // We ignore NotFound errors since oneshots are automatically deregistered,
         // but mio will attempt to deregister them manually.

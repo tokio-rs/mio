@@ -86,8 +86,6 @@ extern crate slab;
 extern crate iovec;
 
 #[cfg(target_os = "fuchsia")]
-extern crate concurrent_hashmap;
-#[cfg(target_os = "fuchsia")]
 extern crate magenta;
 #[cfg(target_os = "fuchsia")]
 extern crate magenta_sys;
