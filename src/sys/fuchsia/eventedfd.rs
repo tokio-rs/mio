@@ -18,19 +18,13 @@ pub struct EventedFdRegistration {
 impl EventedFdRegistration {
     unsafe fn new(token: Token,
                   raw_handle: sys::mx_handle_t,
-                  opts: PollOpt,
-                  signals: magenta::Signals) -> Self
+                  rereg_signals: Option<(magenta::Signals, magenta::WaitAsyncOpts)>,
+                  ) -> Self
     {
-        let needs_rereg = opts.is_level() && !opts.is_oneshot();
-
         EventedFdRegistration {
             token: token,
             handle: DontDrop::new(magenta::Handle::from_raw(raw_handle)),
-            rereg_signals: if needs_rereg {
-                Some((signals, poll_opts_to_wait_async(opts)))
-            } else {
-                None
-            },
+            rereg_signals: rereg_signals
         }
     }
 
@@ -147,8 +141,19 @@ impl EventedFd {
 
         let (raw_handle, signals) = self.handle_and_signals_for_events(interest, opts);
 
+        let needs_rereg = opts.is_level() && !opts.is_oneshot();
+
+        // If we need to reregister, then each registration should be `oneshot`
+        let opts = opts | if needs_rereg { PollOpt::oneshot() } else { PollOpt::empty() };
+
+        let rereg_signals = if needs_rereg {
+            Some((signals, poll_opts_to_wait_async(opts)))
+        } else {
+            None
+        };
+
         *registration = Some(
-            unsafe { EventedFdRegistration::new(token, raw_handle, opts, signals) }
+            unsafe { EventedFdRegistration::new(token, raw_handle, rereg_signals) }
         );
 
         // We don't have ownership of the handle, so we can't drop it
