@@ -139,7 +139,7 @@ impl Selector {
                   _awakener: Token,
                   timeout: Option<Duration>) -> io::Result<bool>
     {
-        evts.event_opt = None;
+        evts.events.drain(0..);
 
         self.reregister_handles()?;
 
@@ -178,7 +178,7 @@ impl Selector {
         match reg_type {
             RegType::Handle => {
                 // We can return immediately-- no lookup or registration necessary.
-                evts.event_opt = Some(Event::new(signals_to_ready(observed_signals), token));
+                evts.events.push(Event::new(signals_to_ready(observed_signals), token));
                 Ok(false)
             },
             RegType::Fd => {
@@ -220,7 +220,7 @@ impl Selector {
                     }
                 }
 
-                evts.event_opt = Some(Event::new(epoll_event_to_ready(events), token));
+                evts.events.push(Event::new(epoll_event_to_ready(events), token));
                 Ok(false)
             },
         }
@@ -337,28 +337,29 @@ fn signals_to_ready(signals: magenta::Signals) -> Ready {
 }
 
 pub struct Events {
-    /// The Fuchsia selector only handles one event at a time, so there's no reason to
-    /// provide storage for multiple events.
-    event_opt: Option<Event>
+    events: Vec<Event>
 }
 
 impl Events {
-    pub fn with_capacity(_u: usize) -> Events { Events { event_opt: None } }
+    pub fn with_capacity(_u: usize) -> Events {
+        // The Fuchsia selector only handles one event at a time,
+        // so we ignore the default capacity and set it to one.
+        Events { events: Vec::with_capacity(1) }
+    }
     pub fn len(&self) -> usize {
-        if self.event_opt.is_some() { 1 } else { 0 }
+        self.events.len()
     }
     pub fn capacity(&self) -> usize {
-        1
+        self.events.capacity()
     }
     pub fn is_empty(&self) -> bool {
-        self.event_opt.is_none()
+        self.events.is_empty()
     }
     pub fn get(&self, idx: usize) -> Option<Event> {
-        if idx == 0 { self.event_opt } else { None }
+        self.events.get(idx).map(|e| *e)
     }
     pub fn push_event(&mut self, event: Event) {
-        assert!(::std::mem::replace(&mut self.event_opt, Some(event)).is_none(),
-        "Only one event at a time can be pushed to Fuchsia `Events`.");
+        self.events.push(event)
     }
 }
 
