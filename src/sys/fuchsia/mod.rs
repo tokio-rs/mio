@@ -19,7 +19,7 @@ pub use self::handles::EventedHandle;
 pub use self::net::{TcpListener, TcpStream, UdpSocket};
 pub use self::selector::{Events, Selector};
 
-// Set non-blocking (workaround since the std version doesn't work in fuchsia
+// Set non-blocking (workaround since the std version doesn't work in fuchsia)
 // TODO: fix the std version and replace this
 pub fn set_nonblock(fd: RawFd) -> io::Result<()> {
     cvt(unsafe { libc::fcntl(fd, libc::F_SETFL, libc::O_NONBLOCK) }).map(|_| ())

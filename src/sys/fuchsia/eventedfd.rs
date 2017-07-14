@@ -15,6 +15,26 @@ pub struct EventedFdRegistration {
     pub rereg_signals: Option<(magenta::Signals, magenta::WaitAsyncOpts)>,
 }
 
+impl EventedFdRegistration {
+    unsafe fn new(token: Token,
+                  raw_handle: sys::mx_handle_t,
+                  opts: PollOpt,
+                  signals: magenta::Signals) -> Self
+    {
+        let needs_rereg = opts.is_level() && !opts.is_oneshot();
+
+        EventedFdRegistration {
+            token: token,
+            handle: DontDrop::new(magenta::Handle::from_raw(raw_handle)),
+            rereg_signals: if needs_rereg {
+                Some((signals, poll_opts_to_wait_async(opts)))
+            } else {
+                None
+            },
+        }
+    }
+}
+
 /// An event-ed file descriptor. The file descriptor is owned by this structure.
 #[derive(Debug)]
 pub struct EventedFdInner {
@@ -85,6 +105,70 @@ impl EventedFd {
             })
         }
     }
+
+    fn handle_and_signals_for_events(&self, interest: Ready, opts: PollOpt)
+                -> (sys::mx_handle_t, magenta::Signals)
+    {
+        let epoll_events = ioevent_to_epoll(interest, opts);
+
+        unsafe {
+            let mut raw_handle: sys::mx_handle_t = mem::uninitialized();
+            let mut signals: sys::mx_signals_t = mem::uninitialized();
+            sys::__mxio_wait_begin(self.inner.mxio, epoll_events, &mut raw_handle, &mut signals);
+
+            (raw_handle, signals)
+        }
+    }
+
+    fn register_with_lock(
+        &self,
+        registration: &mut Option<EventedFdRegistration>,
+        poll: &Poll,
+        token: Token,
+        interest: Ready,
+        opts: PollOpt) -> io::Result<()>
+    {
+        if registration.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "Called register on an already registered file descriptor."));
+        }
+
+        let (raw_handle, signals) = self.handle_and_signals_for_events(interest, opts);
+
+        *registration = Some(
+            unsafe { EventedFdRegistration::new(token, raw_handle, opts, signals) }
+        );
+
+        // We don't have ownership of the handle, so we can't drop it
+        let handle = DontDrop::new(unsafe { magenta::Handle::from_raw(raw_handle) });
+
+        let registered = poll::selector(poll)
+            .register_fd(handle.inner_ref(), self, token, signals, opts);
+
+        if registered.is_err() {
+            *registration = None;
+        }
+
+        registered
+    }
+
+    fn deregister_with_lock(
+        &self,
+        registration: &mut Option<EventedFdRegistration>,
+        poll: &Poll) -> io::Result<()>
+    {
+        let old_registration = if let Some(old_reg) = registration.take() {
+            old_reg
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Called rereregister on an unregistered file descriptor."))
+        };
+
+        poll::selector(poll)
+            .deregister_fd(old_registration.handle.inner_ref(), old_registration.token)
+    }
 }
 
 impl Evented for EventedFd {
@@ -94,48 +178,12 @@ impl Evented for EventedFd {
                 interest: Ready,
                 opts: PollOpt) -> io::Result<()>
     {
-        let epoll_events = ioevent_to_epoll(interest, opts);
-
-        let (handle, raw_handle, signals) = unsafe {
-            let mut raw_handle: sys::mx_handle_t = mem::uninitialized();
-            let mut signals: sys::mx_signals_t = mem::uninitialized();
-            sys::__mxio_wait_begin(self.inner.mxio, epoll_events, &mut raw_handle, &mut signals);
-
-            // We don't have ownership of the handle, so we can't drop it
-            let handle = DontDrop::new(magenta::Handle::from_raw(raw_handle));
-            (handle, raw_handle, signals)
-        };
-
-
-        let needs_rereg = opts.is_level() && !opts.is_oneshot();
-
-        {
-            let mut registration_lock = self.inner.registration.lock().unwrap();
-            if registration_lock.is_some() {
-                return Err(io::Error::new(
-                    io::ErrorKind::AlreadyExists,
-                    "Called register on an already registered file descriptor."));
-            }
-            *registration_lock = Some(EventedFdRegistration {
-                token: token,
-                handle: DontDrop::new(unsafe { magenta::Handle::from_raw(raw_handle) }),
-                rereg_signals: if needs_rereg {
-                    Some((signals, poll_opts_to_wait_async(opts)))
-                } else {
-                    None
-                },
-            })
-        }
-
-        let registered = poll::selector(poll)
-            .register_fd(handle.inner_ref(), self, token, signals, opts);
-
-        if registered.is_err() {
-            let mut registration_lock = self.inner.registration.lock().unwrap();
-            *registration_lock = None;
-        }
-
-        registered
+        self.register_with_lock(
+            &mut *self.inner.registration.lock().unwrap(),
+            poll,
+            token,
+            interest,
+            opts)
     }
 
     fn reregister(&self,
@@ -148,67 +196,19 @@ impl Evented for EventedFd {
         let mut registration_lock = self.inner.registration.lock().unwrap();
 
         // Deregister
-        {
-            let old_registration = if let Some(old_reg) = registration_lock.take() {
-                old_reg
-            } else {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Called rereregister on an unregistered file descriptor."))
-            };
+        self.deregister_with_lock(&mut *registration_lock, poll)?;
 
-            poll::selector(poll)
-                .deregister_fd(old_registration.handle.inner_ref(), old_registration.token)?;
-        }
-
-        // Reregister
-        let epoll_events = ioevent_to_epoll(interest, opts);
-
-        let (handle, raw_handle, signals) = unsafe {
-            let mut raw_handle: sys::mx_handle_t = mem::uninitialized();
-            let mut signals: sys::mx_signals_t = mem::uninitialized();
-            sys::__mxio_wait_begin(self.inner.mxio, epoll_events, &mut raw_handle, &mut signals);
-
-            // We don't have ownership of the handle, so we can't drop it
-            let handle = DontDrop::new(magenta::Handle::from_raw(raw_handle));
-            (handle, raw_handle, signals)
-        };
-
-
-        let needs_rereg = opts.is_level() && !opts.is_oneshot();
-
-        *registration_lock = Some(EventedFdRegistration {
-            token: token,
-            handle: DontDrop::new(unsafe { magenta::Handle::from_raw(raw_handle) }),
-            rereg_signals: if needs_rereg {
-                Some((signals, poll_opts_to_wait_async(opts)))
-            } else {
-                None
-            },
-        });
-
-        let registered = poll::selector(poll)
-            .register_fd(handle.inner_ref(), self, token, signals, opts);
-
-        if registered.is_err() {
-            *registration_lock = None;
-        }
-
-        registered
+        self.register_with_lock(
+            &mut *registration_lock,
+            poll,
+            token,
+            interest,
+            opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
         let mut registration_lock = self.inner.registration.lock().unwrap();
-        let old_registration = if let Some(old_reg) = registration_lock.take() {
-            old_reg
-        } else {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "Called deregister on an unregistered file descriptor."))
-        };
-
-        poll::selector(poll)
-            .deregister_fd(old_registration.handle.inner_ref(), old_registration.token)
+        self.deregister_with_lock(&mut *registration_lock, poll)
     }
 }
 
