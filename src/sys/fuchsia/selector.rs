@@ -120,7 +120,9 @@ impl Selector {
     /// Reregisters all registrations pointed to by the `tokens_to_rereg` list
     /// if `has_tokens_to_rereg`.
     fn reregister_handles(&self) -> io::Result<()> {
-        if self.has_tokens_to_rereg.load(Ordering::Relaxed) {
+        // We use `Ordering::Acquire` to make sure that we see all `tokens_to_rereg`
+        // written before the store using `Ordering::Release`.
+        if self.has_tokens_to_rereg.load(Ordering::Acquire) {
             let mut tokens = self.tokens_to_rereg.lock().unwrap();
             let token_to_fd = self.token_to_fd.lock().unwrap();
             for token in tokens.drain(0..) {
@@ -129,7 +131,7 @@ impl Selector {
                     eventedfd.rereg_for_level(&self.port);
                 }
             }
-            self.has_tokens_to_rereg.store(false, Ordering::Relaxed);
+            self.has_tokens_to_rereg.store(false, Ordering::Release);
         }
         Ok(())
     }
@@ -216,7 +218,9 @@ impl Selector {
                     if needs_to_rereg {
                         let mut tokens_to_rereg_lock = self.tokens_to_rereg.lock().unwrap();
                         tokens_to_rereg_lock.push(token);
-                        self.has_tokens_to_rereg.store(true, Ordering::Relaxed);
+                        // We use `Ordering::Release` to make sure that we see all `tokens_to_rereg`
+                        // written before the store.
+                        self.has_tokens_to_rereg.store(true, Ordering::Release);
                     }
                 }
 
