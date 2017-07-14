@@ -6,10 +6,10 @@ use std::sync::Mutex;
 #[derive(Debug)]
 pub struct EventedHandle<T> where T: HandleBase {
     /// The handle to be registered.
-    pub handle: T,
+    handle: T,
 
     /// The current `Token` with which the handle is registered with mio.
-    pub token: Mutex<Option<Token>>,
+    token: Mutex<Option<Token>>,
 }
 
 impl<T> EventedHandle<T> where T: HandleBase {
@@ -20,6 +20,16 @@ impl<T> EventedHandle<T> where T: HandleBase {
             handle: handle,
             token: Mutex::new(None),
         }
+    }
+
+    /// Get a reference to the underlying `HandleBase`.
+    pub fn get_handle(&self) -> &T {
+        &self.handle
+    }
+
+    /// Pull the `HandleBase` out.
+    pub fn into_handle(self) -> T {
+        self.handle
     }
 }
 
@@ -56,7 +66,11 @@ impl<T> Evented for EventedHandle<T> where T: HandleBase {
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
         let mut this_token = self.token.lock().unwrap();
-        let token = this_token.expect("Attempted to deregister an unregistered handle.");
+        let token = if let Some(token) = *this_token { token } else {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Attempted to deregister an unregistered handle."))
+        };
         {
             poll::selector(poll).deregister_handle(&self.handle, token)?;
             *this_token = None;

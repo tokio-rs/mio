@@ -10,9 +10,9 @@ use std::sync::{Arc, Mutex};
 /// Properties of an `EventedFd`'s current registration
 #[derive(Debug)]
 pub struct EventedFdRegistration {
-    pub token: Token,
-    pub (in sys::fuchsia) handle: DontDrop<magenta::Handle>,
-    pub rereg_signals: Option<(magenta::Signals, magenta::WaitAsyncOpts)>,
+    token: Token,
+    handle: DontDrop<magenta::Handle>,
+    rereg_signals: Option<(magenta::Signals, magenta::WaitAsyncOpts)>,
 }
 
 impl EventedFdRegistration {
@@ -33,22 +33,25 @@ impl EventedFdRegistration {
             },
         }
     }
+
+    pub fn rereg_signals(&self) -> Option<(magenta::Signals, magenta::WaitAsyncOpts)> {
+        self.rereg_signals
+    }
 }
 
 /// An event-ed file descriptor. The file descriptor is owned by this structure.
 #[derive(Debug)]
 pub struct EventedFdInner {
     /// Properties of the current registration.
-    pub registration: Mutex<Option<EventedFdRegistration>>,
+    registration: Mutex<Option<EventedFdRegistration>>,
 
     /// Owned file descriptor.
     ///
-    /// Note that, while this is public, it should not be exported from the crate, as
     /// `fd` is closed on `Drop`, so modifying `fd` is a memory-unsafe operation.
-    pub fd: RawFd,
+    fd: RawFd,
 
     /// Owned `mxio_t` ponter.
-    pub mxio: *const sys::mxio_t,
+    mxio: *const sys::mxio_t,
 }
 
 impl EventedFdInner {
@@ -65,6 +68,14 @@ impl EventedFdInner {
                                     rereg_opts);
             }
         }
+    }
+
+    pub fn registration(&self) -> &Mutex<Option<EventedFdRegistration>> {
+        &self.registration
+    }
+
+    pub fn mxio(&self) -> &sys::mxio_t {
+        unsafe { &*self.mxio }
     }
 }
 

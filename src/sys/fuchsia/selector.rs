@@ -199,17 +199,17 @@ impl Selector {
 
                     events = unsafe {
                         let mut events: u32 = mem::uninitialized();
-                        sys::fuchsia::sys::__mxio_wait_end(handle.mxio, observed_signals, &mut events);
+                        sys::fuchsia::sys::__mxio_wait_end(handle.mxio(), observed_signals, &mut events);
                         events
                     };
 
                     // If necessary, queue to be reregistered before next port_await
                     let needs_to_rereg = {
-                        let registration_lock = handle.registration.lock().unwrap();
+                        let registration_lock = handle.registration().lock().unwrap();
 
                         registration_lock
                             .as_ref()
-                            .map(|r| &r.rereg_signals)
+                            .and_then(|r| r.rereg_signals())
                             .is_some()
                     };
 
