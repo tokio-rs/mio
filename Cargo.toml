@@ -29,6 +29,10 @@ slab     = "0.3.0"
 net2     = "0.2.29"
 iovec    = "0.1.0"
 
+[target.'cfg(target_os = "fuchsia")'.dependencies]
+magenta = "0.1.0"
+magenta-sys = "0.1.0"
+
 [target.'cfg(unix)'.dependencies]
 libc   = "0.2.19"
 

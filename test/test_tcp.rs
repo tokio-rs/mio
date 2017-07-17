@@ -509,7 +509,12 @@ fn connection_reset_by_peer() {
             if event.token() == Token(3) {
                 assert!(event.kind().is_readable());
 
-                server.read(&mut buf).unwrap_err();
+                match server.read(&mut buf) {
+                    Ok(0) |
+                    Err(_) => {},
+
+                    Ok(x) => panic!("expected empty buffer but read {} bytes", x),
+                }
                 return;
             }
         }
@@ -518,6 +523,7 @@ fn connection_reset_by_peer() {
 }
 
  #[test]
+ #[cfg_attr(target_os = "fuchsia", ignore)]
  fn connect_error() {
      let poll = Poll::new().unwrap();
      let mut events = Events::with_capacity(16);

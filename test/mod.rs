@@ -10,6 +10,9 @@ extern crate env_logger;
 extern crate slab;
 extern crate tempdir;
 
+#[cfg(target_os = "fuchsia")]
+extern crate magenta;
+
 pub use ports::localhost;
 
 mod test_custom_evented;
@@ -51,8 +54,13 @@ mod test_subprocess_pipe;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod test_broken_pipe;
 
+#[cfg(any(target_os = "fuchsia"))]
+mod test_fuchsia_handles;
+
 use bytes::{Buf, MutBuf};
 use std::io::{self, Read, Write};
+use std::time::Duration;
+use mio::{Event, Events, Poll};
 
 pub trait TryRead {
     fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
@@ -165,3 +173,32 @@ pub fn sleep_ms(ms: u64) {
     use std::time::Duration;
     thread::sleep(Duration::from_millis(ms));
 }
+
+pub fn expect_events(poll: &Poll,
+                     event_buffer: &mut Events,
+                     poll_try_count: usize,
+                     mut expected: Vec<Event>)
+{
+    const MS: u64 = 1_000;
+
+    for _ in 0..poll_try_count {
+        poll.poll(event_buffer, Some(Duration::from_millis(MS))).unwrap();
+        for event in event_buffer.iter() {
+            let pos_opt = match expected.iter().position(|exp_event| {
+                (event.token() == exp_event.token()) &&
+                event.kind().contains(exp_event.kind())
+            }) {
+                Some(x) => Some(x),
+                None => None,
+            };
+            if let Some(pos) = pos_opt { expected.remove(pos); }
+        }
+
+        if expected.len() == 0 {
+            break;
+        }
+    }
+
+    assert!(expected.len() == 0, "The following expected events were not found: {:?}", expected);
+}
+

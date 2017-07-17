@@ -59,6 +59,18 @@ pub struct TcpStream {
 
 use std::net::Shutdown;
 
+// TODO: remove when fuchsia's set_nonblocking is fixed in libstd
+#[cfg(target_os = "fuchsia")]
+fn set_nonblocking(stream: &net::TcpStream) -> io::Result<()> {
+    sys::set_nonblock(
+        ::std::os::unix::io::AsRawFd::as_raw_fd(stream))
+}
+#[cfg(not(target_os = "fuchsia"))]
+fn set_nonblocking(stream: &net::TcpStream) -> io::Result<()> {
+    stream.set_nonblocking(true)
+}
+
+
 impl TcpStream {
     /// Create a new TCP stream and issue a non-blocking connect to the
     /// specified address.
@@ -119,7 +131,8 @@ impl TcpStream {
     /// it should already be connected via some other means (be it manually, the
     /// net2 crate, or the standard library).
     pub fn from_stream(stream: net::TcpStream) -> io::Result<TcpStream> {
-        try!(stream.set_nonblocking(true));
+        try!(set_nonblocking(&stream));
+
         Ok(TcpStream {
             sys: sys::TcpStream::from_stream(stream),
             selector_id: SelectorId::new(),
@@ -618,24 +631,24 @@ impl Evented for TcpListener {
  *
  */
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 impl IntoRawFd for TcpStream {
     fn into_raw_fd(self) -> RawFd {
         self.sys.into_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 impl AsRawFd for TcpStream {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream {
@@ -645,21 +658,21 @@ impl FromRawFd for TcpStream {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 impl IntoRawFd for TcpListener {
     fn into_raw_fd(self) -> RawFd {
         self.sys.into_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener {

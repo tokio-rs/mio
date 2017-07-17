@@ -85,6 +85,11 @@ extern crate net2;
 extern crate slab;
 extern crate iovec;
 
+#[cfg(target_os = "fuchsia")]
+extern crate magenta;
+#[cfg(target_os = "fuchsia")]
+extern crate magenta_sys;
+
 #[cfg(unix)]
 extern crate libc;
 
@@ -181,13 +186,19 @@ pub use poll::Iter as EventsIter;
 #[doc(hidden)]
 pub use io::deprecated::would_block;
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 pub mod unix {
     //! Unix only extensions
     pub use sys::{
         EventedFd,
     };
     pub use sys::unix::UnixReady;
+}
+
+#[cfg(target_os = "fuchsia")]
+pub mod fuchsia {
+    //! Fuchsia-only extensions
+    pub use sys::EventedHandle;
 }
 
 /// Windows-only extensions to the mio crate.

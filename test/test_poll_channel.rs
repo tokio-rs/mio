@@ -1,4 +1,4 @@
-use {sleep_ms};
+use {expect_events, sleep_ms};
 use mio::*;
 use std::sync::mpsc::TryRecvError;
 use std::thread;
@@ -238,13 +238,10 @@ pub fn test_mixing_channel_with_socket() {
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);
 
-    poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
-    let e = filter(&events, Token(0));
-
-    assert_eq!(1, e.len());
-
-    let e = filter(&events, Token(1));
-    assert_eq!(1, e.len());
+    expect_events(&poll, &mut events, 2, vec![
+        Event::new(Ready::none(), Token(0)),
+        Event::new(Ready::none(), Token(1)),
+    ]);
 }
 
 #[test]
@@ -284,8 +281,4 @@ pub fn test_sending_from_other_thread_while_polling() {
             }
         }
     }
-}
-
-fn filter(events: &Events, token: Token) -> Vec<Event> {
-    events.iter().filter(|e| e.token() == token).collect()
 }
