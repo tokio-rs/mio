@@ -1353,7 +1353,6 @@ impl fmt::Debug for Events {
 
 // ===== Accessors for internal usage =====
 
-#[allow(dead_code)]
 pub fn selector(poll: &Poll) -> &sys::Selector {
     &poll.selector
 }

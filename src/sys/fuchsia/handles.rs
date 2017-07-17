@@ -23,12 +23,17 @@ impl<T> EventedHandle<T> where T: HandleBase {
     }
 
     /// Get a reference to the underlying `HandleBase`.
-    pub fn get_handle(&self) -> &T {
+    pub fn get_ref(&self) -> &T {
         &self.handle
     }
 
-    /// Pull the `HandleBase` out.
-    pub fn into_handle(self) -> T {
+    /// Get a mutable reference to the underlying `HandleBase`.
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.handle
+    }
+
+    /// Convert back into the inner `HandleBase`.
+    pub fn into_inner(self) -> T {
         self.handle
     }
 }

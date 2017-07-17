@@ -1,5 +1,3 @@
-#![allow(unreachable_code, unused_variables)]
-// TODO: remove
 //! Primitives for working with TCP
 //!
 //! The types provided in this module are non-blocking by default and are

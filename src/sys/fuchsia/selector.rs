@@ -231,12 +231,12 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub ( in sys::fuchsia) fn register_fd(&self,
-                                          handle: &magenta::Handle,
-                                          fd: &EventedFd,
-                                          token: Token,
-                                          signals: magenta::Signals,
-                                          poll_opts: PollOpt) -> io::Result<()>
+    pub fn register_fd(&self,
+                       handle: &magenta::Handle,
+                       fd: &EventedFd,
+                       token: Token,
+                       signals: magenta::Signals,
+                       poll_opts: PollOpt) -> io::Result<()>
     {
         {
             let mut token_to_fd = self.token_to_fd.lock().unwrap();
@@ -261,9 +261,7 @@ impl Selector {
     }
 
     /// Deregister event interests for the given IO handle with the OS
-    pub ( in sys::fuchsia) fn deregister_fd(&self,
-                                            handle: &magenta::Handle,
-                                            token: Token) -> io::Result<()> {
+    pub fn deregister_fd(&self, handle: &magenta::Handle, token: Token) -> io::Result<()> {
         self.token_to_fd.lock().unwrap().remove(&token);
 
         // We ignore NotFound errors since oneshots are automatically deregistered,
@@ -277,11 +275,11 @@ impl Selector {
             })
     }
 
-    pub ( in sys::fuchsia) fn register_handle<H>(&self,
-                                                 handle: &H,
-                                                 token: Token,
-                                                 interests: Ready,
-                                                 poll_opts: PollOpt) -> io::Result<()>
+    pub fn register_handle<H>(&self,
+                              handle: &H,
+                              token: Token,
+                              interests: Ready,
+                              poll_opts: PollOpt) -> io::Result<()>
         where H: magenta::HandleBase
     {
         if poll_opts.is_level() && !poll_opts.is_oneshot() {
@@ -297,13 +295,10 @@ impl Selector {
     }
 
 
-    pub ( in sys::fuchsia) fn deregister_handle<H>(&self,
-                                                   handle: &H,
-                                                   token: Token) -> io::Result<()>
+    pub fn deregister_handle<H>(&self, handle: &H, token: Token) -> io::Result<()>
         where H: magenta::HandleBase
     {
-        self.port.cancel(handle,
-                         key_from_token_and_type(token, RegType::Handle)?)
+        self.port.cancel(handle, key_from_token_and_type(token, RegType::Handle)?)
                  .map_err(status_to_io_err)
     }
 }
