@@ -12,8 +12,9 @@ use std::io::{Read, Write};
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
-use net2::TcpBuilder;
+use buffer;
 use iovec::IoVec;
+use net2::TcpBuilder;
 
 use {io, sys, Ready, Poll, PollOpt, Token};
 use event::Evented;
@@ -392,6 +393,9 @@ impl<'a> Read for &'a TcpStream {
         (&self.sys).read(buf)
     }
 }
+
+unsafe impl buffer::ReadBufferMarker for TcpStream { }
+unsafe impl<'a> buffer::ReadBufferMarker for &'a TcpStream { }
 
 impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
