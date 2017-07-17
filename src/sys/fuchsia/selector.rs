@@ -102,11 +102,11 @@ impl Selector {
         let token_to_fd = Mutex::new(hash_map::HashMap::new());
 
         Ok(Selector {
-            id,
-            port,
-            has_tokens_to_rereg,
-            tokens_to_rereg,
-            token_to_fd,
+            id: id,
+            port: port,
+            has_tokens_to_rereg: has_tokens_to_rereg,
+            tokens_to_rereg: tokens_to_rereg,
+            token_to_fd: token_to_fd,
         })
     }
 

@@ -59,6 +59,18 @@ pub struct TcpStream {
 
 use std::net::Shutdown;
 
+// TODO: remove when fuchsia's set_nonblocking is fixed in libstd
+#[cfg(target_os = "fuchsia")]
+fn set_nonblocking(stream: &net::TcpStream) -> io::Result<()> {
+    sys::set_nonblock(
+        ::std::os::unix::io::AsRawFd::as_raw_fd(stream))
+}
+#[cfg(not(target_os = "fuchsia"))]
+fn set_nonblocking(stream: &net::TcpStream) -> io::Result<()> {
+    stream.set_nonblocking(true)
+}
+
+
 impl TcpStream {
     /// Create a new TCP stream and issue a non-blocking connect to the
     /// specified address.
@@ -119,15 +131,7 @@ impl TcpStream {
     /// it should already be connected via some other means (be it manually, the
     /// net2 crate, or the standard library).
     pub fn from_stream(stream: net::TcpStream) -> io::Result<TcpStream> {
-
-        #[cfg(not(target_os = "fuchsia"))]
-        { try!(stream.set_nonblocking(true)); }
-
-        #[cfg(target_os = "fuchsia")]
-        {
-            try!(sys::set_nonblock(
-                ::std::os::unix::io::AsRawFd::as_raw_fd(&stream)));
-        }
+        try!(set_nonblocking(&stream));
 
         Ok(TcpStream {
             sys: sys::TcpStream::from_stream(stream),
