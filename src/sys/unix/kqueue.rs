@@ -1,5 +1,6 @@
 use std::{cmp, fmt, ptr};
-use std::os::raw::c_int;
+#[cfg(not(target_os = "netbsd"))]
+use std::os::raw::{c_int, c_short};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::collections::HashMap;
@@ -20,15 +21,29 @@ use sys::unix::io::set_cloexec;
 /// operation will return with an error. This matches windows behavior.
 static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
+#[cfg(not(target_os = "netbsd"))]
+type Filter = c_short;
+#[cfg(not(target_os = "netbsd"))]
+type UData = *mut ::libc::c_void;
+#[cfg(not(target_os = "netbsd"))]
+type Count = c_int;
+
+#[cfg(target_os = "netbsd")]
+type Filter = u32;
+#[cfg(target_os = "netbsd")]
+type UData = ::libc::intptr_t;
+#[cfg(target_os = "netbsd")]
+type Count = usize;
+
 macro_rules! kevent {
     ($id: expr, $filter: expr, $flags: expr, $data: expr) => {
         libc::kevent {
             ident: $id as ::libc::uintptr_t,
-            filter: $filter,
+            filter: $filter as Filter,
             flags: $flags,
             fflags: 0,
             data: 0,
-            udata: $data as *mut _,
+            udata: $data as UData,
         }
     }
 }
@@ -70,7 +85,7 @@ impl Selector {
                                             0,
                                             evts.sys_events.0.as_mut_ptr(),
             // FIXME: needs a saturating cast here.
-                                            evts.sys_events.0.capacity() as c_int,
+                                            evts.sys_events.0.capacity() as Count,
                                             timeout)));
             evts.sys_events.0.set_len(cnt as usize);
             Ok(evts.coalesce(awakener))
@@ -91,8 +106,8 @@ impl Selector {
                 kevent!(fd, libc::EVFILT_READ, flags | r, usize::from(token)),
                 kevent!(fd, libc::EVFILT_WRITE, flags | w, usize::from(token)),
             ];
-            try!(cvt(libc::kevent(self.kq, changes.as_ptr(), changes.len() as c_int,
-                                           changes.as_mut_ptr(), changes.len() as c_int,
+            try!(cvt(libc::kevent(self.kq, changes.as_ptr(), changes.len() as Count,
+                                           changes.as_mut_ptr(), changes.len() as Count,
                                            ::std::ptr::null())));
             for change in changes.iter() {
                 debug_assert_eq!(change.flags & libc::EV_ERROR, libc::EV_ERROR);
@@ -116,12 +131,12 @@ impl Selector {
                 //
                 // More info can be found at carllerche/mio#582
                 if change.data as i32 == libc::EPIPE &&
-                   change.filter == libc::EVFILT_WRITE {
+                   change.filter == libc::EVFILT_WRITE as Filter {
                     continue
                 }
 
                 // ignore ENOENT error for EV_DELETE
-                let orig_flags = if change.filter == libc::EVFILT_READ { r } else { w };
+                let orig_flags = if change.filter == libc::EVFILT_READ as Filter { r } else { w };
                 if change.data as i32 == libc::ENOENT && orig_flags & libc::EV_DELETE != 0 {
                     continue
                 }
@@ -143,12 +158,18 @@ impl Selector {
             // EV_RECEIPT is a nice way to apply changes and get back per-event results while not
             // draining the actual changes.
             let filter = libc::EV_DELETE | libc::EV_RECEIPT;
+#[cfg(not(target_os = "netbsd"))]
             let mut changes = [
                 kevent!(fd, libc::EVFILT_READ, filter, ptr::null_mut()),
                 kevent!(fd, libc::EVFILT_WRITE, filter, ptr::null_mut()),
             ];
-            try!(cvt(libc::kevent(self.kq, changes.as_ptr(), changes.len() as c_int,
-                                           changes.as_mut_ptr(), changes.len() as c_int,
+#[cfg(target_os = "netbsd")]
+            let mut changes = [
+                kevent!(fd, libc::EVFILT_READ, filter, 0),
+                kevent!(fd, libc::EVFILT_WRITE, filter, 0),
+            ];
+            try!(cvt(libc::kevent(self.kq, changes.as_ptr(), changes.len() as Count,
+                                           changes.as_mut_ptr(), changes.len() as Count,
                                            ::std::ptr::null())).map(|_| ()));
             if changes[0].data as i32 == libc::ENOENT && changes[1].data as i32 == libc::ENOENT {
                 return Err(::std::io::Error::from_raw_os_error(changes[0].data as i32));
@@ -255,9 +276,9 @@ impl Events {
                 event::kind_mut(&mut self.events[idx]).insert(*UnixReady::error());
             }
 
-            if e.filter == libc::EVFILT_READ {
+            if e.filter == libc::EVFILT_READ as Filter {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::readable());
-            } else if e.filter == libc::EVFILT_WRITE {
+            } else if e.filter == libc::EVFILT_WRITE as Filter {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
             }
 #[cfg(any(target_os = "dragonfly",
