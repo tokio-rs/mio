@@ -1,3 +1,11 @@
+# 0.6.10 (July 27, 2017)
+
+* Experimental support for Fuchsia
+* Add `only_v6` option for UDP sockets
+* Fix build on NetBSD
+* Minimum Rust version is now 1.13.0
+* Assignment operators (e.g. `|=`) are now implemented for `Ready`
+
 # 0.6.9 (June 7, 2017)
 
 * More socket options are exposed through the TCP types, brought in through the
