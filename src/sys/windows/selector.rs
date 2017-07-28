@@ -184,7 +184,7 @@ impl Binding {
 
         // Ignore errors, we'll see them on the next line.
         drop(self.selector.fill(selector.inner.clone()));
-        try!(self.check_same_selector(poll));
+        self.check_same_selector(poll)?;
 
         selector.inner.port.add_handle(usize::from(token), handle)
     }
@@ -196,7 +196,7 @@ impl Binding {
                                   poll: &Poll) -> io::Result<()> {
         let selector = poll::selector(poll);
         drop(self.selector.fill(selector.inner.clone()));
-        try!(self.check_same_selector(poll));
+        self.check_same_selector(poll)?;
         selector.inner.port.add_socket(usize::from(token), handle)
     }
 
@@ -357,7 +357,7 @@ impl ReadyBinding {
                            -> io::Result<()> {
         trace!("register {:?} {:?}", token, events);
         unsafe {
-            try!(self.binding.register_socket(socket, token, poll));
+            self.binding.register_socket(socket, token, poll)?;
         }
 
         let (r, s) = poll::new_registration(poll, token, events, opts);
@@ -377,7 +377,7 @@ impl ReadyBinding {
                              -> io::Result<()> {
         trace!("reregister {:?} {:?}", token, events);
         unsafe {
-            try!(self.binding.reregister_socket(socket, token, poll));
+            self.binding.reregister_socket(socket, token, poll)?;
         }
 
         registration.lock().unwrap()
@@ -396,7 +396,7 @@ impl ReadyBinding {
                       -> io::Result<()> {
         trace!("deregistering");
         unsafe {
-            try!(self.binding.deregister_socket(socket, poll));
+            self.binding.deregister_socket(socket, poll)?;
         }
 
         registration.lock().unwrap()

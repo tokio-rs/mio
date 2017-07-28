@@ -57,7 +57,7 @@ impl Selector {
     pub fn new() -> io::Result<Selector> {
         // offset by 1 to avoid choosing 0 as the id of a selector
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
-        let kq = unsafe { try!(cvt(libc::kqueue())) };
+        let kq = unsafe { cvt(libc::kqueue())? };
         drop(set_cloexec(kq));
 
         Ok(Selector {
@@ -80,13 +80,12 @@ impl Selector {
         let timeout = timeout.as_ref().map(|s| s as *const _).unwrap_or(ptr::null_mut());
 
         unsafe {
-            let cnt = try!(cvt(libc::kevent(self.kq,
+            let cnt = cvt(libc::kevent(self.kq,
                                             ptr::null(),
                                             0,
                                             evts.sys_events.0.as_mut_ptr(),
-            // FIXME: needs a saturating cast here.
                                             evts.sys_events.0.capacity() as Count,
-                                            timeout)));
+                                            timeout))?;
             evts.sys_events.0.set_len(cnt as usize);
             Ok(evts.coalesce(awakener))
         }
@@ -106,9 +105,14 @@ impl Selector {
                 kevent!(fd, libc::EVFILT_READ, flags | r, usize::from(token)),
                 kevent!(fd, libc::EVFILT_WRITE, flags | w, usize::from(token)),
             ];
-            try!(cvt(libc::kevent(self.kq, changes.as_ptr(), changes.len() as Count,
-                                           changes.as_mut_ptr(), changes.len() as Count,
-                                           ::std::ptr::null())));
+
+            cvt(libc::kevent(self.kq,
+                             changes.as_ptr(),
+                             changes.len() as Count,
+                             changes.as_mut_ptr(),
+                             changes.len() as Count,
+                             ::std::ptr::null()))?;
+
             for change in changes.iter() {
                 debug_assert_eq!(change.flags & libc::EV_ERROR, libc::EV_ERROR);
 
@@ -163,14 +167,20 @@ impl Selector {
                 kevent!(fd, libc::EVFILT_READ, filter, ptr::null_mut()),
                 kevent!(fd, libc::EVFILT_WRITE, filter, ptr::null_mut()),
             ];
+
 #[cfg(target_os = "netbsd")]
             let mut changes = [
                 kevent!(fd, libc::EVFILT_READ, filter, 0),
                 kevent!(fd, libc::EVFILT_WRITE, filter, 0),
             ];
-            try!(cvt(libc::kevent(self.kq, changes.as_ptr(), changes.len() as Count,
-                                           changes.as_mut_ptr(), changes.len() as Count,
-                                           ::std::ptr::null())).map(|_| ()));
+
+            cvt(libc::kevent(self.kq,
+                             changes.as_ptr(),
+                             changes.len() as Count,
+                             changes.as_mut_ptr(),
+                             changes.len() as Count,
+                             ::std::ptr::null())).map(|_| ())?;
+
             if changes[0].data as i32 == libc::ENOENT && changes[1].data as i32 == libc::ENOENT {
                 return Err(::std::io::Error::from_raw_os_error(changes[0].data as i32));
             }

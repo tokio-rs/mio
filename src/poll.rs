@@ -624,15 +624,15 @@ impl Poll {
         is_sync::<Poll>();
 
         let poll = Poll {
-            selector: try!(sys::Selector::new()),
-            readiness_queue: try!(ReadinessQueue::new()),
+            selector: sys::Selector::new()?,
+            readiness_queue: ReadinessQueue::new()?,
             lock_state: AtomicUsize::new(0),
             lock: Mutex::new(()),
             condvar: Condvar::new(),
         };
 
         // Register the notification wakeup FD with the IO poller
-        try!(poll.readiness_queue.inner.awakener.register(&poll, AWAKEN, Ready::readable(), PollOpt::edge()));
+        poll.readiness_queue.inner.awakener.register(&poll, AWAKEN, Ready::readable(), PollOpt::edge())?;
 
         Ok(poll)
     }
@@ -739,7 +739,7 @@ impl Poll {
     pub fn register<E: ?Sized>(&self, handle: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
-        try!(validate_args(token, interest));
+        validate_args(token, interest)?;
 
         /*
          * Undefined behavior:
@@ -749,7 +749,7 @@ impl Poll {
         trace!("registering with poller");
 
         // Register interests for this socket
-        try!(handle.register(self, token, interest, opts));
+        handle.register(self, token, interest, opts)?;
 
         Ok(())
     }
@@ -802,12 +802,12 @@ impl Poll {
     pub fn reregister<E: ?Sized>(&self, handle: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
-        try!(validate_args(token, interest));
+        validate_args(token, interest)?;
 
         trace!("registering with poller");
 
         // Register interests for this socket
-        try!(handle.reregister(self, token, interest, opts));
+        handle.reregister(self, token, interest, opts)?;
 
         Ok(())
     }
@@ -853,7 +853,7 @@ impl Poll {
         trace!("deregistering handle with poller");
 
         // Deregister interests for this socket
-        try!(handle.deregister(self));
+        handle.deregister(self)?;
 
         Ok(())
     }
@@ -1096,7 +1096,7 @@ impl Poll {
         // First get selector events
         let res = self.selector.select(&mut events.inner, AWAKEN, timeout);
 
-        if try!(res) {
+        if res? {
             // Some awakeners require reading from a FD.
             self.readiness_queue.inner.awakener.cleanup();
         }
@@ -1666,7 +1666,7 @@ impl RegistrationInner {
         if !state.is_queued() && next.is_queued() {
             // We toggled the queued flag, making us responsible for queuing the
             // node in the MPSC readiness queue.
-            try!(self.enqueue_with_wakeup());
+            self.enqueue_with_wakeup()?;
         }
 
         Ok(())
@@ -1824,7 +1824,7 @@ impl RegistrationInner {
 
         if !state.is_queued() && next.is_queued() {
             // We are responsible for enqueing the node.
-            try!(enqueue_with_wakeup(queue, self));
+            enqueue_with_wakeup(queue, self)?;
         }
 
         Ok(())
@@ -1902,7 +1902,7 @@ impl ReadinessQueue {
 
         Ok(ReadinessQueue {
             inner: Arc::new(ReadinessQueueInner {
-                awakener: try!(sys::Awakener::new()),
+                awakener: sys::Awakener::new()?,
                 head_readiness: AtomicPtr::new(ptr),
                 tail_readiness: UnsafeCell::new(ptr),
                 end_marker: end_marker,
@@ -2094,7 +2094,7 @@ impl ReadinessQueueInner {
     /// with relaxed ordering. Returns true if `Poll` needs to be woken up.
     fn enqueue_node_with_wakeup(&self, node: &ReadinessNode) -> io::Result<()> {
         if self.enqueue_node(node) {
-            try!(self.wakeup());
+            self.wakeup()?;
         }
 
         Ok(())

@@ -82,16 +82,16 @@ impl TcpStream {
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
     pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
-        let sock = try!(match *addr {
+        let sock = match *addr {
             SocketAddr::V4(..) => TcpBuilder::new_v4(),
             SocketAddr::V6(..) => TcpBuilder::new_v6(),
-        });
+        }?;
         // Required on Windows for a future `connect_overlapped` operation to be
         // executed successfully.
         if cfg!(windows) {
-            try!(sock.bind(&inaddr_any(addr)));
+            sock.bind(&inaddr_any(addr))?;
         }
-        TcpStream::connect_stream(try!(sock.to_tcp_stream()), addr)
+        TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
     }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
@@ -115,7 +115,7 @@ impl TcpStream {
     pub fn connect_stream(stream: net::TcpStream,
                           addr: &SocketAddr) -> io::Result<TcpStream> {
         Ok(TcpStream {
-            sys: try!(sys::TcpStream::connect(stream, addr)),
+            sys: sys::TcpStream::connect(stream, addr)?,
             selector_id: SelectorId::new(),
         })
     }
@@ -131,7 +131,7 @@ impl TcpStream {
     /// it should already be connected via some other means (be it manually, the
     /// net2 crate, or the standard library).
     pub fn from_stream(stream: net::TcpStream) -> io::Result<TcpStream> {
-        try!(set_nonblocking(&stream));
+        set_nonblocking(&stream)?;
 
         Ok(TcpStream {
             sys: sys::TcpStream::from_stream(stream),
@@ -416,7 +416,7 @@ impl<'a> Write for &'a TcpStream {
 impl Evented for TcpStream {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        try!(self.selector_id.associate_selector(poll));
+        self.selector_id.associate_selector(poll)?;
         self.sys.register(poll, token, interest, opts)
     }
 
@@ -481,23 +481,23 @@ impl TcpListener {
     /// ownership into mio.
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         // Create the socket
-        let sock = try!(match *addr {
+        let sock = match *addr {
             SocketAddr::V4(..) => TcpBuilder::new_v4(),
             SocketAddr::V6(..) => TcpBuilder::new_v6(),
-        });
+        }?;
 
         // Set SO_REUSEADDR, but only on Unix (mirrors what libstd does)
         if cfg!(unix) {
-            try!(sock.reuse_address(true));
+            sock.reuse_address(true)?;
         }
 
         // Bind the socket
-        try!(sock.bind(addr));
+        sock.bind(addr)?;
 
         // listen
-        let listener = try!(sock.listen(1024));
+        let listener = sock.listen(1024)?;
         Ok(TcpListener {
-            sys: try!(sys::TcpListener::new(listener, addr)),
+            sys: sys::TcpListener::new(listener, addr)?,
             selector_id: SelectorId::new(),
         })
     }
@@ -611,7 +611,7 @@ impl TcpListener {
 impl Evented for TcpListener {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        try!(self.selector_id.associate_selector(poll));
+        self.selector_id.associate_selector(poll)?;
         self.sys.register(poll, token, interest, opts)
     }
 

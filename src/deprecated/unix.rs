@@ -37,7 +37,7 @@ impl UnixSocket {
 
     /// Listen for incoming requests
     pub fn listen(self, backlog: usize) -> io::Result<UnixListener> {
-        try!(self.sys.listen(backlog));
+        self.sys.listen(backlog)?;
         Ok(From::from(self.sys))
     }
 
@@ -161,7 +161,7 @@ pub struct UnixListener {
 impl UnixListener {
     pub fn bind<P: AsRef<Path> + ?Sized>(addr: &P) -> io::Result<UnixListener> {
         UnixSocket::stream().and_then(|sock| {
-            try!(sock.bind(addr));
+            sock.bind(addr)?;
             sock.listen(256)
         })
     }
@@ -210,7 +210,7 @@ impl From<sys::UnixSocket> for UnixListener {
  */
 
 pub fn pipe() -> io::Result<(PipeReader, PipeWriter)> {
-    let (rd, wr) = try!(sys::pipe());
+    let (rd, wr) = sys::pipe()?;
     Ok((From::from(rd), From::from(wr)))
 }
 

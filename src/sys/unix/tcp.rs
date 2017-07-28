@@ -27,7 +27,7 @@ pub struct TcpListener {
 
 impl TcpStream {
     pub fn connect(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
-        try!(set_nonblock(stream.as_raw_fd()));
+        set_nonblock(stream.as_raw_fd())?;
 
         match stream.connect(addr) {
             Ok(..) => {}
@@ -211,7 +211,7 @@ impl AsRawFd for TcpStream {
 
 impl TcpListener {
     pub fn new(inner: net::TcpListener, _addr: &SocketAddr) -> io::Result<TcpListener> {
-        try!(set_nonblock(inner.as_raw_fd()));
+        set_nonblock(inner.as_raw_fd())?;
         Ok(TcpListener {
             inner: inner,
         })
@@ -231,7 +231,7 @@ impl TcpListener {
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         self.inner.accept().and_then(|(s, a)| {
-            try!(set_nonblock(s.as_raw_fd()));
+            set_nonblock(s.as_raw_fd())?;
             Ok((TcpStream {
                 inner: s,
             }, a))

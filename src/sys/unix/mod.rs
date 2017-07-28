@@ -53,10 +53,10 @@ pub fn pipe() -> ::io::Result<(Io, Io)> {
     unsafe {
         match pipe2.get() {
             Some(pipe2_fn) => {
-                try!(cvt(pipe2_fn(pipes.as_mut_ptr(), flags)));
+                cvt(pipe2_fn(pipes.as_mut_ptr(), flags))?;
             }
             None => {
-                try!(cvt(libc::pipe(pipes.as_mut_ptr())));
+                cvt(libc::pipe(pipes.as_mut_ptr()))?;
                 libc::fcntl(pipes[0], libc::F_SETFL, flags);
                 libc::fcntl(pipes[1], libc::F_SETFL, flags);
             }

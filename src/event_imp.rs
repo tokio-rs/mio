@@ -497,8 +497,8 @@ impl fmt::Debug for PollOpt {
 
         for &(flag, msg) in &flags {
             if self.contains(flag) {
-                if one { try!(write!(fmt, " | ")) }
-                try!(write!(fmt, "{}", msg));
+                if one { write!(fmt, " | ")? }
+                write!(fmt, "{}", msg)?;
 
                 one = true
             }
@@ -870,18 +870,18 @@ impl fmt::Debug for Ready {
             (Ready(ERROR), "Error"),
             (Ready(HUP), "Hup")];
 
-        try!(write!(fmt, "Ready {{"));
+        write!(fmt, "Ready {{")?;
 
         for &(flag, msg) in &flags {
             if self.contains(flag) {
-                if one { try!(write!(fmt, " | ")) }
-                try!(write!(fmt, "{}", msg));
+                if one { write!(fmt, " | ")? }
+                write!(fmt, "{}", msg)?;
 
                 one = true
             }
         }
 
-        try!(write!(fmt, "}}"));
+        write!(fmt, "}}")?;
 
         Ok(())
     }
