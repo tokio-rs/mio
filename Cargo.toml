@@ -15,7 +15,6 @@ exclude       = [
   ".gitignore",
   ".travis.yml",
   "deploy.sh",
-  "test/**/*",
 ]
 
 [features]
