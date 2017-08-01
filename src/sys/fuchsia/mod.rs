@@ -10,6 +10,7 @@ mod awakener;
 mod handles;
 mod eventedfd;
 mod net;
+mod ready;
 mod selector;
 
 use self::eventedfd::{EventedFd, EventedFdInner};
@@ -18,6 +19,7 @@ pub use self::awakener::Awakener;
 pub use self::handles::EventedHandle;
 pub use self::net::{TcpListener, TcpStream, UdpSocket};
 pub use self::selector::{Events, Selector};
+pub use self::ready::{FuchsiaReady, mx_signals_t};
 
 // Set non-blocking (workaround since the std version doesn't work in fuchsia)
 // TODO: fix the std version and replace this

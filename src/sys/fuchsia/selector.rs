@@ -5,9 +5,9 @@ use sys::fuchsia::{
     status_to_io_err,
     EventedFd,
     EventedFdInner,
+    FuchsiaReady,
 };
 use magenta;
-use magenta_sys;
 use magenta::HandleBase;
 use std::collections::hash_map;
 use std::fmt;
@@ -180,7 +180,7 @@ impl Selector {
         match reg_type {
             RegType::Handle => {
                 // We can return immediately-- no lookup or registration necessary.
-                evts.events.push(Event::new(signals_to_ready(observed_signals), token));
+                evts.events.push(Event::new(Ready::from(observed_signals), token));
                 Ok(false)
             },
             RegType::Fd => {
@@ -289,7 +289,7 @@ impl Selector {
 
         handle.wait_async(&self.port,
                           key_from_token_and_type(token, RegType::Handle)?,
-                          ready_to_signals(interests),
+                          FuchsiaReady::from(interests).into_raw_signals(),
                           poll_opts_to_wait_async(poll_opts))
               .map_err(status_to_io_err)
     }
@@ -301,38 +301,6 @@ impl Selector {
         self.port.cancel(handle, key_from_token_and_type(token, RegType::Handle)?)
                  .map_err(status_to_io_err)
     }
-}
-
-fn ready_to_signals(ready: Ready) -> magenta::Signals {
-    // Get empty notifications for peer closing or other miscellaneous signals:
-    magenta_sys::MX_OBJECT_PEER_CLOSED |
-    magenta::MX_EVENT_SIGNALED |
-
-    if ready.is_writable() {
-        magenta_sys::MX_OBJECT_WRITABLE
-    } else {
-        magenta::MX_SIGNAL_NONE
-    } |
-
-    if ready.is_readable() {
-        magenta_sys::MX_OBJECT_READABLE
-    } else {
-        magenta::MX_SIGNAL_NONE
-    }
-}
-
-fn signals_to_ready(signals: magenta::Signals) -> Ready {
-    (if signals.contains(magenta_sys::MX_OBJECT_WRITABLE) {
-        Ready::writable()
-    } else {
-        Ready::empty()
-    }) |
-
-    (if signals.contains(magenta_sys::MX_OBJECT_READABLE) {
-        Ready::readable()
-    } else {
-        Ready::empty()
-    })
 }
 
 pub struct Events {

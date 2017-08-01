@@ -198,7 +198,10 @@ pub mod unix {
 #[cfg(target_os = "fuchsia")]
 pub mod fuchsia {
     //! Fuchsia-only extensions
-    pub use sys::EventedHandle;
+    pub use sys::{
+        EventedHandle,
+    };
+    pub use sys::fuchsia::{FuchsiaReady, mx_signals_t};
 }
 
 /// Windows-only extensions to the mio crate.
