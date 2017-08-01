@@ -47,4 +47,4 @@ pub use self::fuchsia::{
 };
 
 #[cfg(target_os = "fuchsia")]
-mod fuchsia;
+pub mod fuchsia;
