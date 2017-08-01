@@ -1,5 +1,6 @@
 use {io, Event, PollOpt, Ready, Token};
 use sys::fuchsia::{
+    assert_fuchsia_ready_repr,
     epoll_event_to_ready,
     poll_opts_to_wait_async,
     status_to_io_err,
@@ -89,6 +90,10 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
+        // Assertion from fuchsia/ready.rs to make sure that FuchsiaReady's representation is
+        // compatible with Ready.
+        assert_fuchsia_ready_repr();
+
         let port = Arc::new(
             magenta::Port::create(magenta::PortOpts::Default)
                 .map_err(status_to_io_err)?
@@ -289,7 +294,7 @@ impl Selector {
 
         handle.wait_async(&self.port,
                           key_from_token_and_type(token, RegType::Handle)?,
-                          FuchsiaReady::from(interests).into_raw_signals(),
+                          FuchsiaReady::from(interests).into_mx_signals(),
                           poll_opts_to_wait_async(poll_opts))
               .map_err(status_to_io_err)
     }

@@ -14,6 +14,7 @@ mod ready;
 mod selector;
 
 use self::eventedfd::{EventedFd, EventedFdInner};
+use self::ready::assert_fuchsia_ready_repr;
 
 pub use self::awakener::Awakener;
 pub use self::handles::EventedHandle;
