@@ -19,6 +19,7 @@ sed_escape_rhs() {
 	echo "$@" | sed -e 's/[\/&]/\\&/g' | sed -e ':a;N;$!ba;s/\n/\\n/g'
 }
 
+travisEnv=
 for version in "${versions[@]}"; do
     rustupVersion=$(rustupVersion "$version")
     linuxArchCase='dpkgArch="$(dpkg --print-architecture)"; '$'\\\n'
@@ -39,6 +40,10 @@ for version in "${versions[@]}"; do
                 -e 's!%%DEBIAN-SUITE%%!'"$variant"'!g' \
                 -e 's!%%ARCH-CASE%%!'"$(sed_escape_rhs "$linuxArchCase")"'!g' \
                 Dockerfile-debian.template > "$version/$variant/Dockerfile"
+                travisEnv+='\n  - VERSION='"$version VARIANT=$variant$travisEnv"
         fi
     done
 done
+
+travis="$(awk -v 'RS=\n\n' '$1 == "env:" { $0 = "env:'"$travisEnv"'" } { printf "%s%s", $0, RS }' .travis.yml)"
+echo "$travis" > .travis.yml
