@@ -12,9 +12,6 @@ fi
 versions=( "${versions[@]%/}" )
 
 # see http://stackoverflow.com/a/2705678/433558
-sed_escape_lhs() {
-	echo "$@" | sed -e 's/[]\/$*.^|[]/\\&/g'
-}
 sed_escape_rhs() {
 	echo "$@" | sed -e 's/[\/&]/\\&/g' | sed -e ':a;N;$!ba;s/\n/\\n/g'
 }
