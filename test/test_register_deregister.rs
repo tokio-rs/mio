@@ -93,15 +93,15 @@ pub fn test_register_deregister() {
 }
 
 #[test]
-pub fn test_register_with_no_readable_writable_is_error() {
+pub fn test_register_with_no_readable_writable_is_ok() {
     let poll = Poll::new().unwrap();
     let addr = localhost();
 
     let sock = TcpListener::bind(&addr).unwrap();
 
-    assert!(poll.register(&sock, Token(0), Ready::empty(), PollOpt::edge()).is_err());
+    poll.register(&sock, Token(0), Ready::empty(), PollOpt::edge()).unwrap();
 
-    poll.register(&sock, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.reregister(&sock, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
 
-    assert!(poll.reregister(&sock, Token(0), Ready::empty(), PollOpt::edge()).is_err());
+    poll.reregister(&sock, Token(0), Ready::empty(), PollOpt::edge()).unwrap();
 }

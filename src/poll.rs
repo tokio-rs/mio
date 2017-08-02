@@ -11,8 +11,6 @@ use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool};
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed, SeqCst};
 use std::time::{Duration, Instant};
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-use sys::unix::UnixReady;
 
 // Poll is backed by two readiness queues. The first is a system readiness queue
 // represented by `sys::Selector`. The system readiness queue handles events
@@ -776,7 +774,7 @@ impl Poll {
     pub fn register<E: ?Sized>(&self, handle: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
-        validate_args(token, interest)?;
+        validate_args(token)?;
 
         /*
          * Undefined behavior:
@@ -847,7 +845,7 @@ impl Poll {
     pub fn reregister<E: ?Sized>(&self, handle: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
-        validate_args(token, interest)?;
+        validate_args(token)?;
 
         trace!("registering with poller");
 
@@ -1170,29 +1168,9 @@ impl Poll {
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-fn registerable(interest: Ready) -> bool {
-    let unixinterest = UnixReady::from(interest);
-    unixinterest.is_readable() || unixinterest.is_writable() || unixinterest.is_aio()
-}
-
-#[cfg(target_os = "fuchsia")]
-fn registerable(interest: Ready) -> bool {
-    event::ready_as_usize(interest) != 0
-}
-
-#[cfg(not(unix))]
-fn registerable(interest: Ready) -> bool {
-    interest.is_readable() || interest.is_writable()
-}
-
-fn validate_args(token: Token, interest: Ready) -> io::Result<()> {
+fn validate_args(token: Token) -> io::Result<()> {
     if token == AWAKEN {
         return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
-    }
-
-    if !registerable(interest) {
-        return Err(io::Error::new(io::ErrorKind::Other, "interest must include readable or writable or aio"));
     }
 
     Ok(())
