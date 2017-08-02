@@ -28,4 +28,3 @@ RUN set -eux; \
     rustc --version;
 
 ENV PATH /root/.cargo/bin:$PATH
-
