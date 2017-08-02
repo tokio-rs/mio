@@ -11,6 +11,13 @@ dpkgArches() {
 	_awkArch "$version" '{ print $2 }'
 }
 
+hasBashbrewArch() {
+	local version="$1"; shift
+	local bashbrewArch="$1"; shift
+
+	_awkArch "$version" 'BEGIN { exitCode = 1 } $1 == bashbrewArch { exitCode = 0 } END { exit exitCode }' -v bashbrewArch="$bashbrewArch"
+}
+
 dpkgToRustArch() {
 	local version="$1"; shift
 	local dpkgArch="$1"; shift
@@ -20,4 +27,42 @@ dpkgToRustArch() {
 rustupVersion() {
 	local version="$1"; shift
 	cat "$version/rustup-version" | tr -d '\n'
+}
+
+_generateParentRepoToArches() {
+	local repo="$1"; shift
+	local officialImagesUrl='https://github.com/docker-library/official-images/raw/master/library/'
+
+	eval "declare -g -A parentRepoToArches=( $(
+		find -name 'Dockerfile' -exec awk '
+				toupper($1) == "FROM" && $2 !~ /^('"$repo"'|scratch|microsoft\/[^:]+)(:|$)/ {
+					print "'"$officialImagesUrl"'" $2
+				}
+			' '{}' + \
+			| sort -u \
+			| xargs bashbrew cat --format '[{{ .RepoName }}:{{ .TagName }}]="{{ join " " .TagEntry.Architectures }}"'
+	) )"
+}
+_generateParentRepoToArches 'rust'
+
+parentArches() {
+	local version="$1"; shift # "1.19.0", etc
+	local variant="$1"; shift # "", "stretch", etc
+
+	local parent="$(awk 'toupper($1) == "FROM" { print $2 }' "$version/$variant/Dockerfile")"
+	echo "${parentRepoToArches[$parent]:-}"
+}
+variantArches() {
+	local version=$1; shift # "1.19.0", etc
+	local variant=$1; shift # "", "stretch", etc
+
+	local parentArches="$(parentArches "$version" "$variant")"
+
+	local variantArches=()
+	for arch in $parentArches; do
+		if hasBashbrewArch "$version" "$arch"; then
+			variantArches+=( "$arch" )
+		fi
+	done
+	echo "${variantArches[*]}"
 }
