@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+_awkArch() {
+	local version="$1"; shift
+	local awkExpr="$1"; shift
+	awk "$@" "/^#|^\$/ { next } $awkExpr" "$version/release-architectures"
+}
+
+dpkgArches() {
+	local version="$1"; shift
+	_awkArch "$version" '{ print $2 }'
+}
+
+dpkgToRustArch() {
+	local version="$1"; shift
+	local dpkgArch="$1"; shift
+	_awkArch "$version" '$2 == dpkgArch { print $3; exit }' -v dpkgArch="$dpkgArch"
+}
+
+rustupVersion() {
+	local version="$1"; shift
+	cat "$version/rustup-version" | tr -d '\n'
+}

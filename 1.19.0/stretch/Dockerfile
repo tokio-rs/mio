@@ -1,4 +1,4 @@
-FROM buildpack-deps:jessie
+FROM buildpack-deps:stretch
 
 ENV RUST_VERSION=1.19.0
 ENV RUSTUP_VERSION=1.5.0
