@@ -1,7 +1,10 @@
 FROM buildpack-deps:%%DEBIAN-SUITE%%
 
-ENV RUST_VERSION=%%RUST-VERSION%%
-ENV RUSTUP_VERSION=%%RUSTUP-VERSION%%
+ENV RUST_VERSION=%%RUST-VERSION%% \
+    RUSTUP_VERSION=%%RUSTUP-VERSION%% \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
 
 RUN set -eux; \
     \
@@ -13,10 +16,8 @@ RUN set -eux; \
     echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
     chmod +x rustup-init; \
     ./rustup-init -y --no-modify-path --default-toolchain "${RUST_VERSION}"; \
+    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
     rm rustup-init; \
-    export PATH="/root/.cargo/bin:$PATH"; \
     rustup --version; \
     cargo --version; \
     rustc --version;
-
-ENV PATH /root/.cargo/bin:$PATH

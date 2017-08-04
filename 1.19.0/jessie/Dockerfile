@@ -1,7 +1,10 @@
 FROM buildpack-deps:jessie
 
-ENV RUST_VERSION=1.19.0
-ENV RUSTUP_VERSION=1.5.0
+ENV RUST_VERSION=1.19.0 \
+    RUSTUP_VERSION=1.5.0 \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
 
 RUN set -eux; \
     \
@@ -21,10 +24,8 @@ RUN set -eux; \
     echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
     chmod +x rustup-init; \
     ./rustup-init -y --no-modify-path --default-toolchain "${RUST_VERSION}"; \
+    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
     rm rustup-init; \
-    export PATH="/root/.cargo/bin:$PATH"; \
     rustup --version; \
     cargo --version; \
     rustc --version;
-
-ENV PATH /root/.cargo/bin:$PATH
