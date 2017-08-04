@@ -1115,7 +1115,12 @@ fn registerable(interest: Ready) -> bool {
     unixinterest.is_readable() || unixinterest.is_writable() || unixinterest.is_aio()
 }
 
-#[cfg(not(all(unix, not(target_os = "fuchsia"))))]
+#[cfg(target_os = "fuchsia")]
+fn registerable(interest: Ready) -> bool {
+    event::ready_as_usize(interest) != 0
+}
+
+#[cfg(not(unix))]
 fn registerable(interest: Ready) -> bool {
     interest.is_readable() || interest.is_writable()
 }
