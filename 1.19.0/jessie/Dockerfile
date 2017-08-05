@@ -22,8 +22,8 @@ RUN set -eux; \
     echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
     chmod +x rustup-init; \
     ./rustup-init -y --no-modify-path --default-toolchain 1.19.0; \
-    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
     rm rustup-init; \
+    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
     rustup --version; \
     cargo --version; \
     rustc --version;

@@ -37,7 +37,7 @@ for version in "${versions[@]}"; do
                 -e 's!%%DEBIAN-SUITE%%!'"$variant"'!g' \
                 -e 's!%%ARCH-CASE%%!'"$(sed_escape_rhs "$linuxArchCase")"'!g' \
                 Dockerfile-debian.template > "$version/$variant/Dockerfile"
-                travisEnv+='\n  - VERSION='"$version VARIANT=$variant$travisEnv"
+                travisEnv='\n  - VERSION='"$version VARIANT=$variant$travisEnv"
         fi
     done
 done
