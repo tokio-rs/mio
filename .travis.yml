@@ -6,7 +6,7 @@ env:
   - VERSION=1.19.0 VARIANT=jessie
 
 install:
-  - git clone https://github.com/docker-library/official-images.git ~/official-images
+  - git clone -b rust https://github.com/sfackler/official-images.git ~/official-images
 
 before_script:
   - env | sort
