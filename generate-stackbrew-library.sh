@@ -43,10 +43,10 @@ dirCommit() {
 }
 
 cat <<-EOH
-# this file is generated via https://github.com/rust-lang-nusery/docker-rust/blob/$(fileCommit "$self")/$self
+# this file is generated via https://github.com/rust-lang-nursery/docker-rust/blob/$(fileCommit "$self")/$self
 
 Maintainers: Steven Fackler <sfackler@gmail.com> (@sfackler)
-GitRepo: https://github.com/rust-lang-nusery/docker-rust.git
+GitRepo: https://github.com/rust-lang-nursery/docker-rust.git
 EOH
 
 # prints "$2$1$3$1...$N"
