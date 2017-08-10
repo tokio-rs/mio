@@ -1,0 +1,15 @@
+image: Visual Studio 2017
+
+environment:
+  matrix:
+    - version: 1.19.0
+      variant: windowsservercore
+
+build_script:
+  - cmd: appveyor-retry docker build --pull -t rust %version%/windows/%variant%
+
+after_build:
+  - ps: docker images
+
+test_script:
+  - ps: docker run --rm rust go version

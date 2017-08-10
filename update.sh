@@ -17,6 +17,7 @@ sed_escape_rhs() {
 }
 
 travisEnv=
+appveyorEnv=
 for version in "${versions[@]}"; do
     rustupVersion=$(rustupVersion "$version")
     linuxArchCase='dpkgArch="$(dpkg --print-architecture)"; '$'\\\n'
@@ -40,7 +41,23 @@ for version in "${versions[@]}"; do
                 travisEnv='\n  - VERSION='"$version VARIANT=$variant$travisEnv"
         fi
     done
+
+    windowsSha256="$(curl -fsSL "https://static.rust-lang.org/rustup/archive/${rustupVersion}/x86_64-pc-windows-msvc/rustup-init.exe.sha256" | awk '{ print $1 }')"
+
+    for winVariant in windowsservercore nanoserver; do
+	if [ -d "$version/windows/$winVariant" ]; then
+	    sed -r \
+                -e 's!%%RUST-VERSION%%!'"$version"'!g' \
+                -e 's!%%RUSTUP-VERSION%%!'"$rustupVersion"'!g' \
+		-e 's!%%WIN-SHA256%%!'"$windowsSha256"'!g' \
+		"Dockerfile-windows-$winVariant.template" > "$version/windows/$winVariant/Dockerfile"
+	    appveyorEnv='\n    - version: '"$version"'\n      variant: '"$winVariant$appveyorEnv"
+	fi
+    done
 done
 
 travis="$(awk -v 'RS=\n\n' '$1 == "env:" { $0 = "env:'"$travisEnv"'" } { printf "%s%s", $0, RS }' .travis.yml)"
 echo "$travis" > .travis.yml
+
+appveyor="$(awk -v 'RS=\n\n' '$1 == "environment:" { $0 = "environment:\n  matrix:'"$appveyorEnv"'" } { printf "%s%s", $0, RS }' .appveyor.yml)"
+echo "$appveyor" > .appveyor.yml
