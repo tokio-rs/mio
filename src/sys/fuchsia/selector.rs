@@ -9,7 +9,8 @@ use sys::fuchsia::{
     FuchsiaReady,
 };
 use magenta;
-use magenta::HandleBase;
+use magenta::AsHandleRef;
+use magenta_sys::mx_handle_t;
 use std::collections::hash_map;
 use std::fmt;
 use std::mem;
@@ -255,7 +256,7 @@ impl Selector {
 
         let wait_async_opts = poll_opts_to_wait_async(poll_opts);
 
-        let wait_res = handle.wait_async(&self.port, token.0 as u64, signals, wait_async_opts)
+        let wait_res = handle.wait_async_handle(&self.port, token.0 as u64, signals, wait_async_opts)
             .map_err(status_to_io_err);
 
         if wait_res.is_err() {
@@ -280,31 +281,41 @@ impl Selector {
             })
     }
 
-    pub fn register_handle<H>(&self,
-                              handle: &H,
-                              token: Token,
-                              interests: Ready,
-                              poll_opts: PollOpt) -> io::Result<()>
-        where H: magenta::HandleBase
+    pub fn register_handle(&self,
+                           handle: mx_handle_t,
+                           token: Token,
+                           interests: Ready,
+                           poll_opts: PollOpt) -> io::Result<()>
     {
         if poll_opts.is_level() && !poll_opts.is_oneshot() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput,
                       "Repeated level-triggered events are not supported on Fuchsia handles."));
         }
 
-        handle.wait_async(&self.port,
-                          key_from_token_and_type(token, RegType::Handle)?,
-                          FuchsiaReady::from(interests).into_mx_signals(),
-                          poll_opts_to_wait_async(poll_opts))
-              .map_err(status_to_io_err)
+        let temp_handle = unsafe { magenta::Handle::from_raw(handle) };
+
+        let res = temp_handle.wait_async_handle(
+                    &self.port,
+                    key_from_token_and_type(token, RegType::Handle)?,
+                    FuchsiaReady::from(interests).into_mx_signals(),
+                    poll_opts_to_wait_async(poll_opts))
+              .map_err(status_to_io_err);
+
+        mem::forget(temp_handle);
+
+        res
     }
 
 
-    pub fn deregister_handle<H>(&self, handle: &H, token: Token) -> io::Result<()>
-        where H: magenta::HandleBase
+    pub fn deregister_handle(&self, handle: mx_handle_t, token: Token) -> io::Result<()>
     {
-        self.port.cancel(handle, key_from_token_and_type(token, RegType::Handle)?)
-                 .map_err(status_to_io_err)
+        let temp_handle = unsafe { magenta::Handle::from_raw(handle) };
+        let res = self.port.cancel(&temp_handle, key_from_token_and_type(token, RegType::Handle)?)
+                 .map_err(status_to_io_err);
+
+        mem::forget(temp_handle);
+
+        res
     }
 }
 

@@ -1,7 +1,7 @@
 use {io, poll, Evented, Ready, Poll, PollOpt, Token};
 use libc;
 use magenta;
-use magenta::HandleBase;
+use magenta::AsHandleRef;
 use sys::fuchsia::{DontDrop, poll_opts_to_wait_async, sys};
 use std::mem;
 use std::os::unix::io::RawFd;
@@ -56,10 +56,11 @@ impl EventedFdInner {
                 let _res =
                     registration
                         .handle.inner_ref()
-                        .wait_async(port,
-                                    registration.token.0 as u64,
-                                    rereg_signals,
-                                    rereg_opts);
+                        .wait_async_handle(
+                            port,
+                            registration.token.0 as u64,
+                            rereg_signals,
+                            rereg_opts);
             }
         }
     }
