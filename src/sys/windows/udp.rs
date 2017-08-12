@@ -181,7 +181,7 @@ impl UdpSocket {
         }
     }
 
-    pub fn recv(&self, mut buf: &mut [u8])
+    pub fn recv(&self, buf: &mut [u8])
                      -> io::Result<usize> {
         //Since recv_from can be used on connected sockets just call it and drop the address.
         self.recv_from(buf).map(|(size,_)| size)
