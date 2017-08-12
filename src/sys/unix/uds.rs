@@ -122,7 +122,7 @@ impl UnixSocket {
     }
 
     /// Bind the socket to the specified address
-    #[cfg(not(all(target_arch = "aarch64",target_os = "android")))]
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "x86_64"), target_os = "android")))]
     pub fn bind<P: AsRef<Path> + ?Sized>(&self, addr: &P) -> io::Result<()> {
         unsafe {
             let (addr, len) = sockaddr_un(addr.as_ref())?;
@@ -133,7 +133,7 @@ impl UnixSocket {
         }
     }
 
-    #[cfg(all(target_arch = "aarch64",target_os = "android"))]
+    #[cfg(all(any(target_arch = "aarch64", target_arch = "x86_64"), target_os = "android"))]
     pub fn bind<P: AsRef<Path> + ?Sized>(&self, addr: &P) -> io::Result<()> {
         unsafe {
             let (addr, len) = sockaddr_un(addr.as_ref())?;
