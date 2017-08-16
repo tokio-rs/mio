@@ -1,6 +1,5 @@
 use {localhost, TryWrite};
 use mio::*;
-use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::*;
 use bytes::SliceBuf;
 use std::time::Duration;
@@ -23,7 +22,7 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: Ready) {
+    fn handle_read(&mut self, poll: &mut Poll, token: Token) {
         match token {
             SERVER => {
                 trace!("handle_read; token=SERVER");
@@ -34,41 +33,21 @@ impl TestHandler {
                 trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                event_loop.reregister(&self.client, CLIENT, Ready::writable(), PollOpt::level()).unwrap();
+                poll.reregister(&self.client, CLIENT, Ready::writable(), PollOpt::level()).unwrap();
             }
             _ => panic!("unexpected token"),
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, _: Ready) {
+    fn handle_write(&mut self, poll: &mut Poll, token: Token) {
         debug!("handle_write; token={:?}; state={:?}", token, self.state);
 
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
         self.state = 2;
-        event_loop.deregister(&self.client).unwrap();
-        event_loop.timeout(1, Duration::from_millis(200)).unwrap();
-    }
-}
-
-impl Handler for TestHandler {
-    type Timeout = usize;
-    type Message = ();
-
-    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, token: Token, events: Ready) {
-        if events.is_readable() {
-            self.handle_read(event_loop, token, events);
-        }
-
-        if events.is_writable() {
-            self.handle_write(event_loop, token, events);
-        }
-    }
-
-    fn timeout(&mut self, event_loop: &mut EventLoop<TestHandler>, _: usize) {
-        trace!("timeout");
-        event_loop.shutdown();
+        poll.deregister(&self.client).unwrap();
+        poll.deregister(&self.server).unwrap();
     }
 }
 
@@ -77,26 +56,40 @@ pub fn test_register_deregister() {
     let _ = ::env_logger::init();
 
     debug!("Starting TEST_REGISTER_DEREGISTER");
-    let mut event_loop = EventLoop::new().unwrap();
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(1024);
 
     let addr = localhost();
 
     let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
-    event_loop.register(&server, SERVER, Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&server, SERVER, Ready::readable(), PollOpt::edge()).unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
-    event_loop.register(&client, CLIENT, Ready::readable(), PollOpt::level()).unwrap();
+    poll.register(&client, CLIENT, Ready::readable(), PollOpt::level()).unwrap();
 
     let mut handler = TestHandler::new(server, client);
 
-    // Start the event loop
-    event_loop.run(&mut handler).unwrap();
+    loop {
+        poll.poll(&mut events, None).unwrap();
 
-    assert!(handler.state == 2, "unexpected final state {}", handler.state);
+        if let Some(event) = events.get(0) {
+            if event.readiness().is_readable() {
+                handler.handle_read(&mut poll, event.token());
+            }
+
+            if event.readiness().is_writable() {
+                handler.handle_write(&mut poll, event.token());
+                break;
+            }
+        }
+    }
+
+    poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+    assert_eq!(events.len(), 0);
 }
 
 #[test]
