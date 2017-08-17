@@ -172,11 +172,11 @@ fn read_bufs() {
 
     poll.register(&s, Token(1), Ready::readable(), PollOpt::level()).unwrap();
 
-    let mut b1 = &mut [0; 10][..];
-    let mut b2 = &mut [0; 383][..];
-    let mut b3 = &mut [0; 28][..];
-    let mut b4 = &mut [0; 8][..];
-    let mut b5 = &mut [0; 128][..];
+    let b1 = &mut [0; 10][..];
+    let b2 = &mut [0; 383][..];
+    let b3 = &mut [0; 28][..];
+    let b4 = &mut [0; 8][..];
+    let b5 = &mut [0; 128][..];
     let mut b: [&mut IoVec; 5] = [
         b1.into(),
         b2.into(),
