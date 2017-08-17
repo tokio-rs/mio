@@ -326,23 +326,17 @@ impl fmt::Debug for Events {
 
 #[test]
 fn does_not_register_rw() {
-    #![allow(deprecated)]
+    use {Poll, Ready, PollOpt, Token};
+    use unix::EventedFd;
 
-    use ::deprecated::{EventLoopBuilder, Handler};
-    use ::unix::EventedFd;
-    struct Nop;
-    impl Handler for Nop {
-        type Timeout = ();
-        type Message = ();
-    }
+    let kq = unsafe { libc::kqueue() };
+    let kqf = EventedFd(&kq);
+    let poll = Poll::new().unwrap();
 
     // registering kqueue fd will fail if write is requested (On anything but some versions of OS
     // X)
-    let kq = unsafe { libc::kqueue() };
-    let kqf = EventedFd(&kq);
-    let mut evtloop = EventLoopBuilder::new().build::<Nop>().expect("evt loop builds");
-    evtloop.register(&kqf, Token(1234), Ready::readable(),
-                     PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    poll.register(&kqf, Token(1234), Ready::readable(),
+                  PollOpt::edge() | PollOpt::oneshot()).unwrap();
 }
 
 #[cfg(any(target_os = "dragonfly",
