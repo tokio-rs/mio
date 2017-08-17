@@ -1,28 +1,23 @@
 extern crate mio;
 
-use mio::{Token, Ready, PollOpt};
-use mio::deprecated::{EventLoop, Handler};
+use mio::{Events, Poll, Token, Ready, PollOpt};
 use mio::tcp::TcpListener;
 use std::time::Duration;
 
-struct E;
-
-impl Handler for E {
-    type Timeout = ();
-    type Message = ();
-}
-
 #[test]
 fn run_once_with_nothing() {
-    let mut e = EventLoop::<E>::new().unwrap();
-    e.run_once(&mut E, Some(Duration::from_millis(100))).unwrap();
+    let mut events = Events::with_capacity(1024);
+    let poll = Poll::new().unwrap();
+    poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
 }
 
 #[test]
 fn add_then_drop() {
-    let mut e = EventLoop::<E>::new().unwrap();
+    let mut events = Events::with_capacity(1024);
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
-    e.register(&l, Token(1), Ready::all(), PollOpt::edge()).unwrap();
+    let poll = Poll::new().unwrap();
+    poll.register(&l, Token(1), Ready::all(), PollOpt::edge()).unwrap();
     drop(l);
-    e.run_once(&mut E, Some(Duration::from_millis(100))).unwrap();
+    poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+
 }
