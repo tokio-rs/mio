@@ -132,11 +132,6 @@ pub mod deprecated;
 #[doc(hidden)]
 pub use iovec::IoVec;
 
-#[deprecated(since = "0.6.6", note = "use net module instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod udp;
-
 pub use poll::{
     Poll,
     Registration,
