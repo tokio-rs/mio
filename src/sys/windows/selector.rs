@@ -270,7 +270,8 @@ impl Binding {
 
 impl fmt::Debug for Binding {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Binding")
+        f.debug_struct("Binding")
+            .finish()
     }
 }
 
@@ -517,7 +518,8 @@ impl Overlapped {
 
 impl fmt::Debug for Overlapped {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Overlapped")
+        f.debug_struct("Overlapped")
+            .finish()
     }
 }
 

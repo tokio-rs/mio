@@ -888,7 +888,6 @@ impl ops::Not for Ready {
     }
 }
 
-// TODO: impl Debug for UnixReady
 impl fmt::Debug for Ready {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
@@ -897,8 +896,6 @@ impl fmt::Debug for Ready {
             (Ready::writable(), "Writable"),
             (Ready(ERROR), "Error"),
             (Ready(HUP), "Hup")];
-
-        write!(fmt, "Ready {{")?;
 
         for &(flag, msg) in &flags {
             if self.contains(flag) {
@@ -909,7 +906,9 @@ impl fmt::Debug for Ready {
             }
         }
 
-        write!(fmt, "}}")?;
+        if !one {
+            fmt.write_str("(empty)")?;
+        }
 
         Ok(())
     }

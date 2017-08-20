@@ -1139,7 +1139,8 @@ fn validate_args(token: Token, interest: Ready) -> io::Result<()> {
 
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Poll")
+        fmt.debug_struct("Poll")
+            .finish()
     }
 }
 
@@ -1623,7 +1624,8 @@ impl SetReadiness {
 
 impl fmt::Debug for SetReadiness {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SetReadiness")
+        f.debug_struct("SetReadiness")
+            .finish()
     }
 }
 

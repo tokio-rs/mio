@@ -1,6 +1,7 @@
 use event_imp::{Ready, ready_from_usize};
 
 use std::ops;
+use std::fmt;
 
 /// Unix specific extensions to `Ready`
 ///
@@ -81,7 +82,7 @@ use std::ops;
 ///
 /// [`Poll`]: struct.Poll.html
 /// [readiness]: struct.Poll.html#readiness-operations
-#[derive(Debug, Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct UnixReady(Ready);
 
 const ERROR: usize = 0b00100;
@@ -304,5 +305,32 @@ impl ops::Not for UnixReady {
     #[inline]
     fn not(self) -> UnixReady {
         (!self.0).into()
+    }
+}
+
+impl fmt::Debug for UnixReady {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let mut one = false;
+        let flags = [
+            (UnixReady(Ready::readable()), "Readable"),
+            (UnixReady(Ready::writable()), "Writable"),
+            (UnixReady::error(), "Error"),
+            (UnixReady::hup(), "Hup"),
+            (UnixReady::aio(), "Aio")];
+
+        for &(flag, msg) in &flags {
+            if self.contains(flag) {
+                if one { write!(fmt, " | ")? }
+                write!(fmt, "{}", msg)?;
+
+                one = true
+            }
+        }
+
+        if !one {
+            fmt.write_str("(empty)")?;
+        }
+
+        Ok(())
     }
 }

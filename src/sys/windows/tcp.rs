@@ -586,7 +586,8 @@ impl Evented for TcpStream {
 
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        "TcpStream { ... }".fmt(f)
+        f.debug_struct("TcpStream")
+            .finish()
     }
 }
 
@@ -796,7 +797,8 @@ impl Evented for TcpListener {
 
 impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        "TcpListener { ... }".fmt(f)
+        f.debug_struct("TcpListener")
+            .finish()
     }
 }
 
