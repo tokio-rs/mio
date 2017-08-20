@@ -6,7 +6,8 @@ use std::path::Path;
 
 use libc;
 
-use {io, Evented, Ready, Poll, PollOpt, Token};
+use {io, Ready, Poll, PollOpt, Token};
+use event::Evented;
 use sys::unix::{cvt, Io};
 use sys::unix::io::{set_nonblock, set_cloexec};
 

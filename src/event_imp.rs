@@ -942,7 +942,8 @@ fn test_debug_ready() {
 /// # Examples
 ///
 /// ```
-/// use mio::{Event, Ready, Token};
+/// use mio::{Ready, Token};
+/// use mio::event::Event;
 ///
 /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
 ///
@@ -966,7 +967,8 @@ impl Event {
     /// # Examples
     ///
     /// ```
-    /// use mio::{Event, Ready, Token};
+    /// use mio::{Ready, Token};
+    /// use mio::event::Event;
     ///
     /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
     ///
@@ -985,7 +987,8 @@ impl Event {
     /// # Examples
     ///
     /// ```
-    /// use mio::{Event, Ready, Token};
+    /// use mio::{Ready, Token};
+    /// use mio::event::Event;
     ///
     /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
     ///
@@ -1007,7 +1010,8 @@ impl Event {
     /// # Examples
     ///
     /// ```
-    /// use mio::{Event, Ready, Token};
+    /// use mio::{Ready, Token};
+    /// use mio::event::Event;
     ///
     /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
     ///

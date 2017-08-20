@@ -1,4 +1,5 @@
-use {channel, Evented, Poll, Events, Token};
+use {channel, Poll, Events, Token};
+use event::Evented;
 use deprecated::{Handler, NotifyError};
 use event_imp::{Event, Ready, PollOpt};
 use timer::{self, Timer, Timeout};
