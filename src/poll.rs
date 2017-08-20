@@ -89,38 +89,46 @@ use sys::unix::UnixReady;
 /// A basic example -- establishing a `TcpStream` connection.
 ///
 /// ```
+/// # use std::error::Error;
+/// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Events, Poll, Ready, PollOpt, Token};
 /// use mio::tcp::TcpStream;
 ///
 /// use std::net::{TcpListener, SocketAddr};
 ///
 /// // Bind a server socket to connect to.
-/// let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
-/// let server = TcpListener::bind(&addr).unwrap();
+/// let addr: SocketAddr = "127.0.0.1:0".parse()?;
+/// let server = TcpListener::bind(&addr)?;
 ///
 /// // Construct a new `Poll` handle as well as the `Events` we'll store into
-/// let poll = Poll::new().unwrap();
+/// let poll = Poll::new()?;
 /// let mut events = Events::with_capacity(1024);
 ///
 /// // Connect the stream
-/// let stream = TcpStream::connect(&server.local_addr().unwrap()).unwrap();
+/// let stream = TcpStream::connect(&server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+/// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge())?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
 /// loop {
-///     poll.poll(&mut events, None).unwrap();
+///     poll.poll(&mut events, None)?;
 ///
 ///     for event in &events {
 ///         if event.token() == Token(0) && event.readiness().is_writable() {
 ///             // The socket connected (probably, it could still be a spurious
 ///             // wakeup)
-///             return;
+///             return Ok(());
 ///         }
 ///     }
 /// }
+/// #     Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
 /// ```
 ///
 /// # Edge-triggered and level-triggered
@@ -257,20 +265,28 @@ use sys::unix::UnixReady;
 /// For example:
 ///
 /// ```
+/// # use std::error::Error;
+/// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Poll, Ready, PollOpt, Token};
 /// use mio::tcp::TcpStream;
 /// use std::time::Duration;
 /// use std::thread;
 ///
-/// let sock = TcpStream::connect(&"216.58.193.100:80".parse().unwrap()).unwrap();
+/// let sock = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
 ///
 /// thread::sleep(Duration::from_secs(1));
 ///
-/// let poll = Poll::new().unwrap();
+/// let poll = Poll::new()?;
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// poll.register(&sock, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+/// poll.register(&sock, Token(0), Ready::all(), PollOpt::edge())?;
+/// #     Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
 /// ```
 ///
 /// # Implementation notes
@@ -603,6 +619,8 @@ impl Poll {
     /// # Examples
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Poll, Events};
     /// use std::time::Duration;
     ///
@@ -616,8 +634,14 @@ impl Poll {
     ///
     /// // Wait for events, but none will be received because no `Evented`
     /// // handles have been registered with this `Poll` instance.
-    /// let n = poll.poll(&mut events, Some(Duration::from_millis(500))).unwrap();
+    /// let n = poll.poll(&mut events, Some(Duration::from_millis(500)))?;
     /// assert_eq!(n, 0);
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     pub fn new() -> io::Result<Poll> {
         is_send::<Poll>();
@@ -703,15 +727,17 @@ impl Poll {
     /// # Examples
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll, Ready, PollOpt, Token};
     /// use mio::tcp::TcpStream;
     /// use std::time::{Duration, Instant};
     ///
-    /// let poll = Poll::new().unwrap();
-    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse().unwrap()).unwrap();
+    /// let poll = Poll::new()?;
+    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`
-    /// poll.register(&socket, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+    /// poll.register(&socket, Token(0), Ready::all(), PollOpt::edge())?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// let start = Instant::now();
@@ -722,19 +748,25 @@ impl Poll {
     ///
     ///     if elapsed >= timeout {
     ///         // Connection timed out
-    ///         return;
+    ///         return Ok(());
     ///     }
     ///
     ///     let remaining = timeout - elapsed;
-    ///     poll.poll(&mut events, Some(remaining)).unwrap();
+    ///     poll.poll(&mut events, Some(remaining))?;
     ///
     ///     for event in &events {
     ///         if event.token() == Token(0) {
     ///             // Something (probably) happened on the socket.
-    ///             return;
+    ///             return Ok(());
     ///         }
     ///     }
     /// }
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     pub fn register<E: ?Sized>(&self, handle: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
@@ -780,19 +812,27 @@ impl Poll {
     /// # Examples
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Poll, Ready, PollOpt, Token};
     /// use mio::tcp::TcpStream;
     ///
-    /// let poll = Poll::new().unwrap();
-    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse().unwrap()).unwrap();
+    /// let poll = Poll::new()?;
+    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`, requesting readable
-    /// poll.register(&socket, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    /// poll.register(&socket, Token(0), Ready::readable(), PollOpt::edge())?;
     ///
     /// // Reregister the socket specifying a different token and write interest
     /// // instead. `PollOpt::edge()` must be specified even though that value
     /// // is not being changed.
-    /// poll.reregister(&socket, Token(2), Ready::writable(), PollOpt::edge()).unwrap();
+    /// poll.reregister(&socket, Token(2), Ready::writable(), PollOpt::edge())?;
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     ///
     /// [`struct`]: #
@@ -829,23 +869,31 @@ impl Poll {
     /// # Examples
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll, Ready, PollOpt, Token};
     /// use mio::tcp::TcpStream;
     /// use std::time::Duration;
     ///
-    /// let poll = Poll::new().unwrap();
-    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse().unwrap()).unwrap();
+    /// let poll = Poll::new()?;
+    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`
-    /// poll.register(&socket, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    /// poll.register(&socket, Token(0), Ready::readable(), PollOpt::edge())?;
     ///
-    /// poll.deregister(&socket).unwrap();
+    /// poll.deregister(&socket)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     ///
     /// // Set a timeout because this poll should never receive any events.
-    /// let n = poll.poll(&mut events, Some(Duration::from_secs(1))).unwrap();
+    /// let n = poll.poll(&mut events, Some(Duration::from_secs(1)))?;
     /// assert_eq!(0, n);
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     pub fn deregister<E: ?Sized>(&self, handle: &E) -> io::Result<()>
         where E: Evented
@@ -898,6 +946,8 @@ impl Poll {
     /// A basic example -- establishing a `TcpStream` connection.
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll, Ready, PollOpt, Token};
     /// use mio::tcp::TcpStream;
     ///
@@ -905,9 +955,9 @@ impl Poll {
     /// use std::thread;
     ///
     /// // Bind a server socket to connect to.
-    /// let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
-    /// let server = TcpListener::bind(&addr).unwrap();
-    /// let addr = server.local_addr().unwrap().clone();
+    /// let addr: SocketAddr = "127.0.0.1:0".parse()?;
+    /// let server = TcpListener::bind(&addr)?;
+    /// let addr = server.local_addr()?.clone();
     ///
     /// // Spawn a thread to accept the socket
     /// thread::spawn(move || {
@@ -915,28 +965,34 @@ impl Poll {
     /// });
     ///
     /// // Construct a new `Poll` handle as well as the `Events` we'll store into
-    /// let poll = Poll::new().unwrap();
+    /// let poll = Poll::new()?;
     /// let mut events = Events::with_capacity(1024);
     ///
     /// // Connect the stream
-    /// let stream = TcpStream::connect(&addr).unwrap();
+    /// let stream = TcpStream::connect(&addr)?;
     ///
     /// // Register the stream with `Poll`
-    /// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+    /// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge())?;
     ///
     /// // Wait for the socket to become ready. This has to happens in a loop to
     /// // handle spurious wakeups.
     /// loop {
-    ///     poll.poll(&mut events, None).unwrap();
+    ///     poll.poll(&mut events, None)?;
     ///
     ///     for event in &events {
     ///         if event.token() == Token(0) && event.readiness().is_writable() {
     ///             // The socket connected (probably, it could still be a spurious
     ///             // wakeup)
-    ///             return;
+    ///             return Ok(());
     ///         }
     ///     }
     /// }
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     ///
     /// [struct]: #
@@ -1162,21 +1218,29 @@ impl AsRawFd for Poll {
 /// # Examples
 ///
 /// ```
+/// # use std::error::Error;
+/// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Events, Poll};
 /// use std::time::Duration;
 ///
 /// let mut events = Events::with_capacity(1024);
-/// let poll = Poll::new().unwrap();
+/// let poll = Poll::new()?;
 ///
 /// assert_eq!(0, events.len());
 ///
 /// // Register `Evented` handles with `poll`
 ///
-/// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+/// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
 /// for event in &events {
 ///     println!("event={:?}", event);
 /// }
+/// #     Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
 /// ```
 ///
 /// [`Poll::poll`]: struct.Poll.html#method.poll
@@ -1193,19 +1257,27 @@ pub struct Events {
 /// # Examples
 ///
 /// ```
+/// # use std::error::Error;
+/// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Events, Poll};
 /// use std::time::Duration;
 ///
 /// let mut events = Events::with_capacity(1024);
-/// let poll = Poll::new().unwrap();
+/// let poll = Poll::new()?;
 ///
 /// // Register handles with `poll`
 ///
-/// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+/// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
 /// for event in events.iter() {
 ///     println!("event={:?}", event);
 /// }
+/// #     Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
 /// ```
 ///
 /// [`Events`]: struct.Events.html
@@ -1240,19 +1312,27 @@ impl Events {
     /// # Examples
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll};
     /// use std::time::Duration;
     ///
     /// let mut events = Events::with_capacity(1024);
-    /// let poll = Poll::new().unwrap();
+    /// let poll = Poll::new()?;
     ///
     /// // Register handles with `poll`
     ///
-    /// let n = poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+    /// let n = poll.poll(&mut events, Some(Duration::from_millis(100)))?;
     ///
     /// for i in 0..n {
     ///     println!("event={:?}", events.get(i).unwrap());
     /// }
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.inner.get(idx)
@@ -1306,19 +1386,27 @@ impl Events {
     /// # Examples
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll};
     /// use std::time::Duration;
     ///
     /// let mut events = Events::with_capacity(1024);
-    /// let poll = Poll::new().unwrap();
+    /// let poll = Poll::new()?;
     ///
     /// // Register handles with `poll`
     ///
-    /// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+    /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
     ///
     /// for event in events.iter() {
     ///     println!("event={:?}", event);
     /// }
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     pub fn iter(&self) -> Iter {
         Iter {
@@ -1386,6 +1474,8 @@ impl Registration {
     /// # Examples
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Ready, Registration, Poll, PollOpt, Token};
     /// use std::thread;
     ///
@@ -1398,8 +1488,8 @@ impl Registration {
     ///     set_readiness.set_readiness(Ready::readable());
     /// });
     ///
-    /// let poll = Poll::new().unwrap();
-    /// poll.register(&registration, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+    /// let poll = Poll::new()?;
+    /// poll.register(&registration, Token(0), Ready::all(), PollOpt::edge())?;
     ///
     /// let mut events = Events::with_capacity(256);
     ///
@@ -1408,11 +1498,16 @@ impl Registration {
     ///
     ///     for event in &events {
     ///         if event.token() == Token(0) && event.readiness().is_readable() {
-    ///             return;
+    ///             return Ok(());
     ///         }
     ///     }
     /// }
-    ///
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     /// [struct]: #
     /// [`Poll`]: struct.Poll.html
@@ -1541,14 +1636,22 @@ impl SetReadiness {
     /// # Examples
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Registration, Ready};
     ///
     /// let (registration, set_readiness) = Registration::new2();
     ///
     /// assert!(set_readiness.readiness().is_empty());
     ///
-    /// set_readiness.set_readiness(Ready::readable()).unwrap();
+    /// set_readiness.set_readiness(Ready::readable())?;
     /// assert!(set_readiness.readiness().is_readable());
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     pub fn readiness(&self) -> Ready {
         self.inner.readiness()
@@ -1573,28 +1676,36 @@ impl SetReadiness {
     /// work:
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Registration, Ready, Poll, PollOpt, Token};
     ///
-    /// let poll = Poll::new().unwrap();
+    /// let poll = Poll::new()?;
     /// let (registration, set_readiness) = Registration::new2();
     ///
     /// poll.register(&registration,
     ///               Token(0),
     ///               Ready::readable(),
-    ///               PollOpt::edge()).unwrap();
+    ///               PollOpt::edge())?;
     ///
     /// // Set the readiness, then immediately poll to try to get the readiness
     /// // event
-    /// set_readiness.set_readiness(Ready::readable()).unwrap();
+    /// set_readiness.set_readiness(Ready::readable())?;
     ///
     /// let mut events = Events::with_capacity(1024);
-    /// poll.poll(&mut events, None).unwrap();
+    /// poll.poll(&mut events, None)?;
     ///
     /// // There is NO guarantee that the following will work. It is possible
     /// // that the readiness event will be delivered at a later time.
     /// let event = events.get(0).unwrap();
     /// assert_eq!(event.token(), Token(0));
     /// assert!(event.readiness().is_readable());
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     ///
     /// # Examples
@@ -1603,14 +1714,22 @@ impl SetReadiness {
     /// documentation.
     ///
     /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Registration, Ready};
     ///
     /// let (registration, set_readiness) = Registration::new2();
     ///
     /// assert!(set_readiness.readiness().is_empty());
     ///
-    /// set_readiness.set_readiness(Ready::readable()).unwrap();
+    /// set_readiness.set_readiness(Ready::readable())?;
     /// assert!(set_readiness.readiness().is_readable());
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
     /// ```
     ///
     /// [`Registration`]: struct.Registration.html

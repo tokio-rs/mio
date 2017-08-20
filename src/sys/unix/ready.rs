@@ -63,20 +63,27 @@ use std::ops;
 /// Registering readable and error interest on a socket
 ///
 /// ```
+/// # use std::error::Error;
+/// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Ready, Poll, PollOpt, Token};
 /// use mio::tcp::TcpStream;
 /// use mio::unix::UnixReady;
 ///
-/// let addr = "216.58.193.68:80".parse().unwrap();
-/// let socket = TcpStream::connect(&addr).unwrap();
+/// let addr = "216.58.193.68:80".parse()?;
+/// let socket = TcpStream::connect(&addr)?;
 ///
-/// let poll = Poll::new().unwrap();
+/// let poll = Poll::new()?;
 ///
 /// poll.register(&socket,
 ///               Token(0),
 ///               Ready::readable() | UnixReady::error(),
-///               PollOpt::edge()).unwrap();
-///
+///               PollOpt::edge())?;
+/// #     Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
 /// ```
 ///
 /// [`Poll`]: struct.Poll.html
