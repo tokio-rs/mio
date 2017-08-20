@@ -154,11 +154,6 @@ pub use event::{
     Events,
 };
 
-#[deprecated(since = "0.6.5", note = "use events::Iter instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use poll::Iter as EventsIter;
-
 #[deprecated(since = "0.6.5", note = "std::io::Error can avoid the allocation now")]
 #[cfg(feature = "with-deprecated")]
 #[doc(hidden)]
