@@ -504,8 +504,20 @@ impl fmt::Debug for PollOpt {
             }
         }
 
+        if !one {
+            fmt.write_str("(empty)")?;
+        }
+
         Ok(())
     }
+}
+
+#[test]
+fn test_debug_pollopt() {
+    assert_eq!("(empty)", format!("{:?}", PollOpt::empty()));
+    assert_eq!("Edge-Triggered", format!("{:?}", PollOpt::edge()));
+    assert_eq!("Level-Triggered", format!("{:?}", PollOpt::level()));
+    assert_eq!("OneShot", format!("{:?}", PollOpt::oneshot()));
 }
 
 /// A set of readiness event kinds
@@ -912,6 +924,13 @@ impl fmt::Debug for Ready {
 
         Ok(())
     }
+}
+
+#[test]
+fn test_debug_ready() {
+    assert_eq!("(empty)", format!("{:?}", Ready::empty()));
+    assert_eq!("Readable", format!("{:?}", Ready::readable()));
+    assert_eq!("Writable", format!("{:?}", Ready::writable()));
 }
 
 /// An readiness event returned by [`Poll::poll`].
