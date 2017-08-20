@@ -12,7 +12,8 @@ use std::time::Duration;
 use net2::{self, TcpStreamExt};
 
 use {TryRead, TryWrite};
-use mio::{Token, Ready, PollOpt, Poll, Events, IoVec};
+use mio::{Token, Ready, PollOpt, Poll, Events};
+use iovec::IoVec;
 use mio::deprecated::{EventLoop, Handler};
 use mio::tcp::{TcpListener, TcpStream};
 
