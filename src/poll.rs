@@ -1210,7 +1210,7 @@ pub struct Events {
 ///
 /// [`Events`]: struct.Events.html
 /// [`iter`]: struct.Events.html#method.iter
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Iter<'a> {
     inner: &'a Events,
     pos: usize,
