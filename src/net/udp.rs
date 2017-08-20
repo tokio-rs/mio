@@ -101,6 +101,14 @@ impl UdpSocket {
         self.sys.connect(addr)
     }
 
+    /// Sets the value of the `SO_BROADCAST` option for this socket.
+    ///
+    /// When enabled, this socket is allowed to send packets to a broadcast
+    /// address.
+    pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
+        self.sys.set_broadcast(on)
+    }
+
     /// Gets the value of the `SO_BROADCAST` option for this socket.
     ///
     /// For more information about this option, see
@@ -111,12 +119,12 @@ impl UdpSocket {
         self.sys.broadcast()
     }
 
-    /// Sets the value of the `SO_BROADCAST` option for this socket.
+    /// Sets the value of the `IP_MULTICAST_LOOP` option for this socket.
     ///
-    /// When enabled, this socket is allowed to send packets to a broadcast
-    /// address.
-    pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
-        self.sys.set_broadcast(on)
+    /// If enabled, multicast packets will be looped back to the local socket.
+    /// Note that this may not have any affect on IPv6 sockets.
+    pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
+        self.sys.set_multicast_loop_v4(on)
     }
 
     /// Gets the value of the `IP_MULTICAST_LOOP` option for this socket.
@@ -127,24 +135,6 @@ impl UdpSocket {
     /// [link]: #method.set_multicast_loop_v4
     pub fn multicast_loop_v4(&self) -> io::Result<bool> {
         self.sys.multicast_loop_v4()
-    }
-
-    /// Sets the value of the `IP_MULTICAST_LOOP` option for this socket.
-    ///
-    /// If enabled, multicast packets will be looped back to the local socket.
-    /// Note that this may not have any affect on IPv6 sockets.
-    pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
-        self.sys.set_multicast_loop_v4(on)
-    }
-
-    /// Gets the value of the `IP_MULTICAST_TTL` option for this socket.
-    ///
-    /// For more information about this option, see
-    /// [`set_multicast_ttl_v4`][link].
-    ///
-    /// [link]: #method.set_multicast_ttl_v4
-    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
-        self.sys.multicast_ttl_v4()
     }
 
     /// Sets the value of the `IP_MULTICAST_TTL` option for this socket.
@@ -158,14 +148,14 @@ impl UdpSocket {
         self.sys.set_multicast_ttl_v4(ttl)
     }
 
-    /// Gets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
+    /// Gets the value of the `IP_MULTICAST_TTL` option for this socket.
     ///
     /// For more information about this option, see
-    /// [`set_multicast_loop_v6`][link].
+    /// [`set_multicast_ttl_v4`][link].
     ///
-    /// [link]: #method.set_multicast_loop_v6
-    pub fn multicast_loop_v6(&self) -> io::Result<bool> {
-        self.sys.multicast_loop_v6()
+    /// [link]: #method.set_multicast_ttl_v4
+    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
+        self.sys.multicast_ttl_v4()
     }
 
     /// Sets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
@@ -176,13 +166,14 @@ impl UdpSocket {
         self.sys.set_multicast_loop_v6(on)
     }
 
-    /// Gets the value of the `IP_TTL` option for this socket.
+    /// Gets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
     ///
-    /// For more information about this option, see [`set_ttl`][link].
+    /// For more information about this option, see
+    /// [`set_multicast_loop_v6`][link].
     ///
-    /// [link]: #method.set_ttl
-    pub fn ttl(&self) -> io::Result<u32> {
-        self.sys.ttl()
+    /// [link]: #method.set_multicast_loop_v6
+    pub fn multicast_loop_v6(&self) -> io::Result<bool> {
+        self.sys.multicast_loop_v6()
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -191,6 +182,15 @@ impl UdpSocket {
     /// from this socket.
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.sys.set_ttl(ttl)
+    }
+
+    /// Gets the value of the `IP_TTL` option for this socket.
+    ///
+    /// For more information about this option, see [`set_ttl`][link].
+    ///
+    /// [link]: #method.set_ttl
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.sys.ttl()
     }
 
     /// Executes an operation of the `IP_ADD_MEMBERSHIP` type.
