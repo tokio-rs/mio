@@ -5,9 +5,6 @@ mod io;
 mod handler;
 mod notify;
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-pub mod unix;
-
 pub use self::event_loop::{
     EventLoop,
     EventLoopBuilder,
@@ -23,14 +20,4 @@ pub use self::handler::{
 };
 pub use self::notify::{
     NotifyError,
-};
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-pub use self::unix::{
-    pipe,
-    PipeReader,
-    PipeWriter,
-    UnixListener,
-    UnixSocket,
-    UnixStream,
-    Shutdown,
 };

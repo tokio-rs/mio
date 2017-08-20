@@ -13,10 +13,6 @@ pub use self::unix::{
 };
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
-#[cfg(feature = "with-deprecated")]
-pub use self::unix::UnixSocket;
-
-#[cfg(all(unix, not(target_os = "fuchsia")))]
 pub mod unix;
 
 #[cfg(windows)]
