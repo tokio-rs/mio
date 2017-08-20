@@ -213,7 +213,7 @@ pub fn test_dropping_receive_before_poll() {
 
 #[test]
 pub fn test_mixing_channel_with_socket() {
-    use mio::tcp::*;
+    use mio::net::{TcpListener, TcpStream};
 
     let poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(1024);

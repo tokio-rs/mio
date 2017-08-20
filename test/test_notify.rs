@@ -1,7 +1,7 @@
 use {localhost, sleep_ms};
 use mio::*;
 use mio::deprecated::{EventLoop, EventLoopBuilder, Handler, Sender, NotifyError};
-use mio::tcp::*;
+use mio::net::TcpListener;
 use std::thread;
 
 struct TestHandler {

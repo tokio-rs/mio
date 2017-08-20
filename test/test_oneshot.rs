@@ -1,5 +1,5 @@
 use mio::*;
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use std::io::*;
 use std::time::Duration;
 

@@ -1,6 +1,6 @@
 use {sleep_ms};
 use mio::*;
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use std::time::Duration;
 
 const MS: u64 = 1_000;

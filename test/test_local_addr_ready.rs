@@ -1,7 +1,7 @@
 use {TryWrite};
 use mio::*;
 use mio::deprecated::{EventLoop, Handler};
-use mio::tcp::{TcpListener, TcpStream};
+use mio::net::{TcpListener, TcpStream};
 
 const LISTEN: Token = Token(0);
 const CLIENT: Token = Token(1);

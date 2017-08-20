@@ -38,7 +38,7 @@ use poll::SelectorId;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// #     let _listener = TcpListener::bind("127.0.0.1:3454")?;
 /// use mio::{Events, Ready, Poll, PollOpt, Token};
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
 /// let stream = TcpStream::connect(&"127.0.0.1:34254".parse()?)?;
@@ -453,7 +453,7 @@ impl Evented for TcpStream {
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Events, Ready, Poll, PollOpt, Token};
-/// use mio::tcp::TcpListener;
+/// use mio::net::TcpListener;
 /// use std::time::Duration;
 ///
 /// let listener = TcpListener::bind(&"127.0.0.1:34254".parse()?)?;

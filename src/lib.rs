@@ -24,7 +24,7 @@
 //!
 //! ```
 //! use mio::*;
-//! use mio::tcp::{TcpListener, TcpStream};
+//! use mio::net::{TcpListener, TcpStream};
 //!
 //! // Setup some tokens to allow us to identify which event is
 //! // for which socket.

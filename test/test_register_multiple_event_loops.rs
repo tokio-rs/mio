@@ -1,6 +1,6 @@
 use localhost;
 use mio::*;
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use mio::udp::*;
 use std::io::ErrorKind;
 

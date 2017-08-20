@@ -1,7 +1,7 @@
 use {localhost, sleep_ms, TryRead, TryWrite};
 use mio::*;
 use mio::deprecated::{EventLoop, EventLoopBuilder, Handler};
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use std::collections::LinkedList;
 use slab;
 use std::{io, thread};
