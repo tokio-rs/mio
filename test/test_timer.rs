@@ -362,7 +362,7 @@ impl TestHandler {
                 }
 
                 event_loop.reregister(&self.cli, CLIENT,
-                                      Ready::readable() | Ready::hup(),
+                                      Ready::readable(),
                                       PollOpt::edge()).unwrap();
             }
             CONN => {}
