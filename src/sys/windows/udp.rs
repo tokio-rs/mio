@@ -357,7 +357,8 @@ impl Evented for UdpSocket {
 
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        "UdpSocket { ... }".fmt(f)
+        f.debug_struct("UdpSocket")
+            .finish()
     }
 }
 

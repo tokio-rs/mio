@@ -320,7 +320,9 @@ impl Events {
 
 impl fmt::Debug for Events {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Events {{ len: {} }}", self.sys_events.0.len())
+        fmt.debug_struct("Events")
+            .field("len", &self.sys_events.0.len())
+            .finish()
     }
 }
 
