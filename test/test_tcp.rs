@@ -88,7 +88,7 @@ fn connect() {
     let mut e = EventLoop::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register(&s, Token(1), Ready::all(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(1), Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
 
     let mut h = H { hit: 0 };
     e.run(&mut h).unwrap();
@@ -336,7 +336,7 @@ fn connect_then_close() {
                  _events: Ready) {
             if token == Token(1) {
                 let s = self.listener.accept().unwrap().0;
-                event_loop.register(&s, Token(3), Ready::all(),
+                event_loop.register(&s, Token(3), Ready::readable() | Ready::writable(),
                                         PollOpt::edge()).unwrap();
                 drop(s);
             } else if token == Token(2) {
@@ -433,7 +433,7 @@ fn multiple_writes_immediate_success() {
     'outer: loop {
         poll.poll(&mut events, None).unwrap();
         for event in events.iter() {
-            if event.token() == Token(1) && event.kind().is_writable() {
+            if event.token() == Token(1) && event.readiness().is_writable() {
                 break 'outer
             }
         }
@@ -507,7 +507,7 @@ fn connection_reset_by_peer() {
 
         for event in &events {
             if event.token() == Token(3) {
-                assert!(event.kind().is_readable());
+                assert!(event.readiness().is_readable());
 
                 match server.read(&mut buf) {
                     Ok(0) |
@@ -538,7 +538,7 @@ fn connection_reset_by_peer() {
 
          for event in &events {
              if event.token() == Token(0) {
-                 assert!(event.kind().is_writable());
+                 assert!(event.readiness().is_writable());
                  break 'outer
              }
          }

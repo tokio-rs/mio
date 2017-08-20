@@ -13,8 +13,8 @@ pub fn test_udp_level_triggered() {
     let tx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let rx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
-    poll.register(&tx, Token(0), Ready::all(), PollOpt::level()).unwrap();
-    poll.register(&rx, Token(1), Ready::all(), PollOpt::level()).unwrap();
+    poll.register(&tx, Token(0), Ready::readable() | Ready::writable(), PollOpt::level()).unwrap();
+    poll.register(&rx, Token(1), Ready::readable() | Ready::writable(), PollOpt::level()).unwrap();
 
 
     for _ in 0..2 {

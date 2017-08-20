@@ -49,7 +49,7 @@ pub fn test_notify() {
     // Setup a server socket so that the event loop blocks
     let srv = TcpListener::bind(&addr).unwrap();
 
-    event_loop.register(&srv, Token(0), Ready::all(), PollOpt::edge()).unwrap();
+    event_loop.register(&srv, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
 
     let sender = event_loop.channel();
 

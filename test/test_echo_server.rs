@@ -149,7 +149,7 @@ impl EchoClient {
             rx: SliceBuf::wrap(curr.as_bytes()),
             mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: tok,
-            interest: Ready::none()
+            interest: Ready::empty()
         }
     }
 
@@ -189,7 +189,7 @@ impl EchoClient {
             }
         };
 
-        if !self.interest.is_none() {
+        if !self.interest.is_empty() {
             assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
             event_loop.reregister(&self.sock, self.token, self.interest,
                                        PollOpt::edge() | PollOpt::oneshot())?;

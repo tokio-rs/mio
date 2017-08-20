@@ -186,7 +186,7 @@ pub fn expect_events(poll: &Poll,
         for event in event_buffer.iter() {
             let pos_opt = match expected.iter().position(|exp_event| {
                 (event.token() == exp_event.token()) &&
-                event.kind().contains(exp_event.kind())
+                event.readiness().contains(exp_event.readiness())
             }) {
                 Some(x) => Some(x),
                 None => None,

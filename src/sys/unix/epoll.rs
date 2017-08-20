@@ -140,26 +140,11 @@ impl Selector {
     }
 }
 
-#[cfg(feature = "with-deprecated")]
-#[allow(deprecated)]
-fn is_urgent(opts: PollOpt) -> bool {
-    opts.is_urgent()
-}
-
-#[cfg(not(feature = "with-deprecated"))]
-fn is_urgent(_: PollOpt) -> bool {
-    false
-}
-
 fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
     let mut kind = 0;
 
     if interest.is_readable() {
-        if is_urgent(opts) {
-            kind |= EPOLLPRI;
-        } else {
-            kind |= EPOLLIN;
-        }
+        kind |= EPOLLIN;
     }
 
     if interest.is_writable() {

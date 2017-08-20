@@ -926,9 +926,9 @@ impl fmt::Debug for Ready {
 /// ```
 /// use mio::{Event, Ready, Token};
 ///
-/// let event = Event::new(Ready::all(), Token(0));
+/// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
 ///
-/// assert_eq!(event.readiness(), Ready::all());
+/// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
 /// assert_eq!(event.token(), Token(0));
 /// ```
 ///
@@ -950,9 +950,9 @@ impl Event {
     /// ```
     /// use mio::{Event, Ready, Token};
     ///
-    /// let event = Event::new(Ready::all(), Token(0));
+    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
     ///
-    /// assert_eq!(event.readiness(), Ready::all());
+    /// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
     /// assert_eq!(event.token(), Token(0));
     /// ```
     pub fn new(readiness: Ready, token: Token) -> Event {
@@ -969,9 +969,9 @@ impl Event {
     /// ```
     /// use mio::{Event, Ready, Token};
     ///
-    /// let event = Event::new(Ready::all(), Token(0));
+    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
     ///
-    /// assert_eq!(event.readiness(), Ready::all());
+    /// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
     /// ```
     pub fn readiness(&self) -> Ready {
         self.kind
@@ -991,7 +991,7 @@ impl Event {
     /// ```
     /// use mio::{Event, Ready, Token};
     ///
-    /// let event = Event::new(Ready::all(), Token(0));
+    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
     ///
     /// assert_eq!(event.token(), Token(0));
     /// ```

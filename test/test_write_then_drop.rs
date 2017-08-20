@@ -19,7 +19,7 @@ fn write_then_drop() {
                PollOpt::edge()).unwrap();
     s.register(&poll,
                Token(3),
-               Ready::none(),
+               Ready::empty(),
                PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -78,7 +78,7 @@ fn write_then_deregister() {
                PollOpt::edge()).unwrap();
     s.register(&poll,
                Token(3),
-               Ready::none(),
+               Ready::empty(),
                PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
