@@ -33,23 +33,32 @@ use poll::SelectorId;
 ///
 /// ```
 /// # use std::net::TcpListener;
-/// # let _listener = TcpListener::bind("127.0.0.1:3454").unwrap();
+/// # use std::error::Error;
+/// #
+/// # fn try_main() -> Result<(), Box<Error>> {
+/// #     let _listener = TcpListener::bind("127.0.0.1:3454")?;
 /// use mio::{Events, Ready, Poll, PollOpt, Token};
 /// use mio::tcp::TcpStream;
 /// use std::time::Duration;
 ///
-/// let stream = TcpStream::connect(&"127.0.0.1:34254".parse().unwrap()).unwrap();
+/// let stream = TcpStream::connect(&"127.0.0.1:34254".parse()?)?;
 ///
-/// let poll = Poll::new().unwrap();
+/// let poll = Poll::new()?;
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
 /// poll.register(&stream, Token(0), Ready::writable(),
-///               PollOpt::edge()).unwrap();
+///               PollOpt::edge())?;
 ///
-/// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+/// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
 /// // The socket might be ready at this point
+/// #     Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct TcpStream {
@@ -441,22 +450,30 @@ impl Evented for TcpStream {
 /// # Examples
 ///
 /// ```
+/// # use std::error::Error;
+/// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Events, Ready, Poll, PollOpt, Token};
 /// use mio::tcp::TcpListener;
 /// use std::time::Duration;
 ///
-/// let listener = TcpListener::bind(&"127.0.0.1:34254".parse().unwrap()).unwrap();
+/// let listener = TcpListener::bind(&"127.0.0.1:34254".parse()?)?;
 ///
-/// let poll = Poll::new().unwrap();
+/// let poll = Poll::new()?;
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
 /// poll.register(&listener, Token(0), Ready::writable(),
-///               PollOpt::edge()).unwrap();
+///               PollOpt::edge())?;
 ///
-/// poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+/// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
 /// // There may be a socket ready to be accepted
+/// #     Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct TcpListener {
