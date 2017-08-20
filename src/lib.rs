@@ -154,11 +154,6 @@ pub use event::{
     Events,
 };
 
-#[deprecated(since = "0.6.5", note = "use events:: instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use event::{Event, Evented};
-
 #[deprecated(since = "0.6.5", note = "use events::Iter instead")]
 #[cfg(feature = "with-deprecated")]
 #[doc(hidden)]
