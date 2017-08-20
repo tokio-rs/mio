@@ -127,11 +127,6 @@ pub mod timer;
 #[doc(hidden)]
 pub mod deprecated;
 
-#[deprecated(since = "0.6.5", note = "use iovec crate directly")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use iovec::IoVec;
-
 pub use poll::{
     Poll,
     Registration,
