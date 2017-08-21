@@ -33,7 +33,7 @@ impl TestHandler {
                 trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                poll.reregister(&self.client, CLIENT, Ready::writable(), PollOpt::level()).unwrap();
+                poll.reregister(&self.client, CLIENT, Ready::WRITABLE, PollOpt::level()).unwrap();
             }
             _ => panic!("unexpected token"),
         }
@@ -64,12 +64,12 @@ pub fn test_register_deregister() {
     let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
-    poll.register(&server, SERVER, Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&server, SERVER, Ready::READABLE, PollOpt::edge()).unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
-    poll.register(&client, CLIENT, Ready::readable(), PollOpt::level()).unwrap();
+    poll.register(&client, CLIENT, Ready::READABLE, PollOpt::level()).unwrap();
 
     let mut handler = TestHandler::new(server, client);
 
@@ -101,7 +101,7 @@ pub fn test_register_with_no_readable_writable_is_error() {
 
     assert!(poll.register(&sock, Token(0), Ready::hup(), PollOpt::edge()).is_err());
 
-    poll.register(&sock, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&sock, Token(0), Ready::READABLE, PollOpt::edge()).unwrap();
 
     assert!(poll.reregister(&sock, Token(0), Ready::hup(), PollOpt::edge()).is_err());
 }

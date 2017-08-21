@@ -88,7 +88,7 @@ use std::{fmt, io, ops};
 ///                 thread::sleep(when - now);
 ///             }
 ///
-///             set_readiness.set_readiness(Ready::readable());
+///             set_readiness.set_readiness(Ready::READABLE);
 ///         });
 ///
 ///         Deadline {
@@ -174,7 +174,7 @@ pub trait Evented {
 /// ```
 /// use mio::PollOpt;
 ///
-/// let opts = PollOpt::edge() | PollOpt::oneshot();
+/// let opts = PollOpt::EDGE | PollOpt::ONESHOT;
 ///
 /// assert!(opts.is_edge());
 /// assert!(opts.is_oneshot());
@@ -195,16 +195,23 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::empty();
+    /// let opt = PollOpt::EMPTY;
     ///
     /// assert!(!opt.is_level());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
+    pub const EMPTY: PollOpt = PollOpt(0);
+
+    #[deprecated(since = "0.6.10", note = "use PollOp::EMPTY instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn empty() -> PollOpt {
-        PollOpt(0)
+        PollOpt::EMPTY
     }
+
+
 
     /// Return a `PollOpt` representing edge-triggered notifications.
     ///
@@ -215,15 +222,20 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::edge();
+    /// let opt = PollOpt::EDGE;
     ///
     /// assert!(opt.is_edge());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
+    pub const EDGE: PollOpt = PollOpt(0b0001);
+
+    #[deprecated(since = "0.6.10", note = "use PollOp::EDGE instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn edge() -> PollOpt {
-        PollOpt(0b0001)
+        PollOpt::EDGE
     }
 
     /// Return a `PollOpt` representing level-triggered notifications.
@@ -235,15 +247,20 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::level();
+    /// let opt = PollOpt::LEVEL;
     ///
     /// assert!(opt.is_level());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
+    pub const LEVEL: PollOpt = PollOpt(0b0010);
+
+    #[deprecated(since = "0.6.10", note = "use PollOp::EMPTY instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn level() -> PollOpt {
-        PollOpt(0b0010)
+        PollOpt::LEVEL
     }
 
     /// Return a `PollOpt` representing oneshot notifications.
@@ -255,15 +272,20 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::oneshot();
+    /// let opt = PollOpt::ONESHOT;
     ///
     /// assert!(opt.is_oneshot());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
+    pub const ONESHOT: PollOpt = PollOpt(0b0100);
+
+    #[deprecated(since = "0.6.10", note = "use PollOp::ONESHOT instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn oneshot() -> PollOpt {
-        PollOpt(0b0100)
+        PollOpt::ONESHOT
     }
 
     #[deprecated(since = "0.6.5", note = "removed")]
@@ -279,7 +301,7 @@ impl PollOpt {
     #[doc(hidden)]
     #[inline]
     pub fn all() -> PollOpt {
-        PollOpt::edge() | PollOpt::level() | PollOpt::oneshot()
+        PollOpt::EDGE | PollOpt::LEVEL | PollOpt::ONESHOT
     }
 
     /// Returns true if the options include edge-triggered notifications.
@@ -291,7 +313,7 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::edge();
+    /// let opt = PollOpt::EDGE;
     ///
     /// assert!(opt.is_edge());
     /// ```
@@ -299,7 +321,7 @@ impl PollOpt {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_edge(&self) -> bool {
-        self.contains(PollOpt::edge())
+        self.contains(PollOpt::EDGE)
     }
 
     /// Returns true if the options include level-triggered notifications.
@@ -311,7 +333,7 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::level();
+    /// let opt = PollOpt::LEVEL;
     ///
     /// assert!(opt.is_level());
     /// ```
@@ -319,7 +341,7 @@ impl PollOpt {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_level(&self) -> bool {
-        self.contains(PollOpt::level())
+        self.contains(PollOpt::LEVEL)
     }
 
     /// Returns true if the options includes oneshot.
@@ -331,7 +353,7 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::oneshot();
+    /// let opt = PollOpt::ONESHOT;
     ///
     /// assert!(opt.is_oneshot());
     /// ```
@@ -339,7 +361,7 @@ impl PollOpt {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_oneshot(&self) -> bool {
-        self.contains(PollOpt::oneshot())
+        self.contains(PollOpt::ONESHOT)
     }
 
     #[deprecated(since = "0.6.5", note = "removed")]
@@ -372,29 +394,29 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::oneshot();
+    /// let opt = PollOpt::ONESHOT;
     ///
-    /// assert!(opt.contains(PollOpt::oneshot()));
-    /// assert!(!opt.contains(PollOpt::edge()));
+    /// assert!(opt.contains(PollOpt::ONESHOT));
+    /// assert!(!opt.contains(PollOpt::EDGE));
     /// ```
     ///
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::oneshot() | PollOpt::edge();
+    /// let opt = PollOpt::ONESHOT | PollOpt::EDGE;
     ///
-    /// assert!(opt.contains(PollOpt::oneshot()));
-    /// assert!(opt.contains(PollOpt::edge()));
+    /// assert!(opt.contains(PollOpt::ONESHOT));
+    /// assert!(opt.contains(PollOpt::EDGE));
     /// ```
     ///
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::oneshot() | PollOpt::edge();
+    /// let opt = PollOpt::ONESHOT | PollOpt::EDGE;
     ///
-    /// assert!(!PollOpt::oneshot().contains(opt));
+    /// assert!(!PollOpt::ONESHOT.contains(opt));
     /// assert!(opt.contains(opt));
-    /// assert!((opt | PollOpt::level()).contains(opt));
+    /// assert!((opt | PollOpt::LEVEL).contains(opt));
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
@@ -412,8 +434,8 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let mut opt = PollOpt::empty();
-    /// opt.insert(PollOpt::oneshot());
+    /// let mut opt = PollOpt::EMPTY;
+    /// opt.insert(PollOpt::ONESHOT);
     ///
     /// assert!(opt.is_oneshot());
     /// ```
@@ -431,8 +453,8 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let mut opt = PollOpt::oneshot();
-    /// opt.remove(PollOpt::oneshot());
+    /// let mut opt = PollOpt::ONESHOT;
+    /// opt.remove(PollOpt::ONESHOT);
     ///
     /// assert!(!opt.is_oneshot());
     /// ```
@@ -491,9 +513,9 @@ impl fmt::Debug for PollOpt {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (PollOpt::edge(), "Edge-Triggered"),
-            (PollOpt::level(), "Level-Triggered"),
-            (PollOpt::oneshot(), "OneShot")];
+            (PollOpt::EDGE, "Edge-Triggered"),
+            (PollOpt::LEVEL, "Level-Triggered"),
+            (PollOpt::ONESHOT, "OneShot")];
 
         for &(flag, msg) in &flags {
             if self.contains(flag) {
@@ -511,7 +533,7 @@ impl fmt::Debug for PollOpt {
 /// A set of readiness event kinds
 ///
 /// `Ready` is a set of operation descriptors indicating which kind of an
-/// operation is ready to be performed. For example, `Ready::readable()`
+/// operation is ready to be performed. For example, `Ready::READABLE`
 /// indicates that the associated `Evented` handle is ready to perform a
 /// `read` operation.
 ///
@@ -523,24 +545,23 @@ impl fmt::Debug for PollOpt {
 ///
 /// `Ready` values can be combined together using the various bitwise operators.
 ///
-/// For high level documentation on polling and readiness, see [`Poll`].
+/// For high level documentation on polling and [readiness], see [`Poll`].
 ///
 /// # Examples
 ///
 /// ```
 /// use mio::Ready;
 ///
-/// let ready = Ready::readable() | Ready::writable();
+/// let ready = Ready::READABLE | Ready::WRITABLE;
 ///
 /// assert!(ready.is_readable());
 /// assert!(ready.is_writable());
 /// ```
 ///
 /// [`Poll`]: struct.Poll.html
-/// [`readable`]: #method.readable
-/// [`writable`]: #method.writable
 /// [readiness]: struct.Poll.html#readiness-operations
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
+
 pub struct Ready(usize);
 
 const READABLE: usize = 0b00001;
@@ -558,21 +579,26 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::empty();
+    /// let ready = Ready::EMPTY;
     ///
     /// assert!(!ready.is_readable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
-    pub fn empty() -> Ready {
-        Ready(0)
-    }
+    pub const EMPTY: Ready = Ready(0);
 
-    #[deprecated(since = "0.6.5", note = "use Ready::empty instead")]
+    #[deprecated(since = "0.6.5", note = "use Ready::EMPTY instead")]
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     pub fn none() -> Ready {
-        Ready::empty()
+        Ready::EMPTY
+    }
+
+    #[deprecated(since = "0.6.10", note = "use Ready::EMPTY instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
+    pub fn empty() -> Ready {
+        Ready::EMPTY
     }
 
     /// Returns a `Ready` representing readable readiness.
@@ -584,15 +610,20 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     ///
     /// assert!(ready.is_readable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
+    pub const READABLE: Ready = Ready(READABLE);
+
+    #[deprecated(since = "0.6.10", note = "use Ready::READABLE instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     pub fn readable() -> Ready {
-        Ready(READABLE)
+        Ready::READABLE
     }
 
     /// Returns a `Ready` representing writable readiness.
@@ -604,15 +635,20 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::writable();
+    /// let ready = Ready::READABLE;
     ///
     /// assert!(ready.is_writable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
+    pub const WRITABLE: Ready =  Ready(WRITABLE);
+
+    #[deprecated(since = "0.6.10", note = "use Ready::WRITABLE instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     pub fn writable() -> Ready {
-        Ready(WRITABLE)
+        Ready::WRITABLE
     }
 
     #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
@@ -636,8 +672,8 @@ impl Ready {
     #[doc(hidden)]
     #[inline]
     pub fn all() -> Ready {
-        Ready::readable() |
-            Ready::writable()
+        Ready::READABLE |
+            Ready::WRITABLE
     }
 
     /// Returns true if `Ready` is the empty set
@@ -649,12 +685,12 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::empty();
+    /// let ready = Ready::EMPTY;
     /// assert!(ready.is_empty());
     /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
-        *self == Ready::empty()
+        *self == Ready::EMPTY
     }
 
     #[deprecated(since = "0.6.5", note = "use Ready::is_empty instead")]
@@ -674,7 +710,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     ///
     /// assert!(ready.is_readable());
     /// ```
@@ -682,7 +718,7 @@ impl Ready {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_readable(&self) -> bool {
-        self.contains(Ready::readable())
+        self.contains(Ready::READABLE)
     }
 
     /// Returns true if the value includes writable readiness
@@ -694,7 +730,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::writable();
+    /// let ready = Ready::WRITABLE;
     ///
     /// assert!(ready.is_writable());
     /// ```
@@ -702,7 +738,7 @@ impl Ready {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_writable(&self) -> bool {
-        self.contains(Ready::writable())
+        self.contains(Ready::WRITABLE)
     }
 
     #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
@@ -730,8 +766,8 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let mut readiness = Ready::empty();
-    /// readiness.insert(Ready::readable());
+    /// let mut readiness = Ready::EMPTY;
+    /// readiness.insert(Ready::READABLE);
     ///
     /// assert!(readiness.is_readable());
     /// ```
@@ -750,8 +786,8 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let mut readiness = Ready::readable();
-    /// readiness.remove(Ready::readable());
+    /// let mut readiness = Ready::READBLE;
+    /// readiness.remove(Ready::READABLE);
     ///
     /// assert!(!readiness.is_readable());
     /// ```
@@ -782,29 +818,28 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let readiness = Ready::readable();
+    /// let readiness = Ready::READABLE;
     ///
-    /// assert!(readiness.contains(Ready::readable()));
-    /// assert!(!readiness.contains(Ready::writable()));
+    /// assert!(readiness.contains(Ready::READABLE));
+    /// assert!(!readiness.contains(Ready::WRITABLE));
     /// ```
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let readiness = Ready::readable() | Ready::writable();
+    /// let readiness = Ready::READABLE | Ready::WRITABLE;
     ///
-    /// assert!(readiness.contains(Ready::readable()));
-    /// assert!(readiness.contains(Ready::writable()));
+    /// assert!(readiness.contains(Ready::READABLE));
+    /// assert!(readiness.contains(Ready::WRITABLE));
     /// ```
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let readiness = Ready::readable() | Ready::writable();
+    /// let readiness = Ready::READABLE | Ready::WRITABLE;
     ///
-    /// assert!(!Ready::readable().contains(readiness));
+    /// assert!(!Ready::READABLE.contains(readiness));
     /// assert!(readiness.contains(readiness));
-    /// assert!((readiness | Ready::hup()).contains(readiness));
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
@@ -892,8 +927,8 @@ impl fmt::Debug for Ready {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (Ready::readable(), "Readable"),
-            (Ready::writable(), "Writable"),
+            (Ready::READABLE, "Readable"),
+            (Ready::WRITABLE, "Writable"),
             (Ready(ERROR), "Error"),
             (Ready(HUP), "Hup")];
 
@@ -926,9 +961,9 @@ impl fmt::Debug for Ready {
 /// ```
 /// use mio::{Event, Ready, Token};
 ///
-/// let event = Event::new(Ready::all(), Token(0));
+/// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
 ///
-/// assert_eq!(event.readiness(), Ready::all());
+/// assert_eq!(event.readiness(), Ready::READABLE | Ready::WRITABLE);
 /// assert_eq!(event.token(), Token(0));
 /// ```
 ///
@@ -950,9 +985,9 @@ impl Event {
     /// ```
     /// use mio::{Event, Ready, Token};
     ///
-    /// let event = Event::new(Ready::all(), Token(0));
+    /// let event = Event::new(Ready::READABLE, Token(0));
     ///
-    /// assert_eq!(event.readiness(), Ready::all());
+    /// assert_eq!(event.readiness(), Ready::READABLE);
     /// assert_eq!(event.token(), Token(0));
     /// ```
     pub fn new(readiness: Ready, token: Token) -> Event {
@@ -969,9 +1004,9 @@ impl Event {
     /// ```
     /// use mio::{Event, Ready, Token};
     ///
-    /// let event = Event::new(Ready::all(), Token(0));
+    /// let event = Event::new(Ready::READABLE, Token(0));
     ///
-    /// assert_eq!(event.readiness(), Ready::all());
+    /// assert_eq!(event.readiness(), Ready::READABLE);
     /// ```
     pub fn readiness(&self) -> Ready {
         self.kind
@@ -991,7 +1026,7 @@ impl Event {
     /// ```
     /// use mio::{Event, Ready, Token};
     ///
-    /// let event = Event::new(Ready::all(), Token(0));
+    /// let event = Event::new(Ready::READABLE, Token(0));
     ///
     /// assert_eq!(event.token(), Token(0));
     /// ```

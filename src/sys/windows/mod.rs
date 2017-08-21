@@ -117,7 +117,7 @@
 //!
 //! First up, let's take a look at unimplemented portions of this module:
 //!
-//! * The `PollOpt::level()` option is currently entirely unimplemented.
+//! * The `PollOpt::LEVEL` option is currently entirely unimplemented.
 //! * Each `EventLoop` currently owns its completion port, but this prevents an
 //!   I/O handle from being added to multiple event loops (something that can be
 //!   done on Unix). Additionally, it hinders event loops moving across threads.

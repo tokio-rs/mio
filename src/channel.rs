@@ -199,7 +199,7 @@ impl SenderCtl {
         if 0 == cnt {
             // Toggle readiness to readable
             if let Some(set_readiness) = self.inner.set_readiness.borrow() {
-                set_readiness.set_readiness(Ready::readable())?;
+                set_readiness.set_readiness(Ready::READABLE)?;
             }
         }
 
@@ -229,7 +229,7 @@ impl ReceiverCtl {
         if first == 1 {
             // Unset readiness
             if let Some(set_readiness) = self.inner.set_readiness.borrow() {
-                set_readiness.set_readiness(Ready::empty())?;
+                set_readiness.set_readiness(Ready::EMPTY)?;
             }
         }
 
@@ -240,7 +240,7 @@ impl ReceiverCtl {
             // There are still pending messages. Since readiness was
             // previously unset, it must be reset here
             if let Some(set_readiness) = self.inner.set_readiness.borrow() {
-                set_readiness.set_readiness(Ready::readable())?;
+                set_readiness.set_readiness(Ready::READABLE)?;
             }
         }
 
@@ -259,7 +259,7 @@ impl Evented for ReceiverCtl {
 
         if self.inner.pending.load(Ordering::Relaxed) > 0 {
             // TODO: Don't drop readiness
-            let _ = set_readiness.set_readiness(Ready::readable());
+            let _ = set_readiness.set_readiness(Ready::READABLE);
         }
 
         self.registration.fill(registration).ok().expect("unexpected state encountered");

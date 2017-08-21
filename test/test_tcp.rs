@@ -43,7 +43,7 @@ fn accept() {
 
     let mut e = EventLoop::new().unwrap();
 
-    e.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), Ready::READABLE, PollOpt::edge()).unwrap();
 
     let mut h = H { hit: false, listener: l };
     e.run(&mut h).unwrap();
@@ -142,7 +142,7 @@ fn read() {
     let mut e = EventLoop::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register(&s, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(1), Ready::READABLE, PollOpt::edge()).unwrap();
 
     let mut h = H { amt: 0, socket: s };
     e.run(&mut h).unwrap();
@@ -170,7 +170,7 @@ fn read_bufs() {
 
     let s = TcpStream::connect(&addr).unwrap();
 
-    poll.register(&s, Token(1), Ready::readable(), PollOpt::level()).unwrap();
+    poll.register(&s, Token(1), Ready::READABLE, PollOpt::level()).unwrap();
 
     let b1 = &mut [0; 10][..];
     let b2 = &mut [0; 383][..];
@@ -263,7 +263,7 @@ fn write() {
     let mut e = EventLoop::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register(&s, Token(1), Ready::writable(), PollOpt::edge()).unwrap();
+    e.register(&s, Token(1), Ready::WRITABLE, PollOpt::edge()).unwrap();
 
     let mut h = H { amt: 0, socket: s };
     e.run(&mut h).unwrap();
@@ -296,7 +296,7 @@ fn write_bufs() {
     let poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(128);
     let s = TcpStream::connect(&addr).unwrap();
-    poll.register(&s, Token(1), Ready::writable(), PollOpt::level()).unwrap();
+    poll.register(&s, Token(1), Ready::WRITABLE, PollOpt::level()).unwrap();
 
     let b1 = &[1; 10][..];
     let b2 = &[1; 383][..];
@@ -349,8 +349,8 @@ fn connect_then_close() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let s = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
 
-    e.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
-    e.register(&s, Token(2), Ready::readable(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), Ready::READABLE, PollOpt::edge()).unwrap();
+    e.register(&s, Token(2), Ready::READABLE, PollOpt::edge()).unwrap();
 
     let mut h = H { listener: l };
     e.run(&mut h).unwrap();
@@ -374,7 +374,7 @@ fn listen_then_close() {
     let mut e = EventLoop::new().unwrap();
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
-    e.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    e.register(&l, Token(1), Ready::READABLE, PollOpt::edge()).unwrap();
     drop(l);
 
     let mut h = H;
@@ -426,7 +426,7 @@ fn multiple_writes_immediate_success() {
 
     let poll = Poll::new().unwrap();
     let mut s = TcpStream::connect(&addr).unwrap();
-    poll.register(&s, Token(1), Ready::writable(), PollOpt::level()).unwrap();
+    poll.register(&s, Token(1), Ready::WRITABLE, PollOpt::level()).unwrap();
     let mut events = Events::with_capacity(16);
 
     // Wait for our TCP stream to connect
@@ -467,10 +467,10 @@ fn connection_reset_by_peer() {
     let client = TcpStream::from_stream(client).unwrap();
 
     // Register server
-    poll.register(&l, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&l, Token(0), Ready::READABLE, PollOpt::edge()).unwrap();
 
     // Register interest in the client
-    poll.register(&client, Token(1), Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
+    poll.register(&client, Token(1), Ready::READABLE | Ready::WRITABLE, PollOpt::edge()).unwrap();
 
     // Wait for listener to be ready
     let mut server;
@@ -499,7 +499,7 @@ fn connection_reset_by_peer() {
     thread::sleep(Duration::from_millis(100));
 
     // Register interest in the server socket
-    poll.register(&server, Token(3), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&server, Token(3), Ready::READABLE, PollOpt::edge()).unwrap();
 
 
     loop {
@@ -530,7 +530,7 @@ fn connection_reset_by_peer() {
 
      // Pick a "random" port that shouldn't be in use.
      let l = TcpStream::connect(&"127.0.0.1:38381".parse().unwrap()).unwrap();
-     poll.register(&l, Token(0), Ready::writable(), PollOpt::edge()).unwrap();
+     poll.register(&l, Token(0), Ready::WRITABLE, PollOpt::edge()).unwrap();
 
      'outer:
      loop {

@@ -108,7 +108,7 @@ use sys::unix::UnixReady;
 /// let stream = TcpStream::connect(&server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge())?;
+/// poll.register(&stream, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE)?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -280,7 +280,7 @@ use sys::unix::UnixReady;
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// poll.register(&sock, Token(0), Ready::all(), PollOpt::edge())?;
+/// poll.register(&sock, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE)?;
 /// #     Ok(())
 /// # }
 /// #
@@ -396,7 +396,7 @@ pub struct Poll {
 ///                 thread::sleep(when - now);
 ///             }
 ///
-///             set_readiness.set_readiness(Ready::readable());
+///             set_readiness.set_readiness(Ready::READABLE);
 ///         });
 ///
 ///         Deadline {
@@ -656,7 +656,7 @@ impl Poll {
         };
 
         // Register the notification wakeup FD with the IO poller
-        poll.readiness_queue.inner.awakener.register(&poll, AWAKEN, Ready::readable(), PollOpt::edge())?;
+        poll.readiness_queue.inner.awakener.register(&poll, AWAKEN, Ready::READABLE, PollOpt::EDGE)?;
 
         Ok(poll)
     }
@@ -737,7 +737,7 @@ impl Poll {
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`
-    /// poll.register(&socket, Token(0), Ready::all(), PollOpt::edge())?;
+    /// poll.register(&socket, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// let start = Instant::now();
@@ -821,12 +821,12 @@ impl Poll {
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`, requesting readable
-    /// poll.register(&socket, Token(0), Ready::readable(), PollOpt::edge())?;
+    /// poll.register(&socket, Token(0), Ready::READABLE, PollOpt::EDGE)?;
     ///
     /// // Reregister the socket specifying a different token and write interest
-    /// // instead. `PollOpt::edge()` must be specified even though that value
+    /// // instead. `PollOpt::EDGE` must be specified even though that value
     /// // is not being changed.
-    /// poll.reregister(&socket, Token(2), Ready::writable(), PollOpt::edge())?;
+    /// poll.reregister(&socket, Token(2), Ready::WRITABLE, PollOpt::EDGE)?;
     /// #     Ok(())
     /// # }
     /// #
@@ -879,7 +879,7 @@ impl Poll {
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`
-    /// poll.register(&socket, Token(0), Ready::readable(), PollOpt::edge())?;
+    /// poll.register(&socket, Token(0), Ready::READABLE, PollOpt::EDGE)?;
     ///
     /// poll.deregister(&socket)?;
     ///
@@ -972,7 +972,7 @@ impl Poll {
     /// let stream = TcpStream::connect(&addr)?;
     ///
     /// // Register the stream with `Poll`
-    /// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge())?;
+    /// poll.register(&stream, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE)?;
     ///
     /// // Wait for the socket to become ready. This has to happens in a loop to
     /// // handle spurious wakeups.
@@ -1486,11 +1486,11 @@ impl Registration {
     ///     use std::time::Duration;
     ///     thread::sleep(Duration::from_millis(500));
     ///
-    ///     set_readiness.set_readiness(Ready::readable());
+    ///     set_readiness.set_readiness(Ready::READABLE);
     /// });
     ///
     /// let poll = Poll::new()?;
-    /// poll.register(&registration, Token(0), Ready::all(), PollOpt::edge())?;
+    /// poll.register(&registration, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE)?;
     ///
     /// let mut events = Events::with_capacity(256);
     ///
@@ -1516,7 +1516,7 @@ impl Registration {
         // Allocate the registration node. The new node will have `ref_count`
         // set to 2: one SetReadiness, one Registration.
         let node = Box::into_raw(Box::new(ReadinessNode::new(
-                    ptr::null_mut(), Token(0), Ready::empty(), PollOpt::empty(), 2)));
+                    ptr::null_mut(), Token(0), Ready::EMPTY, PollOpt::EMPTY, 2)));
 
         let registration = Registration {
             inner: RegistrationInner {
@@ -1588,7 +1588,7 @@ impl Registration {
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     pub fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner.update(poll, Token(0), Ready::empty(), PollOpt::empty())
+        self.inner.update(poll, Token(0), Ready::EMPTY, PollOpt::EMPTY)
     }
 }
 
@@ -1602,7 +1602,7 @@ impl Evented for Registration {
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner.update(poll, Token(0), Ready::empty(), PollOpt::empty())
+        self.inner.update(poll, Token(0), Ready::EMPTY, PollOpt::EMPTY)
     }
 }
 
@@ -1645,7 +1645,7 @@ impl SetReadiness {
     ///
     /// assert!(set_readiness.readiness().is_empty());
     ///
-    /// set_readiness.set_readiness(Ready::readable())?;
+    /// set_readiness.set_readiness(Ready::READABLE)?;
     /// assert!(set_readiness.readiness().is_readable());
     /// #     Ok(())
     /// # }
@@ -1686,12 +1686,12 @@ impl SetReadiness {
     ///
     /// poll.register(&registration,
     ///               Token(0),
-    ///               Ready::readable(),
-    ///               PollOpt::edge())?;
+    ///               Ready::READABLE,
+    ///               PollOpt::EDGE)?;
     ///
     /// // Set the readiness, then immediately poll to try to get the readiness
     /// // event
-    /// set_readiness.set_readiness(Ready::readable())?;
+    /// set_readiness.set_readiness(Ready::READABLE)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// poll.poll(&mut events, None)?;
@@ -1723,7 +1723,7 @@ impl SetReadiness {
     ///
     /// assert!(set_readiness.readiness().is_empty());
     ///
-    /// set_readiness.set_readiness(Ready::readable())?;
+    /// set_readiness.set_readiness(Ready::READABLE)?;
     /// assert!(set_readiness.readiness().is_readable());
     /// #     Ok(())
     /// # }
@@ -2358,7 +2358,7 @@ impl ReadinessNode {
 
     fn marker() -> ReadinessNode {
         ReadinessNode {
-            state: AtomicState::new(Ready::empty(), PollOpt::empty()),
+            state: AtomicState::new(Ready::EMPTY, PollOpt::EMPTY),
             token_0: UnsafeCell::new(Token(0)),
             token_1: UnsafeCell::new(Token(0)),
             token_2: UnsafeCell::new(Token(0)),
@@ -2506,7 +2506,7 @@ impl ReadinessState {
 
     #[inline]
     fn disarm(&mut self) {
-        self.set_interest(Ready::empty());
+        self.set_interest(Ready::EMPTY);
     }
 
     /// Get the poll options

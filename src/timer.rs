@@ -290,7 +290,7 @@ impl<T> Timer<T> {
         // No more timeouts to poll
         if let Some(inner) = self.inner.borrow() {
             trace!("unsetting readiness");
-            let _ = inner.set_readiness.set_readiness(Ready::empty());
+            let _ = inner.set_readiness.set_readiness(Ready::EMPTY);
 
             if let Some(tick) = self.next_tick() {
                 self.schedule_readiness(tick);
@@ -462,7 +462,7 @@ fn spawn_wakeup_thread(state: WakeupState, set_readiness: SetReadiness, start: I
 
                 if actual == sleep_until_tick {
                     trace!("setting readiness from wakeup thread");
-                    let _ = set_readiness.set_readiness(Ready::readable());
+                    let _ = set_readiness.set_readiness(Ready::READABLE);
                     sleep_until_tick = usize::MAX as Tick;
                 } else {
                     sleep_until_tick = actual as Tick;

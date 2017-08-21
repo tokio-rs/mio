@@ -339,7 +339,7 @@ impl ReadyBinding {
     pub fn readiness(&self) -> Ready {
         match self.readiness {
             Some(ref i) => i.readiness(),
-            None => Ready::empty(),
+            None => Ready::EMPTY,
         }
     }
 

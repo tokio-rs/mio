@@ -121,8 +121,8 @@ impl<H: Handler> EventLoop<H> {
         let (tx, rx) = channel::sync_channel(config.notify_capacity);
 
         // Register the notification wakeup FD with the IO poller
-        poll.register(&rx, NOTIFY, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
-        poll.register(&timer, TIMER, Ready::readable(), PollOpt::edge())?;
+        poll.register(&rx, NOTIFY, Ready::READABLE, PollOpt::EDGE | PollOpt::ONESHOT)?;
+        poll.register(&timer, TIMER, Ready::READABLE, PollOpt::EDGE)?;
 
         Ok(EventLoop {
             run: true,
@@ -347,7 +347,7 @@ impl<H: Handler> EventLoop<H> {
         }
 
         // Re-register
-        let _ = self.poll.reregister(&self.notify_rx, NOTIFY, Ready::readable(), PollOpt::edge() | PollOpt::oneshot());
+        let _ = self.poll.reregister(&self.notify_rx, NOTIFY, Ready::READABLE, PollOpt::EDGE | PollOpt::ONESHOT);
     }
 
     fn timer_process(&mut self, handler: &mut H) {

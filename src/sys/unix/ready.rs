@@ -29,7 +29,7 @@ use std::fmt;
 /// use mio::Ready;
 /// use mio::unix::UnixReady;
 ///
-/// let ready = Ready::readable() | UnixReady::hup();
+/// let ready = Ready::READABLE | UnixReady::hup();
 ///
 /// assert!(ready.is_readable());
 /// assert!(UnixReady::from(ready).is_hup());
@@ -42,7 +42,7 @@ use std::fmt;
 /// use mio::unix::UnixReady;
 ///
 /// // Start with a portable ready
-/// let ready = Ready::readable();
+/// let ready = Ready::READABLE;
 ///
 /// // Convert to a unix ready, adding HUP
 /// let mut unix_ready = UnixReady::from(ready) | UnixReady::hup();
@@ -77,8 +77,8 @@ use std::fmt;
 ///
 /// poll.register(&socket,
 ///               Token(0),
-///               Ready::readable() | UnixReady::error(),
-///               PollOpt::edge())?;
+///               Ready::READABLE | UnixReady::error(),
+///               PollOpt::EDGE)?;
 /// #     Ok(())
 /// # }
 /// #
@@ -319,8 +319,8 @@ impl fmt::Debug for UnixReady {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (UnixReady(Ready::readable()), "Readable"),
-            (UnixReady(Ready::writable()), "Writable"),
+            (UnixReady(Ready::READABLE), "Readable"),
+            (UnixReady(Ready::WRITABLE), "Writable"),
             (UnixReady::error(), "Error"),
             (UnixReady::hup(), "Hup"),
             (UnixReady::aio(), "Aio")];

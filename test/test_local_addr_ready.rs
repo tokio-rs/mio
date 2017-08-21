@@ -26,7 +26,7 @@ impl Handler for MyHandler {
                 let sock = self.listener.accept().unwrap().0;
                 event_loop.register(&sock,
                                     SERVER,
-                                    Ready::writable(),
+                                    Ready::WRITABLE,
                                     PollOpt::edge()).unwrap();
                 self.accepted = Some(sock);
             }
@@ -53,11 +53,11 @@ fn local_addr_ready() {
     let addr = server.local_addr().unwrap();
 
     let mut event_loop = EventLoop::new().unwrap();
-    event_loop.register(&server, LISTEN, Ready::readable(),
+    event_loop.register(&server, LISTEN, Ready::READABLE,
                         PollOpt::edge()).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
-    event_loop.register(&sock, CLIENT, Ready::readable(),
+    event_loop.register(&sock, CLIENT, Ready::READABLE,
                         PollOpt::edge()).unwrap();
 
     event_loop.run(&mut MyHandler {

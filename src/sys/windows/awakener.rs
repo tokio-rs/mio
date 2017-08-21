@@ -45,8 +45,8 @@ impl Awakener {
 impl Evented for Awakener {
     fn register(&self, poll: &Poll, token: Token, events: Ready,
                 opts: PollOpt) -> io::Result<()> {
-        assert_eq!(opts, PollOpt::edge());
-        assert_eq!(events, Ready::readable());
+        assert_eq!(opts, PollOpt::EDGE);
+        assert_eq!(events, Ready::READABLE);
         *self.inner.lock().unwrap() = Some(AwakenerInner {
             selector: poll::selector(poll).clone_ref(),
             token: token,

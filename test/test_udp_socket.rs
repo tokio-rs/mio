@@ -122,10 +122,10 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     assert!(rx.recv_from(&mut buf).unwrap().is_none());
 
     info!("Registering SENDER");
-    event_loop.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
+    event_loop.register(&tx, SENDER, Ready::WRITABLE, PollOpt::edge()).unwrap();
 
     info!("Registering LISTENER");
-    event_loop.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+    event_loop.register(&rx, LISTENER, Ready::READABLE, PollOpt::edge()).unwrap();
 
     info!("Starting event loop to test with...");
     event_loop.run(&mut UdpHandlerSendRecv::new(tx, rx, connected, "hello world")).unwrap();
@@ -180,8 +180,8 @@ pub fn test_udp_socket_discard() {
 
     assert!(udp_outside.send("hello world".as_bytes()).is_ok());
 
-    event_loop.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
-    event_loop.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
+    event_loop.register(&rx, LISTENER, Ready::READABLE, PollOpt::edge()).unwrap();
+    event_loop.register(&tx, SENDER, Ready::WRITABLE, PollOpt::edge()).unwrap();
 
     event_loop.timeout(5000, time::Duration::from_secs(5)).unwrap();
     event_loop.run(&mut UdpHandlerTimeout {}).unwrap();

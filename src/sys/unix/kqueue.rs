@@ -94,13 +94,13 @@ impl Selector {
     pub fn register(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        let flags = if opts.contains(PollOpt::edge()) { libc::EV_CLEAR } else { 0 } |
-                    if opts.contains(PollOpt::oneshot()) { libc::EV_ONESHOT } else { 0 } |
+        let flags = if opts.contains(PollOpt::EDGE) { libc::EV_CLEAR } else { 0 } |
+                    if opts.contains(PollOpt::ONESHOT) { libc::EV_ONESHOT } else { 0 } |
                     libc::EV_RECEIPT;
 
         unsafe {
-            let r = if interests.contains(Ready::readable()) { libc::EV_ADD } else { libc::EV_DELETE };
-            let w = if interests.contains(Ready::writable()) { libc::EV_ADD } else { libc::EV_DELETE };
+            let r = if interests.contains(Ready::READABLE) { libc::EV_ADD } else { libc::EV_DELETE };
+            let w = if interests.contains(Ready::WRITABLE) { libc::EV_ADD } else { libc::EV_DELETE };
             let mut changes = [
                 kevent!(fd, libc::EVFILT_READ, flags | r, usize::from(token)),
                 kevent!(fd, libc::EVFILT_WRITE, flags | w, usize::from(token)),
@@ -278,7 +278,7 @@ impl Events {
 
             if idx == len {
                 // New entry, insert the default
-                self.events.push(Event::new(Ready::empty(), token));
+                self.events.push(Event::new(Ready::EMPTY, token));
 
             }
 
@@ -287,9 +287,9 @@ impl Events {
             }
 
             if e.filter == libc::EVFILT_READ as Filter {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::readable());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::READABLE);
             } else if e.filter == libc::EVFILT_WRITE as Filter {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::WRITABLE);
             }
 #[cfg(any(target_os = "dragonfly",
     target_os = "freebsd", target_os = "ios", target_os = "macos"))]
@@ -337,8 +337,8 @@ fn does_not_register_rw() {
 
     // registering kqueue fd will fail if write is requested (On anything but some versions of OS
     // X)
-    poll.register(&kqf, Token(1234), Ready::readable(),
-                  PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    poll.register(&kqf, Token(1234), Ready::READABLE,
+                  PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 }
 
 #[cfg(any(target_os = "dragonfly",
