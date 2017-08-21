@@ -1308,7 +1308,7 @@ pub struct Iter<'a> {
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
-/// for event in events.into_iter() {
+/// for event in events {
 ///     println!("event={:?}", event);
 /// }
 /// #     Ok(())
