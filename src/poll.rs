@@ -1161,7 +1161,7 @@ impl Poll {
         self.readiness_queue.poll(&mut events.inner);
 
         // Return number of polled events
-        Ok(events.len())
+        Ok(events.iter().count())
     }
 }
 
@@ -1307,49 +1307,14 @@ impl Events {
         }
     }
 
-    /// Returns the `Event` at the given index, or `None` if the index is out of
-    /// bounds.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Poll};
-    /// use std::time::Duration;
-    ///
-    /// let mut events = Events::with_capacity(1024);
-    /// let poll = Poll::new()?;
-    ///
-    /// // Register handles with `poll`
-    ///
-    /// let n = poll.poll(&mut events, Some(Duration::from_millis(100)))?;
-    ///
-    /// for i in 0..n {
-    ///     println!("event={:?}", events.get(i).unwrap());
-    /// }
-    /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
+    #[deprecated(since="0.6.10", note="Index access removed in favor of iterator only API.")]
+    #[doc(hidden)]
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.inner.get(idx)
     }
 
-    /// Returns the number of `Event` values currently in `self`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Events;
-    ///
-    /// let events = Events::with_capacity(1024);
-    ///
-    /// assert_eq!(0, events.len());
-    /// ```
+    #[doc(hidden)]
+    #[deprecated(since="0.6.10", note="Index access removed in favor of iterator only API.")]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
@@ -1430,7 +1395,7 @@ impl<'a> Iterator for Iter<'a> {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.get(self.pos);
+        let ret = self.inner.inner.get(self.pos);
         self.pos += 1;
         ret
     }
@@ -1439,7 +1404,6 @@ impl<'a> Iterator for Iter<'a> {
 impl fmt::Debug for Events {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Events")
-            .field("len", &self.len())
             .field("capacity", &self.capacity())
             .finish()
     }
