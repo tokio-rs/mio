@@ -316,24 +316,6 @@ impl TcpStream {
         self.sys.linger()
     }
 
-    #[deprecated(since = "0.6.9", note = "use set_keepalive")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn set_keepalive_ms(&self, keepalive: Option<u32>) -> io::Result<()> {
-        self.set_keepalive(keepalive.map(|v| Duration::from_millis(v as u64)))
-    }
-
-    #[deprecated(since = "0.6.9", note = "use keepalive")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
-        self.keepalive().map(|v| {
-            v.map(|v| {
-                ::convert::millis(v) as u32
-            })
-        })
-    }
-
     /// Get the value of the `SO_ERROR` option on this socket.
     ///
     /// This will retrieve the stored error in the underlying socket, clearing
