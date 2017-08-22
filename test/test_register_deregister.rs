@@ -99,9 +99,9 @@ pub fn test_register_with_no_readable_writable_is_error() {
 
     let sock = TcpListener::bind(&addr).unwrap();
 
-    assert!(poll.register(&sock, Token(0), Ready::hup(), PollOpt::edge()).is_err());
+    assert!(poll.register(&sock, Token(0), Ready::empty(), PollOpt::edge()).is_err());
 
     poll.register(&sock, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
 
-    assert!(poll.reregister(&sock, Token(0), Ready::hup(), PollOpt::edge()).is_err());
+    assert!(poll.reregister(&sock, Token(0), Ready::empty(), PollOpt::edge()).is_err());
 }

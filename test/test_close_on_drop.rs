@@ -60,7 +60,7 @@ impl TestHandler {
             }
             _ => panic!("received unknown token {:?}", tok)
         }
-        poll.reregister(&self.cli, CLIENT, Ready::readable() | Ready::hup(), PollOpt::edge()).unwrap();
+        poll.reregister(&self.cli, CLIENT, Ready::readable(), PollOpt::edge()).unwrap();
     }
 
     fn handle_write(&mut self, poll: &mut Poll, tok: Token, _: Ready) {
@@ -68,7 +68,7 @@ impl TestHandler {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {
                 debug!("client connected");
-                poll.reregister(&self.cli, CLIENT, Ready::readable() | Ready::hup(), PollOpt::edge()).unwrap();
+                poll.reregister(&self.cli, CLIENT, Ready::readable(), PollOpt::edge()).unwrap();
             }
             _ => panic!("received unknown token {:?}", tok)
         }
