@@ -1,7 +1,8 @@
 use mio::*;
 use mio::deprecated::{Handler, EventLoop};
-use mio::udp::*;
+use mio::net::UdpSocket;
 use bytes::{Buf, RingBuf, SliceBuf, MutBuf};
+use std::io::ErrorKind;
 use std::str;
 use std::time;
 use localhost;
@@ -43,11 +44,9 @@ impl Handler for UdpHandlerSendRecv {
                     debug!("We are receiving a datagram now...");
                     let cnt = unsafe {
                         if !self.connected {
-                            self.rx.recv_from(self.rx_buf.mut_bytes()).unwrap()
-                                                                      .unwrap().0
+                            self.rx.recv_from(self.rx_buf.mut_bytes()).unwrap().0
                         } else {
                             self.rx.recv(self.rx_buf.mut_bytes()).unwrap()
-                                                                    .unwrap()
                         }
                     };
 
@@ -65,10 +64,8 @@ impl Handler for UdpHandlerSendRecv {
                     let cnt = if !self.connected {
                         let addr = self.rx.local_addr().unwrap();
                         self.tx.send_to(self.buf.bytes(), &addr).unwrap()
-                                                                .unwrap()
                     } else {
                         self.tx.send(self.buf.bytes()).unwrap()
-                                                      .unwrap()
                     };
 
                     self.buf.advance(cnt);
@@ -119,7 +116,7 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
     // ensure that the sockets are non-blocking
     let mut buf = [0; 128];
-    assert!(rx.recv_from(&mut buf).unwrap().is_none());
+    assert_eq!(ErrorKind::WouldBlock, rx.recv_from(&mut buf).unwrap_err().kind());
 
     info!("Registering SENDER");
     event_loop.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
@@ -178,7 +175,8 @@ pub fn test_udp_socket_discard() {
 
     let mut event_loop = EventLoop::new().unwrap();
 
-    assert!(udp_outside.send("hello world".as_bytes()).is_ok());
+    let r = udp_outside.send("hello world".as_bytes());
+    assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
     event_loop.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
     event_loop.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
