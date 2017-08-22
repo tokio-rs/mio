@@ -22,20 +22,24 @@ mod test_double_register;
 mod test_echo_server;
 mod test_local_addr_ready;
 mod test_multicast;
-mod test_notify;
 mod test_oneshot;
 mod test_poll;
-mod test_poll_channel;
 mod test_register_deregister;
 mod test_register_multiple_event_loops;
 mod test_reregister_without_poll;
 mod test_smoke;
 mod test_tcp;
 mod test_tcp_level;
-mod test_tick;
 mod test_udp_level;
 mod test_udp_socket;
 mod test_write_then_drop;
+
+#[cfg(feature = "with-deprecated")]
+mod test_notify;
+#[cfg(feature = "with-deprecated")]
+mod test_poll_channel;
+#[cfg(feature = "with-deprecated")]
+mod test_tick;
 
 // The following tests are for deprecated features. Only run these tests on
 // platforms that were supported from before the features were deprecated
