@@ -108,7 +108,7 @@ use sys::unix::UnixReady;
 /// let stream = TcpStream::connect(&server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge())?;
+/// poll.register(&stream, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -280,7 +280,7 @@ use sys::unix::UnixReady;
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// poll.register(&sock, Token(0), Ready::all(), PollOpt::edge())?;
+/// poll.register(&sock, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
 /// #     Ok(())
 /// # }
 /// #
@@ -737,7 +737,7 @@ impl Poll {
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`
-    /// poll.register(&socket, Token(0), Ready::all(), PollOpt::edge())?;
+    /// poll.register(&socket, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// let start = Instant::now();
@@ -972,7 +972,7 @@ impl Poll {
     /// let stream = TcpStream::connect(&addr)?;
     ///
     /// // Register the stream with `Poll`
-    /// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge())?;
+    /// poll.register(&stream, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
     ///
     /// // Wait for the socket to become ready. This has to happens in a loop to
     /// // handle spurious wakeups.
@@ -1548,7 +1548,7 @@ impl Registration {
     /// });
     ///
     /// let poll = Poll::new()?;
-    /// poll.register(&registration, Token(0), Ready::all(), PollOpt::edge())?;
+    /// poll.register(&registration, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
     ///
     /// let mut events = Events::with_capacity(256);
     ///

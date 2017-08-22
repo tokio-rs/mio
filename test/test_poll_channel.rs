@@ -25,7 +25,7 @@ pub fn test_poll_channel_edge() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.kind(), Ready::readable());
+    assert_eq!(event.readiness(), Ready::readable());
 
     // Poll again and there should be no events
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -47,7 +47,7 @@ pub fn test_poll_channel_edge() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.kind(), Ready::readable());
+    assert_eq!(event.readiness(), Ready::readable());
 
     // Read the value
     rx.try_recv().unwrap();
@@ -60,7 +60,7 @@ pub fn test_poll_channel_edge() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.kind(), Ready::readable());
+    assert_eq!(event.readiness(), Ready::readable());
 
     match rx.try_recv() {
         Err(TryRecvError::Disconnected) => {}
@@ -90,7 +90,7 @@ pub fn test_poll_channel_oneshot() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.kind(), Ready::readable());
+    assert_eq!(event.readiness(), Ready::readable());
 
     // Poll again and there should be no events
     let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
@@ -120,7 +120,7 @@ pub fn test_poll_channel_oneshot() {
 
         let event = events.get(0).unwrap();
         assert_eq!(event.token(), Token(123));
-        assert_eq!(event.kind(), Ready::readable());
+        assert_eq!(event.readiness(), Ready::readable());
     }
 
     // Get the value
@@ -161,7 +161,7 @@ pub fn test_poll_channel_level() {
 
         let event = events.get(0).unwrap();
         assert_eq!(event.token(), Token(123));
-        assert_eq!(event.kind(), Ready::readable());
+        assert_eq!(event.readiness(), Ready::readable());
     }
 
     // Read the value
@@ -239,8 +239,8 @@ pub fn test_mixing_channel_with_socket() {
     sleep_ms(250);
 
     expect_events(&poll, &mut events, 2, vec![
-        Event::new(Ready::none(), Token(0)),
-        Event::new(Ready::none(), Token(1)),
+        Event::new(Ready::empty(), Token(0)),
+        Event::new(Ready::empty(), Token(1)),
     ]);
 }
 

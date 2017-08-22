@@ -83,7 +83,7 @@ mod stress {
                 Registration::new(&poll, Token(i), Ready::readable(), PollOpt::edge())
             }).collect();
 
-            let mut ready: Vec<_> = (0..NUM_REGISTRATIONS).map(|_| Ready::none()).collect();
+            let mut ready: Vec<_> = (0..NUM_REGISTRATIONS).map(|_| Ready::empty()).collect();
 
             let remaining = Arc::new(AtomicUsize::new(NUM_THREADS));
 
@@ -97,10 +97,10 @@ mod stress {
                     for _ in 0..NUM_ITERS {
                         for i in 0..NUM_REGISTRATIONS {
                             set_readiness[i].set_readiness(Ready::readable()).unwrap();
-                            set_readiness[i].set_readiness(Ready::none()).unwrap();
+                            set_readiness[i].set_readiness(Ready::empty()).unwrap();
                             set_readiness[i].set_readiness(Ready::writable()).unwrap();
                             set_readiness[i].set_readiness(Ready::readable() | Ready::writable()).unwrap();
-                            set_readiness[i].set_readiness(Ready::none()).unwrap();
+                            set_readiness[i].set_readiness(Ready::empty()).unwrap();
                         }
                     }
 
@@ -121,7 +121,7 @@ mod stress {
                 poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
 
                 for event in &events {
-                    ready[event.token().0] = event.kind();
+                    ready[event.token().0] = event.readiness();
                 }
 
                 // Update registration
@@ -135,7 +135,7 @@ mod stress {
             poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
 
             for event in &events {
-                ready[event.token().0] = event.kind();
+                ready[event.token().0] = event.readiness();
             }
 
             // Everything should be flagged as readable

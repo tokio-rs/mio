@@ -335,7 +335,7 @@ impl<H: Handler> EventLoop<H> {
     }
 
     fn io_event(&mut self, handler: &mut H, evt: Event) {
-        handler.ready(self, evt.token(), evt.kind());
+        handler.ready(self, evt.token(), evt.readiness());
     }
 
     fn notify(&mut self, handler: &mut H) {

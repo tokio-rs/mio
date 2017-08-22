@@ -129,9 +129,9 @@ impl UnixReady {
     /// # Examples
     ///
     /// ```
-    /// use mio::Ready;
+    /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::error();
+    /// let ready = UnixReady::error();
     ///
     /// assert!(ready.is_error());
     /// ```
@@ -158,9 +158,9 @@ impl UnixReady {
     /// # Examples
     ///
     /// ```
-    /// use mio::Ready;
+    /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::hup();
+    /// let ready = UnixReady::hup();
     ///
     /// assert!(ready.is_hup());
     /// ```
@@ -202,9 +202,9 @@ impl UnixReady {
     /// # Examples
     ///
     /// ```
-    /// use mio::Ready;
+    /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::error();
+    /// let ready = UnixReady::error();
     ///
     /// assert!(ready.is_error());
     /// ```
@@ -230,9 +230,9 @@ impl UnixReady {
     /// # Examples
     ///
     /// ```
-    /// use mio::Ready;
+    /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::hup();
+    /// let ready = UnixReady::hup();
     ///
     /// assert!(ready.is_hup());
     /// ```
