@@ -816,7 +816,6 @@ impl Ready {
     ///
     /// assert!(!Ready::readable().contains(readiness));
     /// assert!(readiness.contains(readiness));
-    /// assert!((readiness | Ready::hup()).contains(readiness));
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
