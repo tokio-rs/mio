@@ -1,4 +1,5 @@
-use mio::*;
+use mio::{Events, Poll, PollOpt, Ready, Registration, SetReadiness, Token};
+use mio::event::Evented;
 use std::time::Duration;
 
 #[test]
@@ -6,7 +7,8 @@ fn smoke() {
     let poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(128);
 
-    let (_r, set) = Registration::new(&poll, Token(0), Ready::readable(), PollOpt::edge());
+    let (r, set) = Registration::new2();
+    r.register(&poll, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
 
     let n = poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
     assert_eq!(n, 0);
@@ -60,7 +62,8 @@ fn set_readiness_before_register() {
 
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 mod stress {
-    use mio::*;
+    use mio::{Events, Poll, PollOpt, Ready, Registration, SetReadiness, Token};
+    use mio::event::Evented;
     use std::time::Duration;
 
     #[test]
@@ -80,7 +83,9 @@ mod stress {
             let mut events = Events::with_capacity(128);
 
             let registrations: Vec<_> = (0..NUM_REGISTRATIONS).map(|i| {
-                Registration::new(&poll, Token(i), Ready::readable(), PollOpt::edge())
+                let (r, s) = Registration::new2();
+                r.register(&poll, Token(i), Ready::readable(), PollOpt::edge()).unwrap();
+                (r, s)
             }).collect();
 
             let mut ready: Vec<_> = (0..NUM_REGISTRATIONS).map(|_| Ready::empty()).collect();
@@ -115,7 +120,7 @@ mod stress {
             while remaining.load(Acquire) > 0 {
                 // Set interest
                 for (i, &(ref r, _)) in registrations.iter().enumerate() {
-                    r.update(&poll, Token(i), Ready::writable(), PollOpt::edge()).unwrap();
+                    r.reregister(&poll, Token(i), Ready::writable(), PollOpt::edge()).unwrap();
                 }
 
                 poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
@@ -127,7 +132,7 @@ mod stress {
                 // Update registration
                 // Set interest
                 for (i, &(ref r, _)) in registrations.iter().enumerate() {
-                    r.update(&poll, Token(i), Ready::readable(), PollOpt::edge()).unwrap();
+                    r.reregister(&poll, Token(i), Ready::readable(), PollOpt::edge()).unwrap();
                 }
             }
 
@@ -175,8 +180,8 @@ mod stress {
 
         // Create entries
         for i in 0..ENTRIES {
-            let (registration, set_readiness) =
-                Registration::new(&poll, Token(i), Ready::readable(), PollOpt::edge());
+            let (registration, set_readiness) = Registration::new2();
+            registration.register(&poll, Token(i), Ready::readable(), PollOpt::edge()).unwrap();
 
             entries.push(Entry {
                 registration: registration,
@@ -362,7 +367,8 @@ fn drop_registration_from_non_main_thread() {
 
     let mut index: usize = 0;
     for _ in 0..ITERS {
-        let (registration, set_readiness) = Registration::new(&mut poll, Token(token_index), Ready::readable(), PollOpt::edge());
+        let (registration, set_readiness) = Registration::new2();
+        registration.register(&mut poll, Token(token_index), Ready::readable(), PollOpt::edge()).unwrap();
         let _ = senders[index].send((registration, set_readiness));
 
         token_index += 1;
@@ -370,7 +376,8 @@ fn drop_registration_from_non_main_thread() {
         if index == THREADS {
             index = 0;
 
-            let (registration, set_readiness) = Registration::new(&mut poll, Token(token_index), Ready::readable(), PollOpt::edge());
+            let (registration, set_readiness) = Registration::new2();
+            registration.register(&mut poll, Token(token_index), Ready::readable(), PollOpt::edge()).unwrap();
             let _ = set_readiness.set_readiness(Ready::readable());
             drop(registration);
             drop(set_readiness);
