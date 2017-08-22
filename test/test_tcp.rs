@@ -14,7 +14,7 @@ use net2::{self, TcpStreamExt};
 use {TryRead, TryWrite};
 use mio::{Token, Ready, PollOpt, Poll, Events, IoVec};
 use mio::deprecated::{EventLoop, Handler};
-use mio::tcp::{TcpListener, TcpStream};
+use mio::net::{TcpListener, TcpStream};
 
 #[test]
 fn accept() {

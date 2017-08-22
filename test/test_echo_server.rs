@@ -1,7 +1,7 @@
 use {localhost, TryRead, TryWrite};
 use mio::*;
 use mio::deprecated::{EventLoop, Handler};
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use slab;
 use std::io;

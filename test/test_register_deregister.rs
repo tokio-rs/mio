@@ -1,6 +1,6 @@
 use {localhost, TryWrite};
 use mio::*;
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use bytes::SliceBuf;
 use std::time::Duration;
 

@@ -67,7 +67,7 @@ use std::fmt;
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Ready, Poll, PollOpt, Token};
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 /// use mio::unix::UnixReady;
 ///
 /// let addr = "216.58.193.68:80".parse()?;

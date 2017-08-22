@@ -14,7 +14,7 @@
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Events, Ready, Poll, PollOpt, Token};
-/// use mio::tcp::TcpListener;
+/// use mio::net::TcpListener;
 ///
 /// use std::thread;
 /// use std::io::{self, Read};

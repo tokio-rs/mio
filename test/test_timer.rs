@@ -3,7 +3,7 @@ use mio::*;
 use mio::deprecated::{EventLoop, Handler};
 use mio::timer::{Timer};
 
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use bytes::{Buf, ByteBuf, SliceBuf};
 use localhost;
 use std::time::Duration;

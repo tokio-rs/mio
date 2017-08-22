@@ -1,6 +1,6 @@
 use std::io::{Write, Read};
 
-use mio::tcp::{TcpStream, TcpListener};
+use mio::net::{TcpListener, TcpStream};
 use mio::{Poll, Events, Ready, PollOpt, Token, Evented};
 
 #[test]

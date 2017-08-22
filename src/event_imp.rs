@@ -32,7 +32,7 @@ use std::{fmt, io, ops};
 /// ```
 /// use mio::{Ready, Poll, PollOpt, Token};
 /// use mio::event::Evented;
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 ///
 /// use std::io;
 ///

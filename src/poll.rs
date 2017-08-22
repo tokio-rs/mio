@@ -92,7 +92,7 @@ use sys::unix::UnixReady;
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Events, Poll, Ready, PollOpt, Token};
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 ///
 /// use std::net::{TcpListener, SocketAddr};
 ///
@@ -268,7 +268,7 @@ use sys::unix::UnixReady;
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Poll, Ready, PollOpt, Token};
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 /// use std::time::Duration;
 /// use std::thread;
 ///
@@ -730,7 +730,7 @@ impl Poll {
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll, Ready, PollOpt, Token};
-    /// use mio::tcp::TcpStream;
+    /// use mio::net::TcpStream;
     /// use std::time::{Duration, Instant};
     ///
     /// let poll = Poll::new()?;
@@ -815,7 +815,7 @@ impl Poll {
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Poll, Ready, PollOpt, Token};
-    /// use mio::tcp::TcpStream;
+    /// use mio::net::TcpStream;
     ///
     /// let poll = Poll::new()?;
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
@@ -872,7 +872,7 @@ impl Poll {
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll, Ready, PollOpt, Token};
-    /// use mio::tcp::TcpStream;
+    /// use mio::net::TcpStream;
     /// use std::time::Duration;
     ///
     /// let poll = Poll::new()?;
@@ -949,7 +949,7 @@ impl Poll {
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll, Ready, PollOpt, Token};
-    /// use mio::tcp::TcpStream;
+    /// use mio::net::TcpStream;
     ///
     /// use std::net::{TcpListener, SocketAddr};
     /// use std::thread;
