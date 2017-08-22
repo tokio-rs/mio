@@ -1,5 +1,5 @@
 use mio::*;
-use mio::udp::*;
+use mio::net::UdpSocket;
 use {expect_events, sleep_ms};
 
 #[test]
@@ -35,7 +35,7 @@ pub fn test_udp_level_triggered() {
     }
 
     let mut buf = [0; 200];
-    while rx.recv_from(&mut buf).unwrap().is_some() {}
+    while rx.recv_from(&mut buf).is_ok() {}
 
     for _ in 0..2 {
         expect_events(poll, events, 4, vec![Event::new(Ready::writable(), Token(1))]);
