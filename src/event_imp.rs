@@ -437,18 +437,6 @@ impl ops::Sub for PollOpt {
     }
 }
 
-#[deprecated(since = "0.6.10", note = "removed")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-impl ops::Not for PollOpt {
-    type Output = PollOpt;
-
-    #[inline]
-    fn not(self) -> PollOpt {
-        PollOpt(!self.0)
-    }
-}
-
 impl fmt::Debug for PollOpt {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
@@ -785,18 +773,6 @@ impl<T: Into<Ready>> ops::SubAssign<T> for Ready {
     #[inline]
     fn sub_assign(&mut self, other: T) {
         self.0 &= !other.into().0;
-    }
-}
-
-#[deprecated(since = "0.6.10", note = "removed")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-impl ops::Not for Ready {
-    type Output = Ready;
-
-    #[inline]
-    fn not(self) -> Ready {
-        Ready(!self.0)
     }
 }
 

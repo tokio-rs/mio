@@ -310,18 +310,6 @@ impl ops::Sub for UnixReady {
     }
 }
 
-#[deprecated(since = "0.6.10", note = "removed")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-impl ops::Not for UnixReady {
-    type Output = UnixReady;
-
-    #[inline]
-    fn not(self) -> UnixReady {
-        (!self.0).into()
-    }
-}
-
 impl fmt::Debug for UnixReady {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
