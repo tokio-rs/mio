@@ -1,6 +1,3 @@
-extern crate mio;
-extern crate env_logger;
-
 use std::cmp;
 use std::io::prelude::*;
 use std::io;
@@ -14,26 +11,11 @@ use net2::{self, TcpStreamExt};
 use {TryRead, TryWrite};
 use mio::{Token, Ready, PollOpt, Poll, Events};
 use iovec::IoVec;
-use mio::deprecated::{EventLoop, Handler};
 use mio::net::{TcpListener, TcpStream};
 
 #[test]
 fn accept() {
-    struct H { hit: bool, listener: TcpListener }
-
-    impl Handler for H {
-        type Timeout = ();
-        type Message = ();
-
-        fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 events: Ready) {
-            self.hit = true;
-            assert_eq!(token, Token(1));
-            assert!(events.is_readable());
-            assert!(self.listener.accept().is_ok());
-            event_loop.shutdown();
-        }
-    }
+    struct H { hit: bool, listener: TcpListener, shutdown: bool }
 
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = l.local_addr().unwrap();
@@ -42,12 +24,24 @@ fn accept() {
         net::TcpStream::connect(&addr).unwrap();
     });
 
-    let mut e = EventLoop::new().unwrap();
+    let poll = Poll::new().unwrap();
 
-    e.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
 
-    let mut h = H { hit: false, listener: l };
-    e.run(&mut h).unwrap();
+    let mut events = Events::with_capacity(128);
+
+    let mut h = H { hit: false, listener: l, shutdown: false };
+    while !h.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            h.hit = true;
+            assert_eq!(event.token(), Token(1));
+            assert!(event.readiness().is_readable());
+            assert!(h.listener.accept().is_ok());
+            h.shutdown = true;
+        }
+    }
     assert!(h.hit);
     assert!(h.listener.accept().unwrap_err().kind() == io::ErrorKind::WouldBlock);
     t.join().unwrap();
@@ -55,24 +49,7 @@ fn accept() {
 
 #[test]
 fn connect() {
-    struct H { hit: u32 }
-
-    impl Handler for H {
-        type Timeout = ();
-        type Message = ();
-
-        fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 events: Ready) {
-            assert_eq!(token, Token(1));
-            match self.hit {
-                0 => assert!(events.is_writable()),
-                1 => assert!(events.is_readable()),
-                _ => panic!(),
-            }
-            self.hit += 1;
-            event_loop.shutdown();
-        }
-    }
+    struct H { hit: u32, shutdown: bool }
 
     let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = l.local_addr().unwrap();
@@ -86,17 +63,46 @@ fn connect() {
         tx2.send(()).unwrap();
     });
 
-    let mut e = EventLoop::new().unwrap();
+    let poll = Poll::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register(&s, Token(1), Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
+    poll.register(&s, Token(1), Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
 
-    let mut h = H { hit: 0 };
-    e.run(&mut h).unwrap();
+    let mut events = Events::with_capacity(128);
+
+    let mut h = H { hit: 0, shutdown: false };
+    while !h.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            assert_eq!(event.token(), Token(1));
+            match h.hit {
+                0 => assert!(event.readiness().is_writable()),
+                1 => assert!(event.readiness().is_readable()),
+                _ => panic!(),
+            }
+            h.hit += 1;
+            h.shutdown = true;
+        }
+    }
     assert_eq!(h.hit, 1);
     tx.send(()).unwrap();
     rx2.recv().unwrap();
-    e.run(&mut h).unwrap();
+    h.shutdown = false;
+    while !h.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            assert_eq!(event.token(), Token(1));
+            match h.hit {
+                0 => assert!(event.readiness().is_writable()),
+                1 => assert!(event.readiness().is_readable()),
+                _ => panic!(),
+            }
+            h.hit += 1;
+            h.shutdown = true;
+        }
+    }
     assert_eq!(h.hit, 2);
     t.join().unwrap();
 }
@@ -104,29 +110,7 @@ fn connect() {
 #[test]
 fn read() {
     const N: usize = 16 * 1024 * 1024;
-    struct H { amt: usize, socket: TcpStream }
-
-    impl Handler for H {
-        type Timeout = ();
-        type Message = ();
-
-        fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 _events: Ready) {
-            assert_eq!(token, Token(1));
-            let mut b = [0; 1024];
-            loop {
-                if let Some(amt) = self.socket.try_read(&mut b).unwrap() {
-                    self.amt += amt;
-                } else {
-                    break
-                }
-                if self.amt >= N {
-                    event_loop.shutdown();
-                    break
-                }
-            }
-        }
-    }
+    struct H { amt: usize, socket: TcpStream, shutdown: bool }
 
     let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = l.local_addr().unwrap();
@@ -140,13 +124,33 @@ fn read() {
         }
     });
 
-    let mut e = EventLoop::new().unwrap();
+    let poll = Poll::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register(&s, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&s, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
 
-    let mut h = H { amt: 0, socket: s };
-    e.run(&mut h).unwrap();
+    let mut events = Events::with_capacity(128);
+
+    let mut h = H { amt: 0, socket: s, shutdown: false };
+    while !h.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            assert_eq!(event.token(), Token(1));
+            let mut b = [0; 1024];
+            loop {
+                if let Some(amt) = h.socket.try_read(&mut b).unwrap() {
+                    h.amt += amt;
+                } else {
+                    break
+                }
+                if h.amt >= N {
+                    h.shutdown = true;
+                    break
+                }
+            }
+        }
+    }
     t.join().unwrap();
 }
 
@@ -225,29 +229,7 @@ fn read_bufs() {
 #[test]
 fn write() {
     const N: usize = 16 * 1024 * 1024;
-    struct H { amt: usize, socket: TcpStream }
-
-    impl Handler for H {
-        type Timeout = ();
-        type Message = ();
-
-        fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 _events: Ready) {
-            assert_eq!(token, Token(1));
-            let b = [0; 1024];
-            loop {
-                if let Some(amt) = self.socket.try_write(&b).unwrap() {
-                    self.amt += amt;
-                } else {
-                    break
-                }
-                if self.amt >= N {
-                    event_loop.shutdown();
-                    break
-                }
-            }
-        }
-    }
+    struct H { amt: usize, socket: TcpStream, shutdown: bool }
 
     let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = l.local_addr().unwrap();
@@ -261,13 +243,33 @@ fn write() {
         }
     });
 
-    let mut e = EventLoop::new().unwrap();
+    let poll = Poll::new().unwrap();
     let s = TcpStream::connect(&addr).unwrap();
 
-    e.register(&s, Token(1), Ready::writable(), PollOpt::edge()).unwrap();
+    poll.register(&s, Token(1), Ready::writable(), PollOpt::edge()).unwrap();
 
-    let mut h = H { amt: 0, socket: s };
-    e.run(&mut h).unwrap();
+    let mut events = Events::with_capacity(128);
+
+    let mut h = H { amt: 0, socket: s, shutdown: false };
+    while !h.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            assert_eq!(event.token(), Token(1));
+            let b = [0; 1024];
+            loop {
+                if let Some(amt) = h.socket.try_write(&b).unwrap() {
+                    h.amt += amt;
+                } else {
+                    break
+                }
+                if h.amt >= N {
+                    h.shutdown = true;
+                    break
+                }
+            }
+        }
+    }
     t.join().unwrap();
 }
 
@@ -327,59 +329,51 @@ fn write_bufs() {
 
 #[test]
 fn connect_then_close() {
-    struct H { listener: TcpListener }
+    struct H { listener: TcpListener, shutdown: bool }
 
-    impl Handler for H {
-        type Timeout = ();
-        type Message = ();
-
-        fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token,
-                 _events: Ready) {
-            if token == Token(1) {
-                let s = self.listener.accept().unwrap().0;
-                event_loop.register(&s, Token(3), Ready::readable() | Ready::writable(),
-                                        PollOpt::edge()).unwrap();
-                drop(s);
-            } else if token == Token(2) {
-                event_loop.shutdown();
-            }
-        }
-    }
-
-    let mut e = EventLoop::new().unwrap();
+    let poll = Poll::new().unwrap();
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let s = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
 
-    e.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
-    e.register(&s, Token(2), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&s, Token(2), Ready::readable(), PollOpt::edge()).unwrap();
 
-    let mut h = H { listener: l };
-    e.run(&mut h).unwrap();
+    let mut events = Events::with_capacity(128);
+
+    let mut h = H { listener: l, shutdown: false };
+    while !h.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            if event.token() == Token(1) {
+                let s = h.listener.accept().unwrap().0;
+                poll.register(&s, Token(3), Ready::readable() | Ready::writable(),
+                                        PollOpt::edge()).unwrap();
+                drop(s);
+            } else if event.token() == Token(2) {
+                h.shutdown = true;
+            }
+        }
+    }
 }
 
 #[test]
 fn listen_then_close() {
-    struct H;
-
-    impl Handler for H {
-        type Timeout = ();
-        type Message = ();
-
-        fn ready(&mut self, _: &mut EventLoop<Self>, token: Token, _: Ready) {
-            if token == Token(1) {
-                panic!("recieved ready() on a closed TcpListener")
-            }
-        }
-    }
-
-    let mut e = EventLoop::new().unwrap();
+    let poll = Poll::new().unwrap();
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
-    e.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&l, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
     drop(l);
 
-    let mut h = H;
-    e.run_once(&mut h, Some(Duration::from_millis(100))).unwrap();
+    let mut events = Events::with_capacity(128);
+
+    poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+
+    for event in &events {
+        if event.token() == Token(1) {
+            panic!("recieved ready() on a closed TcpListener")
+        }
+    }
 }
 
 fn assert_send<T: Send>() {
