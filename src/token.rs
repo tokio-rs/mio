@@ -115,7 +115,7 @@
 ///                         Ok(_) => unreachable!(),
 ///                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
 ///                             // Socket is not ready anymore, stop reading
-///                             continue;
+///                             break;
 ///                         }
 ///                         e => panic!("err={:?}", e), // Unexpected error
 ///                     }
