@@ -1,7 +1,8 @@
 use std::io::{Write, Read};
 
+use mio::event::Evented;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Poll, Events, Ready, PollOpt, Token, Evented};
+use mio::{Poll, Events, Ready, PollOpt, Token};
 
 #[test]
 fn write_then_drop() {

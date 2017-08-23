@@ -2,7 +2,8 @@
 
 #![allow(deprecated, missing_debug_implementations)]
 
-use {convert, io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
+use {convert, io, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
+use event::Evented;
 use lazycell::LazyCell;
 use std::{cmp, error, fmt, u64, usize, iter, thread};
 use std::sync::Arc;

@@ -72,7 +72,8 @@ mod test_fuchsia_handles;
 use bytes::{Buf, MutBuf};
 use std::io::{self, Read, Write};
 use std::time::Duration;
-use mio::{Event, Events, Poll};
+use mio::{Events, Poll};
+use mio::event::Event;
 
 pub trait TryRead {
     fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<usize>>

@@ -1,4 +1,5 @@
-use {io, sys, Evented, Ready, Poll, PollOpt, Token};
+use {io, sys, Ready, Poll, PollOpt, Token};
+use event::Evented;
 use deprecated::TryAccept;
 use io::MapNonBlock;
 use std::io::{Read, Write};
