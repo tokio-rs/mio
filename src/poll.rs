@@ -433,6 +433,10 @@ pub struct Poll {
 /// [`Poll`]: struct.Poll.html
 /// [`Registration::new2`]: struct.Registration.html#method.new2
 /// [`Evented`]: event/trait.Evented.html
+/// [`set_readiness`]: struct.SetReadiness.html#method.set_readiness
+/// [`register`]: struct.Poll.html#method.register
+/// [`reregister`]: struct.Poll.html#method.reregister
+/// [`reregister`]: struct.Poll.html#method.reregister
 pub struct Registration {
     inner: RegistrationInner,
 }
@@ -440,12 +444,13 @@ pub struct Registration {
 unsafe impl Send for Registration {}
 unsafe impl Sync for Registration {}
 
-/// Updates the readiness state of the associated [`Registration`].
+/// Updates the readiness state of the associated `Registration`.
 ///
 /// See [`Registration`] for more documentation on using `SetReadiness` and
 /// [`Poll`] for high level polling documentation.
 ///
-/// [`Registration`]
+/// [`Poll`]: struct.Poll.html
+/// [`Registration`]: struct.Registration.html
 #[derive(Clone)]
 pub struct SetReadiness {
     inner: RegistrationInner,
@@ -663,7 +668,7 @@ impl Poll {
 
     /// Register an `Evented` handle with the `Poll` instance.
     ///
-    /// Once registerd, the `Poll` instance will monitor the `Evented` handle
+    /// Once registered, the `Poll` instance will monitor the `Evented` handle
     /// for readiness state changes. When it notices a state change, it will
     /// return a readiness event for the handle the next time [`poll`] is
     /// called.
@@ -1210,9 +1215,9 @@ impl AsRawFd for Poll {
 /// A collection of readiness events.
 ///
 /// `Events` is passed as an argument to [`Poll::poll`] and will be used to
-/// receive any new readiness events received since the last call to [`poll`].
-/// Usually, a single `Events` instance is created at the same time as the
-/// [`Poll`] and the single instance is reused for each call to [`poll`].
+/// receive any new readiness events received since the last poll. Usually, a
+/// single `Events` instance is created at the same time as a [`Poll`] and
+/// reused on each call to [`Poll::poll`].
 ///
 /// See [`Poll`] for more documentation on polling.
 ///
@@ -1245,7 +1250,6 @@ impl AsRawFd for Poll {
 /// ```
 ///
 /// [`Poll::poll`]: struct.Poll.html#method.poll
-/// [`poll`]: struct.Poll.html#method.poll
 /// [`Poll`]: struct.Poll.html
 pub struct Events {
     inner: sys::Events,
@@ -1719,9 +1723,9 @@ impl SetReadiness {
     /// Set the registration's readiness
     ///
     /// If the associated `Registration` is registered with a [`Poll`] instance
-    /// and has requested readiness events that include `ready`, then a call
-    /// [`poll`] will receive a readiness event representing the readiness
-    /// state change.
+    /// and has requested readiness events that include `ready`, then a future
+    /// call to [`Poll::poll`] will receive a readiness event representing the
+    /// readiness state change.
     ///
     /// # Note
     ///
@@ -1792,8 +1796,9 @@ impl SetReadiness {
     /// ```
     ///
     /// [`Registration`]: struct.Registration.html
+    /// [`Evented`]: event/trait.Evented.html#examples
     /// [`Poll`]: struct.Poll.html
-    /// [`poll`]: struct.Poll.html#method.poll
+    /// [`Poll::poll`]: struct.Poll.html#method.poll
     pub fn set_readiness(&self, ready: Ready) -> io::Result<()> {
         self.inner.set_readiness(ready)
     }
