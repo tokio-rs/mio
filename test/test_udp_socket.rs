@@ -1,5 +1,4 @@
-use mio::*;
-use mio::deprecated::{Handler, EventLoop};
+use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio::net::UdpSocket;
 use bytes::{Buf, RingBuf, SliceBuf, MutBuf};
 use std::io::ErrorKind;
@@ -16,7 +15,8 @@ pub struct UdpHandlerSendRecv {
     msg: &'static str,
     buf: SliceBuf<'static>,
     rx_buf: RingBuf,
-    connected: bool
+    connected: bool,
+    shutdown: bool,
 }
 
 impl UdpHandlerSendRecv {
@@ -27,76 +27,9 @@ impl UdpHandlerSendRecv {
             msg: msg,
             buf: SliceBuf::wrap(msg.as_bytes()),
             rx_buf: RingBuf::new(1024),
-            connected: connected
+            connected: connected,
+            shutdown: false,
         }
-    }
-}
-
-impl Handler for UdpHandlerSendRecv {
-    type Timeout = usize;
-    type Message = ();
-
-    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandlerSendRecv>, token: Token, events: Ready) {
-
-        if events.is_readable() {
-            match token {
-                LISTENER => {
-                    debug!("We are receiving a datagram now...");
-                    let cnt = unsafe {
-                        if !self.connected {
-                            self.rx.recv_from(self.rx_buf.mut_bytes()).unwrap().0
-                        } else {
-                            self.rx.recv(self.rx_buf.mut_bytes()).unwrap()
-                        }
-                    };
-
-                    unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
-                    assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
-                    event_loop.shutdown();
-                },
-                _ => ()
-            }
-        }
-
-        if events.is_writable() {
-            match token {
-                SENDER => {
-                    let cnt = if !self.connected {
-                        let addr = self.rx.local_addr().unwrap();
-                        self.tx.send_to(self.buf.bytes(), &addr).unwrap()
-                    } else {
-                        self.tx.send(self.buf.bytes()).unwrap()
-                    };
-
-                    self.buf.advance(cnt);
-                },
-                _ => {}
-            }
-        }
-    }
-}
-
-pub struct UdpHandlerTimeout {
-}
-
-impl Handler for UdpHandlerTimeout {
-    type Timeout = usize;
-    type Message = ();
-
-    fn ready(&mut self, _event_loop: &mut EventLoop<UdpHandlerTimeout>, token: Token, events: Ready) {
-        if events.is_readable() {
-            match token {
-                LISTENER => {
-                    assert!(false, "Expected to no receive a packet but got something")
-                },
-                _ => ()
-            }
-        }
-   }
-
-    /// Invoked when a timeout has completed.
-    fn timeout(&mut self, event_loop: &mut EventLoop<Self>, _timeout: Self::Timeout) {
-        event_loop.shutdown();
     }
 }
 
@@ -109,7 +42,7 @@ fn assert_sync<T: Sync>() {
 #[cfg(test)]
 fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     debug!("Starting TEST_UDP_SOCKETS");
-    let mut event_loop = EventLoop::new().unwrap();
+    let poll = Poll::new().unwrap();
 
     assert_send::<UdpSocket>();
     assert_sync::<UdpSocket>();
@@ -119,13 +52,57 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     assert_eq!(ErrorKind::WouldBlock, rx.recv_from(&mut buf).unwrap_err().kind());
 
     info!("Registering SENDER");
-    event_loop.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
+    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
 
     info!("Registering LISTENER");
-    event_loop.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+
+    let mut events = Events::with_capacity(1024);
 
     info!("Starting event loop to test with...");
-    event_loop.run(&mut UdpHandlerSendRecv::new(tx, rx, connected, "hello world")).unwrap();
+    let mut handler = UdpHandlerSendRecv::new(tx, rx, connected, "hello world");
+
+    while !handler.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            if event.readiness().is_readable() {
+                match event.token() {
+                    LISTENER => {
+                        debug!("We are receiving a datagram now...");
+                        let cnt = unsafe {
+                            if !handler.connected {
+                                handler.rx.recv_from(handler.rx_buf.mut_bytes()).unwrap().0
+                            } else {
+                                handler.rx.recv(handler.rx_buf.mut_bytes()).unwrap()
+                            }
+                        };
+
+                        unsafe { MutBuf::advance(&mut handler.rx_buf, cnt); }
+                        assert!(str::from_utf8(handler.rx_buf.bytes()).unwrap() == handler.msg);
+                        handler.shutdown = true;
+                    },
+                    _ => ()
+                }
+            }
+
+            if event.readiness().is_writable() {
+                match event.token() {
+                    SENDER => {
+                        let cnt = if !handler.connected {
+                            let addr = handler.rx.local_addr().unwrap();
+                            handler.tx.send_to(handler.buf.bytes(), &addr).unwrap()
+                        } else {
+                            handler.tx.send(handler.buf.bytes()).unwrap()
+                        };
+
+                        handler.buf.advance(cnt);
+                    },
+                    _ => {}
+                }
+            }
+        }
+    }
 }
 
 #[test]
@@ -173,14 +150,26 @@ pub fn test_udp_socket_discard() {
     assert!(udp_outside.connect(rx_addr).is_ok());
     assert!(rx.connect(tx_addr).is_ok());
 
-    let mut event_loop = EventLoop::new().unwrap();
+    let poll = Poll::new().unwrap();
 
     let r = udp_outside.send("hello world".as_bytes());
     assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
-    event_loop.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
-    event_loop.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
+    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
 
-    event_loop.timeout(5000, time::Duration::from_secs(5)).unwrap();
-    event_loop.run(&mut UdpHandlerTimeout {}).unwrap();
+    let mut events = Events::with_capacity(1024);
+
+    poll.poll(&mut events, Some(time::Duration::from_secs(5))).unwrap();
+
+    for event in &events {
+        if event.readiness().is_readable() {
+            match event.token() {
+                LISTENER => {
+                    assert!(false, "Expected to no receive a packet but got something")
+                },
+                _ => ()
+            }
+        }
+    }
 }
