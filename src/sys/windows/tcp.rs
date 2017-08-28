@@ -392,7 +392,7 @@ impl StreamImp {
             _ => return,
         }
 
-        me.iocp.set_readiness(me.iocp.readiness() & !Ready::readable());
+        me.iocp.set_readiness(me.iocp.readiness() - Ready::readable());
 
         trace!("scheduling a read");
         let res = unsafe {
@@ -448,7 +448,7 @@ impl StreamImp {
                       me: &mut StreamInner) {
 
         // About to write, clear any pending level triggered events
-        me.iocp.set_readiness(me.iocp.readiness() & !Ready::writable());
+        me.iocp.set_readiness(me.iocp.readiness() - Ready::writable());
 
         trace!("scheduling a write");
         loop {
@@ -709,7 +709,7 @@ impl ListenerImp {
             _ => return
         }
 
-        me.iocp.set_readiness(me.iocp.readiness() & !Ready::readable());
+        me.iocp.set_readiness(me.iocp.readiness() - Ready::readable());
 
         let res = match self.inner.family {
             Family::V4 => TcpBuilder::new_v4(),
