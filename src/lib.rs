@@ -82,7 +82,6 @@
 
 extern crate lazycell;
 extern crate net2;
-extern crate slab;
 extern crate iovec;
 
 #[cfg(target_os = "fuchsia")]
@@ -104,9 +103,6 @@ extern crate kernel32;
 
 #[macro_use]
 extern crate log;
-
-#[cfg(test)]
-extern crate env_logger;
 
 mod event_imp;
 mod io;

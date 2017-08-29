@@ -2,6 +2,8 @@
 
 #![allow(deprecated, missing_debug_implementations)]
 
+extern crate slab;
+
 use {convert, io, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use event::Evented;
 use lazycell::LazyCell;
@@ -92,7 +94,7 @@ const TICK_MAX: Tick = u64::MAX;
 // Manages communication with wakeup thread
 type WakeupState = Arc<AtomicUsize>;
 
-type Slab<T> = ::slab::Slab<T, ::Token>;
+type Slab<T> = slab::Slab<T, ::Token>;
 
 pub type Result<T> = ::std::result::Result<T, TimerError>;
 // TODO: remove
