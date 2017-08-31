@@ -1,7 +1,7 @@
 use {localhost, sleep_ms, TryRead, TryWrite};
 use mio::*;
 use mio::deprecated::{EventLoop, EventLoopBuilder, Handler};
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use std::collections::LinkedList;
 use slab;
 use std::{io, thread};
@@ -41,7 +41,7 @@ impl EchoConn {
     fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         event_loop.reregister(&self.sock, self.token.unwrap(),
                               Ready::READABLE,
-                              PollOpt::edge() | PollOpt::oneshot())
+                              PollOpt::EDGE | PollOpt::ONESHOT)
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
@@ -66,7 +66,7 @@ impl EchoConn {
             };
         }
 
-        event_loop.reregister(&self.sock, self.token.unwrap(), Ready::READABLE, PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token.unwrap(), Ready::READABLE, PollOpt::EDGE | PollOpt::ONESHOT)
     }
 }
 
@@ -87,7 +87,7 @@ impl EchoServer {
         // Register the connection
         self.conns[tok].token = Some(tok);
         event_loop.register(&self.conns[tok].sock, tok, Ready::READABLE,
-                            PollOpt::edge() | PollOpt::oneshot())
+                            PollOpt::EDGE | PollOpt::ONESHOT)
             .ok().expect("could not register socket with event loop");
 
         Ok(())
@@ -154,7 +154,7 @@ impl EchoClient {
         }
         if self.backlog.len() > 0 {
             event_loop.reregister(&self.sock, self.token, Ready::WRITABLE,
-                                  PollOpt::edge() | PollOpt::oneshot()).unwrap();
+                                  PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
         }
 
         Ok(())
@@ -216,7 +216,7 @@ impl Handler for Echo {
                     &self.client.sock,
                     self.client.token,
                     Ready::WRITABLE,
-                    PollOpt::edge() | PollOpt::oneshot()).unwrap();
+                    PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
             }
         }
     }
@@ -240,13 +240,13 @@ pub fn test_echo_server() {
 
     info!("listen for connections");
     event_loop.register(&srv, SERVER, Ready::READABLE,
-                        PollOpt::edge() | PollOpt::oneshot()).unwrap();
+                        PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
     event_loop.register(&sock, CLIENT, Ready::WRITABLE,
-                        PollOpt::edge() | PollOpt::oneshot()).unwrap();
+                        PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
     let chan = event_loop.channel();
 
     let go = move || {

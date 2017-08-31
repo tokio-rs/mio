@@ -21,9 +21,9 @@ use std::{fmt, io, ops};
 /// [`Registration`] and [`SetReadiness`]. In this case, the implementer takes
 /// responsibility for driving the readiness state changes.
 ///
-/// [`Poll`]: struct.Poll.html
-/// [`Registration`]: struct.Registration.html
-/// [`SetReadiness`]: struct.SetReadiness.html
+/// [`Poll`]: ../struct.Poll.html
+/// [`Registration`]: ../struct.Registration.html
+/// [`SetReadiness`]: ../struct.SetReadiness.html
 ///
 /// # Examples
 ///
@@ -32,7 +32,7 @@ use std::{fmt, io, ops};
 /// ```
 /// use mio::{Ready, Poll, PollOpt, Token};
 /// use mio::event::Evented;
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 ///
 /// use std::io;
 ///
@@ -127,38 +127,30 @@ pub trait Evented {
     /// instead. Implementors should handle registration by either delegating
     /// the call to another `Evented` type or creating a [`Registration`].
     ///
-    /// See [struct] documentation for more details.
-    ///
-    /// [`Poll::register`]: struct.Poll.html#method.register
-    /// [`Registration`]: struct.Registration.html
-    /// [struct]: #
+    /// [`Poll::register`]: ../struct.Poll.html#method.register
+    /// [`Registration`]: ../struct.Registration.html
     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>;
 
     /// Re-register `self` with the given `Poll` instance.
     ///
     /// This function should not be called directly. Use [`Poll::reregister`]
     /// instead. Implementors should handle re-registration by either delegating
-    /// the call to another `Evented` type or calling [`Registration::update`].
+    /// the call to another `Evented` type or calling
+    /// [`SetReadiness::set_readiness`].
     ///
-    /// See [struct] documentation for more details.
-    ///
-    /// [`Poll::reregister`]: struct.Poll.html#method.register
-    /// [`Registration::update`]: struct.Registration.html#method.update
-    /// [struct]: #
+    /// [`Poll::reregister`]: ../struct.Poll.html#method.reregister
+    /// [`SetReadiness::set_readiness`]: ../struct.SetReadiness.html#method.set_readiness
     fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>;
 
     /// Deregister `self` from the given `Poll` instance
     ///
     /// This function should not be called directly. Use [`Poll::deregister`]
-    /// instead. Implementors shuld handle deregistration by either delegating
+    /// instead. Implementors should handle deregistration by either delegating
     /// the call to another `Evented` type or by dropping the [`Registration`]
     /// associated with `self`.
     ///
-    /// See [struct] documentation for more details.
-    ///
-    /// [`Poll::deregister`]: struct.Poll.html#method.deregister
-    /// [`Registration`]: struct.Registration.html
-    /// [struct]: #
+    /// [`Poll::deregister`]: ../struct.Poll.html#method.deregister
+    /// [`Registration`]: ../struct.Registration.html
     fn deregister(&self, poll: &Poll) -> io::Result<()>;
 }
 
@@ -526,8 +518,20 @@ impl fmt::Debug for PollOpt {
             }
         }
 
+        if !one {
+            fmt.write_str("(empty)")?;
+        }
+
         Ok(())
     }
+}
+
+#[test]
+fn test_debug_pollopt() {
+    assert_eq!("(empty)", format!("{:?}", PollOpt::EMPTY));
+    assert_eq!("Edge-Triggered", format!("{:?}", PollOpt::EDGE));
+    assert_eq!("Level-Triggered", format!("{:?}", PollOpt::LEVEL));
+    assert_eq!("OneShot", format!("{:?}", PollOpt::ONESHOT));
 }
 
 /// A set of readiness event kinds
@@ -949,6 +953,13 @@ impl fmt::Debug for Ready {
     }
 }
 
+#[test]
+fn test_debug_ready() {
+    assert_eq!("(empty)", format!("{:?}", Ready::EMPTY));
+    assert_eq!("Readable", format!("{:?}", Ready::READABLE));
+    assert_eq!("Writable", format!("{:?}", Ready::WRITABLE));
+}
+
 /// An readiness event returned by [`Poll::poll`].
 ///
 /// `Event` is a [readiness state] paired with a [`Token`]. It is returned by
@@ -959,7 +970,8 @@ impl fmt::Debug for Ready {
 /// # Examples
 ///
 /// ```
-/// use mio::{Event, Ready, Token};
+/// use mio::{Ready, Token};
+/// use mio::event::Event;
 ///
 /// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
 ///
@@ -967,10 +979,10 @@ impl fmt::Debug for Ready {
 /// assert_eq!(event.token(), Token(0));
 /// ```
 ///
-/// [`Poll::poll`]: struct.Poll.html#method.poll
-/// [`Poll`]: struct.Poll.html
-/// [readiness state ]: struct.Ready.html
-/// [`Token`]: struct.Token.html
+/// [`Poll::poll`]: ../struct.Poll.html#method.poll
+/// [`Poll`]: ../struct.Poll.html
+/// [readiness state]: ../struct.Ready.html
+/// [`Token`]: ../struct.Token.html
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Event {
     kind: Ready,
@@ -983,7 +995,8 @@ impl Event {
     /// # Examples
     ///
     /// ```
-    /// use mio::{Event, Ready, Token};
+    /// use mio::{Ready, Token};
+    /// use mio::event::Event;
     ///
     /// let event = Event::new(Ready::READABLE, Token(0));
     ///
@@ -1002,7 +1015,8 @@ impl Event {
     /// # Examples
     ///
     /// ```
-    /// use mio::{Event, Ready, Token};
+    /// use mio::{Ready, Token};
+    /// use mio::event::Event;
     ///
     /// let event = Event::new(Ready::READABLE, Token(0));
     ///
@@ -1024,7 +1038,8 @@ impl Event {
     /// # Examples
     ///
     /// ```
-    /// use mio::{Event, Ready, Token};
+    /// use mio::{Ready, Token};
+    /// use mio::event::Event;
     ///
     /// let event = Event::new(Ready::READABLE, Token(0));
     ///

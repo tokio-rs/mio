@@ -204,20 +204,20 @@ pub fn subprocess_communicate(mut process : Child, input : &[u8]) -> (Vec<u8>, V
                                                input);
     match subprocess.stdout {
        Some(ref sub_stdout) => event_loop.register(sub_stdout, subprocess.stdout_token, Ready::READABLE,
-                                                   PollOpt::level()).unwrap(),
+                                                   PollOpt::LEVEL).unwrap(),
        None => {},
     }
 
     match subprocess.stderr {
         Some(ref sub_stderr) => event_loop.register(sub_stderr, subprocess.stderr_token, Ready::READABLE,
-                        PollOpt::level()).unwrap(),
+                        PollOpt::LEVEL).unwrap(),
         None => {},
     }
 
     // Connect to the server
     match subprocess.stdin {
         Some (ref sub_stdin) => event_loop.register(sub_stdin, subprocess.stdin_token, Ready::WRITABLE,
-                        PollOpt::level()).unwrap(),
+                        PollOpt::LEVEL).unwrap(),
          None => {},
     }
 

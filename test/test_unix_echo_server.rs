@@ -53,7 +53,7 @@ impl EchoConn {
         }
 
         assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
-        event_loop.reregister(&self.sock, self.token.unwrap(), self.interest, PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token.unwrap(), self.interest, PollOpt::EDGE | PollOpt::ONESHOT)
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
@@ -81,7 +81,7 @@ impl EchoConn {
         };
 
         assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
-        event_loop.reregister(&self.sock, self.token.unwrap(), self.interest, PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token.unwrap(), self.interest, PollOpt::EDGE | PollOpt::ONESHOT)
     }
 }
 
@@ -101,7 +101,7 @@ impl EchoServer {
 
         // Register the connection
         self.conns[tok].token = Some(tok);
-        event_loop.register(&self.conns[tok].sock, tok, Ready::READABLE, PollOpt::edge() | PollOpt::oneshot())
+        event_loop.register(&self.conns[tok].sock, tok, Ready::READABLE, PollOpt::EDGE | PollOpt::ONESHOT)
             .ok().expect("could not register socket with event loop");
 
         Ok(())
@@ -188,7 +188,7 @@ impl EchoClient {
 
         if !self.interest.is_none() {
             assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
-            event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())?;
+            event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::EDGE | PollOpt::ONESHOT)?;
         }
 
         Ok(())
@@ -211,7 +211,7 @@ impl EchoClient {
         }
 
         assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
-        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::EDGE | PollOpt::ONESHOT)
     }
 
     fn next_msg(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
@@ -228,7 +228,7 @@ impl EchoClient {
 
         self.interest.insert(Ready::WRITABLE);
         assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
-        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())
+        event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::EDGE | PollOpt::ONESHOT)
     }
 }
 
@@ -283,12 +283,12 @@ pub fn test_unix_echo_server() {
     let srv = UnixListener::bind(&addr).unwrap();
 
     info!("listen for connections");
-    event_loop.register(&srv, SERVER, Ready::READABLE, PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    event_loop.register(&srv, SERVER, Ready::READABLE, PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 
     let sock = UnixStream::connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register(&sock, CLIENT, Ready::WRITABLE, PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    event_loop.register(&sock, CLIENT, Ready::WRITABLE, PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 
     // Start the event loop
     event_loop.run(&mut Echo::new(srv, sock, vec!["foo", "bar"])).unwrap();

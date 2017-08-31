@@ -1,5 +1,5 @@
 use mio::*;
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use std::io::*;
 use std::time::Duration;
 
@@ -16,17 +16,17 @@ pub fn test_tcp_edge_oneshot() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Ready::READABLE, PollOpt::level()).unwrap();
+    poll.register(&l, Token(0), Ready::READABLE, PollOpt::LEVEL).unwrap();
 
     // Connect a socket, we are going to write to it
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(&s1, Token(1), Ready::WRITABLE, PollOpt::level()).unwrap();
+    poll.register(&s1, Token(1), Ready::WRITABLE, PollOpt::LEVEL).unwrap();
 
     wait_for(&mut poll, &mut events, Token(0));
 
     // Get pair
     let (mut s2, _) = l.accept().unwrap();
-    poll.register(&s2, Token(2), Ready::READABLE, PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    poll.register(&s2, Token(2), Ready::READABLE, PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 
     wait_for(&mut poll, &mut events, Token(1));
 
@@ -41,10 +41,10 @@ pub fn test_tcp_edge_oneshot() {
         assert_eq!(1, s2.read(&mut buf).unwrap());
         assert_eq!(*byte, buf[0]);
 
-        poll.reregister(&s2, Token(2), Ready::READABLE, PollOpt::edge() | PollOpt::oneshot()).unwrap();
+        poll.reregister(&s2, Token(2), Ready::READABLE, PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 
         if *byte == b'o' {
-            poll.reregister(&s2, Token(2), Ready::READABLE, PollOpt::edge() | PollOpt::oneshot()).unwrap();
+            poll.reregister(&s2, Token(2), Ready::READABLE, PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
         }
     }
 }

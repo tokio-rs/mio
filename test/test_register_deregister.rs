@@ -1,6 +1,6 @@
 use {localhost, TryWrite};
 use mio::*;
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use bytes::SliceBuf;
 use std::time::Duration;
 
@@ -33,7 +33,7 @@ impl TestHandler {
                 trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                poll.reregister(&self.client, CLIENT, Ready::WRITABLE, PollOpt::level()).unwrap();
+                poll.reregister(&self.client, CLIENT, Ready::WRITABLE, PollOpt::LEVEL).unwrap();
             }
             _ => panic!("unexpected token"),
         }
@@ -64,12 +64,12 @@ pub fn test_register_deregister() {
     let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
-    poll.register(&server, SERVER, Ready::READABLE, PollOpt::edge()).unwrap();
+    poll.register(&server, SERVER, Ready::READABLE, PollOpt::EDGE).unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
-    poll.register(&client, CLIENT, Ready::READABLE, PollOpt::level()).unwrap();
+    poll.register(&client, CLIENT, Ready::READABLE, PollOpt::LEVEL).unwrap();
 
     let mut handler = TestHandler::new(server, client);
 
@@ -99,9 +99,9 @@ pub fn test_register_with_no_readable_writable_is_error() {
 
     let sock = TcpListener::bind(&addr).unwrap();
 
-    assert!(poll.register(&sock, Token(0), Ready::hup(), PollOpt::edge()).is_err());
+    assert!(poll.register(&sock, Token(0), Ready::EMPTY, PollOpt::EDGE).is_err());
 
-    poll.register(&sock, Token(0), Ready::READABLE, PollOpt::edge()).unwrap();
+    poll.register(&sock, Token(0), Ready::READABLE, PollOpt::EDGE).unwrap();
 
-    assert!(poll.reregister(&sock, Token(0), Ready::hup(), PollOpt::edge()).is_err());
+    assert!(poll.reregister(&sock, Token(0), Ready::EMPTY, PollOpt::EDGE).is_err());
 }

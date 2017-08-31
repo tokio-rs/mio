@@ -1,5 +1,6 @@
-use mio::*;
-use mio::udp::*;
+use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::event::Event;
+use mio::net::UdpSocket;
 use {expect_events, sleep_ms};
 
 #[test]
@@ -13,8 +14,8 @@ pub fn test_udp_level_triggered() {
     let tx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let rx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
-    poll.register(&tx, Token(0), Ready::all(), PollOpt::level()).unwrap();
-    poll.register(&rx, Token(1), Ready::all(), PollOpt::level()).unwrap();
+    poll.register(&tx, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::LEVEL).unwrap();
+    poll.register(&rx, Token(1), Ready::READABLE | Ready::WRITABLE, PollOpt::LEVEL).unwrap();
 
 
     for _ in 0..2 {
@@ -35,7 +36,7 @@ pub fn test_udp_level_triggered() {
     }
 
     let mut buf = [0; 200];
-    while rx.recv_from(&mut buf).unwrap().is_some() {}
+    while rx.recv_from(&mut buf).is_ok() {}
 
     for _ in 0..2 {
         expect_events(poll, events, 4, vec![Event::new(Ready::WRITABLE, Token(1))]);

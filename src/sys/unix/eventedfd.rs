@@ -10,7 +10,7 @@ use std::os::unix::io::RawFd;
 
 #[derive(Debug)]
 
-/// Adapter for [`RawFd`] providing an [`Evented`] implementation.
+/// Adapter for `RawFd` providing an [`Evented`] implementation.
 ///
 /// `EventedFd` enables registering any type with an FD with [`Poll`].
 ///
@@ -86,9 +86,9 @@ use std::os::unix::io::RawFd;
 /// }
 /// ```
 ///
-/// [`RawFd`]: #
-/// [`Evented`]: #
-/// [`Poll`]: #
+/// [`Evented`]: ../event/trait.Evented.html
+/// [`Poll`]: ../struct.Poll.html
+/// [`Poll::register`]: ../struct.Poll.html#method.register
 pub struct EventedFd<'a>(pub &'a RawFd);
 
 impl<'a> Evented for EventedFd<'a> {

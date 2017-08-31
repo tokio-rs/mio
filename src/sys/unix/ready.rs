@@ -67,7 +67,7 @@ use std::fmt;
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Ready, Poll, PollOpt, Token};
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 /// use mio::unix::UnixReady;
 ///
 /// let addr = "216.58.193.68:80".parse()?;
@@ -87,7 +87,7 @@ use std::fmt;
 /// # }
 /// ```
 ///
-/// [`Poll`]: struct.Poll.html
+/// [`Poll`]: ../struct.Poll.html
 /// [readiness]: struct.Poll.html#readiness-operations
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct UnixReady(Ready);
@@ -111,7 +111,7 @@ impl UnixReady {
     /// assert!(ready.is_aio());
     /// ```
     ///
-    /// [`Poll`]: struct.Poll.html
+    /// [`Poll`]: ../struct.Poll.html
     #[inline]
     pub fn aio() -> UnixReady {
         UnixReady(ready_from_usize(AIO))
@@ -129,15 +129,15 @@ impl UnixReady {
     /// # Examples
     ///
     /// ```
-    /// use mio::Ready;
+    /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::error();
+    /// let ready = UnixReady::error();
     ///
     /// assert!(ready.is_error());
     /// ```
     ///
-    /// [`Poll`]: struct.Poll.html
-    /// [readiness]: struct.Poll.html#readiness-operations
+    /// [`Poll`]: ../struct.Poll.html
+    /// [readiness]: ../struct.Poll.html#readiness-operations
     #[inline]
     pub fn error() -> UnixReady {
         UnixReady(ready_from_usize(ERROR))
@@ -158,15 +158,15 @@ impl UnixReady {
     /// # Examples
     ///
     /// ```
-    /// use mio::Ready;
+    /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::hup();
+    /// let ready = UnixReady::hup();
     ///
     /// assert!(ready.is_hup());
     /// ```
     ///
-    /// [`Poll`]: struct.Poll.html
-    /// [readiness]: struct.Poll.html#readiness-operations
+    /// [`Poll`]: ../struct.Poll.html
+    /// [readiness]: ../struct.Poll.html#readiness-operations
     #[inline]
     pub fn hup() -> UnixReady {
         UnixReady(ready_from_usize(HUP))
@@ -185,6 +185,8 @@ impl UnixReady {
     ///
     /// assert!(ready.is_aio());
     /// ```
+    ///
+    /// [`Poll`]: ../struct.Poll.html
     #[inline]
     pub fn is_aio(&self) -> bool {
         self.contains(ready_from_usize(AIO))
@@ -202,14 +204,15 @@ impl UnixReady {
     /// # Examples
     ///
     /// ```
-    /// use mio::Ready;
+    /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::error();
+    /// let ready = UnixReady::error();
     ///
     /// assert!(ready.is_error());
     /// ```
     ///
-    /// [`Poll`]: struct.Poll.html
+    /// [`Poll`]: ../struct.Poll.html
+    /// [readiness]: ../struct.Poll.html#readiness-operations
     #[inline]
     pub fn is_error(&self) -> bool {
         self.contains(ready_from_usize(ERROR))
@@ -230,14 +233,15 @@ impl UnixReady {
     /// # Examples
     ///
     /// ```
-    /// use mio::Ready;
+    /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::hup();
+    /// let ready = UnixReady::hup();
     ///
     /// assert!(ready.is_hup());
     /// ```
     ///
-    /// [`Poll`]: struct.Poll.html
+    /// [`Poll`]: ../struct.Poll.html
+    /// [readiness]: ../struct.Poll.html#readiness-operations
     #[inline]
     pub fn is_hup(&self) -> bool {
         self.contains(ready_from_usize(HUP))

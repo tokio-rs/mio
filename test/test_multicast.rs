@@ -2,9 +2,8 @@
 // Figure out why!
 #![cfg(not(target_os = "android"))]
 
-use mio::*;
-use mio::deprecated::{EventLoop, Handler};
-use mio::udp::*;
+use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::net::UdpSocket;
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use std::str;
 use std::net::IpAddr;
@@ -19,7 +18,8 @@ pub struct UdpHandler {
     msg: &'static str,
     buf: SliceBuf<'static>,
     rx_buf: RingBuf,
-    localhost: IpAddr
+    localhost: IpAddr,
+    shutdown: bool,
 }
 
 impl UdpHandler {
@@ -31,52 +31,37 @@ impl UdpHandler {
             msg: msg,
             buf: SliceBuf::wrap(msg.as_bytes()),
             rx_buf: RingBuf::new(1024),
-            localhost: sock.local_addr().unwrap().ip()
+            localhost: sock.local_addr().unwrap().ip(),
+            shutdown: false,
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, _: Ready) {
+    fn handle_read(&mut self, _: &mut Poll, token: Token, _: Ready) {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
                 match unsafe { self.rx.recv_from(self.rx_buf.mut_bytes()) } {
-                    Ok(Some((cnt, addr))) => {
+                    Ok((cnt, addr)) => {
                         unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
                         assert_eq!(addr.ip(), self.localhost);
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
                 assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
-                event_loop.shutdown();
+                self.shutdown = true;
             },
             _ => ()
         }
     }
 
-    fn handle_write(&mut self, _: &mut EventLoop<UdpHandler>, token: Token, _: Ready) {
+    fn handle_write(&mut self, _: &mut Poll, token: Token, _: Ready) {
         match token {
             SENDER => {
                 let addr = self.rx.local_addr().unwrap();
-                let cnt = self.tx.send_to(self.buf.bytes(), &addr)
-                                 .unwrap().unwrap();
+                let cnt = self.tx.send_to(self.buf.bytes(), &addr).unwrap();
                 self.buf.advance(cnt);
             },
             _ => ()
-        }
-    }
-}
-
-impl Handler for UdpHandler {
-    type Timeout = usize;
-    type Message = ();
-
-    fn ready(&mut self, event_loop: &mut EventLoop<UdpHandler>, token: Token, events: Ready) {
-        if events.is_readable() {
-            self.handle_read(event_loop, token, events);
-        }
-
-        if events.is_writable() {
-            self.handle_write(event_loop, token, events);
         }
     }
 }
@@ -85,7 +70,7 @@ impl Handler for UdpHandler {
 pub fn test_multicast() {
     drop(::env_logger::init());
     debug!("Starting TEST_UDP_CONNECTIONLESS");
-    let mut event_loop = EventLoop::new().unwrap();
+    let mut poll = Poll::new().unwrap();
 
     let addr = localhost();
     let any = "0.0.0.0:0".parse().unwrap();
@@ -101,11 +86,28 @@ pub fn test_multicast() {
     rx.join_multicast_v4(&"227.1.1.101".parse().unwrap(), &any).unwrap();
 
     info!("Registering SENDER");
-    event_loop.register(&tx, SENDER, Ready::WRITABLE, PollOpt::edge()).unwrap();
+    poll.register(&tx, SENDER, Ready::WRITABLE, PollOpt::EDGE).unwrap();
 
     info!("Registering LISTENER");
-    event_loop.register(&rx, LISTENER, Ready::READABLE, PollOpt::edge()).unwrap();
+    poll.register(&rx, LISTENER, Ready::READABLE, PollOpt::EDGE).unwrap();
+
+    let mut events = Events::with_capacity(1024);
+
+    let mut handler = UdpHandler::new(tx, rx, "hello world");
 
     info!("Starting event loop to test with...");
-    event_loop.run(&mut UdpHandler::new(tx, rx, "hello world")).unwrap();
+
+    while !handler.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            if event.readiness().is_readable() {
+                handler.handle_read(&mut poll, event.token(), event.readiness());
+            }
+
+            if event.readiness().is_writable() {
+                handler.handle_write(&mut poll, event.token(), event.readiness());
+            }
+        }
+    }
 }

@@ -1,6 +1,6 @@
 use mio::*;
 use mio::deprecated::{EventLoop, Handler};
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use {sleep_ms};
 
 struct TestHandler {
@@ -46,10 +46,10 @@ pub fn test_tick() {
     let mut event_loop = EventLoop::new().ok().expect("Couldn't make event loop");
 
     let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
-    event_loop.register(&listener, Token(0), Ready::READABLE, PollOpt::level()).unwrap();
+    event_loop.register(&listener, Token(0), Ready::READABLE, PollOpt::LEVEL).unwrap();
 
     let client = TcpStream::connect(&listener.local_addr().unwrap()).unwrap();
-    event_loop.register(&client, Token(1), Ready::READABLE, PollOpt::edge()).unwrap();
+    event_loop.register(&client, Token(1), Ready::READABLE, PollOpt::EDGE).unwrap();
 
     sleep_ms(250);
 

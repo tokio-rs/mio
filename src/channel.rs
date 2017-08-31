@@ -2,7 +2,8 @@
 
 #![allow(unused_imports, deprecated, missing_debug_implementations)]
 
-use {io, Evented, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
+use {io, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
+use event::Evented;
 use lazycell::{LazyCell, AtomicLazyCell};
 use std::any::Any;
 use std::fmt;

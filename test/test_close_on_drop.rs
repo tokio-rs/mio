@@ -1,8 +1,7 @@
 use {localhost, TryRead};
-use mio::*;
-use mio::deprecated::{EventLoop, Handler};
+use mio::{Events, Poll, PollOpt, Ready, Token};
 use bytes::ByteBuf;
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 
 use self::TestState::{Initial, AfterRead};
 
@@ -18,7 +17,8 @@ enum TestState {
 struct TestHandler {
     srv: TcpListener,
     cli: TcpStream,
-    state: TestState
+    state: TestState,
+    shutdown: bool,
 }
 
 impl TestHandler {
@@ -26,11 +26,12 @@ impl TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
-            state: Initial
+            state: Initial,
+            shutdown: false,
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Ready) {
+    fn handle_read(&mut self, poll: &mut Poll, tok: Token, events: Ready) {
         debug!("readable; tok={:?}; hint={:?}", tok, events);
 
         match tok {
@@ -53,39 +54,24 @@ impl TestHandler {
                 let mut buf = ByteBuf::mut_with_capacity(1024);
 
                 match self.cli.try_read_buf(&mut buf) {
-                    Ok(Some(0)) => event_loop.shutdown(),
+                    Ok(Some(0)) => self.shutdown = true,
                     _ => panic!("the client socket should not be readable")
                 }
             }
             _ => panic!("received unknown token {:?}", tok)
         }
-        event_loop.reregister(&self.cli, CLIENT, Ready::READABLE | Ready::hup(), PollOpt::edge()).unwrap();
+
+        poll.reregister(&self.cli, CLIENT, Ready::READABLE, PollOpt::EDGE).unwrap();
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, _: Ready) {
+    fn handle_write(&mut self, poll: &mut Poll, tok: Token, _: Ready) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {
                 debug!("client connected");
-                event_loop.reregister(&self.cli, CLIENT, Ready::READABLE | Ready::hup(), PollOpt::edge()).unwrap();
+                poll.reregister(&self.cli, CLIENT, Ready::READABLE, PollOpt::EDGE).unwrap();
             }
             _ => panic!("received unknown token {:?}", tok)
-        }
-    }
-}
-
-
-impl Handler for TestHandler {
-    type Timeout = ();
-    type Message = ();
-
-    fn ready(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, events: Ready) {
-        if events.is_readable() {
-            self.handle_read(event_loop, tok, events);
-        }
-
-        if events.is_writable() {
-            self.handle_write(event_loop, tok, events);
         }
     }
 }
@@ -93,7 +79,7 @@ impl Handler for TestHandler {
 #[test]
 pub fn test_close_on_drop() {
     debug!("Starting TEST_CLOSE_ON_DROP");
-    let mut event_loop = EventLoop::new().unwrap();
+    let mut poll = Poll::new().unwrap();
 
     // The address to connect to - localhost + a unique port
     let addr = localhost();
@@ -101,17 +87,32 @@ pub fn test_close_on_drop() {
     // == Create & setup server socket
     let srv = TcpListener::bind(&addr).unwrap();
 
-    event_loop.register(&srv, SERVER, Ready::READABLE, PollOpt::edge()).unwrap();
+    poll.register(&srv, SERVER, Ready::READABLE, PollOpt::EDGE).unwrap();
 
     // == Create & setup client socket
     let sock = TcpStream::connect(&addr).unwrap();
 
-    event_loop.register(&sock, CLIENT, Ready::WRITABLE, PollOpt::edge()).unwrap();
+    poll.register(&sock, CLIENT, Ready::WRITABLE, PollOpt::EDGE).unwrap();
+
+    // == Create storage for events
+    let mut events = Events::with_capacity(1024);
 
     // == Setup test handler
     let mut handler = TestHandler::new(srv, sock);
 
     // == Run test
-    event_loop.run(&mut handler).unwrap();
+    while !handler.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            if event.readiness().is_readable() {
+                handler.handle_read(&mut poll, event.token(), event.readiness());
+            }
+
+            if event.readiness().is_writable() {
+                handler.handle_write(&mut poll, event.token(), event.readiness());
+            }
+        }
+    }
     assert!(handler.state == AfterRead, "actual={:?}", handler.state);
 }
