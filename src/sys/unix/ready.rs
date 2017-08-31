@@ -1,4 +1,4 @@
-use event_imp::{Ready, ready_from_usize};
+use event_imp::{Ready, ready_as_usize, ready_from_usize};
 
 use std::ops;
 use std::fmt;
@@ -306,10 +306,13 @@ impl ops::Sub for UnixReady {
 
     #[inline]
     fn sub(self, other: UnixReady) -> UnixReady {
-        (self.0 & !other.0).into()
+        ready_from_usize(ready_as_usize(self.0) & !ready_as_usize(other.0)).into()
     }
 }
 
+#[deprecated(since = "0.6.10", note = "removed")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
 impl ops::Not for UnixReady {
     type Output = UnixReady;
 

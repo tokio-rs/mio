@@ -102,7 +102,7 @@ impl UdpSocket {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest & !Ready::WRITABLE);
+        me.iocp.set_readiness(interest - Ready::WRITABLE);
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = owned_buf.write(buf)?;
@@ -136,7 +136,7 @@ impl UdpSocket {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest & !Ready::WRITABLE);
+        me.iocp.set_readiness(interest - Ready::WRITABLE);
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = owned_buf.write(buf)?;
@@ -299,7 +299,7 @@ impl Imp {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest & !Ready::READABLE);
+        me.iocp.set_readiness(interest - Ready::READABLE);
 
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
