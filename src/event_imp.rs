@@ -642,7 +642,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::READABLE;
+    /// let ready = Ready::WRITABLE;
     ///
     /// assert!(ready.is_writable());
     /// ```
