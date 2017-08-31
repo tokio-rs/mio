@@ -132,6 +132,9 @@ impl ops::Sub for FuchsiaReady {
     }
 }
 
+#[deprecated(since = "0.6.10", note = "removed")]
+#[cfg(feature = "with-deprecated")]
+#[doc(hidden)]
 impl ops::Not for FuchsiaReady {
     type Output = FuchsiaReady;
 
