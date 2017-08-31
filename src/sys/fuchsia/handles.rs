@@ -16,7 +16,8 @@ impl EventedHandle {
     /// Create a new `EventedHandle` which can be registered with mio
     /// in order to receive event notifications.
     ///
-    /// The underlying handle must not be 
+    /// The underlying handle must not be dropped while the
+    /// `EventedHandle` still exists.
     pub unsafe fn new(handle: mx_handle_t) -> Self {
         EventedHandle {
             handle: handle,
