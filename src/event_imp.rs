@@ -793,7 +793,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let mut readiness = Ready::READBLE;
+    /// let mut readiness = Ready::READABLE;
     /// readiness.remove(Ready::READABLE);
     ///
     /// assert!(!readiness.is_readable());
