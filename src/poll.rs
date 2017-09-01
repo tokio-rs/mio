@@ -1166,7 +1166,7 @@ impl Poll {
         self.readiness_queue.poll(&mut events.inner);
 
         // Return number of polled events
-        Ok(events.iter().count())
+        Ok(events.inner.len())
     }
 }
 
@@ -1457,7 +1457,7 @@ impl Iterator for IntoIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.get(self.pos);
+        let ret = self.inner.inner.get(self.pos);
         self.pos += 1;
         ret
     }
