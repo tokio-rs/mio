@@ -1,7 +1,8 @@
 use std::io::{Write, Read};
 
-use mio::tcp::{TcpStream, TcpListener};
-use mio::{Poll, Events, Ready, PollOpt, Token, Evented};
+use mio::event::Evented;
+use mio::net::{TcpListener, TcpStream};
+use mio::{Poll, Events, Ready, PollOpt, Token};
 
 #[test]
 fn write_then_drop() {
@@ -19,7 +20,7 @@ fn write_then_drop() {
                PollOpt::edge()).unwrap();
     s.register(&poll,
                Token(3),
-               Ready::none(),
+               Ready::empty(),
                PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -78,7 +79,7 @@ fn write_then_deregister() {
                PollOpt::edge()).unwrap();
     s.register(&poll,
                Token(3),
-               Ready::none(),
+               Ready::empty(),
                PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);

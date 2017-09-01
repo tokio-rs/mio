@@ -1,6 +1,7 @@
 use {expect_events, sleep_ms, TryRead};
-use mio::*;
-use mio::tcp::*;
+use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::event::Event;
+use mio::net::{TcpListener, TcpStream};
 use std::io::Write;
 use std::time::Duration;
 

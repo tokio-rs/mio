@@ -38,7 +38,7 @@ use poll::SelectorId;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// #     let _listener = TcpListener::bind("127.0.0.1:3454")?;
 /// use mio::{Events, Ready, Poll, PollOpt, Token};
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
 /// let stream = TcpStream::connect(&"127.0.0.1:34254".parse()?)?;
@@ -215,7 +215,7 @@ impl TcpStream {
     /// For more information about this option, see
     /// [`set_recv_buffer_size`][link].
     ///
-    /// [link]: #tymethod.set_recv_buffer_size
+    /// [link]: #method.set_recv_buffer_size
     pub fn recv_buffer_size(&self) -> io::Result<usize> {
         self.sys.recv_buffer_size()
     }
@@ -230,9 +230,10 @@ impl TcpStream {
 
     /// Gets the value of the `SO_SNDBUF` option on this socket.
     ///
-    /// For more information about this option, see [`set_send_buffer`][link].
+    /// For more information about this option, see
+    /// [`set_send_buffer_size`][link].
     ///
-    /// [link]: #tymethod.set_send_buffer
+    /// [link]: #method.set_send_buffer_size
     pub fn send_buffer_size(&self) -> io::Result<usize> {
         self.sys.send_buffer_size()
     }
@@ -258,7 +259,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_keepalive`][link].
     ///
-    /// [link]: #tymethod.set_keepalive
+    /// [link]: #method.set_keepalive
     pub fn keepalive(&self) -> io::Result<Option<Duration>> {
         self.sys.keepalive()
     }
@@ -275,7 +276,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_ttl`][link].
     ///
-    /// [link]: #tymethod.set_ttl
+    /// [link]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
         self.sys.ttl()
     }
@@ -296,17 +297,21 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_only_v6`][link].
     ///
-    /// [link]: #tymethod.set_only_v6
+    /// [link]: #method.set_only_v6
     pub fn only_v6(&self) -> io::Result<bool> {
         self.sys.only_v6()
     }
 
-    /// Sets the linger duration of this socket by setting the SO_LINGER option
+    /// Sets the value for the `SO_LINGER` option on this socket.
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.sys.set_linger(dur)
     }
 
-    /// reads the linger duration for this socket by getting the SO_LINGER option
+    /// Gets the value of the `SO_LINGER` option on this socket.
+    ///
+    /// For more information about this option, see [`set_linger`][link].
+    ///
+    /// [link]: #method.set_linger
     pub fn linger(&self) -> io::Result<Option<Duration>> {
         self.sys.linger()
     }
@@ -453,7 +458,7 @@ impl Evented for TcpStream {
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Events, Ready, Poll, PollOpt, Token};
-/// use mio::tcp::TcpListener;
+/// use mio::net::TcpListener;
 /// use std::time::Duration;
 ///
 /// let listener = TcpListener::bind(&"127.0.0.1:34254".parse()?)?;

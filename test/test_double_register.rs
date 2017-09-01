@@ -4,7 +4,7 @@
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 pub fn test_double_register() {
     use mio::*;
-    use mio::tcp::*;
+    use mio::net::TcpListener;
 
     let poll = Poll::new().unwrap();
 

@@ -1,6 +1,6 @@
 use mio::*;
 use mio::deprecated::{EventLoop, Handler};
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use {sleep_ms};
 
 struct TestHandler {

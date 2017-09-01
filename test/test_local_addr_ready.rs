@@ -1,7 +1,6 @@
 use {TryWrite};
-use mio::*;
-use mio::deprecated::{EventLoop, Handler};
-use mio::tcp::{TcpListener, TcpStream};
+use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::net::{TcpListener, TcpStream};
 
 const LISTEN: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -11,39 +10,7 @@ struct MyHandler {
     listener: TcpListener,
     connected: TcpStream,
     accepted: Option<TcpStream>,
-}
-
-impl Handler for MyHandler {
-    type Timeout = ();
-    type Message = ();
-
-    fn ready(&mut self,
-             event_loop: &mut EventLoop<MyHandler>,
-             token: Token,
-             _: Ready) {
-        match token {
-            LISTEN => {
-                let sock = self.listener.accept().unwrap().0;
-                event_loop.register(&sock,
-                                    SERVER,
-                                    Ready::writable(),
-                                    PollOpt::edge()).unwrap();
-                self.accepted = Some(sock);
-            }
-            SERVER => {
-                self.accepted.as_ref().unwrap().peer_addr().unwrap();
-                self.accepted.as_ref().unwrap().local_addr().unwrap();
-                self.accepted.as_mut().unwrap().try_write(&[1, 2, 3]).unwrap();
-                self.accepted = None;
-            }
-            CLIENT => {
-                self.connected.peer_addr().unwrap();
-                self.connected.local_addr().unwrap();
-                event_loop.shutdown();
-            }
-            _ => panic!("unexpected token"),
-        }
-    }
+    shutdown: bool,
 }
 
 #[test]
@@ -52,17 +19,49 @@ fn local_addr_ready() {
     let server = TcpListener::bind(&addr).unwrap();
     let addr = server.local_addr().unwrap();
 
-    let mut event_loop = EventLoop::new().unwrap();
-    event_loop.register(&server, LISTEN, Ready::readable(),
+    let poll = Poll::new().unwrap();
+    poll.register(&server, LISTEN, Ready::readable(),
                         PollOpt::edge()).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
-    event_loop.register(&sock, CLIENT, Ready::readable(),
+    poll.register(&sock, CLIENT, Ready::readable(),
                         PollOpt::edge()).unwrap();
 
-    event_loop.run(&mut MyHandler {
+    let mut events = Events::with_capacity(1024);
+
+    let mut handler = MyHandler {
         listener: server,
         connected: sock,
         accepted: None,
-    }).unwrap();
+        shutdown: false,
+    };
+
+    while !handler.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            match event.token() {
+                LISTEN => {
+                    let sock = handler.listener.accept().unwrap().0;
+                    poll.register(&sock,
+                                  SERVER,
+                                  Ready::writable(),
+                                  PollOpt::edge()).unwrap();
+                    handler.accepted = Some(sock);
+                }
+                SERVER => {
+                    handler.accepted.as_ref().unwrap().peer_addr().unwrap();
+                    handler.accepted.as_ref().unwrap().local_addr().unwrap();
+                    handler.accepted.as_mut().unwrap().try_write(&[1, 2, 3]).unwrap();
+                    handler.accepted = None;
+                }
+                CLIENT => {
+                    handler.connected.peer_addr().unwrap();
+                    handler.connected.local_addr().unwrap();
+                    handler.shutdown = true;
+                }
+                _ => panic!("unexpected token"),
+            }
+        }
+    }
 }

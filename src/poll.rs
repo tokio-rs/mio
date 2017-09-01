@@ -92,7 +92,7 @@ use sys::unix::UnixReady;
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Events, Poll, Ready, PollOpt, Token};
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 ///
 /// use std::net::{TcpListener, SocketAddr};
 ///
@@ -108,7 +108,7 @@ use sys::unix::UnixReady;
 /// let stream = TcpStream::connect(&server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge())?;
+/// poll.register(&stream, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -268,7 +268,7 @@ use sys::unix::UnixReady;
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Poll, Ready, PollOpt, Token};
-/// use mio::tcp::TcpStream;
+/// use mio::net::TcpStream;
 /// use std::time::Duration;
 /// use std::thread;
 ///
@@ -280,7 +280,7 @@ use sys::unix::UnixReady;
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// poll.register(&sock, Token(0), Ready::all(), PollOpt::edge())?;
+/// poll.register(&sock, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
 /// #     Ok(())
 /// # }
 /// #
@@ -433,6 +433,10 @@ pub struct Poll {
 /// [`Poll`]: struct.Poll.html
 /// [`Registration::new2`]: struct.Registration.html#method.new2
 /// [`Evented`]: event/trait.Evented.html
+/// [`set_readiness`]: struct.SetReadiness.html#method.set_readiness
+/// [`register`]: struct.Poll.html#method.register
+/// [`reregister`]: struct.Poll.html#method.reregister
+/// [`reregister`]: struct.Poll.html#method.reregister
 pub struct Registration {
     inner: RegistrationInner,
 }
@@ -440,12 +444,13 @@ pub struct Registration {
 unsafe impl Send for Registration {}
 unsafe impl Sync for Registration {}
 
-/// Updates the readiness state of the associated [`Registration`].
+/// Updates the readiness state of the associated `Registration`.
 ///
 /// See [`Registration`] for more documentation on using `SetReadiness` and
 /// [`Poll`] for high level polling documentation.
 ///
-/// [`Registration`]
+/// [`Poll`]: struct.Poll.html
+/// [`Registration`]: struct.Registration.html
 #[derive(Clone)]
 pub struct SetReadiness {
     inner: RegistrationInner,
@@ -663,7 +668,7 @@ impl Poll {
 
     /// Register an `Evented` handle with the `Poll` instance.
     ///
-    /// Once registerd, the `Poll` instance will monitor the `Evented` handle
+    /// Once registered, the `Poll` instance will monitor the `Evented` handle
     /// for readiness state changes. When it notices a state change, it will
     /// return a readiness event for the handle the next time [`poll`] is
     /// called.
@@ -730,14 +735,14 @@ impl Poll {
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll, Ready, PollOpt, Token};
-    /// use mio::tcp::TcpStream;
+    /// use mio::net::TcpStream;
     /// use std::time::{Duration, Instant};
     ///
     /// let poll = Poll::new()?;
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`
-    /// poll.register(&socket, Token(0), Ready::all(), PollOpt::edge())?;
+    /// poll.register(&socket, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// let start = Instant::now();
@@ -815,7 +820,7 @@ impl Poll {
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Poll, Ready, PollOpt, Token};
-    /// use mio::tcp::TcpStream;
+    /// use mio::net::TcpStream;
     ///
     /// let poll = Poll::new()?;
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
@@ -872,7 +877,7 @@ impl Poll {
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll, Ready, PollOpt, Token};
-    /// use mio::tcp::TcpStream;
+    /// use mio::net::TcpStream;
     /// use std::time::Duration;
     ///
     /// let poll = Poll::new()?;
@@ -949,7 +954,7 @@ impl Poll {
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::{Events, Poll, Ready, PollOpt, Token};
-    /// use mio::tcp::TcpStream;
+    /// use mio::net::TcpStream;
     ///
     /// use std::net::{TcpListener, SocketAddr};
     /// use std::thread;
@@ -972,7 +977,7 @@ impl Poll {
     /// let stream = TcpStream::connect(&addr)?;
     ///
     /// // Register the stream with `Poll`
-    /// poll.register(&stream, Token(0), Ready::all(), PollOpt::edge())?;
+    /// poll.register(&stream, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
     ///
     /// // Wait for the socket to become ready. This has to happens in a loop to
     /// // handle spurious wakeups.
@@ -1210,9 +1215,9 @@ impl AsRawFd for Poll {
 /// A collection of readiness events.
 ///
 /// `Events` is passed as an argument to [`Poll::poll`] and will be used to
-/// receive any new readiness events received since the last call to [`poll`].
-/// Usually, a single `Events` instance is created at the same time as the
-/// [`Poll`] and the single instance is reused for each call to [`poll`].
+/// receive any new readiness events received since the last poll. Usually, a
+/// single `Events` instance is created at the same time as a [`Poll`] and
+/// reused on each call to [`Poll::poll`].
 ///
 /// See [`Poll`] for more documentation on polling.
 ///
@@ -1245,7 +1250,6 @@ impl AsRawFd for Poll {
 /// ```
 ///
 /// [`Poll::poll`]: struct.Poll.html#method.poll
-/// [`poll`]: struct.Poll.html#method.poll
 /// [`Poll`]: struct.Poll.html
 pub struct Events {
     inner: sys::Events,
@@ -1286,6 +1290,42 @@ pub struct Events {
 #[derive(Debug, Clone)]
 pub struct Iter<'a> {
     inner: &'a Events,
+    pos: usize,
+}
+
+/// Owned [`Events`] iterator.
+///
+/// This struct is created by the `into_iter` method on [`Events`].
+///
+/// # Examples
+///
+/// ```
+/// # use std::error::Error;
+/// # fn try_main() -> Result<(), Box<Error>> {
+/// use mio::{Events, Poll};
+/// use std::time::Duration;
+///
+/// let mut events = Events::with_capacity(1024);
+/// let poll = Poll::new()?;
+///
+/// // Register handles with `poll`
+///
+/// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+///
+/// for event in events {
+///     println!("event={:?}", event);
+/// }
+/// #     Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
+/// ```
+/// [`Events`]: struct.Events.html
+#[derive(Debug)]
+pub struct IntoIter {
+    inner: Events,
     pos: usize,
 }
 
@@ -1401,6 +1441,28 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+impl IntoIterator for Events {
+    type Item = Event;
+    type IntoIter = IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter {
+            inner: self,
+            pos: 0,
+        }
+    }
+}
+
+impl Iterator for IntoIter {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Event> {
+        let ret = self.inner.get(self.pos);
+        self.pos += 1;
+        ret
+    }
+}
+
 impl fmt::Debug for Events {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Events")
@@ -1454,7 +1516,7 @@ impl Registration {
     /// });
     ///
     /// let poll = Poll::new()?;
-    /// poll.register(&registration, Token(0), Ready::all(), PollOpt::edge())?;
+    /// poll.register(&registration, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
     ///
     /// let mut events = Events::with_capacity(256);
     ///
@@ -1625,9 +1687,9 @@ impl SetReadiness {
     /// Set the registration's readiness
     ///
     /// If the associated `Registration` is registered with a [`Poll`] instance
-    /// and has requested readiness events that include `ready`, then a call
-    /// [`poll`] will receive a readiness event representing the readiness
-    /// state change.
+    /// and has requested readiness events that include `ready`, then a future
+    /// call to [`Poll::poll`] will receive a readiness event representing the
+    /// readiness state change.
     ///
     /// # Note
     ///
@@ -1698,8 +1760,9 @@ impl SetReadiness {
     /// ```
     ///
     /// [`Registration`]: struct.Registration.html
+    /// [`Evented`]: event/trait.Evented.html#examples
     /// [`Poll`]: struct.Poll.html
-    /// [`poll`]: struct.Poll.html#method.poll
+    /// [`Poll::poll`]: struct.Poll.html#method.poll
     pub fn set_readiness(&self, ready: Ready) -> io::Result<()> {
         self.inner.set_readiness(ready)
     }

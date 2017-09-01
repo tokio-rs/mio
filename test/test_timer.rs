@@ -3,7 +3,7 @@ use mio::*;
 use mio::deprecated::{EventLoop, Handler};
 use mio::timer::{Timer};
 
-use mio::tcp::*;
+use mio::net::{TcpListener, TcpStream};
 use bytes::{Buf, ByteBuf, SliceBuf};
 use localhost;
 use std::time::Duration;
@@ -43,7 +43,7 @@ fn test_basic_timer_with_poll_edge_set_timeout_after_register() {
 
         assert_eq!(num, 1);
         assert_eq!(Token(0), events.get(0).unwrap().token());
-        assert_eq!(Ready::readable(), events.get(0).unwrap().kind());
+        assert_eq!(Ready::readable(), events.get(0).unwrap().readiness());
     });
 
     assert!(is_about(200, elapsed), "actual={:?}", elapsed);
@@ -67,7 +67,7 @@ fn test_basic_timer_with_poll_edge_set_timeout_before_register() {
 
         assert_eq!(num, 1);
         assert_eq!(Token(0), events.get(0).unwrap().token());
-        assert_eq!(Ready::readable(), events.get(0).unwrap().kind());
+        assert_eq!(Ready::readable(), events.get(0).unwrap().readiness());
     });
 
     assert!(is_about(200, elapsed), "actual={:?}", elapsed);
@@ -93,7 +93,7 @@ fn test_setting_later_timeout_then_earlier_one() {
 
         assert_eq!(num, 1);
         assert_eq!(Token(0), events.get(0).unwrap().token());
-        assert_eq!(Ready::readable(), events.get(0).unwrap().kind());
+        assert_eq!(Ready::readable(), events.get(0).unwrap().readiness());
     });
 
     assert!(is_about(200, elapsed), "actual={:?}", elapsed);
@@ -105,7 +105,7 @@ fn test_setting_later_timeout_then_earlier_one() {
 
         assert_eq!(num, 1);
         assert_eq!(Token(0), events.get(0).unwrap().token());
-        assert_eq!(Ready::readable(), events.get(0).unwrap().kind());
+        assert_eq!(Ready::readable(), events.get(0).unwrap().readiness());
     });
 
     assert!(is_about(400, elapsed), "actual={:?}", elapsed);
@@ -137,7 +137,7 @@ fn test_timer_with_looping_wheel() {
 
             assert_eq!(num, 1);
             assert_eq!(Token(0), events.get(0).unwrap().token());
-            assert_eq!(Ready::readable(), events.get(0).unwrap().kind());
+            assert_eq!(Ready::readable(), events.get(0).unwrap().readiness());
         });
 
         assert!(is_about(500, elapsed), "actual={:?}; msg={:?}", elapsed, msg);
@@ -163,7 +163,7 @@ fn test_edge_without_polling() {
         let num = poll.poll(&mut events, None).unwrap();
         assert_eq!(num, 1);
         assert_eq!(Token(0), events.get(0).unwrap().token());
-        assert_eq!(Ready::readable(), events.get(0).unwrap().kind());
+        assert_eq!(Ready::readable(), events.get(0).unwrap().readiness());
     });
 
     assert!(is_about(400, ms), "actual={:?}", ms);
@@ -192,7 +192,7 @@ fn test_level_triggered() {
         let num = poll.poll(&mut events, None).unwrap();
         assert_eq!(num, 1);
         assert_eq!(Token(0), events.get(0).unwrap().token());
-        assert_eq!(Ready::readable(), events.get(0).unwrap().kind());
+        assert_eq!(Ready::readable(), events.get(0).unwrap().readiness());
     });
 
     assert!(is_about(400, ms), "actual={:?}", ms);
@@ -201,7 +201,7 @@ fn test_level_triggered() {
         let num = poll.poll(&mut events, None).unwrap();
         assert_eq!(num, 1);
         assert_eq!(Token(0), events.get(0).unwrap().token());
-        assert_eq!(Ready::readable(), events.get(0).unwrap().kind());
+        assert_eq!(Ready::readable(), events.get(0).unwrap().readiness());
     });
 
     assert!(is_about(0, ms), "actual={:?}", ms);
@@ -333,7 +333,7 @@ impl TestHandler {
             SERVER => {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().0;
-                event_loop.register(&conn, CONN, Ready::all(),
+                event_loop.register(&conn, CONN, Ready::readable() | Ready::writable(),
                                         PollOpt::edge()).unwrap();
                 event_loop.timeout(conn, Duration::from_millis(200)).unwrap();
 
@@ -417,12 +417,12 @@ pub fn test_old_timer() {
 
     info!("listening for connections");
 
-    event_loop.register(&srv, SERVER, Ready::all(), PollOpt::edge()).unwrap();
+    event_loop.register(&srv, SERVER, Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register(&sock, CLIENT, Ready::all(), PollOpt::edge()).unwrap();
+    event_loop.register(&sock, CLIENT, Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
 
     // Init the handler
     let mut handler = TestHandler::new(srv, sock);

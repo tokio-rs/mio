@@ -1,4 +1,5 @@
-use {channel, Evented, Poll, Events, Token};
+use {channel, Poll, Events, Token};
+use event::Evented;
 use deprecated::{Handler, NotifyError};
 use event_imp::{Event, Ready, PollOpt};
 use timer::{self, Timer, Timeout};
@@ -335,7 +336,7 @@ impl<H: Handler> EventLoop<H> {
     }
 
     fn io_event(&mut self, handler: &mut H, evt: Event) {
-        handler.ready(self, evt.token(), evt.kind());
+        handler.ready(self, evt.token(), evt.readiness());
     }
 
     fn notify(&mut self, handler: &mut H) {
