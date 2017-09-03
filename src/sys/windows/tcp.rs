@@ -16,7 +16,7 @@ use {poll, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
-use sys::windows::{wouldblock, Family};
+use sys::windows::Family;
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`
@@ -256,7 +256,7 @@ impl TcpStream {
             // Empty == we're not associated yet, and if we're pending then
             // these are both cases where we return "would block"
             State::Empty |
-            State::Pending(()) => return Err(wouldblock()),
+            State::Pending(()) => return Err(io::ErrorKind::WouldBlock.into()),
 
             // If we got a delayed error as part of a `read_overlapped` below,
             // return that here. Also schedule another read in case it was
@@ -335,11 +335,11 @@ impl TcpStream {
 
         match me.write {
             State::Empty => {}
-            _ => return Err(wouldblock())
+            _ => return Err(io::ErrorKind::WouldBlock.into())
         }
 
         if !me.iocp.registered() {
-            return Err(wouldblock())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
 
         if bufs.len() == 0 {
@@ -644,10 +644,10 @@ impl TcpListener {
         let mut me = self.inner();
 
         let ret = match mem::replace(&mut me.accept, State::Empty) {
-            State::Empty => return Err(would_block()),
+            State::Empty => return Err(io::ErrorKind::WouldBlock.into()),
             State::Pending(t) => {
                 me.accept = State::Pending(t);
-                return Err(would_block());
+                return Err(io::ErrorKind::WouldBlock.into());
             }
             State::Ready((s, a)) => {
                 s.set_nonblocking(true)?;
@@ -818,12 +818,4 @@ impl Drop for TcpListener {
             }
         }
     }
-}
-
-// TODO: Use std's allocation free io::Error
-const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK as i32;
-
-/// Returns a std `WouldBlock` error without allocating
-pub fn would_block() -> ::std::io::Error {
-    ::std::io::Error::from_raw_os_error(WOULDBLOCK)
 }
