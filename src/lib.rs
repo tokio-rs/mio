@@ -194,6 +194,12 @@ pub mod unix {
 #[cfg(target_os = "fuchsia")]
 pub mod fuchsia {
     //! Fuchsia-only extensions
+    //!
+    //! # Stability
+    //!
+    //! This module depends on the [magenta-sys crate](https://crates.io/crates/magenta-sys)
+    //! and so might introduce breaking changes, even on minor releases,
+    //! so long as that crate remains unstable.
     pub use sys::{
         EventedHandle,
     };
