@@ -85,7 +85,7 @@ impl Selector {
         let mut ret = false;
         for status in events.statuses[..n].iter() {
             // This should only ever happen from the awakener, and we should
-            // only ever have one awakener right not, so assert as such.
+            // only ever have one awakener right now, so assert as such.
             if status.overlapped() as usize == 0 {
                 assert_eq!(status.token(), usize::from(awakener));
                 ret = true;
