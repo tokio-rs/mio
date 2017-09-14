@@ -85,9 +85,9 @@ extern crate net2;
 extern crate iovec;
 
 #[cfg(target_os = "fuchsia")]
-extern crate magenta;
+extern crate zircon;
 #[cfg(target_os = "fuchsia")]
-extern crate magenta_sys;
+extern crate zircon_sys;
 
 #[cfg(unix)]
 extern crate libc;
@@ -203,7 +203,7 @@ pub mod fuchsia {
     pub use sys::{
         EventedHandle,
     };
-    pub use sys::fuchsia::{FuchsiaReady, mx_signals_t};
+    pub use sys::fuchsia::{FuchsiaReady, zx_signals_t};
 }
 
 /// Windows-only extensions to the mio crate.

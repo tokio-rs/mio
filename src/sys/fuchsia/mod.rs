@@ -1,6 +1,6 @@
 use {io, Ready, PollOpt};
 use libc;
-use magenta;
+use zircon;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::ops::{Deref, DerefMut};
@@ -20,7 +20,7 @@ pub use self::awakener::Awakener;
 pub use self::handles::EventedHandle;
 pub use self::net::{TcpListener, TcpStream, UdpSocket};
 pub use self::selector::{Events, Selector};
-pub use self::ready::{FuchsiaReady, mx_signals_t};
+pub use self::ready::{FuchsiaReady, zx_signals_t};
 
 // Set non-blocking (workaround since the std version doesn't work in fuchsia)
 // TODO: fix the std version and replace this
@@ -47,47 +47,47 @@ unsafe fn recv_from(fd: RawFd, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)
 mod sys {
     #![allow(non_camel_case_types)]
     use std::os::unix::io::RawFd;
-    pub use magenta_sys::{mx_handle_t, mx_signals_t};
+    pub use zircon_sys::{zx_handle_t, zx_signals_t};
 
     // 17 fn pointers we don't need for mio :)
-    pub type mxio_ops_t = [usize; 17];
+    pub type fdio_ops_t = [usize; 17];
 
     pub type atomic_int_fast32_t = usize; // TODO: https://github.com/rust-lang/libc/issues/631
 
     #[repr(C)]
-    pub struct mxio_t {
-        pub ops: *const mxio_ops_t,
+    pub struct fdio_t {
+        pub ops: *const fdio_ops_t,
         pub magic: u32,
         pub refcount: atomic_int_fast32_t,
         pub dupcount: u32,
         pub flags: u32,
     }
 
-    #[link(name="mxio")]
+    #[link(name="fdio")]
     extern {
-        pub fn __mxio_fd_to_io(fd: RawFd) -> *const mxio_t;
-        pub fn __mxio_release(io: *const mxio_t);
+        pub fn __fdio_fd_to_io(fd: RawFd) -> *const fdio_t;
+        pub fn __fdio_release(io: *const fdio_t);
 
-        pub fn __mxio_wait_begin(
-            io: *const mxio_t,
+        pub fn __fdio_wait_begin(
+            io: *const fdio_t,
             events: u32,
-            handle_out: &mut mx_handle_t,
-            signals_out: &mut mx_signals_t,
+            handle_out: &mut zx_handle_t,
+            signals_out: &mut zx_signals_t,
         );
-        pub fn __mxio_wait_end(
-            io: *const mxio_t,
-            signals: mx_signals_t,
+        pub fn __fdio_wait_end(
+            io: *const fdio_t,
+            signals: zx_signals_t,
             events_out: &mut u32,
         );
     }
 }
 
-/// Convert from magenta::Status to io::Error.
+/// Convert from zircon::Status to io::Error.
 ///
 /// Note: these conversions are done on a "best-effort" basis and may not necessarily reflect
 /// exactly equivalent error types.
-fn status_to_io_err(status: magenta::Status) -> io::Error {
-    use magenta::Status;
+fn status_to_io_err(status: zircon::Status) -> io::Error {
+    use zircon::Status;
 
     let err_kind: io::ErrorKind = match status {
         Status::ErrInterruptedRetry => io::ErrorKind::Interrupted,
@@ -159,11 +159,11 @@ fn epoll_event_to_ready(epoll: u32) -> Ready {
     */
 }
 
-fn poll_opts_to_wait_async(poll_opts: PollOpt) -> magenta::WaitAsyncOpts {
+fn poll_opts_to_wait_async(poll_opts: PollOpt) -> zircon::WaitAsyncOpts {
     if poll_opts.is_oneshot() {
-        magenta::WaitAsyncOpts::Once
+        zircon::WaitAsyncOpts::Once
     } else {
-        magenta::WaitAsyncOpts::Repeating
+        zircon::WaitAsyncOpts::Repeating
     }
 }
 

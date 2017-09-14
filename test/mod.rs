@@ -12,7 +12,7 @@ extern crate slab;
 extern crate tempdir;
 
 #[cfg(target_os = "fuchsia")]
-extern crate magenta;
+extern crate zircon;
 
 pub use ports::localhost;
 

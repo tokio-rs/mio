@@ -8,9 +8,9 @@ use sys::fuchsia::{
     EventedFdInner,
     FuchsiaReady,
 };
-use magenta;
-use magenta::AsHandleRef;
-use magenta_sys::mx_handle_t;
+use zircon;
+use zircon::AsHandleRef;
+use zircon_sys::zx_handle_t;
 use std::collections::hash_map;
 use std::fmt;
 use std::mem;
@@ -65,8 +65,8 @@ static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 pub struct Selector {
     id: usize,
 
-    /// Magenta object on which the handles have been registered, and on which events occur
-    port: Arc<magenta::Port>,
+    /// Zircon object on which the handles have been registered, and on which events occur
+    port: Arc<zircon::Port>,
 
     /// Whether or not `tokens_to_rereg` contains any elements. This is a best-effort attempt
     /// used to prevent having to lock `tokens_to_rereg` when it is empty.
@@ -85,7 +85,7 @@ pub struct Selector {
     tokens_to_rereg: Mutex<Vec<Token>>,
 
     /// Map from tokens to weak references to `EventedFdInner`-- a structure describing a
-    /// file handle, its associated `mxio` object, and its current registration.
+    /// file handle, its associated `fdio` object, and its current registration.
     token_to_fd: Mutex<hash_map::HashMap<Token, Weak<EventedFdInner>>>,
 }
 
@@ -96,7 +96,7 @@ impl Selector {
         assert_fuchsia_ready_repr();
 
         let port = Arc::new(
-            magenta::Port::create(magenta::PortOpts::Default)
+            zircon::Port::create(zircon::PortOpts::Default)
                 .map_err(status_to_io_err)?
         );
 
@@ -121,7 +121,7 @@ impl Selector {
     }
 
     /// Returns a reference to the underlying port `Arc`.
-    pub fn port(&self) -> &Arc<magenta::Port> { &self.port }
+    pub fn port(&self) -> &Arc<zircon::Port> { &self.port }
 
     /// Reregisters all registrations pointed to by the `tokens_to_rereg` list
     /// if `has_tokens_to_rereg`.
@@ -156,25 +156,25 @@ impl Selector {
                 let nanos = duration.as_secs().saturating_mul(1_000_000_000)
                                 .saturating_add(duration.subsec_nanos() as u64);
 
-                magenta::deadline_after(nanos)
+                zircon::deadline_after(nanos)
             }
-            None => magenta::MX_TIME_INFINITE,
+            None => zircon::ZX_TIME_INFINITE,
         };
 
         let packet = match self.port.wait(deadline) {
             Ok(packet) => packet,
-            Err(magenta::Status::ErrTimedOut) => return Ok(false),
+            Err(zircon::Status::ErrTimedOut) => return Ok(false),
             Err(e) => return Err(status_to_io_err(e)),
         };
 
         let observed_signals = match packet.contents() {
-            magenta::PacketContents::SignalOne(signal_packet) => {
+            zircon::PacketContents::SignalOne(signal_packet) => {
                 signal_packet.observed()
             }
-            magenta::PacketContents::SignalRep(signal_packet) => {
+            zircon::PacketContents::SignalRep(signal_packet) => {
                 signal_packet.observed()
             }
-            magenta::PacketContents::User(_user_packet) => {
+            zircon::PacketContents::User(_user_packet) => {
                 // User packets are only ever sent by an Awakener
                 return Ok(true);
             }
@@ -190,7 +190,7 @@ impl Selector {
                 Ok(false)
             },
             RegType::Fd => {
-                // Convert the signals to epoll events using __mxio_wait_end,
+                // Convert the signals to epoll events using __fdio_wait_end,
                 // and add to reregistration list if necessary.
                 let events: u32;
                 {
@@ -207,7 +207,7 @@ impl Selector {
 
                     events = unsafe {
                         let mut events: u32 = mem::uninitialized();
-                        sys::fuchsia::sys::__mxio_wait_end(handle.mxio(), observed_signals, &mut events);
+                        sys::fuchsia::sys::__fdio_wait_end(handle.fdio(), observed_signals, &mut events);
                         events
                     };
 
@@ -238,10 +238,10 @@ impl Selector {
 
     /// Register event interests for the given IO handle with the OS
     pub fn register_fd(&self,
-                       handle: &magenta::Handle,
+                       handle: &zircon::Handle,
                        fd: &EventedFd,
                        token: Token,
-                       signals: magenta::Signals,
+                       signals: zircon::Signals,
                        poll_opts: PollOpt) -> io::Result<()>
     {
         {
@@ -267,7 +267,7 @@ impl Selector {
     }
 
     /// Deregister event interests for the given IO handle with the OS
-    pub fn deregister_fd(&self, handle: &magenta::Handle, token: Token) -> io::Result<()> {
+    pub fn deregister_fd(&self, handle: &zircon::Handle, token: Token) -> io::Result<()> {
         self.token_to_fd.lock().unwrap().remove(&token);
 
         // We ignore NotFound errors since oneshots are automatically deregistered,
@@ -282,7 +282,7 @@ impl Selector {
     }
 
     pub fn register_handle(&self,
-                           handle: mx_handle_t,
+                           handle: zx_handle_t,
                            token: Token,
                            interests: Ready,
                            poll_opts: PollOpt) -> io::Result<()>
@@ -292,12 +292,12 @@ impl Selector {
                       "Repeated level-triggered events are not supported on Fuchsia handles."));
         }
 
-        let temp_handle = unsafe { magenta::Handle::from_raw(handle) };
+        let temp_handle = unsafe { zircon::Handle::from_raw(handle) };
 
         let res = temp_handle.wait_async_handle(
                     &self.port,
                     key_from_token_and_type(token, RegType::Handle)?,
-                    FuchsiaReady::from(interests).into_mx_signals(),
+                    FuchsiaReady::from(interests).into_zx_signals(),
                     poll_opts_to_wait_async(poll_opts))
               .map_err(status_to_io_err);
 
@@ -307,9 +307,9 @@ impl Selector {
     }
 
 
-    pub fn deregister_handle(&self, handle: mx_handle_t, token: Token) -> io::Result<()>
+    pub fn deregister_handle(&self, handle: zx_handle_t, token: Token) -> io::Result<()>
     {
-        let temp_handle = unsafe { magenta::Handle::from_raw(handle) };
+        let temp_handle = unsafe { zircon::Handle::from_raw(handle) };
         let res = self.port.cancel(&temp_handle, key_from_token_and_type(token, RegType::Handle)?)
                  .map_err(status_to_io_err);
 
