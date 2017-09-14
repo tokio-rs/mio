@@ -94,11 +94,11 @@ impl UdpSocket {
 
         match me.write {
             State::Empty => {}
-            _ => return Err(would_block()),
+            _ => return Err(io::ErrorKind::WouldBlock.into()),
         }
 
         if !me.iocp.registered() {
-            return Err(would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
 
         let interest = me.iocp.readiness();
@@ -128,11 +128,11 @@ impl UdpSocket {
 
         match me.write {
             State::Empty => {}
-            _ => return Err(would_block()),
+            _ => return Err(io::ErrorKind::WouldBlock.into()),
         }
 
         if !me.iocp.registered() {
-            return Err(would_block())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
 
         let interest = me.iocp.readiness();
@@ -153,8 +153,8 @@ impl UdpSocket {
     pub fn recv_from(&self, mut buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         let mut me = self.inner();
         match mem::replace(&mut me.read, State::Empty) {
-            State::Empty => Err(would_block()),
-            State::Pending(b) => { me.read = State::Pending(b); Err(would_block()) }
+            State::Empty => Err(io::ErrorKind::WouldBlock.into()),
+            State::Pending(b) => { me.read = State::Pending(b); Err(io::ErrorKind::WouldBlock.into()) }
             State::Ready(data) => {
                 // If we weren't provided enough space to receive the message
                 // then don't actually read any data, just return an error.
@@ -410,12 +410,4 @@ fn recv_done(status: &OVERLAPPED_ENTRY) {
     }
     me.read = State::Ready(buf);
     me2.add_readiness(&mut me, Ready::readable());
-}
-
-// TODO: Use std's allocation free io::Error
-const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK as i32;
-
-/// Returns a std `WouldBlock` error without allocating
-pub fn would_block() -> ::std::io::Error {
-    ::std::io::Error::from_raw_os_error(WOULDBLOCK)
 }

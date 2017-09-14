@@ -1,3 +1,7 @@
+# Unreleased
+
+* Minimum Rust version is now 1.14.0
+
 # 0.6.10 (July 27, 2017)
 
 * Experimental support for Fuchsia

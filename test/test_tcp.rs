@@ -517,27 +517,80 @@ fn connection_reset_by_peer() {
 
 }
 
- #[test]
- #[cfg_attr(target_os = "fuchsia", ignore)]
- fn connect_error() {
-     let poll = Poll::new().unwrap();
-     let mut events = Events::with_capacity(16);
+#[test]
+#[cfg_attr(target_os = "fuchsia", ignore)]
+fn connect_error() {
+    let poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(16);
 
-     // Pick a "random" port that shouldn't be in use.
-     let l = TcpStream::connect(&"127.0.0.1:38381".parse().unwrap()).unwrap();
-     poll.register(&l, Token(0), Ready::writable(), PollOpt::edge()).unwrap();
+    // Pick a "random" port that shouldn't be in use.
+    let l = TcpStream::connect(&"127.0.0.1:38381".parse().unwrap()).unwrap();
+    poll.register(&l, Token(0), Ready::writable(), PollOpt::edge()).unwrap();
 
-     'outer:
-     loop {
-         poll.poll(&mut events, None).unwrap();
+    'outer:
+    loop {
+        poll.poll(&mut events, None).unwrap();
 
-         for event in &events {
-             if event.token() == Token(0) {
-                 assert!(event.readiness().is_writable());
-                 break 'outer
-             }
-         }
-     }
+        for event in &events {
+            if event.token() == Token(0) {
+                assert!(event.readiness().is_writable());
+                break 'outer
+            }
+        }
+    }
 
-     assert_eq!(l.take_error().unwrap().unwrap().kind(), io::ErrorKind::ConnectionRefused);
- }
+    assert!(l.take_error().unwrap().is_some());
+}
+
+#[test]
+fn write_error() {
+    let poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(16);
+    let (tx, rx) = channel();
+
+    let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let t = thread::spawn(move || {
+        let (conn, _addr) = listener.accept().unwrap();
+        rx.recv().unwrap();
+        drop(conn);
+    });
+
+    let mut s = TcpStream::connect(&addr).unwrap();
+    poll.register(&s,
+                  Token(0),
+                  Ready::readable() | Ready::writable(),
+                  PollOpt::edge()).unwrap();
+
+    let mut wait_writable = || {
+        'outer:
+        loop {
+            poll.poll(&mut events, None).unwrap();
+
+            for event in &events {
+                if event.token() == Token(0) && event.readiness().is_writable() {
+                    break 'outer
+                }
+            }
+        }
+    };
+
+    wait_writable();
+
+    tx.send(()).unwrap();
+    t.join().unwrap();
+
+    let buf = [0; 1024];
+    loop {
+        match s.write(&buf) {
+            Ok(_) => {}
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                wait_writable()
+            }
+            Err(e) => {
+                println!("good error: {}", e);
+                break
+            }
+        }
+    }
+}

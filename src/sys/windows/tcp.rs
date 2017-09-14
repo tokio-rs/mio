@@ -16,7 +16,7 @@ use {poll, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
-use sys::windows::{wouldblock, Family};
+use sys::windows::Family;
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`
@@ -256,7 +256,7 @@ impl TcpStream {
             // Empty == we're not associated yet, and if we're pending then
             // these are both cases where we return "would block"
             State::Empty |
-            State::Pending(()) => return Err(wouldblock()),
+            State::Pending(()) => return Err(io::ErrorKind::WouldBlock.into()),
 
             // If we got a delayed error as part of a `read_overlapped` below,
             // return that here. Also schedule another read in case it was
@@ -333,13 +333,17 @@ impl TcpStream {
         let mut me = self.inner();
         let me = &mut *me;
 
-        match me.write {
+        match mem::replace(&mut me.write, State::Empty) {
             State::Empty => {}
-            _ => return Err(wouldblock())
+            State::Error(e) => return Err(e),
+            other => {
+                me.write = other;
+                return Err(io::ErrorKind::WouldBlock.into())
+            }
         }
 
         if !me.iocp.registered() {
-            return Err(wouldblock())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
 
         if bufs.len() == 0 {
@@ -450,13 +454,14 @@ impl StreamImp {
         // About to write, clear any pending level triggered events
         me.iocp.set_readiness(me.iocp.readiness() - Ready::writable());
 
-        trace!("scheduling a write");
         loop {
+            trace!("scheduling a write of {} bytes", buf[pos..].len());
             let ret = unsafe {
                 self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr())
             };
             match ret {
                 Ok(Some(transferred_bytes)) if me.instant_notify => {
+                    trace!("done immediately with {} bytes", transferred_bytes);
                     if transferred_bytes == buf.len() - pos {
                         self.add_readiness(me, Ready::writable());
                         me.write = State::Empty;
@@ -465,12 +470,14 @@ impl StreamImp {
                     pos += transferred_bytes;
                 }
                 Ok(_) => {
+                    trace!("scheduled for later");
                     // see docs above on StreamImp.inner for rationale on forget
                     me.write = State::Pending((buf, pos));
                     mem::forget(self.clone());
                     break;
                 }
                 Err(e) => {
+                    trace!("write error: {}", e);
                     me.write = State::Error(e);
                     self.add_readiness(me, Ready::writable());
                     me.iocp.put_buffer(buf);
@@ -644,10 +651,10 @@ impl TcpListener {
         let mut me = self.inner();
 
         let ret = match mem::replace(&mut me.accept, State::Empty) {
-            State::Empty => return Err(would_block()),
+            State::Empty => return Err(io::ErrorKind::WouldBlock.into()),
             State::Pending(t) => {
                 me.accept = State::Pending(t);
-                return Err(would_block());
+                return Err(io::ErrorKind::WouldBlock.into());
             }
             State::Ready((s, a)) => {
                 s.set_nonblocking(true)?;
@@ -818,12 +825,4 @@ impl Drop for TcpListener {
             }
         }
     }
-}
-
-// TODO: Use std's allocation free io::Error
-const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK as i32;
-
-/// Returns a std `WouldBlock` error without allocating
-pub fn would_block() -> ::std::io::Error {
-    ::std::io::Error::from_raw_os_error(WOULDBLOCK)
 }
