@@ -106,6 +106,25 @@ impl TcpStream {
         }
         TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
     }
+    
+    /// Create a new TCP stream and issue a non-blocking connect to the
+    /// specified address.
+    ///
+    /// This convenience method is available and uses the system's default
+    /// options when creating a socket which is then connected. If fine-grained
+    /// control over the creation of the socket is desired, you can use
+    /// `net2::TcpBuilder` to configure a socket and then pass its socket to
+    /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
+    /// the connect operation.
+    #[cfg(target_os = "redox")]
+    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
+        use std::os::unix::io::FromRawFd;
+        use syscall;
+        let fd = syscall::open("tcp:", syscall::O_RDWR).map_err(|err| {
+            io::Error::from_raw_os_error(err.errno)
+        })?;
+        TcpStream::connect_stream(unsafe { net::TcpStream::from_raw_fd(fd) }, addr)
+    }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
     /// `std::net::TcpBuilder`, connecting it to the address specified.
@@ -125,7 +144,7 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
-    #[cfg(any(unix, windows))]
+    #[cfg(any(target_os = "redox", unix, windows))]
     pub fn connect_stream(stream: net::TcpStream,
                           addr: &SocketAddr) -> io::Result<TcpStream> {
         Ok(TcpStream {

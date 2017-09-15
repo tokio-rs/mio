@@ -8,6 +8,8 @@ use {io, Evented, Ready, Poll, PollOpt, Token};
 use sys::redox::eventedfd::EventedFd;
 use sys::redox::io::set_nonblock;
 
+use syscall;
+
 #[derive(Debug)]
 pub struct TcpStream {
     inner: net::TcpStream,
@@ -19,21 +21,34 @@ pub struct TcpListener {
 }
 
 impl TcpStream {
-    pub fn connect(_stream: net::TcpStream, _addr: &SocketAddr) -> io::Result<TcpStream> {
-        /*
-        set_nonblock(stream.as_raw_fd())?;
+    pub fn connect(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
+        let fd = stream.as_raw_fd();
+        set_nonblock(fd)?;
 
-        match stream.connect(addr) {
-            Ok(..) => {}
-            Err(ref e) if e.raw_os_error() == Some(libc::EINPROGRESS) => {}
-            Err(e) => return Err(e),
-        }
+        let path = match *addr {
+            SocketAddr::V4(addrv4) => {
+                let ip = addrv4.ip().octets();
+                let port = addrv4.port();
+                format!("{}.{}.{}.{}:{}", ip[0], ip[1], ip[2], ip[3], port)
+            },
+            SocketAddr::V6(_addrv6) => {
+                return Err(io::Error::new(io::ErrorKind::Other, "Not implemented"));
+            }
+        };
+
+        let new_fd = syscall::dup(fd, path.as_bytes()).map_err(|err| {
+            io::Error::from_raw_os_error(err.errno)
+        })?;
+        let ret = syscall::dup2(new_fd, fd, &[]).map_err(|err| {
+            io::Error::from_raw_os_error(err.errno)
+        });
+        let _ = syscall::close(new_fd);
+
+        ret?;
 
         Ok(TcpStream {
             inner: stream,
         })
-        */
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
     }
 
     pub fn from_stream(stream: net::TcpStream) -> TcpStream {
