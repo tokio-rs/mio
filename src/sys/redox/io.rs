@@ -4,9 +4,9 @@ use std::mem;
 use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 use syscall::{fcntl, F_SETFL, F_GETFL, O_NONBLOCK};
 
-pub fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
-    let flags = fcntl(s.as_raw_fd(), F_GETFL, 0).map_err(super::from_syscall_error)?;
-    fcntl(s.as_raw_fd(), F_SETFL, flags | O_NONBLOCK).map_err(super::from_syscall_error)
+pub fn set_nonblock(fd: RawFd) -> io::Result<()> {
+    let flags = fcntl(fd, F_GETFL, 0).map_err(super::from_syscall_error)?;
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK).map_err(super::from_syscall_error)
                                                      .map(|_| ())
 }
 
@@ -17,6 +17,7 @@ pub fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
  *
  */
 
+/// Manages a FD
 #[derive(Debug)]
 pub struct Io {
     fd: RawFd,

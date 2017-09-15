@@ -101,26 +101,21 @@ pub struct Events {
 
 impl Events {
     pub fn with_capacity(u: usize) -> Events {
-        Events {
-            events: Vec::with_capacity(u)
-        }
+        Events { events: Vec::with_capacity(u) }
     }
-
-    #[inline]
     pub fn len(&self) -> usize {
         self.events.len()
     }
-
-    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.events.capacity()
+    }
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
-
-    #[inline]
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|event| {
             let flags = event.flags;
-            let mut kind = Ready::none();
+            let mut kind = Ready::empty();
 
             if flags & EVENT_READ == EVENT_READ {
                 kind = kind | Ready::readable();
@@ -131,11 +126,10 @@ impl Events {
             Event::new(kind, Token(token as usize))
         })
     }
-
     pub fn push_event(&mut self, event: Event) {
         self.events.push(syscall::Event {
             id: usize::from(event.token()),
-            flags: ioevent_to_fevent(event.kind(), PollOpt::empty()),
+            flags: ioevent_to_fevent(event.readiness(), PollOpt::empty()),
             data: 0
         });
     }

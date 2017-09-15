@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
+use std::time::Duration;
 
 use {io, Evented, Ready, Poll, PollOpt, Token};
 
@@ -18,21 +19,28 @@ pub struct TcpListener {
 }
 
 impl TcpStream {
-    /* TODO
-    pub fn connect(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
-        try!(set_nonblock(&stream));
+    pub fn connect(_stream: net::TcpStream, _addr: &SocketAddr) -> io::Result<TcpStream> {
+        /*
+        set_nonblock(stream.as_raw_fd())?;
 
         match stream.connect(addr) {
             Ok(..) => {}
-            Err(ref e) if e.raw_os_error() == Some(syscall::EINPROGRESS) => {}
+            Err(ref e) if e.raw_os_error() == Some(libc::EINPROGRESS) => {}
             Err(e) => return Err(e),
         }
 
         Ok(TcpStream {
             inner: stream,
         })
+        */
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
     }
-    */
+
+    pub fn from_stream(stream: net::TcpStream) -> TcpStream {
+        TcpStream {
+            inner: stream,
+        }
+    }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
@@ -62,14 +70,34 @@ impl TcpStream {
         self.inner.nodelay()
     }
 
-    pub fn set_keepalive_ms(&self, _millis: Option<u32>) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Other, "not implemented"))
-        //self.inner.set_keepalive_ms(millis)
+    pub fn set_recv_buffer_size(&self, _size: usize) -> io::Result<()> {
+        //self.inner.set_recv_buffer_size(size)
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
     }
 
-    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
-        Err(io::Error::new(io::ErrorKind::Other, "not implemented"))
-        //self.inner.keepalive_ms()
+    pub fn recv_buffer_size(&self) -> io::Result<usize> {
+        //self.inner.recv_buffer_size()
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    }
+
+    pub fn set_send_buffer_size(&self, _size: usize) -> io::Result<()> {
+        //self.inner.set_send_buffer_size(size)
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    }
+
+    pub fn send_buffer_size(&self) -> io::Result<usize> {
+        //self.inner.send_buffer_size()
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    }
+
+    pub fn set_keepalive(&self, _keepalive: Option<Duration>) -> io::Result<()> {
+        //self.inner.set_keepalive(keepalive)
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    }
+
+    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
+        //self.inner.keepalive()
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
@@ -78,6 +106,26 @@ impl TcpStream {
 
     pub fn ttl(&self) -> io::Result<u32> {
         self.inner.ttl()
+    }
+
+    pub fn set_only_v6(&self, _only_v6: bool) -> io::Result<()> {
+        //self.inner.set_only_v6(only_v6)
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    }
+
+    pub fn only_v6(&self) -> io::Result<bool> {
+        //self.inner.only_v6()
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    }
+
+    pub fn set_linger(&self, _dur: Option<Duration>) -> io::Result<()> {
+        //self.inner.set_linger(dur)
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    }
+
+    pub fn linger(&self) -> io::Result<Option<Duration>> {
+        //self.inner.linger()
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
@@ -139,7 +187,7 @@ impl AsRawFd for TcpStream {
 
 impl TcpListener {
     pub fn new(inner: net::TcpListener, _addr: &SocketAddr) -> io::Result<TcpListener> {
-        try!(set_nonblock(&inner));
+        set_nonblock(inner.as_raw_fd())?;
         Ok(TcpListener {
             inner: inner,
         })
@@ -159,17 +207,19 @@ impl TcpListener {
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         self.inner.accept().and_then(|(s, a)| {
-            try!(set_nonblock(&s));
+            set_nonblock(s.as_raw_fd())?;
             Ok((TcpStream {
                 inner: s,
             }, a))
         })
     }
 
+    #[allow(deprecated)]
     pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
         self.inner.set_only_v6(only_v6)
     }
 
+    #[allow(deprecated)]
     pub fn only_v6(&self) -> io::Result<bool> {
         self.inner.only_v6()
     }

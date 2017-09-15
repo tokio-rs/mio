@@ -1,5 +1,4 @@
 use {io, Evented, Ready, Poll, PollOpt, Token};
-use io::MapNonBlock;
 use sys::redox::EventedFd;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
@@ -11,7 +10,7 @@ pub struct UdpSocket {
 
 impl UdpSocket {
     pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        try!(socket.set_nonblocking(true));
+        socket.set_nonblocking(true)?;
         Ok(UdpSocket {
             io: socket,
         })
@@ -29,16 +28,25 @@ impl UdpSocket {
         })
     }
 
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
-                   -> io::Result<Option<usize>> {
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         self.io.send_to(buf, target)
-            .map_non_block()
     }
 
-    pub fn recv_from(&self, buf: &mut [u8])
-                     -> io::Result<Option<(usize, SocketAddr)>> {
+    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io.recv_from(buf)
-            .map_non_block()
+    }
+
+    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
+        self.io.send(buf)
+    }
+
+    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io.recv(buf)
+    }
+
+    pub fn connect(&self, addr: SocketAddr)
+                     -> io::Result<()> {
+        self.io.connect(addr)
     }
 
     pub fn broadcast(&self) -> io::Result<bool> {
@@ -103,6 +111,16 @@ impl UdpSocket {
                               multiaddr: &Ipv6Addr,
                               interface: u32) -> io::Result<()> {
         self.io.leave_multicast_v6(multiaddr, interface)
+    }
+
+    pub fn set_only_v6(&self, _only_v6: bool) -> io::Result<()> {
+        //self.io.set_only_v6(only_v6)
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    }
+
+    pub fn only_v6(&self) -> io::Result<bool> {
+        //self.io.only_v6()
+        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {

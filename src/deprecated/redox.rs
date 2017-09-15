@@ -22,14 +22,14 @@ pub struct PipeReader {
 
 impl PipeReader {
     pub fn from_stdout(stdout: process::ChildStdout) -> io::Result<Self> {
-        match sys::set_nonblock(&stdout) {
+        match sys::set_nonblock(stdout.as_raw_fd()) {
             Err(e) => return Err(e),
             _ => {},
         }
         return Ok(PipeReader::from(unsafe { Io::from_raw_fd(stdout.into_raw_fd()) }));
     }
     pub fn from_stderr(stderr: process::ChildStderr) -> io::Result<Self> {
-        match sys::set_nonblock(&stderr) {
+        match sys::set_nonblock(stderr.as_raw_fd()) {
             Err(e) => return Err(e),
             _ => {},
         }
@@ -76,7 +76,7 @@ pub struct PipeWriter {
 
 impl PipeWriter {
     pub fn from_stdin(stdin: process::ChildStdin) -> io::Result<Self> {
-        match sys::set_nonblock(&stdin) {
+        match sys::set_nonblock(stdin.as_raw_fd()) {
             Err(e) => return Err(e),
             _ => {},
         }

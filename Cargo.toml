@@ -29,8 +29,10 @@ default = ["with-deprecated"]
 [dependencies]
 log      = "0.4"
 slab     = "0.4.0"
+
+[target.'cfg(not(target_os = "redox"))'.dependencies]
+iovec    = "0.1.0"
 net2     = "0.2.29"
-iovec    = "0.1.1"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
 fuchsia-zircon = "0.3.2"

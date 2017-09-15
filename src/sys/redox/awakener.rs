@@ -1,9 +1,10 @@
 pub use self::pipe::Awakener;
 
-/// Default *nix awakener implementation
+/// Default awakener backed by a pipe
 mod pipe {
-    use {io, Evented, Ready, Poll, PollOpt, Token};
-    use deprecated::redox::{self, PipeReader, PipeWriter};
+    use sys::redox;
+    use {io, Ready, Poll, PollOpt, Token};
+    use event::Evented;
     use std::io::{Read, Write};
 
     /*
@@ -13,13 +14,13 @@ mod pipe {
      */
 
     pub struct Awakener {
-        reader: PipeReader,
-        writer: PipeWriter,
+        reader: redox::Io,
+        writer: redox::Io,
     }
 
     impl Awakener {
         pub fn new() -> io::Result<Awakener> {
-            let (rd, wr) = try!(redox::pipe());
+            let (rd, wr) = redox::pipe()?;
 
             Ok(Awakener {
                 reader: rd,
@@ -52,7 +53,7 @@ mod pipe {
             }
         }
 
-        fn reader(&self) -> &PipeReader {
+        fn reader(&self) -> &redox::Io {
             &self.reader
         }
     }
