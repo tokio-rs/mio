@@ -29,9 +29,10 @@ default = ["with-deprecated"]
 [dependencies]
 log      = "0.4"
 slab     = "0.4.0"
+net2     = { git = "https://github.com/redox-os/net2-rs.git" }
 
 [target.'cfg(not(target_os = "redox"))'.dependencies]
-iovec    = "0.1.0"
+iovec    = { git = "https://github.com/redox-os/iovec.git" }
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
 fuchsia-zircon = "0.3.2"
@@ -41,7 +42,7 @@ fuchsia-zircon-sys = "0.3.2"
 redox_syscall = "0.1"
 
 [target.'cfg(unix)'.dependencies]
-libc   = "0.2.42"
+libc   = { git = "https://github.com/redox-os/liblibc.git" }
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2.6"
@@ -56,7 +57,3 @@ bytes      = "0.3.0"
 [[test]]
 name = "test"
 path = "test/mod.rs"
-
-[replace]
-"libc:0.2.30" = { git = "https://github.com/redox-os/liblibc.git" }
-"net2:0.2.31" = { git = "https://github.com/redox-os/net2-rs.git" }
