@@ -10,11 +10,9 @@
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
-#[cfg(not(target_os = "redox"))]
 use std::net::{SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
-#[cfg(any(unix, windows))]
 use net2::TcpBuilder;
 #[cfg(not(target_os = "redox"))]
 use iovec::IoVec;
@@ -93,7 +91,6 @@ impl TcpStream {
     /// `net2::TcpBuilder` to configure a socket and then pass its socket to
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
-    #[cfg(any(unix, windows))]
     pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
         let sock = match *addr {
             SocketAddr::V4(..) => TcpBuilder::new_v4(),
@@ -105,25 +102,6 @@ impl TcpStream {
             sock.bind(&inaddr_any(addr))?;
         }
         TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
-    }
-
-    /// Create a new TCP stream and issue a non-blocking connect to the
-    /// specified address.
-    ///
-    /// This convenience method is available and uses the system's default
-    /// options when creating a socket which is then connected. If fine-grained
-    /// control over the creation of the socket is desired, you can use
-    /// `net2::TcpBuilder` to configure a socket and then pass its socket to
-    /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
-    /// the connect operation.
-    #[cfg(target_os = "redox")]
-    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
-        use std::os::unix::io::FromRawFd;
-        use syscall;
-        let fd = syscall::open("tcp:", syscall::O_RDWR).map_err(|err| {
-            io::Error::from_raw_os_error(err.errno)
-        })?;
-        TcpStream::connect_stream(unsafe { net::TcpStream::from_raw_fd(fd) }, addr)
     }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
@@ -144,7 +122,6 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
-    #[cfg(any(target_os = "redox", unix, windows))]
     pub fn connect_stream(stream: net::TcpStream,
                           addr: &SocketAddr) -> io::Result<TcpStream> {
         Ok(TcpStream {
@@ -418,7 +395,6 @@ impl TcpStream {
     }
 }
 
-#[cfg(not(target_os = "redox"))]
 fn inaddr_any(other: &SocketAddr) -> SocketAddr {
     match *other {
         SocketAddr::V4(..) => {
@@ -571,21 +547,13 @@ impl TcpListener {
 
     /// Convenience method to bind a new TCP listener to the specified address
     /// to receive new connections.
-    #[cfg(any(target_os = "redox"))]
+    #[cfg(target_os = "redox")]
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         let listener = net::TcpListener::bind(addr)?;
         Ok(TcpListener {
             sys: sys::TcpListener::new(listener, addr)?,
             selector_id: SelectorId::new(),
         })
-    }
-
-    #[deprecated(since = "0.6.13", note = "use from_std instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn from_listener(listener: net::TcpListener, _: &SocketAddr)
-                         -> io::Result<TcpListener> {
-        TcpListener::from_std(listener)
     }
 
     /// Creates a new `TcpListener` from an instance of a

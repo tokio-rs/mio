@@ -32,7 +32,6 @@ slab     = "0.4.0"
 
 [target.'cfg(not(target_os = "redox"))'.dependencies]
 iovec    = "0.1.0"
-net2     = "0.2.29"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
 fuchsia-zircon = "0.3.2"
@@ -57,3 +56,7 @@ bytes      = "0.3.0"
 [[test]]
 name = "test"
 path = "test/mod.rs"
+
+[replace]
+"libc:0.2.30" = { git = "https://github.com/redox-os/liblibc.git" }
+"net2:0.2.31" = { git = "https://github.com/redox-os/net2-rs.git" }
