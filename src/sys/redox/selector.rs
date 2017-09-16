@@ -1,9 +1,11 @@
 use {io, Ready, PollOpt, Token};
 use event::Event;
 use syscall::{self, O_RDWR, O_CLOEXEC, EVENT_READ, close, fevent, read, open};
+use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::Mutex;
 use std::time::Duration;
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
@@ -16,7 +18,8 @@ static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 #[derive(Debug)]
 pub struct Selector {
     id: usize,
-    efd: RawFd
+    efd: RawFd,
+    tokens: Mutex<BTreeMap<RawFd, BTreeSet<Token>>>
 }
 
 impl Selector {
@@ -29,6 +32,7 @@ impl Selector {
         Ok(Selector {
             id: id,
             efd: efd,
+            tokens: Mutex::new(BTreeMap::new()),
         })
     }
 
@@ -40,18 +44,34 @@ impl Selector {
     pub fn select(&self, evts: &mut Events, awakener: Token, _timeout: Option<Duration>) -> io::Result<bool> {
         use std::slice;
 
-        let dst = unsafe {
+        let mut dst = [syscall::Event::default(); 128];
+
+        let cnt = try!(read(self.efd, unsafe {
             slice::from_raw_parts_mut(
-                evts.events.as_mut_ptr() as *mut u8,
-                evts.events.capacity() * mem::size_of::<syscall::Event>())
-        };
+                dst.as_mut_ptr() as *mut u8,
+                dst.len() * mem::size_of::<syscall::Event>()
+            )
+        }).map_err(super::from_syscall_error))
+        / mem::size_of::<syscall::Event>();
 
-        let cnt = try!(read(self.efd, dst).map_err(super::from_syscall_error))
-                                          / mem::size_of::<syscall::Event>();
+        evts.events.clear();
 
-        unsafe { evts.events.set_len(cnt); }
+        for event in dst[.. cnt].iter() {
+            let mut kind = Ready::empty();
 
-        for i in 0..cnt {
+            if event.flags & EVENT_READ == EVENT_READ {
+                kind = kind | Ready::readable();
+            }
+
+            let tokens = self.tokens.lock().unwrap();
+            if let Some(tokens) = tokens.get(&event.id) {
+                for token in tokens.iter() {
+                    evts.push_event(Event::new(kind, token.clone()));
+                }
+            }
+        }
+
+        for i in 0..evts.len() {
             if evts.get(i).map(|e| e.token()) == Some(awakener) {
                 evts.events.remove(i);
                 return Ok(true);
@@ -62,20 +82,33 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(&self, fd: RawFd, _token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
+    pub fn register(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
         let flags = ioevent_to_fevent(interests, opts);
-        fevent(fd, flags).map_err(super::from_syscall_error).map(|_| ())
+        match fevent(fd, flags).map_err(super::from_syscall_error) {
+            Ok(_) => {
+                let mut tokens = self.tokens.lock().unwrap();
+                tokens.entry(fd).or_insert(BTreeSet::new()).insert(token);
+                Ok(())
+            },
+            Err(err) => Err(err)
+        }
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(&self, fd: RawFd, _token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
-        let flags = ioevent_to_fevent(interests, opts);
-        fevent(fd, flags).map_err(super::from_syscall_error).map(|_| ())
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
+        self.register(fd, token, interests, opts)
     }
 
     /// Deregister event interests for the given IO handle with the OS
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        fevent(fd, 0).map_err(super::from_syscall_error).map(|_| ())
+        match fevent(fd, 0).map_err(super::from_syscall_error) {
+            Ok(_) => {
+                let mut tokens = self.tokens.lock().unwrap();
+                tokens.remove(&fd);
+                Ok(())
+            },
+            Err(err) => Err(err)
+        }
     }
 }
 
@@ -96,7 +129,7 @@ impl Drop for Selector {
 }
 
 pub struct Events {
-    events: Vec<syscall::Event>,
+    events: Vec<Event>,
 }
 
 impl Events {
@@ -113,24 +146,9 @@ impl Events {
         self.events.is_empty()
     }
     pub fn get(&self, idx: usize) -> Option<Event> {
-        self.events.get(idx).map(|event| {
-            let flags = event.flags;
-            let mut kind = Ready::empty();
-
-            if flags & EVENT_READ == EVENT_READ {
-                kind = kind | Ready::readable();
-            }
-
-            let token = self.events[idx].id;
-
-            Event::new(kind, Token(token as usize))
-        })
+        self.events.get(idx).map(|e| e.clone())
     }
     pub fn push_event(&mut self, event: Event) {
-        self.events.push(syscall::Event {
-            id: usize::from(event.token()),
-            flags: ioevent_to_fevent(event.readiness(), PollOpt::empty()),
-            data: 0
-        });
+        self.events.push(event);
     }
 }
