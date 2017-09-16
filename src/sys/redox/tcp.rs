@@ -3,6 +3,8 @@ use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
 use std::time::Duration;
 
+use iovec::IoVec;
+
 use {io, Evented, Ready, Poll, PollOpt, Token};
 
 use sys::redox::eventedfd::EventedFd;
@@ -145,6 +147,14 @@ impl TcpStream {
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.inner.take_error()
+    }
+
+    pub fn readv(&self, _bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+        unimplemented!("readv");
+    }
+
+    pub fn writev(&self, _bufs: &[&IoVec]) -> io::Result<usize> {
+        unimplemented!("writev");
     }
 }
 

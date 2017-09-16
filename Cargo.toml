@@ -30,8 +30,6 @@ default = ["with-deprecated"]
 log      = "0.4"
 slab     = "0.4.0"
 net2     = { git = "https://github.com/redox-os/net2-rs.git" }
-
-[target.'cfg(not(target_os = "redox"))'.dependencies]
 iovec    = { git = "https://github.com/redox-os/iovec.git" }
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]

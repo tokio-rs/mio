@@ -14,7 +14,6 @@ use std::net::{SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
 use net2::TcpBuilder;
-#[cfg(not(target_os = "redox"))]
 use iovec::IoVec;
 
 use {io, sys, Ready, Poll, PollOpt, Token};
@@ -370,7 +369,6 @@ impl TcpStream {
     /// a "would block" error is returned. This operation does not block.
     ///
     /// On Unix this corresponds to the `readv` syscall.
-    #[cfg(not(target_os = "redox"))]
     pub fn read_bufs(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         self.sys.readv(bufs)
     }
@@ -389,7 +387,6 @@ impl TcpStream {
     /// "would block" error is returned. This operation does not block.
     ///
     /// On Unix this corresponds to the `writev` syscall.
-    #[cfg(not(target_os = "redox"))]
     pub fn write_bufs(&self, bufs: &[&IoVec]) -> io::Result<usize> {
         self.sys.writev(bufs)
     }
