@@ -5,9 +5,12 @@
 //! [portability guidelines] are followed, the behavior should be identical no
 //! matter the target platform.
 //!
-/// [portability guidelines]: ../struct.Poll.html#portability
+//! [portability guidelines]: ../struct.Poll.html#portability
 
-use {io, sys, Ready, Poll, PollOpt, Token};
+#![allow(deprecated)]
+
+use {sys, Ready, Poll, PollOpt, Token};
+use io::{self, MapNonBlock};
 use event::Evented;
 use poll::SelectorId;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -72,41 +75,38 @@ impl UdpSocket {
     ///
     /// Address type can be any implementor of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        self.sys.send_to(buf, target)
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
+                   -> io::Result<Option<usize>> {
+        self.sys.send_to(buf, target).map_non_block()
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
-    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.sys.recv_from(buf)
+    pub fn recv_from(&self, buf: &mut [u8])
+                     -> io::Result<Option<(usize, SocketAddr)>> {
+        self.sys.recv_from(buf).map_non_block()
     }
 
     /// Sends data on the socket to the address previously bound via connect(). On success,
     /// returns the number of bytes written.
-    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.sys.send(buf)
+    pub fn send(&self, buf: &[u8])
+                   -> io::Result<Option<usize>> {
+        self.sys.send(buf).map_non_block()
     }
 
     /// Receives data from the socket previously bound with connect(). On success, returns
     /// the number of bytes read and the address from whence the data came.
-    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.sys.recv(buf)
+    pub fn recv(&self, buf: &mut [u8])
+                     -> io::Result<Option<usize>> {
+        self.sys.recv(buf).map_non_block()
     }
 
-    /// Connects the UDP socket setting the default destination for `send()`
+    /// Connects the UDP socket setting the default destination for `send()` 
     /// and limiting packets that are read via `recv` from the address specified
     /// in `addr`.
-    pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
-        self.sys.connect(&addr)
-    }
-
-    /// Sets the value of the `SO_BROADCAST` option for this socket.
-    ///
-    /// When enabled, this socket is allowed to send packets to a broadcast
-    /// address.
-    pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
-        self.sys.set_broadcast(on)
+    pub fn connect(&self, addr: &SocketAddr)
+                 -> io::Result<()> {
+        self.sys.connect(addr)
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.
@@ -119,12 +119,12 @@ impl UdpSocket {
         self.sys.broadcast()
     }
 
-    /// Sets the value of the `IP_MULTICAST_LOOP` option for this socket.
+    /// Sets the value of the `SO_BROADCAST` option for this socket.
     ///
-    /// If enabled, multicast packets will be looped back to the local socket.
-    /// Note that this may not have any affect on IPv6 sockets.
-    pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
-        self.sys.set_multicast_loop_v4(on)
+    /// When enabled, this socket is allowed to send packets to a broadcast
+    /// address.
+    pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
+        self.sys.set_broadcast(on)
     }
 
     /// Gets the value of the `IP_MULTICAST_LOOP` option for this socket.
@@ -135,6 +135,24 @@ impl UdpSocket {
     /// [link]: #method.set_multicast_loop_v4
     pub fn multicast_loop_v4(&self) -> io::Result<bool> {
         self.sys.multicast_loop_v4()
+    }
+
+    /// Sets the value of the `IP_MULTICAST_LOOP` option for this socket.
+    ///
+    /// If enabled, multicast packets will be looped back to the local socket.
+    /// Note that this may not have any affect on IPv6 sockets.
+    pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
+        self.sys.set_multicast_loop_v4(on)
+    }
+
+    /// Gets the value of the `IP_MULTICAST_TTL` option for this socket.
+    ///
+    /// For more information about this option, see
+    /// [`set_multicast_ttl_v4`][link].
+    ///
+    /// [link]: #method.set_multicast_ttl_v4
+    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
+        self.sys.multicast_ttl_v4()
     }
 
     /// Sets the value of the `IP_MULTICAST_TTL` option for this socket.
@@ -148,24 +166,6 @@ impl UdpSocket {
         self.sys.set_multicast_ttl_v4(ttl)
     }
 
-    /// Gets the value of the `IP_MULTICAST_TTL` option for this socket.
-    ///
-    /// For more information about this option, see
-    /// [`set_multicast_ttl_v4`][link].
-    ///
-    /// [link]: #method.set_multicast_ttl_v4
-    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
-        self.sys.multicast_ttl_v4()
-    }
-
-    /// Sets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
-    ///
-    /// Controls whether this socket sees the multicast packets it sends itself.
-    /// Note that this may not have any affect on IPv4 sockets.
-    pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
-        self.sys.set_multicast_loop_v6(on)
-    }
-
     /// Gets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
     ///
     /// For more information about this option, see
@@ -176,12 +176,12 @@ impl UdpSocket {
         self.sys.multicast_loop_v6()
     }
 
-    /// Sets the value for the `IP_TTL` option on this socket.
+    /// Sets the value of the `IPV6_MULTICAST_LOOP` option for this socket.
     ///
-    /// This value sets the time-to-live field that is used in every packet sent
-    /// from this socket.
-    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.sys.set_ttl(ttl)
+    /// Controls whether this socket sees the multicast packets it sends itself.
+    /// Note that this may not have any affect on IPv4 sockets.
+    pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
+        self.sys.set_multicast_loop_v6(on)
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -191,6 +191,14 @@ impl UdpSocket {
     /// [link]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
         self.sys.ttl()
+    }
+
+    /// Sets the value for the `IP_TTL` option on this socket.
+    ///
+    /// This value sets the time-to-live field that is used in every packet sent
+    /// from this socket.
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.sys.set_ttl(ttl)
     }
 
     /// Executes an operation of the `IP_ADD_MEMBERSHIP` type.
@@ -239,27 +247,6 @@ impl UdpSocket {
                               multiaddr: &Ipv6Addr,
                               interface: u32) -> io::Result<()> {
         self.sys.leave_multicast_v6(multiaddr, interface)
-    }
-
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.sys.set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`][link].
-    ///
-    /// [link]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.sys.only_v6()
     }
 
     /// Get the value of the `SO_ERROR` option on this socket.
@@ -319,4 +306,3 @@ impl FromRawFd for UdpSocket {
         }
     }
 }
-

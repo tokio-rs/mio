@@ -187,7 +187,7 @@ impl UdpSocket {
         self.recv_from(buf).map(|(size,_)| size)
     }
 
-    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
+    pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
         self.imp.inner.socket.connect(addr)
     }
 
