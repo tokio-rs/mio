@@ -85,9 +85,9 @@ extern crate net2;
 extern crate iovec;
 
 #[cfg(target_os = "fuchsia")]
-extern crate zircon;
+extern crate fuchsia_zircon as zircon;
 #[cfg(target_os = "fuchsia")]
-extern crate zircon_sys;
+extern crate fuchsia_zircon_sys as zircon_sys;
 
 #[cfg(unix)]
 extern crate libc;
