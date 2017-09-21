@@ -553,14 +553,17 @@ impl TcpListener {
     /// If an accepted stream is returned, the remote address of the peer is
     /// returned along with it.
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.sys.accept().map(|(s, a)| {
-            let stream = TcpStream {
-                sys: s,
-                selector_id: SelectorId::new(),
-            };
+        let (s, a) = try!(self.accept_std());
+        Ok((TcpStream::from_stream(s)?, a))
+    }
 
-            (stream, a)
-        })
+    /// Accepts a new `std::net::TcpStream`.
+    ///
+    /// This method is the same as `accept`, except that it returns a TCP socket
+    /// *in blocking mode* which isn't bound to `mio`. This can be later then
+    /// converted to a `mio` type, if necessary.
+    pub fn accept_std(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
+        self.sys.accept()
     }
 
     /// Returns the local socket address of this listener.
