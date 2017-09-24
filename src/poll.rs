@@ -258,7 +258,7 @@ use std::time::{Duration, Instant};
 /// ### Registering handles
 ///
 /// Unless otherwise noted, it should be assumed that types implementing
-/// [`Evented`] will never be become ready unless they are registered with `Poll`.
+/// [`Evented`] will never become ready unless they are registered with `Poll`.
 ///
 /// For example:
 ///
@@ -917,7 +917,7 @@ impl Poll {
     /// been received or `timeout` has elapsed. A `timeout` of `None` means that
     /// `poll` will block until a readiness event has been received.
     ///
-    /// The supplied `events` will be cleared and newly received readinss events
+    /// The supplied `events` will be cleared and newly received readiness events
     /// will be pushed onto the end. At most `events.capacity()` events will be
     /// returned. If there are further pending readiness events, they will be
     /// returned on the next call to `poll`.
