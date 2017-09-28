@@ -54,6 +54,7 @@ Currently supported platforms:
 * Linux
 * OS X
 * Windows
+* FreeBSD
 * NetBSD
 * Android
 * iOS
