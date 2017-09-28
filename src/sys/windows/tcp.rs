@@ -647,7 +647,7 @@ impl TcpListener {
         }
     }
 
-    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+    pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
         let mut me = self.inner();
 
         let ret = match mem::replace(&mut me.accept, State::Empty) {
@@ -656,10 +656,7 @@ impl TcpListener {
                 me.accept = State::Pending(t);
                 return Err(io::ErrorKind::WouldBlock.into());
             }
-            State::Ready((s, a)) => {
-                s.set_nonblocking(true)?;
-                Ok((TcpStream::new(s, None), a))
-            }
+            State::Ready((s, a)) => Ok((s, a)),
             State::Error(e) => Err(e),
         };
 
