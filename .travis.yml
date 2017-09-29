@@ -89,15 +89,7 @@ matrix:
       install:
         - rustup target add $TARGET
 
-    # FreeBSD
-    - os: linux
-      env: TARGET=x86_64-unknown-freebsd DISABLE_TESTS=1
-      install:
-        - sh ci/trust/install.sh
-        - source ~/.cargo/env || true
-      script:
-        - bash ci/trust/script.sh
-
+    # NetBSD
     - os: linux
       env: TARGET=x86_64-unknown-netbsd DISABLE_TESTS=1
       install:
