@@ -3,7 +3,6 @@ use sys::fuchsia::{
     assert_fuchsia_ready_repr,
     epoll_event_to_ready,
     poll_opts_to_wait_async,
-    status_to_io_err,
     EventedFd,
     EventedFdInner,
     FuchsiaReady,
@@ -96,8 +95,7 @@ impl Selector {
         assert_fuchsia_ready_repr();
 
         let port = Arc::new(
-            zircon::Port::create(zircon::PortOpts::Default)
-                .map_err(status_to_io_err)?
+            zircon::Port::create(zircon::PortOpts::Default)?
         );
 
         // offset by 1 to avoid choosing 0 as the id of a selector
@@ -164,7 +162,7 @@ impl Selector {
         let packet = match self.port.wait(deadline) {
             Ok(packet) => packet,
             Err(zircon::Status::ErrTimedOut) => return Ok(false),
-            Err(e) => return Err(status_to_io_err(e)),
+            Err(e) => Err(e)?,
         };
 
         let observed_signals = match packet.contents() {
@@ -256,14 +254,13 @@ impl Selector {
 
         let wait_async_opts = poll_opts_to_wait_async(poll_opts);
 
-        let wait_res = handle.wait_async_handle(&self.port, token.0 as u64, signals, wait_async_opts)
-            .map_err(status_to_io_err);
+        let wait_res = handle.wait_async_handle(&self.port, token.0 as u64, signals, wait_async_opts);
 
         if wait_res.is_err() {
             self.token_to_fd.lock().unwrap().remove(&token);
         }
 
-        wait_res
+        Ok(wait_res?)
     }
 
     /// Deregister event interests for the given IO handle with the OS
@@ -273,7 +270,7 @@ impl Selector {
         // We ignore NotFound errors since oneshots are automatically deregistered,
         // but mio will attempt to deregister them manually.
         self.port.cancel(&*handle, token.0 as u64)
-            .map_err(status_to_io_err)
+            .map_err(io::Error::from)
             .or_else(|e| if e.kind() == io::ErrorKind::NotFound {
                 Ok(())
             } else {
@@ -298,24 +295,22 @@ impl Selector {
                     &self.port,
                     key_from_token_and_type(token, RegType::Handle)?,
                     FuchsiaReady::from(interests).into_zx_signals(),
-                    poll_opts_to_wait_async(poll_opts))
-              .map_err(status_to_io_err);
+                    poll_opts_to_wait_async(poll_opts));
 
         mem::forget(temp_handle);
 
-        res
+        Ok(res?)
     }
 
 
     pub fn deregister_handle(&self, handle: zx_handle_t, token: Token) -> io::Result<()>
     {
         let temp_handle = unsafe { zircon::Handle::from_raw(handle) };
-        let res = self.port.cancel(&temp_handle, key_from_token_and_type(token, RegType::Handle)?)
-                 .map_err(status_to_io_err);
+        let res = self.port.cancel(&temp_handle, key_from_token_and_type(token, RegType::Handle)?);
 
         mem::forget(temp_handle);
 
-        res
+        Ok(res?)
     }
 }
 

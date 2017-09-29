@@ -1,5 +1,4 @@
 use {io, poll, Evented, Ready, Poll, PollOpt, Token};
-use sys::fuchsia::status_to_io_err;
 use zircon;
 use std::sync::{Arc, Mutex, Weak};
 
@@ -30,7 +29,7 @@ impl Awakener {
         let packet = zircon::Packet::from_user_packet(
             token.0 as u64, status, zircon::UserPacket::from_u8_array([0; 32]));
 
-        port.queue(&packet).map_err(status_to_io_err)
+        Ok(port.queue(&packet)?)
     }
 
     pub fn cleanup(&self) {}
