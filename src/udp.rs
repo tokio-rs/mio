@@ -80,8 +80,17 @@ impl UdpSocket {
         self.sys.send_to(buf, target).map_non_block()
     }
 
-    /// Receives data from the socket. On success, returns the number of bytes
-    /// read and the address from whence the data came.
+    /// Receives data from the socket and stores data in the supplied buffer `buf`. On success,
+    /// returns the number of bytes read and the address from whence the data came.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// The function does not read from `buf`, but is overwriting previous content of `buf`.
+    ///
+    /// Assuming the function has read `n` bytes, slicing `&buf[..n]` provides
+    /// efficient access with iterators and boundary checks.
     pub fn recv_from(&self, buf: &mut [u8])
                      -> io::Result<Option<(usize, SocketAddr)>> {
         self.sys.recv_from(buf).map_non_block()
@@ -94,8 +103,17 @@ impl UdpSocket {
         self.sys.send(buf).map_non_block()
     }
 
-    /// Receives data from the socket previously bound with connect(). On success, returns
-    /// the number of bytes read and the address from whence the data came.
+    /// Receives data from the socket previously bound with connect() and stores data in
+    /// the supplied buffer `buf`. On success, returns the number of bytes read.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// The function does not read from `buf`, but is overwriting previous content of `buf`.
+    ///
+    /// Assuming the function has read `n` bytes, slicing `&buf[..n]` provides
+    /// efficient access with iterators and boundary checks.
     pub fn recv(&self, buf: &mut [u8])
                      -> io::Result<Option<usize>> {
         self.sys.recv(buf).map_non_block()
