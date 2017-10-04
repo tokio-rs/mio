@@ -29,7 +29,7 @@ net2     = "0.2.29"
 iovec    = "0.1.0"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
-fuchsia-zircon = "0.2.0"
+fuchsia-zircon = "0.2.1"
 fuchsia-zircon-sys = "0.2.0"
 
 [target.'cfg(unix)'.dependencies]
