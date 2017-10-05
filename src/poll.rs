@@ -1133,32 +1133,48 @@ impl Poll {
     }
 
     #[inline]
-    fn poll2(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
+    fn poll2(&self, events: &mut Events, mut timeout: Option<Duration>) -> io::Result<usize> {
         // Compute the timeout value passed to the system selector. If the
         // readiness queue has pending nodes, we still want to poll the system
         // selector for new events, but we don't want to block the thread to
         // wait for new events.
-        let timeout = if timeout == Some(Duration::from_millis(0)) {
+        if timeout == Some(Duration::from_millis(0)) {
             // If blocking is not requested, then there is no need to prepare
             // the queue for sleep
-            timeout
         } else if self.readiness_queue.prepare_for_sleep() {
             // The readiness queue is empty. The call to `prepare_for_sleep`
             // inserts `sleep_marker` into the queue. This signals to any
             // threads setting readiness that the `Poll::poll` is going to
             // sleep, so the awakener should be used.
-            timeout
         } else {
             // The readiness queue is not empty, so do not block the thread.
-            Some(Duration::from_millis(0))
-        };
+            timeout = Some(Duration::from_millis(0));
+        }
 
-        // First get selector events
-        let res = self.selector.select(&mut events.inner, AWAKEN, timeout);
-
-        if res? {
-            // Some awakeners require reading from a FD.
-            self.readiness_queue.inner.awakener.cleanup();
+        loop {
+            let now = Instant::now();
+            // First get selector events
+            let res = self.selector.select(&mut events.inner, AWAKEN, timeout);
+            match res {
+                Ok(true) => {
+                    // Some awakeners require reading from a FD.
+                    self.readiness_queue.inner.awakener.cleanup();
+                    break;
+                }
+                Ok(false) => break,
+                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
+                    // Interrupted by a signal; update timeout if necessary and retry
+                    if let Some(to) = timeout {
+                        let elapsed = now.elapsed();
+                        if elapsed >= to {
+                            break;
+                        } else {
+                            timeout = Some(to - elapsed);
+                        }
+                    }
+                }
+                Err(e) => return Err(e),
+            }
         }
 
         // Poll custom event queue
