@@ -25,7 +25,7 @@ default = ["with-deprecated"]
 lazycell = "0.5.0"
 log      = "0.3.1"
 slab     = "0.3.0"
-net2     = "0.2.29"
+net2     = "0.2.30"
 iovec    = "0.1.0"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
@@ -34,6 +34,9 @@ fuchsia-zircon-sys = "0.2.0"
 
 [target.'cfg(unix)'.dependencies]
 libc   = "0.2.19"
+
+[target.'cfg(target_os="emscripten")'.dependencies]
+lazy_static = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2.1"

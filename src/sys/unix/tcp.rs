@@ -209,6 +209,7 @@ impl AsRawFd for TcpStream {
     }
 }
 
+#[cfg(not(target_os="emscripten"))]
 impl TcpListener {
     pub fn new(inner: net::TcpListener, _addr: &SocketAddr) -> io::Result<TcpListener> {
         set_nonblock(inner.as_raw_fd())?;

@@ -92,6 +92,10 @@ extern crate fuchsia_zircon_sys as zircon_sys;
 #[cfg(unix)]
 extern crate libc;
 
+#[cfg(target_os="emscripten")]
+#[macro_use]
+extern crate lazy_static;
+
 #[cfg(windows)]
 extern crate miow;
 
