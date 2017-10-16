@@ -246,7 +246,10 @@ impl TcpStream {
     }
 
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.readv(&mut [buf.into()])
+        match IoVec::from_bytes_mut(buf) {
+            Some(vec) => self.readv(&mut [vec]),
+            None => Ok(0),
+        }
     }
 
     pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
@@ -326,7 +329,10 @@ impl TcpStream {
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        self.writev(&[buf.into()])
+        match IoVec::from_bytes(buf) {
+            Some(vec) => self.writev(&[vec]),
+            None => Ok(0),
+        }
     }
 
     pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
