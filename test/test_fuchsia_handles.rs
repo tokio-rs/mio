@@ -1,6 +1,6 @@
 use mio::*;
 use mio::fuchsia::EventedHandle;
-use magenta::{self, AsHandleRef};
+use zircon::{self, AsHandleRef};
 use std::time::Duration;
 
 const MS: u64 = 1_000;
@@ -11,7 +11,7 @@ pub fn test_fuchsia_channel() {
     let mut event_buffer = Events::with_capacity(1);
     let event_buffer = &mut event_buffer;
 
-    let (channel0, channel1) = magenta::Channel::create(magenta::ChannelOpts::Normal).unwrap();
+    let (channel0, channel1) = zircon::Channel::create(zircon::ChannelOpts::Normal).unwrap();
     let channel1_evented = unsafe { EventedHandle::new(channel1.raw_handle()) };
 
     poll.register(&channel1_evented, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
