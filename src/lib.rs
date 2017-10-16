@@ -237,7 +237,7 @@ pub mod fuchsia {
 ///   buffering to ensure that a readiness interface can be provided. For a
 ///   sample implementation see the TCP/UDP modules in mio itself.
 ///
-/// * `Overlapped` - this type is intended to be used as the concreate instances
+/// * `Overlapped` - this type is intended to be used as the concrete instances
 ///   of the `OVERLAPPED` type that most win32 methods expect. It's crucial, for
 ///   safety, that all asynchronous operations are initiated with an instance of
 ///   `Overlapped` and not another instantiation of `OVERLAPPED`.

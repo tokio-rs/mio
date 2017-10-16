@@ -44,7 +44,7 @@ pub struct EventedFdInner {
     /// `fd` is closed on `Drop`, so modifying `fd` is a memory-unsafe operation.
     fd: RawFd,
 
-    /// Owned `fdio_t` ponter.
+    /// Owned `fdio_t` pointer.
     fdio: *const sys::fdio_t,
 }
 
