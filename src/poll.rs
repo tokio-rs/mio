@@ -159,7 +159,7 @@ use std::time::{Duration, Instant};
 /// assume that [`Poll::poll`] may never return another event for the same token
 /// and readiness until the operation returns [`WouldBlock`].
 ///
-/// By contrast, when level-triggered notfications was requested, each call to
+/// By contrast, when level-triggered notifications was requested, each call to
 /// [`Poll::poll`] will return an event for the socket as long as data remains
 /// in the socket buffer. Generally, level-triggered events should be avoided if
 /// high performance is a concern.
@@ -2179,7 +2179,7 @@ impl ReadinessQueue {
 
     /// Prepare the queue for the `Poll::poll` thread to block in the system
     /// selector. This involves changing `head_readiness` to `sleep_marker`.
-    /// Returns true if successfull and `poll` can block.
+    /// Returns true if successful and `poll` can block.
     fn prepare_for_sleep(&self) -> bool {
         let end_marker = self.inner.end_marker();
         let sleep_marker = self.inner.sleep_marker();
