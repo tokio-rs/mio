@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 // implemented in user space by `ReadinessQueue`. It provides a way to implement
 // purely user space `Evented` types.
 //
-// `ReadinessQueue` is is backed by a MPSC queue that supports reuse of linked
+// `ReadinessQueue` is backed by a MPSC queue that supports reuse of linked
 // list nodes. This significantly reduces the number of required allocations.
 // Each `Registration` / `SetReadiness` pair allocates a single readiness node
 // that is used for the lifetime of the registration.
@@ -252,8 +252,8 @@ use std::time::{Duration, Instant};
 ///
 /// [`readable`]: struct.Ready.html#method.readable
 /// [`writable`]: struct.Ready.html#method.writable
-/// [`error`]: struct.Ready.html#method.error
-/// [`hup`]: struct.Ready.html#method.hup
+/// [`error`]: unix/struct.UnixReady.html#method.error
+/// [`hup`]: unix/struct.UnixReady.html#method.hup
 ///
 /// ### Registering handles
 ///
@@ -434,7 +434,8 @@ pub struct Poll {
 /// [`set_readiness`]: struct.SetReadiness.html#method.set_readiness
 /// [`register`]: struct.Poll.html#method.register
 /// [`reregister`]: struct.Poll.html#method.reregister
-/// [`reregister`]: struct.Poll.html#method.reregister
+/// [`deregister`]: struct.Poll.html#method.deregister
+/// [portability]: struct.Poll.html#portability
 pub struct Registration {
     inner: RegistrationInner,
 }
