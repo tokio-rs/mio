@@ -10,6 +10,8 @@ extern crate env_logger;
 extern crate iovec;
 extern crate slab;
 extern crate tempdir;
+#[macro_use]
+extern crate version_sync;
 
 #[cfg(target_os = "fuchsia")]
 extern crate fuchsia_zircon as zircon;
@@ -33,6 +35,7 @@ mod test_tcp_level;
 mod test_udp_level;
 mod test_udp_socket;
 mod test_write_then_drop;
+mod test_version_numbers;
 
 #[cfg(feature = "with-deprecated")]
 mod test_notify;
