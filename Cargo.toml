@@ -41,9 +41,10 @@ miow   = "0.2.1"
 kernel32-sys = "0.2"
 
 [dev-dependencies]
-env_logger = { version = "0.4.0", default-features = false }
-tempdir    = "0.3.4"
-bytes      = "0.3.0"
+env_logger   = { version = "0.4.0", default-features = false }
+version-sync = "0.4"
+tempdir      = "0.3.4"
+bytes        = "0.3.0"
 
 [[test]]
 name = "test"
