@@ -1,3 +1,7 @@
+# Unreleased
+
+* `Poll`: retry select() when interrupted by a signal
+
 # 0.6.11 (October 25, 2017)
 
 * Allow register to take empty interest (#640).
