@@ -1558,15 +1558,6 @@ impl Registration {
         (registration, set_readiness)
     }
 
-    #[deprecated(since = "0.6.5", note = "use `new2` instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn new(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
-        -> (Registration, SetReadiness)
-    {
-        Registration::new_priv(poll, token, interest, opt)
-    }
-
     // TODO: Get rid of this (windows depends on it for now)
     fn new_priv(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
         -> (Registration, SetReadiness)
@@ -1600,20 +1591,6 @@ impl Registration {
         };
 
         (registration, set_readiness)
-    }
-
-    #[deprecated(since = "0.6.5", note = "use `Evented` impl")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn update(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.inner.update(poll, token, interest, opts)
-    }
-
-    #[deprecated(since = "0.6.5", note = "use `Evented` impl")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner.update(poll, Token(0), Ready::empty(), PollOpt::empty())
     }
 }
 

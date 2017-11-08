@@ -112,21 +112,6 @@ mod token;
 
 pub mod net;
 
-#[deprecated(since = "0.6.5", note = "use mio-more instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod channel;
-
-#[deprecated(since = "0.6.5", note = "use mio-more instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod timer;
-
-#[deprecated(since = "0.6.5", note = "update to use `Poll`")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod deprecated;
-
 pub use poll::{
     Poll,
     Registration,
@@ -227,23 +212,4 @@ pub mod fuchsia {
 pub mod windows {
 
     pub use sys::{Overlapped, Binding};
-}
-
-#[cfg(feature = "with-deprecated")]
-mod convert {
-    use std::time::Duration;
-
-    const NANOS_PER_MILLI: u32 = 1_000_000;
-    const MILLIS_PER_SEC: u64 = 1_000;
-
-    /// Convert a `Duration` to milliseconds, rounding up and saturating at
-    /// `u64::MAX`.
-    ///
-    /// The saturating is fine because `u64::MAX` milliseconds are still many
-    /// million years.
-    pub fn millis(duration: Duration) -> u64 {
-        // Round up.
-        let millis = (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
-        duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
-    }
 }
