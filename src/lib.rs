@@ -75,7 +75,7 @@
 //!
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/mio/0.6.1")]
+#![doc(html_root_url = "https://docs.rs/mio/0.6.11")]
 #![crate_name = "mio"]
 
 #![deny(warnings, missing_docs, missing_debug_implementations)]
