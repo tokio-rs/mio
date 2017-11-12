@@ -3,7 +3,7 @@ use std::{fmt, io, ops};
 
 /// A value that may be registered with `Poll`
 ///
-/// Values that implement `Evented` can be registered with `Poll`. Users of Mio
+/// Values that implement `Evented` can be registered with `Poll`. Users of mio
 /// should not use the `Evented` trait functions directly. Instead, the
 /// equivalent functions on `Poll` should be used.
 ///
