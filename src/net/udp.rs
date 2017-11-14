@@ -17,6 +17,74 @@ use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 /// This is an implementation of a bound UDP socket. This supports both IPv4 and
 /// IPv6 addresses, and there is no corresponding notion of a server because UDP
 /// is a datagram protocol.
+///
+/// # Examples
+///
+/// ```
+/// # use std::error::Error;
+/// #
+/// # fn try_main() -> Result<(), Box<Error>> {
+/// // An Echo program:
+/// // SENDER -> sends a message.
+/// // ECHOER -> listens and prints the message received.
+///
+/// use mio::net::UdpSocket;
+/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use std::time::Duration;
+///
+/// const SENDER: Token = Token(0x4c4f4f43);
+/// const ECHOER: Token = Token(0x54535552);
+///
+/// // This operation will fail if the address is in use, so we select different ports for each
+/// // socket.
+/// let sender_socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+/// let echoer_socket = UdpSocket::bind(&"127.0.0.1:11100".parse()?)?;
+///
+/// // If we do not use connect here, SENDER and ECHOER would need to call send_to and recv_from
+/// // respectively.
+/// sender_socket.connect("127.0.0.1:11100".parse()?)?;
+///
+/// // We need a Poll to check if SENDER is ready to be written into, and if ECHOER is ready to be
+/// // read from.
+/// let poll = Poll::new()?;
+///
+/// // We register our sockets here so that we can check if they are ready to be written/read.
+/// poll.register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
+/// poll.register(&echoer_socket, ECHOER, Ready::readable(), PollOpt::edge())?;
+///
+/// // We keep buffer small to prevent fragmentation.
+/// let msg_to_send = [9; 9];
+/// let mut buffer = [0; 9];
+/// let mut events = Events::with_capacity(128);
+/// loop {
+///     poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+///     for event in events.iter() {
+///         match event.token() {
+///             // Our SENDER is ready to be written into.
+///             SENDER => {
+///                 let bytes_sent = sender_socket.send(&msg_to_send)?;
+///                 assert_eq!(bytes_sent, 9);
+///                 println!("sent {:?} -> {:?} bytes", msg_to_send, bytes_sent);
+///             },
+///             // Our ECHOER is ready to be read from.
+///             ECHOER => {
+///                 let num_recv = echoer_socket.recv(&mut buffer)?;
+///                 println!("echo {:?} -> {:?}", buffer, num_recv);
+///                 buffer = [0; 9];
+///                 # return Ok(());
+///             }
+///             _ => unreachable!()
+///         }
+///     }
+/// }
+/// #
+/// #   Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #   try_main().unwrap();
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct UdpSocket {
     sys: sys::UdpSocket,
@@ -25,6 +93,55 @@ pub struct UdpSocket {
 
 impl UdpSocket {
     /// Creates a UDP socket from the given address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    /// use mio::{Events, Ready, Poll, PollOpt, Token};
+    /// use std::time::Duration;
+    ///
+    /// const SENDER: Token = Token(0x4c4f4f43);
+    ///
+    /// // We must bind it to an open address.
+    /// let socket = match UdpSocket::bind(&"127.0.0.1:7777".parse()?) {
+    ///     Ok(socket) => socket,
+    ///     Err(fail) => {
+    ///         // We panic! here, but you could try to bind it again on another address.
+    ///         panic!("Failed to bind socket. {:?}", fail);
+    ///     }
+    /// };
+    ///
+    /// // Our socket was created, now set up a Poll before using it.
+    /// let poll = Poll::new()?;
+    /// poll.register(&socket, SENDER, Ready::writable(), PollOpt::edge())?;
+    ///
+    /// let mut events = Events::with_capacity(128);
+    /// loop {
+    ///     poll.poll(&mut events, Some(std::time::Duration::from_millis(100)))?;
+    ///     for event in events.iter() {
+    ///         match event.token() {
+    ///             SENDER => {
+    ///                 let bytes_sent = socket.send_to(&[9; 9], &"127.0.0.1:11100".parse()?)?;
+    ///                 println!("SENDER sent {:?} bytes.", bytes_sent);
+    ///                 assert_eq!(bytes_sent, 9);
+    ///                 # return Ok(());
+    ///             }
+    ///             _ => unreachable!()
+    ///         }
+    ///     }
+    /// }
+    /// #
+    /// #   Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
         let socket = net::UdpSocket::bind(addr)?;
         UdpSocket::from_socket(socket)
@@ -48,6 +165,68 @@ impl UdpSocket {
     }
 
     /// Returns the socket address that this socket was created from.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    /// use mio::{Events, Ready, Poll, PollOpt, Token};
+    /// use std::time::Duration;
+    ///
+    /// const SENDER: Token = Token(0x4c4f4f43);
+    /// const ECHOER: Token = Token(0x54535552);
+    /// #
+    /// # let hidden_addr = "127.0.0.1:7777".parse()?;
+    /// // We don't know which address another_socket is using.
+    /// let another_socket = UdpSocket::bind(&hidden_addr)?;
+    ///
+    /// // We check to see if this address isn't being used by another_socket.
+    /// let dangerous_addr = "127.0.0.1:7777".parse()?;
+    /// let fallback_addr = "127.0.0.1:11100".parse()?;
+    /// let socket = if another_socket.local_addr()? == dangerous_addr {
+    ///     UdpSocket::bind(&fallback_addr)?
+    /// } else {
+    ///     UdpSocket::bind(&dangerous_addr)?
+    /// };
+    ///
+    /// // We now have multiple working sockets to use.
+    ///
+    /// another_socket.connect(socket.local_addr()?)?;
+    ///
+    /// let poll = Poll::new()?;
+    /// poll.register(&another_socket, SENDER, Ready::writable(), PollOpt::edge())?;
+    /// poll.register(&socket, ECHOER, Ready::readable(), PollOpt::edge())?;
+    ///
+    /// let mut buffer = [0; 9];
+    /// let mut events = Events::with_capacity(128);
+    /// loop {
+    ///     poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+    ///     for event in events.iter() {
+    ///         match event.token() {
+    ///             SENDER => {
+    ///                 let bytes_sent = another_socket.send(&[9; 9])?;
+    ///                 println!("SENDER sent {:?} bytes", bytes_sent);
+    ///                 assert_eq!(bytes_sent, 9);
+    ///             },
+    ///             ECHOER => {
+    ///                 let num_recv = socket.recv(&mut buffer)?;
+    ///                 println!("ECHOER received {:?} -> {:?} bytes", buffer, num_recv);
+    ///                 # return Ok(());
+    ///             }
+    ///             _ => unreachable!()
+    ///         }
+    ///     }
+    /// }
+    /// #
+    /// #   Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.sys.local_addr()
     }
@@ -72,12 +251,102 @@ impl UdpSocket {
     ///
     /// Address type can be any implementor of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    /// use mio::{Events, Ready, Poll, PollOpt, Token};
+    ///
+    /// const SENDER: Token = Token(0x4c4f4f43);
+    ///
+    /// let socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    ///
+    /// let poll = Poll::new()?;
+    /// poll.register(&socket, SENDER, Ready::writable(), PollOpt::edge())?;
+    ///
+    /// let mut events = Events::with_capacity(128);
+    /// loop {
+    ///     poll.poll(&mut events, Some(std::time::Duration::from_millis(100)))?;
+    ///
+    ///     // We must check if the socket is writable before calling send_to,
+    ///     // or we could run into a WouldBlock error.
+    ///     for event in events.iter() {
+    ///         match event.token() {
+    ///             SENDER => {
+    ///                 let bytes_sent = socket.send_to(&[9; 9], &"127.0.0.1:11100".parse()?)?;
+    ///                 println!("SENDER sent {:?} bytes.", bytes_sent);
+    ///                 assert_eq!(bytes_sent, 9);
+    ///                 # return Ok(());
+    ///             }
+    ///             _ => unreachable!()
+    ///         }
+    ///     }
+    /// }
+    /// #
+    /// #   Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         self.sys.send_to(buf, target)
     }
 
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    /// use mio::{Events, Ready, Poll, PollOpt, Token};
+    /// use std::time::Duration;
+    ///
+    /// # const SENDER: Token = Token(0x4c4f4f43);
+    /// const RECEIVER: Token = Token(0x52494952);
+    ///
+    /// # let sender_socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    /// let socket = UdpSocket::bind(&"127.0.0.1:11100".parse()?)?;
+    ///
+    /// let poll = Poll::new()?;
+    /// # poll.register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
+    /// poll.register(&socket, RECEIVER, Ready::readable(), PollOpt::edge())?;
+    ///
+    /// let mut buf = [0; 9];
+    /// let mut events = Events::with_capacity(128);
+    /// loop {
+    ///     poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+    ///     for event in events.iter() {
+    ///         match event.token() {
+    ///             # SENDER => {
+    ///                 # sender_socket.send_to(&[9; 9], &"127.0.0.1:11100".parse()?)?;
+    ///             # }
+    ///             RECEIVER => {
+    ///                 let (num_recv, from) = socket.recv_from(&mut buf)?;
+    ///                 println!("Received {:?} -> {:?} bytes from {:?}", buf, num_recv, from);
+    ///                 # return Ok(());
+    ///             }
+    ///             _ => unreachable!()
+    ///         }
+    ///     }
+    /// }
+    /// #
+    /// #   Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.sys.recv_from(buf)
     }
@@ -105,6 +374,63 @@ impl UdpSocket {
     ///
     /// When enabled, this socket is allowed to send packets to a broadcast
     /// address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    /// use mio::{Events, Ready, Poll, PollOpt, Token};
+    ///
+    /// const BROADCASTER: Token = Token(0x4f494d);
+    ///
+    /// // This is a special broadcast address for the local network, the router won't forward
+    /// // transmissions sent here to other networks.
+    /// let broadcast_addr = "255.255.255.255:11100".parse()?;
+    /// let broadcast_socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    ///
+    /// // SO_BROADCAST is set to false by default.
+    /// if broadcast_socket.broadcast()? == false {
+    ///     broadcast_socket.set_broadcast(true)?;
+    /// }
+    ///
+    /// let poll = Poll::new()?;
+    /// let mut events = Events::with_capacity(128);
+    ///
+    /// // The socket for this example doesn't need to be readable, as we are only writing into it.
+    /// // We make it readable here for convenience.
+    /// poll.register(&broadcast_socket, BROADCASTER, Ready::readable() | Ready::writable(),
+    ///     PollOpt::edge())?;
+    ///
+    /// loop {
+    ///     poll.poll(&mut events, Some(std::time::Duration::from_millis(100)))?;
+    ///
+    ///     // We must check if the socket is writable before calling send_to,
+    ///     // or we could run into a WouldBlock error.
+    ///     for event in events.iter() {
+    ///         match event.token() {
+    ///             BROADCASTER => {
+    ///                 // Your firewall and/or your router might have a rule 
+    ///                 // blocking broadcast transmissions.
+    ///                 let bytes_sent = broadcast_socket.send_to(&[9; 9], &broadcast_addr)?;
+    ///                 println!("BROADCASTER sent: {:?} bytes.", bytes_sent);
+    ///                 assert_eq!(bytes_sent, 9);
+    ///                 # return Ok(());
+    ///             }
+    ///             _ => unreachable!()
+    ///         }
+    ///     }
+    /// }
+    /// #
+    /// #   Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
         self.sys.set_broadcast(on)
     }
@@ -115,6 +441,58 @@ impl UdpSocket {
     /// [`set_broadcast`][link].
     ///
     /// [link]: #method.set_broadcast
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    /// # use mio::{Events, Ready, Poll, PollOpt, Token};
+    ///
+    /// const BROADCASTER: Token = Token(0x4f494d);
+    ///
+    /// // This is a special broadcast address for the local network, the router won't forward
+    /// // transmissions sent here to other networks.
+    /// let broadcast_addr = "255.255.255.255:11100".parse()?;
+    /// let broadcast_socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    ///
+    /// // SO_BROADCAST is set to false by default.
+    /// if broadcast_socket.broadcast()? == false {
+    ///     broadcast_socket.set_broadcast(true)?;
+    /// }
+    /// #
+    /// // Set up Poll, check if the socket is writable and begin transmission.
+    /// let poll = Poll::new()?;
+    /// let mut events = Events::with_capacity(128);
+    /// 
+    /// poll.register(&broadcast_socket, BROADCASTER, Ready::writable(),
+    ///     PollOpt::edge())?;
+    ///
+    /// loop {
+    ///     poll.poll(&mut events, Some(std::time::Duration::from_millis(100)))?;
+    ///     for event in events.iter() {
+    ///         match event.token() {
+    ///             BROADCASTER => {
+    ///                 // This operation will fail if socket.broadcast() == false.
+    ///                 let bytes_sent = broadcast_socket.send_to(&[9; 9], &broadcast_addr)?;
+    ///                 println!("BROADCASTER sent: {:?} bytes.", bytes_sent);
+    ///                 assert_eq!(bytes_sent, 9);
+    ///                 # return Ok(());
+    ///             }
+    ///             _ => unreachable!()
+    ///         }
+    ///     }
+    /// }
+    /// #
+    /// #   Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn broadcast(&self) -> io::Result<bool> {
         self.sys.broadcast()
     }
