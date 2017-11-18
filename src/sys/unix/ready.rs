@@ -73,9 +73,10 @@ use std::fmt;
 /// let addr = "216.58.193.68:80".parse()?;
 /// let socket = TcpStream::connect(&addr)?;
 ///
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
 ///
-/// poll.register(&socket,
+/// poll.register()
+///     .register(&socket,
 ///               Token(0),
 ///               Ready::readable() | UnixReady::error(),
 ///               PollOpt::edge())?;

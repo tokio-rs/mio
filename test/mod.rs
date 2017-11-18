@@ -153,7 +153,7 @@ pub fn sleep_ms(ms: u64) {
     thread::sleep(Duration::from_millis(ms));
 }
 
-pub fn expect_events(poll: &Poll,
+pub fn expect_events(poll: &mut Poll,
                      event_buffer: &mut Events,
                      poll_try_count: usize,
                      mut expected: Vec<Event>)
