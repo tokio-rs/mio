@@ -17,10 +17,6 @@ exclude       = [
   "deploy.sh",
 ]
 
-[features]
-with-deprecated = []
-default = ["with-deprecated"]
-
 [dependencies]
 lazycell = "0.5.0"
 log      = "0.3.1"

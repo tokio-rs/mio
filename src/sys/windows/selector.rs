@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use std::{fmt, io};
 use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;

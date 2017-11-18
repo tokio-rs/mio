@@ -258,22 +258,6 @@ impl PollOpt {
         PollOpt(0b0100)
     }
 
-    #[deprecated(since = "0.6.5", note = "removed")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn urgent() -> PollOpt {
-        PollOpt(0b1000)
-    }
-
-    #[deprecated(since = "0.6.5", note = "removed")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn all() -> PollOpt {
-        PollOpt::edge() | PollOpt::level() | PollOpt::oneshot()
-    }
-
     /// Returns true if the options include edge-triggered notifications.
     ///
     /// See [`Poll`] for more documentation on polling.
@@ -332,23 +316,6 @@ impl PollOpt {
     #[inline]
     pub fn is_oneshot(&self) -> bool {
         self.contains(PollOpt::oneshot())
-    }
-
-    #[deprecated(since = "0.6.5", note = "removed")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[allow(deprecated)]
-    #[inline]
-    pub fn is_urgent(&self) -> bool {
-        self.contains(PollOpt::urgent())
-    }
-
-    #[deprecated(since = "0.6.5", note = "removed")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn bits(&self) -> usize {
-        self.0
     }
 
     /// Returns true if `self` is a superset of `other`.
@@ -470,18 +437,6 @@ impl ops::Sub for PollOpt {
     }
 }
 
-#[deprecated(since = "0.6.10", note = "removed")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-impl ops::Not for PollOpt {
-    type Output = PollOpt;
-
-    #[inline]
-    fn not(self) -> PollOpt {
-        PollOpt(!self.0)
-    }
-}
-
 impl fmt::Debug for PollOpt {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
@@ -575,13 +530,6 @@ impl Ready {
         Ready(0)
     }
 
-    #[deprecated(since = "0.6.5", note = "use Ready::empty instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn none() -> Ready {
-        Ready::empty()
-    }
-
     /// Returns a `Ready` representing readable readiness.
     ///
     /// See [`Poll`] for more documentation on polling.
@@ -622,31 +570,6 @@ impl Ready {
         Ready(WRITABLE)
     }
 
-    #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn error() -> Ready {
-        Ready(ERROR)
-    }
-
-    #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn hup() -> Ready {
-        Ready(HUP)
-    }
-
-    #[deprecated(since = "0.6.5", note = "removed")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn all() -> Ready {
-        Ready::readable() |
-            Ready::writable()
-    }
-
     /// Returns true if `Ready` is the empty set
     ///
     /// See [`Poll`] for more documentation on polling.
@@ -662,14 +585,6 @@ impl Ready {
     #[inline]
     pub fn is_empty(&self) -> bool {
         *self == Ready::empty()
-    }
-
-    #[deprecated(since = "0.6.5", note = "use Ready::is_empty instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn is_none(&self) -> bool {
-        self.is_empty()
     }
 
     /// Returns true if the value includes readable readiness
@@ -712,22 +627,6 @@ impl Ready {
         self.contains(Ready::writable())
     }
 
-    #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn is_error(&self) -> bool {
-        self.contains(Ready(ERROR))
-    }
-
-    #[deprecated(since = "0.6.5", note = "use UnixReady instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn is_hup(&self) -> bool {
-        self.contains(Ready(HUP))
-    }
-
     /// Adds all readiness represented by `other` into `self`.
     ///
     /// This is equivalent to `*self = *self | other`.
@@ -766,14 +665,6 @@ impl Ready {
     pub fn remove<T: Into<Self>>(&mut self, other: T) {
         let other = other.into();
         self.0 &= !other.0;
-    }
-
-    #[deprecated(since = "0.6.5", note = "removed")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    #[inline]
-    pub fn bits(&self) -> usize {
-        self.0
     }
 
     /// Returns true if `self` is a superset of `other`.
@@ -885,18 +776,6 @@ impl<T: Into<Ready>> ops::SubAssign<T> for Ready {
     }
 }
 
-#[deprecated(since = "0.6.10", note = "removed")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-impl ops::Not for Ready {
-    type Output = Ready;
-
-    #[inline]
-    fn not(self) -> Ready {
-        Ready(!self.0)
-    }
-}
-
 impl fmt::Debug for Ready {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
@@ -993,13 +872,6 @@ impl Event {
     /// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
     /// ```
     pub fn readiness(&self) -> Ready {
-        self.kind
-    }
-
-    #[deprecated(since = "0.6.5", note = "use Event::readiness()")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn kind(&self) -> Ready {
         self.kind
     }
 

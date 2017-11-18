@@ -193,7 +193,7 @@ fn read_bufs() {
     let mut so_far = 0;
     loop {
         for buf in b.iter_mut() {
-            for byte in buf.as_mut_bytes() {
+            for byte in &mut buf[..] {
                 *byte = 0;
             }
         }
@@ -208,7 +208,7 @@ fn read_bufs() {
             Ok(mut n) => {
                 so_far += n;
                 for buf in b.iter() {
-                    let buf = buf.as_bytes();
+                    let buf = &buf[..];
                     for byte in buf[..cmp::min(n, buf.len())].iter() {
                         assert_eq!(*byte, 1);
                     }

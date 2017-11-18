@@ -53,9 +53,9 @@ fn wait_for(poll: &mut Poll, events: &mut Events, token: Token) {
     loop {
         poll.poll(events, Some(Duration::from_millis(MS))).unwrap();
 
-        let cnt = (0..events.len()).map(|i| events.get(i).unwrap())
-                                   .filter(|e| e.token() == token)
-                                   .count();
+        let cnt = events.iter()
+            .filter(|e| e.token() == token)
+            .count();
 
         assert!(cnt < 2, "token appeared multiple times in poll results; cnt={:}", cnt);
 
