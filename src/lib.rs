@@ -189,6 +189,12 @@ pub mod unix {
         EventedFd,
     };
     pub use sys::unix::UnixReady;
+    #[cfg(any(target_os = "bitrig", target_os = "dragonfly",
+              target_os = "freebsd", target_os = "ios", target_os = "macos",
+              target_os = "netbsd", target_os = "openbsd"))]
+    pub use sys::unix::BSDReady;
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+    pub use sys::unix::FreeBSDReady;
 }
 
 #[cfg(target_os = "fuchsia")]
