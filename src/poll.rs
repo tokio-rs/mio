@@ -11,8 +11,6 @@ use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool};
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed, SeqCst};
 use std::time::{Duration, Instant};
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-use sys::unix::UnixReady;
 
 // Poll is backed by two readiness queues. The first is a system readiness queue
 // represented by `sys::Selector`. The system readiness queue handles events
@@ -20,7 +18,7 @@ use sys::unix::UnixReady;
 // implemented in user space by `ReadinessQueue`. It provides a way to implement
 // purely user space `Evented` types.
 //
-// `ReadinessQueue` is is backed by a MPSC queue that supports reuse of linked
+// `ReadinessQueue` is backed by a MPSC queue that supports reuse of linked
 // list nodes. This significantly reduces the number of required allocations.
 // Each `Registration` / `SetReadiness` pair allocates a single readiness node
 // that is used for the lifetime of the registration.
@@ -161,7 +159,7 @@ use sys::unix::UnixReady;
 /// assume that [`Poll::poll`] may never return another event for the same token
 /// and readiness until the operation returns [`WouldBlock`].
 ///
-/// By contrast, when level-triggered notfications was requested, each call to
+/// By contrast, when level-triggered notifications was requested, each call to
 /// [`Poll::poll`] will return an event for the socket as long as data remains
 /// in the socket buffer. Generally, level-triggered events should be avoided if
 /// high performance is a concern.
@@ -254,13 +252,13 @@ use sys::unix::UnixReady;
 ///
 /// [`readable`]: struct.Ready.html#method.readable
 /// [`writable`]: struct.Ready.html#method.writable
-/// [`error`]: struct.Ready.html#method.error
-/// [`hup`]: struct.Ready.html#method.hup
+/// [`error`]: unix/struct.UnixReady.html#method.error
+/// [`hup`]: unix/struct.UnixReady.html#method.hup
 ///
 /// ### Registering handles
 ///
 /// Unless otherwise noted, it should be assumed that types implementing
-/// [`Evented`] will never be become ready unless they are registered with `Poll`.
+/// [`Evented`] will never become ready unless they are registered with `Poll`.
 ///
 /// For example:
 ///
@@ -436,7 +434,8 @@ pub struct Poll {
 /// [`set_readiness`]: struct.SetReadiness.html#method.set_readiness
 /// [`register`]: struct.Poll.html#method.register
 /// [`reregister`]: struct.Poll.html#method.reregister
-/// [`reregister`]: struct.Poll.html#method.reregister
+/// [`deregister`]: struct.Poll.html#method.deregister
+/// [portability]: struct.Poll.html#portability
 pub struct Registration {
     inner: RegistrationInner,
 }
@@ -776,7 +775,7 @@ impl Poll {
     pub fn register<E: ?Sized>(&self, handle: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
-        validate_args(token, interest)?;
+        validate_args(token)?;
 
         /*
          * Undefined behavior:
@@ -847,7 +846,7 @@ impl Poll {
     pub fn reregister<E: ?Sized>(&self, handle: &E, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()>
         where E: Evented
     {
-        validate_args(token, interest)?;
+        validate_args(token)?;
 
         trace!("registering with poller");
 
@@ -919,7 +918,7 @@ impl Poll {
     /// been received or `timeout` has elapsed. A `timeout` of `None` means that
     /// `poll` will block until a readiness event has been received.
     ///
-    /// The supplied `events` will be cleared and newly received readinss events
+    /// The supplied `events` will be cleared and newly received readiness events
     /// will be pushed onto the end. At most `events.capacity()` events will be
     /// returned. If there are further pending readiness events, they will be
     /// returned on the next call to `poll`.
@@ -937,7 +936,10 @@ impl Poll {
     ///
     /// `poll` returns the number of readiness events that have been pushed into
     /// `events` or `Err` when an error has been encountered with the system
-    /// selector.
+    /// selector.  The value returned is deprecated and will be removed in 0.7.0.
+    /// Accessing the events by index is also deprecated.  Events can be
+    /// inserted by other events triggering, thus making sequential access
+    /// problematic.  Use the iterator API instead.  See [`iter`].
     ///
     /// See the [struct] level documentation for a higher level discussion of
     /// polling.
@@ -945,6 +947,7 @@ impl Poll {
     /// [`readable`]: struct.Ready.html#method.readable
     /// [`writable`]: struct.Ready.html#method.writable
     /// [struct]: #
+    /// [`iter`]: struct.Events.html#method.iter
     ///
     /// # Examples
     ///
@@ -1134,65 +1137,61 @@ impl Poll {
     }
 
     #[inline]
-    fn poll2(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
+    fn poll2(&self, events: &mut Events, mut timeout: Option<Duration>) -> io::Result<usize> {
         // Compute the timeout value passed to the system selector. If the
         // readiness queue has pending nodes, we still want to poll the system
         // selector for new events, but we don't want to block the thread to
         // wait for new events.
-        let timeout = if timeout == Some(Duration::from_millis(0)) {
+        if timeout == Some(Duration::from_millis(0)) {
             // If blocking is not requested, then there is no need to prepare
             // the queue for sleep
-            timeout
         } else if self.readiness_queue.prepare_for_sleep() {
             // The readiness queue is empty. The call to `prepare_for_sleep`
             // inserts `sleep_marker` into the queue. This signals to any
             // threads setting readiness that the `Poll::poll` is going to
             // sleep, so the awakener should be used.
-            timeout
         } else {
             // The readiness queue is not empty, so do not block the thread.
-            Some(Duration::from_millis(0))
-        };
+            timeout = Some(Duration::from_millis(0));
+        }
 
-        // First get selector events
-        let res = self.selector.select(&mut events.inner, AWAKEN, timeout);
-
-        if res? {
-            // Some awakeners require reading from a FD.
-            self.readiness_queue.inner.awakener.cleanup();
+        loop {
+            let now = Instant::now();
+            // First get selector events
+            let res = self.selector.select(&mut events.inner, AWAKEN, timeout);
+            match res {
+                Ok(true) => {
+                    // Some awakeners require reading from a FD.
+                    self.readiness_queue.inner.awakener.cleanup();
+                    break;
+                }
+                Ok(false) => break,
+                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
+                    // Interrupted by a signal; update timeout if necessary and retry
+                    if let Some(to) = timeout {
+                        let elapsed = now.elapsed();
+                        if elapsed >= to {
+                            break;
+                        } else {
+                            timeout = Some(to - elapsed);
+                        }
+                    }
+                }
+                Err(e) => return Err(e),
+            }
         }
 
         // Poll custom event queue
         self.readiness_queue.poll(&mut events.inner);
 
         // Return number of polled events
-        Ok(events.len())
+        Ok(events.inner.len())
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-fn registerable(interest: Ready) -> bool {
-    let unixinterest = UnixReady::from(interest);
-    unixinterest.is_readable() || unixinterest.is_writable() || unixinterest.is_aio()
-}
-
-#[cfg(target_os = "fuchsia")]
-fn registerable(interest: Ready) -> bool {
-    event::ready_as_usize(interest) != 0
-}
-
-#[cfg(not(unix))]
-fn registerable(interest: Ready) -> bool {
-    interest.is_readable() || interest.is_writable()
-}
-
-fn validate_args(token: Token, interest: Ready) -> io::Result<()> {
+fn validate_args(token: Token) -> io::Result<()> {
     if token == AWAKEN {
         return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
-    }
-
-    if !registerable(interest) {
-        return Err(io::Error::new(io::ErrorKind::Other, "interest must include readable or writable or aio"));
     }
 
     Ok(())
@@ -1347,49 +1346,14 @@ impl Events {
         }
     }
 
-    /// Returns the `Event` at the given index, or `None` if the index is out of
-    /// bounds.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Poll};
-    /// use std::time::Duration;
-    ///
-    /// let mut events = Events::with_capacity(1024);
-    /// let poll = Poll::new()?;
-    ///
-    /// // Register handles with `poll`
-    ///
-    /// let n = poll.poll(&mut events, Some(Duration::from_millis(100)))?;
-    ///
-    /// for i in 0..n {
-    ///     println!("event={:?}", events.get(i).unwrap());
-    /// }
-    /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
+    #[deprecated(since="0.6.10", note="Index access removed in favor of iterator only API.")]
+    #[doc(hidden)]
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.inner.get(idx)
     }
 
-    /// Returns the number of `Event` values currently in `self`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Events;
-    ///
-    /// let events = Events::with_capacity(1024);
-    ///
-    /// assert_eq!(0, events.len());
-    /// ```
+    #[doc(hidden)]
+    #[deprecated(since="0.6.10", note="Index access removed in favor of iterator only API.")]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
@@ -1470,7 +1434,7 @@ impl<'a> Iterator for Iter<'a> {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.get(self.pos);
+        let ret = self.inner.inner.get(self.pos);
         self.pos += 1;
         ret
     }
@@ -1492,7 +1456,7 @@ impl Iterator for IntoIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.get(self.pos);
+        let ret = self.inner.inner.get(self.pos);
         self.pos += 1;
         ret
     }
@@ -1501,7 +1465,6 @@ impl Iterator for IntoIter {
 impl fmt::Debug for Events {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Events")
-            .field("len", &self.len())
             .field("capacity", &self.capacity())
             .finish()
     }
@@ -2201,7 +2164,7 @@ impl ReadinessQueue {
 
     /// Prepare the queue for the `Poll::poll` thread to block in the system
     /// selector. This involves changing `head_readiness` to `sleep_marker`.
-    /// Returns true if successfull and `poll` can block.
+    /// Returns true if successful and `poll` can block.
     fn prepare_for_sleep(&self) -> bool {
         let end_marker = self.inner.end_marker();
         let sleep_marker = self.inner.sleep_marker();

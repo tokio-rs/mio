@@ -136,7 +136,7 @@ pub fn test_tcp_stream_level_triggered() {
 }
 
 fn filter(events: &Events, token: Token) -> Vec<Event> {
-    (0..events.len()).map(|i| events.get(i).unwrap())
-                     .filter(|e| e.token() == token)
-                     .collect()
+    events.iter()
+        .filter(|e| e.token() == token)
+        .collect()
 }

@@ -332,7 +332,7 @@ impl UdpSocket {
         self.io.recv(buf)
     }
 
-    pub fn connect(&self, addr: SocketAddr)
+    pub fn connect(&self, addr: &SocketAddr)
                    -> io::Result<()> {
         self.io.connect(addr)
     }

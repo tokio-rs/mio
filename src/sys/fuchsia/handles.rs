@@ -1,12 +1,12 @@
 use {io, poll, Evented, Ready, Poll, PollOpt, Token};
-use magenta_sys::mx_handle_t;
+use zircon_sys::zx_handle_t;
 use std::sync::Mutex;
 
 /// Wrapper for registering a `HandleBase` type with mio.
 #[derive(Debug)]
 pub struct EventedHandle {
     /// The handle to be registered.
-    handle: mx_handle_t,
+    handle: zx_handle_t,
 
     /// The current `Token` with which the handle is registered with mio.
     token: Mutex<Option<Token>>,
@@ -18,7 +18,7 @@ impl EventedHandle {
     ///
     /// The underlying handle must not be dropped while the
     /// `EventedHandle` still exists.
-    pub unsafe fn new(handle: mx_handle_t) -> Self {
+    pub unsafe fn new(handle: zx_handle_t) -> Self {
         EventedHandle {
             handle: handle,
             token: Mutex::new(None),
@@ -26,7 +26,7 @@ impl EventedHandle {
     }
 
     /// Get the underlying handle being registered.
-    pub fn get_handle(&self) -> mx_handle_t {
+    pub fn get_handle(&self) -> zx_handle_t {
         self.handle
     }
 }

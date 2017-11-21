@@ -281,27 +281,6 @@ impl TcpStream {
         self.sys.ttl()
     }
 
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.sys.set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`][link].
-    ///
-    /// [link]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.sys.only_v6()
-    }
-
     /// Sets the value for the `SO_LINGER` option on this socket.
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.sys.set_linger(dur)
@@ -314,24 +293,6 @@ impl TcpStream {
     /// [link]: #method.set_linger
     pub fn linger(&self) -> io::Result<Option<Duration>> {
         self.sys.linger()
-    }
-
-    #[deprecated(since = "0.6.9", note = "use set_keepalive")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn set_keepalive_ms(&self, keepalive: Option<u32>) -> io::Result<()> {
-        self.set_keepalive(keepalive.map(|v| Duration::from_millis(v as u64)))
-    }
-
-    #[deprecated(since = "0.6.9", note = "use keepalive")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
-        self.keepalive().map(|v| {
-            v.map(|v| {
-                ::convert::millis(v) as u32
-            })
-        })
     }
 
     /// Get the value of the `SO_ERROR` option on this socket.
@@ -553,14 +514,17 @@ impl TcpListener {
     /// If an accepted stream is returned, the remote address of the peer is
     /// returned along with it.
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.sys.accept().map(|(s, a)| {
-            let stream = TcpStream {
-                sys: s,
-                selector_id: SelectorId::new(),
-            };
+        let (s, a) = try!(self.accept_std());
+        Ok((TcpStream::from_stream(s)?, a))
+    }
 
-            (stream, a)
-        })
+    /// Accepts a new `std::net::TcpStream`.
+    ///
+    /// This method is the same as `accept`, except that it returns a TCP socket
+    /// *in blocking mode* which isn't bound to `mio`. This can be later then
+    /// converted to a `mio` type, if necessary.
+    pub fn accept_std(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
+        self.sys.accept()
     }
 
     /// Returns the local socket address of this listener.
@@ -597,27 +561,6 @@ impl TcpListener {
     /// [link]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
         self.sys.ttl()
-    }
-
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.sys.set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`][link].
-    ///
-    /// [link]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.sys.only_v6()
     }
 
     /// Get the value of the `SO_ERROR` option on this socket.

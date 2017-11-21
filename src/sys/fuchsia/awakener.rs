@@ -1,13 +1,12 @@
 use {io, poll, Evented, Ready, Poll, PollOpt, Token};
-use sys::fuchsia::status_to_io_err;
-use magenta;
+use zircon;
 use std::sync::{Arc, Mutex, Weak};
 
 pub struct Awakener {
     /// Token and weak reference to the port on which Awakener was registered.
     ///
     /// When `Awakener::wakeup` is called, these are used to send a wakeup message to the port.
-    inner: Mutex<Option<(Token, Weak<magenta::Port>)>>,
+    inner: Mutex<Option<(Token, Weak<zircon::Port>)>>,
 }
 
 impl Awakener {
@@ -27,10 +26,10 @@ impl Awakener {
         let port = weak_port.upgrade().expect("Tried to wakeup a closed port.");
 
         let status = 0; // arbitrary
-        let packet = magenta::Packet::from_user_packet(
-            token.0 as u64, status, magenta::UserPacket::from_u8_array([0; 32]));
+        let packet = zircon::Packet::from_user_packet(
+            token.0 as u64, status, zircon::UserPacket::from_u8_array([0; 32]));
 
-        port.queue(&packet).map_err(status_to_io_err)
+        Ok(port.queue(&packet)?)
     }
 
     pub fn cleanup(&self) {}

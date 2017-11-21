@@ -75,7 +75,7 @@
 //!
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/mio/0.6.1")]
+#![doc(html_root_url = "https://docs.rs/mio/0.6.11")]
 #![crate_name = "mio"]
 
 #![deny(warnings, missing_docs, missing_debug_implementations)]
@@ -85,9 +85,9 @@ extern crate net2;
 extern crate iovec;
 
 #[cfg(target_os = "fuchsia")]
-extern crate magenta;
+extern crate fuchsia_zircon as zircon;
 #[cfg(target_os = "fuchsia")]
-extern crate magenta_sys;
+extern crate fuchsia_zircon_sys as zircon_sys;
 
 #[cfg(unix)]
 extern crate libc;
@@ -112,39 +112,6 @@ mod token;
 
 pub mod net;
 
-#[deprecated(since = "0.6.5", note = "use mio-more instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod channel;
-
-#[deprecated(since = "0.6.5", note = "use mio-more instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod timer;
-
-#[deprecated(since = "0.6.5", note = "update to use `Poll`")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod deprecated;
-
-#[deprecated(since = "0.6.5", note = "use iovec crate directly")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use iovec::IoVec;
-
-#[deprecated(since = "0.6.6", note = "use net module instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod tcp {
-    pub use net::{TcpListener, TcpStream};
-    pub use std::net::Shutdown;
-}
-
-#[deprecated(since = "0.6.6", note = "use net module instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod udp;
-
 pub use poll::{
     Poll,
     Registration,
@@ -167,21 +134,6 @@ pub use event::{
     Events,
 };
 
-#[deprecated(since = "0.6.5", note = "use events:: instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use event::{Event, Evented};
-
-#[deprecated(since = "0.6.5", note = "use events::Iter instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use poll::Iter as EventsIter;
-
-#[deprecated(since = "0.6.5", note = "std::io::Error can avoid the allocation now")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use io::deprecated::would_block;
-
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 pub mod unix {
     //! Unix only extensions
@@ -194,10 +146,16 @@ pub mod unix {
 #[cfg(target_os = "fuchsia")]
 pub mod fuchsia {
     //! Fuchsia-only extensions
+    //!
+    //! # Stability
+    //!
+    //! This module depends on the [magenta-sys crate](https://crates.io/crates/magenta-sys)
+    //! and so might introduce breaking changes, even on minor releases,
+    //! so long as that crate remains unstable.
     pub use sys::{
         EventedHandle,
     };
-    pub use sys::fuchsia::{FuchsiaReady, mx_signals_t};
+    pub use sys::fuchsia::{FuchsiaReady, zx_signals_t};
 }
 
 /// Windows-only extensions to the mio crate.
@@ -231,7 +189,7 @@ pub mod fuchsia {
 ///   buffering to ensure that a readiness interface can be provided. For a
 ///   sample implementation see the TCP/UDP modules in mio itself.
 ///
-/// * `Overlapped` - this type is intended to be used as the concreate instances
+/// * `Overlapped` - this type is intended to be used as the concrete instances
 ///   of the `OVERLAPPED` type that most win32 methods expect. It's crucial, for
 ///   safety, that all asynchronous operations are initiated with an instance of
 ///   `Overlapped` and not another instantiation of `OVERLAPPED`.
@@ -252,25 +210,5 @@ pub mod fuchsia {
 /// later hooked into the mio event loop.
 #[cfg(windows)]
 pub mod windows {
-
     pub use sys::{Overlapped, Binding};
-}
-
-#[cfg(feature = "with-deprecated")]
-mod convert {
-    use std::time::Duration;
-
-    const NANOS_PER_MILLI: u32 = 1_000_000;
-    const MILLIS_PER_SEC: u64 = 1_000;
-
-    /// Convert a `Duration` to milliseconds, rounding up and saturating at
-    /// `u64::MAX`.
-    ///
-    /// The saturating is fine because `u64::MAX` milliseconds are still many
-    /// million years.
-    pub fn millis(duration: Duration) -> u64 {
-        // Round up.
-        let millis = (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
-        duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
-    }
 }

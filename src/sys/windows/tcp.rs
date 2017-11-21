@@ -16,7 +16,7 @@ use {poll, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
-use sys::windows::{wouldblock, Family};
+use sys::windows::Family;
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`
@@ -179,14 +179,6 @@ impl TcpStream {
         self.imp.inner.socket.ttl()
     }
 
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.imp.inner.socket.set_only_v6(only_v6)
-    }
-
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.imp.inner.socket.only_v6()
-    }
-
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.imp.inner.socket.set_linger(dur)
     }
@@ -246,7 +238,10 @@ impl TcpStream {
     }
 
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.readv(&mut [buf.into()])
+        match IoVec::from_bytes_mut(buf) {
+            Some(vec) => self.readv(&mut [vec]),
+            None => Ok(0),
+        }
     }
 
     pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
@@ -256,7 +251,7 @@ impl TcpStream {
             // Empty == we're not associated yet, and if we're pending then
             // these are both cases where we return "would block"
             State::Empty |
-            State::Pending(()) => return Err(wouldblock()),
+            State::Pending(()) => return Err(io::ErrorKind::WouldBlock.into()),
 
             // If we got a delayed error as part of a `read_overlapped` below,
             // return that here. Also schedule another read in case it was
@@ -326,20 +321,27 @@ impl TcpStream {
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        self.writev(&[buf.into()])
+        match IoVec::from_bytes(buf) {
+            Some(vec) => self.writev(&[vec]),
+            None => Ok(0),
+        }
     }
 
     pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
 
-        match me.write {
+        match mem::replace(&mut me.write, State::Empty) {
             State::Empty => {}
-            _ => return Err(wouldblock())
+            State::Error(e) => return Err(e),
+            other => {
+                me.write = other;
+                return Err(io::ErrorKind::WouldBlock.into())
+            }
         }
 
         if !me.iocp.registered() {
-            return Err(wouldblock())
+            return Err(io::ErrorKind::WouldBlock.into())
         }
 
         if bufs.len() == 0 {
@@ -450,13 +452,14 @@ impl StreamImp {
         // About to write, clear any pending level triggered events
         me.iocp.set_readiness(me.iocp.readiness() - Ready::WRITABLE);
 
-        trace!("scheduling a write");
         loop {
+            trace!("scheduling a write of {} bytes", buf[pos..].len());
             let ret = unsafe {
                 self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr())
             };
             match ret {
                 Ok(Some(transferred_bytes)) if me.instant_notify => {
+                    trace!("done immediately with {} bytes", transferred_bytes);
                     if transferred_bytes == buf.len() - pos {
                         self.add_readiness(me, Ready::WRITABLE);
                         me.write = State::Empty;
@@ -465,12 +468,14 @@ impl StreamImp {
                     pos += transferred_bytes;
                 }
                 Ok(_) => {
+                    trace!("scheduled for later");
                     // see docs above on StreamImp.inner for rationale on forget
                     me.write = State::Pending((buf, pos));
                     mem::forget(self.clone());
                     break;
                 }
                 Err(e) => {
+                    trace!("write error: {}", e);
                     me.write = State::Error(e);
                     self.add_readiness(me, Ready::WRITABLE);
                     me.iocp.put_buffer(buf);
@@ -640,19 +645,16 @@ impl TcpListener {
         }
     }
 
-    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+    pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
         let mut me = self.inner();
 
         let ret = match mem::replace(&mut me.accept, State::Empty) {
-            State::Empty => return Err(would_block()),
+            State::Empty => return Err(io::ErrorKind::WouldBlock.into()),
             State::Pending(t) => {
                 me.accept = State::Pending(t);
-                return Err(would_block());
+                return Err(io::ErrorKind::WouldBlock.into());
             }
-            State::Ready((s, a)) => {
-                s.set_nonblocking(true)?;
-                Ok((TcpStream::new(s, None), a))
-            }
+            State::Ready((s, a)) => Ok((s, a)),
             State::Error(e) => Err(e),
         };
 
@@ -669,16 +671,6 @@ impl TcpListener {
         self.imp.inner.socket.try_clone().map(|s| {
             TcpListener::new_family(s, self.imp.inner.family)
         })
-    }
-
-    #[allow(deprecated)]
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.imp.inner.socket.set_only_v6(only_v6)
-    }
-
-    #[allow(deprecated)]
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.imp.inner.socket.only_v6()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
@@ -818,12 +810,4 @@ impl Drop for TcpListener {
             }
         }
     }
-}
-
-// TODO: Use std's allocation free io::Error
-const WOULDBLOCK: i32 = ::winapi::winerror::WSAEWOULDBLOCK as i32;
-
-/// Returns a std `WouldBlock` error without allocating
-pub fn would_block() -> ::std::io::Error {
-    ::std::io::Error::from_raw_os_error(WOULDBLOCK)
 }

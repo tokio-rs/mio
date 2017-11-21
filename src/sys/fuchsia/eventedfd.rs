@@ -1,7 +1,7 @@
 use {io, poll, Evented, Ready, Poll, PollOpt, Token};
 use libc;
-use magenta;
-use magenta::AsHandleRef;
+use zircon;
+use zircon::AsHandleRef;
 use sys::fuchsia::{DontDrop, poll_opts_to_wait_async, sys};
 use std::mem;
 use std::os::unix::io::RawFd;
@@ -11,24 +11,24 @@ use std::sync::{Arc, Mutex};
 #[derive(Debug)]
 pub struct EventedFdRegistration {
     token: Token,
-    handle: DontDrop<magenta::Handle>,
-    rereg_signals: Option<(magenta::Signals, magenta::WaitAsyncOpts)>,
+    handle: DontDrop<zircon::Handle>,
+    rereg_signals: Option<(zircon::Signals, zircon::WaitAsyncOpts)>,
 }
 
 impl EventedFdRegistration {
     unsafe fn new(token: Token,
-                  raw_handle: sys::mx_handle_t,
-                  rereg_signals: Option<(magenta::Signals, magenta::WaitAsyncOpts)>,
+                  raw_handle: sys::zx_handle_t,
+                  rereg_signals: Option<(zircon::Signals, zircon::WaitAsyncOpts)>,
                   ) -> Self
     {
         EventedFdRegistration {
             token: token,
-            handle: DontDrop::new(magenta::Handle::from_raw(raw_handle)),
+            handle: DontDrop::new(zircon::Handle::from_raw(raw_handle)),
             rereg_signals: rereg_signals
         }
     }
 
-    pub fn rereg_signals(&self) -> Option<(magenta::Signals, magenta::WaitAsyncOpts)> {
+    pub fn rereg_signals(&self) -> Option<(zircon::Signals, zircon::WaitAsyncOpts)> {
         self.rereg_signals
     }
 }
@@ -44,12 +44,12 @@ pub struct EventedFdInner {
     /// `fd` is closed on `Drop`, so modifying `fd` is a memory-unsafe operation.
     fd: RawFd,
 
-    /// Owned `mxio_t` ponter.
-    mxio: *const sys::mxio_t,
+    /// Owned `fdio_t` pointer.
+    fdio: *const sys::fdio_t,
 }
 
 impl EventedFdInner {
-    pub fn rereg_for_level(&self, port: &magenta::Port) {
+    pub fn rereg_for_level(&self, port: &zircon::Port) {
         let registration_opt = self.registration.lock().unwrap();
         if let Some(ref registration) = *registration_opt {
             if let Some((rereg_signals, rereg_opts)) = registration.rereg_signals {
@@ -69,25 +69,25 @@ impl EventedFdInner {
         &self.registration
     }
 
-    pub fn mxio(&self) -> &sys::mxio_t {
-        unsafe { &*self.mxio }
+    pub fn fdio(&self) -> &sys::fdio_t {
+        unsafe { &*self.fdio }
     }
 }
 
 impl Drop for EventedFdInner {
     fn drop(&mut self) {
         unsafe {
-            sys::__mxio_release(self.mxio);
+            sys::__fdio_release(self.fdio);
             let _ = libc::close(self.fd);
         }
     }
 }
 
 // `EventedInner` must be manually declared `Send + Sync` because it contains a `RawFd` and a
-// `*const sys::mxio_t`. These are only used to make thread-safe system calls, so accessing
+// `*const sys::fdio_t`. These are only used to make thread-safe system calls, so accessing
 // them is entirely thread-safe.
 //
-// Note: one minor exception to this are the calls to `libc::close` and `__mxio_release`, which
+// Note: one minor exception to this are the calls to `libc::close` and `__fdio_release`, which
 // happen on `Drop`. These accesses are safe because `drop` can only be called at most once from
 // a single thread, and after it is called no other functions can be called on the `EventedFdInner`.
 unsafe impl Sync for EventedFdInner {}
@@ -100,27 +100,27 @@ pub struct EventedFd {
 
 impl EventedFd {
     pub unsafe fn new(fd: RawFd) -> Self {
-        let mxio = sys::__mxio_fd_to_io(fd);
-        assert!(mxio != ::std::ptr::null(), "FileDescriptor given to EventedFd must be valid.");
+        let fdio = sys::__fdio_fd_to_io(fd);
+        assert!(fdio != ::std::ptr::null(), "FileDescriptor given to EventedFd must be valid.");
 
         EventedFd {
             inner: Arc::new(EventedFdInner {
                 registration: Mutex::new(None),
                 fd: fd,
-                mxio: mxio,
+                fdio: fdio,
             })
         }
     }
 
     fn handle_and_signals_for_events(&self, interest: Ready, opts: PollOpt)
-                -> (sys::mx_handle_t, magenta::Signals)
+                -> (sys::zx_handle_t, zircon::Signals)
     {
         let epoll_events = ioevent_to_epoll(interest, opts);
 
         unsafe {
-            let mut raw_handle: sys::mx_handle_t = mem::uninitialized();
-            let mut signals: sys::mx_signals_t = mem::uninitialized();
-            sys::__mxio_wait_begin(self.inner.mxio, epoll_events, &mut raw_handle, &mut signals);
+            let mut raw_handle: sys::zx_handle_t = mem::uninitialized();
+            let mut signals: sys::zx_signals_t = mem::uninitialized();
+            sys::__fdio_wait_begin(self.inner.fdio, epoll_events, &mut raw_handle, &mut signals);
 
             (raw_handle, signals)
         }
@@ -158,7 +158,7 @@ impl EventedFd {
         );
 
         // We don't have ownership of the handle, so we can't drop it
-        let handle = DontDrop::new(unsafe { magenta::Handle::from_raw(raw_handle) });
+        let handle = DontDrop::new(unsafe { zircon::Handle::from_raw(raw_handle) });
 
         let registered = poll::selector(poll)
             .register_fd(handle.inner_ref(), self, token, signals, opts);

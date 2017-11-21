@@ -1,3 +1,17 @@
+# Unreleased
+
+* `Poll`: retry select() when interrupted by a signal
+
+# 0.6.11 (October 25, 2017)
+
+* Allow register to take empty interest (#640).
+* Fix bug with TCP errors on windows (#725).
+* Add TcpListener::accept_std (#733).
+* Update IoVec to fix soundness bug -- includes behavior change. (#747).
+* Minimum Rust version is now 1.14.0.
+* Fix Android x86_64 build.
+* Misc API & doc polish.
+
 # 0.6.10 (July 27, 2017)
 
 * Experimental support for Fuchsia
@@ -47,7 +61,7 @@
 # 0.6.4 (January 24, 2017)
 
 * Fix compilation on musl
-* Add `TcpStream::from_stream` which conversts a std TCP stream to Mio.
+* Add `TcpStream::from_stream` which converts a std TCP stream to Mio.
 
 # 0.6.3 (January 22, 2017)
 
