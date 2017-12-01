@@ -1,7 +1,7 @@
 use {localhost, TryRead, TryWrite};
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio::net::{TcpListener, TcpStream};
-use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
+use bytes::{Buf, Bytes, BytesMut, SliceBuf};
 use slab;
 use std::io;
 
@@ -10,8 +10,8 @@ const CLIENT: Token = Token(10_000_001);
 
 struct EchoConn {
     sock: TcpStream,
-    buf: Option<ByteBuf>,
-    mut_buf: Option<MutByteBuf>,
+    buf: Option<Bytes>,
+    mut_buf: Option<BytesMut>,
     token: Option<Token>,
     interest: Ready
 }
@@ -23,7 +23,7 @@ impl EchoConn {
         EchoConn {
             sock: sock,
             buf: None,
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
+            mut_buf: Some(BytesMut::with_capacity(2048)),
             token: None,
             interest: Ready::empty(),
         }
@@ -130,7 +130,7 @@ struct EchoClient {
     msgs: Vec<&'static str>,
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
-    mut_buf: Option<MutByteBuf>,
+    mut_buf: Option<BytesMut>,
     token: Token,
     interest: Ready,
     shutdown: bool,
@@ -147,7 +147,7 @@ impl EchoClient {
             msgs: msgs,
             tx: SliceBuf::wrap(curr.as_bytes()),
             rx: SliceBuf::wrap(curr.as_bytes()),
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
+            mut_buf: Some(BytesMut::with_capacity(2048)),
             token: tok,
             interest: Ready::empty(),
             shutdown: false,

@@ -2,7 +2,7 @@ use {TryRead, TryWrite};
 use mio::*;
 use mio::deprecated::{EventLoop, Handler};
 use mio::deprecated::unix::*;
-use bytes::{Buf, ByteBuf, SliceBuf};
+use bytes::{Buf, BytesMut, SliceBuf};
 use slab;
 use std::path::PathBuf;
 use std::io::{self, Read};
@@ -55,7 +55,7 @@ impl EchoConn {
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
-        let mut buf = ByteBuf::mut_with_capacity(2048);
+        let mut buf = BytesMut::with_capacity(2048);
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
