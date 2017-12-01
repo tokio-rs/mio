@@ -22,7 +22,7 @@ with-deprecated = []
 default = ["with-deprecated"]
 
 [dependencies]
-lazycell = "0.5.0"
+lazycell = "0.6.0"
 log      = "0.3.1"
 slab     = "0.3.0"
 net2     = "0.2.29"
