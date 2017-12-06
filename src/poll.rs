@@ -2029,6 +2029,7 @@ impl ReadinessQueue {
         // sleep. If it is not, then the queue is not empty and there should be
         // no sleeping.
         if tail == sleep_marker {
+            // False assumption: having 3 meta nodes the queue may be empty even if head!=tail
             return self.inner.head_readiness.load(Acquire) == sleep_marker;
         }
 
@@ -2165,45 +2166,67 @@ impl ReadinessQueueInner {
         let mut tail = *self.tail_readiness.get();
         let mut next = (*tail).next_readiness.load(Acquire);
 
-        if tail == self.end_marker() || tail == self.sleep_marker() || tail == self.closed_marker() {
+        // Note: Having 3 meta-nodes it is getting very messy
+
+        // The 3 meta-nodes might be enqueued after each other, such as
+        // end_marker->sleep_marker->closed_marker
+
+        while tail == self.end_marker() || tail == self.sleep_marker() || tail == self.closed_marker() {
             if next.is_null() {
+                // POST: Empty queue, always true in case tail==closed_marker()
                 return Dequeue::Empty;
             }
 
             *self.tail_readiness.get() = next;
             tail = next;
             next = (*next).next_readiness.load(Acquire);
+
+            // If new tail is sleep_marker, return so prepare_for_sleep() can check the condition
+            if tail == self.sleep_marker() {
+                return Dequeue::Empty;
+            }
         }
 
         // Only need to check `until` at this point. `until` is either null,
         // which will never match tail OR it is a node that was pushed by
         // the current thread. This means that either:
         //
-        // 1) The queue is inconsistent, which is handled explicitly
+        // 1a) The queue contains a single node only, but next is set by a concurrent thread
+        // 1b) The queue contains a single node only, but next is set by this thread (end_marker)
         // 2) We encounter `until` at this point in dequeue
         // 3) we will pop a different node
+
         if tail == until {
+            // Case 2)
             return Dequeue::Empty;
         }
 
         if !next.is_null() {
+            // Case 3)
             *self.tail_readiness.get() = next;
             return Dequeue::Data(tail);
         }
 
+        // POST: next==null
+
         if self.head_readiness.load(Acquire) != tail {
-            return Dequeue::Inconsistent;
+            // Case 1a)
+            // Must not touch (*tail).next_readiness, might not be updated yet by other thread
+            return Dequeue::Empty;
         }
 
-        // Push the stub node
+        // Push the stub node, competing with concurrent threads invoking `enqueue_node` as well
         self.enqueue_node(&*self.end_marker);
 
+        // Case 1a) or 1b) due to concurrency of enqueu-ing threads
         next = (*tail).next_readiness.load(Acquire);
 
         if !next.is_null() {
             *self.tail_readiness.get() = next;
             return Dequeue::Data(tail);
         }
+
+        // never reached
 
         Dequeue::Inconsistent
     }
