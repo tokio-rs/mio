@@ -495,14 +495,9 @@ struct ReadinessQueueInner {
     // Only accessed by Poll::poll. Coordination will be handled by the poll fn
     tail_readiness: UnsafeCell<*mut ReadinessNode>,
 
-    // Fake readiness node used to punctuate the end of the readiness queue.
-    // Before attempting to read from the queue, this node is inserted in order
-    // to partition the queue between nodes that are "owned" by the dequeue end
-    // and nodes that will be pushed on by producers.
-    end_marker: Box<ReadinessNode>,
-
-    // Similar to `end_marker`, but this node signals to producers that `Poll`
-    // has gone to sleep and must be woken up.
+    // Fake readiness node used to punctuate the queue's event set.
+    // This node signals to producers that `Poll` has gone to sleep
+    // and must be woken up.
     sleep_marker: Box<ReadinessNode>,
 
     // Similar to `end_marker`, but the node signals that the queue is closed.
@@ -600,7 +595,6 @@ struct ReadinessState(usize);
 enum Dequeue {
     Data(*mut ReadinessNode),
     Empty,
-    Inconsistent,
 }
 
 const AWAKEN: Token = Token(usize::MAX);
@@ -788,36 +782,41 @@ impl Poll {
             timeout = Some(Duration::from_millis(0));
         }
 
-        loop {
-            let now = Instant::now();
+        if inner.readiness_queue.prepare_for_sleep() {
+            loop {
+                let now = Instant::now();
 
-            // First get selector events
-            let res = inner.selector.select(&mut events.inner, AWAKEN, timeout);
+                // First get selector events
+                let res = inner.selector.select(&mut events.inner, AWAKEN, timeout);
 
-            match res {
-                Ok(true) => {
-                    // Some awakeners require reading from a FD.
-                    inner.readiness_queue.inner.awakener.cleanup();
-                    break;
-                }
-                Ok(false) => break,
-                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
-                    // Interrupted by a signal; update timeout if necessary and retry
-                    if let Some(to) = timeout {
-                        let elapsed = now.elapsed();
-                        if elapsed >= to {
-                            break;
-                        } else {
-                            timeout = Some(to - elapsed);
+                match res {
+                    Ok(true) => {
+                        // Some awakeners require reading from a FD.
+                        inner.readiness_queue.inner.awakener.cleanup();
+                        break;
+                    }
+                    Ok(false) => break,
+                    Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
+                        // Interrupted by a signal; update timeout if necessary and retry
+                        if let Some(to) = timeout {
+                            let elapsed = now.elapsed();
+                            if elapsed >= to {
+                                break;
+                            } else {
+                                timeout = Some(to - elapsed);
+                            }
                         }
                     }
+                    Err(e) => return Err(e),
                 }
-                Err(e) => return Err(e),
             }
-        }
 
-        // Poll custom event queue
-        inner.readiness_queue.poll(&mut events.inner);
+            // Poll custom event queue
+            inner.readiness_queue.poll(&mut events.inner);
+        } else {
+            // Poll custom event queue
+            inner.readiness_queue.poll(&mut events.inner);
+        }
 
         // Return number of polled events
         Ok(())
@@ -1656,7 +1655,7 @@ impl RegistrationInner {
             // If the readiness is not blank, try to obtain permission to
             // push the node into the readiness queue.
             if !next.effective_readiness().is_empty() {
-                next.set_queued();
+                next.set_queued(); // race-condition !! multiple threads might get permission to change state!!
             }
 
             let actual = self.state.compare_and_swap(state, next, AcqRel);
@@ -1910,8 +1909,7 @@ impl ReadinessQueue {
                 awakener: sys::Awakener::new()?,
                 head_readiness: AtomicPtr::new(ptr),
                 tail_readiness: UnsafeCell::new(ptr),
-                end_marker: end_marker,
-                sleep_marker: sleep_marker,
+                sleep_marker: sleep_marker, // sleep_marker (also stub)
                 closed_marker: closed_marker,
             })
         })
@@ -1931,7 +1929,7 @@ impl ReadinessQueue {
             // a syscall, which should be enough to enable the other thread to
             // finish the queuing process.
             let ptr = match unsafe { self.inner.dequeue_node(until) } {
-                Dequeue::Empty | Dequeue::Inconsistent => break,
+                Dequeue::Empty => break,
                 Dequeue::Data(ptr) => ptr,
             };
 
@@ -2019,46 +2017,13 @@ impl ReadinessQueue {
     /// selector. This involves changing `head_readiness` to `sleep_marker`.
     /// Returns true if successful and `poll` can block.
     fn prepare_for_sleep(&self) -> bool {
-        let end_marker = self.inner.end_marker();
         let sleep_marker = self.inner.sleep_marker();
+        let closed_marker = self.inner.closed_marker();
 
         let tail = unsafe { *self.inner.tail_readiness.get() };
 
-        // If the tail is currently set to the sleep_marker, then check if the
-        // head is as well. If it is, then the queue is currently ready to
-        // sleep. If it is not, then the queue is not empty and there should be
-        // no sleeping.
-        if tail == sleep_marker {
-            // False assumption: having 3 meta nodes the queue may be empty even if head!=tail
-            return self.inner.head_readiness.load(Acquire) == sleep_marker;
-        }
-
-        // If the tail is not currently set to `end_marker`, then the queue is
-        // not empty.
-        if tail != end_marker {
-            return false;
-        }
-
-        self.inner.sleep_marker.next_readiness.store(ptr::null_mut(), Relaxed);
-
-        let actual = self.inner.head_readiness.compare_and_swap(
-            end_marker, sleep_marker, AcqRel);
-
-        debug_assert!(actual != sleep_marker);
-
-        if actual != end_marker {
-            // The readiness queue is not empty
-            return false;
-        }
-
-        // The current tail should be pointing to `end_marker`
-        debug_assert!(unsafe { *self.inner.tail_readiness.get() == end_marker });
-        // The `end_marker` next pointer should be null
-        debug_assert!(self.inner.end_marker.next_readiness.load(Relaxed).is_null());
-
-        // Update tail pointer.
-        unsafe { *self.inner.tail_readiness.get() = sleep_marker; }
-        true
+        // sleep_marker to balance between network IO and custom IO
+        return tail == sleep_marker || tail == closed_marker;
     }
 }
 
@@ -2066,25 +2031,21 @@ impl Drop for ReadinessQueue {
     fn drop(&mut self) {
         // Close the queue by enqueuing the closed node
         self.inner.enqueue_node(&*self.inner.closed_marker);
+        let _sleep_marker = self.inner.sleep_marker();
+        let _closed_marker = self.inner.closed_marker();
 
         loop {
             // Free any nodes that happen to be left in the readiness queue
             let ptr = match unsafe { self.inner.dequeue_node(ptr::null_mut()) } {
                 Dequeue::Empty => break,
-                Dequeue::Inconsistent => {
-                    // This really shouldn't be possible as all other handles to
-                    // `ReadinessQueueInner` are dropped, but handle this by
-                    // spinning I guess?
-                    continue;
-                }
                 Dequeue::Data(ptr) => ptr,
             };
 
-            let node = unsafe { &*ptr };
+          //  let node = unsafe { &*ptr };
 
-            let state = node.state.load(Acquire);
+           //   let state = node.state.load(Acquire);
 
-            debug_assert!(state.is_queued());
+           //   debug_assert!(state.is_queued());
 
             release_node(ptr);
         }
@@ -2120,7 +2081,7 @@ impl ReadinessQueueInner {
 
         // Relaxed used as the ordering is "released" when swapping
         // `head_readiness`
-        node.next_readiness.store(ptr::null_mut(), Relaxed);
+        node.next_readiness.store(ptr::null_mut(), Release);
 
         unsafe {
             let mut prev = self.head_readiness.load(Acquire);
@@ -2128,10 +2089,8 @@ impl ReadinessQueueInner {
             loop {
                 if prev == self.closed_marker() {
                     debug_assert!(node_ptr != self.closed_marker());
-                    // debug_assert!(node_ptr != self.end_marker());
-                    debug_assert!(node_ptr != self.sleep_marker());
 
-                    if node_ptr != self.end_marker() {
+                    if node_ptr != self.sleep_marker() {
                         // The readiness queue is shutdown, but the enqueue flag was
                         // set. This means that we are responsible for decrementing
                         // the ready queue's ref count
@@ -2151,7 +2110,7 @@ impl ReadinessQueueInner {
                 prev = act;
             }
 
-            debug_assert!((*prev).next_readiness.load(Relaxed).is_null());
+            debug_assert!((*prev).next_readiness.load(Acquire).is_null());
 
             (*prev).next_readiness.store(node_ptr, Release);
 
@@ -2166,14 +2125,21 @@ impl ReadinessQueueInner {
         let mut tail = *self.tail_readiness.get();
         let mut next = (*tail).next_readiness.load(Acquire);
 
-        // Note: Having 3 meta-nodes it is getting very messy
+        assert_ne!(tail, ptr::null_mut());
 
-        // The 3 meta-nodes might be enqueued after each other, such as
-        // end_marker->sleep_marker->closed_marker
+        if tail == until {
+            return Dequeue::Empty;
+        }
 
-        while tail == self.end_marker() || tail == self.sleep_marker() || tail == self.closed_marker() {
+        // I: tail == self.close_marker() ==> tail == head
+        if tail == self.closed_marker() {
+            return Dequeue::Empty;
+        }
+
+        // Consume the sleep_marker (aka stub) and re-attach to head, so this
+        // `stub` will be always member of the queue!
+        if tail == self.sleep_marker() {
             if next.is_null() {
-                // POST: Empty queue, always true in case tail==closed_marker()
                 return Dequeue::Empty;
             }
 
@@ -2181,58 +2147,29 @@ impl ReadinessQueueInner {
             tail = next;
             next = (*next).next_readiness.load(Acquire);
 
-            // If new tail is sleep_marker, return so prepare_for_sleep() can check the condition
-            if tail == self.sleep_marker() {
-                return Dequeue::Empty;
-            }
+            // Re-Attaching may fail if head==closed_marker(), competing with concurrent threads
+            self.enqueue_node(&*self.sleep_marker);
         }
 
-        // Only need to check `until` at this point. `until` is either null,
-        // which will never match tail OR it is a node that was pushed by
-        // the current thread. This means that either:
-        //
-        // 1a) The queue contains a single node only, but next is set by a concurrent thread
-        // 1b) The queue contains a single node only, but next is set by this thread (end_marker)
+        // Need to check for different cases:
+        // 1) We reached the closed_marker
         // 2) We encounter `until` at this point in dequeue
         // 3) we will pop a different node
 
-        if tail == until {
-            // Case 2)
+        // New tail must be checked, might be `closed_marker`, or `until`
+        // I: tail == self.close_marker() ==> tail == head
+        if tail == self.closed_marker() || tail == until {
+            // Case 1) or Case 2)
             return Dequeue::Empty;
         }
 
-        if !next.is_null() {
-            // Case 3)
-            *self.tail_readiness.get() = next;
-            return Dequeue::Data(tail);
-        }
+        debug_assert!(!next.is_null());
 
-        // POST: next==null
-
-        if self.head_readiness.load(Acquire) != tail {
-            // Case 1a)
-            // Must not touch (*tail).next_readiness, might not be updated yet by other thread
-            return Dequeue::Empty;
-        }
-
-        // Push the stub node, competing with concurrent threads invoking `enqueue_node` as well
-        self.enqueue_node(&*self.end_marker);
-
-        // Case 1a) or 1b) due to concurrency of enqueu-ing threads
-        next = (*tail).next_readiness.load(Acquire);
-
-        if !next.is_null() {
-            *self.tail_readiness.get() = next;
-            return Dequeue::Data(tail);
-        }
+        // Case 3)
+        *self.tail_readiness.get() = next;
+        return Dequeue::Data(tail);
 
         // never reached
-
-        Dequeue::Inconsistent
-    }
-
-    fn end_marker(&self) -> *mut ReadinessNode {
-        &*self.end_marker as *const ReadinessNode as *mut ReadinessNode
     }
 
     fn sleep_marker(&self) -> *mut ReadinessNode {
