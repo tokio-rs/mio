@@ -50,7 +50,7 @@ use std::time::{Duration, Instant};
 // `stub`. The second marker is a `sleep_marker` which is used to signal to
 // producers that the consumer is going to sleep. This sleep_marker is only used
 // when the queue is empty, implying that the only node in the queue is
-// `end_marker`.
+// `sleep_marker`.
 //
 // The second modification is an `until` argument passed to the dequeue
 // function. When `poll` encounters a level-triggered node, the node will be
@@ -500,7 +500,7 @@ struct ReadinessQueueInner {
     // and must be woken up.
     sleep_marker: Box<ReadinessNode>,
 
-    // Similar to `end_marker`, but the node signals that the queue is closed.
+    // Similar to `sleep_marker`, but the node signals that the queue is closed.
     // This happens when `ReadyQueue` is dropped and signals to producers that
     // the nodes should no longer be pushed into the queue.
     closed_marker: Box<ReadinessNode>,
@@ -769,18 +769,18 @@ impl Poll {
         // readiness queue has pending nodes, we still want to poll the system
         // selector for new events, but we don't want to block the thread to
         // wait for new events.
-        if timeout == Some(Duration::from_millis(0)) {
+       //  if timeout == Some(Duration::from_millis(0)) {
             // If blocking is not requested, then there is no need to prepare
             // the queue for sleep
-        } else if inner.readiness_queue.prepare_for_sleep() {
+       //  } else if inner.readiness_queue.prepare_for_sleep() {
             // The readiness queue is empty. The call to `prepare_for_sleep`
             // inserts `sleep_marker` into the queue. This signals to any
             // threads setting readiness that the `Poll::poll` is going to
             // sleep, so the awakener should be used.
-        } else {
+       //  } else {
             // The readiness queue is not empty, so do not block the thread.
-            timeout = Some(Duration::from_millis(0));
-        }
+        //     timeout = Some(Duration::from_millis(0));
+       //  }
 
         if inner.readiness_queue.prepare_for_sleep() {
             loop {
@@ -1642,7 +1642,7 @@ impl RegistrationInner {
         let mut next;
 
         loop {
-            next = state;
+            next = state; // clone
 
             if state.is_dropped() {
                 // Node is dropped, no more notifications
@@ -1655,7 +1655,7 @@ impl RegistrationInner {
             // If the readiness is not blank, try to obtain permission to
             // push the node into the readiness queue.
             if !next.effective_readiness().is_empty() {
-                next.set_queued(); // race-condition !! multiple threads might get permission to change state!!
+                next.set_queued();
             }
 
             let actual = self.state.compare_and_swap(state, next, AcqRel);
@@ -1687,7 +1687,7 @@ impl RegistrationInner {
         let other: &*mut () = unsafe { mem::transmute(&register.inner.readiness_queue.inner) };
         let other = *other;
 
-        debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
+        //debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
 
         if queue.is_null() {
             // Attempt to set the queue pointer. `Release` ordering synchronizes
@@ -1826,6 +1826,9 @@ impl RegistrationInner {
         // Release the lock
         self.update_lock.store(false, Release);
 
+       let _state_queued = state.is_queued();
+       let _next_queued = next.is_queued();
+
         if !state.is_queued() && next.is_queued() {
             // We are responsible for enqueing the node.
             enqueue_with_wakeup(queue, self)?;
@@ -1898,11 +1901,10 @@ impl ReadinessQueue {
         is_send::<Self>();
         is_sync::<Self>();
 
-        let end_marker = Box::new(ReadinessNode::marker());
         let sleep_marker = Box::new(ReadinessNode::marker());
         let closed_marker = Box::new(ReadinessNode::marker());
 
-        let ptr = &*end_marker as *const _ as *mut _;
+        let ptr = &*sleep_marker as *const _ as *mut _;
 
         Ok(ReadinessQueue {
             inner: Arc::new(ReadinessQueueInner {
@@ -2087,6 +2089,17 @@ impl ReadinessQueueInner {
             let mut prev = self.head_readiness.load(Acquire);
 
             loop {
+
+                if prev == node_ptr {
+                    if node_ptr != self.sleep_marker()  {
+                        let _i = 1;
+                    } else if node_ptr != self.closed_marker() {
+                        let _j = 2;
+                    } else {
+                        let _k = 3;
+                    }
+                }
+
                 if prev == self.closed_marker() {
                     debug_assert!(node_ptr != self.closed_marker());
 
@@ -2143,23 +2156,27 @@ impl ReadinessQueueInner {
                 return Dequeue::Empty;
             }
 
-            *self.tail_readiness.get() = next;
-            tail = next;
-            next = (*next).next_readiness.load(Acquire);
-
-            // Re-Attaching may fail if head==closed_marker(), competing with concurrent threads
+            // Re-Attaching slep_marker may fail if head==closed_marker() (concurrency!)
             self.enqueue_node(&*self.sleep_marker);
+
+            // write back
+            *self.tail_readiness.get() = next;
+
+            // ensure values are cache-coherent
+            tail = *self.tail_readiness.get();
+            next = (*tail).next_readiness.load(Acquire); // next->next may be NULL or the the sleep_marker again
         }
 
         // Need to check for different cases:
+        // 0) The new next has not been defined yet (deal with concurrency)
         // 1) We reached the closed_marker
         // 2) We encounter `until` at this point in dequeue
         // 3) we will pop a different node
 
         // New tail must be checked, might be `closed_marker`, or `until`
         // I: tail == self.close_marker() ==> tail == head
-        if tail == self.closed_marker() || tail == until {
-            // Case 1) or Case 2)
+        if next.is_null() ||  tail == self.closed_marker() || tail == until  {
+            // Case 0) or Case 1) or Case 2)
             return Dequeue::Empty;
         }
 

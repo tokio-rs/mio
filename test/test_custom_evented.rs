@@ -15,9 +15,9 @@ fn smoke() {
 
     set.set_readiness(Ready::readable()).unwrap();
 
-    //poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
-    //assert_eq!(events.iter().count(), 1);
-    //assert_eq!(events.iter().next().unwrap().token(), Token(0));
+    poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
+    assert_eq!(events.iter().count(), 1);
+    assert_eq!(events.iter().next().unwrap().token(), Token(0));
 }
 
 #[test]
@@ -35,14 +35,16 @@ fn set_readiness_before_register() {
         let b2 = b1.clone();
 
         let th = thread::spawn(move || {
-            b2.wait();
             set.set_readiness(Ready::readable()).unwrap();
-        });
+            b2.wait();
 
+        });
+        
         b1.wait();
 
         poll.register()
             .register(&r, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
+
 
         loop {
             poll.poll(&mut events, None).unwrap();
@@ -51,6 +53,7 @@ fn set_readiness_before_register() {
             if n == 0 {
                 continue;
             }
+
 
             assert_eq!(n, 1);
             assert_eq!(events.iter().next().unwrap().token(), Token(123));
