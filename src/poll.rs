@@ -1633,7 +1633,7 @@ impl RegistrationInner {
         let mut next;
 
         loop {
-            next = state; // clone
+            next = state;
 
             if state.is_dropped() {
                 // Node is dropped, no more notifications
@@ -1678,7 +1678,7 @@ impl RegistrationInner {
         let other: &*mut () = unsafe { mem::transmute(&register.inner.readiness_queue.inner) };
         let other = *other;
 
-        //debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
+        debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
 
         if queue.is_null() {
             // Attempt to set the queue pointer. `Release` ordering synchronizes
@@ -1816,9 +1816,6 @@ impl RegistrationInner {
 
         // Release the lock
         self.update_lock.store(false, Release);
-
-       let _state_queued = state.is_queued();
-       let _next_queued = next.is_queued();
 
         if !state.is_queued() && next.is_queued() {
             // We are responsible for enqueing the node.
@@ -2024,8 +2021,6 @@ impl Drop for ReadinessQueue {
     fn drop(&mut self) {
         // Close the queue by enqueuing the closed node
         self.inner.enqueue_node(&*self.inner.closed_marker);
-        let _sleep_marker = self.inner.sleep_marker();
-        let _closed_marker = self.inner.closed_marker();
 
         loop {
             // Free any nodes that happen to be left in the readiness queue
@@ -2080,17 +2075,6 @@ impl ReadinessQueueInner {
             let mut prev = self.head_readiness.load(Acquire);
 
             loop {
-
-                if prev == node_ptr {
-                    if node_ptr != self.sleep_marker()  {
-                        let _i = 1;
-                    } else if node_ptr != self.closed_marker() {
-                        let _j = 2;
-                    } else {
-                        let _k = 3;
-                    }
-                }
-
                 if prev == self.closed_marker() {
                     debug_assert!(node_ptr != self.closed_marker());
 
