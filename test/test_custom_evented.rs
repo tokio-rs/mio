@@ -35,11 +35,13 @@ fn set_readiness_before_register() {
         let b2 = b1.clone();
 
         let th = thread::spawn(move || {
+            // first set the readiness and then break the barrier, so the main thread will register
             set.set_readiness(Ready::readable()).unwrap();
-            b2.wait();
 
+            b2.wait();
         });
-        
+
+        // wait until back-ground thread did set the readiness, then do the register-call
         b1.wait();
 
         poll.register()
@@ -49,11 +51,6 @@ fn set_readiness_before_register() {
         loop {
             poll.poll(&mut events, None).unwrap();
             let n = events.iter().count();
-
-            if n == 0 {
-                continue;
-            }
-
 
             assert_eq!(n, 1);
             assert_eq!(events.iter().next().unwrap().token(), Token(123));
@@ -84,7 +81,7 @@ mod stress {
 
         for _ in 0..NUM_ATTEMPTS {
             let mut poll = Poll::new().unwrap();
-            let mut events = Events::with_capacity(128);
+            let mut events = Events::with_capacity(NUM_REGISTRATIONS);
 
             let registrations: Vec<_> = (0..NUM_REGISTRATIONS).map(|i| {
                 let (r, s) = Registration::new();
@@ -140,11 +137,16 @@ mod stress {
                 }
             }
 
-            // One final poll
-            poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
-
-            for event in &events {
-                ready[event.token().0] = event.readiness();
+            // Final polls, until readiness-queue empty
+            loop {
+                poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
+                if events.is_empty() {
+                    // no more events in readiness queue pending
+                    break;
+                }
+                for event in &events {
+                    ready[event.token().0] = event.readiness();
+                }
             }
 
             // Everything should be flagged as readable

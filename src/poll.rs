@@ -765,23 +765,14 @@ impl Poll {
     {
         let inner = &*self.register.inner;
 
-        // Compute the timeout value passed to the system selector. If the
-        // readiness queue has pending nodes, we still want to poll the system
-        // selector for new events, but we don't want to block the thread to
-        // wait for new events.
-       //  if timeout == Some(Duration::from_millis(0)) {
-            // If blocking is not requested, then there is no need to prepare
-            // the queue for sleep
-       //  } else if inner.readiness_queue.prepare_for_sleep() {
-            // The readiness queue is empty. The call to `prepare_for_sleep`
-            // inserts `sleep_marker` into the queue. This signals to any
-            // threads setting readiness that the `Poll::poll` is going to
-            // sleep, so the awakener should be used.
-       //  } else {
-            // The readiness queue is not empty, so do not block the thread.
-        //     timeout = Some(Duration::from_millis(0));
-       //  }
-
+        if None == timeout {
+            timeout = Some(Duration::from_millis(0));
+        }
+        // If in ReadinessQueue still pending nodes read them straight, otherwise if
+        // the tail is pointing to the sleep_marker, dive into the system selector and
+        // wait for  system events or custom events until timeout occurs.
+        // The sleep_marker is a rotating token being consumed and attached to the head again,
+        // so that system events and custom events are balanced within time slices.
         if inner.readiness_queue.prepare_for_sleep() {
             loop {
                 let now = Instant::now();
@@ -803,7 +794,7 @@ impl Poll {
                             if elapsed >= to {
                                 break;
                             } else {
-                                timeout = Some(to - elapsed);
+                                timeout = Some(to - elapsed); // !! change param to "&mut timeout"
                             }
                         }
                     }
@@ -814,7 +805,7 @@ impl Poll {
             // Poll custom event queue
             inner.readiness_queue.poll(&mut events.inner);
         } else {
-            // Poll custom event queue
+            // Poll custom event queue pending nodes
             inner.readiness_queue.poll(&mut events.inner);
         }
 
