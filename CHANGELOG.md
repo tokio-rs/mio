@@ -1,5 +1,6 @@
 # Unreleased
 
+* Add `TcpStream::peek` function (#773)
 * Raise minimum Rust version to 1.18.0
 * `Poll`: retry select() when interrupted by a signal
 
