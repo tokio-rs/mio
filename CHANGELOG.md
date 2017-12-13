@@ -1,5 +1,6 @@
 # Unreleased
 
+* Raise minimum Rust version to 1.18.0
 * `Poll`: retry select() when interrupted by a signal
 
 # 0.6.11 (October 25, 2017)
