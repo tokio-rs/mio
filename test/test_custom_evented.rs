@@ -193,11 +193,15 @@ mod stress {
             });
         }
 
-        let mut events = Events::with_capacity(4);
+        // CHECKME: seems the events-list can not be cleared??
+        // let mut events = Events::with_capacity(4);
 
         barrier.wait();
 
         for _ in 0..ITER {
+            // FIXME: workaround as the events-list can not be cleared
+            let mut events = Events::with_capacity(4);
+
             poll.poll(&mut events, None).unwrap();
         }
 
@@ -207,6 +211,8 @@ mod stress {
 
 
         for _ in 0..5 {
+            // FIXME: workaround as the events-list can not be cleared
+            let mut events = Events::with_capacity(4);
             poll.poll(&mut events, None).unwrap();
 
             for event in &events {

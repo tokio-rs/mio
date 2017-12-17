@@ -776,14 +776,27 @@ impl Poll {
         if inner.readiness_queue.prepare_for_sleep() {
             loop {
                 let now = Instant::now();
+                // PRE: tail is pointing to sleep_marker
 
                 // First get selector events
                 let res = inner.selector.select(&mut events.inner, AWAKEN, timeout);
 
+                // POST: tail is pointing to sleep/close marker
+
                 match res {
                     Ok(true) => {
-                        // Some awakeners require reading from a FD.
-                        inner.readiness_queue.inner.awakener.cleanup();
+                        // Some awakeners require reading from a FD. ?? Why "some awakeners" ?
+                        if !inner.readiness_queue.tail_equals_head() &&
+                            inner.readiness_queue.inner.awakener.take() { // take care for concurrency
+                            // since last sleep a node has has been attached
+
+                            // PRE: tail is pointing to sleep marker
+
+                            // Poll custom event queue
+                            inner.readiness_queue.poll(&mut events.inner);
+
+                            // POST: tail==marker || tail!=marker
+                        }
                         break;
                     }
                     Ok(false) => break,
@@ -802,11 +815,15 @@ impl Poll {
                 }
             }
 
-            // Poll custom event queue
-            inner.readiness_queue.poll(&mut events.inner);
+            // POST: tail==marker || tail!=marker
+
         } else {
+            // PRE: tail != sleep_marker
+
             // Poll custom event queue pending nodes
             inner.readiness_queue.poll(&mut events.inner);
+
+            // POST: tail==sleep_marker || tail!=sleep_marker
         }
 
         // Return number of polled events
@@ -2000,6 +2017,11 @@ impl ReadinessQueue {
                 // Push the event
                 dst.push_event(Event::new(readiness, token));
             }
+
+            // interrupt if the new tail is the sleep marker now
+            if self.prepare_for_sleep() {
+                break;
+            }
         }
     }
 
@@ -2013,7 +2035,16 @@ impl ReadinessQueue {
         let tail = unsafe { *self.inner.tail_readiness.get() };
 
         // sleep_marker to balance between network IO and custom IO
-        return tail == sleep_marker || tail == closed_marker;
+        return tail == sleep_marker  || tail == closed_marker;
+    }
+
+    fn tail_equals_head(&self) -> bool {
+
+        let tail = unsafe { *self.inner.tail_readiness.get() };
+        let head = self.inner.head_readiness.load(Acquire);
+
+        // sleep_marker to balance between network IO and custom IO
+        return tail == head;
     }
 }
 
