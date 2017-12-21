@@ -39,7 +39,7 @@ extern crate mio;
 
 ## Non goals
 
-The following are specifically omitted from MIO and are left to the user
+The following are specifically omitted from Mio and are left to the user
 or higher level libraries.
 
 * File operations
@@ -67,12 +67,12 @@ platform, submit a PR to update the list!
 * [mioco](//github.com/dpc/mioco) - Mio COroutines
 * [simplesched](//github.com/zonyitoo/simplesched) - Coroutine I/O with a simple scheduler
 * [coio-rs](//github.com/zonyitoo/coio-rs) - Coroutine I/O with work-stealing scheduler
-* [rotor](//github.com/tailhook/rotor) - A wrapper that allows to create composable I/O libraries on top of mio
+* [rotor](//github.com/tailhook/rotor) - A wrapper that allows to create composable I/O libraries on top of Mio
 * [ws-rs](//github.com/housleyjk/ws-rs) - WebSockets based on Mio
 
 ## Community
 
-A group of mio users hang out in the #mio channel on the Mozilla IRC
+A group of Mio users hang out in the #mio channel on the Mozilla IRC
 server (irc.mozilla.org). This can be a good place to go for questions.
 
 ## Contributing

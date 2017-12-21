@@ -146,7 +146,7 @@
 * [FEATURE] Expose TCP shutdown
 * [IMPROVEMENT] Coalesce readable & writable into `ready` event (#184)
 * [IMPROVEMENT] Rename TryRead & TryWrite function names to avoid conflict with std.
-* [IMPROVEMENT] Provide TCP and UDP types in mio (path to windows #155)
+* [IMPROVEMENT] Provide TCP and UDP types in Mio (path to windows #155)
 * [IMPROVEMENT] Use clock_ticks crate instead of time (path to windows #155)
 * [IMPROVEMENT] Move unix specific features into mio::unix module
 * [IMPROVEMENT] TcpListener sets SO_REUSEADDR by default
