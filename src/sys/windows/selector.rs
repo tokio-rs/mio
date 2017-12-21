@@ -9,7 +9,8 @@ use std::time::Duration;
 
 use lazycell::AtomicLazyCell;
 
-use winapi::*;
+use winapi::shared::winerror;
+use winapi::um::minwinbase::{OVERLAPPED, OVERLAPPED_ENTRY};
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 
@@ -78,7 +79,7 @@ impl Selector {
         trace!("polling IOCP");
         let n = match self.inner.port.get_many(&mut events.statuses, timeout) {
             Ok(statuses) => statuses.len(),
-            Err(ref e) if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) => 0,
+            Err(ref e) if e.raw_os_error() == Some(winerror::WAIT_TIMEOUT as i32) => 0,
             Err(e) => return Err(e),
         };
 

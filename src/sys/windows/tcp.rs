@@ -9,7 +9,8 @@ use std::time::Duration;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
-use winapi::*;
+use winapi::shared::ntdef::HANDLE;
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 use iovec::IoVec;
 
 use {poll, Ready, Poll, PollOpt, Token};
@@ -277,10 +278,11 @@ impl TcpStream {
     }
 
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        match IoVec::from_bytes_mut(buf) {
-            Some(vec) => self.readv(&mut [vec]),
-            None => Ok(0),
+        if buf.is_empty() {
+            return Ok(0);
         }
+        let mut vec = IoVec::from_bytes(buf);
+        self.readv(&mut [&mut vec])
     }
 
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
@@ -348,10 +350,11 @@ impl TcpStream {
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        match IoVec::from_bytes(buf) {
-            Some(vec) => self.writev(&[vec]),
-            None => Ok(0),
+        if buf.is_empty() {
+            return Ok(0);
         }
+        let mut vec = IoVec::from_bytes(buf);
+        self.writev(&[&mut vec])
     }
 
     pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
