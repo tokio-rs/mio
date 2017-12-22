@@ -77,8 +77,8 @@ impl Selector {
             .unwrap_or(-1);
 
         // Wait for epoll events for at most timeout_ms milliseconds
+        evts.clear();
         unsafe {
-            evts.events.set_len(0);
             let cnt = cvt(libc::epoll_wait(self.epfd,
                                                 evts.events.as_mut_ptr(),
                                                 evts.events.capacity() as i32,
@@ -245,6 +245,8 @@ impl Events {
             u64: usize::from(event.token()) as u64
         });
     }
+
+    pub fn clear(&mut self) { unsafe { self.events.set_len(0); } }
 }
 
 const NANOS_PER_MILLI: u32 = 1_000_000;

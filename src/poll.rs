@@ -1419,6 +1419,39 @@ impl Events {
             pos: 0
         }
     }
+
+    /// Clearing all `Event` values from container explicitly.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::{Events, Poll};
+    /// use std::time::Duration;
+    ///
+    /// let mut events = Events::with_capacity(1024);
+    /// let poll = Poll::new()?;
+    ///
+    /// // Register handles with `poll`
+    /// for _ in 0..2 {
+    ///     events.clear();
+    ///     poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+    ///
+    ///     for event in events.iter() {
+    ///         println!("event={:?}", event);
+    ///     }
+    /// }
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn clear(&mut self) {
+        self.inner.clear();
+    }
 }
 
 impl<'a> IntoIterator for &'a Events {

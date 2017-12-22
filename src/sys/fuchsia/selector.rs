@@ -145,7 +145,7 @@ impl Selector {
                   _awakener: Token,
                   timeout: Option<Duration>) -> io::Result<bool>
     {
-        evts.events.drain(0..);
+        evts.clear();
 
         self.reregister_handles()?;
 
@@ -339,6 +339,7 @@ impl Events {
     pub fn push_event(&mut self, event: Event) {
         self.events.push(event)
     }
+    pub fn clear(&mut self) { self.events.events.drain(0..); }
 }
 
 impl fmt::Debug for Events {
