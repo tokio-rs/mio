@@ -34,38 +34,6 @@ mod test_udp_level;
 mod test_udp_socket;
 mod test_write_then_drop;
 
-#[cfg(feature = "with-deprecated")]
-mod test_notify;
-#[cfg(feature = "with-deprecated")]
-mod test_poll_channel;
-#[cfg(feature = "with-deprecated")]
-mod test_tick;
-
-// The following tests are for deprecated features. Only run these tests on
-// platforms that were supported from before the features were deprecated
-#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-#[cfg(feature = "with-deprecated")]
-mod test_timer;
-#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-#[cfg(feature = "with-deprecated")]
-mod test_battery;
-
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_unix_echo_server;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_unix_pass_fd;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_uds_shutdown;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_subprocess_pipe;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_broken_pipe;
-
 #[cfg(any(target_os = "fuchsia"))]
 mod test_fuchsia_handles;
 
