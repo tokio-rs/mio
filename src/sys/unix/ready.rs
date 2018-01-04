@@ -123,6 +123,15 @@ impl UnixReady {
         UnixReady(ready_from_usize(AIO))
     }
 
+    #[cfg(not(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
+    pub fn aio() -> UnixReady {
+        UnixReady(0)
+    }
+
     /// Returns a `Ready` representing error readiness.
     ///
     /// **Note that only readable and writable readiness is guaranteed to be
@@ -219,6 +228,15 @@ impl UnixReady {
         target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn is_aio(&self) -> bool {
         self.contains(ready_from_usize(AIO))
+    }
+
+    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
+    #[cfg(feature = "with-deprecated")]
+    #[cfg(not(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+    #[doc(hidden)]
+    pub fn is_aio(&self) -> bool {
+        false
     }
 
     /// Returns true if the value includes error readiness
