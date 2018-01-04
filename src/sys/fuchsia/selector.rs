@@ -339,7 +339,9 @@ impl Events {
     pub fn push_event(&mut self, event: Event) {
         self.events.push(event)
     }
-    pub fn clear(&mut self) { self.events.events.drain(0..); }
+    pub fn clear(&mut self) {
+        self.events.events.drain(0..);
+    }
 }
 
 impl fmt::Debug for Events {

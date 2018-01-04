@@ -454,7 +454,9 @@ impl Events {
         self.events.push(event);
     }
 
-    pub fn clear(&mut self) { self.events.truncate(0); }
+    pub fn clear(&mut self) {
+        self.events.truncate(0);
+    }
 }
 
 macro_rules! overlapped2arc {

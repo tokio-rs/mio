@@ -246,7 +246,9 @@ impl Events {
         });
     }
 
-    pub fn clear(&mut self) { unsafe { self.events.set_len(0); } }
+    pub fn clear(&mut self) {
+        unsafe { self.events.set_len(0); }
+    }
 }
 
 const NANOS_PER_MILLI: u32 = 1_000_000;
