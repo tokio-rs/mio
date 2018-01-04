@@ -12,6 +12,11 @@ use libc::{self, time_t};
 use {io, Ready, PollOpt, Token};
 use event_imp::{self as event, Event};
 use sys::unix::{cvt, UnixReady};
+#[cfg(any(target_os = "dragonfly",
+    target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+use sys::unix::BSDReady;
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+use sys::unix::FreeBSDReady;
 use sys::unix::io::set_cloexec;
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
@@ -295,7 +300,13 @@ impl Events {
     target_os = "freebsd", target_os = "ios", target_os = "macos"))]
             {
                 if e.filter == libc::EVFILT_AIO {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::aio());
+                    event::kind_mut(&mut self.events[idx]).insert(BSDReady::aio());
+                }
+            }
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+            {
+                if e.filter == libc::EVFILT_LIO {
+                    event::kind_mut(&mut self.events[idx]).insert(FreeBSDReady::lio());
                 }
             }
 
@@ -348,6 +359,6 @@ fn test_coalesce_aio() {
     let mut events = Events::with_capacity(1);
     events.sys_events.0.push(kevent!(0x1234, libc::EVFILT_AIO, 0, 42));
     events.coalesce(Token(0));
-    assert!(events.events[0].readiness() == UnixReady::aio().into());
+    assert!(events.events[0].readiness() == BSDReady::aio().into());
     assert!(events.events[0].token() == Token(42));
 }

@@ -20,6 +20,10 @@ mod kqueue;
 pub use self::kqueue::{Events, Selector};
 
 mod awakener;
+#[cfg(any(target_os = "bitrig", target_os = "dragonfly",
+          target_os = "freebsd", target_os = "ios", target_os = "macos",
+          target_os = "netbsd", target_os = "openbsd"))]
+mod bsd;
 mod eventedfd;
 mod io;
 mod ready;
@@ -33,6 +37,12 @@ pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
 pub use self::io::{Io, set_nonblock};
 pub use self::ready::UnixReady;
+#[cfg(any(target_os = "bitrig", target_os = "dragonfly",
+          target_os = "freebsd", target_os = "ios", target_os = "macos",
+          target_os = "netbsd", target_os = "openbsd"))]
+pub use self::bsd::ready::BSDReady;
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+pub use self::bsd::freebsd::ready::FreeBSDReady;
 pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 

@@ -92,31 +92,10 @@ use std::fmt;
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct UnixReady(Ready);
 
-const ERROR: usize = 0b00100;
-const HUP: usize   = 0b01000;
-const AIO: usize   = 0b10000;
+const ERROR: usize = 0b000100;
+const HUP: usize   = 0b001000;
 
 impl UnixReady {
-    /// Returns a `Ready` representing AIO completion readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::unix::UnixReady;
-    ///
-    /// let ready = UnixReady::aio();
-    ///
-    /// assert!(ready.is_aio());
-    /// ```
-    ///
-    /// [`Poll`]: ../struct.Poll.html
-    #[inline]
-    pub fn aio() -> UnixReady {
-        UnixReady(ready_from_usize(AIO))
-    }
-
     /// Returns a `Ready` representing error readiness.
     ///
     /// **Note that only readable and writable readiness is guaranteed to be
@@ -170,26 +149,6 @@ impl UnixReady {
     #[inline]
     pub fn hup() -> UnixReady {
         UnixReady(ready_from_usize(HUP))
-    }
-
-    /// Returns true if `Ready` contains AIO readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::unix::UnixReady;
-    ///
-    /// let ready = UnixReady::aio();
-    ///
-    /// assert!(ready.is_aio());
-    /// ```
-    ///
-    /// [`Poll`]: ../struct.Poll.html
-    #[inline]
-    pub fn is_aio(&self) -> bool {
-        self.contains(ready_from_usize(AIO))
     }
 
     /// Returns true if the value includes error readiness
@@ -329,8 +288,7 @@ impl fmt::Debug for UnixReady {
             (UnixReady(Ready::readable()), "Readable"),
             (UnixReady(Ready::writable()), "Writable"),
             (UnixReady::error(), "Error"),
-            (UnixReady::hup(), "Hup"),
-            (UnixReady::aio(), "Aio")];
+            (UnixReady::hup(), "Hup")];
 
         for &(flag, msg) in &flags {
             if self.contains(flag) {
