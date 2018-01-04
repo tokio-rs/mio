@@ -37,8 +37,8 @@ impl Awakener {
         Ok(())
     }
 
-    pub fn cleanup(&self) {
-        // noop
+    pub fn take(&self) -> bool {
+      // dummy, to be implemented
     }
 }
 

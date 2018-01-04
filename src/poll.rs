@@ -666,7 +666,7 @@ impl Poll {
                 poll.register(),
                 AWAKEN,
                 Ready::readable(),
-                PollOpt::edge())?;
+                PollOpt::level())?;
 
         Ok(poll)
     }
@@ -798,16 +798,16 @@ impl Poll {
                                                 AWAKEN, timeout_derived);
 
                 match res {
-                    Ok(_) => {
+                    Ok(awakener_triggered) => {
                         // consume a single token from awakener if we do not continue a cycle, consume the
                         if !continue_cycle {
                             // PRE: tail == sleep_marker
+                            if awakener_triggered {
+                                let has_token = inner.readiness_queue.inner.awakener.take();
+                                debug_assert!(has_token);
 
-                            if !inner.readiness_queue.tail_equals_head() {
-                                if inner.readiness_queue.inner.awakener.take() {
                                     // Poll custom event queue
                                     inner.readiness_queue.poll(&mut events.inner);
-                                }
                             }
                         } else {
                             // Poll custom event queue
@@ -2066,14 +2066,6 @@ impl ReadinessQueue {
         return tail == sleep_marker  || tail == closed_marker;
     }
 
-    fn tail_equals_head(&self) -> bool {
-
-        let tail = unsafe { *self.inner.tail_readiness.get() };
-        let head = self.inner.head_readiness.load(Acquire);
-
-        // sleep_marker to balance between network IO and custom IO
-        return tail == head;
-    }
 }
 
 impl Drop for ReadinessQueue {

@@ -31,8 +31,10 @@ impl Awakener {
 
         Ok(port.queue(&packet)?)
     }
-
-    pub fn cleanup(&self) {}
+    
+    pub fn take(&self) -> bool {
+        // dummy, to be implemented
+    }
 }
 
 impl Evented for Awakener {

@@ -41,18 +41,6 @@ mod pipe {
             }
         }
 
-//        pub fn cleanup(&self) {
-//            let mut buf = [0; 128];
-//
-//            loop {
-//                // Consume data until all bytes are purged
-//                match (&self.reader).read(&mut buf) {
-//                    Ok(i) if i > 0 => {},
-//                    _ => return,
-//                }
-//            }
-//        }
-
         pub fn take(&self) -> bool {
             let mut buf = [0; 1];
 
