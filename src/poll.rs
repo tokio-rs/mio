@@ -343,6 +343,9 @@ struct Inner {
 
     // Custom readiness queue
     readiness_queue: ReadinessQueue,
+
+    // Flag to balance system events and custom events
+    selector_poll_next_turn: AtomicBool,
 }
 
 /// Handle to a user space `Poll` registration.
@@ -652,6 +655,7 @@ impl Poll {
                 inner: Arc::new(Inner {
                     selector: sys::Selector::new()?,
                     readiness_queue: ReadinessQueue::new()?,
+                    selector_poll_next_turn: AtomicBool::new(true),
                 }),
             },
         };
@@ -764,64 +768,88 @@ impl Poll {
         -> io::Result<()>
     {
         let inner = &*self.register.inner;
+        let now = Instant::now();
 
-        if None == timeout {
-            timeout = Some(Duration::from_millis(0));
-        }
         // If in ReadinessQueue still pending nodes read them straight, otherwise if
         // the tail is pointing to the sleep_marker, dive into the system selector and
         // wait for  system events or custom events until timeout occurs.
         // The sleep_marker is a rotating token being consumed and attached to the head again,
         // so that system events and custom events are balanced within time slices.
-        if inner.readiness_queue.prepare_for_sleep() {
-            loop {
-                let now = Instant::now();
-                // PRE: tail is pointing to sleep_marker
+        loop {
 
+            // If tail!=sleep_marker, the previous call didn't consume all custom-events of cycle
+            let continue_cycle = !inner.readiness_queue.prepare_for_sleep();
+            let selector_poll_next_turn = inner.selector_poll_next_turn.load(Ordering::Relaxed);
+
+            // zero timeout if continuing a cycle
+            let timeout_derived: Option<Duration> =
+                if None == timeout || continue_cycle {
+                    Some(Duration::from_millis(0))
+                } else {
+                    timeout
+                };
+
+
+            if !continue_cycle || selector_poll_next_turn {
                 // First get selector events
-                let res = inner.selector.select(&mut events.inner, AWAKEN, timeout);
+                inner.selector_poll_next_turn.store(false,  Ordering::Relaxed);
 
-                // POST: tail is pointing to sleep/close marker
+                let res = inner.selector.select(&mut events.inner,
+                                                AWAKEN, timeout_derived);
 
                 match res {
-                    Ok(true) => {
-                        // Some awakeners require reading from a FD. ?? Why "some awakeners" ?
-                        if !inner.readiness_queue.tail_equals_head() &&
-                            inner.readiness_queue.inner.awakener.take() { // take care for concurrency
-                            // since last sleep a node has has been attached
+                    Ok(_) => {
+                        // consume a single token from awakener if we do not continue a cycle, consume the
+                        if !continue_cycle {
+                            // PRE: tail == sleep_marker
 
-                            // PRE: tail is pointing to sleep marker
-
+                            if !inner.readiness_queue.tail_equals_head() {
+                                if inner.readiness_queue.inner.awakener.take() {
+                                    // Poll custom event queue
+                                    inner.readiness_queue.poll(&mut events.inner);
+                                }
+                            }
+                        } else {
                             // Poll custom event queue
                             inner.readiness_queue.poll(&mut events.inner);
-
-                            // POST: tail==marker || tail!=marker
                         }
                         break;
                     }
-                    Ok(false) => break,
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
                         // Interrupted by a signal; update timeout if necessary and retry
-                        if let Some(to) = timeout {
-                            let elapsed = now.elapsed();
-                            if elapsed >= to {
-                                break;
-                            } else {
-                                timeout = Some(to - elapsed); // !! change param to "&mut timeout"
-                            }
+                        let elapsed = now.elapsed();
+
+                        match timeout {
+                            Some(to) if elapsed < to => timeout = Some(to - elapsed), // !! change param to "&mut timeout"
+                            Some(_) => break,
+                            None => break // The original code does not check this condition!!
                         }
                     }
                     Err(e) => return Err(e),
                 }
+            } else {
+                // Poll custom event queue
+                inner.selector_poll_next_turn.store(true,  Ordering::Relaxed);
+
+                inner.readiness_queue.poll(&mut events.inner);
+                if !events.is_empty() {
+                    // success, pending events have been consumed from readiness-queue
+                    break;
+                }
+
+                // Pain, the poll did clear de-queued event nodes only, reaching end of a cycle.
+                // If the timeout has not been exceeded, repeat this loop and perform sleep
+                // until events do occur.
+                let elapsed = now.elapsed();
+
+                // adapt the timeout if specified
+                match timeout {
+                    Some(to) if elapsed < to => timeout = Some(to - elapsed), // !! change param to "&mut timeout"
+                    Some(_) => timeout = Some(Duration::from_millis(0)),
+                    None => timeout = None // The original code does not check this condition!!
+                }
+                // continue
             }
-
-            // POST: tail==marker || tail!=marker
-
-        } else {
-            // PRE: tail != sleep_marker
-
-            // Poll custom event queue pending nodes
-            inner.readiness_queue.poll(&mut events.inner);
 
             // POST: tail==sleep_marker || tail!=sleep_marker
         }
