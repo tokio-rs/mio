@@ -11,7 +11,7 @@ use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
 use winapi::shared::ntdef::HANDLE;
 use winapi::um::minwinbase::OVERLAPPED_ENTRY;
-use iovec::IoVec;
+use iovec::{IoVec, IoVecMut};
 
 use {poll, Ready, Poll, PollOpt, Token};
 use event::Evented;
@@ -281,8 +281,8 @@ impl TcpStream {
         if buf.is_empty() {
             return Ok(0);
         }
-        let mut vec = IoVec::from_bytes(buf);
-        self.readv(&mut [&mut vec])
+        let vec = IoVecMut::from_bytes(buf);
+        self.readv(&mut [vec])
     }
 
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
@@ -298,7 +298,7 @@ impl TcpStream {
         }
     }
 
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    pub fn readv(&self, bufs: &mut [IoVecMut]) -> io::Result<usize> {
         let mut me = self.before_read()?;
 
         // TODO: Does WSARecv work on a nonblocking sockets? We ideally want to
@@ -353,11 +353,11 @@ impl TcpStream {
         if buf.is_empty() {
             return Ok(0);
         }
-        let mut vec = IoVec::from_bytes(buf);
-        self.writev(&[&mut vec])
+        let vec = IoVec::from_bytes(buf);
+        self.writev(&[vec])
     }
 
-    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    pub fn writev(&self, bufs: &[IoVec]) -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
 
@@ -748,8 +748,11 @@ impl ListenerImp {
             Family::V6 => TcpBuilder::new_v6(),
         }.and_then(|builder| unsafe {
             trace!("scheduling an accept");
-            self.inner.socket.accept_overlapped(&builder, &mut me.accept_buf,
-                                                self.inner.accept.as_mut_ptr())
+            builder.to_tcp_stream().and_then(|stream| {
+                let result = self.inner.socket.accept_overlapped(&stream, &mut me.accept_buf,
+                                                                 self.inner.accept.as_mut_ptr());
+                result.map(|ok| (stream, ok))
+            })
         });
         match res {
             Ok((socket, _)) => {

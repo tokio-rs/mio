@@ -37,7 +37,7 @@ libc   = "0.2.19"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["std", "ioapiset", "winbase", "winerror"] }
-miow   = "0.2.1"
+miow   = "0.3.1"
 
 [dev-dependencies]
 env_logger = { version = "0.4.0", default-features = false }
@@ -49,6 +49,4 @@ name = "test"
 path = "test/mod.rs"
 
 [replace]
-"miow:0.2.1" = { git = "https://github.com/steffengy/miow.git" }
-"winapi:0.3.2" = { git = "https://github.com/retep998/winapi-rs", branch = "0.3" }
 "iovec:0.1.1" = { git = "https://github.com/steffengy/iovec.git" }

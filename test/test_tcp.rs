@@ -10,7 +10,7 @@ use net2::{self, TcpStreamExt};
 
 use {TryRead, TryWrite};
 use mio::{Token, Ready, PollOpt, Poll, Events};
-use iovec::IoVec;
+use iovec::{IoVec, IoVecMut};
 use mio::net::{TcpListener, TcpStream};
 
 #[test]
@@ -237,7 +237,7 @@ fn read_bufs() {
     let b3 = &mut [0; 28][..];
     let b4 = &mut [0; 8][..];
     let b5 = &mut [0; 128][..];
-    let mut b: [&mut IoVec; 5] = [
+    let mut b: [IoVecMut; 5] = [
         b1.into(),
         b2.into(),
         b3.into(),
@@ -248,7 +248,7 @@ fn read_bufs() {
     let mut so_far = 0;
     loop {
         for buf in b.iter_mut() {
-            for byte in buf.as_mut_bytes() {
+            for byte in buf.iter_mut() {
                 *byte = 0;
             }
         }
@@ -263,7 +263,6 @@ fn read_bufs() {
             Ok(mut n) => {
                 so_far += n;
                 for buf in b.iter() {
-                    let buf = buf.as_bytes();
                     for byte in buf[..cmp::min(n, buf.len())].iter() {
                         assert_eq!(*byte, 1);
                     }
@@ -361,7 +360,7 @@ fn write_bufs() {
     let b3 = &[1; 28][..];
     let b4 = &[1; 8][..];
     let b5 = &[1; 128][..];
-    let b: [&IoVec; 5] = [
+    let b: [IoVec; 5] = [
         b1.into(),
         b2.into(),
         b3.into(),
