@@ -2185,6 +2185,16 @@ impl ReadinessQueue {
             return false;
         }
 
+        // The sleep marker is *not* currently in the readiness queue.
+        //
+        // The sleep marker is only inserted in this function. It is also only
+        // inserted in the tail position. This is guaranteed by first checking
+        // that the end marker is in the tail position, pushing the sleep marker
+        // after the end marker, then removing the end marker.
+        //
+        // Before inserting a node into the queue, the next pointer has to be
+        // set to null. Again, this is only safe to do when the node is not
+        // currently in the queue, but we already have ensured this.
         self.inner.sleep_marker.next_readiness.store(ptr::null_mut(), Relaxed);
 
         let actual = self.inner.head_readiness.compare_and_swap(
