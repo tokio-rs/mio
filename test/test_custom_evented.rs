@@ -36,12 +36,17 @@ fn set_readiness_before_register() {
         let b2 = b1.clone();
 
         let th = thread::spawn(move || {
-            b2.wait();
+            // set readiness before register
             set.set_readiness(Ready::readable()).unwrap();
+
+            // run into barrier so both can pass
+            b2.wait();
         });
 
+        // wait for readiness
         b1.wait();
 
+        // now register
         poll.register(&r, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
 
         loop {
