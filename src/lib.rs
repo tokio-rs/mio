@@ -112,12 +112,12 @@ mod token;
 
 pub mod net;
 
-#[deprecated(since = "0.6.5", note = "use mio-more instead")]
+#[deprecated(since = "0.6.5", note = "use mio-extras instead")]
 #[cfg(feature = "with-deprecated")]
 #[doc(hidden)]
 pub mod channel;
 
-#[deprecated(since = "0.6.5", note = "use mio-more instead")]
+#[deprecated(since = "0.6.5", note = "use mio-extras instead")]
 #[cfg(feature = "with-deprecated")]
 #[doc(hidden)]
 pub mod timer;
