@@ -123,6 +123,7 @@ mod stress {
                 for (i, &(ref r, _)) in registrations.iter().enumerate() {
                     r.reregister(poll.register(), Token(i), Ready::writable(), PollOpt::edge()).unwrap();
                 }
+                let mut events = Events::with_capacity(NUM_REGISTRATIONS);
 
                 poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
 
@@ -139,6 +140,8 @@ mod stress {
 
             // Final polls, until readiness-queue empty
             loop {
+                let mut events = Events::with_capacity(NUM_REGISTRATIONS);
+
                 poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
                 if events.is_empty() {
                     // no more events in readiness queue pending

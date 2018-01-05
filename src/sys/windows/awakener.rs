@@ -38,7 +38,8 @@ impl Awakener {
     }
 
     pub fn take(&self) -> bool {
-      // dummy, to be implemented
+        // dummy, to be implemented
+        return true;
     }
 }
 

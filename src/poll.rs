@@ -666,7 +666,7 @@ impl Poll {
                 poll.register(),
                 AWAKEN,
                 Ready::readable(),
-                PollOpt::level())?;
+                PollOpt::edge())?;
 
         Ok(poll)
     }
@@ -806,10 +806,20 @@ impl Poll {
                                 let has_token = inner.readiness_queue.inner.awakener.take();
                                 debug_assert!(has_token);
 
-                                    // Poll custom event queue
-                                    inner.readiness_queue.poll(&mut events.inner);
+                                // Poll custom event queue
+                                inner.readiness_queue.poll(&mut events.inner);
                             }
                         } else {
+                            // Postpone the future cycle of custom events. Re-attach the token to the
+                            // end of system events so that select-operation will be triggered.
+                            if awakener_triggered {
+                                let has_token = inner.readiness_queue.inner.awakener.take();
+                                debug_assert!(has_token);
+
+                                // re-publish the token to end of system-queue, we should deal with
+                                // error conditions here.
+                                let _ = inner.readiness_queue.inner.awakener.wakeup();
+                            }
                             // Poll custom event queue
                             inner.readiness_queue.poll(&mut events.inner);
                         }

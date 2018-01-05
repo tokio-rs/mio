@@ -31,10 +31,12 @@ impl Awakener {
 
         Ok(port.queue(&packet)?)
     }
-    
+
     pub fn take(&self) -> bool {
         // dummy, to be implemented
+        return true;
     }
+
 }
 
 impl Evented for Awakener {
