@@ -769,6 +769,7 @@ impl Poll {
     {
         let inner = &*self.register.inner;
         let now = Instant::now();
+        // TODO: 'timeout' w/o 'mut' (but API-change), instead using local var 'mut timeout_derived'
         let timeout_user = timeout;
 
         // If in ReadinessQueue still pending nodes read them straight, otherwise if
@@ -776,6 +777,9 @@ impl Poll {
         // wait for  system events or custom events until timeout occurs.
         // The sleep_marker is a rotating token being consumed and attached to the head again,
         // so that system events and custom events are balanced within time slices.
+        // The awakener-token corresponds to the sleep_marker, as long as the sleep-marker
+        // is not consumed, the awakener-token must stay as system-event to release
+        // from selector.select.
         loop {
 
             // If tail!=sleep_marker, the previous call didn't consume all custom-events of cycle
@@ -784,7 +788,7 @@ impl Poll {
 
             // zero timeout if continuing a cycle
             let timeout_derived: Option<Duration> =
-                if None == timeout || continue_cycle {
+                if continue_cycle {
                     Some(Duration::from_millis(0))
                 } else {
                     timeout
@@ -792,7 +796,9 @@ impl Poll {
 
 
             if !continue_cycle || selector_poll_next_turn {
-                // First get selector events
+                // First get selector events, then poll custom events with remaining capacity
+
+                // Next time prioritize custom-events (flip-flop)
                 inner.selector_poll_next_turn.store(false,  Ordering::Relaxed);
 
                 let res = inner.selector.select(&mut events.inner,
@@ -809,20 +815,32 @@ impl Poll {
 
                                 // Poll custom event queue
                                 inner.readiness_queue.poll(&mut events.inner);
+                                // POST: case 0: events-container is full
+                                //       case 1: readiness-queue is empty
+                                //       case 2: tail==sleep_marker (end of cycle)
+
                             }
                         } else {
-                            // Postpone the future cycle of custom events. Re-attach the token to the
-                            // end of system events so that select-operation will be triggered.
+                            // Token for the future cycle of custom events. Re-attach the token to the
+                            // end of system events so that waking up when entering the selector.select.
                             if awakener_triggered {
                                 let has_token = inner.readiness_queue.inner.awakener.take();
                                 debug_assert!(has_token);
 
                                 // re-publish the token to end of system-queue, we should deal with
                                 // error conditions here.
+                                // OPTME: skip re-attaching in case after the poll below the tail is referencing
+                                //        the sleep_marker and readinessQueue is not empty (tail!=head);
+                                //        immediately start new cycle pushing sleep_marker to head.
                                 let _ = inner.readiness_queue.inner.awakener.wakeup();
                             }
                             // Poll custom event queue
                             inner.readiness_queue.poll(&mut events.inner);
+                            // POST: case 0: events-container is full
+                            //       case 1: readiness-queue is empty
+                            //       case 2: tail==sleep_marker (end of cycle)
+
+                            // OPTME: check for tail==sleep_marker && tail!=head and kick new cycle
                         }
                         break;
                     }
@@ -831,18 +849,24 @@ impl Poll {
                         let elapsed = now.elapsed();
 
                         match timeout_user {
-                            Some(to) if elapsed < to => timeout = Some(to - elapsed), // !! change param to "&mut timeout"
+                            Some(to) if elapsed < to => timeout = Some(to - elapsed),
                             Some(_) => break,
-                            None => break // The original code does not check this condition!!
+                            None => timeout = None // blocking till event occures
                         }
                     }
                     Err(e) => return Err(e),
                 }
             } else {
                 // Poll custom event queue
+
+                // Next time prioritize system-events (flip-flop)
                 inner.selector_poll_next_turn.store(true,  Ordering::Relaxed);
 
                 inner.readiness_queue.poll(&mut events.inner);
+                // POST: case 0: events-container is full
+                //       case 1: readiness-queue is empty
+                //       case 2: tail==sleep_marker (end of cycle)
+
                 if !events.is_empty() {
                     // success, pending events have been consumed from readiness-queue
                     break;
@@ -855,9 +879,9 @@ impl Poll {
 
                 // adapt the timeout if specified
                 match timeout_user {
-                    Some(to) if elapsed < to => timeout = Some(to - elapsed), // !! change param to "&mut timeout"
-                    Some(_) => timeout = Some(Duration::from_millis(0)),
-                    None => timeout = None // The original code does not check this condition!!
+                    Some(to) if elapsed < to => timeout = Some(to - elapsed),
+                    Some(_) => timeout = Some(Duration::from_millis(0)), // iterate once more and check for system events
+                    None => timeout = None // blocking till event occures
                 }
                 // continue
             }
