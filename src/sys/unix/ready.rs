@@ -126,10 +126,9 @@ impl UnixReady {
     #[cfg(not(any(target_os = "dragonfly",
         target_os = "freebsd", target_os = "ios", target_os = "macos")))]
     #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
-    #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     pub fn aio() -> UnixReady {
-        UnixReady(0)
+        UnixReady(Ready::empty())
     }
 
     /// Returns a `Ready` representing error readiness.
@@ -396,6 +395,7 @@ impl fmt::Debug for UnixReady {
             (UnixReady(Ready::writable()), "Writable"),
             (UnixReady::error(), "Error"),
             (UnixReady::hup(), "Hup"),
+            #[allow(deprecated)]
             (UnixReady::aio(), "Aio")];
 
         for &(flag, msg) in &flags {
