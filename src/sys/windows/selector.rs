@@ -73,7 +73,7 @@ impl Selector {
         trace!("select; timeout={:?}", timeout);
 
         // Clear out the previous list of I/O events and get some more!
-        events.events.truncate(0);
+        events.clear();
 
         trace!("polling IOCP");
         let n = match self.inner.port.get_many(&mut events.statuses, timeout) {
@@ -452,6 +452,10 @@ impl Events {
 
     pub fn push_event(&mut self, event: Event) {
         self.events.push(event);
+    }
+
+    pub fn clear(&mut self) {
+        self.events.truncate(0);
     }
 }
 
