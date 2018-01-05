@@ -37,17 +37,19 @@
 //! let server = TcpListener::bind(&addr).unwrap();
 //!
 //! // Create a poll instance
-//! let poll = Poll::new().unwrap();
+//! let mut poll = Poll::new().unwrap();
 //!
 //! // Start listening for incoming connections
-//! poll.register(&server, SERVER, Ready::readable(),
+//! poll.register()
+//!     .register(&server, SERVER, Ready::readable(),
 //!               PollOpt::edge()).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
-//! poll.register(&sock, CLIENT, Ready::readable(),
+//! poll.register()
+//!     .register(&sock, CLIENT, Ready::readable(),
 //!               PollOpt::edge()).unwrap();
 //!
 //! // Create storage for events
@@ -114,6 +116,7 @@ pub mod net;
 
 pub use poll::{
     Poll,
+    Register,
     Registration,
     SetReadiness,
 };

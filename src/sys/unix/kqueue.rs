@@ -337,8 +337,10 @@ fn does_not_register_rw() {
 
     // registering kqueue fd will fail if write is requested (On anything but some versions of OS
     // X)
-    poll.register(&kqf, Token(1234), Ready::readable(),
-                  PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    poll.register()
+        .register(
+            &kqf, Token(1234), Ready::readable(),
+            PollOpt::edge() | PollOpt::oneshot()).unwrap();
 }
 
 #[cfg(any(target_os = "dragonfly",

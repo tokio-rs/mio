@@ -7,7 +7,7 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
-use {io, sys, Ready, Poll, PollOpt, Token};
+use {io, sys, Ready, Register, PollOpt, Token};
 use event::Evented;
 use poll::SelectorId;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -273,17 +273,17 @@ impl UdpSocket {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interest, opts)
+    fn register(&self, register: &Register, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
+        self.selector_id.associate_selector(register)?;
+        self.sys.register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(poll, token, interest, opts)
+    fn reregister(&self, register: &Register, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.sys.deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        self.sys.deregister(register)
     }
 }
 

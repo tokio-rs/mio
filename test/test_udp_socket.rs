@@ -42,7 +42,7 @@ fn assert_sync<T: Sync>() {
 #[cfg(test)]
 fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     debug!("Starting TEST_UDP_SOCKETS");
-    let poll = Poll::new().unwrap();
+    let mut poll = Poll::new().unwrap();
 
     assert_send::<UdpSocket>();
     assert_sync::<UdpSocket>();
@@ -52,10 +52,10 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     assert_eq!(ErrorKind::WouldBlock, rx.recv_from(&mut buf).unwrap_err().kind());
 
     info!("Registering SENDER");
-    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
+    poll.register().register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
 
     info!("Registering LISTENER");
-    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
 
@@ -145,18 +145,18 @@ pub fn test_udp_socket_discard() {
 
     let tx_addr = tx.local_addr().unwrap();
     let rx_addr = rx.local_addr().unwrap();
- 
+
     assert!(tx.connect(&rx_addr).is_ok());
     assert!(udp_outside.connect(&rx_addr).is_ok());
     assert!(rx.connect(&tx_addr).is_ok());
 
-    let poll = Poll::new().unwrap();
+    let mut poll = Poll::new().unwrap();
 
     let r = udp_outside.send("hello world".as_bytes());
     assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
-    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
-    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
+    poll.register().register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
 
