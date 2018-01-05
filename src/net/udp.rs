@@ -97,8 +97,8 @@ impl UdpSocket {
     /// Connects the UDP socket setting the default destination for `send()`
     /// and limiting packets that are read via `recv` from the address specified
     /// in `addr`.
-    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
-        self.sys.connect(addr)
+    pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
+        self.sys.connect(&addr)
     }
 
     /// Sets the value of the `SO_BROADCAST` option for this socket.
