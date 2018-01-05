@@ -769,6 +769,7 @@ impl Poll {
     {
         let inner = &*self.register.inner;
         let now = Instant::now();
+        let timeout_user = timeout;
 
         // If in ReadinessQueue still pending nodes read them straight, otherwise if
         // the tail is pointing to the sleep_marker, dive into the system selector and
@@ -829,7 +830,7 @@ impl Poll {
                         // Interrupted by a signal; update timeout if necessary and retry
                         let elapsed = now.elapsed();
 
-                        match timeout {
+                        match timeout_user {
                             Some(to) if elapsed < to => timeout = Some(to - elapsed), // !! change param to "&mut timeout"
                             Some(_) => break,
                             None => break // The original code does not check this condition!!
@@ -853,7 +854,7 @@ impl Poll {
                 let elapsed = now.elapsed();
 
                 // adapt the timeout if specified
-                match timeout {
+                match timeout_user {
                     Some(to) if elapsed < to => timeout = Some(to - elapsed), // !! change param to "&mut timeout"
                     Some(_) => timeout = Some(Duration::from_millis(0)),
                     None => timeout = None // The original code does not check this condition!!
