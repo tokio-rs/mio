@@ -33,9 +33,10 @@ extern crate mio;
 
 ## Features
 
-* Event loop backed by epoll, kqueue.
+* Non-blocking TCP, UDP.
+* I/O event notification queue backed by epoll, kqueue, and IOCP.
 * Zero allocations at runtime
-* Non-blocking TCP, UDP and Unix domain sockets
+* Platform specific extensions.
 
 ## Non-goals
 
@@ -44,6 +45,7 @@ or higher-level libraries.
 
 * File operations
 * Thread pools / multi-threaded event loop
+* Timers
 
 ## Platforms
 
@@ -56,6 +58,7 @@ Currently supported platforms:
 * NetBSD
 * Android
 * iOS
+* Fuchsia (experimental).
 
 There are potentially others. If you find that Mio works on another
 platform, submit a PR to update the list!
@@ -65,9 +68,7 @@ platform, submit a PR to update the list!
 * [tokio-core](https://github.com/tokio-rs/tokio-core) – Underlying event loop
   for the [Tokio project](https://github.com/tokio-rs/tokio).
 * [mioco](https://github.com/dpc/mioco) – Mio COroutines
-* [simplesched](https://github.com/zonyitoo/simplesched) – Coroutine I/O with a simple scheduler
 * [coio-rs](https://github.com/zonyitoo/coio-rs) – Coroutine I/O with work-stealing scheduler
-* [rotor](https://github.com/tailhook/rotor) – A wrapper that allows to create composable I/O libraries on top of mio
 * [ws-rs](https://github.com/housleyjk/ws-rs) – WebSockets based on Mio
 
 ## Community
