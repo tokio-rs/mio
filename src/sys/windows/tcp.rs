@@ -99,8 +99,8 @@ impl TcpStream {
             registration: Mutex::new(None),
             imp: StreamImp {
                 inner: FromRawArc::new(StreamIo {
-                    read: Overlapped::new(read_done),
-                    write: Overlapped::new(write_done),
+                    read: Overlapped::new_(read_done),
+                    write: Overlapped::new_(write_done),
                     socket: socket,
                     inner: Mutex::new(StreamInner {
                         iocp: ReadyBinding::new(),
@@ -400,7 +400,7 @@ impl StreamImp {
     fn schedule_connect(&self, addr: &SocketAddr) -> io::Result<()> {
         unsafe {
             trace!("scheduling a connect");
-            self.inner.socket.connect_overlapped(addr, &[], self.inner.read.as_mut_ptr())?;
+            self.inner.socket.connect_overlapped(addr, &[], self.inner.read.as_mut_ptr_())?;
         }
         // see docs above on StreamImp.inner for rationale on forget
         mem::forget(self.clone());
@@ -428,7 +428,7 @@ impl StreamImp {
 
         trace!("scheduling a read");
         let res = unsafe {
-            self.inner.socket.read_overlapped(&mut [], self.inner.read.as_mut_ptr())
+            self.inner.socket.read_overlapped(&mut [], self.inner.read.as_mut_ptr_())
         };
         match res {
             // Note that `Ok(true)` means that this completed immediately and
@@ -485,7 +485,7 @@ impl StreamImp {
         loop {
             trace!("scheduling a write of {} bytes", buf[pos..].len());
             let ret = unsafe {
-                self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr())
+                self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr_())
             };
             match ret {
                 Ok(Some(transferred_bytes)) if me.instant_notify => {
@@ -661,7 +661,7 @@ impl TcpListener {
             registration: Mutex::new(None),
             imp: ListenerImp {
                 inner: FromRawArc::new(ListenerIo {
-                    accept: Overlapped::new(accept_done),
+                    accept: Overlapped::new_(accept_done),
                     family: family,
                     socket: socket,
                     inner: Mutex::new(ListenerInner {
@@ -750,7 +750,7 @@ impl ListenerImp {
             trace!("scheduling an accept");
             builder.to_tcp_stream().and_then(|stream| {
                 let result = self.inner.socket.accept_overlapped(&stream, &mut me.accept_buf,
-                                                                 self.inner.accept.as_mut_ptr());
+                                                                 self.inner.accept.as_mut_ptr_());
                 result.map(|ok| (stream, ok))
             })
         });

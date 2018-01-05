@@ -60,8 +60,8 @@ impl UdpSocket {
             registration: Mutex::new(None),
             imp: Imp {
                 inner: FromRawArc::new(Io {
-                    read: Overlapped::new(recv_done),
-                    write: Overlapped::new(send_done),
+                    read: Overlapped::new_(recv_done),
+                    write: Overlapped::new_(send_done),
                     socket: socket,
                     inner: Mutex::new(Inner {
                         iocp: ReadyBinding::new(),
@@ -110,7 +110,7 @@ impl UdpSocket {
         unsafe {
             trace!("scheduling a send");
             self.imp.inner.socket.send_to_overlapped(&owned_buf, target,
-                                                     self.imp.inner.write.as_mut_ptr())
+                                                     self.imp.inner.write.as_mut_ptr_())
         }?;
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
@@ -143,7 +143,7 @@ impl UdpSocket {
         let amt = owned_buf.write(buf)?;
         unsafe {
             trace!("scheduling a send");
-            self.imp.inner.socket.send_overlapped(&owned_buf, self.imp.inner.write.as_mut_ptr())
+            self.imp.inner.socket.send_overlapped(&owned_buf, self.imp.inner.write.as_mut_ptr_())
 
         }?;
         me.write = State::Pending(owned_buf);
@@ -308,7 +308,7 @@ impl Imp {
             let cap = buf.capacity();
             buf.set_len(cap);
             self.inner.socket.recv_from_overlapped(&mut buf, &mut me.read_buf,
-                                                   self.inner.read.as_mut_ptr())
+                                                   self.inner.read.as_mut_ptr_())
         };
         match res {
             Ok(_) => {
