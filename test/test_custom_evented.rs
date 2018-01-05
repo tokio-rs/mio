@@ -85,7 +85,7 @@ mod stress {
 
         for _ in 0..NUM_ATTEMPTS {
             let poll = Poll::new().unwrap();
-            let mut events = Events::with_capacity(128);
+            let mut events = Events::with_capacity(NUM_REGISTRATIONS);
 
             let registrations: Vec<_> = (0..NUM_REGISTRATIONS).map(|i| {
                 let (r, s) = Registration::new2();
