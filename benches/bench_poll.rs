@@ -13,18 +13,17 @@ fn bench_poll(bench: &mut Bencher) {
     const NUM: usize = 10_000;
     const THREADS: usize = 4;
 
-    let poll = Poll::new().unwrap();
+    let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(1024);
 
     let mut registrations = vec![];
     let mut set_readiness = vec![];
 
     for i in 0..NUM {
-        let (r, s) = Registration::new(
-            &poll,
-            Token(i),
-            Ready::readable(),
-            PollOpt::edge());
+        let (r, s) = Registration::new();
+
+         poll.register()
+            .register(&r, Token(i), Ready::readable(), PollOpt::edge()).unwrap();
 
         registrations.push(r);
         set_readiness.push(s);
@@ -43,10 +42,12 @@ fn bench_poll(bench: &mut Bencher) {
             });
         }
 
-        let mut n = 0;
+        let mut n: usize = 0;
 
         while n < NUM {
-            n += poll.poll(&mut events, None).unwrap();
+            if poll.poll(&mut events, None).is_ok() {
+                n += events.iter().count();
+            }
         }
     })
 }
