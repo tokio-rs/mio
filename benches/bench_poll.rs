@@ -46,10 +46,7 @@ fn bench_poll(bench: &mut Bencher) {
 
         while n < NUM {
             if poll.poll(&mut events, None).is_ok() {
-                // TBD: would be handy to have a method such as events.len()
-                for _ in events.iter() {
-                    n += 1;
-                }
+                n += events.iter().count();
             }
         }
     })
