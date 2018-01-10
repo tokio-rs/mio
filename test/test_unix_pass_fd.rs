@@ -3,7 +3,7 @@ use mio::*;
 use mio::deprecated::{EventLoop, Handler};
 use mio::deprecated::unix::*;
 use bytes::{Buf, ByteBuf, SliceBuf};
-use slab;
+use slab::Slab;
 use std::path::PathBuf;
 use std::io::{self, Read};
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -18,8 +18,6 @@ struct EchoConn {
     token: Option<Token>,
     interest: Ready,
 }
-
-type Slab<T> = slab::Slab<T, Token>;
 
 impl EchoConn {
     fn new(sock: UnixStream) -> EchoConn {
@@ -107,12 +105,11 @@ impl EchoServer {
 
         let sock = self.sock.accept().unwrap();
         let conn = EchoConn::new(sock);
-        let tok = self.conns.insert(conn)
-            .ok().expect("could not add connection to slab");
+        let tok = self.conns.insert(conn);
 
         // Register the connection
-        self.conns[tok].token = Some(tok);
-        event_loop.register(&self.conns[tok].sock, tok, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())
+        self.conns[tok].token = Some(Token(tok));
+        event_loop.register(&self.conns[tok].sock, Token(tok), Ready::readable(), PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
         Ok(())
@@ -129,7 +126,7 @@ impl EchoServer {
     }
 
     fn conn<'a>(&'a mut self, tok: Token) -> &'a mut EchoConn {
-        &mut self.conns[tok]
+        &mut self.conns[tok.into()]
     }
 }
 
