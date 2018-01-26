@@ -305,6 +305,16 @@ impl TcpStream {
         self.sys.take_error()
     }
 
+    /// Receives data on the socket from the remote address to which it is
+    /// connected, without removing that data from the queue. On success,
+    /// returns the number of bytes peeked.
+    ///
+    /// Successive calls return the same data. This is accomplished by passing
+    /// `MSG_PEEK` as a flag to the underlying recv system call.
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.sys.peek(buf)
+    }
+
     /// Read in a list of buffers all at once.
     ///
     /// This operation will attempt to read bytes from this socket and place

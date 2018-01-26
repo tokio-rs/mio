@@ -17,6 +17,76 @@ use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 /// This is an implementation of a bound UDP socket. This supports both IPv4 and
 /// IPv6 addresses, and there is no corresponding notion of a server because UDP
 /// is a datagram protocol.
+///
+/// # Examples
+///
+/// ```
+/// # use std::error::Error;
+/// #
+/// # fn try_main() -> Result<(), Box<Error>> {
+/// // An Echo program:
+/// // SENDER -> sends a message.
+/// // ECHOER -> listens and prints the message received.
+///
+/// use mio::net::UdpSocket;
+/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use std::time::Duration;
+///
+/// const SENDER: Token = Token(0);
+/// const ECHOER: Token = Token(1);
+///
+/// // This operation will fail if the address is in use, so we select different ports for each
+/// // socket.
+/// let sender_socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+/// let echoer_socket = UdpSocket::bind(&"127.0.0.1:11100".parse()?)?;
+///
+/// // If we do not use connect here, SENDER and ECHOER would need to call send_to and recv_from
+/// // respectively.
+/// sender_socket.connect(&"127.0.0.1:11100".parse()?)?;
+///
+/// // We need a Poll to check if SENDER is ready to be written into, and if ECHOER is ready to be
+/// // read from.
+/// let mut poll = Poll::new()?;
+///
+/// // We register our sockets here so that we can check if they are ready to be written/read.
+/// poll.register()
+///     .register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
+/// poll.register()
+///     .register(&echoer_socket, ECHOER, Ready::readable(), PollOpt::edge())?;
+///
+/// let msg_to_send = [9; 9];
+/// let mut buffer = [0; 9];
+///
+/// let mut events = Events::with_capacity(128);
+/// loop {
+///     poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+///     for event in events.iter() {
+///         match event.token() {
+///             // Our SENDER is ready to be written into.
+///             SENDER => {
+///                 let bytes_sent = sender_socket.send(&msg_to_send)?;
+///                 assert_eq!(bytes_sent, 9);
+///                 println!("sent {:?} -> {:?} bytes", msg_to_send, bytes_sent);
+///             },
+///             // Our ECHOER is ready to be read from.
+///             ECHOER => {
+///                 let num_recv = echoer_socket.recv(&mut buffer)?;
+///                 println!("echo {:?} -> {:?}", buffer, num_recv);
+///                 buffer = [0; 9];
+///                 # return Ok(());
+///             }
+///             _ => unreachable!()
+///         }
+///     }
+/// }
+/// #
+/// #   Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #   try_main().unwrap();
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct UdpSocket {
     sys: sys::UdpSocket,
@@ -25,6 +95,32 @@ pub struct UdpSocket {
 
 impl UdpSocket {
     /// Creates a UDP socket from the given address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    ///
+    /// // We must bind it to an open address.
+    /// let socket = match UdpSocket::bind(&"127.0.0.1:7777".parse()?) {
+    ///     Ok(new_socket) => new_socket,
+    ///     Err(fail) => {
+    ///         // We panic! here, but you could try to bind it again on another address.
+    ///         panic!("Failed to bind socket. {:?}", fail);
+    ///     }
+    /// };
+    ///
+    /// // Our socket was created, but we should not use it before checking it's readiness.
+    /// #    Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
         let socket = net::UdpSocket::bind(addr)?;
         UdpSocket::from_socket(socket)
@@ -48,6 +144,25 @@ impl UdpSocket {
     }
 
     /// Returns the socket address that this socket was created from.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    ///
+    /// let addr = "127.0.0.1:7777".parse()?;
+    /// let socket = UdpSocket::bind(&addr)?;
+    ///
+    /// assert_eq!(socket.local_addr()?, addr);
+    /// #    Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.sys.local_addr()
     }
@@ -72,12 +187,69 @@ impl UdpSocket {
     ///
     /// Address type can be any implementor of `ToSocketAddrs` trait. See its
     /// documentation for concrete examples.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    /// 
+    /// let socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    ///
+    /// // We must check if the socket is writable before calling send_to,
+    /// // or we could run into a WouldBlock error.
+    ///
+    /// let bytes_sent = socket.send_to(&[9; 9], &"127.0.0.1:11100".parse()?)?;
+    /// assert_eq!(bytes_sent, 9);
+    /// #
+    /// #    Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         self.sys.send_to(buf, target)
     }
 
-    /// Receives data from the socket. On success, returns the number of bytes
-    /// read and the address from whence the data came.
+    /// Receives data from the socket and stores data in the supplied buffer `buf`. On success,
+    /// returns the number of bytes read and the address from whence the data came.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// The function does not read from `buf`, but is overwriting previous content of `buf`.
+    ///
+    /// Assuming the function has read `n` bytes, slicing `&buf[..n]` provides
+    /// efficient access with iterators and boundary checks.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    ///
+    /// let socket = UdpSocket::bind(&"127.0.0.1:11100".parse()?)?;
+    ///
+    /// // We must check if the socket is readable before calling recv_from,
+    /// // or we could run into a WouldBlock error.
+    ///
+    /// let mut buf = [0; 9];
+    /// let (num_recv, from_addr) = socket.recv_from(&mut buf)?;
+    /// println!("Received {:?} -> {:?} bytes from {:?}", buf, num_recv, from_addr);
+    /// #
+    /// #    Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.sys.recv_from(buf)
     }
@@ -88,8 +260,17 @@ impl UdpSocket {
         self.sys.send(buf)
     }
 
-    /// Receives data from the socket previously bound with connect(). On success, returns
-    /// the number of bytes read and the address from whence the data came.
+    /// Receives data from the socket previously bound with connect() and stores data in
+    /// the supplied buffer `buf`. On success, returns the number of bytes read.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// The function does not read from `buf`, but is overwriting previous content of `buf`.
+    ///
+    /// Assuming the function has read `n` bytes, slicing `&buf[..n]` provides
+    /// efficient access with iterators and boundary checks.
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.recv(buf)
     }
@@ -105,6 +286,29 @@ impl UdpSocket {
     ///
     /// When enabled, this socket is allowed to send packets to a broadcast
     /// address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    ///
+    /// let broadcast_socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    /// if broadcast_socket.broadcast()? == false {
+    ///     broadcast_socket.set_broadcast(true)?;
+    /// }
+    ///
+    /// assert_eq!(broadcast_socket.broadcast()?, true);
+    /// #
+    /// #    Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
         self.sys.set_broadcast(on)
     }
@@ -115,6 +319,25 @@ impl UdpSocket {
     /// [`set_broadcast`][link].
     ///
     /// [link]: #method.set_broadcast
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    ///
+    /// let broadcast_socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    /// assert_eq!(broadcast_socket.broadcast()?, false);
+    /// #
+    /// #    Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn broadcast(&self) -> io::Result<bool> {
         self.sys.broadcast()
     }

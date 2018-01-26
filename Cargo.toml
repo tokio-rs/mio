@@ -1,7 +1,7 @@
 [package]
 
 name          = "mio"
-version       = "0.6.11"
+version       = "0.6.12" # remember to update html_root_url
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
@@ -18,15 +18,15 @@ exclude       = [
 ]
 
 [dependencies]
-lazycell = "0.5.0"
+lazycell = "0.6.0"
 log      = "0.3.1"
 slab     = "0.3.0"
 net2     = "0.2.29"
 iovec    = "0.1.1"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
-fuchsia-zircon = "0.2.1"
-fuchsia-zircon-sys = "0.2.0"
+fuchsia-zircon = "0.3.2"
+fuchsia-zircon-sys = "0.3.2"
 
 [target.'cfg(unix)'.dependencies]
 libc   = "0.2.19"

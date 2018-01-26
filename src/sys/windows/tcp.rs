@@ -222,29 +222,7 @@ impl TcpStream {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: Ready, me: &mut StreamInner) {
-        if interest.is_readable() {
-            self.imp.schedule_read(me);
-        }
-
-        // At least with epoll, if a socket is registered with an interest in
-        // writing and it's immediately writable then a writable event is
-        // generated immediately, so do so here.
-        if interest.is_writable() {
-            if let State::Empty = me.write {
-                self.imp.add_readiness(me, Ready::writable());
-            }
-        }
-    }
-
-    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        match IoVec::from_bytes_mut(buf) {
-            Some(vec) => self.readv(&mut [vec]),
-            None => Ok(0),
-        }
-    }
-
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    fn before_read(&self) -> io::Result<MutexGuard<StreamInner>> {
         let mut me = self.inner();
 
         match me.read {
@@ -271,6 +249,47 @@ impl TcpStream {
             // below.
             State::Ready(()) => {}
         }
+
+        Ok(me)
+    }
+
+    fn post_register(&self, interest: Ready, me: &mut StreamInner) {
+        if interest.is_readable() {
+            self.imp.schedule_read(me);
+        }
+
+        // At least with epoll, if a socket is registered with an interest in
+        // writing and it's immediately writable then a writable event is
+        // generated immediately, so do so here.
+        if interest.is_writable() {
+            if let State::Empty = me.write {
+                self.imp.add_readiness(me, Ready::writable());
+            }
+        }
+    }
+
+    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        match IoVec::from_bytes_mut(buf) {
+            Some(vec) => self.readv(&mut [vec]),
+            None => Ok(0),
+        }
+    }
+
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut me = self.before_read()?;
+
+        match (&self.imp.inner.socket).peek(buf) {
+            Ok(n) => Ok(n),
+            Err(e) => {
+                me.read = State::Empty;
+                self.imp.schedule_read(&mut me);
+                Err(e)
+            }
+        }
+    }
+
+    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+        let mut me = self.before_read()?;
 
         // TODO: Does WSARecv work on a nonblocking sockets? We ideally want to
         //       call that instead of looping over all the buffers and calling

@@ -1293,6 +1293,39 @@ impl Events {
             pos: 0
         }
     }
+
+    /// Clearing all `Event` values from container explicitly.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::{Events, Poll};
+    /// use std::time::Duration;
+    ///
+    /// let mut events = Events::with_capacity(1024);
+    /// let mut poll = Poll::new()?;
+    ///
+    /// // Register handles with `poll`
+    /// for _ in 0..2 {
+    ///     events.clear();
+    ///     poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+    ///
+    ///     for event in events.iter() {
+    ///         println!("event={:?}", event);
+    ///     }
+    /// }
+    /// #     Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn clear(&mut self) {
+        self.inner.clear();
+    }
 }
 
 impl<'a> IntoIterator for &'a Events {
@@ -2038,6 +2071,16 @@ impl ReadinessQueue {
             return false;
         }
 
+        // The sleep marker is *not* currently in the readiness queue.
+        //
+        // The sleep marker is only inserted in this function. It is also only
+        // inserted in the tail position. This is guaranteed by first checking
+        // that the end marker is in the tail position, pushing the sleep marker
+        // after the end marker, then removing the end marker.
+        //
+        // Before inserting a node into the queue, the next pointer has to be
+        // set to null. Again, this is only safe to do when the node is not
+        // currently in the queue, but we already have ensured this.
         self.inner.sleep_marker.next_readiness.store(ptr::null_mut(), Relaxed);
 
         let actual = self.inner.head_readiness.compare_and_swap(

@@ -4,19 +4,9 @@ use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::time::Duration;
 use std::{cmp, i32};
 
-use libc::c_int;
-use libc;
-use libc::{EPOLLERR, EPOLLHUP};
+use libc::{self, c_int};
+use libc::{EPOLLERR, EPOLLHUP, EPOLLRDHUP, EPOLLONESHOT};
 use libc::{EPOLLET, EPOLLOUT, EPOLLIN, EPOLLPRI};
-
-#[cfg(not(target_os = "android"))]
-use libc::{EPOLLRDHUP, EPOLLONESHOT};
-
-// libc doesn't define these constants on android, but they are supported.
-#[cfg(target_os = "android")]
-const EPOLLRDHUP: libc::c_int = 0x00002000;
-#[cfg(target_os = "android")]
-const EPOLLONESHOT: libc::c_int = 0x40000000;
 
 use {io, Ready, PollOpt, Token};
 use event_imp::Event;
@@ -76,12 +66,12 @@ impl Selector {
             .unwrap_or(-1);
 
         // Wait for epoll events for at most timeout_ms milliseconds
+        evts.clear();
         unsafe {
-            evts.events.set_len(0);
             let cnt = cvt(libc::epoll_wait(self.epfd,
-                                                evts.events.as_mut_ptr(),
-                                                evts.events.capacity() as i32,
-                                                timeout_ms))?;
+                                           evts.events.as_mut_ptr(),
+                                           evts.events.capacity() as i32,
+                                           timeout_ms))?;
             let cnt = cnt as usize;
             evts.events.set_len(cnt);
 
@@ -243,6 +233,10 @@ impl Events {
             events: ioevent_to_epoll(event.readiness(), PollOpt::empty()),
             u64: usize::from(event.token()) as u64
         });
+    }
+
+    pub fn clear(&mut self) {
+        unsafe { self.events.set_len(0); }
     }
 }
 
