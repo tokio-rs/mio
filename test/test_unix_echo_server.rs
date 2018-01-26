@@ -40,7 +40,7 @@ impl EchoConn {
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
-                self.buf.clear();
+                self.buf.drain(..r);
                 self.interest.insert(Ready::readable());
                 self.interest.remove(Ready::writable());
             }
@@ -155,7 +155,7 @@ impl EchoClient {
 
                 // prepare for reading
 
-                debug!("CLIENT : buf = {:?} -- rx = {:?}", buf.bytes(), self.rx);
+                debug!("CLIENT : buf = {:?} -- rx = {:?}", buf, self.rx);
                 for actual in buf.iter() {
                     let expect = self.rx[0];
                     self.rx = &self.rx[1..];

@@ -2,7 +2,7 @@ use {TryRead, TryWrite};
 use mio::*;
 use mio::deprecated::{EventLoop, Handler};
 use mio::deprecated::unix::*;
-use bytes::{Buf, ByteBuf, SliceBuf};
+use bytes::IntoBuf;
 use slab;
 use std::path::PathBuf;
 use std::io::{self, Read};
@@ -55,7 +55,7 @@ impl EchoConn {
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
-        let mut buf = ByteBuf::mut_with_capacity(2048);
+        let mut buf = Vec::with_capacity(2048);
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
@@ -77,7 +77,7 @@ impl EchoConn {
         // without blocking, for simplicity -- we're only testing that
         // the FD makes it through somehow
         let (rd, mut wr) = pipe().unwrap();
-        let mut buf = buf.flip();
+        let mut buf = buf.into_buf();
         match wr.try_write_buf(&mut buf) {
             Ok(None) => {
                 panic!("writing to our own pipe blocked :(");
@@ -136,8 +136,8 @@ impl EchoServer {
 struct EchoClient {
     sock: UnixStream,
     msgs: Vec<&'static str>,
-    tx: SliceBuf<'static>,
-    rx: SliceBuf<'static>,
+    tx: &'static [u8],
+    rx: &'static [u8],
     token: Token,
     interest: Ready,
 }
@@ -151,8 +151,8 @@ impl EchoClient {
         EchoClient {
             sock: sock,
             msgs: msgs,
-            tx: SliceBuf::wrap(curr.as_bytes()),
-            rx: SliceBuf::wrap(curr.as_bytes()),
+            tx: curr.as_bytes(),
+            rx: curr.as_bytes(),
             token: tok,
             interest: Ready::none(),
         }
@@ -191,13 +191,14 @@ impl EchoClient {
         };
 
         for &actual in buf[0..n].iter() {
-            let expect = self.rx.read_byte().unwrap();
+            let expect = self.rx[0];
+            self.rx = &self.rx[1..];
             assert!(actual == expect, "actual={}; expect={}", actual, expect);
         }
 
         self.interest.remove(Ready::readable());
 
-        if !self.rx.has_remaining() {
+        if self.rx.is_empty() {
             self.next_msg(event_loop).unwrap();
         }
 
@@ -212,7 +213,7 @@ impl EchoClient {
     fn writable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
         debug!("client socket writable");
 
-        match self.sock.try_write_buf(&mut self.tx) {
+        match self.sock.try_write_buf(&mut self.tx.into_buf()) {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
                 self.interest.insert(Ready::writable());
@@ -238,8 +239,8 @@ impl EchoClient {
         let curr = self.msgs.remove(0);
 
         debug!("client prepping next message");
-        self.tx = SliceBuf::wrap(curr.as_bytes());
-        self.rx = SliceBuf::wrap(curr.as_bytes());
+        self.tx = curr.as_bytes();
+        self.rx = curr.as_bytes();
 
         self.interest.insert(Ready::writable());
         event_loop.reregister(&self.sock, self.token, self.interest, PollOpt::edge() | PollOpt::oneshot())

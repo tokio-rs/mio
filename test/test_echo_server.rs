@@ -37,7 +37,7 @@ impl EchoConn {
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
-                self.buf.clear();
+                self.buf.drain(..r);
                 self.interest.insert(Ready::readable());
                 self.interest.remove(Ready::writable());
             }
