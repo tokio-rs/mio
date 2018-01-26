@@ -1,6 +1,6 @@
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio::net::UdpSocket;
-use bytes::{Buf, RingBuf, SliceBuf, MutBuf};
+use bytes::BufMut;
 use std::io::ErrorKind;
 use std::str;
 use std::time;
@@ -13,8 +13,8 @@ pub struct UdpHandlerSendRecv {
     tx: UdpSocket,
     rx: UdpSocket,
     msg: &'static str,
-    buf: SliceBuf<'static>,
-    rx_buf: RingBuf,
+    buf: &'static [u8],
+    rx_buf: Vec<u8>,
     connected: bool,
     shutdown: bool,
 }
@@ -25,8 +25,8 @@ impl UdpHandlerSendRecv {
             tx: tx,
             rx: rx,
             msg: msg,
-            buf: SliceBuf::wrap(msg.as_bytes()),
-            rx_buf: RingBuf::new(1024),
+            buf: msg.as_bytes(),
+            rx_buf: Vec::with_capacity(1024),
             connected: connected,
             shutdown: false,
         }
@@ -72,14 +72,14 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
                         debug!("We are receiving a datagram now...");
                         let cnt = unsafe {
                             if !handler.connected {
-                                handler.rx.recv_from(handler.rx_buf.mut_bytes()).unwrap().0
+                                handler.rx.recv_from(handler.rx_buf.bytes_mut()).unwrap().0
                             } else {
-                                handler.rx.recv(handler.rx_buf.mut_bytes()).unwrap()
+                                handler.rx.recv(handler.rx_buf.bytes_mut()).unwrap()
                             }
                         };
 
-                        unsafe { MutBuf::advance(&mut handler.rx_buf, cnt); }
-                        assert!(str::from_utf8(handler.rx_buf.bytes()).unwrap() == handler.msg);
+                        unsafe { BufMut::advance_mut(&mut handler.rx_buf, cnt); }
+                        assert!(str::from_utf8(handler.rx_buf.as_ref()).unwrap() == handler.msg);
                         handler.shutdown = true;
                     },
                     _ => ()
@@ -91,12 +91,12 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
                     SENDER => {
                         let cnt = if !handler.connected {
                             let addr = handler.rx.local_addr().unwrap();
-                            handler.tx.send_to(handler.buf.bytes(), &addr).unwrap()
+                            handler.tx.send_to(handler.buf, &addr).unwrap()
                         } else {
-                            handler.tx.send(handler.buf.bytes()).unwrap()
+                            handler.tx.send(handler.buf).unwrap()
                         };
 
-                        handler.buf.advance(cnt);
+                        handler.buf = &handler.buf[cnt..];
                     },
                     _ => {}
                 }

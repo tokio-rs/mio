@@ -4,7 +4,7 @@
 
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio::net::UdpSocket;
-use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
+use bytes::BufMut;
 use std::str;
 use std::net::IpAddr;
 use localhost;
@@ -16,8 +16,8 @@ pub struct UdpHandler {
     tx: UdpSocket,
     rx: UdpSocket,
     msg: &'static str,
-    buf: SliceBuf<'static>,
-    rx_buf: RingBuf,
+    buf: &'static [u8],
+    rx_buf: Vec<u8>,
     localhost: IpAddr,
     shutdown: bool,
 }
@@ -29,8 +29,8 @@ impl UdpHandler {
             tx: tx,
             rx: rx,
             msg: msg,
-            buf: SliceBuf::wrap(msg.as_bytes()),
-            rx_buf: RingBuf::new(1024),
+            buf: msg.as_bytes(),
+            rx_buf: Vec::with_capacity(1024),
             localhost: sock.local_addr().unwrap().ip(),
             shutdown: false,
         }
@@ -40,14 +40,14 @@ impl UdpHandler {
         match token {
             LISTENER => {
                 debug!("We are receiving a datagram now...");
-                match unsafe { self.rx.recv_from(self.rx_buf.mut_bytes()) } {
+                match unsafe { self.rx.recv_from(self.rx_buf.bytes_mut()) } {
                     Ok((cnt, addr)) => {
-                        unsafe { MutBuf::advance(&mut self.rx_buf, cnt); }
+                        unsafe { BufMut::advance_mut(&mut self.rx_buf, cnt); }
                         assert_eq!(addr.ip(), self.localhost);
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
-                assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
+                assert!(str::from_utf8(self.rx_buf.as_ref()).unwrap() == self.msg);
                 self.shutdown = true;
             },
             _ => ()
@@ -58,8 +58,8 @@ impl UdpHandler {
         match token {
             SENDER => {
                 let addr = self.rx.local_addr().unwrap();
-                let cnt = self.tx.send_to(self.buf.bytes(), &addr).unwrap();
-                self.buf.advance(cnt);
+                let cnt = self.tx.send_to(self.buf.as_ref(), &addr).unwrap();
+                self.buf = &self.buf[cnt..];
             },
             _ => ()
         }

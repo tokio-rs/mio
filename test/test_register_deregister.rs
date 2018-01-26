@@ -2,7 +2,7 @@ use {expect_events, localhost, TryWrite};
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
-use bytes::SliceBuf;
+use bytes::IntoBuf;
 use std::time::Duration;
 
 const SERVER: Token = Token(0);
@@ -28,7 +28,7 @@ impl TestHandler {
             SERVER => {
                 trace!("handle_read; token=SERVER");
                 let mut sock = self.server.accept().unwrap().0;
-                sock.try_write_buf(&mut SliceBuf::wrap("foobar".as_bytes())).unwrap();
+                sock.try_write_buf(&mut b"foobar".into_buf()).unwrap();
             }
             CLIENT => {
                 trace!("handle_read; token=CLIENT");

@@ -4,7 +4,7 @@ use mio::deprecated::{EventLoop, Handler};
 use mio::timer::{Timer};
 
 use mio::net::{TcpListener, TcpStream};
-use bytes::{Buf, ByteBuf, SliceBuf};
+use bytes::IntoBuf;
 use localhost;
 use std::time::Duration;
 
@@ -348,13 +348,13 @@ impl TestHandler {
                     AfterRead => {}
                 }
 
-                let mut buf = ByteBuf::mut_with_capacity(2048);
+                let mut buf = Vec::with_capacity(2048);
 
                 match self.cli.try_read_buf(&mut buf) {
                     Ok(Some(0)) => return event_loop.shutdown(),
                     Ok(n) => {
                         debug!("read {:?} bytes", n);
-                        assert!(b"zomg" == buf.flip().bytes());
+                        assert_eq!(b"zomg", &buf[..]);
                     }
                     Err(e) => {
                         debug!("client sock failed to read; err={:?}", e.kind());
@@ -400,7 +400,7 @@ impl Handler for TestHandler {
 
     fn timeout(&mut self, _event_loop: &mut EventLoop<TestHandler>, mut sock: TcpStream) {
         debug!("timeout handler : writing to socket");
-        sock.try_write_buf(&mut SliceBuf::wrap(b"zomg")).unwrap().unwrap();
+        sock.try_write_buf(&mut b"zomg".into_buf()).unwrap().unwrap();
     }
 }
 

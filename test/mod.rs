@@ -69,14 +69,14 @@ mod test_broken_pipe;
 #[cfg(any(target_os = "fuchsia"))]
 mod test_fuchsia_handles;
 
-use bytes::{Buf, MutBuf};
 use std::io::{self, Read, Write};
 use std::time::Duration;
+use bytes::{Buf, BufMut};
 use mio::{Events, Poll};
 use mio::event::Event;
 
 pub trait TryRead {
-    fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
+    fn try_read_buf<B: BufMut>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
         where Self : Sized
     {
         // Reads the length of the slice supplied by buf.mut_bytes into the buffer
@@ -84,10 +84,10 @@ pub trait TryRead {
         // If your protocol is msg based (instead of continuous stream) you should
         // ensure that your buffer is large enough to hold an entire segment (1532 bytes if not jumbo
         // frames)
-        let res = self.try_read(unsafe { buf.mut_bytes() });
+        let res = self.try_read(unsafe { buf.bytes_mut() });
 
         if let Ok(Some(cnt)) = res {
-            unsafe { buf.advance(cnt); }
+            unsafe { buf.advance_mut(cnt); }
         }
 
         res
