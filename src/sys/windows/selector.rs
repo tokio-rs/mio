@@ -493,7 +493,7 @@ pub struct Overlapped {
 }
 
 impl Overlapped {
-    pub(crate) fn new_(cb: fn(&OVERLAPPED_ENTRY)) -> Overlapped  {
+    pub(crate) fn new2(cb: fn(&OVERLAPPED_ENTRY)) -> Overlapped  {
         Overlapped {
             inner: UnsafeCell::new(miow::Overlapped::zero()),
             callback: cb,
@@ -509,10 +509,10 @@ impl Overlapped {
     /// operation associated with an `OVERLAPPED` pointer completes the event
     /// loop will invoke the function pointer provided by `cb`.
     pub fn new(cb: fn(*const ::std::os::raw::c_void)) -> Overlapped {
-        Overlapped::new_(unsafe { mem::transmute(cb) })
+        Overlapped::new2(unsafe { mem::transmute(cb) })
     }
 
-    pub(crate) fn as_mut_ptr_(&self) -> *mut OVERLAPPED {
+    pub(crate) fn as_mut_ptr2(&self) -> *mut OVERLAPPED {
         unsafe {
             (*self.inner.get()).raw()
         }
@@ -523,7 +523,7 @@ impl Overlapped {
     /// This can be useful when only a shared borrow is held and the overlapped
     /// pointer needs to be passed down to winapi.
     pub fn as_mut_ptr(&self) -> *mut ::std::os::raw::c_void {
-        self.as_mut_ptr_() as *mut _
+        self.as_mut_ptr2() as *mut _
     }
 }
 
