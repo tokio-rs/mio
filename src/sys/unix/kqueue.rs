@@ -299,7 +299,7 @@ impl Events {
                     event::kind_mut(&mut self.events[idx]).insert(UnixReady::aio());
                 }
             }
-#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+#[cfg(any(target_os = "freebsd"))]
             {
                 if e.filter == libc::EVFILT_LIO {
                     event::kind_mut(&mut self.events[idx]).insert(UnixReady::lio());

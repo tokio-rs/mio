@@ -97,7 +97,7 @@ const HUP: usize   = 0b001000;
 #[cfg(any(target_os = "dragonfly",
     target_os = "freebsd", target_os = "ios", target_os = "macos"))]
 const AIO: usize   = 0b010000;
-#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+#[cfg(any(target_os = "freebsd"))]
 const LIO: usize   = 0b100000;
 
 impl UnixReady {
@@ -202,7 +202,7 @@ impl UnixReady {
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
-    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+    #[cfg(any(target_os = "freebsd"))]
     pub fn lio() -> UnixReady {
         UnixReady(ready_from_usize(LIO))
     }
@@ -307,7 +307,7 @@ impl UnixReady {
     /// assert!(ready.is_lio());
     /// ```
     #[inline]
-    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+    #[cfg(any(target_os = "freebsd"))]
     pub fn is_lio(&self) -> bool {
         self.contains(ready_from_usize(LIO))
     }
