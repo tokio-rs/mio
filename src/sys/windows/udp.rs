@@ -18,7 +18,7 @@ use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
-use {poll, Ready, Poll, PollOpt, Token};
+use {poll, Ready, Register, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
@@ -188,7 +188,7 @@ impl UdpSocket {
         self.recv_from(buf).map(|(size,_)| size)
     }
 
-    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
+    pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
         self.imp.inner.socket.connect(addr)
     }
 
@@ -330,29 +330,29 @@ impl Imp {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         me.iocp.register_socket(&self.imp.inner.socket,
-                                     poll, token, interest, opts,
+                                     register, token, interest, opts,
                                      &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         me.iocp.reregister_socket(&self.imp.inner.socket,
-                                       poll, token, interest,
+                                       register, token, interest,
                                        opts, &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+    fn deregister(&self, register: &Register) -> io::Result<()> {
         self.inner().iocp.deregister(&self.imp.inner.socket,
-                                     poll, &self.registration)
+                                     register, &self.registration)
     }
 }
 

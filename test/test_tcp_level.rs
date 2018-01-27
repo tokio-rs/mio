@@ -9,17 +9,17 @@ const MS: u64 = 1_000;
 
 #[test]
 pub fn test_tcp_listener_level_triggered() {
-    let poll = Poll::new().unwrap();
+    let mut poll = Poll::new().unwrap();
     let mut pevents = Events::with_capacity(1024);
 
     // Create the listener
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Ready::readable(), PollOpt::level()).unwrap();
+    poll.register().register(&l, Token(0), Ready::readable(), PollOpt::level()).unwrap();
 
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(&s1, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&s1, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
 
     while filter(&pevents, Token(0)).len() == 0 {
         poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
@@ -42,7 +42,7 @@ pub fn test_tcp_listener_level_triggered() {
     assert!(events.is_empty(), "actual={:?}", events);
 
     let s3 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(&s3, Token(2), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&s3, Token(2), Ready::readable(), PollOpt::edge()).unwrap();
 
     while filter(&pevents, Token(0)).len() == 0 {
         poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
@@ -62,22 +62,22 @@ pub fn test_tcp_listener_level_triggered() {
 #[test]
 pub fn test_tcp_stream_level_triggered() {
     drop(::env_logger::init());
-    let poll = Poll::new().unwrap();
+    let mut poll = Poll::new().unwrap();
     let mut pevents = Events::with_capacity(1024);
 
     // Create the listener
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&l, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
 
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(&s1, Token(1), Ready::readable() | Ready::writable(), PollOpt::level()).unwrap();
+    poll.register().register(&s1, Token(1), Ready::readable() | Ready::writable(), PollOpt::level()).unwrap();
 
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);
 
-    expect_events(&poll, &mut pevents, 2, vec![
+    expect_events(&mut poll, &mut pevents, 2, vec![
         Event::new(Ready::readable(), Token(0)),
         Event::new(Ready::writable(), Token(1)),
     ]);
@@ -88,12 +88,12 @@ pub fn test_tcp_stream_level_triggered() {
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);
 
-    expect_events(&poll, &mut pevents, 2, vec![
+    expect_events(&mut poll, &mut pevents, 2, vec![
         Event::new(Ready::writable(), Token(1))
     ]);
 
     // Register the socket
-    poll.register(&s1_tx, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&s1_tx, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
 
     debug!("writing some data ----------");
 
@@ -107,7 +107,7 @@ pub fn test_tcp_stream_level_triggered() {
     debug!("looking at rx end ----------");
 
     // Poll rx end
-    expect_events(&poll, &mut pevents, 2, vec![
+    expect_events(&mut poll, &mut pevents, 2, vec![
         Event::new(Ready::readable(), Token(1))
     ]);
 
@@ -122,7 +122,7 @@ pub fn test_tcp_stream_level_triggered() {
 
     debug!("checking just read ----------");
 
-    expect_events(&poll, &mut pevents, 1, vec![
+    expect_events(&mut poll, &mut pevents, 1, vec![
         Event::new(Ready::writable(), Token(1))]);
 
     // Closing the socket clears all active level events
@@ -136,7 +136,7 @@ pub fn test_tcp_stream_level_triggered() {
 }
 
 fn filter(events: &Events, token: Token) -> Vec<Event> {
-    (0..events.len()).map(|i| events.get(i).unwrap())
-                     .filter(|e| e.token() == token)
-                     .collect()
+    events.iter()
+        .filter(|e| e.token() == token)
+        .collect()
 }

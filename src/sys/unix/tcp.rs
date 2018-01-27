@@ -9,7 +9,7 @@ use net2::TcpStreamExt;
 use iovec::{IoVec, IoVecMut};
 use iovec::unix as iovec;
 
-use {io, Ready, Poll, PollOpt, Token};
+use {io, Ready, Register, PollOpt, Token};
 use event::Evented;
 
 use sys::unix::eventedfd::EventedFd;
@@ -178,18 +178,18 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).deregister(register)
     }
 }
 
@@ -237,16 +237,6 @@ impl TcpListener {
         self.inner.accept()
     }
 
-    #[allow(deprecated)]
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.inner.set_only_v6(only_v6)
-    }
-
-    #[allow(deprecated)]
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.inner.only_v6()
-    }
-
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.set_ttl(ttl)
     }
@@ -261,18 +251,18 @@ impl TcpListener {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).deregister(register)
     }
 }
 

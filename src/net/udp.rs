@@ -7,7 +7,7 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
-use {io, sys, Ready, Poll, PollOpt, Token};
+use {io, sys, Ready, Register, PollOpt, Token};
 use event::Evented;
 use poll::SelectorId;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -42,15 +42,17 @@ use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 ///
 /// // If we do not use connect here, SENDER and ECHOER would need to call send_to and recv_from
 /// // respectively.
-/// sender_socket.connect("127.0.0.1:11100".parse()?)?;
+/// sender_socket.connect(&"127.0.0.1:11100".parse()?)?;
 ///
 /// // We need a Poll to check if SENDER is ready to be written into, and if ECHOER is ready to be
 /// // read from.
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// poll.register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
-/// poll.register(&echoer_socket, ECHOER, Ready::readable(), PollOpt::edge())?;
+/// poll.register()
+///     .register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
+/// poll.register()
+///     .register(&echoer_socket, ECHOER, Ready::readable(), PollOpt::edge())?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];
@@ -212,8 +214,17 @@ impl UdpSocket {
         self.sys.send_to(buf, target)
     }
 
-    /// Receives data from the socket. On success, returns the number of bytes
-    /// read and the address from whence the data came.
+    /// Receives data from the socket and stores data in the supplied buffer `buf`. On success,
+    /// returns the number of bytes read and the address from whence the data came.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// The function does not read from `buf`, but is overwriting previous content of `buf`.
+    ///
+    /// Assuming the function has read `n` bytes, slicing `&buf[..n]` provides
+    /// efficient access with iterators and boundary checks.
     ///
     /// # Examples
     ///
@@ -249,8 +260,17 @@ impl UdpSocket {
         self.sys.send(buf)
     }
 
-    /// Receives data from the socket previously bound with connect(). On success, returns
-    /// the number of bytes read and the address from whence the data came.
+    /// Receives data from the socket previously bound with connect() and stores data in
+    /// the supplied buffer `buf`. On success, returns the number of bytes read.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// The function does not read from `buf`, but is overwriting previous content of `buf`.
+    ///
+    /// Assuming the function has read `n` bytes, slicing `&buf[..n]` provides
+    /// efficient access with iterators and boundary checks.
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.recv(buf)
     }
@@ -258,8 +278,8 @@ impl UdpSocket {
     /// Connects the UDP socket setting the default destination for `send()`
     /// and limiting packets that are read via `recv` from the address specified
     /// in `addr`.
-    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
-        self.sys.connect(addr)
+    pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
+        self.sys.connect(&addr)
     }
 
     /// Sets the value of the `SO_BROADCAST` option for this socket.
@@ -279,7 +299,7 @@ impl UdpSocket {
     /// if broadcast_socket.broadcast()? == false {
     ///     broadcast_socket.set_broadcast(true)?;
     /// }
-    /// 
+    ///
     /// assert_eq!(broadcast_socket.broadcast()?, true);
     /// #
     /// #    Ok(())
@@ -476,17 +496,17 @@ impl UdpSocket {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interest, opts)
+    fn register(&self, register: &Register, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
+        self.selector_id.associate_selector(register)?;
+        self.sys.register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(poll, token, interest, opts)
+    fn reregister(&self, register: &Register, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
+        self.sys.reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.sys.deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        self.sys.deregister(register)
     }
 }
 

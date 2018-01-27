@@ -73,9 +73,10 @@ use std::fmt;
 /// let addr = "216.58.193.68:80".parse()?;
 /// let socket = TcpStream::connect(&addr)?;
 ///
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
 ///
-/// poll.register(&socket,
+/// poll.register()
+///     .register(&socket,
 ///               Token(0),
 ///               Ready::readable() | UnixReady::error(),
 ///               PollOpt::edge())?;
@@ -92,9 +93,13 @@ use std::fmt;
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct UnixReady(Ready);
 
-const ERROR: usize = 0b00100;
-const HUP: usize   = 0b01000;
-const AIO: usize   = 0b10000;
+const ERROR: usize = 0b000100;
+const HUP: usize   = 0b001000;
+#[cfg(any(target_os = "dragonfly",
+    target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+const AIO: usize   = 0b010000;
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+const LIO: usize   = 0b100000;
 
 impl UnixReady {
     /// Returns a `Ready` representing AIO completion readiness
@@ -113,8 +118,18 @@ impl UnixReady {
     ///
     /// [`Poll`]: ../struct.Poll.html
     #[inline]
+    #[cfg(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn aio() -> UnixReady {
         UnixReady(ready_from_usize(AIO))
+    }
+
+    #[cfg(not(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
+    #[doc(hidden)]
+    pub fn aio() -> UnixReady {
+        UnixReady(Ready::empty())
     }
 
     /// Returns a `Ready` representing error readiness.
@@ -172,6 +187,27 @@ impl UnixReady {
         UnixReady(ready_from_usize(HUP))
     }
 
+    /// Returns a `Ready` representing LIO completion readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::unix::UnixReady;
+    ///
+    /// let ready = UnixReady::lio();
+    ///
+    /// assert!(ready.is_lio());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    #[inline]
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+    pub fn lio() -> UnixReady {
+        UnixReady(ready_from_usize(LIO))
+    }
+
     /// Returns true if `Ready` contains AIO readiness
     ///
     /// See [`Poll`] for more documentation on polling.
@@ -188,8 +224,19 @@ impl UnixReady {
     ///
     /// [`Poll`]: ../struct.Poll.html
     #[inline]
+    #[cfg(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn is_aio(&self) -> bool {
         self.contains(ready_from_usize(AIO))
+    }
+
+    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
+    #[cfg(feature = "with-deprecated")]
+    #[cfg(not(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+    #[doc(hidden)]
+    pub fn is_aio(&self) -> bool {
+        false
     }
 
     /// Returns true if the value includes error readiness
@@ -245,6 +292,25 @@ impl UnixReady {
     #[inline]
     pub fn is_hup(&self) -> bool {
         self.contains(ready_from_usize(HUP))
+    }
+
+    /// Returns true if `Ready` contains LIO readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::unix::UnixReady;
+    ///
+    /// let ready = UnixReady::lio();
+    ///
+    /// assert!(ready.is_lio());
+    /// ```
+    #[inline]
+    #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+    pub fn is_lio(&self) -> bool {
+        self.contains(ready_from_usize(LIO))
     }
 }
 
@@ -310,18 +376,6 @@ impl ops::Sub for UnixReady {
     }
 }
 
-#[deprecated(since = "0.6.10", note = "removed")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-impl ops::Not for UnixReady {
-    type Output = UnixReady;
-
-    #[inline]
-    fn not(self) -> UnixReady {
-        (!self.0).into()
-    }
-}
-
 impl fmt::Debug for UnixReady {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
@@ -330,6 +384,7 @@ impl fmt::Debug for UnixReady {
             (UnixReady(Ready::writable()), "Writable"),
             (UnixReady::error(), "Error"),
             (UnixReady::hup(), "Hup"),
+            #[allow(deprecated)]
             (UnixReady::aio(), "Aio")];
 
         for &(flag, msg) in &flags {

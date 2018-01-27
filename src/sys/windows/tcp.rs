@@ -13,7 +13,7 @@ use winapi::shared::ntdef::HANDLE;
 use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 use iovec::{IoVec, IoVecMut};
 
-use {poll, Ready, Poll, PollOpt, Token};
+use {poll, Ready, Register, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
@@ -178,14 +178,6 @@ impl TcpStream {
 
     pub fn ttl(&self) -> io::Result<u32> {
         self.imp.inner.socket.ttl()
-    }
-
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.imp.inner.socket.set_only_v6(only_v6)
-    }
-
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.imp.inner.socket.only_v6()
     }
 
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
@@ -582,10 +574,10 @@ fn write_done(status: &OVERLAPPED_ENTRY) {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.register_socket(&self.imp.inner.socket, poll, token,
+        me.iocp.register_socket(&self.imp.inner.socket, register, token,
                                      interest, opts, &self.registration)?;
 
         unsafe {
@@ -604,18 +596,18 @@ impl Evented for TcpStream {
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
+        me.iocp.reregister_socket(&self.imp.inner.socket, register, token,
                                        interest, opts, &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+    fn deregister(&self, register: &Register) -> io::Result<()> {
         self.inner().iocp.deregister(&self.imp.inner.socket,
-                                     poll, &self.registration)
+                                     register, &self.registration)
     }
 }
 
@@ -701,16 +693,6 @@ impl TcpListener {
         self.imp.inner.socket.try_clone().map(|s| {
             TcpListener::new_family(s, self.imp.inner.family)
         })
-    }
-
-    #[allow(deprecated)]
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.imp.inner.socket.set_only_v6(only_v6)
-    }
-
-    #[allow(deprecated)]
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.imp.inner.socket.only_v6()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
@@ -800,10 +782,10 @@ fn accept_done(status: &OVERLAPPED_ENTRY) {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.register_socket(&self.imp.inner.socket, poll, token,
+        me.iocp.register_socket(&self.imp.inner.socket, register, token,
                                      interest, opts, &self.registration)?;
 
         unsafe {
@@ -815,18 +797,18 @@ impl Evented for TcpListener {
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
+        me.iocp.reregister_socket(&self.imp.inner.socket, register, token,
                                        interest, opts, &self.registration)?;
         self.imp.schedule_accept(&mut me);
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+    fn deregister(&self, register: &Register) -> io::Result<()> {
         self.inner().iocp.deregister(&self.imp.inner.socket,
-                                     poll, &self.registration)
+                                     register, &self.registration)
     }
 }
 

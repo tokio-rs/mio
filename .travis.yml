@@ -19,12 +19,12 @@ matrix:
 
     # Test compatibility
     #
-    # 1.18.0 is the oldest supported version of Rust. This value should NOT be
+    # 1.20.0 is the oldest supported version of Rust. This value should NOT be
     # changed without prior discussion.
     #
     # This build also deploys docs
     - os: linux
-      rust: 1.18.0
+      rust: 1.20.0
       before_script:
         - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
       script:
