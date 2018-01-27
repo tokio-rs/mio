@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use libc;
 use net2::TcpStreamExt;
-use iovec::IoVec;
+use iovec::{IoVec, IoVecMut};
 use iovec::unix as iovec;
 
 use {io, Ready, Register, PollOpt, Token};
@@ -130,7 +130,7 @@ impl TcpStream {
         self.inner.peek(buf)
     }
 
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    pub fn readv(&self, bufs: &mut [IoVecMut]) -> io::Result<usize> {
         unsafe {
             let slice = iovec::as_os_slice_mut(bufs);
             let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());
@@ -145,7 +145,7 @@ impl TcpStream {
         }
     }
 
-    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    pub fn writev(&self, bufs: &[IoVec]) -> io::Result<usize> {
         unsafe {
             let slice = iovec::as_os_slice(bufs);
             let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());

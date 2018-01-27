@@ -1,7 +1,7 @@
 use {localhost, TryRead, TryWrite};
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio::net::{TcpListener, TcpStream};
-use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
+use bytes::{BytesMut, IntoBuf};
 use slab;
 use std::io;
 
@@ -10,8 +10,7 @@ const CLIENT: Token = Token(10_000_001);
 
 struct EchoConn {
     sock: TcpStream,
-    buf: Option<ByteBuf>,
-    mut_buf: Option<MutByteBuf>,
+    buf: Vec<u8>,
     token: Option<Token>,
     interest: Ready
 }
@@ -22,28 +21,23 @@ impl EchoConn {
     fn new(sock: TcpStream) -> EchoConn {
         EchoConn {
             sock: sock,
-            buf: None,
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
+            buf: Vec::with_capacity(2048),
             token: None,
             interest: Ready::empty(),
         }
     }
 
     fn writable(&mut self, poll: &mut Poll) -> io::Result<()> {
-        let mut buf = self.buf.take().unwrap();
-
-        match self.sock.try_write_buf(&mut buf) {
+        match self.sock.try_write_buf(&mut self.buf.as_slice().into_buf()) {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
 
-                self.buf = Some(buf);
                 self.interest.insert(Ready::writable());
             }
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
-                self.mut_buf = Some(buf.flip());
-
+                self.buf.drain(..r);
                 self.interest.insert(Ready::readable());
                 self.interest.remove(Ready::writable());
             }
@@ -58,19 +52,14 @@ impl EchoConn {
     }
 
     fn readable(&mut self, poll: &mut Poll) -> io::Result<()> {
-        let mut buf = self.mut_buf.take().unwrap();
-
-        match self.sock.try_read_buf(&mut buf) {
+        match self.sock.try_read_buf(&mut self.buf) {
             Ok(None) => {
                 debug!("CONN : spurious read wakeup");
-                self.mut_buf = Some(buf);
             }
             Ok(Some(r)) => {
                 debug!("CONN : we read {} bytes!", r);
 
                 // prepare to provide this to writable
-                self.buf = Some(buf.flip());
-
                 self.interest.remove(Ready::readable());
                 self.interest.insert(Ready::writable());
             }
@@ -134,9 +123,9 @@ impl EchoServer {
 struct EchoClient {
     sock: TcpStream,
     msgs: Vec<&'static str>,
-    tx: SliceBuf<'static>,
-    rx: SliceBuf<'static>,
-    mut_buf: Option<MutByteBuf>,
+    tx: &'static [u8],
+    rx: &'static [u8],
+    mut_buf: Option<BytesMut>,
     token: Token,
     interest: Ready,
     shutdown: bool,
@@ -151,9 +140,9 @@ impl EchoClient {
         EchoClient {
             sock: sock,
             msgs: msgs,
-            tx: SliceBuf::wrap(curr.as_bytes()),
-            rx: SliceBuf::wrap(curr.as_bytes()),
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
+            tx: curr.as_bytes(),
+            rx: curr.as_bytes(),
+            mut_buf: Some(BytesMut::with_capacity(2048)),
             token: tok,
             interest: Ready::empty(),
             shutdown: false,
@@ -174,20 +163,19 @@ impl EchoClient {
                 debug!("CLIENT : We read {} bytes!", r);
 
                 // prepare for reading
-                let mut buf = buf.flip();
+                for actual in buf.iter() {
+                    let expect = self.rx[0];
+                    self.rx = &self.rx[1..];
 
-                while buf.has_remaining() {
-                    let actual = buf.read_byte().unwrap();
-                    let expect = self.rx.read_byte().unwrap();
-
-                    assert!(actual == expect, "actual={}; expect={}", actual, expect);
+                    assert!(*actual == expect, "actual={}; expect={}", actual, expect);
                 }
 
-                self.mut_buf = Some(buf.flip());
+                buf.clear();
+                self.mut_buf = Some(buf);
 
                 self.interest.remove(Ready::readable());
 
-                if !self.rx.has_remaining() {
+                if self.rx.is_empty() {
                     self.next_msg(poll).unwrap();
                 }
             }
@@ -210,12 +198,13 @@ impl EchoClient {
     fn writable(&mut self, poll: &mut Poll) -> io::Result<()> {
         debug!("client socket writable");
 
-        match self.sock.try_write_buf(&mut self.tx) {
+        match self.sock.try_write_buf(&mut self.tx.into_buf()) {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
                 self.interest.insert(Ready::writable());
             }
             Ok(Some(r)) => {
+                self.tx = &self.tx[r..];
                 debug!("CLIENT : we wrote {} bytes!", r);
                 self.interest.insert(Ready::readable());
                 self.interest.remove(Ready::writable());
@@ -242,8 +231,8 @@ impl EchoClient {
         let curr = self.msgs.remove(0);
 
         debug!("client prepping next message");
-        self.tx = SliceBuf::wrap(curr.as_bytes());
-        self.rx = SliceBuf::wrap(curr.as_bytes());
+        self.tx = curr.as_bytes();
+        self.rx = curr.as_bytes();
 
         self.interest.insert(Ready::writable());
         poll.register()

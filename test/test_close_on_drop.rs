@@ -1,6 +1,6 @@
 use {localhost, TryRead};
 use mio::{Events, Poll, PollOpt, Ready, Token};
-use bytes::ByteBuf;
+use bytes::BytesMut;
 use mio::net::{TcpListener, TcpStream};
 
 use self::TestState::{Initial, AfterRead};
@@ -51,7 +51,7 @@ impl TestHandler {
                     AfterRead => {}
                 }
 
-                let mut buf = ByteBuf::mut_with_capacity(1024);
+                let mut buf = BytesMut::with_capacity(1024);
 
                 match self.cli.try_read_buf(&mut buf) {
                     Ok(Some(0)) => self.shutdown = true,

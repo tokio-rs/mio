@@ -1,5 +1,6 @@
 use std::{fmt, io};
 use std::cell::UnsafeCell;
+use std::mem;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -7,7 +8,8 @@ use std::time::Duration;
 
 use lazycell::AtomicLazyCell;
 
-use winapi::*;
+use winapi::um::minwinbase::{OVERLAPPED, OVERLAPPED_ENTRY};
+use winapi::shared::winerror;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 
@@ -76,7 +78,7 @@ impl Selector {
         trace!("polling IOCP");
         let n = match self.inner.port.get_many(&mut events.statuses, timeout) {
             Ok(statuses) => statuses.len(),
-            Err(ref e) if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) => 0,
+            Err(ref e) if e.raw_os_error() == Some(winerror::WAIT_TIMEOUT as i32) => 0,
             Err(e) => return Err(e),
         };
 
@@ -500,17 +502,28 @@ pub struct Overlapped {
 }
 
 impl Overlapped {
+    pub(crate) fn new2(cb: fn(&OVERLAPPED_ENTRY)) -> Overlapped  {
+        Overlapped {
+            inner: UnsafeCell::new(miow::Overlapped::zero()),
+            callback: cb,
+        }
+    }
+
     /// Creates a new `Overlapped` which will invoke the provided `cb` callback
     /// whenever it's triggered.
+    /// The callback takes a pointer to `OVERLAPPED_ENTRY` as parameter.
     ///
     /// The returned `Overlapped` must be used as the `OVERLAPPED` passed to all
     /// I/O operations that are registered with mio's event loop. When the I/O
     /// operation associated with an `OVERLAPPED` pointer completes the event
     /// loop will invoke the function pointer provided by `cb`.
-    pub fn new(cb: fn(&OVERLAPPED_ENTRY)) -> Overlapped {
-        Overlapped {
-            inner: UnsafeCell::new(miow::Overlapped::zero()),
-            callback: cb,
+    pub fn new(cb: fn(*const ::std::os::raw::c_void)) -> Overlapped {
+        Overlapped::new2(unsafe { mem::transmute(cb) })
+    }
+
+    pub(crate) fn as_mut_ptr2(&self) -> *mut OVERLAPPED {
+        unsafe {
+            (*self.inner.get()).raw()
         }
     }
 
@@ -518,10 +531,8 @@ impl Overlapped {
     ///
     /// This can be useful when only a shared borrow is held and the overlapped
     /// pointer needs to be passed down to winapi.
-    pub fn as_mut_ptr(&self) -> *mut OVERLAPPED {
-        unsafe {
-            (*self.inner.get()).raw()
-        }
+    pub fn as_mut_ptr(&self) -> *mut ::std::os::raw::c_void {
+        self.as_mut_ptr2() as *mut _
     }
 }
 
