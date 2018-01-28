@@ -12,9 +12,17 @@
 //!
 //! # Platforms
 //!
-//! There are multiple platforms that mio supports including Linux, OS X, iOS,
-//! Windows, FreeBSD, and Android. mio can handle interfacing with each of the
-//! event notification systems of the aforementioned platforms. The details of
+//! Currently supported platforms:
+//!
+//! * Linux
+//! * OS X
+//! * Windows
+//! * FreeBSD
+//! * NetBSD
+//! * Android
+//! * iOS
+//!
+//! mio can handle interfacing with each of the event notification systems of the aforementioned platforms. The details of
 //! their implementation are further discussed in [`Poll`].
 //!
 //! # Usage
