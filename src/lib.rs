@@ -10,6 +10,13 @@
 //! * Design to allow for stack allocated buffers when possible (avoid double buffering).
 //! * Provide utilities such as a timers, a notification channel, buffer abstractions, and a slab.
 //!
+//! # Platforms
+//!
+//! There are multiple platforms that mio supports including Linux, OS X, iOS,
+//! Windows, FreeBSD, and Android. mio can handle interfacing with each of the
+//! event notification systems of the aforementioned platforms. The details of
+//! their implementation are further discussed in [`Poll`].
+//!
 //! # Usage
 //!
 //! Using mio starts by creating a [`Poll`], which reads events from the OS and
