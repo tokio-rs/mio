@@ -209,7 +209,7 @@ pub struct TcpListener {
 }
 
 impl TcpListener {
-    pub fn new(inner: net::TcpListener, _addr: &SocketAddr) -> io::Result<TcpListener> {
+    pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
         set_nonblock(inner.as_raw_fd())?;
 
         let evented_fd = unsafe { EventedFd::new(inner.as_raw_fd()) };
