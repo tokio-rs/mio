@@ -529,9 +529,17 @@ impl TcpListener {
         // listen
         let listener = sock.listen(1024)?;
         Ok(TcpListener {
-            sys: sys::TcpListener::new(listener, addr)?,
+            sys: sys::TcpListener::new(listener)?,
             selector_id: SelectorId::new(),
         })
+    }
+
+    #[deprecated(since = "0.6.13", note = "use from_std instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
+    pub fn from_listener(listener: net::TcpListener, _: &SocketAddr)
+                         -> io::Result<TcpListener> {
+        TcpListener::from_std(listener)
     }
 
     /// Creates a new `TcpListener` from an instance of a
@@ -543,9 +551,8 @@ impl TcpListener {
     /// loop.
     ///
     /// The address provided must be the address that the listener is bound to.
-    pub fn from_listener(listener: net::TcpListener, addr: &SocketAddr)
-                         -> io::Result<TcpListener> {
-        sys::TcpListener::new(listener, addr).map(|s| {
+    pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
+        sys::TcpListener::new(listener).map(|s| {
             TcpListener {
                 sys: s,
                 selector_id: SelectorId::new(),
