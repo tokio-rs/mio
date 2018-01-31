@@ -126,9 +126,7 @@ impl UnixReady {
 
     #[cfg(not(any(target_os = "dragonfly",
         target_os = "freebsd", target_os = "ios", target_os = "macos")))]
-    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
-    #[doc(hidden)]
-    pub fn aio() -> UnixReady {
+    fn aio() -> UnixReady {
         UnixReady(Ready::empty())
     }
 
@@ -208,6 +206,11 @@ impl UnixReady {
         UnixReady(ready_from_usize(LIO))
     }
 
+    #[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
+    fn lio() -> UnixReady {
+        UnixReady(Ready::empty())
+    }
+
     /// Returns true if `Ready` contains AIO readiness
     ///
     /// See [`Poll`] for more documentation on polling.
@@ -228,15 +231,6 @@ impl UnixReady {
         target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn is_aio(&self) -> bool {
         self.contains(ready_from_usize(AIO))
-    }
-
-    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
-    #[cfg(feature = "with-deprecated")]
-    #[cfg(not(any(target_os = "dragonfly",
-        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
-    #[doc(hidden)]
-    pub fn is_aio(&self) -> bool {
-        false
     }
 
     /// Returns true if the value includes error readiness
@@ -384,8 +378,8 @@ impl fmt::Debug for UnixReady {
             (UnixReady(Ready::writable()), "Writable"),
             (UnixReady::error(), "Error"),
             (UnixReady::hup(), "Hup"),
-            #[allow(deprecated)]
-            (UnixReady::aio(), "Aio")];
+            (UnixReady::aio(), "Aio"),
+            (UnixReady::lio(), "Lio")];
 
         for &(flag, msg) in &flags {
             if self.contains(flag) {
