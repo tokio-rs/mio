@@ -145,6 +145,11 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
+    // This assertion is almost, but not quite, universal.  It fails on
+    // shared-IP FreeBSD jails.  It's hard for mio to know whether we're jailed,
+    // so simply disable the test on FreeBSD.
+    #[cfg_attr(not(target_os = "freebsd"), doc = " ```")]
+    #[cfg_attr(target_os = "freebsd", doc = " ```no_run")]
     /// ```
     /// # use std::error::Error;
     /// #
