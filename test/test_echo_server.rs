@@ -2,7 +2,7 @@ use {localhost, TryRead, TryWrite};
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio::net::{TcpListener, TcpStream};
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
-use slab;
+use slab::Slab;
 use std::io;
 
 const SERVER: Token = Token(10_000_000);
@@ -15,8 +15,6 @@ struct EchoConn {
     token: Option<Token>,
     interest: Ready
 }
-
-type Slab<T> = slab::Slab<T, Token>;
 
 impl EchoConn {
     fn new(sock: TcpStream) -> EchoConn {
@@ -96,12 +94,11 @@ impl EchoServer {
 
         let sock = self.sock.accept().unwrap().0;
         let conn = EchoConn::new(sock,);
-        let tok = self.conns.insert(conn)
-            .ok().expect("could not add connection to slab");
+        let tok = self.conns.insert(conn);
 
         // Register the connection
-        self.conns[tok].token = Some(tok);
-        poll.register(&self.conns[tok].sock, tok, Ready::readable(),
+        self.conns[tok].token = Some(Token(tok));
+        poll.register(&self.conns[tok].sock, Token(tok), Ready::readable(),
                                 PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
@@ -121,7 +118,7 @@ impl EchoServer {
     }
 
     fn conn<'a>(&'a mut self, tok: Token) -> &'a mut EchoConn {
-        &mut self.conns[tok]
+        &mut self.conns[tok.into()]
     }
 }
 

@@ -3,7 +3,7 @@ use mio::*;
 use mio::deprecated::{EventLoop, EventLoopBuilder, Handler};
 use mio::net::{TcpListener, TcpStream};
 use std::collections::LinkedList;
-use slab;
+use slab::Slab;
 use std::{io, thread};
 use std::time::Duration;
 
@@ -22,8 +22,6 @@ struct EchoConn {
     count: usize,
     buf: Vec<u8>
 }
-
-type Slab<T> = slab::Slab<T, Token>;
 
 impl EchoConn {
     fn new(sock: TcpStream) -> EchoConn {
@@ -81,12 +79,11 @@ impl EchoServer {
 
         let sock = self.sock.accept().unwrap().0;
         let conn = EchoConn::new(sock,);
-        let tok = self.conns.insert(conn)
-            .ok().expect("could not add connection to slab");
+        let tok = self.conns.insert(conn);
 
         // Register the connection
-        self.conns[tok].token = Some(tok);
-        event_loop.register(&self.conns[tok].sock, tok, Ready::readable(),
+        self.conns[tok].token = Some(Token(tok));
+        event_loop.register(&self.conns[tok].sock, Token(tok), Ready::readable(),
                             PollOpt::edge() | PollOpt::oneshot())
             .ok().expect("could not register socket with event loop");
 
@@ -106,7 +103,7 @@ impl EchoServer {
     }
 
     fn conn<'a>(&'a mut self, tok: Token) -> &'a mut EchoConn {
-        &mut self.conns[tok]
+        &mut self.conns[tok.into()]
     }
 }
 
