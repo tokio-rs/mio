@@ -1,13 +1,13 @@
 use {io, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use unix::EventedFd;
+use std::fmt;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
 
 #[allow(unused_imports)] // only here for Rust 1.8
 use net2::UdpSocketExt;
 
-#[derive(Debug)]
 pub struct UdpSocket {
     io: net::UdpSocket,
 }
@@ -141,6 +141,12 @@ impl Evented for UdpSocket {
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).deregister(poll)
+    }
+}
+
+impl fmt::Debug for UdpSocket {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.io, f)
     }
 }
 

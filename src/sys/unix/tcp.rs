@@ -1,4 +1,5 @@
 use std::cmp;
+use std::fmt;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
@@ -15,12 +16,10 @@ use event::Evented;
 use sys::unix::eventedfd::EventedFd;
 use sys::unix::io::set_nonblock;
 
-#[derive(Debug)]
 pub struct TcpStream {
     inner: net::TcpStream,
 }
 
-#[derive(Debug)]
 pub struct TcpListener {
     inner: net::TcpListener,
 }
@@ -193,6 +192,12 @@ impl Evented for TcpStream {
     }
 }
 
+impl fmt::Debug for TcpStream {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.inner, f)
+    }
+}
+
 impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream {
@@ -273,6 +278,12 @@ impl Evented for TcpListener {
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).deregister(poll)
+    }
+}
+
+impl fmt::Debug for TcpListener {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.inner, f)
     }
 }
 
