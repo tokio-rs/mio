@@ -1004,7 +1004,19 @@ impl Poll {
     /// ```
     ///
     /// [struct]: #
-    pub fn poll(&self, events: &mut Events, mut timeout: Option<Duration>) -> io::Result<usize> {
+    pub fn poll(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
+        self.poll1(events, timeout, false)
+    }
+
+    /// Like `poll`, but may be interrupted by a signal
+    ///
+    /// If `poll` is inturrupted while blocking, it will transparently retry the syscall.  If you
+    /// want to handle signals yourself, however, use `poll_interruptible`.
+    pub fn poll_interruptible(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
+        self.poll1(events, timeout, true)
+    }
+
+    fn poll1(&self, events: &mut Events, mut timeout: Option<Duration>, interruptible: bool) -> io::Result<usize> {
         let zero = Some(Duration::from_millis(0));
 
         // At a high level, the synchronization strategy is to acquire access to
@@ -1122,7 +1134,7 @@ impl Poll {
             }
         }
 
-        let ret = self.poll2(events, timeout);
+        let ret = self.poll2(events, timeout, interruptible);
 
         // Release the lock
         if 1 != self.lock_state.fetch_and(!1, Release) {
@@ -1137,7 +1149,7 @@ impl Poll {
     }
 
     #[inline]
-    fn poll2(&self, events: &mut Events, mut timeout: Option<Duration>) -> io::Result<usize> {
+    fn poll2(&self, events: &mut Events, mut timeout: Option<Duration>, interruptible: bool) -> io::Result<usize> {
         // Compute the timeout value passed to the system selector. If the
         // readiness queue has pending nodes, we still want to poll the system
         // selector for new events, but we don't want to block the thread to
@@ -1166,7 +1178,7 @@ impl Poll {
                     break;
                 }
                 Ok(false) => break,
-                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
+                Err(ref e) if e.kind() == io::ErrorKind::Interrupted && !interruptible => {
                     // Interrupted by a signal; update timeout if necessary and retry
                     if let Some(to) = timeout {
                         let elapsed = now.elapsed();
