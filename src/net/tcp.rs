@@ -7,7 +7,7 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
-
+use std::fmt;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
@@ -60,7 +60,6 @@ use poll::SelectorId;
 /// #     try_main().unwrap();
 /// # }
 /// ```
-#[derive(Debug)]
 pub struct TcpStream {
     sys: sys::TcpStream,
     selector_id: SelectorId,
@@ -454,6 +453,12 @@ impl Evented for TcpStream {
     }
 }
 
+impl fmt::Debug for TcpStream {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.sys, f)
+    }
+}
+
 /*
  *
  * ===== TcpListener =====
@@ -490,7 +495,6 @@ impl Evented for TcpStream {
 /// #     try_main().unwrap();
 /// # }
 /// ```
-#[derive(Debug)]
 pub struct TcpListener {
     sys: sys::TcpListener,
     selector_id: SelectorId,
@@ -664,6 +668,12 @@ impl Evented for TcpListener {
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
         self.sys.deregister(poll)
+    }
+}
+
+impl fmt::Debug for TcpListener {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.sys, f)
     }
 }
 

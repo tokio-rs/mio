@@ -10,6 +10,7 @@
 use {io, sys, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use poll::SelectorId;
+use std::fmt;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 /// A User Datagram Protocol socket.
@@ -85,7 +86,6 @@ use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 /// #   try_main().unwrap();
 /// # }
 /// ```
-#[derive(Debug)]
 pub struct UdpSocket {
     sys: sys::UdpSocket,
     selector_id: SelectorId,
@@ -492,6 +492,12 @@ impl Evented for UdpSocket {
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
         self.sys.deregister(poll)
+    }
+}
+
+impl fmt::Debug for UdpSocket {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.sys, f)
     }
 }
 
