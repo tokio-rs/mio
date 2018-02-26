@@ -1,3 +1,7 @@
+# Unreleased
+
+* Add `Poll::poll_interruptible` (#811).
+
 # 0.6.13 (February 5, 2018)
 
 * Fix build on DragonFlyBSD.
