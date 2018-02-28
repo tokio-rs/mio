@@ -150,7 +150,6 @@ impl UdpSocket {
     // so simply disable the test on FreeBSD.
     #[cfg_attr(not(target_os = "freebsd"), doc = " ```")]
     #[cfg_attr(target_os = "freebsd", doc = " ```no_run")]
-    /// ```
     /// # use std::error::Error;
     /// #
     /// # fn try_main() -> Result<(), Box<Error>> {
@@ -166,6 +165,7 @@ impl UdpSocket {
     /// # fn main() {
     /// #   try_main().unwrap();
     /// # }
+    /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.sys.local_addr()
     }
@@ -175,6 +175,28 @@ impl UdpSocket {
     /// The returned `UdpSocket` is a reference to the same socket that this
     /// object references. Both handles will read and write the same port, and
     /// options set on one socket will be propagated to the other.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    ///
+    /// // We must bind it to an open address.
+    /// let socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    /// let cloned_socket = socket.try_clone()?;
+    ///
+    /// assert_eq!(socket.local_addr()?, cloned_socket.local_addr()?);
+    ///
+    /// #    Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
         self.sys.try_clone()
             .map(|s| {
@@ -388,6 +410,29 @@ impl UdpSocket {
     ///
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    ///
+    /// let socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    /// if socket.ttl()? < 255 {
+    ///     socket.set_ttl(255)?;
+    /// }
+    ///
+    /// assert_eq!(socket.ttl()?, 255);
+    /// #
+    /// #    Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.sys.set_ttl(ttl)
     }
@@ -397,6 +442,27 @@ impl UdpSocket {
     /// For more information about this option, see [`set_ttl`][link].
     ///
     /// [link]: #method.set_ttl
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// use mio::net::UdpSocket;
+    ///
+    /// let socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    /// socket.set_ttl(255)?;
+    ///
+    /// assert_eq!(socket.ttl()?, 255);
+    /// #
+    /// #    Ok(())
+    /// # }
+    /// #
+    /// # fn main() {
+    /// #   try_main().unwrap();
+    /// # }
+    /// ```
     pub fn ttl(&self) -> io::Result<u32> {
         self.sys.ttl()
     }
