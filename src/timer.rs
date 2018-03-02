@@ -6,10 +6,12 @@ use {convert, io, Ready, Poll, PollOpt, Registration, SetReadiness, Token};
 use event::Evented;
 use lazycell::LazyCell;
 use slab::Slab;
-use std::{cmp, fmt, u64, usize, iter, thread};
+use std::{cmp, error, fmt, u64, usize, iter, thread};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
+
+use self::TimerErrorKind::TimerOverflow;
 
 pub struct Timer<T> {
     // Size of each tick in milliseconds
@@ -91,9 +93,21 @@ const TICK_MAX: Tick = u64::MAX;
 // Manages communication with wakeup thread
 type WakeupState = Arc<AtomicUsize>;
 
-pub type Result<T> = ::std::result::Result<T, io::Error>;
+pub type Result<T> = ::std::result::Result<T, TimerError>;
 // TODO: remove
 pub type TimerResult<T> = Result<T>;
+
+
+/// Deprecated and unused.
+#[derive(Debug)]
+pub struct TimerError;
+
+/// Deprecated and unused.
+#[derive(Debug)]
+pub enum TimerErrorKind {
+    TimerOverflow,
+}
+
 // TODO: Remove
 pub type OldTimerResult<T> = Result<T>;
 
@@ -475,6 +489,28 @@ impl<T> Entry<T> {
                 prev: EMPTY,
                 next: next,
             },
+        }
+    }
+}
+
+impl fmt::Display for TimerError {
+    fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
+        // `TimerError` will never be constructed.
+        unreachable!();
+    }
+}
+
+impl error::Error for TimerError {
+    fn description(&self) -> &str {
+        // `TimerError` will never be constructed.
+        unreachable!();
+    }
+}
+
+impl fmt::Display for TimerErrorKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TimerOverflow => write!(fmt, "TimerOverflow"),
         }
     }
 }
