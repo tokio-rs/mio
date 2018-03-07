@@ -32,7 +32,7 @@ mod uds;
 pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
 pub use self::io::{Io, set_nonblock};
-pub use self::ready::UnixReady;
+pub use self::ready::{UnixReady, READY_ALL};
 pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 

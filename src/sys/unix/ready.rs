@@ -94,11 +94,23 @@ pub struct UnixReady(Ready);
 
 const ERROR: usize = 0b000100;
 const HUP: usize   = 0b001000;
+
 #[cfg(any(target_os = "dragonfly",
     target_os = "freebsd", target_os = "ios", target_os = "macos"))]
 const AIO: usize   = 0b010000;
+
+#[cfg(not(any(target_os = "dragonfly",
+    target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+const AIO: usize   = 0b000000;
+
 #[cfg(any(target_os = "freebsd"))]
 const LIO: usize   = 0b100000;
+
+#[cfg(not(any(target_os = "freebsd")))]
+const LIO: usize   = 0b000000;
+
+// Export to support `Ready::all`
+pub const READY_ALL: usize = ERROR | HUP | AIO | LIO;
 
 impl UnixReady {
     /// Returns a `Ready` representing AIO completion readiness
