@@ -552,8 +552,10 @@ pub struct Ready(usize);
 
 const READABLE: usize = 0b00001;
 const WRITABLE: usize = 0b00010;
-const ERROR: usize    = 0b00100;
-const HUP: usize      = 0b01000;
+
+// These are deprecated and are moved into platform specific implementations.
+const ERROR: usize = 0b00100;
+const HUP: usize = 0b01000;
 
 impl Ready {
     /// Returns the empty `Ready` set.
@@ -638,13 +640,28 @@ impl Ready {
         Ready(HUP)
     }
 
-    #[deprecated(since = "0.6.5", note = "removed")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
+    /// Returns a `Ready` representing readiness for all operations.
+    ///
+    /// This includes platform specific operations as well (`hup`, `aio`,
+    /// `error`, `lio`).
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::all();
+    ///
+    /// assert!(ready.is_readable());
+    /// assert!(ready.is_writable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn all() -> Ready {
-        Ready::readable() |
-            Ready::writable()
+        Ready(READABLE | WRITABLE | ::sys::READY_ALL)
     }
 
     /// Returns true if `Ready` is the empty set
@@ -818,6 +835,59 @@ impl Ready {
     pub fn contains<T: Into<Self>>(&self, other: T) -> bool {
         let other = other.into();
         (*self & other) == other
+    }
+
+    /// Create a `Ready` instance using the given `usize` representation.
+    ///
+    /// The `usize` representation must have been obtained from a call to
+    /// `Ready::as_usize`.
+    ///
+    /// The `usize` representation must be treated as opaque. There is no
+    /// guaranteed correlation between the returned value and platform defined
+    /// constants. Also, there is no guarantee that the `usize` representation
+    /// will remain constant across patch releases of Mio.
+    ///
+    /// This function is mainly provided to allow the caller to loa a
+    /// readiness value from an `AtomicUsize`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::readable();
+    /// let ready_usize = ready.as_usize();
+    /// let ready2 = Ready::from_usize(ready_usize);
+    ///
+    /// assert_eq!(ready, ready2);
+    /// ```
+    pub fn from_usize(val: usize) -> Ready {
+        Ready(val)
+    }
+
+    /// Returns a `usize` representation of the `Ready` value.
+    ///
+    /// This `usize` representation must be treated as opaque. There is no
+    /// guaranteed correlation between the returned value and platform defined
+    /// constants. Also, there is no guarantee that the `usize` representation
+    /// will remain constant across patch releases of Mio.
+    ///
+    /// This function is mainly provided to allow the caller to store a
+    /// readiness value in an `AtomicUsize`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::readable();
+    /// let ready_usize = ready.as_usize();
+    /// let ready2 = Ready::from_usize(ready_usize);
+    ///
+    /// assert_eq!(ready, ready2);
+    /// ```
+    pub fn as_usize(&self) -> usize {
+        self.0
     }
 }
 
