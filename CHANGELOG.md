@@ -1,6 +1,7 @@
-# Unreleased
+# 0.6.14 (March 8, 2018)
 
-* Add `Poll::poll_interruptible` (#811).
+* Add `Poll::poll_interruptible` (#811)
+* Add `Ready::all` and `usize` conversions (#825)
 
 # 0.6.13 (February 5, 2018)
 
