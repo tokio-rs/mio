@@ -89,7 +89,7 @@ matrix:
       install:
         - rustup target add $TARGET
 
-    # NetBSD 
+    # NetBSD
     - os: linux
       env: TARGET=x86_64-unknown-netbsd DISABLE_TESTS=1
       install:
