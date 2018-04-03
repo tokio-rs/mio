@@ -439,7 +439,7 @@ impl UdpSocket {
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::net::UdpSocket;
     ///
-    /// let socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    /// let socket = UdpSocket::bind(&"127.0.0.1:7778".parse()?)?;
     /// if socket.ttl()? < 255 {
     ///     socket.set_ttl(255)?;
     /// }
