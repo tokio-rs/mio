@@ -7,7 +7,7 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
-
+use std::fmt;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
@@ -61,7 +61,6 @@ use poll::SelectorId;
 /// #     try_main().unwrap();
 /// # }
 /// ```
-#[derive(Debug)]
 pub struct TcpStream {
     sys: sys::TcpStream,
     selector_id: SelectorId,
@@ -416,6 +415,12 @@ impl Evented for TcpStream {
     }
 }
 
+impl fmt::Debug for TcpStream {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.sys, f)
+    }
+}
+
 /*
  *
  * ===== TcpListener =====
@@ -453,7 +458,6 @@ impl Evented for TcpStream {
 /// #     try_main().unwrap();
 /// # }
 /// ```
-#[derive(Debug)]
 pub struct TcpListener {
     sys: sys::TcpListener,
     selector_id: SelectorId,
@@ -492,9 +496,17 @@ impl TcpListener {
         // listen
         let listener = sock.listen(1024)?;
         Ok(TcpListener {
-            sys: sys::TcpListener::new(listener, addr)?,
+            sys: sys::TcpListener::new(listener)?,
             selector_id: SelectorId::new(),
         })
+    }
+
+    #[deprecated(since = "0.6.13", note = "use from_std instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
+    pub fn from_listener(listener: net::TcpListener, _: &SocketAddr)
+                         -> io::Result<TcpListener> {
+        TcpListener::from_std(listener)
     }
 
     /// Creates a new `TcpListener` from an instance of a
@@ -506,9 +518,8 @@ impl TcpListener {
     /// loop.
     ///
     /// The address provided must be the address that the listener is bound to.
-    pub fn from_listener(listener: net::TcpListener, addr: &SocketAddr)
-                         -> io::Result<TcpListener> {
-        sys::TcpListener::new(listener, addr).map(|s| {
+    pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
+        sys::TcpListener::new(listener).map(|s| {
             TcpListener {
                 sys: s,
                 selector_id: SelectorId::new(),
@@ -599,6 +610,12 @@ impl Evented for TcpListener {
 
     fn deregister(&self, register: &Register) -> io::Result<()> {
         self.sys.deregister(register)
+    }
+}
+
+impl fmt::Debug for TcpListener {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.sys, f)
     }
 }
 

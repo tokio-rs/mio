@@ -10,6 +10,21 @@
 //! * Design to allow for stack allocated buffers when possible (avoid double buffering).
 //! * Provide utilities such as a timers, a notification channel, buffer abstractions, and a slab.
 //!
+//! # Platforms
+//!
+//! Currently supported platforms:
+//!
+//! * Linux
+//! * OS X
+//! * Windows
+//! * FreeBSD
+//! * NetBSD
+//! * Android
+//! * iOS
+//!
+//! mio can handle interfacing with each of the event notification systems of the aforementioned platforms. The details of
+//! their implementation are further discussed in [`Poll`].
+//!
 //! # Usage
 //!
 //! Using mio starts by creating a [`Poll`], which reads events from the OS and
@@ -77,7 +92,7 @@
 //!
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/mio/0.6.12")]
+#![doc(html_root_url = "https://docs.rs/mio/0.6.14")]
 #![crate_name = "mio"]
 
 #![deny(warnings, missing_docs, missing_debug_implementations)]
@@ -85,6 +100,7 @@
 extern crate lazycell;
 extern crate net2;
 extern crate iovec;
+extern crate slab;
 
 #[cfg(target_os = "fuchsia")]
 extern crate fuchsia_zircon as zircon;

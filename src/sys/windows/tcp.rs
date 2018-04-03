@@ -640,9 +640,10 @@ impl Drop for TcpStream {
 }
 
 impl TcpListener {
-    pub fn new(socket: net::TcpListener, addr: &SocketAddr)
+    pub fn new(socket: net::TcpListener)
                -> io::Result<TcpListener> {
-        Ok(TcpListener::new_family(socket, match *addr {
+        let addr = socket.local_addr()?;
+        Ok(TcpListener::new_family(socket, match addr {
             SocketAddr::V4(..) => Family::V4,
             SocketAddr::V6(..) => Family::V6,
         }))

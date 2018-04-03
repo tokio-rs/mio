@@ -13,6 +13,13 @@ pub use self::unix::{
 };
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
+pub use self::unix::READY_ALL;
+
+#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(feature = "with-deprecated")]
+pub use self::unix::UnixSocket;
+
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 pub mod unix;
 
 #[cfg(windows)]
@@ -44,3 +51,6 @@ pub use self::fuchsia::{
 
 #[cfg(target_os = "fuchsia")]
 pub mod fuchsia;
+
+#[cfg(not(all(unix, not(target_os = "fuchsia"))))]
+pub const READY_ALL: usize = 0;

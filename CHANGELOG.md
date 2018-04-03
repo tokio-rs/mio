@@ -1,3 +1,14 @@
+# 0.6.14 (March 8, 2018)
+
+* Add `Poll::poll_interruptible` (#811)
+* Add `Ready::all` and `usize` conversions (#825)
+
+# 0.6.13 (February 5, 2018)
+
+* Fix build on DragonFlyBSD.
+* Add `TcpListener::from_std` that does not require the socket addr.
+* Deprecate `TcpListener::from_listener` in favor of from_std.
+
 # 0.6.12 (January 5, 2018)
 
 * Add `TcpStream::peek` function (#773).
