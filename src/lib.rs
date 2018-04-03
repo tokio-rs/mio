@@ -37,17 +37,19 @@
 //! let server = TcpListener::bind(&addr).unwrap();
 //!
 //! // Create a poll instance
-//! let poll = Poll::new().unwrap();
+//! let mut poll = Poll::new().unwrap();
 //!
 //! // Start listening for incoming connections
-//! poll.register(&server, SERVER, Ready::READABLE,
+//! poll.register()
+//!     .register(&server, SERVER, Ready::READABLE,
 //!               PollOpt::EDGE).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
-//! poll.register(&sock, CLIENT, Ready::READABLE,
+//! poll.register()
+//!     .register(&sock, CLIENT, Ready::READABLE,
 //!               PollOpt::EDGE).unwrap();
 //!
 //! // Create storage for events
@@ -75,7 +77,7 @@
 //!
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/mio/0.6.11")]
+#![doc(html_root_url = "https://docs.rs/mio/0.6.12")]
 #![crate_name = "mio"]
 
 #![deny(warnings, missing_docs, missing_debug_implementations)]
@@ -98,9 +100,6 @@ extern crate miow;
 #[cfg(windows)]
 extern crate winapi;
 
-#[cfg(windows)]
-extern crate kernel32;
-
 #[macro_use]
 extern crate log;
 
@@ -114,6 +113,7 @@ pub mod net;
 
 pub use poll::{
     Poll,
+    Register,
     Registration,
     SetReadiness,
 };

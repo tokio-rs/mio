@@ -79,6 +79,7 @@ impl Selector {
         });
         let timeout = timeout.as_ref().map(|s| s as *const _).unwrap_or(ptr::null_mut());
 
+        evts.clear();
         unsafe {
             let cnt = cvt(libc::kevent(self.kq,
                                             ptr::null(),
@@ -298,6 +299,12 @@ impl Events {
                     event::kind_mut(&mut self.events[idx]).insert(UnixReady::aio());
                 }
             }
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+            {
+                if e.filter == libc::EVFILT_LIO {
+                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::lio());
+                }
+            }
 
             if e.flags & libc::EV_EOF != 0 {
                 event::kind_mut(&mut self.events[idx]).insert(UnixReady::hup());
@@ -315,6 +322,12 @@ impl Events {
 
     pub fn push_event(&mut self, event: Event) {
         self.events.push(event);
+    }
+
+    pub fn clear(&mut self) {
+        self.sys_events.0.truncate(0);
+        self.events.truncate(0);
+        self.event_map.clear();
     }
 }
 
@@ -337,8 +350,10 @@ fn does_not_register_rw() {
 
     // registering kqueue fd will fail if write is requested (On anything but some versions of OS
     // X)
-    poll.register(&kqf, Token(1234), Ready::READABLE,
-                  PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
+    poll.register()
+        .register(
+            &kqf, Token(1234), Ready::READABLE,
+            PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 }
 
 #[cfg(any(target_os = "dragonfly",

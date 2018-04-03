@@ -1,5 +1,6 @@
 use std::{fmt, io};
 use std::cell::UnsafeCell;
+use std::mem;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -7,12 +8,13 @@ use std::time::Duration;
 
 use lazycell::AtomicLazyCell;
 
-use winapi::*;
+use winapi::um::minwinbase::{OVERLAPPED, OVERLAPPED_ENTRY};
+use winapi::shared::winerror;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 
 use event_imp::{Event, Evented, Ready};
-use poll::{self, Poll};
+use poll::{self, Register};
 use sys::windows::buffer_pool::BufferPool;
 use {Token, PollOpt};
 
@@ -71,12 +73,12 @@ impl Selector {
         trace!("select; timeout={:?}", timeout);
 
         // Clear out the previous list of I/O events and get some more!
-        events.events.truncate(0);
+        events.clear();
 
         trace!("polling IOCP");
         let n = match self.inner.port.get_many(&mut events.statuses, timeout) {
             Ok(statuses) => statuses.len(),
-            Err(ref e) if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) => 0,
+            Err(ref e) if e.raw_os_error() == Some(winerror::WAIT_TIMEOUT as i32) => 0,
             Err(e) => return Err(e),
         };
 
@@ -116,6 +118,13 @@ impl Selector {
     /// Return the `Selector`'s identifier
     pub fn id(&self) -> usize {
         self.inner.id
+    }
+}
+
+impl fmt::Debug for Selector {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Selector")
+            .finish()
     }
 }
 
@@ -177,12 +186,12 @@ impl Binding {
     pub unsafe fn register_handle(&self,
                                   handle: &AsRawHandle,
                                   token: Token,
-                                  poll: &Poll) -> io::Result<()> {
-        let selector = poll::selector(poll);
+                                  register: &Register) -> io::Result<()> {
+        let selector = poll::selector(register);
 
         // Ignore errors, we'll see them on the next line.
         drop(self.selector.fill(selector.inner.clone()));
-        self.check_same_selector(poll)?;
+        self.check_same_selector(register)?;
 
         selector.inner.port.add_handle(usize::from(token), handle)
     }
@@ -191,21 +200,21 @@ impl Binding {
     pub unsafe fn register_socket(&self,
                                   handle: &AsRawSocket,
                                   token: Token,
-                                  poll: &Poll) -> io::Result<()> {
-        let selector = poll::selector(poll);
+                                  register: &Register) -> io::Result<()> {
+        let selector = poll::selector(register);
         drop(self.selector.fill(selector.inner.clone()));
-        self.check_same_selector(poll)?;
+        self.check_same_selector(register)?;
         selector.inner.port.add_socket(usize::from(token), handle)
     }
 
-    /// Reregisters the handle provided from the `Poll` provided.
+    /// Reregisters the handle provided from the `Register` provided.
     ///
     /// This is intended to be used as part of `Evented::reregister` but note
     /// that this function does not currently reregister the provided handle
     /// with the `poll` specified. IOCP has a special binding for changing the
     /// token which has not yet been implemented. Instead this function should
     /// be used to assert that the call to `reregister` happened on the same
-    /// `Poll` that was passed into to `register`.
+    /// `Register` that was passed into to `register`.
     ///
     /// Eventually, though, the provided `handle` will be re-assigned to have
     /// the token `token` on the given `poll` assuming that it's been
@@ -218,26 +227,26 @@ impl Binding {
     pub unsafe fn reregister_handle(&self,
                                     _handle: &AsRawHandle,
                                     _token: Token,
-                                    poll: &Poll) -> io::Result<()> {
-        self.check_same_selector(poll)
+                                    register: &Register) -> io::Result<()> {
+        self.check_same_selector(register)
     }
 
     /// Same as `reregister_handle`, but for sockets.
     pub unsafe fn reregister_socket(&self,
                                     _socket: &AsRawSocket,
                                     _token: Token,
-                                    poll: &Poll) -> io::Result<()> {
+                                    poll: &Register) -> io::Result<()> {
         self.check_same_selector(poll)
     }
 
-    /// Deregisters the handle provided from the `Poll` provided.
+    /// Deregisters the handle provided from the `Register` provided.
     ///
     /// This is intended to be used as part of `Evented::deregister` but note
     /// that this function does not currently deregister the provided handle
-    /// from the `poll` specified. IOCP has a special binding for that which has
-    /// not yet been implemented. Instead this function should be used to assert
-    /// that the call to `deregister` happened on the same `Poll` that was
-    /// passed into to `register`.
+    /// from the `Register` specified. IOCP has a special binding for that which
+    /// has not yet been implemented. Instead this function should be used to
+    /// assert that the call to `deregister` happened on the same `Register`
+    /// that was passed into to `register`.
     ///
     /// # Unsafety
     ///
@@ -245,19 +254,19 @@ impl Binding {
     /// there may be pending I/O events and such which aren't handled correctly.
     pub unsafe fn deregister_handle(&self,
                                     _handle: &AsRawHandle,
-                                    poll: &Poll) -> io::Result<()> {
-        self.check_same_selector(poll)
+                                    register: &Register) -> io::Result<()> {
+        self.check_same_selector(register)
     }
 
     /// Same as `deregister_handle`, but for sockets.
     pub unsafe fn deregister_socket(&self,
                                     _socket: &AsRawSocket,
-                                    poll: &Poll) -> io::Result<()> {
-        self.check_same_selector(poll)
+                                    register: &Register) -> io::Result<()> {
+        self.check_same_selector(register)
     }
 
-    fn check_same_selector(&self, poll: &Poll) -> io::Result<()> {
-        let selector = poll::selector(poll);
+    fn check_same_selector(&self, register: &Register) -> io::Result<()> {
+        let selector = poll::selector(register);
         match self.selector.borrow() {
             Some(prev) if prev.identical(&selector.inner) => Ok(()),
             Some(_) |
@@ -348,7 +357,7 @@ impl ReadyBinding {
     /// possible change tokens.
     pub fn register_socket(&mut self,
                            socket: &AsRawSocket,
-                           poll: &Poll,
+                           register: &Register,
                            token: Token,
                            events: Ready,
                            opts: PollOpt,
@@ -356,10 +365,10 @@ impl ReadyBinding {
                            -> io::Result<()> {
         trace!("register {:?} {:?}", token, events);
         unsafe {
-            self.binding.register_socket(socket, token, poll)?;
+            self.binding.register_socket(socket, token, register)?;
         }
 
-        let (r, s) = poll::new_registration(poll, token, events, opts);
+        let (r, s) = poll::new_registration(register, token, events, opts);
         self.readiness = Some(s);
         *registration.lock().unwrap() = Some(r);
         Ok(())
@@ -368,7 +377,7 @@ impl ReadyBinding {
     /// Implementation of `Evented::reregister` function.
     pub fn reregister_socket(&mut self,
                              socket: &AsRawSocket,
-                             poll: &Poll,
+                             register: &Register,
                              token: Token,
                              events: Ready,
                              opts: PollOpt,
@@ -376,12 +385,12 @@ impl ReadyBinding {
                              -> io::Result<()> {
         trace!("reregister {:?} {:?}", token, events);
         unsafe {
-            self.binding.reregister_socket(socket, token, poll)?;
+            self.binding.reregister_socket(socket, token, register)?;
         }
 
         registration.lock().unwrap()
                     .as_mut().unwrap()
-                    .reregister(poll, token, events, opts)
+                    .reregister(register, token, events, opts)
     }
 
     /// Implementation of the `Evented::deregister` function.
@@ -390,17 +399,17 @@ impl ReadyBinding {
     /// readiness notifications and such.
     pub fn deregister(&mut self,
                       socket: &AsRawSocket,
-                      poll: &Poll,
+                      register: &Register,
                       registration: &Mutex<Option<poll::Registration>>)
                       -> io::Result<()> {
         trace!("deregistering");
         unsafe {
-            self.binding.deregister_socket(socket, poll)?;
+            self.binding.deregister_socket(socket, register)?;
         }
 
         registration.lock().unwrap()
                     .as_ref().unwrap()
-                    .deregister(poll)
+                    .deregister(register)
     }
 }
 
@@ -451,6 +460,10 @@ impl Events {
     pub fn push_event(&mut self, event: Event) {
         self.events.push(event);
     }
+
+    pub fn clear(&mut self) {
+        self.events.truncate(0);
+    }
 }
 
 macro_rules! overlapped2arc {
@@ -489,17 +502,28 @@ pub struct Overlapped {
 }
 
 impl Overlapped {
+    pub(crate) fn new2(cb: fn(&OVERLAPPED_ENTRY)) -> Overlapped  {
+        Overlapped {
+            inner: UnsafeCell::new(miow::Overlapped::zero()),
+            callback: cb,
+        }
+    }
+
     /// Creates a new `Overlapped` which will invoke the provided `cb` callback
     /// whenever it's triggered.
+    /// The callback takes a pointer to `OVERLAPPED_ENTRY` as parameter.
     ///
     /// The returned `Overlapped` must be used as the `OVERLAPPED` passed to all
     /// I/O operations that are registered with mio's event loop. When the I/O
     /// operation associated with an `OVERLAPPED` pointer completes the event
     /// loop will invoke the function pointer provided by `cb`.
-    pub fn new(cb: fn(&OVERLAPPED_ENTRY)) -> Overlapped {
-        Overlapped {
-            inner: UnsafeCell::new(miow::Overlapped::zero()),
-            callback: cb,
+    pub fn new(cb: fn(*const ::std::os::raw::c_void)) -> Overlapped {
+        Overlapped::new2(unsafe { mem::transmute(cb) })
+    }
+
+    pub(crate) fn as_mut_ptr2(&self) -> *mut OVERLAPPED {
+        unsafe {
+            (*self.inner.get()).raw()
         }
     }
 
@@ -507,10 +531,8 @@ impl Overlapped {
     ///
     /// This can be useful when only a shared borrow is held and the overlapped
     /// pointer needs to be passed down to winapi.
-    pub fn as_mut_ptr(&self) -> *mut OVERLAPPED {
-        unsafe {
-            (*self.inner.get()).raw()
-        }
+    pub fn as_mut_ptr(&self) -> *mut ::std::os::raw::c_void {
+        self.as_mut_ptr2() as *mut _
     }
 }
 

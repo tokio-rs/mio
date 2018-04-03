@@ -6,10 +6,10 @@ use std::time::Duration;
 
 use libc;
 use net2::TcpStreamExt;
-use iovec::IoVec;
+use iovec::{IoVec, IoVecMut};
 use iovec::unix as iovec;
 
-use {io, Ready, Poll, PollOpt, Token};
+use {io, Ready, Register, PollOpt, Token};
 use event::Evented;
 
 use sys::unix::eventedfd::EventedFd;
@@ -126,7 +126,11 @@ impl TcpStream {
         self.inner.take_error()
     }
 
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.peek(buf)
+    }
+
+    pub fn readv(&self, bufs: &mut [IoVecMut]) -> io::Result<usize> {
         unsafe {
             let slice = iovec::as_os_slice_mut(bufs);
             let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());
@@ -141,7 +145,7 @@ impl TcpStream {
         }
     }
 
-    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    pub fn writev(&self, bufs: &[IoVec]) -> io::Result<usize> {
         unsafe {
             let slice = iovec::as_os_slice(bufs);
             let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());
@@ -174,18 +178,18 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).deregister(register)
     }
 }
 
@@ -247,18 +251,18 @@ impl TcpListener {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).deregister(register)
     }
 }
 

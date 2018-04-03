@@ -12,13 +12,13 @@ fn write_then_drop() {
     let addr = a.local_addr().unwrap();
     let mut s = TcpStream::connect(&addr).unwrap();
 
-    let poll = Poll::new().unwrap();
+    let mut poll = Poll::new().unwrap();
 
-    a.register(&poll,
+    a.register(poll.register(),
                Token(1),
                Ready::READABLE,
                PollOpt::EDGE).unwrap();
-    s.register(&poll,
+    s.register(poll.register(),
                Token(3),
                Ready::EMPTY,
                PollOpt::EDGE).unwrap();
@@ -32,7 +32,7 @@ fn write_then_drop() {
 
     let mut s2 = a.accept().unwrap().0;
 
-    s2.register(&poll,
+    s2.register(poll.register(),
                 Token(2),
                 Ready::WRITABLE,
                 PollOpt::EDGE).unwrap();
@@ -47,7 +47,7 @@ fn write_then_drop() {
     s2.write(&[1, 2, 3, 4]).unwrap();
     drop(s2);
 
-    s.reregister(&poll,
+    s.reregister(poll.register(),
                  Token(3),
                  Ready::READABLE,
                  PollOpt::EDGE).unwrap();
@@ -71,13 +71,13 @@ fn write_then_deregister() {
     let addr = a.local_addr().unwrap();
     let mut s = TcpStream::connect(&addr).unwrap();
 
-    let poll = Poll::new().unwrap();
+    let mut poll = Poll::new().unwrap();
 
-    a.register(&poll,
+    a.register(poll.register(),
                Token(1),
                Ready::READABLE,
                PollOpt::EDGE).unwrap();
-    s.register(&poll,
+    s.register(poll.register(),
                Token(3),
                Ready::EMPTY,
                PollOpt::EDGE).unwrap();
@@ -91,7 +91,7 @@ fn write_then_deregister() {
 
     let mut s2 = a.accept().unwrap().0;
 
-    s2.register(&poll,
+    s2.register(poll.register(),
                 Token(2),
                 Ready::WRITABLE,
                 PollOpt::EDGE).unwrap();
@@ -104,9 +104,9 @@ fn write_then_deregister() {
     assert_eq!(events.iter().next().unwrap().token(), Token(2));
 
     s2.write(&[1, 2, 3, 4]).unwrap();
-    s2.deregister(&poll).unwrap();
+    s2.deregister(poll.register()).unwrap();
 
-    s.reregister(&poll,
+    s.reregister(poll.register(),
                  Token(3),
                  Ready::READABLE,
                  PollOpt::EDGE).unwrap();

@@ -9,10 +9,11 @@ use std::time::Duration;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
-use winapi::*;
-use iovec::IoVec;
+use winapi::shared::ntdef::HANDLE;
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
+use iovec::{IoVec, IoVecMut};
 
-use {poll, Ready, Poll, PollOpt, Token};
+use {poll, Ready, Register, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
@@ -98,8 +99,8 @@ impl TcpStream {
             registration: Mutex::new(None),
             imp: StreamImp {
                 inner: FromRawArc::new(StreamIo {
-                    read: Overlapped::new(read_done),
-                    write: Overlapped::new(write_done),
+                    read: Overlapped::new2(read_done),
+                    write: Overlapped::new2(write_done),
                     socket: socket,
                     inner: Mutex::new(StreamInner {
                         iocp: ReadyBinding::new(),
@@ -222,29 +223,7 @@ impl TcpStream {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: Ready, me: &mut StreamInner) {
-        if interest.is_readable() {
-            self.imp.schedule_read(me);
-        }
-
-        // At least with epoll, if a socket is registered with an interest in
-        // writing and it's immediately writable then a writable event is
-        // generated immediately, so do so here.
-        if interest.is_writable() {
-            if let State::Empty = me.write {
-                self.imp.add_readiness(me, Ready::WRITABLE);
-            }
-        }
-    }
-
-    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        match IoVec::from_bytes_mut(buf) {
-            Some(vec) => self.readv(&mut [vec]),
-            None => Ok(0),
-        }
-    }
-
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    fn before_read(&self) -> io::Result<MutexGuard<StreamInner>> {
         let mut me = self.inner();
 
         match me.read {
@@ -271,6 +250,48 @@ impl TcpStream {
             // below.
             State::Ready(()) => {}
         }
+
+        Ok(me)
+    }
+
+    fn post_register(&self, interest: Ready, me: &mut StreamInner) {
+        if interest.is_readable() {
+            self.imp.schedule_read(me);
+        }
+
+        // At least with epoll, if a socket is registered with an interest in
+        // writing and it's immediately writable then a writable event is
+        // generated immediately, so do so here.
+        if interest.is_writable() {
+            if let State::Empty = me.write {
+                self.imp.add_readiness(me, Ready::writable());
+            }
+        }
+    }
+
+    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        let vec = IoVecMut::from_bytes(buf);
+        self.readv(&mut [vec])
+    }
+
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut me = self.before_read()?;
+
+        match (&self.imp.inner.socket).peek(buf) {
+            Ok(n) => Ok(n),
+            Err(e) => {
+                me.read = State::Empty;
+                self.imp.schedule_read(&mut me);
+                Err(e)
+            }
+        }
+    }
+
+    pub fn readv(&self, bufs: &mut [IoVecMut]) -> io::Result<usize> {
+        let mut me = self.before_read()?;
 
         // TODO: Does WSARecv work on a nonblocking sockets? We ideally want to
         //       call that instead of looping over all the buffers and calling
@@ -321,13 +342,14 @@ impl TcpStream {
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        match IoVec::from_bytes(buf) {
-            Some(vec) => self.writev(&[vec]),
-            None => Ok(0),
+        if buf.is_empty() {
+            return Ok(0);
         }
+        let vec = IoVec::from_bytes(buf);
+        self.writev(&[vec])
     }
 
-    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    pub fn writev(&self, bufs: &[IoVec]) -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
 
@@ -370,7 +392,7 @@ impl StreamImp {
     fn schedule_connect(&self, addr: &SocketAddr) -> io::Result<()> {
         unsafe {
             trace!("scheduling a connect");
-            self.inner.socket.connect_overlapped(addr, &[], self.inner.read.as_mut_ptr())?;
+            self.inner.socket.connect_overlapped(addr, &[], self.inner.read.as_mut_ptr2())?;
         }
         // see docs above on StreamImp.inner for rationale on forget
         mem::forget(self.clone());
@@ -398,7 +420,7 @@ impl StreamImp {
 
         trace!("scheduling a read");
         let res = unsafe {
-            self.inner.socket.read_overlapped(&mut [], self.inner.read.as_mut_ptr())
+            self.inner.socket.read_overlapped(&mut [], self.inner.read.as_mut_ptr2())
         };
         match res {
             // Note that `Ok(true)` means that this completed immediately and
@@ -455,7 +477,7 @@ impl StreamImp {
         loop {
             trace!("scheduling a write of {} bytes", buf[pos..].len());
             let ret = unsafe {
-                self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr())
+                self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr2())
             };
             match ret {
                 Ok(Some(transferred_bytes)) if me.instant_notify => {
@@ -552,10 +574,10 @@ fn write_done(status: &OVERLAPPED_ENTRY) {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.register_socket(&self.imp.inner.socket, poll, token,
+        me.iocp.register_socket(&self.imp.inner.socket, register, token,
                                      interest, opts, &self.registration)?;
 
         unsafe {
@@ -574,18 +596,18 @@ impl Evented for TcpStream {
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
+        me.iocp.reregister_socket(&self.imp.inner.socket, register, token,
                                        interest, opts, &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+    fn deregister(&self, register: &Register) -> io::Result<()> {
         self.inner().iocp.deregister(&self.imp.inner.socket,
-                                     poll, &self.registration)
+                                     register, &self.registration)
     }
 }
 
@@ -631,7 +653,7 @@ impl TcpListener {
             registration: Mutex::new(None),
             imp: ListenerImp {
                 inner: FromRawArc::new(ListenerIo {
-                    accept: Overlapped::new(accept_done),
+                    accept: Overlapped::new2(accept_done),
                     family: family,
                     socket: socket,
                     inner: Mutex::new(ListenerInner {
@@ -708,8 +730,11 @@ impl ListenerImp {
             Family::V6 => TcpBuilder::new_v6(),
         }.and_then(|builder| unsafe {
             trace!("scheduling an accept");
-            self.inner.socket.accept_overlapped(&builder, &mut me.accept_buf,
-                                                self.inner.accept.as_mut_ptr())
+            builder.to_tcp_stream().and_then(|stream| {
+                let result = self.inner.socket.accept_overlapped(&stream, &mut me.accept_buf,
+                                                                 self.inner.accept.as_mut_ptr2());
+                result.map(|ok| (stream, ok))
+            })
         });
         match res {
             Ok((socket, _)) => {
@@ -757,10 +782,10 @@ fn accept_done(status: &OVERLAPPED_ENTRY) {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.register_socket(&self.imp.inner.socket, poll, token,
+        me.iocp.register_socket(&self.imp.inner.socket, register, token,
                                      interest, opts, &self.registration)?;
 
         unsafe {
@@ -772,18 +797,18 @@ impl Evented for TcpListener {
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
+        me.iocp.reregister_socket(&self.imp.inner.socket, register, token,
                                        interest, opts, &self.registration)?;
         self.imp.schedule_accept(&mut me);
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+    fn deregister(&self, register: &Register) -> io::Result<()> {
         self.inner().iocp.deregister(&self.imp.inner.socket,
-                                     poll, &self.registration)
+                                     register, &self.registration)
     }
 }
 

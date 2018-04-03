@@ -13,9 +13,9 @@ use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr}
 use std::time::Duration;
 
 use net2::TcpBuilder;
-use iovec::IoVec;
+use iovec::{IoVec, IoVecMut};
 
-use {io, sys, Ready, Poll, PollOpt, Token};
+use {io, sys, Ready, Register, PollOpt, Token};
 use event::Evented;
 use poll::SelectorId;
 
@@ -43,12 +43,13 @@ use poll::SelectorId;
 ///
 /// let stream = TcpStream::connect(&"127.0.0.1:34254".parse()?)?;
 ///
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.register(&stream, Token(0), Ready::WRITABLE,
-///               PollOpt::EDGE)?;
+/// poll.register().register(
+///     &stream, Token(0), Ready::WRITABLE,
+///     PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -304,6 +305,16 @@ impl TcpStream {
         self.sys.take_error()
     }
 
+    /// Receives data on the socket from the remote address to which it is
+    /// connected, without removing that data from the queue. On success,
+    /// returns the number of bytes peeked.
+    ///
+    /// Successive calls return the same data. This is accomplished by passing
+    /// `MSG_PEEK` as a flag to the underlying recv system call.
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.sys.peek(buf)
+    }
+
     /// Read in a list of buffers all at once.
     ///
     /// This operation will attempt to read bytes from this socket and place
@@ -318,7 +329,7 @@ impl TcpStream {
     /// a "would block" error is returned. This operation does not block.
     ///
     /// On Unix this corresponds to the `readv` syscall.
-    pub fn read_bufs(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    pub fn read_bufs(&self, bufs: &mut [IoVecMut]) -> io::Result<usize> {
         self.sys.readv(bufs)
     }
 
@@ -336,7 +347,7 @@ impl TcpStream {
     /// "would block" error is returned. This operation does not block.
     ///
     /// On Unix this corresponds to the `writev` syscall.
-    pub fn write_bufs(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    pub fn write_bufs(&self, bufs: &[IoVec]) -> io::Result<usize> {
         self.sys.writev(bufs)
     }
 }
@@ -389,19 +400,19 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interest, opts)
+        self.selector_id.associate_selector(register)?;
+        self.sys.register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(poll, token, interest, opts)
+        self.sys.reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.sys.deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        self.sys.deregister(register)
     }
 }
 
@@ -424,11 +435,12 @@ impl Evented for TcpStream {
 ///
 /// let listener = TcpListener::bind(&"127.0.0.1:34254".parse()?)?;
 ///
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.register(&listener, Token(0), Ready::WRITABLE,
+/// poll.register()
+///     .register(&listener, Token(0), Ready::WRITABLE,
 ///               PollOpt::EDGE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
@@ -574,19 +586,19 @@ impl TcpListener {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interest, opts)
+        self.selector_id.associate_selector(register)?;
+        self.sys.register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(poll, token, interest, opts)
+        self.sys.reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.sys.deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        self.sys.deregister(register)
     }
 }
 
