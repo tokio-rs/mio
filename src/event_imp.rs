@@ -617,6 +617,29 @@ impl Ready {
     pub fn is_empty(&self) -> bool {
         *self == Ready::EMPTY
     }
+  /// Returns a `Ready` representing readiness for all operations.
+  ///
+  /// This includes platform specific operations as well (`hup`, `aio`,
+  /// `error`, `lio`).
+  ///
+  /// See [`Poll`] for more documentation on polling.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use mio::Ready;
+  ///
+  /// let ready = Ready::all();
+  ///
+  /// assert!(ready.is_readable());
+  /// assert!(ready.is_writable());
+  /// ```
+  ///
+  /// [`Poll`]: struct.Poll.html
+  #[inline]
+    pub fn all() -> Ready {
+        Ready(READABLE | WRITABLE | ::sys::READY_ALL)
+    }
 
     /// Returns true if the value includes readable readiness
     ///
@@ -760,7 +783,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     /// let ready_usize = ready.as_usize();
     /// let ready2 = Ready::from_usize(ready_usize);
     ///
@@ -785,7 +808,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     /// let ready_usize = ready.as_usize();
     /// let ready2 = Ready::from_usize(ready_usize);
     ///

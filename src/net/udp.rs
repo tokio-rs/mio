@@ -51,9 +51,9 @@ use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
 /// poll.register()
-///     .register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
+///     .register(&sender_socket, SENDER, Ready::WRITABLE, PollOpt::EDGE)?;
 /// poll.register()
-///     .register(&echoer_socket, ECHOER, Ready::readable(), PollOpt::edge())?;
+///     .register(&echoer_socket, ECHOER, Ready::READABLE, PollOpt::EDGE)?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];
@@ -221,7 +221,7 @@ impl UdpSocket {
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::net::UdpSocket;
-    /// 
+    ///
     /// let socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
     ///
     /// // We must check if the socket is writable before calling send_to,
@@ -619,4 +619,3 @@ impl FromRawFd for UdpSocket {
         }
     }
 }
-

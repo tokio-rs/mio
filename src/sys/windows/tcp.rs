@@ -264,7 +264,7 @@ impl TcpStream {
         // generated immediately, so do so here.
         if interest.is_writable() {
             if let State::Empty = me.write {
-                self.imp.add_readiness(me, Ready::writable());
+                self.imp.add_readiness(me, Ready::WRITABLE);
             }
         }
     }
