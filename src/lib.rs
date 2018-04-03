@@ -8,7 +8,6 @@
 //! * Zero allocations
 //! * A scalable readiness-based API, similar to epoll on Linux
 //! * Design to allow for stack allocated buffers when possible (avoid double buffering).
-//! * Provide utilities such as a notification channel, buffer abstractions, and a slab.
 //!
 //! # Platforms
 //!
