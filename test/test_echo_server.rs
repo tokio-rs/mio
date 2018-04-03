@@ -96,7 +96,7 @@ impl EchoServer {
         self.conns[tok].token = Some(tok);
         poll.register()
             .register(
-                &self.conns[tok].sock, tok, Ready::readable(),
+                &self.conns[tok].sock, tok, Ready::READABLE,
                 PollOpt::EDGE | PollOpt::ONESHOT)
             .ok().expect("could not register socket with event loop");
 

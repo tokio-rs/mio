@@ -9,7 +9,7 @@ fn test_tcp_register_multiple_event_loops() {
     let listener = TcpListener::bind(&addr).unwrap();
 
     let poll1 = Poll::new().unwrap();
-    poll1.regsiter().register(&listener, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE).unwrap();
+    poll1.register().register(&listener, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE).unwrap();
 
     let poll2 = Poll::new().unwrap();
 

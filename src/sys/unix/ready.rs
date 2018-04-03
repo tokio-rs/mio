@@ -129,7 +129,7 @@ impl UnixReady {
     #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
     #[doc(hidden)]
     pub fn aio() -> UnixReady {
-        UnixReady(Ready::empty())
+        UnixReady(Ready::EMPTY)
     }
 
     /// Returns a `Ready` representing error readiness.

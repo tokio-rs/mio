@@ -270,7 +270,7 @@ fn drop_registration_from_non_main_thread() {
 
             let (registration, set_readiness) = Registration::new();
             registration.register(poll.register(), Token(token_index), Ready::READABLE, PollOpt::EDGE).unwrap();
-            let _ = set_readiness.set_readiness(Ready::readable());
+            let _ = set_readiness.set_readiness(Ready::READABLE);
             drop(registration);
             drop(set_readiness);
             token_index += 1;

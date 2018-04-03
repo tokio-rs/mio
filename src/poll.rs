@@ -279,8 +279,9 @@ use std::time::{Duration, Instant};
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
+/// ```
 /// poll.register()
-        .register(&sock, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE)?;
+///         .register(&sock, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE)?;
 /// #     Ok(())
 /// # }
 /// #
@@ -902,7 +903,7 @@ impl Register {
     ///
     /// // Register the socket with `poll`
     /// poll.register()
-            .register(&socket, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE)?;
+    ///     .register(&socket, Token(0), Ready::READABLE | Ready::WRITABLE, PollOpt::EDGE)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// let start = Instant::now();
@@ -987,13 +988,13 @@ impl Register {
     ///
     /// // Register the socket with `poll`, requesting readable
     /// poll.register()
-            .register(&socket, Token(0), Ready::READABLE, PollOpt::EDGE)?;
+    ///     .register(&socket, Token(0), Ready::READABLE, PollOpt::EDGE)?;
     ///
     /// // Reregister the socket specifying a different token and write interest
     /// // instead. `PollOpt::EDGE` must be specified even though that value
     /// // is not being changed.
     /// poll.register()
-            .reregister(&socket, Token(2), Ready::WRITABLE, PollOpt::EDGE)?;
+    ///     .reregister(&socket, Token(2), Ready::WRITABLE, PollOpt::EDGE)?;
     /// #     Ok(())
     /// # }
     /// #
@@ -1047,7 +1048,7 @@ impl Register {
     ///
     /// // Register the socket with `poll`
     /// poll.register()
-            .register(&socket, Token(0), Ready::READABLE, PollOpt::EDGE)?;
+    ///     .register(&socket, Token(0), Ready::READABLE, PollOpt::EDGE)?;
     ///
     /// poll.register().deregister(&socket)?;
     ///
