@@ -578,8 +578,8 @@ fn connect_error() {
     let poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(16);
 
-    // Pick a "random" port that shouldn't be in use.
-    let l = TcpStream::connect(&"127.0.0.1:38381".parse().unwrap()).unwrap();
+    let l = TcpStream::connect(&"10.245.111.123:38381".parse().unwrap()).unwrap();
+
     poll.register(&l, Token(0), Ready::writable(), PollOpt::edge()).unwrap();
 
     'outer:

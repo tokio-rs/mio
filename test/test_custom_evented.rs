@@ -265,7 +265,7 @@ mod stress {
             }));
         }
 
-        let per_thread: Vec<_> = threads.into_iter()
+        let _: Vec<_> = threads.into_iter()
             .map(|th| th.join().unwrap())
             .collect();
 
