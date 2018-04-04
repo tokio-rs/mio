@@ -13,9 +13,9 @@ use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr}
 use std::time::Duration;
 
 use net2::TcpBuilder;
-use iovec::IoVec;
+use iovec::{IoVec, IoVecMut};
 
-use {io, sys, Ready, Poll, PollOpt, Token};
+use {io, sys, Ready, Register, PollOpt, Token};
 use event::Evented;
 use poll::SelectorId;
 
@@ -43,12 +43,13 @@ use poll::SelectorId;
 ///
 /// let stream = TcpStream::connect(&"127.0.0.1:34254".parse()?)?;
 ///
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.register(&stream, Token(0), Ready::writable(),
-///               PollOpt::edge())?;
+/// poll.register().register(
+///     &stream, Token(0), Ready::WRITABLE,
+///     PollOpt::EDGE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -280,27 +281,6 @@ impl TcpStream {
         self.sys.ttl()
     }
 
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.sys.set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`][link].
-    ///
-    /// [link]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.sys.only_v6()
-    }
-
     /// Sets the value for the `SO_LINGER` option on this socket.
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.sys.set_linger(dur)
@@ -313,24 +293,6 @@ impl TcpStream {
     /// [link]: #method.set_linger
     pub fn linger(&self) -> io::Result<Option<Duration>> {
         self.sys.linger()
-    }
-
-    #[deprecated(since = "0.6.9", note = "use set_keepalive")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn set_keepalive_ms(&self, keepalive: Option<u32>) -> io::Result<()> {
-        self.set_keepalive(keepalive.map(|v| Duration::from_millis(v as u64)))
-    }
-
-    #[deprecated(since = "0.6.9", note = "use keepalive")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
-        self.keepalive().map(|v| {
-            v.map(|v| {
-                ::convert::millis(v) as u32
-            })
-        })
     }
 
     /// Get the value of the `SO_ERROR` option on this socket.
@@ -366,7 +328,7 @@ impl TcpStream {
     /// a "would block" error is returned. This operation does not block.
     ///
     /// On Unix this corresponds to the `readv` syscall.
-    pub fn read_bufs(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    pub fn read_bufs(&self, bufs: &mut [IoVecMut]) -> io::Result<usize> {
         self.sys.readv(bufs)
     }
 
@@ -384,7 +346,7 @@ impl TcpStream {
     /// "would block" error is returned. This operation does not block.
     ///
     /// On Unix this corresponds to the `writev` syscall.
-    pub fn write_bufs(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    pub fn write_bufs(&self, bufs: &[IoVec]) -> io::Result<usize> {
         self.sys.writev(bufs)
     }
 }
@@ -437,19 +399,19 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interest, opts)
+        self.selector_id.associate_selector(register)?;
+        self.sys.register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(poll, token, interest, opts)
+        self.sys.reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.sys.deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        self.sys.deregister(register)
     }
 }
 
@@ -478,12 +440,13 @@ impl fmt::Debug for TcpStream {
 ///
 /// let listener = TcpListener::bind(&"127.0.0.1:34254".parse()?)?;
 ///
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.register(&listener, Token(0), Ready::writable(),
-///               PollOpt::edge())?;
+/// poll.register()
+///     .register(&listener, Token(0), Ready::WRITABLE,
+///               PollOpt::EDGE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -623,27 +586,6 @@ impl TcpListener {
         self.sys.ttl()
     }
 
-    /// Sets the value for the `IPV6_V6ONLY` option on this socket.
-    ///
-    /// If this is set to `true` then the socket is restricted to sending and
-    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
-    /// can bind the same port at the same time.
-    ///
-    /// If this is set to `false` then the socket can be used to send and
-    /// receive packets from an IPv4-mapped IPv6 address.
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.sys.set_only_v6(only_v6)
-    }
-
-    /// Gets the value of the `IPV6_V6ONLY` option for this socket.
-    ///
-    /// For more information about this option, see [`set_only_v6`][link].
-    ///
-    /// [link]: #method.set_only_v6
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.sys.only_v6()
-    }
-
     /// Get the value of the `SO_ERROR` option on this socket.
     ///
     /// This will retrieve the stored error in the underlying socket, clearing
@@ -655,19 +597,19 @@ impl TcpListener {
 }
 
 impl Evented for TcpListener {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interest, opts)
+        self.selector_id.associate_selector(register)?;
+        self.sys.register(register, token, interest, opts)
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.sys.reregister(poll, token, interest, opts)
+        self.sys.reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.sys.deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        self.sys.deregister(register)
     }
 }
 

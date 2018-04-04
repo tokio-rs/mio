@@ -1,4 +1,3 @@
-#![allow(deprecated)]
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -204,14 +203,14 @@ impl Events {
     pub fn get(&self, idx: usize) -> Option<Event> {
         self.events.get(idx).map(|event| {
             let epoll = event.events as c_int;
-            let mut kind = Ready::empty();
+            let mut kind = Ready::EMPTY;
 
             if (epoll & EPOLLIN) != 0 || (epoll & EPOLLPRI) != 0 {
-                kind = kind | Ready::readable();
+                kind = kind | Ready::READABLE;
             }
 
             if (epoll & EPOLLOUT) != 0 {
-                kind = kind | Ready::writable();
+                kind = kind | Ready::WRITABLE;
             }
 
             // EPOLLHUP - Usually means a socket error happened
@@ -231,7 +230,7 @@ impl Events {
 
     pub fn push_event(&mut self, event: Event) {
         self.events.push(libc::epoll_event {
-            events: ioevent_to_epoll(event.readiness(), PollOpt::empty()),
+            events: ioevent_to_epoll(event.readiness(), PollOpt::EMPTY),
             u64: usize::from(event.token()) as u64
         });
     }

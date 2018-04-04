@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 extern crate mio;
 extern crate bytes;
 extern crate net2;
@@ -34,49 +32,17 @@ mod test_udp_level;
 mod test_udp_socket;
 mod test_write_then_drop;
 
-#[cfg(feature = "with-deprecated")]
-mod test_notify;
-#[cfg(feature = "with-deprecated")]
-mod test_poll_channel;
-#[cfg(feature = "with-deprecated")]
-mod test_tick;
-
-// The following tests are for deprecated features. Only run these tests on
-// platforms that were supported from before the features were deprecated
-#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-#[cfg(feature = "with-deprecated")]
-mod test_timer;
-#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-#[cfg(feature = "with-deprecated")]
-mod test_battery;
-
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_unix_echo_server;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_unix_pass_fd;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_uds_shutdown;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_subprocess_pipe;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_broken_pipe;
-
 #[cfg(any(target_os = "fuchsia"))]
 mod test_fuchsia_handles;
 
-use bytes::{Buf, MutBuf};
 use std::io::{self, Read, Write};
 use std::time::Duration;
+use bytes::{Buf, BufMut};
 use mio::{Events, Poll};
 use mio::event::Event;
 
 pub trait TryRead {
-    fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
+    fn try_read_buf<B: BufMut>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
         where Self : Sized
     {
         // Reads the length of the slice supplied by buf.mut_bytes into the buffer
@@ -84,10 +50,10 @@ pub trait TryRead {
         // If your protocol is msg based (instead of continuous stream) you should
         // ensure that your buffer is large enough to hold an entire segment (1532 bytes if not jumbo
         // frames)
-        let res = self.try_read(unsafe { buf.mut_bytes() });
+        let res = self.try_read(unsafe { buf.bytes_mut() });
 
         if let Ok(Some(cnt)) = res {
-            unsafe { buf.advance(cnt); }
+            unsafe { buf.advance_mut(cnt); }
         }
 
         res
@@ -187,7 +153,7 @@ pub fn sleep_ms(ms: u64) {
     thread::sleep(Duration::from_millis(ms));
 }
 
-pub fn expect_events(poll: &Poll,
+pub fn expect_events(poll: &mut Poll,
                      event_buffer: &mut Events,
                      poll_try_count: usize,
                      mut expected: Vec<Event>)

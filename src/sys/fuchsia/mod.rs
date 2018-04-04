@@ -84,14 +84,14 @@ mod sys {
 
 fn epoll_event_to_ready(epoll: u32) -> Ready {
     let epoll = epoll as i32; // casts the bits directly
-    let mut kind = Ready::empty();
+    let mut kind = Ready::EMPTY;
 
     if (epoll & libc::EPOLLIN) != 0 || (epoll & libc::EPOLLPRI) != 0 {
-        kind = kind | Ready::readable();
+        kind = kind | Ready::READABLE;
     }
 
     if (epoll & libc::EPOLLOUT) != 0 {
-        kind = kind | Ready::writable();
+        kind = kind | Ready::WRITABLE;
     }
 
     kind

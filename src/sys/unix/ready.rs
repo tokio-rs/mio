@@ -29,7 +29,7 @@ use std::fmt;
 /// use mio::Ready;
 /// use mio::unix::UnixReady;
 ///
-/// let ready = Ready::readable() | UnixReady::hup();
+/// let ready = Ready::READABLE | UnixReady::hup();
 ///
 /// assert!(ready.is_readable());
 /// assert!(UnixReady::from(ready).is_hup());
@@ -42,7 +42,7 @@ use std::fmt;
 /// use mio::unix::UnixReady;
 ///
 /// // Start with a portable ready
-/// let ready = Ready::readable();
+/// let ready = Ready::READABLE;
 ///
 /// // Convert to a unix ready, adding HUP
 /// let mut unix_ready = UnixReady::from(ready) | UnixReady::hup();
@@ -73,12 +73,13 @@ use std::fmt;
 /// let addr = "216.58.193.68:80".parse()?;
 /// let socket = TcpStream::connect(&addr)?;
 ///
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
 ///
-/// poll.register(&socket,
+/// poll.register()
+///     .register(&socket,
 ///               Token(0),
-///               Ready::readable() | UnixReady::error(),
-///               PollOpt::edge())?;
+///               Ready::READABLE | UnixReady::error(),
+///               PollOpt::EDGE)?;
 /// #     Ok(())
 /// # }
 /// #
@@ -140,7 +141,7 @@ impl UnixReady {
     #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
     #[doc(hidden)]
     pub fn aio() -> UnixReady {
-        UnixReady(Ready::empty())
+        UnixReady(Ready::EMPTY)
     }
 
     /// Returns a `Ready` representing error readiness.
@@ -387,24 +388,12 @@ impl ops::Sub for UnixReady {
     }
 }
 
-#[deprecated(since = "0.6.10", note = "removed")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-impl ops::Not for UnixReady {
-    type Output = UnixReady;
-
-    #[inline]
-    fn not(self) -> UnixReady {
-        (!self.0).into()
-    }
-}
-
 impl fmt::Debug for UnixReady {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (UnixReady(Ready::readable()), "Readable"),
-            (UnixReady(Ready::writable()), "Writable"),
+            (UnixReady(Ready::READABLE), "Readable"),
+            (UnixReady(Ready::WRITABLE), "Writable"),
             (UnixReady::error(), "Error"),
             (UnixReady::hup(), "Hup"),
             #[allow(deprecated)]

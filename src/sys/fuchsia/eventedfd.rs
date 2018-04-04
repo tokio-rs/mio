@@ -145,7 +145,7 @@ impl EventedFd {
         let needs_rereg = opts.is_level() && !opts.is_oneshot();
 
         // If we need to reregister, then each registration should be `oneshot`
-        let opts = opts | if needs_rereg { PollOpt::oneshot() } else { PollOpt::empty() };
+        let opts = opts | if needs_rereg { PollOpt::ONESHOT } else { PollOpt::EMPTY };
 
         let rereg_signals = if needs_rereg {
             Some((signals, poll_opts_to_wait_async(opts)))

@@ -14,12 +14,12 @@ use std::ops;
 #[inline]
 pub fn assert_fuchsia_ready_repr() {
     debug_assert!(
-        ZX_OBJECT_READABLE.bits() as usize == ready_as_usize(Ready::readable()),
-        "Zircon ZX_OBJECT_READABLE should have the same repr as Ready::readable()"
+        ZX_OBJECT_READABLE.bits() as usize == ready_as_usize(Ready::READABLE),
+        "Zircon ZX_OBJECT_READABLE should have the same repr as Ready::READABLE"
     );
     debug_assert!(
-        ZX_OBJECT_WRITABLE.bits() as usize == ready_as_usize(Ready::writable()),
-        "Zircon ZX_OBJECT_WRITABLE should have the same repr as Ready::writable()"
+        ZX_OBJECT_WRITABLE.bits() as usize == ready_as_usize(Ready::WRITABLE),
+        "Zircon ZX_OBJECT_WRITABLE should have the same repr as Ready::WRITABLE"
     );
 }
 
@@ -129,18 +129,6 @@ impl ops::Sub for FuchsiaReady {
     #[inline]
     fn sub(self, other: FuchsiaReady) -> FuchsiaReady {
         (self.0 & !other.0).into()
-    }
-}
-
-#[deprecated(since = "0.6.10", note = "removed")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-impl ops::Not for FuchsiaReady {
-    type Output = FuchsiaReady;
-
-    #[inline]
-    fn not(self) -> FuchsiaReady {
-        (!self.0).into()
     }
 }
 

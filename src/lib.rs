@@ -52,18 +52,20 @@
 //! let server = TcpListener::bind(&addr).unwrap();
 //!
 //! // Create a poll instance
-//! let poll = Poll::new().unwrap();
+//! let mut poll = Poll::new().unwrap();
 //!
 //! // Start listening for incoming connections
-//! poll.register(&server, SERVER, Ready::readable(),
-//!               PollOpt::edge()).unwrap();
+//! poll.register()
+//!     .register(&server, SERVER, Ready::READABLE,
+//!               PollOpt::EDGE).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
-//! poll.register(&sock, CLIENT, Ready::readable(),
-//!               PollOpt::edge()).unwrap();
+//! poll.register()
+//!     .register(&sock, CLIENT, Ready::READABLE,
+//!               PollOpt::EDGE).unwrap();
 //!
 //! // Create storage for events
 //! let mut events = Events::with_capacity(1024);
@@ -114,9 +116,6 @@ extern crate miow;
 #[cfg(windows)]
 extern crate winapi;
 
-#[cfg(windows)]
-extern crate kernel32;
-
 #[macro_use]
 extern crate log;
 
@@ -128,41 +127,9 @@ mod token;
 
 pub mod net;
 
-#[deprecated(since = "0.6.5", note = "use mio-extras instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod channel;
-
-#[deprecated(since = "0.6.5", note = "use mio-extras instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod timer;
-
-#[deprecated(since = "0.6.5", note = "update to use `Poll`")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod deprecated;
-
-#[deprecated(since = "0.6.5", note = "use iovec crate directly")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use iovec::IoVec;
-
-#[deprecated(since = "0.6.6", note = "use net module instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod tcp {
-    pub use net::{TcpListener, TcpStream};
-    pub use std::net::Shutdown;
-}
-
-#[deprecated(since = "0.6.6", note = "use net module instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub mod udp;
-
 pub use poll::{
     Poll,
+    Register,
     Registration,
     SetReadiness,
 };
@@ -182,21 +149,6 @@ pub mod event {
 pub use event::{
     Events,
 };
-
-#[deprecated(since = "0.6.5", note = "use events:: instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use event::{Event, Evented};
-
-#[deprecated(since = "0.6.5", note = "use events::Iter instead")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use poll::Iter as EventsIter;
-
-#[deprecated(since = "0.6.5", note = "std::io::Error can avoid the allocation now")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-pub use io::deprecated::would_block;
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 pub mod unix {
@@ -274,25 +226,5 @@ pub mod fuchsia {
 /// later hooked into the mio event loop.
 #[cfg(windows)]
 pub mod windows {
-
     pub use sys::{Overlapped, Binding};
-}
-
-#[cfg(feature = "with-deprecated")]
-mod convert {
-    use std::time::Duration;
-
-    const NANOS_PER_MILLI: u32 = 1_000_000;
-    const MILLIS_PER_SEC: u64 = 1_000;
-
-    /// Convert a `Duration` to milliseconds, rounding up and saturating at
-    /// `u64::MAX`.
-    ///
-    /// The saturating is fine because `u64::MAX` milliseconds are still many
-    /// million years.
-    pub fn millis(duration: Duration) -> u64 {
-        // Round up.
-        let millis = (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
-        duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
-    }
 }

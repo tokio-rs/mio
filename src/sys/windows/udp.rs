@@ -12,12 +12,13 @@ use std::sync::{Mutex, MutexGuard};
 
 #[allow(unused_imports)]
 use net2::{UdpBuilder, UdpSocketExt};
-use winapi::*;
+use winapi::shared::winerror;
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
 
-use {poll, Ready, Poll, PollOpt, Token};
+use {poll, Ready, Register, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
@@ -59,8 +60,8 @@ impl UdpSocket {
             registration: Mutex::new(None),
             imp: Imp {
                 inner: FromRawArc::new(Io {
-                    read: Overlapped::new(recv_done),
-                    write: Overlapped::new(send_done),
+                    read: Overlapped::new2(recv_done),
+                    write: Overlapped::new2(send_done),
                     socket: socket,
                     inner: Mutex::new(Inner {
                         iocp: ReadyBinding::new(),
@@ -102,14 +103,14 @@ impl UdpSocket {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest - Ready::writable());
+        me.iocp.set_readiness(interest - Ready::WRITABLE);
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = owned_buf.write(buf)?;
         unsafe {
             trace!("scheduling a send");
             self.imp.inner.socket.send_to_overlapped(&owned_buf, target,
-                                                     self.imp.inner.write.as_mut_ptr())
+                                                     self.imp.inner.write.as_mut_ptr2())
         }?;
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
@@ -136,13 +137,13 @@ impl UdpSocket {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest - Ready::writable());
+        me.iocp.set_readiness(interest - Ready::WRITABLE);
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = owned_buf.write(buf)?;
         unsafe {
             trace!("scheduling a send");
-            self.imp.inner.socket.send_overlapped(&owned_buf, self.imp.inner.write.as_mut_ptr())
+            self.imp.inner.socket.send_overlapped(&owned_buf, self.imp.inner.write.as_mut_ptr2())
 
         }?;
         me.write = State::Pending(owned_buf);
@@ -160,7 +161,7 @@ impl UdpSocket {
                 // then don't actually read any data, just return an error.
                 if buf.len() < data.len() {
                     me.read = State::Ready(data);
-                    Err(io::Error::from_raw_os_error(WSAEMSGSIZE as i32))
+                    Err(io::Error::from_raw_os_error(winerror::WSAEMSGSIZE as i32))
                 } else {
                     let r = if let Some(addr) = me.read_buf.to_socket_addr() {
                         buf.write(&data).unwrap();
@@ -187,7 +188,7 @@ impl UdpSocket {
         self.recv_from(buf).map(|(size,_)| size)
     }
 
-    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
+    pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
         self.imp.inner.socket.connect(addr)
     }
 
@@ -281,7 +282,7 @@ impl UdpSocket {
         // See comments in TcpSocket::post_register for what's going on here
         if interest.is_writable() {
             if let State::Empty = me.write {
-                self.imp.add_readiness(me, Ready::writable());
+                self.imp.add_readiness(me, Ready::WRITABLE);
             }
         }
     }
@@ -299,7 +300,7 @@ impl Imp {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest - Ready::readable());
+        me.iocp.set_readiness(interest - Ready::READABLE);
 
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
@@ -307,7 +308,7 @@ impl Imp {
             let cap = buf.capacity();
             buf.set_len(cap);
             self.inner.socket.recv_from_overlapped(&mut buf, &mut me.read_buf,
-                                                   self.inner.read.as_mut_ptr())
+                                                   self.inner.read.as_mut_ptr2())
         };
         match res {
             Ok(_) => {
@@ -316,7 +317,7 @@ impl Imp {
             }
             Err(e) => {
                 me.read = State::Error(e);
-                self.add_readiness(me, Ready::readable());
+                self.add_readiness(me, Ready::READABLE);
                 me.iocp.put_buffer(buf);
             }
         }
@@ -329,29 +330,29 @@ impl Imp {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, poll: &Poll, token: Token,
+    fn register(&self, register: &Register, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         me.iocp.register_socket(&self.imp.inner.socket,
-                                     poll, token, interest, opts,
+                                     register, token, interest, opts,
                                      &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
+    fn reregister(&self, register: &Register, token: Token,
                   interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
         me.iocp.reregister_socket(&self.imp.inner.socket,
-                                       poll, token, interest,
+                                       register, token, interest,
                                        opts, &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+    fn deregister(&self, register: &Register) -> io::Result<()> {
         self.inner().iocp.deregister(&self.imp.inner.socket,
-                                     poll, &self.registration)
+                                     register, &self.registration)
     }
 }
 
@@ -391,7 +392,7 @@ fn send_done(status: &OVERLAPPED_ENTRY) {
     };
     let mut me = me2.inner();
     me.write = State::Empty;
-    me2.add_readiness(&mut me, Ready::writable());
+    me2.add_readiness(&mut me, Ready::WRITABLE);
 }
 
 fn recv_done(status: &OVERLAPPED_ENTRY) {
@@ -409,5 +410,5 @@ fn recv_done(status: &OVERLAPPED_ENTRY) {
         buf.set_len(status.bytes_transferred() as usize);
     }
     me.read = State::Ready(buf);
-    me2.add_readiness(&mut me, Ready::readable());
+    me2.add_readiness(&mut me, Ready::READABLE);
 }
