@@ -185,7 +185,7 @@ impl UdpSocket {
     /// use mio::net::UdpSocket;
     ///
     /// // We must bind it to an open address.
-    /// let socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    /// let socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
     /// let cloned_socket = socket.try_clone()?;
     ///
     /// assert_eq!(socket.local_addr()?, cloned_socket.local_addr()?);
@@ -302,11 +302,11 @@ impl UdpSocket {
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::net::UdpSocket;
     ///
-    /// let broadcast_socket = UdpSocket::bind(&"127.0.0.1:7777".parse()?)?;
+    /// let broadcast_socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
     /// if broadcast_socket.broadcast()? == false {
     ///     broadcast_socket.set_broadcast(true)?;
     /// }
-    /// 
+    ///
     /// assert_eq!(broadcast_socket.broadcast()?, true);
     /// #
     /// #    Ok(())

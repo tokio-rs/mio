@@ -272,13 +272,6 @@ mod stress {
         for entry in entries.iter() {
             assert_eq!(PER_ENTRY, entry.num.load(Relaxed));
         }
-
-        for th in per_thread {
-            // Kind of annoying that we can't really test anything better than this,
-            // but CI tends to be very non deterministic when it comes to multi
-            // threading.
-            assert!(th > 0, "actual={:?}", th);
-        }
     }
 
     #[test]
