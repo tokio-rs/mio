@@ -215,11 +215,11 @@ impl Events {
 
             // EPOLLHUP - Usually means a socket error happened
             if (epoll & EPOLLERR) != 0 {
-                kind = kind | UnixReady::ERROR;
+                kind = kind | *UnixReady::ERROR;
             }
 
             if (epoll & EPOLLRDHUP) != 0 || (epoll & EPOLLHUP) != 0 {
-                kind = kind | UnixReady::HUP;
+                kind = kind | *UnixReady::HUP;
             }
 
             let token = self.events[idx].u64;

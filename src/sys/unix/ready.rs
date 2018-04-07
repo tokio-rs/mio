@@ -29,7 +29,7 @@ bitflags! {
     /// use mio::Ready;
     /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::READABLE | UnixReady::HUP;
+    /// let ready = Ready::READABLE | *UnixReady::HUP;
     ///
     /// assert!(ready.is_readable());
     /// assert!(UnixReady::from(ready).is_hup());
@@ -78,7 +78,7 @@ bitflags! {
     /// poll.register()
     ///     .register(&socket,
     ///               Token(0),
-    ///               Ready::READABLE | UnixReady::ERROR,
+    ///               Ready::READABLE | *UnixReady::ERROR,
     ///               PollOpt::EDGE)?;
     /// #     Ok(())
     /// # }

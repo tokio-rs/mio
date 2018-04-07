@@ -296,23 +296,23 @@ impl Events {
     target_os = "freebsd", target_os = "ios", target_os = "macos"))]
             {
                 if e.filter == libc::EVFILT_AIO {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::AIO);
+                    event::kind_mut(&mut self.events[idx]).insert(*UnixReady::AIO);
                 }
             }
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
             {
                 if e.filter == libc::EVFILT_LIO {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::LIO);
+                    event::kind_mut(&mut self.events[idx]).insert(*UnixReady::LIO);
                 }
             }
 
             if e.flags & libc::EV_EOF != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(UnixReady::HUP);
+                event::kind_mut(&mut self.events[idx]).insert(*UnixReady::HUP);
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
                 if e.fflags != 0 {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::ERROR);
+                    event::kind_mut(&mut self.events[idx]).insert(*UnixReady::ERROR);
                 }
             }
         }
