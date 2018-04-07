@@ -1,5 +1,5 @@
 use {sys, Token};
-use event_imp::{self as event, Ready, Event, Evented, PollOpt};
+use event_imp::{Ready, Event, Evented, PollOpt};
 use std::{fmt, io, ptr, usize};
 use std::cell::UnsafeCell;
 use std::{mem, ops, isize};
@@ -2380,7 +2380,7 @@ impl ReadinessState {
     // Create a `ReadinessState` initialized with the provided arguments
     #[inline]
     fn new(interest: Ready, opt: PollOpt) -> ReadinessState {
-        let interest = event::ready_as_usize(interest);
+        let interest = interest.bits();
         let opt = opt.bits();
 
         debug_assert!(interest <= MASK_4);
@@ -2406,7 +2406,7 @@ impl ReadinessState {
     #[inline]
     fn readiness(&self) -> Ready {
         let v = self.get(MASK_4, READINESS_SHIFT);
-        event::ready_from_usize(v)
+        Ready::new(v)
     }
 
     #[inline]
@@ -2417,20 +2417,20 @@ impl ReadinessState {
     /// Set the readiness
     #[inline]
     fn set_readiness(&mut self, v: Ready) {
-        self.set(event::ready_as_usize(v), MASK_4, READINESS_SHIFT);
+        self.set(v.bits(), MASK_4, READINESS_SHIFT);
     }
 
     /// Get the interest
     #[inline]
     fn interest(&self) -> Ready {
         let v = self.get(MASK_4, INTEREST_SHIFT);
-        event::ready_from_usize(v)
+        Ready::new(v)
     }
 
     /// Set the interest
     #[inline]
     fn set_interest(&mut self, v: Ready) {
-        self.set(event::ready_as_usize(v), MASK_4, INTEREST_SHIFT);
+        self.set(v.bits(), MASK_4, INTEREST_SHIFT);
     }
 
     #[inline]
