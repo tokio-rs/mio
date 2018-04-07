@@ -34,7 +34,7 @@ impl TestHandler {
                 trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                poll.register().reregister(&self.client, CLIENT, Ready::writable(), PollOpt::LEVEL).unwrap();
+                poll.register().reregister(&self.client, CLIENT, Ready::WRITABLE, PollOpt::LEVEL).unwrap();
             }
             _ => panic!("unexpected token"),
         }
@@ -65,12 +65,12 @@ pub fn test_register_deregister() {
     let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
-    poll.register().register(&server, SERVER, Ready::readable(), PollOpt::EDGE).unwrap();
+    poll.register().register(&server, SERVER, Ready::READABLE, PollOpt::EDGE).unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
-    poll.register().register(&client, CLIENT, Ready::readable(), PollOpt::LEVEL).unwrap();
+    poll.register().register(&client, CLIENT, Ready::READABLE, PollOpt::LEVEL).unwrap();
 
     let mut handler = TestHandler::new(server, client);
 
@@ -114,9 +114,9 @@ pub fn test_register_empty_interest() {
     assert!(events.iter().next().is_none(), "Received unexpected event: {:?}", events.iter().next().unwrap());
 
     // now sock is reregistered with readable, we should receive the pending event
-    poll.register().reregister(&sock, Token(0), Ready::readable(), PollOpt::EDGE).unwrap();
+    poll.register().reregister(&sock, Token(0), Ready::READABLE, PollOpt::EDGE).unwrap();
     expect_events(&mut poll, &mut events, 2, vec![
-        Event::new(Ready::readable(), Token(0))
+        Event::new(Ready::READABLE, Token(0))
     ]);
 
     poll.register().reregister(&sock, Token(0), Ready::empty(), PollOpt::EDGE).unwrap();

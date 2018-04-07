@@ -41,7 +41,7 @@
 //!
 //! // Start listening for incoming connections
 //! poll.register()
-//!     .register(&server, SERVER, Ready::readable(),
+//!     .register(&server, SERVER, Ready::READABLE,
 //!               PollOpt::EDGE).unwrap();
 //!
 //! // Setup the client socket
@@ -49,7 +49,7 @@
 //!
 //! // Register the socket
 //! poll.register()
-//!     .register(&sock, CLIENT, Ready::readable(),
+//!     .register(&sock, CLIENT, Ready::READABLE,
 //!               PollOpt::EDGE).unwrap();
 //!
 //! // Create storage for events

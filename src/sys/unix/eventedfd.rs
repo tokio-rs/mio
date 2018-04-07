@@ -46,7 +46,7 @@ use std::os::unix::io::RawFd;
 /// poll.register()
 ///     .register(
 ///         &EventedFd(&listener.as_raw_fd()),
-///         Token(0), Ready::readable(), PollOpt::EDGE)?;
+///         Token(0), Ready::READABLE, PollOpt::EDGE)?;
 /// #     Ok(())
 /// # }
 /// #

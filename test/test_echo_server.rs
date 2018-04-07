@@ -32,14 +32,14 @@ impl EchoConn {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
 
-                self.interest.insert(Ready::writable());
+                self.interest.insert(Ready::WRITABLE);
             }
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
                 self.buf.drain(..r);
-                self.interest.insert(Ready::readable());
-                self.interest.remove(Ready::writable());
+                self.interest.insert(Ready::READABLE);
+                self.interest.remove(Ready::WRITABLE);
             }
             Err(e) => debug!("not implemented; client err={:?}", e),
         }
@@ -60,12 +60,12 @@ impl EchoConn {
                 debug!("CONN : we read {} bytes!", r);
 
                 // prepare to provide this to writable
-                self.interest.remove(Ready::readable());
-                self.interest.insert(Ready::writable());
+                self.interest.remove(Ready::READABLE);
+                self.interest.insert(Ready::WRITABLE);
             }
             Err(e) => {
                 debug!("not implemented; client err={:?}", e);
-                self.interest.remove(Ready::readable());
+                self.interest.remove(Ready::READABLE);
             }
 
         };
@@ -96,7 +96,7 @@ impl EchoServer {
         self.conns[tok].token = Some(tok);
         poll.register()
             .register(
-                &self.conns[tok].sock, tok, Ready::readable(),
+                &self.conns[tok].sock, tok, Ready::READABLE,
                 PollOpt::EDGE | PollOpt::ONESHOT)
             .ok().expect("could not register socket with event loop");
 
@@ -173,7 +173,7 @@ impl EchoClient {
                 buf.clear();
                 self.mut_buf = Some(buf);
 
-                self.interest.remove(Ready::readable());
+                self.interest.remove(Ready::READABLE);
 
                 if self.rx.is_empty() {
                     self.next_msg(poll).unwrap();
@@ -201,13 +201,13 @@ impl EchoClient {
         match self.sock.try_write_buf(&mut self.tx.into_buf()) {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
-                self.interest.insert(Ready::writable());
+                self.interest.insert(Ready::WRITABLE);
             }
             Ok(Some(r)) => {
                 self.tx = &self.tx[r..];
                 debug!("CLIENT : we wrote {} bytes!", r);
-                self.interest.insert(Ready::readable());
-                self.interest.remove(Ready::writable());
+                self.interest.insert(Ready::READABLE);
+                self.interest.remove(Ready::WRITABLE);
             }
             Err(e) => debug!("not implemented; client err={:?}", e)
         }
@@ -234,7 +234,7 @@ impl EchoClient {
         self.tx = curr.as_bytes();
         self.rx = curr.as_bytes();
 
-        self.interest.insert(Ready::writable());
+        self.interest.insert(Ready::WRITABLE);
         poll.register()
             .reregister(
                 &self.sock, self.token, self.interest,
@@ -270,7 +270,7 @@ pub fn test_echo_server() {
     info!("listen for connections");
     poll.register()
         .register(
-            &srv, SERVER, Ready::readable(),
+            &srv, SERVER, Ready::READABLE,
             PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
@@ -278,7 +278,7 @@ pub fn test_echo_server() {
     // Connect to the server
     poll.register()
         .register(
-            &sock, CLIENT, Ready::writable(),
+            &sock, CLIENT, Ready::WRITABLE,
             PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 
     // == Create storage for events

@@ -29,7 +29,7 @@ bitflags! {
     /// use mio::Ready;
     /// use mio::unix::UnixReady;
     ///
-    /// let ready = Ready::readable() | UnixReady::hup();
+    /// let ready = Ready::READABLE | UnixReady::HUP;
     ///
     /// assert!(ready.is_readable());
     /// assert!(UnixReady::from(ready).is_hup());
@@ -42,12 +42,12 @@ bitflags! {
     /// use mio::unix::UnixReady;
     ///
     /// // Start with a portable ready
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     ///
     /// // Convert to a unix ready, adding HUP
-    /// let mut unix_ready = UnixReady::from(ready) | UnixReady::hup();
+    /// let mut unix_ready = UnixReady::from(ready) | UnixReady::HUP;
     ///
-    /// unix_ready.insert(UnixReady::error());
+    /// unix_ready.insert(UnixReady::ERROR);
     ///
     /// // `unix_ready` maintains readable interest
     /// assert!(unix_ready.is_readable());
@@ -78,7 +78,7 @@ bitflags! {
     /// poll.register()
     ///     .register(&socket,
     ///               Token(0),
-    ///               Ready::readable() | UnixReady::error(),
+    ///               Ready::READABLE | UnixReady::ERROR,
     ///               PollOpt::EDGE)?;
     /// #     Ok(())
     /// # }
@@ -105,7 +105,7 @@ bitflags! {
         /// ```
         /// use mio::unix::UnixReady;
         ///
-        /// let ready = UnixReady::error();
+        /// let ready = UnixReady::ERROR;
         ///
         /// assert!(ready.is_error());
         /// ```
@@ -130,7 +130,7 @@ bitflags! {
         /// ```
         /// use mio::unix::UnixReady;
         ///
-        /// let ready = UnixReady::hup();
+        /// let ready = UnixReady::HUP;
         ///
         /// assert!(ready.is_hup());
         /// ```
@@ -149,7 +149,7 @@ bitflags! {
         /// ```
         /// use mio::unix::UnixReady;
         ///
-        /// let ready = UnixReady::aio();
+        /// let ready = UnixReady::AIO;
         ///
         /// assert!(ready.is_aio());
         /// ```
@@ -165,7 +165,7 @@ bitflags! {
         /// ```
         /// use mio::unix::UnixReady;
         ///
-        /// let ready = UnixReady::lio();
+        /// let ready = UnixReady::LIO;
         ///
         /// assert!(ready.is_lio());
         /// ```
@@ -229,7 +229,7 @@ impl UnixReady {
     /// ```
     /// use mio::unix::UnixReady;
     ///
-    /// let ready = UnixReady::aio();
+    /// let ready = UnixReady::AIO;
     ///
     /// assert!(ready.is_aio());
     /// ```
@@ -265,7 +265,7 @@ impl UnixReady {
     /// ```
     /// use mio::unix::UnixReady;
     ///
-    /// let ready = UnixReady::error();
+    /// let ready = UnixReady::ERROR;
     ///
     /// assert!(ready.is_error());
     /// ```
@@ -294,7 +294,7 @@ impl UnixReady {
     /// ```
     /// use mio::unix::UnixReady;
     ///
-    /// let ready = UnixReady::hup();
+    /// let ready = UnixReady::HUP;
     ///
     /// assert!(ready.is_hup());
     /// ```
@@ -315,7 +315,7 @@ impl UnixReady {
     /// ```
     /// use mio::unix::UnixReady;
     ///
-    /// let ready = UnixReady::lio();
+    /// let ready = UnixReady::LIO;
     ///
     /// assert!(ready.is_lio());
     /// ```

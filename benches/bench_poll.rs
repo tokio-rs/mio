@@ -23,7 +23,7 @@ fn bench_poll(bench: &mut Bencher) {
         let (r, s) = Registration::new(
             &poll,
             Token(i),
-            Ready::readable(),
+            Ready::READABLE,
             PollOpt::EDGE);
 
         registrations.push(r);
@@ -37,7 +37,7 @@ fn bench_poll(bench: &mut Bencher) {
             let set_readiness = set_readiness.clone();
             thread::spawn(move || {
                 while i < NUM {
-                    set_readiness[i].set_readiness(Ready::readable()).unwrap();
+                    set_readiness[i].set_readiness(Ready::READABLE).unwrap();
                     i += THREADS;
                 }
             });

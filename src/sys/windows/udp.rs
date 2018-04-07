@@ -103,7 +103,7 @@ impl UdpSocket {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest - Ready::writable());
+        me.iocp.set_readiness(interest - Ready::WRITABLE);
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = owned_buf.write(buf)?;
@@ -137,7 +137,7 @@ impl UdpSocket {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest - Ready::writable());
+        me.iocp.set_readiness(interest - Ready::WRITABLE);
 
         let mut owned_buf = me.iocp.get_buffer(64 * 1024);
         let amt = owned_buf.write(buf)?;
@@ -282,7 +282,7 @@ impl UdpSocket {
         // See comments in TcpSocket::post_register for what's going on here
         if interest.is_writable() {
             if let State::Empty = me.write {
-                self.imp.add_readiness(me, Ready::writable());
+                self.imp.add_readiness(me, Ready::WRITABLE);
             }
         }
     }
@@ -300,7 +300,7 @@ impl Imp {
         }
 
         let interest = me.iocp.readiness();
-        me.iocp.set_readiness(interest - Ready::readable());
+        me.iocp.set_readiness(interest - Ready::READABLE);
 
         let mut buf = me.iocp.get_buffer(64 * 1024);
         let res = unsafe {
@@ -317,7 +317,7 @@ impl Imp {
             }
             Err(e) => {
                 me.read = State::Error(e);
-                self.add_readiness(me, Ready::readable());
+                self.add_readiness(me, Ready::READABLE);
                 me.iocp.put_buffer(buf);
             }
         }
@@ -392,7 +392,7 @@ fn send_done(status: &OVERLAPPED_ENTRY) {
     };
     let mut me = me2.inner();
     me.write = State::Empty;
-    me2.add_readiness(&mut me, Ready::writable());
+    me2.add_readiness(&mut me, Ready::WRITABLE);
 }
 
 fn recv_done(status: &OVERLAPPED_ENTRY) {
@@ -410,5 +410,5 @@ fn recv_done(status: &OVERLAPPED_ENTRY) {
         buf.set_len(status.bytes_transferred() as usize);
     }
     me.read = State::Ready(buf);
-    me2.add_readiness(&mut me, Ready::readable());
+    me2.add_readiness(&mut me, Ready::READABLE);
 }

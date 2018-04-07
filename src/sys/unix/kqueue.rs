@@ -100,8 +100,8 @@ impl Selector {
                     libc::EV_RECEIPT;
 
         unsafe {
-            let r = if interests.contains(Ready::readable()) { libc::EV_ADD } else { libc::EV_DELETE };
-            let w = if interests.contains(Ready::writable()) { libc::EV_ADD } else { libc::EV_DELETE };
+            let r = if interests.contains(Ready::READABLE) { libc::EV_ADD } else { libc::EV_DELETE };
+            let w = if interests.contains(Ready::WRITABLE) { libc::EV_ADD } else { libc::EV_DELETE };
             let mut changes = [
                 kevent!(fd, libc::EVFILT_READ, flags | r, usize::from(token)),
                 kevent!(fd, libc::EVFILT_WRITE, flags | w, usize::from(token)),
@@ -284,35 +284,35 @@ impl Events {
             }
 
             if e.flags & libc::EV_ERROR != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(*UnixReady::error());
+                event::kind_mut(&mut self.events[idx]).insert(*UnixReady::ERROR);
             }
 
             if e.filter == libc::EVFILT_READ as Filter {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::readable());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::READABLE);
             } else if e.filter == libc::EVFILT_WRITE as Filter {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::WRITABLE);
             }
 #[cfg(any(target_os = "dragonfly",
     target_os = "freebsd", target_os = "ios", target_os = "macos"))]
             {
                 if e.filter == libc::EVFILT_AIO {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::aio());
+                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::AIO);
                 }
             }
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
             {
                 if e.filter == libc::EVFILT_LIO {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::lio());
+                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::LIO);
                 }
             }
 
             if e.flags & libc::EV_EOF != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(UnixReady::hup());
+                event::kind_mut(&mut self.events[idx]).insert(UnixReady::HUP);
 
                 // When the read end of the socket is closed, EV_EOF is set on
                 // flags, and fflags contains the error if there is one.
                 if e.fflags != 0 {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::error());
+                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::ERROR);
                 }
             }
         }
@@ -352,7 +352,7 @@ fn does_not_register_rw() {
     // X)
     poll.register()
         .register(
-            &kqf, Token(1234), Ready::readable(),
+            &kqf, Token(1234), Ready::READABLE,
             PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 }
 
@@ -363,6 +363,6 @@ fn test_coalesce_aio() {
     let mut events = Events::with_capacity(1);
     events.sys_events.0.push(kevent!(0x1234, libc::EVFILT_AIO, 0, 42));
     events.coalesce(Token(0));
-    assert!(events.events[0].readiness() == UnixReady::aio().into());
+    assert!(events.events[0].readiness() == UnixReady::AIO.into());
     assert!(events.events[0].token() == Token(42));
 }

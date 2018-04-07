@@ -87,11 +87,11 @@ fn epoll_event_to_ready(epoll: u32) -> Ready {
     let mut kind = Ready::empty();
 
     if (epoll & libc::EPOLLIN) != 0 || (epoll & libc::EPOLLPRI) != 0 {
-        kind = kind | Ready::readable();
+        kind = kind | Ready::READABLE;
     }
 
     if (epoll & libc::EPOLLOUT) != 0 {
-        kind = kind | Ready::writable();
+        kind = kind | Ready::WRITABLE;
     }
 
     kind
@@ -99,11 +99,11 @@ fn epoll_event_to_ready(epoll: u32) -> Ready {
     /* TODO: support?
     // EPOLLHUP - Usually means a socket error happened
     if (epoll & libc::EPOLLERR) != 0 {
-        kind = kind | UnixReady::error();
+        kind = kind | UnixReady::ERROR;
     }
 
     if (epoll & libc::EPOLLRDHUP) != 0 || (epoll & libc::EPOLLHUP) != 0 {
-        kind = kind | UnixReady::hup();
+        kind = kind | UnixReady::HUP;
     }
     */
 }

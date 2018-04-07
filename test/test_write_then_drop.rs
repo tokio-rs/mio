@@ -16,7 +16,7 @@ fn write_then_drop() {
 
     a.register(poll.register(),
                Token(1),
-               Ready::readable(),
+               Ready::READABLE,
                PollOpt::EDGE).unwrap();
     s.register(poll.register(),
                Token(3),
@@ -34,7 +34,7 @@ fn write_then_drop() {
 
     s2.register(poll.register(),
                 Token(2),
-                Ready::writable(),
+                Ready::WRITABLE,
                 PollOpt::EDGE).unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -49,7 +49,7 @@ fn write_then_drop() {
 
     s.reregister(poll.register(),
                  Token(3),
-                 Ready::readable(),
+                 Ready::READABLE,
                  PollOpt::EDGE).unwrap();
     let mut events = Events::with_capacity(1024);
     while events.iter().count() == 0 {
@@ -75,7 +75,7 @@ fn write_then_deregister() {
 
     a.register(poll.register(),
                Token(1),
-               Ready::readable(),
+               Ready::READABLE,
                PollOpt::EDGE).unwrap();
     s.register(poll.register(),
                Token(3),
@@ -93,7 +93,7 @@ fn write_then_deregister() {
 
     s2.register(poll.register(),
                 Token(2),
-                Ready::writable(),
+                Ready::WRITABLE,
                 PollOpt::EDGE).unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -108,7 +108,7 @@ fn write_then_deregister() {
 
     s.reregister(poll.register(),
                  Token(3),
-                 Ready::readable(),
+                 Ready::READABLE,
                  PollOpt::EDGE).unwrap();
     let mut events = Events::with_capacity(1024);
     while events.iter().count() == 0 {

@@ -14,12 +14,12 @@ use std::ops;
 #[inline]
 pub fn assert_fuchsia_ready_repr() {
     debug_assert!(
-        ZX_OBJECT_READABLE.bits() as usize == ready_as_usize(Ready::readable()),
-        "Zircon ZX_OBJECT_READABLE should have the same repr as Ready::readable()"
+        ZX_OBJECT_READABLE.bits() as usize == ready_as_usize(Ready::READABLE),
+        "Zircon ZX_OBJECT_READABLE should have the same repr as Ready::READABLE"
     );
     debug_assert!(
-        ZX_OBJECT_WRITABLE.bits() as usize == ready_as_usize(Ready::writable()),
-        "Zircon ZX_OBJECT_WRITABLE should have the same repr as Ready::writable()"
+        ZX_OBJECT_WRITABLE.bits() as usize == ready_as_usize(Ready::WRITABLE),
+        "Zircon ZX_OBJECT_WRITABLE should have the same repr as Ready::WRITABLE"
     );
 }
 
