@@ -16,10 +16,10 @@ pub fn test_tcp_listener_level_triggered() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register().register(&l, Token(0), Ready::readable(), PollOpt::level()).unwrap();
+    poll.register().register(&l, Token(0), Ready::readable(), PollOpt::LEVEL).unwrap();
 
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register().register(&s1, Token(1), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&s1, Token(1), Ready::readable(), PollOpt::EDGE).unwrap();
 
     while filter(&pevents, Token(0)).len() == 0 {
         poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
@@ -42,7 +42,7 @@ pub fn test_tcp_listener_level_triggered() {
     assert!(events.is_empty(), "actual={:?}", events);
 
     let s3 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register().register(&s3, Token(2), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&s3, Token(2), Ready::readable(), PollOpt::EDGE).unwrap();
 
     while filter(&pevents, Token(0)).len() == 0 {
         poll.poll(&mut pevents, Some(Duration::from_millis(MS))).unwrap();
@@ -69,10 +69,10 @@ pub fn test_tcp_stream_level_triggered() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register().register(&l, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&l, Token(0), Ready::readable(), PollOpt::EDGE).unwrap();
 
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register().register(&s1, Token(1), Ready::readable() | Ready::writable(), PollOpt::level()).unwrap();
+    poll.register().register(&s1, Token(1), Ready::readable() | Ready::writable(), PollOpt::LEVEL).unwrap();
 
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);
@@ -93,7 +93,7 @@ pub fn test_tcp_stream_level_triggered() {
     ]);
 
     // Register the socket
-    poll.register().register(&s1_tx, Token(123), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&s1_tx, Token(123), Ready::readable(), PollOpt::EDGE).unwrap();
 
     debug!("writing some data ----------");
 

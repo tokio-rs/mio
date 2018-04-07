@@ -107,7 +107,7 @@ use std::time::{Duration, Instant};
 ///
 /// // Register the stream with `Poll`
 /// poll.register()
-///     .register(&stream, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
+///     .register(&stream, Token(0), Ready::readable() | Ready::writable(), PollOpt::EDGE)?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -280,7 +280,7 @@ use std::time::{Duration, Instant};
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
 /// poll.register()
-///     .register(&sock, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
+///     .register(&sock, Token(0), Ready::readable() | Ready::writable(), PollOpt::EDGE)?;
 /// #     Ok(())
 /// # }
 /// #
@@ -668,7 +668,7 @@ impl Poll {
                 poll.register(),
                 AWAKEN,
                 Ready::readable(),
-                PollOpt::edge())?;
+                PollOpt::EDGE)?;
 
         Ok(poll)
     }
@@ -742,7 +742,7 @@ impl Poll {
     ///
     /// // Register the stream with `Poll`
     /// poll.register()
-    ///     .register(&stream, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
+    ///     .register(&stream, Token(0), Ready::readable() | Ready::writable(), PollOpt::EDGE)?;
     ///
     /// // Wait for the socket to become ready. This has to happens in a loop to
     /// // handle spurious wakeups.
@@ -902,7 +902,7 @@ impl Register {
     ///
     /// // Register the socket with `poll`
     /// poll.register()
-    ///     .register(&socket, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
+    ///     .register(&socket, Token(0), Ready::readable() | Ready::writable(), PollOpt::EDGE)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// let start = Instant::now();
@@ -987,13 +987,13 @@ impl Register {
     ///
     /// // Register the socket with `poll`, requesting readable
     /// poll.register()
-    ///     .register(&socket, Token(0), Ready::readable(), PollOpt::edge())?;
+    ///     .register(&socket, Token(0), Ready::readable(), PollOpt::EDGE)?;
     ///
     /// // Reregister the socket specifying a different token and write interest
-    /// // instead. `PollOpt::edge()` must be specified even though that value
+    /// // instead. `PollOpt::EDGE` must be specified even though that value
     /// // is not being changed.
     /// poll.register()
-    ///     .reregister(&socket, Token(2), Ready::writable(), PollOpt::edge())?;
+    ///     .reregister(&socket, Token(2), Ready::writable(), PollOpt::EDGE)?;
     /// #     Ok(())
     /// # }
     /// #
@@ -1047,7 +1047,7 @@ impl Register {
     ///
     /// // Register the socket with `poll`
     /// poll.register()
-    ///     .register(&socket, Token(0), Ready::readable(), PollOpt::edge())?;
+    ///     .register(&socket, Token(0), Ready::readable(), PollOpt::EDGE)?;
     ///
     /// poll.register().deregister(&socket)?;
     ///
@@ -1423,7 +1423,7 @@ impl Registration {
     ///
     /// let mut poll = Poll::new()?;
     /// poll.register()
-    ///     .register(&registration, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
+    ///     .register(&registration, Token(0), Ready::readable() | Ready::writable(), PollOpt::EDGE)?;
     ///
     /// let mut events = Events::with_capacity(256);
     ///
@@ -1598,7 +1598,7 @@ impl SetReadiness {
     ///     .register(&registration,
     ///               Token(0),
     ///               Ready::readable(),
-    ///               PollOpt::edge())?;
+    ///               PollOpt::EDGE)?;
     ///
     /// // Set the readiness, then immediately poll to try to get the readiness
     /// // event

@@ -48,7 +48,7 @@ impl EchoConn {
         poll.register()
             .reregister(
                 &self.sock, self.token.unwrap(), self.interest,
-                PollOpt::edge() | PollOpt::oneshot())
+                PollOpt::EDGE | PollOpt::ONESHOT)
     }
 
     fn readable(&mut self, poll: &mut Poll) -> io::Result<()> {
@@ -74,7 +74,7 @@ impl EchoConn {
         poll.register()
             .reregister(
                 &self.sock, self.token.unwrap(), self.interest,
-                PollOpt::edge())
+                PollOpt::EDGE)
     }
 }
 
@@ -97,7 +97,7 @@ impl EchoServer {
         poll.register()
             .register(
                 &self.conns[tok].sock, tok, Ready::readable(),
-                PollOpt::edge() | PollOpt::oneshot())
+                PollOpt::EDGE | PollOpt::ONESHOT)
             .ok().expect("could not register socket with event loop");
 
         Ok(())
@@ -189,7 +189,7 @@ impl EchoClient {
             poll.register()
                 .reregister(
                     &self.sock, self.token, self.interest,
-                    PollOpt::edge() | PollOpt::oneshot())?;
+                    PollOpt::EDGE | PollOpt::ONESHOT)?;
         }
 
         Ok(())
@@ -216,7 +216,7 @@ impl EchoClient {
             try!(poll.register()
                  .reregister(
                      &self.sock, self.token, self.interest,
-                     PollOpt::edge() | PollOpt::oneshot()));
+                     PollOpt::EDGE | PollOpt::ONESHOT));
         }
 
         Ok(())
@@ -238,7 +238,7 @@ impl EchoClient {
         poll.register()
             .reregister(
                 &self.sock, self.token, self.interest,
-                PollOpt::edge() | PollOpt::oneshot())
+                PollOpt::EDGE | PollOpt::ONESHOT)
     }
 }
 
@@ -271,7 +271,7 @@ pub fn test_echo_server() {
     poll.register()
         .register(
             &srv, SERVER, Ready::readable(),
-            PollOpt::edge() | PollOpt::oneshot()).unwrap();
+            PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
 
@@ -279,7 +279,7 @@ pub fn test_echo_server() {
     poll.register()
         .register(
             &sock, CLIENT, Ready::writable(),
-            PollOpt::edge() | PollOpt::oneshot()).unwrap();
+            PollOpt::EDGE | PollOpt::ONESHOT).unwrap();
 
     // == Create storage for events
     let mut events = Events::with_capacity(1024);

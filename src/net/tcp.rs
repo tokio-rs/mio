@@ -49,7 +49,7 @@ use poll::SelectorId;
 /// // Register the socket with `Poll`
 /// poll.register().register(
 ///     &stream, Token(0), Ready::writable(),
-///     PollOpt::edge())?;
+///     PollOpt::EDGE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -441,7 +441,7 @@ impl Evented for TcpStream {
 /// // Register the socket with `Poll`
 /// poll.register()
 ///     .register(&listener, Token(0), Ready::writable(),
-///               PollOpt::edge())?;
+///               PollOpt::EDGE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///

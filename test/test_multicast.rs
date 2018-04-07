@@ -86,10 +86,10 @@ pub fn test_multicast() {
     rx.join_multicast_v4(&"227.1.1.101".parse().unwrap(), &any).unwrap();
 
     info!("Registering SENDER");
-    poll.register().register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
+    poll.register().register(&tx, SENDER, Ready::writable(), PollOpt::EDGE).unwrap();
 
     info!("Registering LISTENER");
-    poll.register().register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&rx, LISTENER, Ready::readable(), PollOpt::EDGE).unwrap();
 
     let mut events = Events::with_capacity(1024);
 

@@ -23,13 +23,13 @@ fn local_addr_ready() {
     poll.register()
         .register(
             &server, LISTEN, Ready::readable(),
-            PollOpt::edge()).unwrap();
+            PollOpt::EDGE).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
     poll.register()
         .register(
             &sock, CLIENT, Ready::readable(),
-            PollOpt::edge()).unwrap();
+            PollOpt::EDGE).unwrap();
 
     let mut events = Events::with_capacity(1024);
 
@@ -51,7 +51,7 @@ fn local_addr_ready() {
                         .register(&sock,
                                   SERVER,
                                   Ready::writable(),
-                                  PollOpt::edge()).unwrap();
+                                  PollOpt::EDGE).unwrap();
                     handler.accepted = Some(sock);
                 }
                 SERVER => {

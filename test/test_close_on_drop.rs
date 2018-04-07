@@ -60,7 +60,7 @@ impl TestHandler {
             }
             _ => panic!("received unknown token {:?}", tok)
         }
-        poll.register().reregister(&self.cli, CLIENT, Ready::readable(), PollOpt::edge()).unwrap();
+        poll.register().reregister(&self.cli, CLIENT, Ready::readable(), PollOpt::EDGE).unwrap();
     }
 
     fn handle_write(&mut self, poll: &mut Poll, tok: Token, _: Ready) {
@@ -68,7 +68,7 @@ impl TestHandler {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {
                 debug!("client connected");
-                poll.register().reregister(&self.cli, CLIENT, Ready::readable(), PollOpt::edge()).unwrap();
+                poll.register().reregister(&self.cli, CLIENT, Ready::readable(), PollOpt::EDGE).unwrap();
             }
             _ => panic!("received unknown token {:?}", tok)
         }
@@ -86,12 +86,12 @@ pub fn test_close_on_drop() {
     // == Create & setup server socket
     let srv = TcpListener::bind(&addr).unwrap();
 
-    poll.register().register(&srv, SERVER, Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register().register(&srv, SERVER, Ready::readable(), PollOpt::EDGE).unwrap();
 
     // == Create & setup client socket
     let sock = TcpStream::connect(&addr).unwrap();
 
-    poll.register().register(&sock, CLIENT, Ready::writable(), PollOpt::edge()).unwrap();
+    poll.register().register(&sock, CLIENT, Ready::writable(), PollOpt::EDGE).unwrap();
 
     // == Create storage for events
     let mut events = Events::with_capacity(1024);

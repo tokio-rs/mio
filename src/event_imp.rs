@@ -167,7 +167,7 @@ bitflags! {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opts = PollOpt::edge() | PollOpt::oneshot();
+    /// let opts = PollOpt::EDGE | PollOpt::ONESHOT;
     ///
     /// assert!(opts.is_edge());
     /// assert!(opts.is_oneshot());
@@ -185,7 +185,7 @@ bitflags! {
         /// ```
         /// use mio::PollOpt;
         ///
-        /// let opt = PollOpt::edge();
+        /// let opt = PollOpt::EDGE;
         ///
         /// assert!(opt.is_edge());
         /// ```
@@ -201,7 +201,7 @@ bitflags! {
         /// ```
         /// use mio::PollOpt;
         ///
-        /// let opt = PollOpt::level();
+        /// let opt = PollOpt::LEVEL;
         ///
         /// assert!(opt.is_level());
         /// ```
@@ -217,7 +217,7 @@ bitflags! {
         /// ```
         /// use mio::PollOpt;
         ///
-        /// let opt = PollOpt::oneshot();
+        /// let opt = PollOpt::ONESHOT;
         ///
         /// assert!(opt.is_oneshot());
         /// ```
@@ -261,7 +261,7 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::edge();
+    /// let opt = PollOpt::EDGE;
     ///
     /// assert!(opt.is_edge());
     /// ```
@@ -281,7 +281,7 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::level();
+    /// let opt = PollOpt::LEVEL;
     ///
     /// assert!(opt.is_level());
     /// ```
@@ -301,7 +301,7 @@ impl PollOpt {
     /// ```
     /// use mio::PollOpt;
     ///
-    /// let opt = PollOpt::oneshot();
+    /// let opt = PollOpt::ONESHOT;
     ///
     /// assert!(opt.is_oneshot());
     /// ```
@@ -317,9 +317,9 @@ impl fmt::Display for PollOpt {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (PollOpt::edge(), "Edge-Triggered"),
-            (PollOpt::level(), "Level-Triggered"),
-            (PollOpt::oneshot(), "OneShot")];
+            (PollOpt::EDGE, "Edge-Triggered"),
+            (PollOpt::LEVEL, "Level-Triggered"),
+            (PollOpt::ONESHOT, "OneShot")];
 
         for &(flag, msg) in &flags {
             if self.contains(flag) {
@@ -341,9 +341,9 @@ impl fmt::Display for PollOpt {
 #[test]
 fn test_debug_pollopt() {
     assert_eq!("(empty)", format!("{}", PollOpt::empty()));
-    assert_eq!("Edge-Triggered", format!("{}", PollOpt::edge()));
-    assert_eq!("Level-Triggered", format!("{}", PollOpt::level()));
-    assert_eq!("OneShot", format!("{}", PollOpt::oneshot()));
+    assert_eq!("Edge-Triggered", format!("{}", PollOpt::EDGE));
+    assert_eq!("Level-Triggered", format!("{}", PollOpt::LEVEL));
+    assert_eq!("OneShot", format!("{}", PollOpt::ONESHOT));
 }
 
 /// A set of readiness event kinds

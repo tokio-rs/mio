@@ -79,7 +79,7 @@ use std::fmt;
 ///     .register(&socket,
 ///               Token(0),
 ///               Ready::readable() | UnixReady::error(),
-///               PollOpt::edge())?;
+///               PollOpt::EDGE)?;
 /// #     Ok(())
 /// # }
 /// #

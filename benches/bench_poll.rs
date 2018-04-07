@@ -24,7 +24,7 @@ fn bench_poll(bench: &mut Bencher) {
             &poll,
             Token(i),
             Ready::readable(),
-            PollOpt::edge());
+            PollOpt::EDGE);
 
         registrations.push(r);
         set_readiness.push(s);
