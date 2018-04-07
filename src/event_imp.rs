@@ -154,108 +154,102 @@ pub trait Evented {
     fn deregister(&self, register: &Register) -> io::Result<()>;
 }
 
-/// Options supplied when registering an `Evented` handle with `Register`
-///
-/// `PollOpt` values can be combined together using the various bitwise
-/// operators.
-///
-/// For high level documentation on polling and poll options, see [`Poll`].
-///
-/// # Examples
-///
-/// ```
-/// use mio::PollOpt;
-///
-/// let opts = PollOpt::edge() | PollOpt::oneshot();
-///
-/// assert!(opts.is_edge());
-/// assert!(opts.is_oneshot());
-/// assert!(!opts.is_level());
-/// ```
-///
-/// [`Poll`]: struct.Poll.html
-#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct PollOpt(usize);
+bitflags! {
+    /// Options supplied when registering an `Evented` handle with `Register`
+    ///
+    /// `PollOpt` values can be combined together using the various bitwise
+    /// operators.
+    ///
+    /// For high level documentation on polling and poll options, see [`Poll`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::PollOpt;
+    ///
+    /// let opts = PollOpt::edge() | PollOpt::oneshot();
+    ///
+    /// assert!(opts.is_edge());
+    /// assert!(opts.is_oneshot());
+    /// assert!(!opts.is_level());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    pub struct PollOpt: usize {
+        /// `PollOpt` representing edge-triggered notifications.
+        ///
+        /// See [`Poll`] for more documentation on polling.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use mio::PollOpt;
+        ///
+        /// let opt = PollOpt::edge();
+        ///
+        /// assert!(opt.is_edge());
+        /// ```
+        ///
+        /// [`Poll`]: struct.Poll.html
+        const EDGE    = 0b0001;
+        /// `PollOpt` representing level-triggered notifications.
+        ///
+        /// See [`Poll`] for more documentation on polling.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use mio::PollOpt;
+        ///
+        /// let opt = PollOpt::level();
+        ///
+        /// assert!(opt.is_level());
+        /// ```
+        ///
+        /// [`Poll`]: struct.Poll.html
+        const LEVEL   = 0b0010;
+        /// `PollOpt` representing oneshot notifications.
+        ///
+        /// See [`Poll`] for more documentation on polling.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use mio::PollOpt;
+        ///
+        /// let opt = PollOpt::oneshot();
+        ///
+        /// assert!(opt.is_oneshot());
+        /// ```
+        ///
+        /// [`Poll`]: struct.Poll.html
+        const ONESHOT = 0b0100;
+    }
+}
 
 impl PollOpt {
-    /// Return a `PollOpt` representing no set options.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::empty();
-    ///
-    /// assert!(!opt.is_level());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    pub fn empty() -> PollOpt {
-        PollOpt(0)
-    }
-
-    /// Return a `PollOpt` representing edge-triggered notifications.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::edge();
-    ///
-    /// assert!(opt.is_edge());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
+    #[deprecated(since = "0.7.0", note = "use PollOpt::EDGE instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn edge() -> PollOpt {
-        PollOpt(0b0001)
+        Self::EDGE
     }
 
-    /// Return a `PollOpt` representing level-triggered notifications.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::level();
-    ///
-    /// assert!(opt.is_level());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
+    #[deprecated(since = "0.7.0", note = "use PollOpt::LEVEL instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn level() -> PollOpt {
-        PollOpt(0b0010)
+        Self::LEVEL
     }
 
-    /// Return a `PollOpt` representing oneshot notifications.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::oneshot();
-    ///
-    /// assert!(opt.is_oneshot());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
+    #[deprecated(since = "0.7.0", note = "use PollOpt::ONESHOT instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
     #[inline]
     pub fn oneshot() -> PollOpt {
-        PollOpt(0b0100)
+        Self::ONESHOT
     }
 
     /// Returns true if the options include edge-triggered notifications.
@@ -275,7 +269,7 @@ impl PollOpt {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_edge(&self) -> bool {
-        self.contains(PollOpt::edge())
+        self.contains(Self::EDGE)
     }
 
     /// Returns true if the options include level-triggered notifications.
@@ -295,7 +289,7 @@ impl PollOpt {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_level(&self) -> bool {
-        self.contains(PollOpt::level())
+        self.contains(Self::LEVEL)
     }
 
     /// Returns true if the options includes oneshot.
@@ -315,129 +309,11 @@ impl PollOpt {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_oneshot(&self) -> bool {
-        self.contains(PollOpt::oneshot())
-    }
-
-    /// Returns true if `self` is a superset of `other`.
-    ///
-    /// `other` may represent more than one option, in which case the function
-    /// only returns true if `self` contains all of the options specified in
-    /// `other`.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::oneshot();
-    ///
-    /// assert!(opt.contains(PollOpt::oneshot()));
-    /// assert!(!opt.contains(PollOpt::edge()));
-    /// ```
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::oneshot() | PollOpt::edge();
-    ///
-    /// assert!(opt.contains(PollOpt::oneshot()));
-    /// assert!(opt.contains(PollOpt::edge()));
-    /// ```
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::oneshot() | PollOpt::edge();
-    ///
-    /// assert!(!PollOpt::oneshot().contains(opt));
-    /// assert!(opt.contains(opt));
-    /// assert!((opt | PollOpt::level()).contains(opt));
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    pub fn contains(&self, other: PollOpt) -> bool {
-        (*self & other) == other
-    }
-
-    /// Adds all options represented by `other` into `self`.
-    ///
-    /// This is equivalent to `*self = *self | other`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let mut opt = PollOpt::empty();
-    /// opt.insert(PollOpt::oneshot());
-    ///
-    /// assert!(opt.is_oneshot());
-    /// ```
-    #[inline]
-    pub fn insert(&mut self, other: PollOpt) {
-        self.0 |= other.0;
-    }
-
-    /// Removes all options represented by `other` from `self`.
-    ///
-    /// This is equivalent to `*self = *self & !other`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let mut opt = PollOpt::oneshot();
-    /// opt.remove(PollOpt::oneshot());
-    ///
-    /// assert!(!opt.is_oneshot());
-    /// ```
-    #[inline]
-    pub fn remove(&mut self, other: PollOpt) {
-        self.0 &= !other.0;
+        self.contains(Self::ONESHOT)
     }
 }
 
-impl ops::BitOr for PollOpt {
-    type Output = PollOpt;
-
-    #[inline]
-    fn bitor(self, other: PollOpt) -> PollOpt {
-        PollOpt(self.0 | other.0)
-    }
-}
-
-impl ops::BitXor for PollOpt {
-    type Output = PollOpt;
-
-    #[inline]
-    fn bitxor(self, other: PollOpt) -> PollOpt {
-        PollOpt(self.0 ^ other.0)
-    }
-}
-
-impl ops::BitAnd for PollOpt {
-    type Output = PollOpt;
-
-    #[inline]
-    fn bitand(self, other: PollOpt) -> PollOpt {
-        PollOpt(self.0 & other.0)
-    }
-}
-
-impl ops::Sub for PollOpt {
-    type Output = PollOpt;
-
-    #[inline]
-    fn sub(self, other: PollOpt) -> PollOpt {
-        PollOpt(self.0 & !other.0)
-    }
-}
-
-impl fmt::Debug for PollOpt {
+impl fmt::Display for PollOpt {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
         let flags = [
@@ -464,10 +340,10 @@ impl fmt::Debug for PollOpt {
 
 #[test]
 fn test_debug_pollopt() {
-    assert_eq!("(empty)", format!("{:?}", PollOpt::empty()));
-    assert_eq!("Edge-Triggered", format!("{:?}", PollOpt::edge()));
-    assert_eq!("Level-Triggered", format!("{:?}", PollOpt::level()));
-    assert_eq!("OneShot", format!("{:?}", PollOpt::oneshot()));
+    assert_eq!("(empty)", format!("{}", PollOpt::empty()));
+    assert_eq!("Edge-Triggered", format!("{}", PollOpt::edge()));
+    assert_eq!("Level-Triggered", format!("{}", PollOpt::level()));
+    assert_eq!("OneShot", format!("{}", PollOpt::oneshot()));
 }
 
 /// A set of readiness event kinds
@@ -902,16 +778,8 @@ pub fn ready_as_usize(events: Ready) -> usize {
     events.0
 }
 
-pub fn opt_as_usize(opt: PollOpt) -> usize {
-    opt.0
-}
-
 pub fn ready_from_usize(events: usize) -> Ready {
     Ready(events)
-}
-
-pub fn opt_from_usize(opt: usize) -> PollOpt {
-    PollOpt(opt)
 }
 
 // Used internally to mutate an `Event` in place

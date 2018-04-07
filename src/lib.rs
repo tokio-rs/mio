@@ -82,6 +82,8 @@
 
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
+#[macro_use]
+extern crate bitflags;
 extern crate lazycell;
 extern crate net2;
 extern crate iovec;
