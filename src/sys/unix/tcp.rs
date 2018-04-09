@@ -132,7 +132,7 @@ impl TcpStream {
     pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         unsafe {
             let slice = iovec::as_os_slice_mut(bufs);
-            let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());
+            let len = cmp::min(1024, slice.len());
             let rc = libc::readv(self.inner.as_raw_fd(),
                                  slice.as_ptr(),
                                  len as libc::c_int);
@@ -147,7 +147,7 @@ impl TcpStream {
     pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
         unsafe {
             let slice = iovec::as_os_slice(bufs);
-            let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());
+            let len = cmp::min(1024, slice.len());
             let rc = libc::writev(self.inner.as_raw_fd(),
                                   slice.as_ptr(),
                                   len as libc::c_int);
