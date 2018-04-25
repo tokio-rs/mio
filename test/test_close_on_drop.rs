@@ -55,7 +55,8 @@ impl TestHandler {
 
                 match self.cli.try_read_buf(&mut buf) {
                     Ok(Some(0)) => self.shutdown = true,
-                    _ => panic!("the client socket should not be readable")
+                    Ok(_) => panic!("the client socket should not be readable"),
+                    Err(e) => panic!("Unexpected error {:?}", e)
                 }
             }
             _ => panic!("received unknown token {:?}", tok)
@@ -77,6 +78,7 @@ impl TestHandler {
 
 #[test]
 pub fn test_close_on_drop() {
+    let _ = ::env_logger::init();
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut poll = Poll::new().unwrap();
 

@@ -98,6 +98,15 @@ matrix:
       script:
         - bash ci/trust/script.sh
 
+    # Solaris
+    - os: linux
+      env: TARGET=x86_64-sun-solaris DISABLE_TESTS=1
+      install:
+        - sh ci/trust/install.sh
+        - source ~/.cargo/env || true
+      script:
+        - bash ci/trust/script.sh
+
 env:
   global:
     - CRATE_NAME=mio
