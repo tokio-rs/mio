@@ -56,6 +56,7 @@ Currently supported platforms:
 * Windows
 * FreeBSD
 * NetBSD
+* Solaris
 * Android
 * iOS
 * Fuchsia (experimental).
