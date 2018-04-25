@@ -588,6 +588,7 @@ fn connect_error() {
         },
         Err(e) => panic!("TcpStream::connect unexpected error {:?}", e)
     };
+
     poll.register(&l, Token(0), Ready::writable(), PollOpt::edge()).unwrap();
 
     'outer:
