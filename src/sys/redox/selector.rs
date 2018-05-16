@@ -151,4 +151,7 @@ impl Events {
     pub fn push_event(&mut self, event: Event) {
         self.events.push(event);
     }
+    pub fn clear(&mut self) {
+        self.events.clear();
+    }
 }

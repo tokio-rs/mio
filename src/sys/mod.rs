@@ -70,5 +70,5 @@ pub use self::redox::{
 #[cfg(target_os = "redox")]
 mod redox;
 
-#[cfg(not(all(unix, not(any(target_os = "fuchsia", target_os = "redox")))))]
+#[cfg(not(all(unix, not(target_os = "fuchsia"))))]
 pub const READY_ALL: usize = 0;

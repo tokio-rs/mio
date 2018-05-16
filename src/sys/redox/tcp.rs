@@ -149,6 +149,10 @@ impl TcpStream {
         self.inner.take_error()
     }
 
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.peek(buf)
+    }
+
     pub fn readv(&self, _bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         unimplemented!("readv");
     }
@@ -211,7 +215,7 @@ impl AsRawFd for TcpStream {
 }
 
 impl TcpListener {
-    pub fn new(inner: net::TcpListener, _addr: &SocketAddr) -> io::Result<TcpListener> {
+    pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
         set_nonblock(inner.as_raw_fd())?;
         Ok(TcpListener {
             inner: inner,
@@ -230,12 +234,10 @@ impl TcpListener {
         })
     }
 
-    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+    pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
         self.inner.accept().and_then(|(s, a)| {
             set_nonblock(s.as_raw_fd())?;
-            Ok((TcpStream {
-                inner: s,
-            }, a))
+            Ok((s, a))
         })
     }
 

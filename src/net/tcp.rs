@@ -548,7 +548,7 @@ impl TcpListener {
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         let listener = net::TcpListener::bind(addr)?;
         Ok(TcpListener {
-            sys: sys::TcpListener::new(listener, addr)?,
+            sys: sys::TcpListener::new(listener)?,
             selector_id: SelectorId::new(),
         })
     }

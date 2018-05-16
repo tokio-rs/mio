@@ -27,10 +27,10 @@ with-deprecated = []
 default = ["with-deprecated"]
 
 [dependencies]
+iovec    = "0.1.2"
 log      = "0.4"
-slab     = "0.4.0"
 net2     = { git = "https://github.com/redox-os/net2-rs.git" }
-iovec    = { git = "https://github.com/redox-os/iovec.git" }
+slab     = "0.4.0"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
 fuchsia-zircon = "0.3.2"
@@ -40,7 +40,7 @@ fuchsia-zircon-sys = "0.3.2"
 redox_syscall = "0.1"
 
 [target.'cfg(unix)'.dependencies]
-libc   = { git = "https://github.com/redox-os/liblibc.git" }
+libc = "0.2.19"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2.6"
