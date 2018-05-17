@@ -7,13 +7,16 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
+#[cfg(windows)]
+use std::net::{SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
+#[cfg(not(target_os = "redox"))]
+use net2::TcpBuilder;
+
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
-use std::net::{SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
-use net2::TcpBuilder;
 use iovec::IoVec;
 
 use {io, sys, Ready, Poll, PollOpt, Token};
@@ -90,6 +93,7 @@ impl TcpStream {
     /// `net2::TcpBuilder` to configure a socket and then pass its socket to
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
+    #[cfg(not(target_os = "redox"))]
     pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
         let sock = match *addr {
             SocketAddr::V4(..) => TcpBuilder::new_v4(),
@@ -97,10 +101,17 @@ impl TcpStream {
         }?;
         // Required on Windows for a future `connect_overlapped` operation to be
         // executed successfully.
-        if cfg!(windows) {
-            sock.bind(&inaddr_any(addr))?;
-        }
+        #[cfg(windows)]
+        sock.bind(&inaddr_any(addr))?;
+
         TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
+    }
+    /// Create a new TCP stream and issue a non-blocking connect to the
+    /// specified address.
+    #[cfg(target_os = "redox")]
+    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
+        let tcp = net::TcpStream::connect(addr)?;
+        TcpStream::connect_stream(tcp, addr)
     }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
@@ -392,6 +403,7 @@ impl TcpStream {
     }
 }
 
+#[cfg(windows)]
 fn inaddr_any(other: &SocketAddr) -> SocketAddr {
     match *other {
         SocketAddr::V4(..) => {
@@ -527,9 +539,8 @@ impl TcpListener {
         }?;
 
         // Set SO_REUSEADDR, but only on Unix (mirrors what libstd does)
-        if cfg!(unix) {
-            sock.reuse_address(true)?;
-        }
+        #[cfg(unix)]
+        sock.reuse_address(true)?;
 
         // Bind the socket
         sock.bind(addr)?;
@@ -690,24 +701,24 @@ impl fmt::Debug for TcpListener {
  *
  */
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(any(all(unix, not(target_os = "fuchsia")), target_os = "redox"))]
 use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(any(all(unix, not(target_os = "fuchsia")), target_os = "redox"))]
 impl IntoRawFd for TcpStream {
     fn into_raw_fd(self) -> RawFd {
         self.sys.into_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(any(all(unix, not(target_os = "fuchsia")), target_os = "redox"))]
 impl AsRawFd for TcpStream {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(any(all(unix, not(target_os = "fuchsia")), target_os = "redox"))]
 impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream {
@@ -717,21 +728,21 @@ impl FromRawFd for TcpStream {
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(any(all(unix, not(target_os = "fuchsia")), target_os = "redox"))]
 impl IntoRawFd for TcpListener {
     fn into_raw_fd(self) -> RawFd {
         self.sys.into_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(any(all(unix, not(target_os = "fuchsia")), target_os = "redox"))]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(any(all(unix, not(target_os = "fuchsia")), target_os = "redox"))]
 impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener {

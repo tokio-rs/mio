@@ -3,14 +3,13 @@ use std::net::{self, SocketAddr};
 use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
 use std::time::Duration;
 
+use net2::TcpStreamExt;
 use iovec::IoVec;
 
 use {io, Evented, Ready, Poll, PollOpt, Token};
 
 use sys::redox::eventedfd::EventedFd;
 use sys::redox::io::set_nonblock;
-
-use syscall;
 
 #[derive(Debug)]
 pub struct TcpStream {
@@ -23,30 +22,8 @@ pub struct TcpListener {
 }
 
 impl TcpStream {
-    pub fn connect(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
-        let fd = stream.as_raw_fd();
-        set_nonblock(fd)?;
-
-        let path = match *addr {
-            SocketAddr::V4(addrv4) => {
-                let ip = addrv4.ip().octets();
-                let port = addrv4.port();
-                format!("{}.{}.{}.{}:{}", ip[0], ip[1], ip[2], ip[3], port)
-            },
-            SocketAddr::V6(_addrv6) => {
-                return Err(io::Error::new(io::ErrorKind::Other, "Not implemented"));
-            }
-        };
-
-        let new_fd = syscall::dup(fd, path.as_bytes()).map_err(|err| {
-            io::Error::from_raw_os_error(err.errno)
-        })?;
-        let ret = syscall::dup2(new_fd, fd, &[]).map_err(|err| {
-            io::Error::from_raw_os_error(err.errno)
-        });
-        let _ = syscall::close(new_fd);
-
-        ret?;
+    pub fn connect(stream: net::TcpStream, _addr: &SocketAddr) -> io::Result<TcpStream> {
+        stream.set_nonblocking(true)?;
 
         Ok(TcpStream {
             inner: stream,
@@ -87,34 +64,28 @@ impl TcpStream {
         self.inner.nodelay()
     }
 
-    pub fn set_recv_buffer_size(&self, _size: usize) -> io::Result<()> {
-        //self.inner.set_recv_buffer_size(size)
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
+        self.inner.set_recv_buffer_size(size)
     }
 
     pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        //self.inner.recv_buffer_size()
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+        self.inner.recv_buffer_size()
     }
 
-    pub fn set_send_buffer_size(&self, _size: usize) -> io::Result<()> {
-        //self.inner.set_send_buffer_size(size)
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
+        self.inner.set_send_buffer_size(size)
     }
 
     pub fn send_buffer_size(&self) -> io::Result<usize> {
-        //self.inner.send_buffer_size()
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+        self.inner.send_buffer_size()
     }
 
-    pub fn set_keepalive(&self, _keepalive: Option<Duration>) -> io::Result<()> {
-        //self.inner.set_keepalive(keepalive)
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
+        self.inner.set_keepalive(keepalive)
     }
 
     pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        //self.inner.keepalive()
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+        self.inner.keepalive()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
@@ -125,24 +96,20 @@ impl TcpStream {
         self.inner.ttl()
     }
 
-    pub fn set_only_v6(&self, _only_v6: bool) -> io::Result<()> {
-        //self.inner.set_only_v6(only_v6)
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
+        self.inner.set_only_v6(only_v6)
     }
 
     pub fn only_v6(&self) -> io::Result<bool> {
-        //self.inner.only_v6()
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+        self.inner.only_v6()
     }
 
-    pub fn set_linger(&self, _dur: Option<Duration>) -> io::Result<()> {
-        //self.inner.set_linger(dur)
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+        self.inner.set_linger(dur)
     }
 
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        //self.inner.linger()
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+        self.inner.linger()
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
@@ -155,10 +122,28 @@ impl TcpStream {
 
     pub fn readv(&self, _bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         unimplemented!("readv");
+        //let mut total = 0;
+        //for buf in bufs {
+        //    let n = self.inner.read(buf)?;
+        //    total += n;
+        //    if n < buf.len() {
+        //        return Ok(total);
+        //    }
+        //}
+        //Ok(total)
     }
 
     pub fn writev(&self, _bufs: &[&IoVec]) -> io::Result<usize> {
         unimplemented!("writev");
+        //let mut total = 0;
+        //for buf in bufs {
+        //    let n = self.inner.write(buf)?;
+        //    total += n;
+        //    if n < buf.len() {
+        //        return Ok(total);
+        //    }
+        //}
+        //Ok(total)
     }
 }
 
@@ -217,6 +202,7 @@ impl AsRawFd for TcpStream {
 impl TcpListener {
     pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
         set_nonblock(inner.as_raw_fd())?;
+
         Ok(TcpListener {
             inner: inner,
         })
@@ -236,7 +222,7 @@ impl TcpListener {
 
     pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
         self.inner.accept().and_then(|(s, a)| {
-            set_nonblock(s.as_raw_fd())?;
+            s.set_nonblocking(true)?;
             Ok((s, a))
         })
     }

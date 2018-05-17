@@ -54,7 +54,7 @@ impl Selector {
         }).map_err(super::from_syscall_error))
         / mem::size_of::<syscall::Event>();
 
-        evts.events.clear();
+        evts.clear();
 
         for event in dst[.. cnt].iter() {
             let mut kind = Ready::empty();
