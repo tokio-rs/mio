@@ -1,6 +1,6 @@
 use {io, Ready, PollOpt, Token};
 use event::Event;
-use syscall::{self, O_RDWR, O_CLOEXEC, EVENT_READ, EVENT_WRITE, close, fevent, read, open};
+use syscall::{self, O_RDWR, O_CLOEXEC, EVENT_READ, EVENT_WRITE, close, read, open, write};
 use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 use std::os::unix::io::RawFd;
@@ -66,12 +66,7 @@ impl Selector {
                 kind = kind | Ready::writable();
             }
 
-            let tokens = self.tokens.lock().unwrap();
-            if let Some(tokens) = tokens.get(&event.id) {
-                for token in tokens.iter() {
-                    evts.push_event(Event::new(kind, token.clone()));
-                }
-            }
+            evts.push_event(Event::new(kind, Token::from(event.data)));
         }
 
         for i in 0..evts.len() {
@@ -84,17 +79,24 @@ impl Selector {
         Ok(false)
     }
 
+    fn inner_register(&self, fd: RawFd, token: Token, flags: usize) -> io::Result<()> {
+        write(self.efd, &syscall::Event {
+            id: fd as usize,
+            flags: flags,
+            data: token.into()
+        })
+        .map(|_| ())
+        .map_err(super::from_syscall_error)
+    }
+
     /// Register event interests for the given IO handle with the OS
     pub fn register(&self, fd: RawFd, token: Token, interests: Ready, opts: PollOpt) -> io::Result<()> {
-        let flags = ioevent_to_fevent(interests, opts);
-        match fevent(fd, flags).map_err(super::from_syscall_error) {
-            Ok(_) => {
-                let mut tokens = self.tokens.lock().unwrap();
-                tokens.entry(fd).or_insert(BTreeSet::new()).insert(token);
-                Ok(())
-            },
-            Err(err) => Err(err)
-        }
+        self.inner_register(fd, token, ioevent_to_fevent(interests, opts))?;
+
+        let mut tokens = self.tokens.lock().unwrap();
+        tokens.entry(fd).or_insert_with(BTreeSet::new).insert(token);
+
+        Ok(())
     }
 
     /// Register event interests for the given IO handle with the OS
@@ -104,14 +106,15 @@ impl Selector {
 
     /// Deregister event interests for the given IO handle with the OS
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        match fevent(fd, 0).map_err(super::from_syscall_error) {
-            Ok(_) => {
-                let mut tokens = self.tokens.lock().unwrap();
-                tokens.remove(&fd);
-                Ok(())
-            },
-            Err(err) => Err(err)
+        let mut tokens = self.tokens.lock().unwrap();
+
+        if let Some(tokens) = tokens.remove(&fd) {
+            for token in tokens {
+                self.inner_register(fd, token, 0)?;
+            }
         }
+
+        Ok(())
     }
 }
 
