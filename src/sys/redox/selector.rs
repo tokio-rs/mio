@@ -1,6 +1,6 @@
 use {io, Ready, PollOpt, Token};
 use event::Event;
-use syscall::{self, O_RDWR, O_CLOEXEC, EVENT_READ, close, fevent, read, open};
+use syscall::{self, O_RDWR, O_CLOEXEC, EVENT_READ, EVENT_WRITE, close, fevent, read, open};
 use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 use std::os::unix::io::RawFd;
@@ -62,6 +62,9 @@ impl Selector {
             if event.flags & EVENT_READ == EVENT_READ {
                 kind = kind | Ready::readable();
             }
+            if event.flags & EVENT_WRITE == EVENT_WRITE {
+                kind = kind | Ready::writable();
+            }
 
             let tokens = self.tokens.lock().unwrap();
             if let Some(tokens) = tokens.get(&event.id) {
@@ -117,6 +120,9 @@ fn ioevent_to_fevent(interest: Ready, _opts: PollOpt) -> usize {
 
     if interest.is_readable() {
         flags |= EVENT_READ;
+    }
+    if interest.is_writable() {
+        flags |= EVENT_WRITE;
     }
 
     flags
