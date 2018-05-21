@@ -11,6 +11,8 @@ use {io, Evented, Ready, Poll, PollOpt, Token};
 use sys::redox::eventedfd::EventedFd;
 use sys::redox::io::set_nonblock;
 
+use syscall::{read, write};
+
 #[derive(Debug)]
 pub struct TcpStream {
     inner: net::TcpStream,
@@ -120,30 +122,28 @@ impl TcpStream {
         self.inner.peek(buf)
     }
 
-    pub fn readv(&self, _bufs: &mut [&mut IoVec]) -> io::Result<usize> {
-        unimplemented!("readv");
-        //let mut total = 0;
-        //for buf in bufs {
-        //    let n = self.inner.read(buf)?;
-        //    total += n;
-        //    if n < buf.len() {
-        //        return Ok(total);
-        //    }
-        //}
-        //Ok(total)
+    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+        let mut total = 0;
+        for buf in bufs {
+            let n = read(self.inner.as_raw_fd(), buf).map_err(super::from_syscall_error)?;
+            total += n;
+            if n < buf.len() {
+                return Ok(total);
+            }
+        }
+        Ok(total)
     }
 
-    pub fn writev(&self, _bufs: &[&IoVec]) -> io::Result<usize> {
-        unimplemented!("writev");
-        //let mut total = 0;
-        //for buf in bufs {
-        //    let n = self.inner.write(buf)?;
-        //    total += n;
-        //    if n < buf.len() {
-        //        return Ok(total);
-        //    }
-        //}
-        //Ok(total)
+    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+        let mut total = 0;
+        for buf in bufs {
+            let n = write(self.inner.as_raw_fd(), buf).map_err(super::from_syscall_error)?;
+            total += n;
+            if n < buf.len() {
+                return Ok(total);
+            }
+        }
+        Ok(total)
     }
 }
 
