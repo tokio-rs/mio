@@ -1,12 +1,19 @@
-use {io, Ready, PollOpt, Token};
 use event::Event;
-use syscall::{self, O_RDWR, O_CLOEXEC, EVENT_READ, EVENT_WRITE, close, read, open, write};
-use std::collections::{BTreeMap, BTreeSet};
-use std::mem;
-use std::os::unix::io::RawFd;
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-use std::sync::Mutex;
-use std::time::Duration;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+    os::unix::io::RawFd,
+    slice,
+    sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT}
+    },
+    time::Duration
+};
+use syscall::{self, CLOCK_MONOTONIC, EVENT_READ, EVENT_WRITE, O_CLOEXEC, O_RDWR, close, read, open, write};
+use {io, Ready, PollOpt, Token};
+
+const TIMEOUT_TOKEN: Token = Token(::std::usize::MAX - 1);
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -41,8 +48,29 @@ impl Selector {
     }
 
     /// Wait for events from the OS
-    pub fn select(&self, evts: &mut Events, awakener: Token, _timeout: Option<Duration>) -> io::Result<bool> {
-        use std::slice;
+    pub fn select(&self, evts: &mut Events, awakener: Token, timeout: Option<Duration>) -> io::Result<bool> {
+        let mut timeout_fd = None;
+        if let Some(timeout) = timeout {
+            let file = open(format!("time:{}", CLOCK_MONOTONIC), O_RDWR | O_CLOEXEC)
+                .map_err(super::from_syscall_error)?;
+
+            // TODO: use try_from below when stable
+            if timeout.as_secs() > ::std::i64::MAX as u64 {
+                panic!("too high duration");
+            }
+
+            let mut time = syscall::TimeSpec::default();
+            read(file, &mut time).map_err(super::from_syscall_error)?;
+
+            //tv_sec += i64::try_from(timeout.as_secs()).expect("too high duration"),
+            time.tv_sec += timeout.as_secs() as i64;
+            time.tv_nsec += timeout.subsec_nanos() as i32;
+
+            write(file, &time).map_err(super::from_syscall_error)?;
+
+            self.inner_register(file, TIMEOUT_TOKEN, EVENT_READ)?;
+            timeout_fd = Some(file);
+        }
 
         let cnt;
         unsafe {
@@ -55,14 +83,25 @@ impl Selector {
             evts.events.set_len(cnt);
         }
 
-        for i in 0..evts.len() {
-            if evts.events.get(i).map(|e| e.data) == Some(awakener.into()) {
-                evts.events.remove(i);
-                return Ok(true);
-            }
+        let mut timeout_token = None;
+        if let Some(file) = timeout_fd {
+            self.inner_register(file, TIMEOUT_TOKEN, 0)?;
+            timeout_token = Some(TIMEOUT_TOKEN.into());
         }
 
-        Ok(false)
+        let mut awakener_found = false;
+
+        let awakener = awakener.into();
+        evts.events.retain(|e| {
+            if e.data == awakener {
+                awakener_found = true;
+                return false;
+            }
+
+            Some(e.data) != timeout_token
+        });
+
+        Ok(awakener_found)
     }
 
     fn inner_register(&self, fd: RawFd, token: Token, flags: usize) -> io::Result<()> {
