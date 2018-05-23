@@ -2,6 +2,7 @@ use event::Event;
 use std::{
     collections::{BTreeMap, BTreeSet},
     mem,
+    ops::Deref,
     os::unix::io::RawFd,
     slice,
     sync::{
@@ -12,6 +13,20 @@ use std::{
 };
 use syscall::{self, CLOCK_MONOTONIC, EVENT_READ, EVENT_WRITE, O_CLOEXEC, O_RDWR, close, read, open, write};
 use {io, Ready, PollOpt, Token};
+
+#[derive(Debug)]
+struct RawFile(RawFd);
+impl Deref for RawFile {
+    type Target = RawFd;
+    fn deref(&self) -> &RawFd {
+        &self.0
+    }
+}
+impl Drop for RawFile {
+    fn drop(&mut self) {
+        let _ = close(self.0);
+    }
+}
 
 const TIMEOUT_TOKEN: Token = Token(::std::usize::MAX - 1);
 
@@ -25,7 +40,7 @@ static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 #[derive(Debug)]
 pub struct Selector {
     id: usize,
-    efd: RawFd,
+    efd: RawFile,
     tokens: Mutex<BTreeMap<RawFd, BTreeSet<Token>>>
 }
 
@@ -38,7 +53,7 @@ impl Selector {
 
         Ok(Selector {
             id: id,
-            efd: efd,
+            efd: RawFile(efd),
             tokens: Mutex::new(BTreeMap::new()),
         })
     }
@@ -53,6 +68,7 @@ impl Selector {
         if let Some(timeout) = timeout {
             let file = open(format!("time:{}", CLOCK_MONOTONIC), O_RDWR | O_CLOEXEC)
                 .map_err(super::from_syscall_error)?;
+            let file = RawFile(file);
 
             // TODO: use try_from below when stable
             if timeout.as_secs() > ::std::i64::MAX as u64 {
@@ -60,21 +76,21 @@ impl Selector {
             }
 
             let mut time = syscall::TimeSpec::default();
-            read(file, &mut time).map_err(super::from_syscall_error)?;
+            read(*file, &mut time).map_err(super::from_syscall_error)?;
 
             //tv_sec += i64::try_from(timeout.as_secs()).expect("too high duration"),
             time.tv_sec += timeout.as_secs() as i64;
             time.tv_nsec += timeout.subsec_nanos() as i32;
 
-            write(file, &time).map_err(super::from_syscall_error)?;
+            write(*file, &time).map_err(super::from_syscall_error)?;
 
-            self.inner_register(file, TIMEOUT_TOKEN, EVENT_READ)?;
+            self.inner_register(*file, TIMEOUT_TOKEN, EVENT_READ)?;
             timeout_fd = Some(file);
         }
 
         let cnt;
         unsafe {
-            let bytes = read(self.efd, slice::from_raw_parts_mut(
+            let bytes = read(*self.efd, slice::from_raw_parts_mut(
                 evts.events.as_mut_ptr() as *mut u8,
                 evts.events.capacity() * mem::size_of::<syscall::Event>()
             )).map_err(super::from_syscall_error)?;
@@ -85,7 +101,7 @@ impl Selector {
 
         let mut timeout_token = None;
         if let Some(file) = timeout_fd {
-            self.inner_register(file, TIMEOUT_TOKEN, 0)?;
+            self.inner_register(*file, TIMEOUT_TOKEN, 0)?;
             timeout_token = Some(TIMEOUT_TOKEN.into());
         }
 
@@ -105,7 +121,7 @@ impl Selector {
     }
 
     fn inner_register(&self, fd: RawFd, token: Token, flags: usize) -> io::Result<()> {
-        write(self.efd, &syscall::Event {
+        write(*self.efd, &syscall::Event {
             id: fd as usize,
             flags: flags,
             data: token.into()
@@ -166,12 +182,6 @@ fn fevent_to_ioevent(flags: usize) -> Ready {
     }
 
     kind
-}
-
-impl Drop for Selector {
-    fn drop(&mut self) {
-        let _ = close(self.efd);
-    }
 }
 
 pub struct Events {
