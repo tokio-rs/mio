@@ -1,9 +1,10 @@
 use event::Event;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fs::File,
+    io::prelude::*,
     mem,
-    ops::Deref,
-    os::unix::io::RawFd,
+    os::unix::io::{AsRawFd, RawFd},
     slice,
     sync::{
         Mutex,
@@ -11,22 +12,8 @@ use std::{
     },
     time::Duration
 };
-use syscall::{self, CLOCK_MONOTONIC, EVENT_READ, EVENT_WRITE, O_CLOEXEC, O_RDWR, close, read, open, write};
+use syscall::{self, CLOCK_MONOTONIC, EVENT_READ, EVENT_WRITE};
 use {io, Ready, PollOpt, Token};
-
-#[derive(Debug)]
-struct RawFile(RawFd);
-impl Deref for RawFile {
-    type Target = RawFd;
-    fn deref(&self) -> &RawFd {
-        &self.0
-    }
-}
-impl Drop for RawFile {
-    fn drop(&mut self) {
-        let _ = close(self.0);
-    }
-}
 
 const TIMEOUT_TOKEN: Token = Token(::std::usize::MAX - 1);
 
@@ -40,20 +27,20 @@ static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 #[derive(Debug)]
 pub struct Selector {
     id: usize,
-    efd: RawFile,
+    efd: File,
     tokens: Mutex<BTreeMap<RawFd, BTreeSet<Token>>>
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        let efd = open("event:", O_RDWR | O_CLOEXEC).map_err(super::from_syscall_error)?;
+        let efd = File::open("event:")?;
 
         // offset by 1 to avoid choosing 0 as the id of a selector
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
 
         Ok(Selector {
             id: id,
-            efd: RawFile(efd),
+            efd: efd,
             tokens: Mutex::new(BTreeMap::new()),
         })
     }
@@ -66,9 +53,7 @@ impl Selector {
     pub fn select(&self, evts: &mut Events, awakener: Token, timeout: Option<Duration>) -> io::Result<bool> {
         let mut timeout_fd = None;
         if let Some(timeout) = timeout {
-            let file = open(format!("time:{}", CLOCK_MONOTONIC), O_RDWR | O_CLOEXEC)
-                .map_err(super::from_syscall_error)?;
-            let file = RawFile(file);
+            let mut file = File::open(format!("time:{}", CLOCK_MONOTONIC))?;
 
             // TODO: use try_from below when stable
             if timeout.as_secs() > ::std::i64::MAX as u64 {
@@ -76,24 +61,24 @@ impl Selector {
             }
 
             let mut time = syscall::TimeSpec::default();
-            read(*file, &mut time).map_err(super::from_syscall_error)?;
+            file.read(&mut time)?;
 
             //tv_sec += i64::try_from(timeout.as_secs()).expect("too high duration"),
             time.tv_sec += timeout.as_secs() as i64;
             time.tv_nsec += timeout.subsec_nanos() as i32;
 
-            write(*file, &time).map_err(super::from_syscall_error)?;
+            file.write(&time)?;
 
-            self.inner_register(*file, TIMEOUT_TOKEN, EVENT_READ)?;
+            self.inner_register(file.as_raw_fd(), TIMEOUT_TOKEN, EVENT_READ)?;
             timeout_fd = Some(file);
         }
 
         let cnt;
         unsafe {
-            let bytes = read(*self.efd, slice::from_raw_parts_mut(
+            let bytes = (&self.efd).read(slice::from_raw_parts_mut(
                 evts.events.as_mut_ptr() as *mut u8,
                 evts.events.capacity() * mem::size_of::<syscall::Event>()
-            )).map_err(super::from_syscall_error)?;
+            ))?;
             cnt = bytes / mem::size_of::<syscall::Event>();
 
             evts.events.set_len(cnt);
@@ -101,7 +86,7 @@ impl Selector {
 
         let mut timeout_token = None;
         if let Some(file) = timeout_fd {
-            self.inner_register(*file, TIMEOUT_TOKEN, 0)?;
+            self.inner_register(file.as_raw_fd(), TIMEOUT_TOKEN, 0)?;
             timeout_token = Some(TIMEOUT_TOKEN.into());
         }
 
@@ -121,13 +106,12 @@ impl Selector {
     }
 
     fn inner_register(&self, fd: RawFd, token: Token, flags: usize) -> io::Result<()> {
-        write(*self.efd, &syscall::Event {
+        (&self.efd).write(&syscall::Event {
             id: fd as usize,
             flags: flags,
             data: token.into()
         })
         .map(|_| ())
-        .map_err(super::from_syscall_error)
     }
 
     /// Register event interests for the given IO handle with the OS
