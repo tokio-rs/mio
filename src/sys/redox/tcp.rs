@@ -11,8 +11,6 @@ use {io, Evented, Ready, Poll, PollOpt, Token};
 use sys::redox::eventedfd::EventedFd;
 use sys::redox::io::set_nonblock;
 
-use syscall::{read, write};
-
 #[derive(Debug)]
 pub struct TcpStream {
     inner: net::TcpStream,
@@ -125,7 +123,7 @@ impl TcpStream {
     pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         let mut total = 0;
         for buf in bufs {
-            let n = read(self.inner.as_raw_fd(), buf).map_err(super::from_syscall_error)?;
+            let n = (&self.inner).read(buf)?;
             total += n;
             if n < buf.len() {
                 return Ok(total);
@@ -137,7 +135,7 @@ impl TcpStream {
     pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
         let mut total = 0;
         for buf in bufs {
-            let n = write(self.inner.as_raw_fd(), buf).map_err(super::from_syscall_error)?;
+            let n = (&self.inner).write(buf)?;
             total += n;
             if n < buf.len() {
                 return Ok(total);
