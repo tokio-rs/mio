@@ -44,7 +44,7 @@ libc = "0.2.19"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.3.4"
-miow   = { git = "https://gitlab.redox-os.org/redox-os/miow", rev = "5b10500" }
+miow   = { git = "https://gitlab.redox-os.org/redox-os/miow" }
 
 [dev-dependencies]
 env_logger = { version = "0.4.0", default-features = false }
