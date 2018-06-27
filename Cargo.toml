@@ -29,7 +29,7 @@ default = ["with-deprecated"]
 [dependencies]
 iovec    = "0.1.2"
 log      = "0.4"
-net2     = { git = "https://gitlab.redox-os.org/redox-os/net2-rs" }
+net2     = { git = "https://github.com/redox-os/net2-rs" }
 slab     = "0.4.0"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
@@ -44,7 +44,7 @@ libc = "0.2.19"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.3.4"
-miow   = { git = "https://gitlab.redox-os.org/redox-os/miow" }
+miow   = "0.3.1"
 
 [dev-dependencies]
 env_logger = { version = "0.4.0", default-features = false }
