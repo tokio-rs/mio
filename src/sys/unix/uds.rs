@@ -138,10 +138,10 @@ impl UnixSocket {
     pub fn bind<P: AsRef<Path> + ?Sized>(&self, addr: &P) -> io::Result<()> {
         unsafe {
             let (addr, len) = sockaddr_un(addr.as_ref())?;
-            let len_i32 = len as i32;
+            let len_u32 = len as u32;
             cvt(libc::bind(self.as_raw_fd(),
                                 &addr as *const _ as *const _,
-                                len_i32))?;
+                                len_u32))?;
             Ok(())
         }
     }
