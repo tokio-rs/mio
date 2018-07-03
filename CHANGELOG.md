@@ -1,3 +1,8 @@
+# 0.6.15 (July 3, 2018)
+
+* Implement `Evented` for containers (#840).
+* Fix android-aarch64 build (#850).
+
 # 0.6.14 (March 8, 2018)
 
 * Add `Poll::poll_interruptible` (#811)
