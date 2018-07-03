@@ -79,18 +79,15 @@ matrix:
         - rustup target add $TARGET
 
     # Android aarch64-linux-android
-    #
-    # TODO: Re-enable once net2 is fixed.
-    #       https://github.com/rust-lang-nursery/net2-rs/pull/74
-    # - os: linux
-    #   env: TARGET=aarch64-linux-android
-    #   rust: stable
-    #   script:
-    #     - cargo build
-    #     - cargo build --no-default-features
-    #     - sh ci/run-docker.sh $TARGET;
-    #   install:
-    #     - rustup target add $TARGET
+    - os: linux
+      env: TARGET=aarch64-linux-android
+      rust: stable
+      script:
+        - cargo build
+        - cargo build --no-default-features
+        - sh ci/run-docker.sh $TARGET;
+      install:
+        - rustup target add $TARGET
 
     # NetBSD
     - os: linux
