@@ -9,8 +9,7 @@ use std::time::Duration;
 
 use lazycell::AtomicLazyCell;
 
-use winapi::shared::winerror::*;
-use winapi::um::minwinbase::*;
+use winapi::*;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 

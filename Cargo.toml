@@ -43,8 +43,9 @@ redox_syscall = "0.1"
 libc = "0.2.19"
 
 [target.'cfg(windows)'.dependencies]
-winapi = "0.3.4"
-miow   = "0.3.1"
+winapi = "0.2.6"
+miow   = "0.2.1"
+kernel32-sys = "0.2"
 
 [dev-dependencies]
 env_logger = { version = "0.4.0", default-features = false }
