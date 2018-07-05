@@ -9,7 +9,8 @@ use std::time::Duration;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
-use winapi::*;
+use winapi::shared::ntdef::*;
+use winapi::um::minwinbase::*;
 use iovec::IoVec;
 
 use {poll, Ready, Poll, PollOpt, Token};
@@ -744,13 +745,16 @@ impl ListenerImp {
         let res = match self.inner.family {
             Family::V4 => TcpBuilder::new_v4(),
             Family::V6 => TcpBuilder::new_v6(),
-        }.and_then(|builder| unsafe {
+        }
+        .and_then(|builder| builder.to_tcp_stream())
+        .and_then(|stream| unsafe {
             trace!("scheduling an accept");
-            self.inner.socket.accept_overlapped(&builder, &mut me.accept_buf,
+            self.inner.socket.accept_overlapped(&stream, &mut me.accept_buf,
                                                 self.inner.accept.as_mut_ptr())
+                .map(move |_| stream)
         });
         match res {
-            Ok((socket, _)) => {
+            Ok(socket) => {
                 // see docs above on StreamImp.inner for rationale on forget
                 me.accept = State::Pending(socket);
                 mem::forget(self.clone());
