@@ -733,3 +733,60 @@ impl FromRawFd for TcpListener {
         }
     }
 }
+
+/*
+ *
+ * ===== Windows ext =====
+ *
+ */
+
+#[cfg(windows)]
+use std::os::windows::io::{IntoRawSocket, AsRawSocket, FromRawSocket, RawSocket};
+
+#[cfg(windows)]
+impl IntoRawSocket for TcpStream {
+    fn into_raw_socket(self) -> RawSocket {
+        self.sys.into_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for TcpStream {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.sys.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for TcpStream {
+    unsafe fn from_raw_socket(socket: RawSocket) -> TcpStream {
+        TcpStream {
+            sys: FromRawSocket::from_raw_socket(socket),
+            selector_id: SelectorId::new(),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for TcpListener {
+    fn into_raw_socket(self) -> RawSocket {
+        self.sys.into_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for TcpListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.sys.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for TcpListener {
+    unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
+        TcpListener {
+            sys: FromRawSocket::from_raw_socket(socket),
+            selector_id: SelectorId::new(),
+        }
+    }
+}

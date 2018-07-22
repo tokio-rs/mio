@@ -623,6 +623,25 @@ impl fmt::Debug for TcpStream {
     }
 }
 
+impl FromRawSocket for TcpStream {
+    unsafe fn from_raw_socket(socket: RawSocket) -> TcpStream {
+        let stream = net::TcpStream::from_raw_socket(socket);
+        TcpStream::from_stream(stream)
+    }
+}
+
+impl IntoRawSocket for TcpStream {
+    fn into_raw_socket(self) -> RawSocket {
+        self.as_raw_socket()
+    }
+}
+
+impl AsRawSocket for TcpStream {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.imp.inner.socket.as_raw_socket()
+    }
+}
+
 impl Drop for TcpStream {
     fn drop(&mut self) {
         // If we're still internally reading, we're no longer interested. Note
@@ -829,6 +848,26 @@ impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("TcpListener")
             .finish()
+    }
+}
+
+impl FromRawSocket for TcpListener {
+    unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
+        let stream = net::TcpListener::from_raw_socket(socket);
+        TcpListener::new(stream)
+            .expect("tried to get local address of invalid/unbound socket")
+    }
+}
+
+impl IntoRawSocket for TcpListener {
+    fn into_raw_socket(self) -> RawSocket {
+        self.imp.inner.socket.as_raw_socket()
+    }
+}
+
+impl AsRawSocket for TcpListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.imp.inner.socket.as_raw_socket()
     }
 }
 

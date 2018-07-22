@@ -8,6 +8,7 @@ use std::io::prelude::*;
 use std::io;
 use std::mem;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::os::windows::io::{IntoRawSocket, AsRawSocket, FromRawSocket, RawSocket};
 use std::sync::{Mutex, MutexGuard};
 
 #[allow(unused_imports)]
@@ -380,6 +381,26 @@ impl Drop for UdpSocket {
                 State::Error(_) => {}
             }
         }
+    }
+}
+
+impl FromRawSocket for UdpSocket {
+    unsafe fn from_raw_socket(socket: RawSocket) -> UdpSocket {
+        let stream = net::UdpSocket::from_raw_socket(socket);
+        // Note that this cannot fail right now
+        UdpSocket::new(stream).unwrap()
+    }
+}
+
+impl IntoRawSocket for UdpSocket {
+    fn into_raw_socket(self) -> RawSocket {
+        self.imp.inner.socket.as_raw_socket()
+    }
+}
+
+impl AsRawSocket for UdpSocket {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.imp.inner.socket.as_raw_socket()
     }
 }
 
