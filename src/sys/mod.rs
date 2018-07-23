@@ -66,7 +66,6 @@ pub use self::redox::{
     set_nonblock,
 };
 
-
 #[cfg(target_os = "redox")]
 mod redox;
 

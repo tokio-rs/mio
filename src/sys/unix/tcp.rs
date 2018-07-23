@@ -54,11 +54,7 @@ impl TcpStream {
     }
 
     pub fn try_clone(&self) -> io::Result<TcpStream> {
-        self.inner.try_clone().map(|s| {
-            TcpStream {
-                inner: s,
-            }
-        })
+        self.inner.try_clone().map(Self::from_stream)
     }
 
     pub fn shutdown(&self, how: net::Shutdown) -> io::Result<()> {

@@ -530,7 +530,7 @@ impl TcpListener {
     /// socket is desired then the `net2::TcpBuilder` methods can be used in
     /// combination with the `TcpListener::from_listener` method to transfer
     /// ownership into mio.
-    #[cfg(all(any(unix, windows), not(target_os = "redox")))]
+    #[cfg(not(target_os = "redox"))]
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         // Create the socket
         let sock = match *addr {

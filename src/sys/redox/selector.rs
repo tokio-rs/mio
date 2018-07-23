@@ -1,6 +1,7 @@
 use event::Event;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    self,
+    collections::{HashMap, HashSet},
     fs::File,
     io::prelude::*,
     mem,
@@ -15,7 +16,7 @@ use std::{
 use syscall::{self, CLOCK_MONOTONIC, EVENT_READ, EVENT_WRITE};
 use {io, Ready, PollOpt, Token};
 
-const TIMEOUT_TOKEN: Token = Token(::std::usize::MAX - 1);
+const TIMEOUT_TOKEN: Token = Token(std::usize::MAX - 1);
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -28,7 +29,7 @@ static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 pub struct Selector {
     id: usize,
     efd: File,
-    tokens: Mutex<BTreeMap<RawFd, BTreeSet<Token>>>
+    tokens: Mutex<HashMap<RawFd, HashSet<Token>>>
 }
 
 impl Selector {
@@ -41,7 +42,7 @@ impl Selector {
         Ok(Selector {
             id: id,
             efd: efd,
-            tokens: Mutex::new(BTreeMap::new()),
+            tokens: Mutex::new(HashMap::new()),
         })
     }
 
@@ -56,14 +57,14 @@ impl Selector {
             let mut file = File::open(format!("time:{}", CLOCK_MONOTONIC))?;
 
             // TODO: use try_from below when stable
-            if timeout.as_secs() > ::std::i64::MAX as u64 {
-                panic!("too high duration");
+            if timeout.as_secs() > std::i64::MAX as u64 {
+                panic!("too high timeout given to mio::select");
             }
 
             let mut time = syscall::TimeSpec::default();
             file.read(&mut time)?;
 
-            //tv_sec += i64::try_from(timeout.as_secs()).expect("too high duration"),
+            //tv_sec += i64::try_from(timeout.as_secs()).expect("too high timeout given to mio::select"),
             time.tv_sec += timeout.as_secs() as i64;
             time.tv_nsec += timeout.subsec_nanos() as i32;
 
@@ -73,14 +74,13 @@ impl Selector {
             timeout_fd = Some(file);
         }
 
-        let cnt;
         unsafe {
             let bytes = (&self.efd).read(slice::from_raw_parts_mut(
                 evts.events.as_mut_ptr() as *mut u8,
                 evts.events.capacity() * mem::size_of::<syscall::Event>()
             ))?;
-            cnt = bytes / mem::size_of::<syscall::Event>();
 
+            let cnt = bytes / mem::size_of::<syscall::Event>();
             evts.events.set_len(cnt);
         }
 
@@ -119,7 +119,7 @@ impl Selector {
         self.inner_register(fd, token, ioevent_to_fevent(interests))?;
 
         let mut tokens = self.tokens.lock().unwrap();
-        tokens.entry(fd).or_insert_with(BTreeSet::new).insert(token);
+        tokens.entry(fd).or_insert_with(HashSet::new).insert(token);
 
         Ok(())
     }

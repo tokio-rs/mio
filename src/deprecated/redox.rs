@@ -1,6 +1,7 @@
 use {io, sys, Evented, Ready, Poll, PollOpt, Token};
 use std::io::{Read, Write};
 use std::process;
+use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
 
 pub use sys::Io;
 
@@ -11,8 +12,8 @@ pub use sys::Io;
  */
 
 pub fn pipe() -> io::Result<(PipeReader, PipeWriter)> {
-    let (rd, wr) = try!(sys::pipe());
-    Ok((From::from(rd), From::from(wr)))
+    let (rd, wr) = sys::pipe()?;
+    Ok((rd.into(), wr.into()))
 }
 
 #[derive(Debug)]
@@ -22,18 +23,13 @@ pub struct PipeReader {
 
 impl PipeReader {
     pub fn from_stdout(stdout: process::ChildStdout) -> io::Result<Self> {
-        match sys::set_nonblock(stdout.as_raw_fd()) {
-            Err(e) => return Err(e),
-            _ => {},
-        }
-        return Ok(PipeReader::from(unsafe { Io::from_raw_fd(stdout.into_raw_fd()) }));
+        sys::set_nonblock(stdout.as_raw_fd())?;
+        Ok(unsafe { PipeReader::from_raw_fd(stdout.into_raw_fd()) })
     }
+
     pub fn from_stderr(stderr: process::ChildStderr) -> io::Result<Self> {
-        match sys::set_nonblock(stderr.as_raw_fd()) {
-            Err(e) => return Err(e),
-            _ => {},
-        }
-        return Ok(PipeReader::from(unsafe { Io::from_raw_fd(stderr.into_raw_fd()) }));
+        sys::set_nonblock(stderr.as_raw_fd())?;
+        Ok(unsafe { PipeReader::from_raw_fd(stderr.into_raw_fd()) })
     }
 }
 
@@ -76,11 +72,8 @@ pub struct PipeWriter {
 
 impl PipeWriter {
     pub fn from_stdin(stdin: process::ChildStdin) -> io::Result<Self> {
-        match sys::set_nonblock(stdin.as_raw_fd()) {
-            Err(e) => return Err(e),
-            _ => {},
-        }
-        return Ok(PipeWriter::from(unsafe { Io::from_raw_fd(stdin.into_raw_fd()) }));
+        sys::set_nonblock(stdin.as_raw_fd())?;
+        Ok(unsafe { PipeWriter::from_raw_fd(stdin.into_raw_fd()) })
     }
 }
 
@@ -130,40 +123,39 @@ impl From<Io> for PipeWriter {
  *
  */
 
- use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
 
- impl IntoRawFd for PipeReader {
-     fn into_raw_fd(self) -> RawFd {
-         self.io.into_raw_fd()
-     }
- }
+impl IntoRawFd for PipeReader {
+    fn into_raw_fd(self) -> RawFd {
+        self.io.into_raw_fd()
+    }
+}
 
- impl AsRawFd for PipeReader {
-     fn as_raw_fd(&self) -> RawFd {
-         self.io.as_raw_fd()
-     }
- }
+impl AsRawFd for PipeReader {
+    fn as_raw_fd(&self) -> RawFd {
+        self.io.as_raw_fd()
+    }
+}
 
- impl FromRawFd for PipeReader {
-     unsafe fn from_raw_fd(fd: RawFd) -> PipeReader {
-         PipeReader { io: FromRawFd::from_raw_fd(fd) }
-     }
- }
+impl FromRawFd for PipeReader {
+    unsafe fn from_raw_fd(fd: RawFd) -> PipeReader {
+        PipeReader { io: FromRawFd::from_raw_fd(fd) }
+    }
+}
 
- impl IntoRawFd for PipeWriter {
-     fn into_raw_fd(self) -> RawFd {
-         self.io.into_raw_fd()
-     }
- }
+impl IntoRawFd for PipeWriter {
+    fn into_raw_fd(self) -> RawFd {
+        self.io.into_raw_fd()
+    }
+}
 
- impl AsRawFd for PipeWriter {
-     fn as_raw_fd(&self) -> RawFd {
-         self.io.as_raw_fd()
-     }
- }
+impl AsRawFd for PipeWriter {
+    fn as_raw_fd(&self) -> RawFd {
+        self.io.as_raw_fd()
+    }
+}
 
- impl FromRawFd for PipeWriter {
-     unsafe fn from_raw_fd(fd: RawFd) -> PipeWriter {
-         PipeWriter { io: FromRawFd::from_raw_fd(fd) }
-     }
- }
+impl FromRawFd for PipeWriter {
+    unsafe fn from_raw_fd(fd: RawFd) -> PipeWriter {
+        PipeWriter { io: FromRawFd::from_raw_fd(fd) }
+    }
+}

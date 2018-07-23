@@ -115,12 +115,12 @@ impl UdpSocket {
 
     pub fn set_only_v6(&self, _only_v6: bool) -> io::Result<()> {
         //self.io.set_only_v6(only_v6)
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+        Err(io::Error::new(io::ErrorKind::Other, "UdpSocket::set_only_v6 is unimplemented on redox"))
     }
 
     pub fn only_v6(&self) -> io::Result<bool> {
         //self.io.only_v6()
-        Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+        Err(io::Error::new(io::ErrorKind::Other, "UdpSocket::only_v6 is unimplemented on redox"))
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
