@@ -61,7 +61,7 @@ impl Evented for PipeReader {
 
 impl From<Io> for PipeReader {
     fn from(io: Io) -> PipeReader {
-        PipeReader { io: io }
+        PipeReader { io }
     }
 }
 
@@ -113,7 +113,7 @@ impl Evented for PipeWriter {
 
 impl From<Io> for PipeWriter {
     fn from(io: Io) -> PipeWriter {
-        PipeWriter { io: io }
+        PipeWriter { io }
     }
 }
 
