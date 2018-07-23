@@ -564,6 +564,14 @@ impl TcpListener {
         })
     }
 
+    #[deprecated(since = "0.6.13", note = "use from_std instead")]
+    #[cfg(feature = "with-deprecated")]
+    #[doc(hidden)]
+    pub fn from_listener(listener: net::TcpListener, _: &SocketAddr)
+                         -> io::Result<TcpListener> {
+        TcpListener::from_std(listener)
+    }
+
     /// Creates a new `TcpListener` from an instance of a
     /// `std::net::TcpListener` type.
     ///
