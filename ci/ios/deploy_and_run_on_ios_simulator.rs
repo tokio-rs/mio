@@ -22,12 +22,28 @@ use std::io::Write;
 use std::path::Path;
 use std::thread;
 use std::process::{self, Command, Stdio};
+use std::ffi::OsStr;
 
 macro_rules! t {
     ($e:expr) => (match $e {
         Ok(e) => e,
         Err(e) => panic!("{} failed with: {}", stringify!($e), e),
     })
+}
+
+// If we're running on Travis CI, launch `c` with `travis_wait`, to
+// prevent Travis from timing out.
+fn command_with_travis_wait<S: AsRef<OsStr>>(c: S) -> Command {
+    if let Ok("true") = env::var("TRAVIS")
+        .as_ref()
+        .map(String::as_ref)
+    {
+        let mut command = Command::new("travis_wait");
+        command.arg("20").arg(c.as_ref());
+        command
+    } else {
+        Command::new(c)
+    }
 }
 
 // Step one: Wrap as an app
@@ -117,7 +133,7 @@ fn run_app_on_simulator() {
     use std::io::{self, Read, Write};
 
     println!("Running app");
-    let mut child = t!(Command::new("xcrun")
+    let mut child = t!(command_with_travis_wait("xcrun")
                     .arg("simctl")
                     .arg("launch")
                     .arg("--console")
