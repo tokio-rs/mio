@@ -31,20 +31,6 @@ macro_rules! t {
     })
 }
 
-// If we're running on Travis CI, launch `c` with `travis_wait`, to
-// prevent Travis from timing out.
-fn command_with_travis_wait<S: AsRef<OsStr>>(c: S) -> Command {
-    if let Ok("true") = env::var("TRAVIS")
-        .as_ref()
-        .map(String::as_ref)
-    {
-        let mut command = Command::new("travis_wait");
-        command.arg("20").arg(c.as_ref());
-        command
-    } else {
-        Command::new(c)
-    }
-}
 
 // Step one: Wrap as an app
 fn package_as_simulator_app(crate_name: &str, test_binary_path: &Path) {
@@ -133,7 +119,7 @@ fn run_app_on_simulator() {
     use std::io::{self, Read, Write};
 
     println!("Running app");
-    let mut child = t!(command_with_travis_wait("xcrun")
+    let mut child = t!(Command::new("xcrun")
                     .arg("simctl")
                     .arg("launch")
                     .arg("--console")

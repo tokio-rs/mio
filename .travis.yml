@@ -63,7 +63,7 @@ matrix:
       rust: stable
       script:
         - cargo build
-        - CARGO_TARGET_DIR=`pwd` sh ci/run-ios.sh $TARGET
+        - CARGO_TARGET_DIR=`pwd` travis_wait 30 ci/run-ios.sh $TARGET
       install:
         - rustup target add $TARGET
 
