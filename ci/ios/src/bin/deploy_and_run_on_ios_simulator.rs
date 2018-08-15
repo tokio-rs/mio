@@ -49,7 +49,7 @@ macro_rules! t {
 fn tick_until<F: Future>(at: Instant, every: Duration, until: F)
     -> impl Future<Item = F::Item, Error = F::Error>
 {
-    Interval::new(at, every)
+    Interval::new(at + every, every)
         .for_each(move |_| {
             println!("\tstill waiting... (for {} seconds)", at.elapsed().as_secs());
             future::ok(())
@@ -193,7 +193,7 @@ fn run_app_on_simulator() {
     // });
 
     println!("Waiting for cmd to finish");
-    let f = tick_until(t0, Duration::from_secs(30), child)
+    let f = tick_until(t0, Duration::from_secs(5), child)
         .map_err(|e| panic!("error: {:?}", e))
         .map(|output| {
             let stdout = String::from_utf8_lossy(&output.stdout);
