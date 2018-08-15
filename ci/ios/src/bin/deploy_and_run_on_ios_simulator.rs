@@ -22,7 +22,22 @@ use std::io::Write;
 use std::path::Path;
 use std::thread;
 use std::process::{self, Command, Stdio};
+use std::fmt;
 use std::ffi::OsStr;
+use std::time::{Duration, Instant};
+
+extern crate tokio;
+extern crate tokio_process;
+
+use tokio::{
+    prelude::{
+        future::{self, Either},
+        Future,
+        Stream,
+    },
+    timer::Interval,
+};
+use tokio_process::CommandExt;
 
 macro_rules! t {
     ($e:expr) => (match $e {
@@ -31,6 +46,27 @@ macro_rules! t {
     })
 }
 
+fn tick_until<F: Future>(at: Instant, every: Duration, until: F)
+    -> impl Future<Item = F::Item, Error = F::Error>
+{
+    Interval::new(at, every)
+        .for_each(move |_| {
+            println!("\tstill waiting... (for {} seconds)", at.elapsed().as_secs());
+            future::ok(())
+        })
+        .select2(until)
+        .map(move |r|
+            if let Either::B((item, _)) = r {
+                println!("\tfinished after {} seconds", at.elapsed().as_secs());
+                item
+            } else {
+                panic!("infinite stream finished!")
+            })
+        .map_err(|e| match e {
+            Either::A((timer_err, _)) => panic!("timer failed! failed {:?}", timer_err),
+            Either::B((err, _)) => err,
+        })
+}
 
 // Step one: Wrap as an app
 fn package_as_simulator_app(crate_name: &str, test_binary_path: &Path) {
@@ -119,6 +155,7 @@ fn run_app_on_simulator() {
     use std::io::{self, Read, Write};
 
     println!("Running app");
+    let t0 = Instant::now();
     let mut child = t!(Command::new("xcrun")
                     .arg("simctl")
                     .arg("launch")
@@ -129,51 +166,54 @@ fn run_app_on_simulator() {
                     .arg("never")
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
-                    .spawn());
+                    .spawn_async())
+                    .wait_with_output();
 
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
+    // let stdout = child.stdout.take().unwrap();
+    // let stderr = child.stderr.take().unwrap();
 
-    let th = thread::spawn(move || {
-        let mut out = vec![];
+    // let th = thread::spawn(move || {
+    //     let mut out = vec![];
 
-        for b in stdout.bytes() {
-            let b = b.unwrap();
-            out.push(b);
-            let out = [b];
-            io::stdout().write(&out[..]).unwrap();
-        }
+    //     for b in stdout.bytes() {
+    //         let b = b.unwrap();
+    //         out.push(b);
+    //         let out = [b];
+    //         io::stdout().write(&out[..]).unwrap();
+    //     }
 
-        out
-    });
+    //     out
+    // });
 
-    thread::spawn(move || {
-        for b in stderr.bytes() {
-            let out = [b.unwrap()];
-            io::stderr().write(&out[..]).unwrap();
-        }
-    });
+    // thread::spawn(move || {
+    //     for b in stderr.bytes() {
+    //         let out = [b.unwrap()];
+    //         io::stderr().write(&out[..]).unwrap();
+    //     }
+    // });
 
     println!("Waiting for cmd to finish");
-    child.wait().unwrap();
+    let f = tick_until(t0, Duration::from_secs(30), child)
+        .map_err(|e| panic!("error: {:?}", e))
+        .map(|output| {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let passed = stdout.lines()
+                    .find(|l| l.contains("test result"))
+                    .map(|l| l.contains(" 0 failed"))
+                    .unwrap_or(false);
+            println!("{}", stdout);
+            println!("Shutting down simulator");
+            Command::new("xcrun")
+                .arg("simctl")
+                .arg("shutdown")
+                .arg("rust_ios")
+                .check_status();
+            if !passed {
+                panic!("tests didn't pass")
+            }
+        });
 
-    println!("Waiting for stdout");
-    let stdout = th.join().unwrap();
-    let stdout = String::from_utf8_lossy(&stdout);
-    let passed = stdout.lines()
-                       .find(|l| l.contains("test result"))
-                       .map(|l| l.contains(" 0 failed"))
-                       .unwrap_or(false);
-
-    println!("Shutting down simulator");
-    Command::new("xcrun")
-        .arg("simctl")
-        .arg("shutdown")
-        .arg("rust_ios")
-        .check_status();
-    if !passed {
-        panic!("tests didn't pass");
-    }
+    tokio::run(f);
 }
 
 trait CheckStatus {

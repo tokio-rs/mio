@@ -1,0 +1,8 @@
+[package]
+name = "ios"
+version = "0.1.0"
+authors = ["Eliza Weisman <eliza@buoyant.io>"]
+
+[dependencies]
+tokio = "0.1.7"
+tokio-process = "0.2.2"
