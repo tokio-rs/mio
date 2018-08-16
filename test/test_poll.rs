@@ -56,7 +56,7 @@ fn test_poll_duration_0_doesnt_block() {
         is_blocked2.store(false, Ordering::SeqCst);
     });
 
-    thread::sleep(Duration::from_millis(1));
+    thread::sleep(Duration::from_millis(100));
     assert_eq!(is_blocked.load(Ordering::SeqCst), false);
 
 }
@@ -79,7 +79,7 @@ fn test_poll_unblocks() {
 
     assert!(is_blocked.load(Ordering::SeqCst));
     set_readiness.set_readiness(Ready::readable()).unwrap();
-    thread::sleep(Duration::from_millis(1));
+    thread::sleep(Duration::from_millis(100));
     assert_eq!(is_blocked.load(Ordering::SeqCst), false);
 
 }
