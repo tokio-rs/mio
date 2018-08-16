@@ -1,9 +1,7 @@
 use mio::*;
 use std::time::Duration;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 
 #[test]
