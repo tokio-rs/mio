@@ -105,6 +105,76 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     }
 }
 
+#[cfg(test)]
+fn test_send_peek_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
+    debug!("Starting TEST_UDP_SOCKETS");
+    let poll = Poll::new().unwrap();
+
+    assert_send::<UdpSocket>();
+    assert_sync::<UdpSocket>();
+
+    // ensure that the sockets are non-blocking
+    let mut buf = [0; 128];
+    assert_eq!(ErrorKind::WouldBlock, rx.recv_from(&mut buf).unwrap_err().kind());
+
+    info!("Registering SENDER");
+    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
+
+    info!("Registering LISTENER");
+    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+
+    let mut events = Events::with_capacity(1024);
+
+    info!("Starting event loop to test with...");
+    let mut handler = UdpHandlerSendRecv::new(tx, rx, connected, "hello world");
+
+    while !handler.shutdown {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in &events {
+            if event.readiness().is_readable() {
+                match event.token() {
+                    LISTENER => {
+                        debug!("We are receiving a datagram now...");
+                        for i in 1..3 {
+                            debug!("doing peek #{}...", i);
+                            let cnt = unsafe {
+                                if !handler.connected {
+                                    handler.rx.peek_from(handler.rx_buf.mut_bytes()).unwrap().0
+                                } else {
+                                    handler.rx.peek(handler.rx_buf.mut_bytes()).unwrap()
+                                }
+                            };
+                            let expected_msg = handler.msg.repeat(i);
+                            unsafe { MutBuf::advance(&mut handler.rx_buf, cnt); }
+                            assert_eq!(str::from_utf8(handler.rx_buf.bytes()).unwrap(), expected_msg);
+                        }
+
+                        handler.shutdown = true;
+                    },
+                    _ => ()
+                }
+            }
+
+            if event.readiness().is_writable() {
+                match event.token() {
+                    SENDER => {
+                        let cnt = if !handler.connected {
+                            let addr = handler.rx.local_addr().unwrap();
+                            handler.tx.send_to(handler.buf.bytes(), &addr).unwrap()
+                        } else {
+                            handler.tx.send(handler.buf.bytes()).unwrap()
+                        };
+
+                        handler.buf.advance(cnt);
+                    },
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
 #[test]
 pub fn test_udp_socket() {
     let addr = localhost();
@@ -145,7 +215,7 @@ pub fn test_udp_socket_discard() {
 
     let tx_addr = tx.local_addr().unwrap();
     let rx_addr = rx.local_addr().unwrap();
- 
+
     assert!(tx.connect(rx_addr).is_ok());
     assert!(udp_outside.connect(rx_addr).is_ok());
     assert!(rx.connect(tx_addr).is_ok());
@@ -172,4 +242,32 @@ pub fn test_udp_socket_discard() {
             }
         }
     }
+}
+
+#[test]
+pub fn test_udp_socket_peek_from() {
+    let addr = localhost();
+    let any = localhost();
+
+    let tx = UdpSocket::bind(&any).unwrap();
+    let rx = UdpSocket::bind(&addr).unwrap();
+
+    test_send_peek_udp(tx, rx, false);
+}
+
+#[test]
+pub fn test_udp_socket_peek() {
+    let addr = localhost();
+    let any = localhost();
+
+    let tx = UdpSocket::bind(&any).unwrap();
+    let rx = UdpSocket::bind(&addr).unwrap();
+
+        let tx_addr = tx.local_addr().unwrap();
+    let rx_addr = rx.local_addr().unwrap();
+
+    assert!(tx.connect(rx_addr).is_ok());
+    assert!(rx.connect(tx_addr).is_ok());
+
+    test_send_peek_udp(tx, rx, true);
 }
