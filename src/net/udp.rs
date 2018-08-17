@@ -542,6 +542,33 @@ impl UdpSocket {
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.sys.take_error()
     }
+
+    /// Receives a single datagram on the socket from the remote address to which it is
+    /// connected, without removing the message from input queue. On success, returns
+    /// the number of bytes peeked.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// Successive calls return the same data. This is accomplished by passing
+    /// `MSG_PEEK` as a flag to the underlying `recv` system call.
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.sys.peek(buf)
+    }
+
+    /// Receives a single datagram message on the socket, without removing it from the
+    /// queue. On success, returns the number of bytes read and the origin.
+    ///
+    /// The function must be called with valid byte array `buf` of sufficient size to
+    /// hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// excess bytes may be discarded.
+    ///
+    /// Successive calls return the same data. This is accomplished by passing
+    /// `MSG_PEEK` as a flag to the underlying `recvfrom` system call.
+    pub fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.sys.peek_from(buf)
+    }
 }
 
 impl Evented for UdpSocket {

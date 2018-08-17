@@ -413,9 +413,16 @@ impl UdpSocket {
         self.io.only_v6()
     }
 
-
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.io.take_error()
+    }
+
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io.peek(buf)
+    }
+
+    pub fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.io.peek_from(buf)
     }
 }
 
