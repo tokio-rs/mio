@@ -267,6 +267,44 @@ impl UdpSocket {
         self.imp.inner.socket.take_error()
     }
 
+    pub fn peek_from(&self, mut buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        let mut me = self.inner();
+
+        match mem::replace(&mut me.read, State::Empty) {
+            State::Empty => Err(io::ErrorKind::WouldBlock.into()),
+
+            State::Pending(b) => {
+                me.read = State::Pending(b);
+                Err(io::ErrorKind::WouldBlock.into())
+            },
+
+            State::Error(e) => {
+                self.imp.schedule_read_from(&mut me);
+                Err(e)
+            },
+
+            State::Ready(data) => {
+                let data_len = data.len();
+                let r = if buf.len() < data_len {
+                    Err(io::Error::from_raw_os_error(WSAEMSGSIZE as i32))
+                } else if let Some(addr) = me.read_buf.to_socket_addr() {
+                    buf.write(&data).unwrap();
+                    Ok((data_len, addr))
+                } else {
+                    Err(io::Error::new(io::ErrorKind::Other,
+                                        "failed to parse socket address"))
+                };
+                me.read = State::Ready(data);
+                r
+            },
+        }
+    }
+
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.peek_from(buf).map(|(size,_)| size)
+    }
+
+
     fn inner(&self) -> MutexGuard<Inner> {
         self.imp.inner()
     }
