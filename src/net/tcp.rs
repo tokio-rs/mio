@@ -9,10 +9,12 @@
 
 #[cfg(not(target_os = "redox"))]
 use net2::TcpBuilder;
+#[cfg(not(target_os = "redox"))]
+use std::net::{SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 
 use std::fmt;
 use std::io::{Read, Write};
-use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
+use std::net::{self, SocketAddr};
 use std::time::Duration;
 
 use iovec::IoVec;
@@ -402,6 +404,7 @@ impl TcpStream {
     }
 }
 
+#[cfg(not(target_os = "redox"))]
 fn inaddr_any(other: &SocketAddr) -> SocketAddr {
     match *other {
         SocketAddr::V4(..) => {
