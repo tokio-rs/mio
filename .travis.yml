@@ -107,6 +107,15 @@ matrix:
       script:
         - bash ci/trust/script.sh
 
+    # Redox
+    - os: linux
+      env: TARGET=x86_64-unknown-redox
+      install:
+        - rustup toolchain install nightly
+        - rustup target add $TARGET --toolchain nightly
+      script:
+        - cargo +nightly check --target $TARGET
+
 env:
   global:
     - CRATE_NAME=mio
