@@ -7,14 +7,12 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
-#[cfg(windows)]
-use std::net::{SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 #[cfg(not(target_os = "redox"))]
 use net2::TcpBuilder;
 
 use std::fmt;
 use std::io::{Read, Write};
-use std::net::{self, SocketAddr};
+use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
 use iovec::IoVec;
@@ -101,8 +99,9 @@ impl TcpStream {
         }?;
         // Required on Windows for a future `connect_overlapped` operation to be
         // executed successfully.
-        #[cfg(windows)]
-        sock.bind(&inaddr_any(addr))?;
+        if cfg!(windows) {
+            sock.bind(&inaddr_any(addr))?;
+        }
 
         TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
     }
@@ -403,7 +402,6 @@ impl TcpStream {
     }
 }
 
-#[cfg(windows)]
 fn inaddr_any(other: &SocketAddr) -> SocketAddr {
     match *other {
         SocketAddr::V4(..) => {
@@ -539,8 +537,9 @@ impl TcpListener {
         }?;
 
         // Set SO_REUSEADDR, but only on Unix (mirrors what libstd does)
-        #[cfg(unix)]
-        sock.reuse_address(true)?;
+        if cfg!(unix) {
+            sock.reuse_address(true)?;
+        }
 
         // Bind the socket
         sock.bind(addr)?;
