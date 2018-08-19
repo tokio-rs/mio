@@ -22,6 +22,7 @@
 use std::ops::Deref;
 use std::mem;
 use std::sync::atomic::{self, AtomicUsize, Ordering};
+use winapi::OVERLAPPED;
 
 pub struct FromRawArc<T> {
     _inner: *mut Inner<T>,
@@ -83,6 +84,30 @@ impl<T> Drop for FromRawArc<T> {
             atomic::fence(Ordering::Acquire);
             drop(mem::transmute::<_, Box<T>>(self._inner));
         }
+    }
+}
+
+unsafe impl Send for FromRawArcStore { }
+unsafe impl Sync for FromRawArcStore { }
+
+pub struct FromRawArcStore {
+    _ptr: *mut OVERLAPPED,
+    deallocator: fn(*mut OVERLAPPED),
+}
+
+impl FromRawArcStore {
+    pub fn new(ptr: *mut OVERLAPPED, deallocator: fn(*mut OVERLAPPED)) -> FromRawArcStore {
+        let store = FromRawArcStore {
+            _ptr: unsafe { mem::transmute(ptr) },
+            deallocator: deallocator,
+        };
+        store
+    }
+}
+
+impl Drop for FromRawArcStore {
+    fn drop(&mut self) {
+        (self.deallocator)(self._ptr);
     }
 }
 

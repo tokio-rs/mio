@@ -6,6 +6,7 @@ use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::time::Duration;
+use std::mem;
 
 use lazycell::AtomicLazyCell;
 
@@ -16,6 +17,7 @@ use miow::iocp::{CompletionPort, CompletionStatus};
 use event_imp::{Event, Evented, Ready};
 use poll::{self, Poll};
 use sys::windows::buffer_pool::BufferPool;
+use sys::windows::from_raw_arc::FromRawArcStore;
 use {Token, PollOpt};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
@@ -48,6 +50,8 @@ struct SelectorInner {
     /// Primitives will take buffers from this pool to perform I/O operations,
     /// and once complete they'll be put back in.
     buffers: Mutex<BufferPool>,
+
+    incompletes: Mutex<Vec<(isize, FromRawArcStore)>>,
 }
 
 impl Selector {
@@ -61,6 +65,7 @@ impl Selector {
                     id: id,
                     port: cp,
                     buffers: Mutex::new(BufferPool::new(256)),
+                    incompletes: Mutex::new(Vec::new()),
                 }),
             }
         })
@@ -91,6 +96,20 @@ impl Selector {
                 ret = true;
                 continue;
             }
+            // Deadlock will occur if you don't release it first before the callback.
+            {
+                let mut incompletes = self.inner.incompletes.lock().unwrap();
+                let pos = incompletes.iter().position(|item| item.0 == (status.overlapped() as isize));
+                match pos {
+                    Some(pos) => {
+                        let store = incompletes.remove(pos);
+                        mem::forget(store);
+                    },
+                    None => {
+                        trace!("cannot find store, omiting...");
+                    }
+                }
+            }
 
             let callback = unsafe {
                 (*(status.overlapped() as *mut Overlapped)).callback
@@ -102,6 +121,16 @@ impl Selector {
 
         trace!("returning");
         Ok(ret)
+    }
+
+    pub fn store_overlapped_content(&self, ptr: *mut OVERLAPPED, deallocator: fn(*mut OVERLAPPED)) {
+        let mut incompletes = self.inner.incompletes.lock().unwrap();
+        incompletes.push((ptr as isize, FromRawArcStore::new(ptr, deallocator)));
+    }
+
+    pub fn clean_overlapped_content(&self, ptr: *mut OVERLAPPED) {
+        let mut incompletes = self.inner.incompletes.lock().unwrap();
+        incompletes.retain(|item| ptr as isize != item.0);
     }
 
     /// Gets a reference to the underlying `CompletionPort` structure.
@@ -403,6 +432,24 @@ impl ReadyBinding {
         registration.lock().unwrap()
                     .as_ref().unwrap()
                     .deregister(poll)
+    }
+
+    pub fn store_overlapped_content(&self, ptr: *mut OVERLAPPED, deallocator: fn(*mut OVERLAPPED)) {
+        if let Some(i) = self.binding.selector.borrow() {
+            let selector = Selector {
+                inner: i.clone(),
+            };
+            selector.store_overlapped_content(ptr, deallocator);
+        }
+    }
+
+    pub fn clean_overlapped_content(&self, ptr: *mut OVERLAPPED) {
+        if let Some(i) = self.binding.selector.borrow() {
+            let selector = Selector {
+                inner: i.clone(),
+            };
+            selector.clean_overlapped_content(ptr);
+        }
     }
 }
 

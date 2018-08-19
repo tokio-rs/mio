@@ -113,6 +113,7 @@ impl UdpSocket {
         }?;
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
+        me.iocp.store_overlapped_content(self.imp.inner.write.as_mut_ptr(), send_deallocate);
         Ok(amt)
     }
 
@@ -147,6 +148,7 @@ impl UdpSocket {
         }?;
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
+        me.iocp.store_overlapped_content(self.imp.inner.write.as_mut_ptr(), send_deallocate);
         Ok(amt)
     }
 
@@ -313,6 +315,7 @@ impl Imp {
             Ok(_) => {
                 me.read = State::Pending(buf);
                 mem::forget(self.clone());
+                me.iocp.store_overlapped_content(self.inner.read.as_mut_ptr(), recv_deallocate);
             }
             Err(e) => {
                 me.read = State::Error(e);
@@ -410,4 +413,18 @@ fn recv_done(status: &OVERLAPPED_ENTRY) {
     }
     me.read = State::Ready(buf);
     me2.add_readiness(&mut me, Ready::readable());
+}
+
+fn send_deallocate(ptr: *mut OVERLAPPED) {
+    let me = Imp {
+        inner: unsafe { overlapped2arc!(ptr, Io, write) },
+    };
+    drop(me);
+}
+
+fn recv_deallocate(ptr: *mut OVERLAPPED) {
+    let me = Imp {
+        inner: unsafe { overlapped2arc!(ptr, Io, read) },
+    };
+    drop(me);
 }

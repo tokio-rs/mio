@@ -394,13 +394,14 @@ impl StreamImp {
         self.inner.inner.lock().unwrap()
     }
 
-    fn schedule_connect(&self, addr: &SocketAddr) -> io::Result<()> {
+    fn schedule_connect(&self, addr: &SocketAddr, me: &mut StreamInner) -> io::Result<()> {
         unsafe {
             trace!("scheduling a connect");
             self.inner.socket.connect_overlapped(addr, &[], self.inner.read.as_mut_ptr())?;
         }
         // see docs above on StreamImp.inner for rationale on forget
         mem::forget(self.clone());
+        me.iocp.store_overlapped_content(self.inner.read.as_mut_ptr(), read_deallocate);
         Ok(())
     }
 
@@ -454,6 +455,7 @@ impl StreamImp {
                 // see docs above on StreamImp.inner for rationale on forget
                 me.read = State::Pending(());
                 mem::forget(self.clone());
+                me.iocp.store_overlapped_content(self.inner.read.as_mut_ptr(), read_deallocate);
             }
             Err(e) => {
                 me.read = State::Error(e);
@@ -499,6 +501,7 @@ impl StreamImp {
                     // see docs above on StreamImp.inner for rationale on forget
                     me.write = State::Pending((buf, pos));
                     mem::forget(self.clone());
+                    me.iocp.store_overlapped_content(self.inner.write.as_mut_ptr(), write_deallocate);
                     break;
                 }
                 Err(e) => {
@@ -578,6 +581,20 @@ fn write_done(status: &OVERLAPPED_ENTRY) {
     }
 }
 
+fn read_deallocate(ptr: *mut OVERLAPPED) {
+    let me = StreamImp {
+        inner: unsafe { overlapped2arc!(ptr, StreamIo, read) },
+    };
+    drop(me);
+}
+
+fn write_deallocate(ptr: *mut OVERLAPPED) {
+    let me = StreamImp {
+        inner: unsafe { overlapped2arc!(ptr, StreamIo, write) },
+    };
+    drop(me);
+}
+
 impl Evented for TcpStream {
     fn register(&self, poll: &Poll, token: Token,
                 interest: Ready, opts: PollOpt) -> io::Result<()> {
@@ -595,7 +612,7 @@ impl Evented for TcpStream {
         // successful connect will worry about generating writable/readable
         // events and scheduling a new read.
         if let Some(addr) = me.deferred_connect.take() {
-            return self.imp.schedule_connect(&addr).map(|_| ())
+            return self.imp.schedule_connect(&addr, &mut me).map(|_| ())
         }
         self.post_register(interest, &mut me);
         Ok(())
@@ -632,11 +649,15 @@ impl Drop for TcpStream {
         // Note that "Empty" here may mean that a connect is pending, so we
         // cancel even if that happens as well.
         unsafe {
-            match self.inner().read {
+            let inner = self.inner();
+            match inner.read {
                 State::Pending(_) | State::Empty => {
                     trace!("cancelling active TCP read");
                     drop(super::cancel(&self.imp.inner.socket,
                                        &self.imp.inner.read));
+                    trace!("cleaning remaining overlapped contents");
+                    inner.iocp.clean_overlapped_content(self.imp.inner.read.as_mut_ptr());
+                    inner.iocp.clean_overlapped_content(self.imp.inner.write.as_mut_ptr());
                 }
                 State::Ready(_) | State::Error(_) => {}
             }
@@ -754,6 +775,7 @@ impl ListenerImp {
                 // see docs above on StreamImp.inner for rationale on forget
                 me.accept = State::Pending(socket);
                 mem::forget(self.clone());
+                me.iocp.store_overlapped_content(self.inner.accept.as_mut_ptr(), accept_dellocate);
             }
             Err(e) => {
                 me.accept = State::Error(e);
@@ -792,6 +814,13 @@ fn accept_done(status: &OVERLAPPED_ENTRY) {
         Err(e) => State::Error(e),
     };
     me2.add_readiness(&mut me, Ready::readable());
+}
+
+fn accept_dellocate(ptr: *mut OVERLAPPED) {
+    let me = ListenerImp {
+        inner: unsafe { overlapped2arc!(ptr, ListenerIo, accept) },
+    };
+    drop(me);
 }
 
 impl Evented for TcpListener {
@@ -836,11 +865,14 @@ impl Drop for TcpListener {
     fn drop(&mut self) {
         // If we're still internally reading, we're no longer interested.
         unsafe {
-            match self.inner().accept {
+            let inner = self.inner();
+            match inner.accept {
                 State::Pending(_) => {
                     trace!("cancelling active TCP accept");
                     drop(super::cancel(&self.imp.inner.socket,
                                        &self.imp.inner.accept));
+                    trace!("cleaning remaining overlapped contents");
+                    inner.iocp.clean_overlapped_content(self.imp.inner.accept.as_mut_ptr());
                 }
                 State::Empty |
                 State::Ready(_) |
