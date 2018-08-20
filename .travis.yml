@@ -59,11 +59,11 @@ matrix:
     # iOS
     - os: osx
       osx_image: xcode8.2
-      env: TARGET=x86_64-apple-ios
+      env: TARGET=x86_64-apple-ios DISABLE_TESTS=1
       rust: stable
       script:
-        - cargo build
-        - CARGO_TARGET_DIR=`pwd` sh ci/run-ios.sh $TARGET
+        - cargo build --target "$TARGET"
+        - cargo build --target "$TARGET" --no-default-features
       install:
         - rustup target add $TARGET
 
