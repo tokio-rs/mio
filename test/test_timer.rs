@@ -1,21 +1,23 @@
-use {sleep_ms, TryRead, TryWrite};
-use mio::*;
 use mio::deprecated::{EventLoop, Handler};
-use mio::timer::{Timer};
+use mio::timer::Timer;
+use mio::*;
+use {sleep_ms, TryRead, TryWrite};
 
-use mio::net::{TcpListener, TcpStream};
 use bytes::{Buf, ByteBuf, SliceBuf};
 use localhost;
+use mio::net::{TcpListener, TcpStream};
 use std::time::Duration;
 
-use self::TestState::{Initial, AfterRead};
+use self::TestState::{AfterRead, Initial};
 
 #[test]
 fn test_basic_timer_without_poll() {
     let mut timer = Timer::default();
 
     // Set the timeout
-    timer.set_timeout(Duration::from_millis(200), "hello").unwrap();
+    timer
+        .set_timeout(Duration::from_millis(200), "hello")
+        .unwrap();
 
     // Nothing when polled immediately
     assert!(timer.poll().is_none());
@@ -35,8 +37,11 @@ fn test_basic_timer_with_poll_edge_set_timeout_after_register() {
     let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
-    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
-    timer.set_timeout(Duration::from_millis(200), "hello").unwrap();
+    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge())
+        .unwrap();
+    timer
+        .set_timeout(Duration::from_millis(200), "hello")
+        .unwrap();
 
     let elapsed = elapsed(|| {
         let num = poll.poll(&mut events, None).unwrap();
@@ -59,8 +64,11 @@ fn test_basic_timer_with_poll_edge_set_timeout_before_register() {
     let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
-    timer.set_timeout(Duration::from_millis(200), "hello").unwrap();
-    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    timer
+        .set_timeout(Duration::from_millis(200), "hello")
+        .unwrap();
+    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge())
+        .unwrap();
 
     let elapsed = elapsed(|| {
         let num = poll.poll(&mut events, None).unwrap();
@@ -83,10 +91,15 @@ fn test_setting_later_timeout_then_earlier_one() {
     let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
-    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge())
+        .unwrap();
 
-    timer.set_timeout(Duration::from_millis(600), "hello").unwrap();
-    timer.set_timeout(Duration::from_millis(200), "world").unwrap();
+    timer
+        .set_timeout(Duration::from_millis(600), "hello")
+        .unwrap();
+    timer
+        .set_timeout(Duration::from_millis(200), "world")
+        .unwrap();
 
     let elapsed = elapsed(|| {
         let num = poll.poll(&mut events, None).unwrap();
@@ -119,16 +132,17 @@ fn test_timer_with_looping_wheel() {
 
     let poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(1024);
-    let mut timer = timer::Builder::default()
-        .num_slots(2)
-        .build();
+    let mut timer = timer::Builder::default().num_slots(2).build();
 
-    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge())
+        .unwrap();
 
-    const TOKENS: &'static [ &'static str ] = &[ "hello", "world", "some", "thing" ];
+    const TOKENS: &'static [&'static str] = &["hello", "world", "some", "thing"];
 
     for (i, msg) in TOKENS.iter().enumerate() {
-        timer.set_timeout(Duration::from_millis(500 * (i as u64 + 1)), msg).unwrap();
+        timer
+            .set_timeout(Duration::from_millis(500 * (i as u64 + 1)), msg)
+            .unwrap();
     }
 
     for msg in TOKENS {
@@ -140,10 +154,14 @@ fn test_timer_with_looping_wheel() {
             assert_eq!(Ready::readable(), events.get(0).unwrap().readiness());
         });
 
-        assert!(is_about(500, elapsed), "actual={:?}; msg={:?}", elapsed, msg);
+        assert!(
+            is_about(500, elapsed),
+            "actual={:?}; msg={:?}",
+            elapsed,
+            msg
+        );
         assert_eq!(Some(msg), timer.poll());
         assert_eq!(None, timer.poll());
-
     }
 }
 
@@ -155,9 +173,12 @@ fn test_edge_without_polling() {
     let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
-    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge())
+        .unwrap();
 
-    timer.set_timeout(Duration::from_millis(400), "hello").unwrap();
+    timer
+        .set_timeout(Duration::from_millis(400), "hello")
+        .unwrap();
 
     let ms = elapsed(|| {
         let num = poll.poll(&mut events, None).unwrap();
@@ -169,7 +190,9 @@ fn test_edge_without_polling() {
     assert!(is_about(400, ms), "actual={:?}", ms);
 
     let ms = elapsed(|| {
-        let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
+        let num = poll
+            .poll(&mut events, Some(Duration::from_millis(300)))
+            .unwrap();
         assert_eq!(num, 0);
     });
 
@@ -184,9 +207,12 @@ fn test_level_triggered() {
     let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
-    poll.register(&timer, Token(0), Ready::readable(), PollOpt::level()).unwrap();
+    poll.register(&timer, Token(0), Ready::readable(), PollOpt::level())
+        .unwrap();
 
-    timer.set_timeout(Duration::from_millis(400), "hello").unwrap();
+    timer
+        .set_timeout(Duration::from_millis(400), "hello")
+        .unwrap();
 
     let ms = elapsed(|| {
         let num = poll.poll(&mut events, None).unwrap();
@@ -215,9 +241,16 @@ fn test_edge_oneshot_triggered() {
     let mut events = Events::with_capacity(1024);
     let mut timer = Timer::default();
 
-    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    poll.register(
+        &timer,
+        Token(0),
+        Ready::readable(),
+        PollOpt::edge() | PollOpt::oneshot(),
+    ).unwrap();
 
-    timer.set_timeout(Duration::from_millis(200), "hello").unwrap();
+    timer
+        .set_timeout(Duration::from_millis(200), "hello")
+        .unwrap();
 
     let ms = elapsed(|| {
         let num = poll.poll(&mut events, None).unwrap();
@@ -227,13 +260,20 @@ fn test_edge_oneshot_triggered() {
     assert!(is_about(200, ms), "actual={:?}", ms);
 
     let ms = elapsed(|| {
-        let num = poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
+        let num = poll
+            .poll(&mut events, Some(Duration::from_millis(300)))
+            .unwrap();
         assert_eq!(num, 0);
     });
 
     assert!(is_about(300, ms), "actual={:?}", ms);
 
-    poll.reregister(&timer, Token(0), Ready::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+    poll.reregister(
+        &timer,
+        Token(0),
+        Ready::readable(),
+        PollOpt::edge() | PollOpt::oneshot(),
+    ).unwrap();
 
     let ms = elapsed(|| {
         let num = poll.poll(&mut events, None).unwrap();
@@ -254,7 +294,8 @@ fn test_cancel_timeout() {
     timer.cancel_timeout(&timeout);
 
     let poll = Poll::new().unwrap();
-    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&timer, Token(0), Ready::readable(), PollOpt::edge())
+        .unwrap();
 
     let mut events = Events::with_capacity(16);
 
@@ -315,7 +356,7 @@ enum TestState {
 struct TestHandler {
     srv: TcpListener,
     cli: TcpStream,
-    state: TestState
+    state: TestState,
 }
 
 impl TestHandler {
@@ -323,22 +364,29 @@ impl TestHandler {
         TestHandler {
             srv: srv,
             cli: cli,
-            state: Initial
+            state: Initial,
         }
     }
 
-    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>,
-                   tok: Token, _events: Ready) {
+    fn handle_read(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, _events: Ready) {
         match tok {
             SERVER => {
                 debug!("server connection ready for accept");
                 let conn = self.srv.accept().unwrap().0;
-                event_loop.register(&conn, CONN, Ready::readable() | Ready::writable(),
-                                        PollOpt::edge()).unwrap();
-                event_loop.timeout(conn, Duration::from_millis(200)).unwrap();
+                event_loop
+                    .register(
+                        &conn,
+                        CONN,
+                        Ready::readable() | Ready::writable(),
+                        PollOpt::edge(),
+                    ).unwrap();
+                event_loop
+                    .timeout(conn, Duration::from_millis(200))
+                    .unwrap();
 
-                event_loop.reregister(&self.srv, SERVER, Ready::readable(),
-                                      PollOpt::edge()).unwrap();
+                event_loop
+                    .reregister(&self.srv, SERVER, Ready::readable(), PollOpt::edge())
+                    .unwrap();
             }
             CLIENT => {
                 debug!("client readable");
@@ -361,17 +409,20 @@ impl TestHandler {
                     }
                 }
 
-                event_loop.reregister(&self.cli, CLIENT,
-                                      Ready::readable() | Ready::hup(),
-                                      PollOpt::edge()).unwrap();
+                event_loop
+                    .reregister(
+                        &self.cli,
+                        CLIENT,
+                        Ready::readable() | Ready::hup(),
+                        PollOpt::edge(),
+                    ).unwrap();
             }
             CONN => {}
             _ => panic!("received unknown token {:?}", tok),
         }
     }
 
-    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>,
-                    tok: Token, _: Ready) {
+    fn handle_write(&mut self, event_loop: &mut EventLoop<TestHandler>, tok: Token, _: Ready) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => debug!("client connected"),
@@ -379,8 +430,9 @@ impl TestHandler {
             _ => panic!("received unknown token {:?}", tok),
         }
 
-        event_loop.reregister(&self.cli, CLIENT, Ready::readable(),
-                              PollOpt::edge()).unwrap();
+        event_loop
+            .reregister(&self.cli, CLIENT, Ready::readable(), PollOpt::edge())
+            .unwrap();
     }
 }
 
@@ -400,7 +452,9 @@ impl Handler for TestHandler {
 
     fn timeout(&mut self, _event_loop: &mut EventLoop<TestHandler>, mut sock: TcpStream) {
         debug!("timeout handler : writing to socket");
-        sock.try_write_buf(&mut SliceBuf::wrap(b"zomg")).unwrap().unwrap();
+        sock.try_write_buf(&mut SliceBuf::wrap(b"zomg"))
+            .unwrap()
+            .unwrap();
     }
 }
 
@@ -417,12 +471,24 @@ pub fn test_old_timer() {
 
     info!("listening for connections");
 
-    event_loop.register(&srv, SERVER, Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
+    event_loop
+        .register(
+            &srv,
+            SERVER,
+            Ready::readable() | Ready::writable(),
+            PollOpt::edge(),
+        ).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
-    event_loop.register(&sock, CLIENT, Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
+    event_loop
+        .register(
+            &sock,
+            CLIENT,
+            Ready::readable() | Ready::writable(),
+            PollOpt::edge(),
+        ).unwrap();
 
     // Init the handler
     let mut handler = TestHandler::new(srv, sock);

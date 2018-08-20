@@ -3,20 +3,48 @@ use libc::{self, c_int};
 #[macro_use]
 pub mod dlsym;
 
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+#[cfg(
+    any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "solaris"
+    )
+)]
 mod epoll;
 
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+#[cfg(
+    any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "solaris"
+    )
+)]
 pub use self::epoll::{Events, Selector};
 
-#[cfg(any(target_os = "bitrig", target_os = "dragonfly",
-          target_os = "freebsd", target_os = "ios", target_os = "macos",
-          target_os = "netbsd", target_os = "openbsd"))]
+#[cfg(
+    any(
+        target_os = "bitrig",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    )
+)]
 mod kqueue;
 
-#[cfg(any(target_os = "bitrig", target_os = "dragonfly",
-          target_os = "freebsd", target_os = "ios", target_os = "macos",
-          target_os = "netbsd", target_os = "openbsd"))]
+#[cfg(
+    any(
+        target_os = "bitrig",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    )
+)]
 pub use self::kqueue::{Events, Selector};
 
 mod awakener;
@@ -31,9 +59,9 @@ mod uds;
 
 pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
-pub use self::io::{Io, set_nonblock};
+pub use self::io::{set_nonblock, Io};
 pub use self::ready::{UnixReady, READY_ALL};
-pub use self::tcp::{TcpStream, TcpListener};
+pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
 
 #[cfg(feature = "with-deprecated")]
@@ -63,9 +91,7 @@ pub fn pipe() -> ::io::Result<(Io, Io)> {
         }
     }
 
-    unsafe {
-        Ok((Io::from_raw_fd(pipes[0]), Io::from_raw_fd(pipes[1])))
-    }
+    unsafe { Ok((Io::from_raw_fd(pipes[0]), Io::from_raw_fd(pipes[1]))) }
 }
 
 trait IsMinusOne {
@@ -73,10 +99,14 @@ trait IsMinusOne {
 }
 
 impl IsMinusOne for i32 {
-    fn is_minus_one(&self) -> bool { *self == -1 }
+    fn is_minus_one(&self) -> bool {
+        *self == -1
+    }
 }
 impl IsMinusOne for isize {
-    fn is_minus_one(&self) -> bool { *self == -1 }
+    fn is_minus_one(&self) -> bool {
+        *self == -1
+    }
 }
 
 fn cvt<T: IsMinusOne>(t: T) -> ::io::Result<T> {

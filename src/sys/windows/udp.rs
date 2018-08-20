@@ -4,23 +4,23 @@
 //! something seems odd you may also want to try the docs over there.
 
 use std::fmt;
-use std::io::prelude::*;
 use std::io;
+use std::io::prelude::*;
 use std::mem;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::{Mutex, MutexGuard};
 
-#[allow(unused_imports)]
-use net2::{UdpBuilder, UdpSocketExt};
-use winapi::*;
 use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
+#[allow(unused_imports)]
+use net2::{UdpBuilder, UdpSocketExt};
+use winapi::*;
 
-use {poll, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
+use {poll, Poll, PollOpt, Ready, Token};
 
 pub struct UdpSocket {
     imp: Imp,
@@ -87,8 +87,7 @@ impl UdpSocket {
     /// TODO: This... may be wrong in the long run. We're reporting that we
     ///       successfully wrote all of the bytes in `buf` but it's possible
     ///       that we don't actually end up writing all of them!
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr)
-                   -> io::Result<usize> {
+    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
 
@@ -98,7 +97,7 @@ impl UdpSocket {
         }
 
         if !me.iocp.registered() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let interest = me.iocp.readiness();
@@ -108,12 +107,16 @@ impl UdpSocket {
         let amt = owned_buf.write(buf)?;
         unsafe {
             trace!("scheduling a send");
-            self.imp.inner.socket.send_to_overlapped(&owned_buf, target,
-                                                     self.imp.inner.write.as_mut_ptr())
+            self.imp.inner.socket.send_to_overlapped(
+                &owned_buf,
+                target,
+                self.imp.inner.write.as_mut_ptr(),
+            )
         }?;
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
-        me.iocp.store_overlapped_content(self.imp.inner.write.as_mut_ptr(), send_deallocate);
+        me.iocp
+            .store_overlapped_content(self.imp.inner.write.as_mut_ptr(), send_deallocate);
         Ok(amt)
     }
 
@@ -133,7 +136,7 @@ impl UdpSocket {
         }
 
         if !me.iocp.registered() {
-            return Err(io::ErrorKind::WouldBlock.into())
+            return Err(io::ErrorKind::WouldBlock.into());
         }
 
         let interest = me.iocp.readiness();
@@ -143,12 +146,15 @@ impl UdpSocket {
         let amt = owned_buf.write(buf)?;
         unsafe {
             trace!("scheduling a send");
-            self.imp.inner.socket.send_overlapped(&owned_buf, self.imp.inner.write.as_mut_ptr())
-
+            self.imp
+                .inner
+                .socket
+                .send_overlapped(&owned_buf, self.imp.inner.write.as_mut_ptr())
         }?;
         me.write = State::Pending(owned_buf);
         mem::forget(self.imp.clone());
-        me.iocp.store_overlapped_content(self.imp.inner.write.as_mut_ptr(), send_deallocate);
+        me.iocp
+            .store_overlapped_content(self.imp.inner.write.as_mut_ptr(), send_deallocate);
         Ok(amt)
     }
 
@@ -156,7 +162,10 @@ impl UdpSocket {
         let mut me = self.inner();
         match mem::replace(&mut me.read, State::Empty) {
             State::Empty => Err(io::ErrorKind::WouldBlock.into()),
-            State::Pending(b) => { me.read = State::Pending(b); Err(io::ErrorKind::WouldBlock.into()) }
+            State::Pending(b) => {
+                me.read = State::Pending(b);
+                Err(io::ErrorKind::WouldBlock.into())
+            }
             State::Ready(data) => {
                 // If we weren't provided enough space to receive the message
                 // then don't actually read any data, just return an error.
@@ -168,8 +177,10 @@ impl UdpSocket {
                         buf.write(&data).unwrap();
                         Ok((data.len(), addr))
                     } else {
-                        Err(io::Error::new(io::ErrorKind::Other,
-                                           "failed to parse socket address"))
+                        Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            "failed to parse socket address",
+                        ))
                     };
                     me.iocp.put_buffer(data);
                     self.imp.schedule_read_from(&mut me);
@@ -183,10 +194,9 @@ impl UdpSocket {
         }
     }
 
-    pub fn recv(&self, buf: &mut [u8])
-                     -> io::Result<usize> {
+    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         //Since recv_from can be used on connected sockets just call it and drop the address.
-        self.recv_from(buf).map(|(size,_)| size)
+        self.recv_from(buf).map(|(size, _)| size)
     }
 
     pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
@@ -233,28 +243,32 @@ impl UdpSocket {
         self.imp.inner.socket.set_ttl(ttl)
     }
 
-    pub fn join_multicast_v4(&self,
-                             multiaddr: &Ipv4Addr,
-                             interface: &Ipv4Addr) -> io::Result<()> {
-        self.imp.inner.socket.join_multicast_v4(multiaddr, interface)
+    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.imp
+            .inner
+            .socket
+            .join_multicast_v4(multiaddr, interface)
     }
 
-    pub fn join_multicast_v6(&self,
-                             multiaddr: &Ipv6Addr,
-                             interface: u32) -> io::Result<()> {
-        self.imp.inner.socket.join_multicast_v6(multiaddr, interface)
+    pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.imp
+            .inner
+            .socket
+            .join_multicast_v6(multiaddr, interface)
     }
 
-    pub fn leave_multicast_v4(&self,
-                              multiaddr: &Ipv4Addr,
-                              interface: &Ipv4Addr) -> io::Result<()> {
-        self.imp.inner.socket.leave_multicast_v4(multiaddr, interface)
+    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.imp
+            .inner
+            .socket
+            .leave_multicast_v4(multiaddr, interface)
     }
 
-    pub fn leave_multicast_v6(&self,
-                              multiaddr: &Ipv6Addr,
-                              interface: u32) -> io::Result<()> {
-        self.imp.inner.socket.leave_multicast_v6(multiaddr, interface)
+    pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.imp
+            .inner
+            .socket
+            .leave_multicast_v6(multiaddr, interface)
     }
 
     pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
@@ -308,14 +322,18 @@ impl Imp {
             trace!("scheduling a read");
             let cap = buf.capacity();
             buf.set_len(cap);
-            self.inner.socket.recv_from_overlapped(&mut buf, &mut me.read_buf,
-                                                   self.inner.read.as_mut_ptr())
+            self.inner.socket.recv_from_overlapped(
+                &mut buf,
+                &mut me.read_buf,
+                self.inner.read.as_mut_ptr(),
+            )
         };
         match res {
             Ok(_) => {
                 me.read = State::Pending(buf);
                 mem::forget(self.clone());
-                me.iocp.store_overlapped_content(self.inner.read.as_mut_ptr(), recv_deallocate);
+                me.iocp
+                    .store_overlapped_content(self.inner.read.as_mut_ptr(), recv_deallocate);
             }
             Err(e) => {
                 me.read = State::Error(e);
@@ -332,36 +350,56 @@ impl Imp {
 }
 
 impl Evented for UdpSocket {
-    fn register(&self, poll: &Poll, token: Token,
-                interest: Ready, opts: PollOpt) -> io::Result<()> {
+    fn register(
+        &self,
+        poll: &Poll,
+        token: Token,
+        interest: Ready,
+        opts: PollOpt,
+    ) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.register_socket(&self.imp.inner.socket,
-                                     poll, token, interest, opts,
-                                     &self.registration)?;
+        me.iocp.register_socket(
+            &self.imp.inner.socket,
+            poll,
+            token,
+            interest,
+            opts,
+            &self.registration,
+        )?;
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn reregister(&self, poll: &Poll, token: Token,
-                  interest: Ready, opts: PollOpt) -> io::Result<()> {
+    fn reregister(
+        &self,
+        poll: &Poll,
+        token: Token,
+        interest: Ready,
+        opts: PollOpt,
+    ) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.reregister_socket(&self.imp.inner.socket,
-                                       poll, token, interest,
-                                       opts, &self.registration)?;
+        me.iocp.reregister_socket(
+            &self.imp.inner.socket,
+            poll,
+            token,
+            interest,
+            opts,
+            &self.registration,
+        )?;
         self.post_register(interest, &mut me);
         Ok(())
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner().iocp.deregister(&self.imp.inner.socket,
-                                     poll, &self.registration)
+        self.inner()
+            .iocp
+            .deregister(&self.imp.inner.socket, poll, &self.registration)
     }
 }
 
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("UdpSocket")
-            .finish()
+        f.debug_struct("UdpSocket").finish()
     }
 }
 
@@ -375,12 +413,9 @@ impl Drop for UdpSocket {
         unsafe {
             match inner.read {
                 State::Pending(_) => {
-                    drop(super::cancel(&self.imp.inner.socket,
-                                       &self.imp.inner.read));
+                    drop(super::cancel(&self.imp.inner.socket, &self.imp.inner.read));
                 }
-                State::Empty |
-                State::Ready(_) |
-                State::Error(_) => {}
+                State::Empty | State::Ready(_) | State::Error(_) => {}
             }
         }
     }
