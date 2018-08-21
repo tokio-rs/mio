@@ -33,7 +33,6 @@ mod test_tcp_level;
 mod test_udp_level;
 mod test_udp_socket;
 mod test_write_then_drop;
-mod test_drop_cancels_interest_and_shuts_down;
 
 #[cfg(feature = "with-deprecated")]
 mod test_notify;
