@@ -103,7 +103,7 @@ impl Selector {
                 match pos {
                     Some(pos) => {
                         let store = incompletes.remove(pos);
-                        mem::forget(store);
+                        mem::forget(store.1);
                     },
                     None => {
                         trace!("cannot find store, omiting...");

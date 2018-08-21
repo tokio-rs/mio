@@ -97,11 +97,10 @@ pub struct FromRawArcStore {
 
 impl FromRawArcStore {
     pub fn new(ptr: *mut OVERLAPPED, deallocator: fn(*mut OVERLAPPED)) -> FromRawArcStore {
-        let store = FromRawArcStore {
+        FromRawArcStore {
             _ptr: unsafe { mem::transmute(ptr) },
             deallocator: deallocator,
-        };
-        store
+        }
     }
 }
 
