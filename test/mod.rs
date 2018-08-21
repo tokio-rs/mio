@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
-extern crate bytes;
 extern crate mio;
+extern crate bytes;
 extern crate net2;
 
 #[macro_use]
@@ -16,10 +16,9 @@ extern crate fuchsia_zircon as zircon;
 
 pub use ports::localhost;
 
-mod test_close_on_drop;
 mod test_custom_evented;
+mod test_close_on_drop;
 mod test_double_register;
-mod test_drop_cancels_interest_and_shuts_down;
 mod test_echo_server;
 mod test_local_addr_ready;
 mod test_multicast;
@@ -34,6 +33,7 @@ mod test_tcp_level;
 mod test_udp_level;
 mod test_udp_socket;
 mod test_write_then_drop;
+mod test_drop_cancels_interest_and_shuts_down;
 
 #[cfg(feature = "with-deprecated")]
 mod test_notify;
@@ -44,54 +44,41 @@ mod test_tick;
 
 // The following tests are for deprecated features. Only run these tests on
 // platforms that were supported from before the features were deprecated
-#[cfg(
-    any(
-        target_os = "macos",
-        target_os = "linux",
-        target_os = "windows"
-    )
-)]
-#[cfg(feature = "with-deprecated")]
-mod test_battery;
-#[cfg(
-    any(
-        target_os = "macos",
-        target_os = "linux",
-        target_os = "windows"
-    )
-)]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 #[cfg(feature = "with-deprecated")]
 mod test_timer;
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+#[cfg(feature = "with-deprecated")]
+mod test_battery;
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_broken_pipe;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_subprocess_pipe;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[cfg(feature = "with-deprecated")]
-mod test_uds_shutdown;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[cfg(feature = "with-deprecated")]
 mod test_unix_echo_server;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[cfg(feature = "with-deprecated")]
 mod test_unix_pass_fd;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(feature = "with-deprecated")]
+mod test_uds_shutdown;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(feature = "with-deprecated")]
+mod test_subprocess_pipe;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(feature = "with-deprecated")]
+mod test_broken_pipe;
 
 #[cfg(any(target_os = "fuchsia"))]
 mod test_fuchsia_handles;
 
 use bytes::{Buf, MutBuf};
-use mio::event::Event;
-use mio::{Events, Poll};
 use std::io::{self, Read, Write};
 use std::time::Duration;
+use mio::{Events, Poll};
+use mio::event::Event;
 
 pub trait TryRead {
     fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
-    where
-        Self: Sized,
+        where Self : Sized
     {
         // Reads the length of the slice supplied by buf.mut_bytes into the buffer
         // This is not guaranteed to consume an entire datagram or segment.
@@ -101,9 +88,7 @@ pub trait TryRead {
         let res = self.try_read(unsafe { buf.mut_bytes() });
 
         if let Ok(Some(cnt)) = res {
-            unsafe {
-                buf.advance(cnt);
-            }
+            unsafe { buf.advance(cnt); }
         }
 
         res
@@ -114,8 +99,7 @@ pub trait TryRead {
 
 pub trait TryWrite {
     fn try_write_buf<B: Buf>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
-    where
-        Self: Sized,
+        where Self : Sized
     {
         let res = self.try_write(buf.bytes());
 
@@ -174,8 +158,8 @@ impl<T> MapNonBlock<T> for io::Result<T> {
 mod ports {
     use std::net::SocketAddr;
     use std::str::FromStr;
-    use std::sync::atomic::Ordering::SeqCst;
     use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+    use std::sync::atomic::Ordering::SeqCst;
 
     // Helper for getting a unique port for the task run
     // TODO: Reuse ports to not spam the system
@@ -204,28 +188,24 @@ pub fn sleep_ms(ms: u64) {
     thread::sleep(Duration::from_millis(ms));
 }
 
-pub fn expect_events(
-    poll: &Poll,
-    event_buffer: &mut Events,
-    poll_try_count: usize,
-    mut expected: Vec<Event>,
-) {
+pub fn expect_events(poll: &Poll,
+                     event_buffer: &mut Events,
+                     poll_try_count: usize,
+                     mut expected: Vec<Event>)
+{
     const MS: u64 = 1_000;
 
     for _ in 0..poll_try_count {
-        poll.poll(event_buffer, Some(Duration::from_millis(MS)))
-            .unwrap();
+        poll.poll(event_buffer, Some(Duration::from_millis(MS))).unwrap();
         for event in event_buffer.iter() {
             let pos_opt = match expected.iter().position(|exp_event| {
-                (event.token() == exp_event.token())
-                    && event.readiness().contains(exp_event.readiness())
+                (event.token() == exp_event.token()) &&
+                event.readiness().contains(exp_event.readiness())
             }) {
                 Some(x) => Some(x),
                 None => None,
             };
-            if let Some(pos) = pos_opt {
-                expected.remove(pos);
-            }
+            if let Some(pos) = pos_opt { expected.remove(pos); }
         }
 
         if expected.len() == 0 {
@@ -233,9 +213,6 @@ pub fn expect_events(
         }
     }
 
-    assert!(
-        expected.len() == 0,
-        "The following expected events were not found: {:?}",
-        expected
-    );
+    assert!(expected.len() == 0, "The following expected events were not found: {:?}", expected);
 }
+

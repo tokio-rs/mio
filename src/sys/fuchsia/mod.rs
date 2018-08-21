@@ -1,14 +1,14 @@
+use {io, Ready, PollOpt};
 use libc;
+use zircon;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::ops::{Deref, DerefMut};
 use std::os::unix::io::RawFd;
-use zircon;
-use {io, PollOpt, Ready};
 
 mod awakener;
-mod eventedfd;
 mod handles;
+mod eventedfd;
 mod net;
 mod ready;
 mod selector;
@@ -19,8 +19,8 @@ use self::ready::assert_fuchsia_ready_repr;
 pub use self::awakener::Awakener;
 pub use self::handles::EventedHandle;
 pub use self::net::{TcpListener, TcpStream, UdpSocket};
-pub use self::ready::{zx_signals_t, FuchsiaReady};
 pub use self::selector::{Events, Selector};
+pub use self::ready::{FuchsiaReady, zx_signals_t};
 
 // Set non-blocking (workaround since the std version doesn't work in fuchsia)
 // TODO: fix the std version and replace this
@@ -32,12 +32,12 @@ pub fn set_nonblock(fd: RawFd) -> io::Result<()> {
 unsafe fn recv_from(fd: RawFd, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
     let flags = 0;
 
-    let n = cvt(libc::recv(
-        fd,
-        buf.as_mut_ptr() as *mut libc::c_void,
-        buf.len(),
-        flags,
-    ))?;
+    let n = cvt(
+        libc::recv(fd,
+                   buf.as_mut_ptr() as *mut libc::c_void,
+                   buf.len(),
+                   flags)
+    )?;
 
     // random address-- we don't use it
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
@@ -63,8 +63,8 @@ mod sys {
         pub flags: u32,
     }
 
-    #[link(name = "fdio")]
-    extern "C" {
+    #[link(name="fdio")]
+    extern {
         pub fn __fdio_fd_to_io(fd: RawFd) -> *const fdio_t;
         pub fn __fdio_release(io: *const fdio_t);
 
@@ -74,7 +74,11 @@ mod sys {
             handle_out: &mut zx_handle_t,
             signals_out: &mut zx_signals_t,
         );
-        pub fn __fdio_wait_end(io: *const fdio_t, signals: zx_signals_t, events_out: &mut u32);
+        pub fn __fdio_wait_end(
+            io: *const fdio_t,
+            signals: zx_signals_t,
+            events_out: &mut u32,
+        );
     }
 }
 
@@ -117,15 +121,11 @@ trait IsMinusOne {
 }
 
 impl IsMinusOne for i32 {
-    fn is_minus_one(&self) -> bool {
-        *self == -1
-    }
+    fn is_minus_one(&self) -> bool { *self == -1 }
 }
 
 impl IsMinusOne for isize {
-    fn is_minus_one(&self) -> bool {
-        *self == -1
-    }
+    fn is_minus_one(&self) -> bool { *self == -1 }
 }
 
 fn cvt<T: IsMinusOne>(t: T) -> ::io::Result<T> {

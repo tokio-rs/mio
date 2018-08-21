@@ -1,5 +1,5 @@
-use channel;
-use std::{any, error, fmt, io};
+use {channel};
+use std::{fmt, io, error, any};
 
 pub enum NotifyError<T> {
     Io(io::Error),
@@ -10,9 +10,15 @@ pub enum NotifyError<T> {
 impl<M> fmt::Debug for NotifyError<M> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            NotifyError::Io(ref e) => write!(fmt, "NotifyError::Io({:?})", e),
-            NotifyError::Full(..) => write!(fmt, "NotifyError::Full(..)"),
-            NotifyError::Closed(..) => write!(fmt, "NotifyError::Closed(..)"),
+            NotifyError::Io(ref e) => {
+                write!(fmt, "NotifyError::Io({:?})", e)
+            }
+            NotifyError::Full(..) => {
+                write!(fmt, "NotifyError::Full(..)")
+            }
+            NotifyError::Closed(..) => {
+                write!(fmt, "NotifyError::Closed(..)")
+            }
         }
     }
 }
@@ -20,9 +26,11 @@ impl<M> fmt::Debug for NotifyError<M> {
 impl<M> fmt::Display for NotifyError<M> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            NotifyError::Io(ref e) => write!(fmt, "IO error: {}", e),
+            NotifyError::Io(ref e) => {
+                write!(fmt, "IO error: {}", e)
+            }
             NotifyError::Full(..) => write!(fmt, "Full"),
-            NotifyError::Closed(..) => write!(fmt, "Closed"),
+            NotifyError::Closed(..) => write!(fmt, "Closed")
         }
     }
 }
@@ -32,14 +40,14 @@ impl<M: any::Any> error::Error for NotifyError<M> {
         match *self {
             NotifyError::Io(ref err) => err.description(),
             NotifyError::Closed(..) => "The receiving end has hung up",
-            NotifyError::Full(..) => "Queue is full",
+            NotifyError::Full(..) => "Queue is full"
         }
     }
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
             NotifyError::Io(ref err) => Some(err),
-            _ => None,
+            _ => None
         }
     }
 }

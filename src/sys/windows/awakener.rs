@@ -1,9 +1,9 @@
 use std::sync::Mutex;
 
-use event::Evented;
 use miow::iocp::CompletionStatus;
+use {io, poll, Ready, Poll, PollOpt, Token};
+use event::Evented;
 use sys::windows::Selector;
-use {io, poll, Poll, PollOpt, Ready, Token};
 
 pub struct Awakener {
     inner: Mutex<Option<AwakenerInner>>,
@@ -29,7 +29,9 @@ impl Awakener {
         // If we haven't been registered with an event loop yet just silently
         // succeed.
         if let Some(inner) = self.inner.lock().unwrap().as_ref() {
-            let status = CompletionStatus::new(0, usize::from(inner.token), 0 as *mut _);
+            let status = CompletionStatus::new(0,
+                                               usize::from(inner.token),
+                                               0 as *mut _);
             inner.selector.port().post(status)?;
         }
         Ok(())
@@ -41,7 +43,8 @@ impl Awakener {
 }
 
 impl Evented for Awakener {
-    fn register(&self, poll: &Poll, token: Token, events: Ready, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, events: Ready,
+                opts: PollOpt) -> io::Result<()> {
         assert_eq!(opts, PollOpt::edge());
         assert_eq!(events, Ready::readable());
         *self.inner.lock().unwrap() = Some(AwakenerInner {
@@ -51,13 +54,8 @@ impl Evented for Awakener {
         Ok(())
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        events: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, events: Ready,
+                  opts: PollOpt) -> io::Result<()> {
         self.register(poll, token, events, opts)
     }
 

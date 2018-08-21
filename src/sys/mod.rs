@@ -1,7 +1,15 @@
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 pub use self::unix::{
-    pipe, set_nonblock, Awakener, EventedFd, Events, Io, Selector, TcpListener, TcpStream,
+    Awakener,
+    EventedFd,
+    Events,
+    Io,
+    Selector,
+    TcpStream,
+    TcpListener,
     UdpSocket,
+    pipe,
+    set_nonblock,
 };
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
@@ -16,7 +24,14 @@ pub mod unix;
 
 #[cfg(windows)]
 pub use self::windows::{
-    Awakener, Binding, Events, Overlapped, Selector, TcpListener, TcpStream, UdpSocket,
+    Awakener,
+    Events,
+    Selector,
+    TcpStream,
+    TcpListener,
+    UdpSocket,
+    Overlapped,
+    Binding,
 };
 
 #[cfg(windows)]
@@ -24,7 +39,14 @@ mod windows;
 
 #[cfg(target_os = "fuchsia")]
 pub use self::fuchsia::{
-    set_nonblock, Awakener, EventedHandle, Events, Selector, TcpListener, TcpStream, UdpSocket,
+    Awakener,
+    Events,
+    EventedHandle,
+    Selector,
+    TcpStream,
+    TcpListener,
+    UdpSocket,
+    set_nonblock,
 };
 
 #[cfg(target_os = "fuchsia")]

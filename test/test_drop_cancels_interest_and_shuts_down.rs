@@ -10,7 +10,7 @@ fn drop_cancels_interest_and_shuts_down() {
 
     use env_logger;
     let _ = env_logger::init();
-    let l = TcpListener::bind("127.0.0.1:0").unwrap();
+    let l = TcpListener::bind("127.0.0.1:18000").unwrap();
     let addr = l.local_addr().unwrap();
 
     let t = thread::spawn(move || {
@@ -22,6 +22,7 @@ fn drop_cancels_interest_and_shuts_down() {
             Ok(_) => (),
             Err(e) => {
                 if e.kind() != io::ErrorKind::UnexpectedEof {
+					eprintln!("{}", e);
                     panic!(e);
                 }
             }

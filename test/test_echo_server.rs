@@ -1,9 +1,9 @@
-use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
-use mio::net::{TcpListener, TcpStream};
+use {localhost, TryRead, TryWrite};
 use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::net::{TcpListener, TcpStream};
+use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use slab::Slab;
 use std::io;
-use {localhost, TryRead, TryWrite};
 
 const SERVER: Token = Token(10_000_000);
 const CLIENT: Token = Token(10_000_001);
@@ -13,7 +13,7 @@ struct EchoConn {
     buf: Option<ByteBuf>,
     mut_buf: Option<MutByteBuf>,
     token: Option<Token>,
-    interest: Ready,
+    interest: Ready
 }
 
 impl EchoConn {
@@ -48,17 +48,9 @@ impl EchoConn {
             Err(e) => debug!("not implemented; client err={:?}", e),
         }
 
-        assert!(
-            self.interest.is_readable() || self.interest.is_writable(),
-            "actual={:?}",
-            self.interest
-        );
-        poll.reregister(
-            &self.sock,
-            self.token.unwrap(),
-            self.interest,
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
+        assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
+        poll.reregister(&self.sock, self.token.unwrap(), self.interest,
+                              PollOpt::edge() | PollOpt::oneshot())
     }
 
     fn readable(&mut self, poll: &mut Poll) -> io::Result<()> {
@@ -82,25 +74,18 @@ impl EchoConn {
                 debug!("not implemented; client err={:?}", e);
                 self.interest.remove(Ready::readable());
             }
+
         };
 
-        assert!(
-            self.interest.is_readable() || self.interest.is_writable(),
-            "actual={:?}",
-            self.interest
-        );
-        poll.reregister(
-            &self.sock,
-            self.token.unwrap(),
-            self.interest,
-            PollOpt::edge(),
-        )
+        assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
+        poll.reregister(&self.sock, self.token.unwrap(), self.interest,
+                              PollOpt::edge())
     }
 }
 
 struct EchoServer {
     sock: TcpListener,
-    conns: Slab<EchoConn>,
+    conns: Slab<EchoConn>
 }
 
 impl EchoServer {
@@ -108,28 +93,26 @@ impl EchoServer {
         debug!("server accepting socket");
 
         let sock = self.sock.accept().unwrap().0;
-        let conn = EchoConn::new(sock);
+        let conn = EchoConn::new(sock,);
         let tok = self.conns.insert(conn);
 
         // Register the connection
         self.conns[tok].token = Some(Token(tok));
-        poll.register(
-            &self.conns[tok].sock,
-            Token(tok),
-            Ready::readable(),
-            PollOpt::edge() | PollOpt::oneshot(),
-        ).ok()
-        .expect("could not register socket with event loop");
+        poll.register(&self.conns[tok].sock, Token(tok), Ready::readable(),
+                                PollOpt::edge() | PollOpt::oneshot())
+            .ok().expect("could not register socket with event loop");
 
         Ok(())
     }
 
-    fn conn_readable(&mut self, poll: &mut Poll, tok: Token) -> io::Result<()> {
+    fn conn_readable(&mut self, poll: &mut Poll,
+                     tok: Token) -> io::Result<()> {
         debug!("server conn readable; tok={:?}", tok);
         self.conn(tok).readable(poll)
     }
 
-    fn conn_writable(&mut self, poll: &mut Poll, tok: Token) -> io::Result<()> {
+    fn conn_writable(&mut self, poll: &mut Poll,
+                     tok: Token) -> io::Result<()> {
         debug!("server conn writable; tok={:?}", tok);
         self.conn(tok).writable(poll)
     }
@@ -150,9 +133,10 @@ struct EchoClient {
     shutdown: bool,
 }
 
+
 // Sends a message and expects to receive the same exact message, one at a time
 impl EchoClient {
-    fn new(sock: TcpStream, tok: Token, mut msgs: Vec<&'static str>) -> EchoClient {
+    fn new(sock: TcpStream, tok: Token,  mut msgs: Vec<&'static str>) -> EchoClient {
         let curr = msgs.remove(0);
 
         EchoClient {
@@ -204,17 +188,9 @@ impl EchoClient {
         };
 
         if !self.interest.is_empty() {
-            assert!(
-                self.interest.is_readable() || self.interest.is_writable(),
-                "actual={:?}",
-                self.interest
-            );
-            poll.reregister(
-                &self.sock,
-                self.token,
-                self.interest,
-                PollOpt::edge() | PollOpt::oneshot(),
-            )?;
+            assert!(self.interest.is_readable() || self.interest.is_writable(), "actual={:?}", self.interest);
+            poll.reregister(&self.sock, self.token, self.interest,
+                                       PollOpt::edge() | PollOpt::oneshot())?;
         }
 
         Ok(())
@@ -233,16 +209,12 @@ impl EchoClient {
                 self.interest.insert(Ready::readable());
                 self.interest.remove(Ready::writable());
             }
-            Err(e) => debug!("not implemented; client err={:?}", e),
+            Err(e) => debug!("not implemented; client err={:?}", e)
         }
 
         if self.interest.is_readable() || self.interest.is_writable() {
-            try!(poll.reregister(
-                &self.sock,
-                self.token,
-                self.interest,
-                PollOpt::edge() | PollOpt::oneshot()
-            ));
+            try!(poll.reregister(&self.sock, self.token, self.interest,
+                                  PollOpt::edge() | PollOpt::oneshot()));
         }
 
         Ok(())
@@ -261,12 +233,8 @@ impl EchoClient {
         self.rx = SliceBuf::wrap(curr.as_bytes());
 
         self.interest.insert(Ready::writable());
-        poll.reregister(
-            &self.sock,
-            self.token,
-            self.interest,
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
+        poll.reregister(&self.sock, self.token, self.interest,
+                              PollOpt::edge() | PollOpt::oneshot())
     }
 }
 
@@ -280,9 +248,9 @@ impl Echo {
         Echo {
             server: EchoServer {
                 sock: srv,
-                conns: Slab::with_capacity(128),
+                conns: Slab::with_capacity(128)
             },
-            client: EchoClient::new(client, CLIENT, msgs),
+            client: EchoClient::new(client, CLIENT, msgs)
         }
     }
 }
@@ -296,22 +264,14 @@ pub fn test_echo_server() {
     let srv = TcpListener::bind(&addr).unwrap();
 
     info!("listen for connections");
-    poll.register(
-        &srv,
-        SERVER,
-        Ready::readable(),
-        PollOpt::edge() | PollOpt::oneshot(),
-    ).unwrap();
+    poll.register(&srv, SERVER, Ready::readable(),
+                            PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
-    poll.register(
-        &sock,
-        CLIENT,
-        Ready::writable(),
-        PollOpt::edge() | PollOpt::oneshot(),
-    ).unwrap();
+    poll.register(&sock, CLIENT, Ready::writable(),
+                        PollOpt::edge() | PollOpt::oneshot()).unwrap();
     // == Create storage for events
     let mut events = Events::with_capacity(1024);
 
@@ -327,7 +287,7 @@ pub fn test_echo_server() {
                 match event.token() {
                     SERVER => handler.server.accept(&mut poll).unwrap(),
                     CLIENT => handler.client.readable(&mut poll).unwrap(),
-                    i => handler.server.conn_readable(&mut poll, i).unwrap(),
+                    i => handler.server.conn_readable(&mut poll, i).unwrap()
                 }
             }
 
@@ -335,7 +295,7 @@ pub fn test_echo_server() {
                 match event.token() {
                     SERVER => panic!("received writable for token 0"),
                     CLIENT => handler.client.writable(&mut poll).unwrap(),
-                    i => handler.server.conn_writable(&mut poll, i).unwrap(),
+                    i => handler.server.conn_writable(&mut poll, i).unwrap()
                 };
             }
         }

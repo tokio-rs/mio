@@ -1,11 +1,11 @@
-use deprecated::TryAccept;
+use {io, sys, Ready, Poll, PollOpt, Token};
 use event::Evented;
+use deprecated::TryAccept;
 use io::MapNonBlock;
 use std::io::{Read, Write};
-pub use std::net::Shutdown;
 use std::path::Path;
+pub use std::net::Shutdown;
 use std::process;
-use {io, sys, Poll, PollOpt, Ready, Token};
 
 pub use sys::Io;
 
@@ -17,7 +17,8 @@ pub struct UnixSocket {
 impl UnixSocket {
     /// Returns a new, unbound, non-blocking Unix domain socket
     pub fn stream() -> io::Result<UnixSocket> {
-        sys::UnixSocket::stream().map(From::from)
+        sys::UnixSocket::stream()
+            .map(From::from)
     }
 
     /// Connect the socket to the specified address
@@ -42,28 +43,17 @@ impl UnixSocket {
     }
 
     pub fn try_clone(&self) -> io::Result<UnixSocket> {
-        self.sys.try_clone().map(From::from)
+        self.sys.try_clone()
+            .map(From::from)
     }
 }
 
 impl Evented for UnixSocket {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)
     }
 
@@ -97,7 +87,8 @@ impl UnixStream {
     }
 
     pub fn try_clone(&self) -> io::Result<UnixStream> {
-        self.sys.try_clone().map(From::from)
+        self.sys.try_clone()
+            .map(From::from)
     }
 
     pub fn shutdown(&self, how: Shutdown) -> io::Result<usize> {
@@ -108,10 +99,7 @@ impl UnixStream {
         self.sys.read_recv_fd(buf)
     }
 
-    pub fn try_read_recv_fd(
-        &mut self,
-        buf: &mut [u8],
-    ) -> io::Result<Option<(usize, Option<RawFd>)>> {
+    pub fn try_read_recv_fd(&mut self, buf: &mut [u8]) -> io::Result<Option<(usize, Option<RawFd>)>> {
         self.read_recv_fd(buf).map_non_block()
     }
 
@@ -141,23 +129,11 @@ impl Write for UnixStream {
 }
 
 impl Evented for UnixStream {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)
     }
 
@@ -201,23 +177,11 @@ impl UnixListener {
 }
 
 impl Evented for UnixListener {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)
     }
 
@@ -260,20 +224,16 @@ impl PipeReader {
     pub fn from_stdout(stdout: process::ChildStdout) -> io::Result<Self> {
         match sys::set_nonblock(stdout.as_raw_fd()) {
             Err(e) => return Err(e),
-            _ => {}
+            _ => {},
         }
-        return Ok(PipeReader::from(unsafe {
-            Io::from_raw_fd(stdout.into_raw_fd())
-        }));
+        return Ok(PipeReader::from(unsafe { Io::from_raw_fd(stdout.into_raw_fd()) }));
     }
     pub fn from_stderr(stderr: process::ChildStderr) -> io::Result<Self> {
         match sys::set_nonblock(stderr.as_raw_fd()) {
             Err(e) => return Err(e),
-            _ => {}
+            _ => {},
         }
-        return Ok(PipeReader::from(unsafe {
-            Io::from_raw_fd(stderr.into_raw_fd())
-        }));
+        return Ok(PipeReader::from(unsafe { Io::from_raw_fd(stderr.into_raw_fd()) }));
     }
 }
 
@@ -290,23 +250,11 @@ impl<'a> Read for &'a PipeReader {
 }
 
 impl Evented for PipeReader {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.io.reregister(poll, token, interest, opts)
     }
 
@@ -330,11 +278,9 @@ impl PipeWriter {
     pub fn from_stdin(stdin: process::ChildStdin) -> io::Result<Self> {
         match sys::set_nonblock(stdin.as_raw_fd()) {
             Err(e) => return Err(e),
-            _ => {}
+            _ => {},
         }
-        return Ok(PipeWriter::from(unsafe {
-            Io::from_raw_fd(stdin.into_raw_fd())
-        }));
+        return Ok(PipeWriter::from(unsafe { Io::from_raw_fd(stdin.into_raw_fd()) }));
     }
 }
 
@@ -359,23 +305,11 @@ impl<'a> Write for &'a PipeWriter {
 }
 
 impl Evented for PipeWriter {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.io.register(poll, token, interest, opts)
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.io.reregister(poll, token, interest, opts)
     }
 
@@ -396,7 +330,7 @@ impl From<Io> for PipeWriter {
  *
  */
 
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{RawFd, IntoRawFd, AsRawFd, FromRawFd};
 
 impl IntoRawFd for UnixSocket {
     fn into_raw_fd(self) -> RawFd {
@@ -412,9 +346,7 @@ impl AsRawFd for UnixSocket {
 
 impl FromRawFd for UnixSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixSocket {
-        UnixSocket {
-            sys: FromRawFd::from_raw_fd(fd),
-        }
+        UnixSocket { sys: FromRawFd::from_raw_fd(fd) }
     }
 }
 
@@ -432,9 +364,7 @@ impl AsRawFd for UnixStream {
 
 impl FromRawFd for UnixStream {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixStream {
-        UnixStream {
-            sys: FromRawFd::from_raw_fd(fd),
-        }
+        UnixStream { sys: FromRawFd::from_raw_fd(fd) }
     }
 }
 
@@ -452,9 +382,7 @@ impl AsRawFd for UnixListener {
 
 impl FromRawFd for UnixListener {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixListener {
-        UnixListener {
-            sys: FromRawFd::from_raw_fd(fd),
-        }
+        UnixListener { sys: FromRawFd::from_raw_fd(fd) }
     }
 }
 
@@ -472,9 +400,7 @@ impl AsRawFd for PipeReader {
 
 impl FromRawFd for PipeReader {
     unsafe fn from_raw_fd(fd: RawFd) -> PipeReader {
-        PipeReader {
-            io: FromRawFd::from_raw_fd(fd),
-        }
+        PipeReader { io: FromRawFd::from_raw_fd(fd) }
     }
 }
 
@@ -492,8 +418,6 @@ impl AsRawFd for PipeWriter {
 
 impl FromRawFd for PipeWriter {
     unsafe fn from_raw_fd(fd: RawFd) -> PipeWriter {
-        PipeWriter {
-            io: FromRawFd::from_raw_fd(fd),
-        }
+        PipeWriter { io: FromRawFd::from_raw_fd(fd) }
     }
 }

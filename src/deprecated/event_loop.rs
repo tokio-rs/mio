@@ -1,11 +1,11 @@
-use deprecated::{Handler, NotifyError};
+use {channel, Poll, Events, Token};
 use event::Evented;
-use event_imp::{Event, PollOpt, Ready};
+use deprecated::{Handler, NotifyError};
+use event_imp::{Event, Ready, PollOpt};
+use timer::{self, Timer, Timeout};
+use std::{io, fmt, usize};
 use std::default::Default;
 use std::time::Duration;
-use std::{fmt, io, usize};
-use timer::{self, Timeout, Timer};
-use {channel, Events, Poll, Token};
 
 #[derive(Debug, Default, Clone)]
 pub struct EventLoopBuilder {
@@ -101,6 +101,7 @@ const NOTIFY: Token = Token(usize::MAX - 1);
 const TIMER: Token = Token(usize::MAX - 2);
 
 impl<H: Handler> EventLoop<H> {
+
     /// Constructs a new `EventLoop` using the default configuration values.
     /// The `EventLoop` will not be running.
     pub fn new() -> io::Result<EventLoop<H>> {
@@ -121,12 +122,7 @@ impl<H: Handler> EventLoop<H> {
         let (tx, rx) = channel::sync_channel(config.notify_capacity);
 
         // Register the notification wakeup FD with the IO poller
-        poll.register(
-            &rx,
-            NOTIFY,
-            Ready::readable(),
-            PollOpt::edge() | PollOpt::oneshot(),
-        )?;
+        poll.register(&rx, NOTIFY, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
         poll.register(&timer, TIMER, Ready::readable(), PollOpt::edge())?;
 
         Ok(EventLoop {
@@ -245,29 +241,15 @@ impl<H: Handler> EventLoop<H> {
     }
 
     /// Registers an IO handle with the event loop.
-    pub fn register<E: ?Sized>(
-        &mut self,
-        io: &E,
-        token: Token,
-        interest: Ready,
-        opt: PollOpt,
-    ) -> io::Result<()>
-    where
-        E: Evented,
+    pub fn register<E: ?Sized>(&mut self, io: &E, token: Token, interest: Ready, opt: PollOpt) -> io::Result<()>
+        where E: Evented
     {
         self.poll.register(io, token, interest, opt)
     }
 
     /// Re-Registers an IO handle with the event loop.
-    pub fn reregister<E: ?Sized>(
-        &mut self,
-        io: &E,
-        token: Token,
-        interest: Ready,
-        opt: PollOpt,
-    ) -> io::Result<()>
-    where
-        E: Evented,
+    pub fn reregister<E: ?Sized>(&mut self, io: &E, token: Token, interest: Ready, opt: PollOpt) -> io::Result<()>
+        where E: Evented
     {
         self.poll.reregister(io, token, interest, opt)
     }
@@ -293,10 +275,7 @@ impl<H: Handler> EventLoop<H> {
     ///
     /// Warning: kqueue effectively builds in deregister when using edge-triggered mode with
     /// oneshot. Calling `deregister()` on the socket will cause a TcpStream error.
-    pub fn deregister<E: ?Sized>(&mut self, io: &E) -> io::Result<()>
-    where
-        E: Evented,
-    {
+    pub fn deregister<E: ?Sized>(&mut self, io: &E) -> io::Result<()> where E: Evented {
         self.poll.deregister(io)
     }
 
@@ -349,7 +328,7 @@ impl<H: Handler> EventLoop<H> {
             match evt.token() {
                 NOTIFY => self.notify(handler),
                 TIMER => self.timer_process(handler),
-                _ => self.io_event(handler, evt),
+                _ => self.io_event(handler, evt)
             }
 
             i += 1;
@@ -369,12 +348,7 @@ impl<H: Handler> EventLoop<H> {
         }
 
         // Re-register
-        let _ = self.poll.reregister(
-            &self.notify_rx,
-            NOTIFY,
-            Ready::readable(),
-            PollOpt::edge() | PollOpt::oneshot(),
-        );
+        let _ = self.poll.reregister(&self.notify_rx, NOTIFY, Ready::readable(), PollOpt::edge() | PollOpt::oneshot());
     }
 
     fn timer_process(&mut self, handler: &mut H) {
@@ -396,7 +370,7 @@ impl<H: Handler> fmt::Debug for EventLoop<H> {
 
 /// Sends messages to the EventLoop from other threads.
 pub struct Sender<M> {
-    tx: channel::SyncSender<M>,
+    tx: channel::SyncSender<M>
 }
 
 impl<M> fmt::Debug for Sender<M> {
@@ -405,11 +379,9 @@ impl<M> fmt::Debug for Sender<M> {
     }
 }
 
-impl<M> Clone for Sender<M> {
+impl<M> Clone for Sender <M> {
     fn clone(&self) -> Sender<M> {
-        Sender {
-            tx: self.tx.clone(),
-        }
+        Sender { tx: self.tx.clone() }
     }
 }
 

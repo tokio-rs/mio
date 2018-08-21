@@ -1,7 +1,7 @@
-use event_imp::{ready_as_usize, ready_from_usize, Ready};
+use event_imp::{Ready, ready_as_usize, ready_from_usize};
 
-use std::fmt;
 use std::ops;
+use std::fmt;
 
 /// Unix specific extensions to `Ready`
 ///
@@ -93,35 +93,21 @@ use std::ops;
 pub struct UnixReady(Ready);
 
 const ERROR: usize = 0b000100;
-const HUP: usize = 0b001000;
+const HUP: usize   = 0b001000;
 
-#[cfg(
-    any(
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos"
-    )
-)]
-const AIO: usize = 0b010000;
+#[cfg(any(target_os = "dragonfly",
+    target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+const AIO: usize   = 0b010000;
 
-#[cfg(
-    not(
-        any(
-            target_os = "dragonfly",
-            target_os = "freebsd",
-            target_os = "ios",
-            target_os = "macos"
-        )
-    )
-)]
-const AIO: usize = 0b000000;
+#[cfg(not(any(target_os = "dragonfly",
+    target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+const AIO: usize   = 0b000000;
 
 #[cfg(any(target_os = "freebsd"))]
-const LIO: usize = 0b100000;
+const LIO: usize   = 0b100000;
 
 #[cfg(not(any(target_os = "freebsd")))]
-const LIO: usize = 0b000000;
+const LIO: usize   = 0b000000;
 
 // Export to support `Ready::all`
 pub const READY_ALL: usize = ERROR | HUP | AIO | LIO;
@@ -143,32 +129,15 @@ impl UnixReady {
     ///
     /// [`Poll`]: ../struct.Poll.html
     #[inline]
-    #[cfg(
-        any(
-            target_os = "dragonfly",
-            target_os = "freebsd",
-            target_os = "ios",
-            target_os = "macos"
-        )
-    )]
+    #[cfg(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn aio() -> UnixReady {
         UnixReady(ready_from_usize(AIO))
     }
 
-    #[cfg(
-        not(
-            any(
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos"
-            )
-        )
-    )]
-    #[deprecated(
-        since = "0.6.12",
-        note = "this function is now platform specific"
-    )]
+    #[cfg(not(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
     #[doc(hidden)]
     pub fn aio() -> UnixReady {
         UnixReady(Ready::empty())
@@ -266,33 +235,16 @@ impl UnixReady {
     ///
     /// [`Poll`]: ../struct.Poll.html
     #[inline]
-    #[cfg(
-        any(
-            target_os = "dragonfly",
-            target_os = "freebsd",
-            target_os = "ios",
-            target_os = "macos"
-        )
-    )]
+    #[cfg(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn is_aio(&self) -> bool {
         self.contains(ready_from_usize(AIO))
     }
 
-    #[deprecated(
-        since = "0.6.12",
-        note = "this function is now platform specific"
-    )]
+    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
     #[cfg(feature = "with-deprecated")]
-    #[cfg(
-        not(
-            any(
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos"
-            )
-        )
-    )]
+    #[cfg(not(any(target_os = "dragonfly",
+        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
     #[doc(hidden)]
     pub fn is_aio(&self) -> bool {
         false
@@ -456,14 +408,11 @@ impl fmt::Debug for UnixReady {
             (UnixReady::error(), "Error"),
             (UnixReady::hup(), "Hup"),
             #[allow(deprecated)]
-            (UnixReady::aio(), "Aio"),
-        ];
+            (UnixReady::aio(), "Aio")];
 
         for &(flag, msg) in &flags {
             if self.contains(flag) {
-                if one {
-                    write!(fmt, " | ")?
-                }
+                if one { write!(fmt, " | ")? }
                 write!(fmt, "{}", msg)?;
 
                 one = true

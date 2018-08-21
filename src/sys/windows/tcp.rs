@@ -1,22 +1,22 @@
 use std::fmt;
-use std::io::{self, ErrorKind, Read};
+use std::io::{self, Read, ErrorKind};
 use std::mem;
-use std::net::{self, Shutdown, SocketAddr};
+use std::net::{self, SocketAddr, Shutdown};
 use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
-use iovec::IoVec;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
 use winapi::*;
+use iovec::IoVec;
 
+use {poll, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
 use sys::windows::Family;
-use {poll, Poll, PollOpt, Ready, Token};
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`
@@ -85,14 +85,15 @@ struct ListenerInner {
 }
 
 enum State<T, U> {
-    Empty,            // no I/O operation in progress
-    Pending(T),       // an I/O operation is in progress
-    Ready(U),         // I/O has finished with this value
-    Error(io::Error), // there was an I/O error
+    Empty,              // no I/O operation in progress
+    Pending(T),         // an I/O operation is in progress
+    Ready(U),           // I/O has finished with this value
+    Error(io::Error),   // there was an I/O error
 }
 
 impl TcpStream {
-    fn new(socket: net::TcpStream, deferred_connect: Option<SocketAddr>) -> TcpStream {
+    fn new(socket: net::TcpStream,
+           deferred_connect: Option<SocketAddr>) -> TcpStream {
         TcpStream {
             registration: Mutex::new(None),
             imp: StreamImp {
@@ -112,7 +113,8 @@ impl TcpStream {
         }
     }
 
-    pub fn connect(socket: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
+    pub fn connect(socket: net::TcpStream, addr: &SocketAddr)
+                   -> io::Result<TcpStream> {
         socket.set_nonblocking(true)?;
         Ok(TcpStream::new(socket, Some(*addr)))
     }
@@ -130,11 +132,7 @@ impl TcpStream {
     }
 
     pub fn try_clone(&self) -> io::Result<TcpStream> {
-        self.imp
-            .inner
-            .socket
-            .try_clone()
-            .map(|s| TcpStream::new(s, None))
+        self.imp.inner.socket.try_clone().map(|s| TcpStream::new(s, None))
     }
 
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
@@ -199,7 +197,7 @@ impl TcpStream {
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         if let Some(e) = self.imp.inner.socket.take_error()? {
-            return Ok(Some(e));
+            return Ok(Some(e))
         }
 
         // If the syscall didn't return anything then also check to see if we've
@@ -238,7 +236,8 @@ impl TcpStream {
         match me.read {
             // Empty == we're not associated yet, and if we're pending then
             // these are both cases where we return "would block"
-            State::Empty | State::Pending(()) => return Err(io::ErrorKind::WouldBlock.into()),
+            State::Empty |
+            State::Pending(()) => return Err(io::ErrorKind::WouldBlock.into()),
 
             // If we got a delayed error as part of a `read_overlapped` below,
             // return that here. Also schedule another read in case it was
@@ -249,7 +248,7 @@ impl TcpStream {
                     _ => panic!(),
                 };
                 self.imp.schedule_read(&mut me);
-                return Err(e);
+                return Err(e)
             }
 
             // If we're ready for a read then some previous 0-byte read has
@@ -332,14 +331,14 @@ impl TcpStream {
                     if amt > 0 && e.kind() == io::ErrorKind::WouldBlock {
                         me.read = State::Empty;
                         self.imp.schedule_read(&mut me);
-                        return Ok(amt);
+                        return Ok(amt)
                     } else if amt > 0 {
                         me.read = State::Error(e);
-                        return Ok(amt);
+                        return Ok(amt)
                     } else {
                         me.read = State::Empty;
                         self.imp.schedule_read(&mut me);
-                        return Err(e);
+                        return Err(e)
                     }
                 }
             }
@@ -364,16 +363,16 @@ impl TcpStream {
             State::Error(e) => return Err(e),
             other => {
                 me.write = other;
-                return Err(io::ErrorKind::WouldBlock.into());
+                return Err(io::ErrorKind::WouldBlock.into())
             }
         }
 
         if !me.iocp.registered() {
-            return Err(io::ErrorKind::WouldBlock.into());
+            return Err(io::ErrorKind::WouldBlock.into())
         }
 
         if bufs.len() == 0 {
-            return Ok(0);
+            return Ok(0)
         }
 
         let len = bufs.iter().map(|b| b.len()).fold(0, |a, b| a + b);
@@ -398,14 +397,11 @@ impl StreamImp {
     fn schedule_connect(&self, addr: &SocketAddr, me: &mut StreamInner) -> io::Result<()> {
         unsafe {
             trace!("scheduling a connect");
-            self.inner
-                .socket
-                .connect_overlapped(addr, &[], self.inner.read.as_mut_ptr())?;
+            self.inner.socket.connect_overlapped(addr, &[], self.inner.read.as_mut_ptr())?;
         }
         // see docs above on StreamImp.inner for rationale on forget
         mem::forget(self.clone());
-        me.iocp
-            .store_overlapped_content(self.inner.read.as_mut_ptr(), read_deallocate);
+        me.iocp.store_overlapped_content(self.inner.read.as_mut_ptr(), read_deallocate);
         Ok(())
     }
 
@@ -426,14 +422,11 @@ impl StreamImp {
             _ => return,
         }
 
-        me.iocp
-            .set_readiness(me.iocp.readiness() - Ready::readable());
+        me.iocp.set_readiness(me.iocp.readiness() - Ready::readable());
 
         trace!("scheduling a read");
         let res = unsafe {
-            self.inner
-                .socket
-                .read_overlapped(&mut [], self.inner.read.as_mut_ptr())
+            self.inner.socket.read_overlapped(&mut [], self.inner.read.as_mut_ptr())
         };
         match res {
             // Note that `Ok(true)` means that this completed immediately and
@@ -462,8 +455,7 @@ impl StreamImp {
                 // see docs above on StreamImp.inner for rationale on forget
                 me.read = State::Pending(());
                 mem::forget(self.clone());
-                me.iocp
-                    .store_overlapped_content(self.inner.read.as_mut_ptr(), read_deallocate);
+                me.iocp.store_overlapped_content(self.inner.read.as_mut_ptr(), read_deallocate);
             }
             Err(e) => {
                 me.read = State::Error(e);
@@ -481,17 +473,18 @@ impl StreamImp {
     ///
     /// A new writable event (e.g. allowing another write) will only happen once
     /// the buffer has been written completely (or hit an error).
-    fn schedule_write(&self, buf: Vec<u8>, mut pos: usize, me: &mut StreamInner) {
+    fn schedule_write(&self,
+                      buf: Vec<u8>,
+                      mut pos: usize,
+                      me: &mut StreamInner) {
+
         // About to write, clear any pending level triggered events
-        me.iocp
-            .set_readiness(me.iocp.readiness() - Ready::writable());
+        me.iocp.set_readiness(me.iocp.readiness() - Ready::writable());
 
         loop {
             trace!("scheduling a write of {} bytes", buf[pos..].len());
             let ret = unsafe {
-                self.inner
-                    .socket
-                    .write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr())
+                self.inner.socket.write_overlapped(&buf[pos..], self.inner.write.as_mut_ptr())
             };
             match ret {
                 Ok(Some(transferred_bytes)) if me.instant_notify => {
@@ -508,8 +501,7 @@ impl StreamImp {
                     // see docs above on StreamImp.inner for rationale on forget
                     me.write = State::Pending((buf, pos));
                     mem::forget(self.clone());
-                    me.iocp
-                        .store_overlapped_content(self.inner.write.as_mut_ptr(), write_deallocate);
+                    me.iocp.store_overlapped_content(self.inner.write.as_mut_ptr(), write_deallocate);
                     break;
                 }
                 Err(e) => {
@@ -545,7 +537,7 @@ fn read_done(status: &OVERLAPPED_ENTRY) {
             trace!("finished a read: {}", status.bytes_transferred());
             assert_eq!(status.bytes_transferred(), 0);
             me.read = State::Ready(());
-            return me2.add_readiness(&mut me, Ready::readable());
+            return me2.add_readiness(&mut me, Ready::readable())
         }
         s => me.read = s,
     }
@@ -604,22 +596,11 @@ fn write_deallocate(ptr: *mut OVERLAPPED) {
 }
 
 impl Evented for TcpStream {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token,
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.register_socket(
-            &self.imp.inner.socket,
-            poll,
-            token,
-            interest,
-            opts,
-            &self.registration,
-        )?;
+        me.iocp.register_socket(&self.imp.inner.socket, poll, token,
+                                     interest, opts, &self.registration)?;
 
         unsafe {
             super::no_notify_on_instant_completion(self.imp.inner.socket.as_raw_socket() as HANDLE)?;
@@ -631,42 +612,31 @@ impl Evented for TcpStream {
         // successful connect will worry about generating writable/readable
         // events and scheduling a new read.
         if let Some(addr) = me.deferred_connect.take() {
-            return self.imp.schedule_connect(&addr, &mut me).map(|_| ());
+            return self.imp.schedule_connect(&addr, &mut me).map(|_| ())
         }
         self.post_register(interest, &mut me);
         Ok(())
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token,
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.reregister_socket(
-            &self.imp.inner.socket,
-            poll,
-            token,
-            interest,
-            opts,
-            &self.registration,
-        )?;
+        me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
+                                       interest, opts, &self.registration)?;
         self.post_register(interest, &mut me);
         Ok(())
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner()
-            .iocp
-            .deregister(&self.imp.inner.socket, poll, &self.registration)
+        self.inner().iocp.deregister(&self.imp.inner.socket,
+                                     poll, &self.registration)
     }
 }
 
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("TcpStream").finish()
+        f.debug_struct("TcpStream")
+            .finish()
     }
 }
 
@@ -683,14 +653,11 @@ impl Drop for TcpStream {
             match inner.read {
                 State::Pending(_) | State::Empty => {
                     trace!("cancelling active TCP read");
-                    drop(super::cancel(&self.imp.inner.socket, &self.imp.inner.read));
+                    drop(super::cancel(&self.imp.inner.socket,
+                                       &self.imp.inner.read));
                     trace!("cleaning remaining overlapped contents");
-                    inner
-                        .iocp
-                        .clean_overlapped_content(self.imp.inner.read.as_mut_ptr());
-                    inner
-                        .iocp
-                        .clean_overlapped_content(self.imp.inner.write.as_mut_ptr());
+                    inner.iocp.clean_overlapped_content(self.imp.inner.read.as_mut_ptr());
+                    inner.iocp.clean_overlapped_content(self.imp.inner.write.as_mut_ptr());
                 }
                 State::Ready(_) | State::Error(_) => {}
             }
@@ -699,15 +666,13 @@ impl Drop for TcpStream {
 }
 
 impl TcpListener {
-    pub fn new(socket: net::TcpListener) -> io::Result<TcpListener> {
+    pub fn new(socket: net::TcpListener)
+               -> io::Result<TcpListener> {
         let addr = socket.local_addr()?;
-        Ok(TcpListener::new_family(
-            socket,
-            match addr {
-                SocketAddr::V4(..) => Family::V4,
-                SocketAddr::V6(..) => Family::V6,
-            },
-        ))
+        Ok(TcpListener::new_family(socket, match addr {
+            SocketAddr::V4(..) => Family::V4,
+            SocketAddr::V6(..) => Family::V6,
+        }))
     }
 
     fn new_family(socket: net::TcpListener, family: Family) -> TcpListener {
@@ -744,7 +709,7 @@ impl TcpListener {
 
         self.imp.schedule_accept(&mut me);
 
-        return ret;
+        return ret
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -752,11 +717,9 @@ impl TcpListener {
     }
 
     pub fn try_clone(&self) -> io::Result<TcpListener> {
-        self.imp
-            .inner
-            .socket
-            .try_clone()
-            .map(|s| TcpListener::new_family(s, self.imp.inner.family))
+        self.imp.inner.socket.try_clone().map(|s| {
+            TcpListener::new_family(s, self.imp.inner.family)
+        })
     }
 
     #[allow(deprecated)]
@@ -794,30 +757,25 @@ impl ListenerImp {
     fn schedule_accept(&self, me: &mut ListenerInner) {
         match me.accept {
             State::Empty => {}
-            _ => return,
+            _ => return
         }
 
-        me.iocp
-            .set_readiness(me.iocp.readiness() - Ready::readable());
+        me.iocp.set_readiness(me.iocp.readiness() - Ready::readable());
 
         let res = match self.inner.family {
             Family::V4 => TcpBuilder::new_v4(),
             Family::V6 => TcpBuilder::new_v6(),
         }.and_then(|builder| unsafe {
             trace!("scheduling an accept");
-            self.inner.socket.accept_overlapped(
-                &builder,
-                &mut me.accept_buf,
-                self.inner.accept.as_mut_ptr(),
-            )
+            self.inner.socket.accept_overlapped(&builder, &mut me.accept_buf,
+                                                self.inner.accept.as_mut_ptr())
         });
         match res {
             Ok((socket, _)) => {
                 // see docs above on StreamImp.inner for rationale on forget
                 me.accept = State::Pending(socket);
                 mem::forget(self.clone());
-                me.iocp
-                    .store_overlapped_content(self.inner.accept.as_mut_ptr(), accept_dellocate);
+                me.iocp.store_overlapped_content(self.inner.accept.as_mut_ptr(), accept_dellocate);
             }
             Err(e) => {
                 me.accept = State::Error(e);
@@ -844,15 +802,13 @@ fn accept_done(status: &OVERLAPPED_ENTRY) {
         _ => unreachable!(),
     };
     trace!("finished an accept");
-    let result = me2
-        .inner
-        .socket
-        .accept_complete(&socket)
-        .and_then(|()| me.accept_buf.parse(&me2.inner.socket))
-        .and_then(|buf| {
-            buf.remote()
-                .ok_or_else(|| io::Error::new(ErrorKind::Other, "could not obtain remote address"))
-        });
+    let result = me2.inner.socket.accept_complete(&socket).and_then(|()| {
+        me.accept_buf.parse(&me2.inner.socket)
+    }).and_then(|buf| {
+        buf.remote().ok_or_else(|| {
+            io::Error::new(ErrorKind::Other, "could not obtain remote address")
+        })
+    });
     me.accept = match result {
         Ok(remote_addr) => State::Ready((socket, remote_addr)),
         Err(e) => State::Error(e),
@@ -868,22 +824,11 @@ fn accept_dellocate(ptr: *mut OVERLAPPED) {
 }
 
 impl Evented for TcpListener {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token,
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.register_socket(
-            &self.imp.inner.socket,
-            poll,
-            token,
-            interest,
-            opts,
-            &self.registration,
-        )?;
+        me.iocp.register_socket(&self.imp.inner.socket, poll, token,
+                                     interest, opts, &self.registration)?;
 
         unsafe {
             super::no_notify_on_instant_completion(self.imp.inner.socket.as_raw_socket() as HANDLE)?;
@@ -894,36 +839,25 @@ impl Evented for TcpListener {
         Ok(())
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token,
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         let mut me = self.inner();
-        me.iocp.reregister_socket(
-            &self.imp.inner.socket,
-            poll,
-            token,
-            interest,
-            opts,
-            &self.registration,
-        )?;
+        me.iocp.reregister_socket(&self.imp.inner.socket, poll, token,
+                                       interest, opts, &self.registration)?;
         self.imp.schedule_accept(&mut me);
         Ok(())
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner()
-            .iocp
-            .deregister(&self.imp.inner.socket, poll, &self.registration)
+        self.inner().iocp.deregister(&self.imp.inner.socket,
+                                     poll, &self.registration)
     }
 }
 
 impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("TcpListener").finish()
+        f.debug_struct("TcpListener")
+            .finish()
     }
 }
 
@@ -935,16 +869,14 @@ impl Drop for TcpListener {
             match inner.accept {
                 State::Pending(_) => {
                     trace!("cancelling active TCP accept");
-                    drop(super::cancel(
-                        &self.imp.inner.socket,
-                        &self.imp.inner.accept,
-                    ));
+                    drop(super::cancel(&self.imp.inner.socket,
+                                       &self.imp.inner.accept));
                     trace!("cleaning remaining overlapped contents");
-                    inner
-                        .iocp
-                        .clean_overlapped_content(self.imp.inner.accept.as_mut_ptr());
+                    inner.iocp.clean_overlapped_content(self.imp.inner.accept.as_mut_ptr());
                 }
-                State::Empty | State::Ready(_) | State::Error(_) => {}
+                State::Empty |
+                State::Ready(_) |
+                State::Error(_) => {}
             }
         }
     }

@@ -6,17 +6,18 @@
 //! matter the target platform.
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
+
 use std::fmt;
 use std::io::{Read, Write};
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
-use iovec::IoVec;
 use net2::TcpBuilder;
+use iovec::IoVec;
 
+use {io, sys, Ready, Poll, PollOpt, Token};
 use event::Evented;
 use poll::SelectorId;
-use {io, sys, Poll, PollOpt, Ready, Token};
 
 /*
  *
@@ -69,12 +70,14 @@ use std::net::Shutdown;
 // TODO: remove when fuchsia's set_nonblocking is fixed in libstd
 #[cfg(target_os = "fuchsia")]
 fn set_nonblocking(stream: &net::TcpStream) -> io::Result<()> {
-    sys::set_nonblock(::std::os::unix::io::AsRawFd::as_raw_fd(stream))
+    sys::set_nonblock(
+        ::std::os::unix::io::AsRawFd::as_raw_fd(stream))
 }
 #[cfg(not(target_os = "fuchsia"))]
 fn set_nonblocking(stream: &net::TcpStream) -> io::Result<()> {
     stream.set_nonblocking(true)
 }
+
 
 impl TcpStream {
     /// Create a new TCP stream and issue a non-blocking connect to the
@@ -117,7 +120,8 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
-    pub fn connect_stream(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
+    pub fn connect_stream(stream: net::TcpStream,
+                          addr: &SocketAddr) -> io::Result<TcpStream> {
         Ok(TcpStream {
             sys: sys::TcpStream::connect(stream, addr)?,
             selector_id: SelectorId::new(),
@@ -160,9 +164,11 @@ impl TcpStream {
     /// data, and options set on one stream will be propagated to the other
     /// stream.
     pub fn try_clone(&self) -> io::Result<TcpStream> {
-        self.sys.try_clone().map(|s| TcpStream {
-            sys: s,
-            selector_id: self.selector_id.clone(),
+        self.sys.try_clone().map(|s| {
+            TcpStream {
+                sys: s,
+                selector_id: self.selector_id.clone(),
+            }
         })
     }
 
@@ -320,8 +326,11 @@ impl TcpStream {
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     pub fn keepalive_ms(&self) -> io::Result<Option<u32>> {
-        self.keepalive()
-            .map(|v| v.map(|v| ::convert::millis(v) as u32))
+        self.keepalive().map(|v| {
+            v.map(|v| {
+                ::convert::millis(v) as u32
+            })
+        })
     }
 
     /// Get the value of the `SO_ERROR` option on this socket.
@@ -428,24 +437,14 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token,
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.selector_id.associate_selector(poll)?;
         self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token,
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)
     }
 
@@ -542,7 +541,8 @@ impl TcpListener {
     #[deprecated(since = "0.6.13", note = "use from_std instead")]
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
-    pub fn from_listener(listener: net::TcpListener, _: &SocketAddr) -> io::Result<TcpListener> {
+    pub fn from_listener(listener: net::TcpListener, _: &SocketAddr)
+                         -> io::Result<TcpListener> {
         TcpListener::from_std(listener)
     }
 
@@ -556,9 +556,11 @@ impl TcpListener {
     ///
     /// The address provided must be the address that the listener is bound to.
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
-        sys::TcpListener::new(listener).map(|s| TcpListener {
-            sys: s,
-            selector_id: SelectorId::new(),
+        sys::TcpListener::new(listener).map(|s| {
+            TcpListener {
+                sys: s,
+                selector_id: SelectorId::new(),
+            }
         })
     }
 
@@ -596,9 +598,11 @@ impl TcpListener {
     /// object references. Both handles can be used to accept incoming
     /// connections and options set on one listener will affect the other.
     pub fn try_clone(&self) -> io::Result<TcpListener> {
-        self.sys.try_clone().map(|s| TcpListener {
-            sys: s,
-            selector_id: self.selector_id.clone(),
+        self.sys.try_clone().map(|s| {
+            TcpListener {
+                sys: s,
+                selector_id: self.selector_id.clone(),
+            }
         })
     }
 
@@ -651,24 +655,14 @@ impl TcpListener {
 }
 
 impl Evented for TcpListener {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token,
+                interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.selector_id.associate_selector(poll)?;
         self.sys.register(poll, token, interest, opts)
     }
 
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn reregister(&self, poll: &Poll, token: Token,
+                  interest: Ready, opts: PollOpt) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)
     }
 
@@ -690,7 +684,7 @@ impl fmt::Debug for TcpListener {
  */
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 impl IntoRawFd for TcpStream {
