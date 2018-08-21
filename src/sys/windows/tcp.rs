@@ -1,6 +1,7 @@
 use std::fmt;
 use std::io::{self, Read, ErrorKind};
 use std::mem;
+use std::net::{SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 use std::net::{self, SocketAddr, Shutdown};
 use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
@@ -91,7 +92,36 @@ enum State<T, U> {
     Error(io::Error),   // there was an I/O error
 }
 
+fn inaddr_any(other: &SocketAddr) -> SocketAddr {
+    match *other {
+        SocketAddr::V4(..) => {
+            let any = Ipv4Addr::new(0, 0, 0, 0);
+            let addr = SocketAddrV4::new(any, 0);
+            SocketAddr::V4(addr)
+        }
+        SocketAddr::V6(..) => {
+            let any = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0);
+            let addr = SocketAddrV6::new(any, 0, 0, 0);
+            SocketAddr::V6(addr)
+        }
+    }
+}
+
+
 impl TcpStream {
+    pub fn connect_std(addr: &SocketAddr) -> io::Result<net::TcpStream> {
+        let sock = match *addr {
+            SocketAddr::V4(..) => TcpBuilder::new_v4(),
+            SocketAddr::V6(..) => TcpBuilder::new_v6(),
+        }?;
+
+        // Required on Windows for a future `connect_overlapped` operation to be
+        // executed successfully.
+        sock.bind(&inaddr_any(addr))?;
+
+        sock.to_tcp_stream()
+    }
+
     fn new(socket: net::TcpStream,
            deferred_connect: Option<SocketAddr>) -> TcpStream {
         TcpStream {
@@ -645,6 +675,20 @@ impl Drop for TcpStream {
 }
 
 impl TcpListener {
+    pub fn bind_std(addr: &SocketAddr) -> io::Result<net::TcpListener> {
+        // Create the socket
+        let sock = match *addr {
+            SocketAddr::V4(..) => TcpBuilder::new_v4(),
+            SocketAddr::V6(..) => TcpBuilder::new_v6(),
+        }?;
+
+        // Bind the socket
+        sock.bind(addr)?;
+
+        // listen
+        sock.listen(1024)
+    }
+
     pub fn new(socket: net::TcpListener)
                -> io::Result<TcpListener> {
         let addr = socket.local_addr()?;

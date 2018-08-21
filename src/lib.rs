@@ -205,14 +205,16 @@ pub use poll::Iter as EventsIter;
 #[doc(hidden)]
 pub use io::deprecated::would_block;
 
-#[cfg(any(all(unix, not(target_os = "fuchsia")), target_os = "redox"))]
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 pub mod unix {
     //! Unix only extensions
-    pub use sys::{
-        EventedFd,
-    };
-    #[cfg(unix)]
+    pub use sys::EventedFd;
     pub use sys::unix::UnixReady;
+}
+#[cfg(target_os = "redox")]
+pub mod unix {
+    //! Unix only extensions
+    pub use sys::EventedFd;
 }
 
 #[cfg(target_os = "fuchsia")]

@@ -6,7 +6,7 @@ use std::os::unix::io::{RawFd, FromRawFd, IntoRawFd, AsRawFd};
 use std::time::Duration;
 
 use libc;
-use net2::TcpStreamExt;
+use net2::{TcpBuilder, TcpStreamExt};
 use iovec::IoVec;
 use iovec::unix as iovec;
 
@@ -25,6 +25,14 @@ pub struct TcpListener {
 }
 
 impl TcpStream {
+    pub fn connect_std(addr: &SocketAddr) -> io::Result<net::TcpStream> {
+        let sock = match *addr {
+            SocketAddr::V4(..) => TcpBuilder::new_v4(),
+            SocketAddr::V6(..) => TcpBuilder::new_v6(),
+        }?;
+        sock.to_tcp_stream()
+    }
+
     pub fn connect(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
         set_nonblock(stream.as_raw_fd())?;
 
@@ -219,6 +227,23 @@ impl AsRawFd for TcpStream {
 }
 
 impl TcpListener {
+    pub fn bind_std(addr: &SocketAddr) -> io::Result<net::TcpListener> {
+        // Create the socket
+        let sock = match *addr {
+            SocketAddr::V4(..) => TcpBuilder::new_v4(),
+            SocketAddr::V6(..) => TcpBuilder::new_v6(),
+        }?;
+
+        // Set SO_REUSEADDR, but only on Unix (mirrors what libstd does)
+        sock.reuse_address(true)?;
+
+        // Bind the socket
+        sock.bind(addr)?;
+
+        // listen
+        sock.listen(1024)
+    }
+
     pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
         set_nonblock(inner.as_raw_fd())?;
         Ok(TcpListener {
