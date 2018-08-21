@@ -695,8 +695,8 @@ impl Poll {
     /// readiness. `Poll` will only return readiness events for operations
     /// specified by this argument.
     ///
-    /// If a socket is registered with [`readable`] interest and the socket
-    /// becomes writable, no event will be returned from [`poll`].
+    /// If a socket is registered with readable interest and the socket becomes
+    /// writable, no event will be returned from [`poll`].
     ///
     /// The readiness interest for an `Evented` handle can be changed at any
     /// time by calling [`reregister`].
@@ -860,7 +860,7 @@ impl Poll {
     ///
     /// When an `Evented` handle is deregistered, the `Poll` instance will
     /// no longer monitor it for readiness state changes. Unlike disabling
-    /// handles with [`oneshot`], deregistering clears up any internal resources
+    /// handles with oneshot, deregistering clears up any internal resources
     /// needed to track the handle.
     ///
     /// A handle can be passed back to `register` after it has been
