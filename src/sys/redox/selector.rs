@@ -55,6 +55,7 @@ impl Selector {
         let mut timeout_fd = None;
         if let Some(timeout) = timeout {
             let mut file = File::open(format!("time:{}", CLOCK_MONOTONIC))?;
+            self.inner_register(file.as_raw_fd(), TIMEOUT_TOKEN, EVENT_READ)?;
 
             // TODO: use try_from below when stable
             if timeout.as_secs() > std::i64::MAX as u64 {
@@ -70,7 +71,6 @@ impl Selector {
 
             file.write(&time)?;
 
-            self.inner_register(file.as_raw_fd(), TIMEOUT_TOKEN, EVENT_READ)?;
             timeout_fd = Some(file);
         }
 
