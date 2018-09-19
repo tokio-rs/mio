@@ -22,10 +22,6 @@ pub struct TcpListener {
 }
 
 impl TcpStream {
-    pub fn connect_std(addr: &SocketAddr) -> io::Result<net::TcpStream> {
-        net::TcpStream::connect(addr)
-    }
-
     pub fn connect(stream: net::TcpStream, _addr: &SocketAddr) -> io::Result<TcpStream> {
         stream.set_nonblocking(true)?;
 
@@ -202,10 +198,6 @@ impl AsRawFd for TcpStream {
 }
 
 impl TcpListener {
-    pub fn bind_std(addr: &SocketAddr) -> io::Result<net::TcpListener> {
-        net::TcpListener::bind(addr)
-    }
-
     pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
         set_nonblock(inner.as_raw_fd())?;
 

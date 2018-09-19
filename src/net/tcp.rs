@@ -7,6 +7,11 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
+#[cfg(not(target_os = "redox"))]
+use net2::TcpBuilder;
+#[cfg(not(target_os = "redox"))]
+use std::net::{SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
+
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
@@ -88,9 +93,26 @@ impl TcpStream {
     /// `net2::TcpBuilder` to configure a socket and then pass its socket to
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
+    #[cfg(not(target_os = "redox"))]
     pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
-        let sock = sys::TcpStream::connect_std(addr)?;
-        TcpStream::connect_stream(sock, addr)
+        let sock = match *addr {
+            SocketAddr::V4(..) => TcpBuilder::new_v4(),
+            SocketAddr::V6(..) => TcpBuilder::new_v6(),
+        }?;
+        // Required on Windows for a future `connect_overlapped` operation to be
+        // executed successfully.
+        if cfg!(windows) {
+            sock.bind(&inaddr_any(addr))?;
+        }
+
+        TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
+    }
+    /// Create a new TCP stream and issue a non-blocking connect to the
+    /// specified address.
+    #[cfg(target_os = "redox")]
+    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
+        let tcp = net::TcpStream::connect(addr)?;
+        TcpStream::connect_stream(tcp, addr)
     }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
@@ -382,6 +404,22 @@ impl TcpStream {
     }
 }
 
+#[cfg(not(target_os = "redox"))]
+fn inaddr_any(other: &SocketAddr) -> SocketAddr {
+    match *other {
+        SocketAddr::V4(..) => {
+            let any = Ipv4Addr::new(0, 0, 0, 0);
+            let addr = SocketAddrV4::new(any, 0);
+            SocketAddr::V4(addr)
+        }
+        SocketAddr::V6(..) => {
+            let any = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0);
+            let addr = SocketAddrV6::new(any, 0, 0, 0);
+            SocketAddr::V6(addr)
+        }
+    }
+}
+
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         (&self.sys).read(buf)
@@ -493,9 +531,39 @@ impl TcpListener {
     /// socket is desired then the `net2::TcpBuilder` methods can be used in
     /// combination with the `TcpListener::from_listener` method to transfer
     /// ownership into mio.
+    #[cfg(not(target_os = "redox"))]
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
-        let listener = sys::TcpListener::bind_std(addr)?;
-        TcpListener::from_std(listener)
+        // Create the socket
+        let sock = match *addr {
+            SocketAddr::V4(..) => TcpBuilder::new_v4(),
+            SocketAddr::V6(..) => TcpBuilder::new_v6(),
+        }?;
+
+        // Set SO_REUSEADDR, but only on Unix (mirrors what libstd does)
+        if cfg!(unix) {
+            sock.reuse_address(true)?;
+        }
+
+        // Bind the socket
+        sock.bind(addr)?;
+
+        // listen
+        let listener = sock.listen(1024)?;
+        Ok(TcpListener {
+            sys: sys::TcpListener::new(listener)?,
+            selector_id: SelectorId::new(),
+        })
+    }
+
+    /// Convenience method to bind a new TCP listener to the specified address
+    /// to receive new connections.
+    #[cfg(target_os = "redox")]
+    pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
+        let listener = net::TcpListener::bind(addr)?;
+        Ok(TcpListener {
+            sys: sys::TcpListener::new(listener)?,
+            selector_id: SelectorId::new(),
+        })
     }
 
     #[deprecated(since = "0.6.13", note = "use from_std instead")]
