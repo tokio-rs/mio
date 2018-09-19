@@ -7,9 +7,7 @@
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
 
-#[cfg(not(target_os = "redox"))]
 use net2::TcpBuilder;
-#[cfg(not(target_os = "redox"))]
 use std::net::{SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr};
 
 use std::fmt;
@@ -93,7 +91,6 @@ impl TcpStream {
     /// `net2::TcpBuilder` to configure a socket and then pass its socket to
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
-    #[cfg(not(target_os = "redox"))]
     pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
         let sock = match *addr {
             SocketAddr::V4(..) => TcpBuilder::new_v4(),
@@ -106,13 +103,6 @@ impl TcpStream {
         }
 
         TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
-    }
-    /// Create a new TCP stream and issue a non-blocking connect to the
-    /// specified address.
-    #[cfg(target_os = "redox")]
-    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
-        let tcp = net::TcpStream::connect(addr)?;
-        TcpStream::connect_stream(tcp, addr)
     }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
@@ -404,7 +394,6 @@ impl TcpStream {
     }
 }
 
-#[cfg(not(target_os = "redox"))]
 fn inaddr_any(other: &SocketAddr) -> SocketAddr {
     match *other {
         SocketAddr::V4(..) => {
@@ -531,7 +520,6 @@ impl TcpListener {
     /// socket is desired then the `net2::TcpBuilder` methods can be used in
     /// combination with the `TcpListener::from_listener` method to transfer
     /// ownership into mio.
-    #[cfg(not(target_os = "redox"))]
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         // Create the socket
         let sock = match *addr {
@@ -549,17 +537,6 @@ impl TcpListener {
 
         // listen
         let listener = sock.listen(1024)?;
-        Ok(TcpListener {
-            sys: sys::TcpListener::new(listener)?,
-            selector_id: SelectorId::new(),
-        })
-    }
-
-    /// Convenience method to bind a new TCP listener to the specified address
-    /// to receive new connections.
-    #[cfg(target_os = "redox")]
-    pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
-        let listener = net::TcpListener::bind(addr)?;
         Ok(TcpListener {
             sys: sys::TcpListener::new(listener)?,
             selector_id: SelectorId::new(),
