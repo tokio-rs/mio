@@ -47,6 +47,14 @@ matrix:
         - cargo test
         - cargo test --no-default-features
 
+    # Minimal versions
+    - os: linux
+      rust: nightly
+      script:
+        - cargo update -Zminimal-versions
+        - cargo test
+        - cargo test --no-default-features
+
     # OS X
     - os: osx
       rust: stable
