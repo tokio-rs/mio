@@ -8,11 +8,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![cfg_attr(not(test), no_std)]
-
 #![deny(missing_docs)]
-#![cfg_attr(feature = "nightly", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
+#![allow(unused)]
 
 //! This crate provides a `LazyCell` struct which acts as a lazily filled
 //! `Cell`.
@@ -22,32 +19,9 @@
 //! variation on `RefCell` which allows borrows to be tied to the lifetime of
 //! the outer object.
 //!
-//! # Example
-//!
-//! The following example shows a quick example of the basic functionality of
-//! `LazyCell`.
-//!
-//! ```
-//! use lazycell::LazyCell;
-//!
-//! let lazycell = LazyCell::new();
-//!
-//! assert_eq!(lazycell.borrow(), None);
-//! assert!(!lazycell.filled());
-//! lazycell.fill(1).ok();
-//! assert!(lazycell.filled());
-//! assert_eq!(lazycell.borrow(), Some(&1));
-//! assert_eq!(lazycell.into_inner(), Some(1));
-//! ```
-//!
 //! `AtomicLazyCell` is a variant that uses an atomic variable to manage
 //! coordination in a thread-safe fashion. The limitation of an `AtomicLazyCell`
 //! is that after it is initialized, it can't be modified.
-
-
-#[cfg(not(test))]
-#[macro_use]
-extern crate core as std;
 
 use std::cell::UnsafeCell;
 use std::mem;
@@ -228,15 +202,12 @@ pub struct AtomicLazyCell<T> {
 }
 
 impl<T> AtomicLazyCell<T> {
-    /// An empty `AtomicLazyCell`.
-    pub const NONE: Self = Self {
-        inner: UnsafeCell::new(None),
-        state: AtomicUsize::new(NONE),
-    };
-
     /// Creates a new, empty, `AtomicLazyCell`.
     pub fn new() -> AtomicLazyCell<T> {
-        Self::NONE
+        Self {
+            inner: UnsafeCell::new(None),
+            state: AtomicUsize::new(NONE),
+        }
     }
 
     /// Put a value into this cell.
