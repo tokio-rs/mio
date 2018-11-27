@@ -257,6 +257,10 @@ impl Echo {
 
 #[test]
 pub fn test_echo_server() {
+    use std::time::{Instant, Duration};
+
+    let _ = ::env_logger::init();
+
     debug!("Starting TEST_ECHO_SERVER");
     let mut poll = Poll::new().unwrap();
 
@@ -277,9 +281,16 @@ pub fn test_echo_server() {
 
     let mut handler = Echo::new(srv, sock, vec!["foo", "bar"]);
 
+    let max_dur = Duration::from_secs(10);
+    let start = Instant::now();
+
     // Start the event loop
     while !handler.client.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        if start.elapsed() > max_dur {
+            panic!("took too long");
+        }
+
+        poll.poll(&mut events, Some(max_dur)).unwrap();
 
         for event in &events {
             debug!("ready {:?} {:?}", event.token(), event.readiness());
