@@ -78,7 +78,7 @@ impl TestHandler {
 
 #[test]
 pub fn test_close_on_drop() {
-    let _ = ::env_logger::init();
+    let _ = ::env_logger::try_init();
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut poll = Poll::new().unwrap();
 

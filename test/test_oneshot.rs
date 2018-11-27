@@ -7,7 +7,7 @@ const MS: u64 = 1_000;
 
 #[test]
 pub fn test_tcp_edge_oneshot() {
-    let _ = ::env_logger::init();
+    let _ = ::env_logger::try_init();
 
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(1024);

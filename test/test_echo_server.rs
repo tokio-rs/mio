@@ -259,7 +259,7 @@ impl Echo {
 pub fn test_echo_server() {
     use std::time::{Instant, Duration};
 
-    let _ = ::env_logger::init();
+    let _ = ::env_logger::try_init();
 
     debug!("Starting TEST_ECHO_SERVER");
     let mut poll = Poll::new().unwrap();
