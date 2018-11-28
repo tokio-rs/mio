@@ -1,3 +1,7 @@
+# Unreleased (Unreleased)
+
+* Fix lazycell related compilation issues.
+
 # 0.6.16 (September 5, 2018)
 
 * Add EPOLLPRI readiness to UnixReady on supported platforms (#867)

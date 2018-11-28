@@ -25,7 +25,7 @@ case "$TARGET" in
 
   aarch64-linux-android)
     # Use the 64bit emulator
-    export LD_LIBRARY_PATH="/android/sdk/emulator/lib64/qt/lib:/usr/lib/x86_64-linux-gnu"
+    export LD_LIBRARY_PATH="/android/sdk/emulator/lib64/qt/lib:/android/sdk/emulator/lib64:/usr/lib/x86_64-linux-gnu"
     qemu-system-aarch64 @arm64-24 -memory 768 -accel off -gpu off -no-skin -no-window -no-audio -no-snapshot-load -no-snapshot-save &
     adb wait-for-device
     adb root

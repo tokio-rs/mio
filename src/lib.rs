@@ -94,7 +94,6 @@
 //!
 //! ```
 
-extern crate lazycell;
 extern crate net2;
 extern crate iovec;
 extern crate slab;
@@ -124,6 +123,7 @@ mod io;
 mod poll;
 mod sys;
 mod token;
+mod lazycell;
 
 pub mod net;
 
