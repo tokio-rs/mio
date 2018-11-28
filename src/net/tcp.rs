@@ -482,7 +482,7 @@ impl fmt::Debug for TcpStream {
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.register(&listener, Token(0), Ready::writable(),
+/// poll.register(&listener, Token(0), Ready::readable(),
 ///               PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
