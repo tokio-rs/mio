@@ -7,6 +7,7 @@ use std::{mem, ops, isize};
 use std::os::unix::io::AsRawFd;
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::RawFd;
+use std::process;
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool};
 use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed, SeqCst};
@@ -2063,8 +2064,7 @@ impl Clone for RegistrationInner {
         // We abort because such a program is incredibly degenerate, and we
         // don't care to support it.
         if old_size & !MAX_REFCOUNT != 0 {
-            // TODO: This should really abort the process
-            panic!();
+            process::abort();
         }
 
         RegistrationInner {
