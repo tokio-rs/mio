@@ -2596,7 +2596,7 @@ impl ReadinessState {
     }
 
     #[inline]
-    fn get(&self, mask: usize, shift: usize) -> usize{
+    fn get(self, mask: usize, shift: usize) -> usize{
         (self.0 >> shift) & mask
     }
 
@@ -2607,13 +2607,13 @@ impl ReadinessState {
 
     /// Get the readiness
     #[inline]
-    fn readiness(&self) -> Ready {
+    fn readiness(self) -> Ready {
         let v = self.get(MASK_4, READINESS_SHIFT);
         event::ready_from_usize(v)
     }
 
     #[inline]
-    fn effective_readiness(&self) -> Ready {
+    fn effective_readiness(self) -> Ready {
         self.readiness() & self.interest()
     }
 
@@ -2625,7 +2625,7 @@ impl ReadinessState {
 
     /// Get the interest
     #[inline]
-    fn interest(&self) -> Ready {
+    fn interest(self) -> Ready {
         let v = self.get(MASK_4, INTEREST_SHIFT);
         event::ready_from_usize(v)
     }
@@ -2643,7 +2643,7 @@ impl ReadinessState {
 
     /// Get the poll options
     #[inline]
-    fn poll_opt(&self) -> PollOpt {
+    fn poll_opt(self) -> PollOpt {
         let v = self.get(MASK_4, POLL_OPT_SHIFT);
         event::opt_from_usize(v)
     }
@@ -2655,7 +2655,7 @@ impl ReadinessState {
     }
 
     #[inline]
-    fn is_queued(&self) -> bool {
+    fn is_queued(self) -> bool {
         self.0 & QUEUED_MASK == QUEUED_MASK
     }
 
@@ -2674,22 +2674,22 @@ impl ReadinessState {
     }
 
     #[inline]
-    fn is_dropped(&self) -> bool {
+    fn is_dropped(self) -> bool {
         self.0 & DROPPED_MASK == DROPPED_MASK
     }
 
     #[inline]
-    fn token_read_pos(&self) -> usize {
+    fn token_read_pos(self) -> usize {
         self.get(MASK_2, TOKEN_RD_SHIFT)
     }
 
     #[inline]
-    fn token_write_pos(&self) -> usize {
+    fn token_write_pos(self) -> usize {
         self.get(MASK_2, TOKEN_WR_SHIFT)
     }
 
     #[inline]
-    fn next_token_pos(&self) -> usize {
+    fn next_token_pos(self) -> usize {
         let rd = self.token_read_pos();
         let wr = self.token_write_pos();
 
