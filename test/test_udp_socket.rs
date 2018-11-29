@@ -22,12 +22,12 @@ pub struct UdpHandlerSendRecv {
 impl UdpHandlerSendRecv {
     fn new(tx: UdpSocket, rx: UdpSocket, connected: bool, msg : &'static str) -> UdpHandlerSendRecv {
         UdpHandlerSendRecv {
-            tx: tx,
-            rx: rx,
-            msg: msg,
+            tx,
+            rx,
+            msg,
             buf: SliceBuf::wrap(msg.as_bytes()),
             rx_buf: RingBuf::new(1024),
-            connected: connected,
+            connected,
             shutdown: false,
         }
     }
@@ -67,38 +67,32 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
         for event in &events {
             if event.readiness().is_readable() {
-                match event.token() {
-                    LISTENER => {
-                        debug!("We are receiving a datagram now...");
-                        let cnt = unsafe {
-                            if !handler.connected {
-                                handler.rx.recv_from(handler.rx_buf.mut_bytes()).unwrap().0
-                            } else {
-                                handler.rx.recv(handler.rx_buf.mut_bytes()).unwrap()
-                            }
-                        };
+                if let LISTENER = event.token() {
+                    debug!("We are receiving a datagram now...");
+                    let cnt = unsafe {
+                        if !handler.connected {
+                            handler.rx.recv_from(handler.rx_buf.mut_bytes()).unwrap().0
+                        } else {
+                            handler.rx.recv(handler.rx_buf.mut_bytes()).unwrap()
+                        }
+                    };
 
-                        unsafe { MutBuf::advance(&mut handler.rx_buf, cnt); }
-                        assert!(str::from_utf8(handler.rx_buf.bytes()).unwrap() == handler.msg);
-                        handler.shutdown = true;
-                    },
-                    _ => ()
+                    unsafe { MutBuf::advance(&mut handler.rx_buf, cnt); }
+                    assert!(str::from_utf8(handler.rx_buf.bytes()).unwrap() == handler.msg);
+                    handler.shutdown = true;
                 }
             }
 
             if event.readiness().is_writable() {
-                match event.token() {
-                    SENDER => {
-                        let cnt = if !handler.connected {
-                            let addr = handler.rx.local_addr().unwrap();
-                            handler.tx.send_to(handler.buf.bytes(), &addr).unwrap()
-                        } else {
-                            handler.tx.send(handler.buf.bytes()).unwrap()
-                        };
+                if let SENDER = event.token() {
+                    let cnt = if !handler.connected {
+                        let addr = handler.rx.local_addr().unwrap();
+                        handler.tx.send_to(handler.buf.bytes(), &addr).unwrap()
+                    } else {
+                        handler.tx.send(handler.buf.bytes()).unwrap()
+                    };
 
-                        handler.buf.advance(cnt);
-                    },
-                    _ => {}
+                    handler.buf.advance(cnt);
                 }
             }
         }
@@ -152,7 +146,7 @@ pub fn test_udp_socket_discard() {
 
     let poll = Poll::new().unwrap();
 
-    let r = udp_outside.send("hello world".as_bytes());
+    let r = udp_outside.send(b"hello world");
     assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
     poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
@@ -164,11 +158,8 @@ pub fn test_udp_socket_discard() {
 
     for event in &events {
         if event.readiness().is_readable() {
-            match event.token() {
-                LISTENER => {
-                    assert!(false, "Expected to no receive a packet but got something")
-                },
-                _ => ()
+            if let LISTENER = event.token() {
+                assert!(false, "Expected to no receive a packet but got something")
             }
         }
     }

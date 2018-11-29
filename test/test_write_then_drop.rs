@@ -24,7 +24,7 @@ fn write_then_drop() {
                PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.len() == 0 {
+    while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
     assert_eq!(events.len(), 1);
@@ -38,7 +38,7 @@ fn write_then_drop() {
                 PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.len() == 0 {
+    while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
     assert_eq!(events.len(), 1);
@@ -52,7 +52,7 @@ fn write_then_drop() {
                  Ready::readable(),
                  PollOpt::edge()).unwrap();
     let mut events = Events::with_capacity(1024);
-    while events.len() == 0 {
+    while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
     assert_eq!(events.len(), 1);
@@ -83,7 +83,7 @@ fn write_then_deregister() {
                PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.len() == 0 {
+    while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
     assert_eq!(events.len(), 1);
@@ -97,7 +97,7 @@ fn write_then_deregister() {
                 PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.len() == 0 {
+    while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
     assert_eq!(events.len(), 1);
@@ -111,7 +111,7 @@ fn write_then_deregister() {
                  Ready::readable(),
                  PollOpt::edge()).unwrap();
     let mut events = Events::with_capacity(1024);
-    while events.len() == 0 {
+    while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
     assert_eq!(events.len(), 1);

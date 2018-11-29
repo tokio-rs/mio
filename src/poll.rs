@@ -1149,6 +1149,7 @@ impl Poll {
     }
 
     #[inline]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::if_same_then_else))]
     fn poll2(&self, events: &mut Events, mut timeout: Option<Duration>, interruptible: bool) -> io::Result<usize> {
         // Compute the timeout value passed to the system selector. If the
         // readiness queue has pending nodes, we still want to poll the system
@@ -1592,13 +1593,13 @@ impl Registration {
 
         let registration = Registration {
             inner: RegistrationInner {
-                node: node,
+                node,
             },
         };
 
         let set_readiness = SetReadiness {
             inner: RegistrationInner {
-                node: node,
+                node,
             },
         };
 
@@ -1636,13 +1637,13 @@ impl Registration {
 
         let registration = Registration {
             inner: RegistrationInner {
-                node: node,
+                node,
             },
         };
 
         let set_readiness = SetReadiness {
             inner: RegistrationInner {
-                node: node,
+                node,
             },
         };
 
@@ -1879,7 +1880,10 @@ impl RegistrationInner {
         // pointer is being operated on. The actual memory is guaranteed to be
         // visible the `poll: &Poll` ref passed as an argument to the function.
         let mut queue = self.readiness_queue.load(Relaxed);
-        let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue.inner) };
+        let other: &*mut () = unsafe {
+            &*(&poll.readiness_queue.inner as *const _ as *const *mut ())
+        };
+        //let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue.inner) };
         let other = *other;
 
         debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
@@ -2068,7 +2072,7 @@ impl Clone for RegistrationInner {
         }
 
         RegistrationInner {
-            node: self.node.clone(),
+            node: self.node,
         }
     }
 }
@@ -2104,9 +2108,9 @@ impl ReadinessQueue {
                 awakener: sys::Awakener::new()?,
                 head_readiness: AtomicPtr::new(ptr),
                 tail_readiness: UnsafeCell::new(ptr),
-                end_marker: end_marker,
-                sleep_marker: sleep_marker,
-                closed_marker: closed_marker,
+                end_marker,
+                sleep_marker,
+                closed_marker,
             })
         })
     }
@@ -2509,7 +2513,10 @@ impl ReadinessNode {
 fn enqueue_with_wakeup(queue: *mut (), node: &ReadinessNode) -> io::Result<()> {
     debug_assert!(!queue.is_null());
     // This is ugly... but we don't want to bump the ref count.
-    let queue: &Arc<ReadinessQueueInner> = unsafe { mem::transmute(&queue) };
+    let queue: &Arc<ReadinessQueueInner> = unsafe {
+        &*(&queue as *const *mut () as *const Arc<ReadinessQueueInner>)
+    };
+    //let queue: &Arc<ReadinessQueueInner> = unsafe { mem::transmute(&queue) };
     queue.enqueue_node_with_wakeup(node)
 }
 

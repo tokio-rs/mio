@@ -204,11 +204,11 @@ pub fn expect_events(poll: &Poll,
             if let Some(pos) = pos_opt { expected.remove(pos); }
         }
 
-        if expected.len() == 0 {
+        if expected.is_empty() {
             break;
         }
     }
 
-    assert!(expected.len() == 0, "The following expected events were not found: {:?}", expected);
+    assert!(expected.is_empty(), "The following expected events were not found: {:?}", expected);
 }
 
