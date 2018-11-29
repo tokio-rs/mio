@@ -44,7 +44,7 @@ fn write_then_drop() {
     assert_eq!(events.len(), 1);
     assert_eq!(events.get(0).unwrap().token(), Token(2));
 
-    s2.write(&[1, 2, 3, 4]).unwrap();
+    s2.write_all(&[1, 2, 3, 4]).unwrap();
     drop(s2);
 
     s.reregister(&poll,
@@ -103,7 +103,7 @@ fn write_then_deregister() {
     assert_eq!(events.len(), 1);
     assert_eq!(events.get(0).unwrap().token(), Token(2));
 
-    s2.write(&[1, 2, 3, 4]).unwrap();
+    s2.write_all(&[1, 2, 3, 4]).unwrap();
     s2.deregister(&poll).unwrap();
 
     s.reregister(&poll,
