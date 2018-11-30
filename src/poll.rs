@@ -1883,7 +1883,6 @@ impl RegistrationInner {
         let other: &*mut () = unsafe {
             &*(&poll.readiness_queue.inner as *const _ as *const *mut ())
         };
-        //let other: &*mut () = unsafe { mem::transmute(&poll.readiness_queue.inner) };
         let other = *other;
 
         debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
@@ -2516,7 +2515,6 @@ fn enqueue_with_wakeup(queue: *mut (), node: &ReadinessNode) -> io::Result<()> {
     let queue: &Arc<ReadinessQueueInner> = unsafe {
         &*(&queue as *const *mut () as *const Arc<ReadinessQueueInner>)
     };
-    //let queue: &Arc<ReadinessQueueInner> = unsafe { mem::transmute(&queue) };
     queue.enqueue_node_with_wakeup(node)
 }
 
