@@ -219,7 +219,8 @@ use std::time::{Duration, Instant};
 /// associated operation will as well.
 ///
 /// If operation fails with [`WouldBlock`], then the caller should not treat
-/// this as an error and wait until another readiness event is received.
+/// this as an error, but instead should wait until another readiness event is
+/// received.
 ///
 /// ### Draining readiness
 ///
