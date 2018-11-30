@@ -61,8 +61,8 @@ impl Selector {
         drop(set_cloexec(kq));
 
         Ok(Selector {
-            id: id,
-            kq: kq,
+            id,
+            kq,
         })
     }
 
@@ -74,7 +74,7 @@ impl Selector {
         let timeout = timeout.map(|to| {
             libc::timespec {
                 tv_sec: cmp::min(to.as_secs(), time_t::max_value() as u64) as time_t,
-                tv_nsec: to.subsec_nanos() as libc::c_long,
+                tv_nsec: libc::c_long::from(to.subsec_nanos()),
             }
         });
         let timeout = timeout.as_ref().map(|s| s as *const _).unwrap_or(ptr::null_mut());
@@ -255,7 +255,7 @@ impl Events {
     }
 
     pub fn get(&self, idx: usize) -> Option<Event> {
-        self.events.get(idx).map(|e| *e)
+        self.events.get(idx).cloned()
     }
 
     fn coalesce(&mut self, awakener: Token) -> bool {

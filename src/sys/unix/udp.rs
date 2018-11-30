@@ -27,7 +27,7 @@ impl UdpSocket {
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
         self.io.try_clone().map(|io| {
             UdpSocket {
-                io: io,
+                io,
             }
         })
     }

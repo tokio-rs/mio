@@ -92,22 +92,22 @@ use std::fmt;
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct UnixReady(Ready);
 
-const ERROR: usize = 0b000100;
-const HUP: usize   = 0b001000;
+const ERROR: usize = 0b00_0100;
+const HUP: usize   = 0b00_1000;
 
 #[cfg(any(target_os = "dragonfly",
     target_os = "freebsd", target_os = "ios", target_os = "macos"))]
-const AIO: usize   = 0b010000;
+const AIO: usize   = 0b01_0000;
 
 #[cfg(not(any(target_os = "dragonfly",
     target_os = "freebsd", target_os = "ios", target_os = "macos")))]
-const AIO: usize   = 0b000000;
+const AIO: usize   = 0b00_0000;
 
 #[cfg(any(target_os = "freebsd"))]
-const LIO: usize   = 0b100000;
+const LIO: usize   = 0b10_0000;
 
 #[cfg(not(any(target_os = "freebsd")))]
-const LIO: usize   = 0b000000;
+const LIO: usize   = 0b00_0000;
 
 
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]

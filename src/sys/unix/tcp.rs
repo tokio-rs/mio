@@ -222,7 +222,7 @@ impl TcpListener {
     pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
         set_nonblock(inner.as_raw_fd())?;
         Ok(TcpListener {
-            inner: inner,
+            inner,
         })
     }
 
