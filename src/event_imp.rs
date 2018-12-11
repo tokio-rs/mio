@@ -685,7 +685,7 @@ impl Ready {
     /// Returns a `Ready` representing readiness for all operations.
     ///
     /// This includes platform specific operations as well (`hup`, `aio`,
-    /// `error`, `lio`).
+    /// `error`, `lio`, `pri`).
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
