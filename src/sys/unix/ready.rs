@@ -118,6 +118,21 @@ const PRI: usize = 0;
 // Export to support `Ready::all`
 pub const READY_ALL: usize = ERROR | HUP | AIO | LIO | PRI;
 
+#[test]
+fn test_ready_all() {
+    let readable = Ready::readable().as_usize();
+    let writable = Ready::writable().as_usize();
+
+    assert_eq!(
+        READY_ALL | readable | writable,
+        ERROR + HUP + AIO + LIO + PRI + readable + writable
+    );
+
+    // Issue #896.
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    assert!(!Ready::from(UnixReady::priority()).is_writable());
+}
+
 impl UnixReady {
     /// Returns a `Ready` representing AIO completion readiness
     ///
