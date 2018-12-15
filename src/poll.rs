@@ -216,7 +216,7 @@ use std::time::{Duration, Instant};
 /// [`Evented`] handle is not actually ready. Given the same code, this may
 /// happen more on some platforms than others. It is important to never assume
 /// that, just because a readiness notification was received, that the
-/// associated operation will as well.
+/// associated operation will succeed as well.
 ///
 /// If operation fails with [`WouldBlock`], then the caller should not treat
 /// this as an error, but instead should wait until another readiness event is
