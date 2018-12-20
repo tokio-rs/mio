@@ -623,6 +623,18 @@ impl fmt::Debug for TcpStream {
     }
 }
 
+impl FromRawSocket for TcpStream {
+    unsafe fn from_raw_socket(socket: RawSocket) -> TcpStream {
+        TcpStream::from_stream(net::TcpStream::from_raw_socket(socket))
+    }
+}
+
+impl AsRawSocket for TcpStream {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.imp.inner.socket.as_raw_socket()
+    }
+}
+
 impl Drop for TcpStream {
     fn drop(&mut self) {
         // If we're still internally reading, we're no longer interested. Note
@@ -829,6 +841,19 @@ impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("TcpListener")
             .finish()
+    }
+}
+
+impl FromRawSocket for TcpListener {
+    unsafe fn from_raw_socket(fd: RawSocket) -> TcpListener {
+        TcpListener::new(net::TcpListener::from_raw_socket(fd))
+            .expect("Can't create listener from raw socket")
+    }
+}
+
+impl AsRawSocket for TcpListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.imp.inner.socket.as_raw_socket()
     }
 }
 

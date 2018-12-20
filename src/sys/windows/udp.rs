@@ -8,6 +8,7 @@ use std::io::prelude::*;
 use std::io;
 use std::mem;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 
 #[allow(unused_imports)]
@@ -359,6 +360,19 @@ impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("UdpSocket")
             .finish()
+    }
+}
+
+impl FromRawSocket for UdpSocket {
+    unsafe fn from_raw_socket(socket: RawSocket) -> UdpSocket {
+        // new() can't possibly fail
+        UdpSocket::new(net::UdpSocket::from_raw_socket(socket)).unwrap()
+    }
+}
+
+impl AsRawSocket for UdpSocket {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.imp.inner.socket.as_raw_socket()
     }
 }
 
