@@ -855,7 +855,7 @@ impl FromRawSocket for TcpListener {
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
         let stream = net::TcpListener::from_raw_socket(socket);
         TcpListener::new(stream)
-            .expect("tried to get local address of invalid/unbound socket")
+            .expect("failed to create mio::sys::windows::TcpListener from std::net::TcpListener")
     }
 }
 

@@ -387,8 +387,8 @@ impl Drop for UdpSocket {
 impl FromRawSocket for UdpSocket {
     unsafe fn from_raw_socket(socket: RawSocket) -> UdpSocket {
         let stream = net::UdpSocket::from_raw_socket(socket);
-        // Note that this cannot fail right now
-        UdpSocket::new(stream).unwrap()
+        UdpSocket::new(stream)
+            .expect("failed to create mio::sys::windows::UdpSocket from std::net::UdpSocket")
     }
 }
 
