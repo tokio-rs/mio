@@ -8,7 +8,7 @@ task:
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y
   cargo_cache:
-    folder: $CARGO_HOME/registry
+    folder: $HOME/.cargo/registry
   build_script:
     - . $HOME/.cargo/env
     - cargo build
@@ -18,4 +18,4 @@ task:
     - cargo test
     - cargo test --no-default-features
   before_cache_script:
-    - rm -rf $CARGO_HOME/registry/index
+    - rm -rf $HOME/.cargo/registry/index
