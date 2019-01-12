@@ -10,13 +10,20 @@
 //! notification, and other useful utilities for building high performance IO
 //! apps.
 //!
-//! # Goals
+//! # Features
 //!
-//! * Fast - minimal overhead over the equivalent OS facilities (epoll, kqueue, etc...)
-//! * Zero allocations
-//! * A scalable readiness-based API, similar to epoll on Linux
-//! * Design to allow for stack allocated buffers when possible (avoid double buffering).
-//! * Provide utilities such as a timers, a notification channel, buffer abstractions, and a slab.
+//! * Non-blocking TCP, UDP
+//! * I/O event notification queue backed by epoll, kqueue, and IOCP
+//! * Zero allocations at runtime
+//! * Platform specific extensions
+//!
+//! # Non-goals
+//!
+//! The following are specifically omitted from Mio and are left to the user or higher-level libraries.
+//!
+//! * File operations
+//! * Thread pools / multi-threaded event loop
+//! * Timers
 //!
 //! # Platforms
 //!
