@@ -68,6 +68,14 @@ pub fn pipe() -> ::io::Result<(Io, Io)> {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub fn eventfd() -> ::io::Result<Io> {
+    unsafe {
+        let raw_fd = cvt(libc::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK))?;
+        Ok(Io::from_raw_fd(raw_fd))
+    }
+}
+
 trait IsMinusOne {
     fn is_minus_one(&self) -> bool;
 }
