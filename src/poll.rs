@@ -424,7 +424,7 @@ pub struct Poll {
 ///     }
 ///
 ///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-///         self.registration.deregister(poll)
+///         poll.deregister(&self.registration)
 ///     }
 /// }
 /// ```
@@ -1659,7 +1659,7 @@ impl Registration {
         self.inner.update(poll, token, interest, opts)
     }
 
-    #[deprecated(since = "0.6.5", note = "use `Evented` impl")]
+    #[deprecated(since = "0.6.5", note = "use `Poll::deregister` instead")]
     #[cfg(feature = "with-deprecated")]
     #[doc(hidden)]
     pub fn deregister(&self, poll: &Poll) -> io::Result<()> {
