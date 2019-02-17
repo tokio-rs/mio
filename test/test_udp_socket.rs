@@ -1,11 +1,11 @@
-use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
-use iovec::IoVec;
-use localhost;
-use mio::net::UdpSocket;
 use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::net::UdpSocket;
+use bytes::{Buf, RingBuf, SliceBuf, MutBuf};
 use std::io::ErrorKind;
 use std::str;
 use std::time;
+use localhost;
+use iovec::IoVec;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
@@ -21,7 +21,7 @@ pub struct UdpHandlerSendRecv {
 }
 
 impl UdpHandlerSendRecv {
-    fn new(tx: UdpSocket, rx: UdpSocket, connected: bool, msg: &'static str) -> UdpHandlerSendRecv {
+    fn new(tx: UdpSocket, rx: UdpSocket, connected: bool, msg : &'static str) -> UdpHandlerSendRecv {
         UdpHandlerSendRecv {
             tx,
             rx,
@@ -34,26 +34,10 @@ impl UdpHandlerSendRecv {
     }
 }
 
-fn assert_send<T: Send>() {}
+fn assert_send<T: Send>() {
+}
 
-fn assert_sync<T: Sync>() {}
-
-#[cfg(test)]
-/// Returns the sender and the receiver
-fn connected_sockets() -> (UdpSocket, UdpSocket) {
-    let addr = localhost();
-    let any = localhost();
-
-    let tx = UdpSocket::bind(&any).unwrap();
-    let rx = UdpSocket::bind(&addr).unwrap();
-
-    let tx_addr = tx.local_addr().unwrap();
-    let rx_addr = rx.local_addr().unwrap();
-
-    assert!(tx.connect(rx_addr).is_ok());
-    assert!(rx.connect(tx_addr).is_ok());
-
-    (tx, rx)
+fn assert_sync<T: Sync>() {
 }
 
 #[cfg(test)]
@@ -66,18 +50,13 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
     // ensure that the sockets are non-blocking
     let mut buf = [0; 128];
-    assert_eq!(
-        ErrorKind::WouldBlock,
-        rx.recv_from(&mut buf).unwrap_err().kind()
-    );
+    assert_eq!(ErrorKind::WouldBlock, rx.recv_from(&mut buf).unwrap_err().kind());
 
     info!("Registering SENDER");
-    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge())
-        .unwrap();
+    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
 
     info!("Registering LISTENER");
-    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
-        .unwrap();
+    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
 
@@ -99,9 +78,7 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
                         }
                     };
 
-                    unsafe {
-                        MutBuf::advance(&mut handler.rx_buf, cnt);
-                    }
+                    unsafe { MutBuf::advance(&mut handler.rx_buf, cnt); }
                     assert!(str::from_utf8(handler.rx_buf.bytes()).unwrap() == handler.msg);
                     handler.shutdown = true;
                 }
@@ -121,6 +98,24 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
             }
         }
     }
+}
+
+/// Returns the sender and the receiver
+#[cfg(test)]
+fn connected_sockets() -> (UdpSocket, UdpSocket) {
+    let addr = localhost();
+    let any = localhost();
+
+    let tx = UdpSocket::bind(&any).unwrap();
+    let rx = UdpSocket::bind(&addr).unwrap();
+
+    let tx_addr = tx.local_addr().unwrap();
+    let rx_addr = rx.local_addr().unwrap();
+
+    assert!(tx.connect(rx_addr).is_ok());
+    assert!(rx.connect(tx_addr).is_ok());
+
+    (tx, rx)
 }
 
 #[test]
@@ -163,15 +158,12 @@ pub fn test_udp_socket_discard() {
     let r = udp_outside.send(b"hello world");
     assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
-    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
-        .unwrap();
-    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge())
-        .unwrap();
+    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge()).unwrap();
 
     let mut events = Events::with_capacity(1024);
 
-    poll.poll(&mut events, Some(time::Duration::from_secs(5)))
-        .unwrap();
+    poll.poll(&mut events, Some(time::Duration::from_secs(5))).unwrap();
 
     for event in &events {
         if event.readiness().is_readable() {
@@ -182,6 +174,7 @@ pub fn test_udp_socket_discard() {
     }
 }
 
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 #[test]
 pub fn test_udp_socket_send_recv_bufs() {
     let (tx, rx) = connected_sockets();
@@ -230,8 +223,7 @@ pub fn test_udp_socket_send_recv_bufs() {
                         assert_eq!(cnt, data.len());
                         let res: Vec<u8> = read_bufs
                             .iter()
-                            .map(|buf| buf.iter())
-                            .flatten()
+                            .flat_map(|buf| buf.iter())
                             .cloned()
                             .collect();
                         assert_eq!(&res[..cnt], &data[..cnt]);
