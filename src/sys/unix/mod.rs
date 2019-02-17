@@ -37,7 +37,6 @@ pub use self::ready::{UnixReady, READY_ALL};
 pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 
-
 #[cfg(feature = "with-deprecated")]
 pub use self::uds::UnixSocket;
 
