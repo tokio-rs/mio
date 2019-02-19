@@ -275,7 +275,7 @@ impl UdpSocket {
     }
 
     /// Receives data from the socket previously bound with connect(). On success, returns
-    /// the number of bytes read and the address from whence the data came.
+    /// the number of bytes read.
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.recv(buf)
     }
