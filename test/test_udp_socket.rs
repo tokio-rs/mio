@@ -101,7 +101,6 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 }
 
 /// Returns the sender and the receiver
-#[cfg(test)]
 fn connected_sockets() -> (UdpSocket, UdpSocket) {
     let addr = localhost();
     let any = localhost();

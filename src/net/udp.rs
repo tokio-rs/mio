@@ -546,26 +546,28 @@ impl UdpSocket {
         self.sys.take_error()
     }
 
-    /// Receives a single datagram message socket previously bound with connect().
+    /// Receives a single datagram message socket previously bound with connect.
     ///
     /// This operation will attempt to read bytes from this socket and place
     /// them into the list of buffers provided. Note that each buffer is an
     /// `IoVec` which can be created from a byte slice.
     ///
-    /// The buffers provided will be filled in sequentially. A buffer will be
+    /// The buffers provided will be filled sequentially. A buffer will be
     /// entirely filled up before the next is written to.
     ///
     /// The number of bytes read is returned, if successful, or an error is
     /// returned otherwise. If no bytes are available to be read yet then
-    /// a "would block" error is returned. This operation does not block.
+    /// a [`WouldBlock`][link] error is returned. This operation does not block.
     ///
     /// On Unix this corresponds to the `readv` syscall.
+    ///
+    /// [link]: https://doc.rust-lang.org/nightly/std/io/enum.ErrorKind.html#variant.WouldBlock
     #[cfg(all(unix, not(target_os = "fuchsia")))]
     pub fn recv_bufs(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         self.sys.readv(bufs)
     }
 
-    /// Sends data on the socket to the address previously bound via connect().
+    /// Sends data on the socket to the address previously bound via connect.
     ///
     /// This operation will attempt to send a list of byte buffers to this
     /// socket in a single datagram. Note that each buffer is an `IoVec`
@@ -576,9 +578,11 @@ impl UdpSocket {
     ///
     /// The number of bytes written is returned, if successful, or an error is
     /// returned otherwise. If the socket is not currently writable then a
-    /// "would block" error is returned. This operation does not block.
+    /// [`WouldBlock`][link] error is returned. This operation does not block.
     ///
     /// On Unix this corresponds to the `writev` syscall.
+    ///
+    /// [link]: https://doc.rust-lang.org/nightly/std/io/enum.ErrorKind.html#variant.WouldBlock
     #[cfg(all(unix, not(target_os = "fuchsia")))]
     pub fn send_bufs(&self, bufs: &[&IoVec]) -> io::Result<usize> {
         self.sys.writev(bufs)
