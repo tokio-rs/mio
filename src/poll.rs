@@ -438,7 +438,7 @@ pub struct Poll {
 /// [`reregister`]: struct.Poll.html#method.reregister
 /// [`deregister`]: struct.Poll.html#method.deregister
 /// [portability]: struct.Poll.html#portability
-pub struct Registration {
+struct Registration {
     inner: RegistrationInner,
 }
 
@@ -453,7 +453,7 @@ unsafe impl Sync for Registration {}
 /// [`Poll`]: struct.Poll.html
 /// [`Registration`]: struct.Registration.html
 #[derive(Clone)]
-pub struct SetReadiness {
+struct SetReadiness {
     inner: RegistrationInner,
 }
 
