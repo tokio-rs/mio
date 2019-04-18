@@ -981,6 +981,70 @@ fn test_debug_ready() {
     assert_eq!("Writable", format!("{:?}", Ready::writable()));
 }
 
+
+#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
+pub struct Interests(usize);
+
+impl Interests {
+    #[inline]
+    pub fn readable() -> Interests {
+        Interests(READABLE)
+    }
+
+    #[inline]
+    pub fn writable() -> Interests {
+        Interests(WRITABLE)
+    }
+
+    #[inline]
+    pub fn both() -> Interests {
+        Interests(READABLE | WRITABLE)
+    }
+
+    pub fn is_readable(&self) -> bool {
+        (self.0 & READABLE) != 0
+    }
+
+    pub fn is_writable(&self) -> bool {
+        (self.0 & WRITABLE) != 0
+    }
+
+    pub fn from_usize(val: usize) -> Interests {
+        Interests(val)
+    }
+    
+    pub fn as_usize(&self) -> usize {
+        self.0
+    }
+}
+
+impl<T: Into<Interests>> ops::BitOr<T> for Interests {
+    type Output = Interests;
+
+    #[inline]
+    fn bitor(self, other: T) -> Interests {
+        Interests(self.0 | other.into().0)
+    }
+}
+
+impl<T: Into<Interests>> ops::BitOrAssign<T> for Interests {
+    #[inline]
+    fn bitor_assign(&mut self, other: T){
+        self.0 |= other.into().0;
+    }
+}
+
+impl fmt::Debug for Interests {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.write_str(match (self.is_readable(), self.is_writable()) {
+            (true, true) => "READABLE | WRITABLE",
+            (true, false) => "READABLE",
+            (false, true) => "WRITABLE",
+            (false, false) => unreachable!(),
+        })
+    }
+}
+
 /// An readiness event returned by [`Poll::poll`].
 ///
 /// `Event` is a [readiness state] paired with a [`Token`]. It is returned by
