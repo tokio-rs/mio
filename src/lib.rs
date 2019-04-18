@@ -132,7 +132,7 @@ mod token;
 
 pub mod net;
 
-pub use event_imp::{PollOpt, Ready};
+pub use event_imp::{PollOpt, Ready, Interests};
 pub use poll::{Poll, Registration, SetReadiness};
 pub use token::Token;
 

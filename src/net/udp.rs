@@ -10,7 +10,7 @@ use poll::SelectorId;
 use std::fmt;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 /// [portability guidelines]: ../struct.Poll.html#portability
-use {io, sys, Poll, PollOpt, Ready, Token};
+use {io, sys, Poll, PollOpt, Interests, Token};
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use iovec::IoVec;
@@ -582,7 +582,7 @@ impl Evented for UdpSocket {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.selector_id.associate_selector(poll)?;
@@ -593,7 +593,7 @@ impl Evented for UdpSocket {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)

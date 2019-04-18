@@ -11,7 +11,7 @@ use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI};
 use event_imp::Event;
 use sys::unix::io::set_cloexec;
 use sys::unix::{cvt, UnixReady};
-use {io, PollOpt, Ready, Token};
+use {io, PollOpt, Ready, Token, Interests};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -93,11 +93,11 @@ impl Selector {
         &self,
         fd: RawFd,
         token: Token,
-        interests: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut info = libc::epoll_event {
-            events: ioevent_to_epoll(interests, opts),
+            events: ioevent_to_epoll(Ready::from_usize(interests.as_usize()), opts),
             u64: usize::from(token) as u64,
         };
 
@@ -117,11 +117,11 @@ impl Selector {
         &self,
         fd: RawFd,
         token: Token,
-        interests: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut info = libc::epoll_event {
-            events: ioevent_to_epoll(interests, opts),
+            events: ioevent_to_epoll(Ready::from_usize(interests.as_usize()), opts),
             u64: usize::from(token) as u64,
         };
 

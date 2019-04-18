@@ -1,6 +1,6 @@
 use event::Evented;
 use std::os::unix::io::RawFd;
-use {io, poll, Poll, PollOpt, Ready, Token};
+use {io, poll, Poll, PollOpt, Interests, Token};
 
 /*
  *
@@ -97,7 +97,7 @@ impl<'a> Evented for EventedFd<'a> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         poll::selector(poll).register(*self.0, token, interest, opts)
@@ -107,7 +107,7 @@ impl<'a> Evented for EventedFd<'a> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         poll::selector(poll).reregister(*self.0, token, interest, opts)

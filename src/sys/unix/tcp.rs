@@ -9,7 +9,7 @@ use libc;
 use net2::TcpStreamExt;
 
 use event::Evented;
-use {io, Poll, PollOpt, Ready, Token};
+use {io, Poll, PollOpt, Interests, Token};
 
 use sys::unix::eventedfd::EventedFd;
 use sys::unix::io::set_nonblock;
@@ -150,7 +150,7 @@ impl Evented for TcpStream {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
@@ -160,7 +160,7 @@ impl Evented for TcpStream {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
@@ -233,7 +233,7 @@ impl Evented for TcpListener {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
@@ -243,7 +243,7 @@ impl Evented for TcpListener {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)

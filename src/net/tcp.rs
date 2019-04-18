@@ -16,7 +16,7 @@ use net2::TcpBuilder;
 
 use event::Evented;
 use poll::SelectorId;
-use {io, sys, Poll, PollOpt, Ready, Token};
+use {io, sys, Poll, PollOpt, Interests, Token};
 
 /*
  *
@@ -396,7 +396,7 @@ impl Evented for TcpStream {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.selector_id.associate_selector(poll)?;
@@ -407,7 +407,7 @@ impl Evented for TcpStream {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)
@@ -591,7 +591,7 @@ impl Evented for TcpListener {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.selector_id.associate_selector(poll)?;
@@ -602,7 +602,7 @@ impl Evented for TcpListener {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.sys.reregister(poll, token, interest, opts)

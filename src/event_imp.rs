@@ -129,7 +129,7 @@ pub trait Evented {
     ///
     /// [`Poll::register`]: ../struct.Poll.html#method.register
     /// [`Registration`]: ../struct.Registration.html
-    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+    fn register(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
         -> io::Result<()>;
 
     /// Re-register `self` with the given `Poll` instance.
@@ -145,7 +145,7 @@ pub trait Evented {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()>;
 
@@ -166,7 +166,7 @@ impl Evented for Box<Evented> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.as_ref().register(poll, token, interest, opts)
@@ -176,7 +176,7 @@ impl Evented for Box<Evented> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.as_ref().reregister(poll, token, interest, opts)
@@ -192,7 +192,7 @@ impl<T: Evented> Evented for Box<T> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.as_ref().register(poll, token, interest, opts)
@@ -202,7 +202,7 @@ impl<T: Evented> Evented for Box<T> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.as_ref().reregister(poll, token, interest, opts)
@@ -218,7 +218,7 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.as_ref().register(poll, token, interest, opts)
@@ -228,7 +228,7 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.as_ref().reregister(poll, token, interest, opts)
@@ -982,37 +982,160 @@ fn test_debug_ready() {
 }
 
 
+/// Interests used in registering.
+///
+/// Interests are used in registering [`Evented`] handles with [`Poll`],
+/// they indicate what readiness should be monitored for. For example if a
+/// socket is registered with readable interests and the socket becomes
+/// writable, no event will be returned from [`poll`].
+///
+/// [`Poll`]: struct.Poll.html                                                 
+/// [`readable`]: #method.readable
+/// [`writable`]: #method.writable
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Interests(usize);
 
 impl Interests {
+
+    /// Returns a `Interests` representing readable readiness.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::readable();
+    ///
+    /// assert!(interest.is_readable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn readable() -> Interests {
         Interests(READABLE)
     }
 
+    /// Returns a `Interests` representing writable readiness.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::writable();
+    ///
+    /// assert!(interest.is_writable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn writable() -> Interests {
         Interests(WRITABLE)
     }
 
+    /// Returns a `Interests` representing readable and writable readiness.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::both();
+    ///
+    /// assert!(interest.is_readable());
+    /// assert!(interest.is_writable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn both() -> Interests {
         Interests(READABLE | WRITABLE)
     }
-
+    
+    /// Returns true if the value includes readable readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::readable();
+    ///
+    /// assert!(interest.is_readable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     pub fn is_readable(&self) -> bool {
         (self.0 & READABLE) != 0
     }
 
+    /// Returns true if the value includes writable readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::writable();
+    ///
+    /// assert!(interest.writable());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
     pub fn is_writable(&self) -> bool {
         (self.0 & WRITABLE) != 0
     }
 
+    /// Create a `Interests` instance using the given `usize` representation.
+    ///
+    /// The `usize` representation must be treated as opaque. There is no
+    /// guaranteed correlation between the returned value and platform defined
+    /// constants. Also, there is no guarantee that the `usize` representation
+    /// will remain constant across patch releases of Mio.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::readable();
+    /// let interest_usize = interest.as_usize();
+    /// let interest2 = Interests::from_usize(interest_usize);
+    ///
+    /// assert_eq!(interest, interest2);
+    /// ```
     pub fn from_usize(val: usize) -> Interests {
         Interests(val)
     }
     
+    /// Returns a `usize` representation of the `Interests` value.
+    ///
+    /// This `usize` representation must be treated as opaque. There is no
+    /// guaranteed correlation between the returned value and platform defined
+    /// constants. Also, there is no guarantee that the `usize` representation
+    /// will remain constant across patch releases of Mio.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::readable();
+    /// let interest_usize = interest.as_usize();
+    /// let interest2 = Interests::from_usize(interest_usize);
+    ///
+    /// assert_eq!(interest, interest2);
+    /// ```
     pub fn as_usize(&self) -> usize {
         self.0
     }
@@ -1043,6 +1166,13 @@ impl fmt::Debug for Interests {
             (false, false) => unreachable!(),
         })
     }
+}
+
+#[test]
+fn test_debug_interests() {
+    assert_eq!("READABLE | WRITABLE", format!("{:?}", Interests::both()));
+    assert_eq!("Readable", format!("{:?}", Interests::readable()));
+    assert_eq!("Writable", format!("{:?}", Interests::writable()));
 }
 
 /// An readiness event returned by [`Poll::poll`].

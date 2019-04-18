@@ -1,4 +1,4 @@
-use event_imp::{self as event, Event, Evented, PollOpt, Ready};
+use event_imp::{self as event, Event, Evented, PollOpt, Ready, Interests};
 use std::cell::UnsafeCell;
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::AsRawFd;
@@ -664,7 +664,7 @@ impl Poll {
         poll.readiness_queue.inner.awakener.register(
             &poll,
             AWAKEN,
-            Ready::readable(),
+            Interests::readable(),
             PollOpt::edge(),
         )?;
 
@@ -782,7 +782,7 @@ impl Poll {
         &self,
         handle: &E,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()>
     where
@@ -860,7 +860,7 @@ impl Poll {
         &self,
         handle: &E,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()>
     where
@@ -1555,7 +1555,7 @@ pub fn selector(poll: &Poll) -> &sys::Selector {
 pub fn new_registration(
     poll: &Poll,
     token: Token,
-    ready: Ready,
+    ready: Interests,
     opt: PollOpt,
 ) -> (Registration, SetReadiness) {
     Registration::new_priv(poll, token, ready, opt)
@@ -1634,7 +1634,7 @@ impl Registration {
     fn new_priv(
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opt: PollOpt,
     ) -> (Registration, SetReadiness) {
         is_send::<Registration>();
@@ -1650,7 +1650,7 @@ impl Registration {
 
         // Allocate the registration node. The new node will have `ref_count`
         // set to 3: one SetReadiness, one Registration, and one Poll handle.
-        let node = Box::into_raw(Box::new(ReadinessNode::new(queue, token, interest, opt, 3)));
+        let node = Box::into_raw(Box::new(ReadinessNode::new(queue, token, Ready::from_usize(interest.as_usize()), opt, 3)));
 
         let registration = Registration {
             inner: RegistrationInner { node },
@@ -1669,20 +1669,20 @@ impl Evented for Registration {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(poll, token, interest, opts)
+        self.inner.update(poll, token, Ready::from_usize(interest.as_usize()), opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(poll, token, interest, opts)
+        self.inner.update(poll, token, Ready::from_usize(interest.as_usize()), opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
