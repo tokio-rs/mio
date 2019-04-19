@@ -16,7 +16,7 @@ use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
 use sys::windows::Family;
-use {poll, Poll, PollOpt, Ready, Token};
+use {poll, Poll, PollOpt, Ready, Token, Interests};
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`
@@ -254,7 +254,7 @@ impl TcpStream {
         Ok(me)
     }
 
-    fn post_register(&self, interest: Ready, me: &mut StreamInner) {
+    fn post_register(&self, interest: Interests, me: &mut StreamInner) {
         if interest.is_readable() {
             self.imp.schedule_read(me);
         }
@@ -580,7 +580,7 @@ impl Evented for TcpStream {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -613,7 +613,7 @@ impl Evented for TcpStream {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -818,7 +818,7 @@ impl Evented for TcpListener {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -844,7 +844,7 @@ impl Evented for TcpListener {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();

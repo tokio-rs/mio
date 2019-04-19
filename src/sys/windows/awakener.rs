@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use event::Evented;
 use miow::iocp::CompletionStatus;
 use sys::windows::Selector;
-use {io, poll, Poll, PollOpt, Ready, Token};
+use {io, poll, Poll, PollOpt, Interests, Token};
 
 pub struct Awakener {
     inner: Mutex<Option<AwakenerInner>>,
@@ -41,9 +41,9 @@ impl Awakener {
 }
 
 impl Evented for Awakener {
-    fn register(&self, poll: &Poll, token: Token, events: Ready, opts: PollOpt) -> io::Result<()> {
+    fn register(&self, poll: &Poll, token: Token, events: Interests, opts: PollOpt) -> io::Result<()> {
         assert_eq!(opts, PollOpt::edge());
-        assert_eq!(events, Ready::readable());
+        assert_eq!(events, Interests::readable());
         *self.inner.lock().unwrap() = Some(AwakenerInner {
             selector: poll::selector(poll).clone_ref(),
             token: token,
@@ -55,7 +55,7 @@ impl Evented for Awakener {
         &self,
         poll: &Poll,
         token: Token,
-        events: Ready,
+        events: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.register(poll, token, events, opts)

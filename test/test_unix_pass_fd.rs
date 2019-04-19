@@ -25,7 +25,7 @@ impl EchoConn {
             sock: sock,
             pipe_fd: None,
             token: None,
-            interest: None,
+            interest: Some(Interests::from_usize(Ready::hup().as_usize())),
         }
     }
 
@@ -77,7 +77,7 @@ impl EchoConn {
                 debug!("CONN : we read {} bytes!", r);
                 self.interest = match self.interest {
                     None => Some(Interests::writable()),
-                    Some(x) => Some((x | Interests::writable()) - Interests::writable()),
+                    Some(x) => Some((x | Interests::writable()) - Interests::readable()),
                 }
             }
             Err(e) => {
@@ -106,11 +106,14 @@ impl EchoConn {
         }
         self.pipe_fd = Some(rd);
 
+        //Interests can only be READABLE / WRITABLE.
+        /*
         assert!(
             self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), 
             "actual={:?}", 
             self.interest
         );
+        */
         event_loop.reregister(
             &self.sock, 
             self.token.unwrap(), 
@@ -233,6 +236,7 @@ impl EchoClient {
         }
 
         if !self.interest.is_none() {
+<<<<<<< HEAD
             assert!(
                 self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), 
                 "actual={:?}", 
@@ -244,6 +248,11 @@ impl EchoClient {
                 self.interest.unwrap(), 
                 PollOpt::edge() | PollOpt::oneshot(),
             )?;
+=======
+            //Interests can only be READABLE / WRITABLE.
+            //assert!(self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), "actual={:?}", self.interest);
+            event_loop.reregister(&self.sock, self.token, self.interest.unwrap(), PollOpt::edge() | PollOpt::oneshot())?;
+>>>>>>> Fix Windows support(https://github.com/carllerche/mio/issues/908)
         }
 
         Ok(())

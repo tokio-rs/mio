@@ -20,7 +20,7 @@ use winapi::*;
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
-use {poll, Poll, PollOpt, Ready, Token};
+use {poll, Poll, PollOpt, Ready, Token, Interests};
 
 pub struct UdpSocket {
     imp: Imp,
@@ -283,7 +283,7 @@ impl UdpSocket {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: Ready, me: &mut Inner) {
+    fn post_register(&self, interest: Interests, me: &mut Inner) {
         if interest.is_readable() {
             //We use recv_from here since it is well specified for both
             //connected and non-connected sockets and we can discard the address
@@ -348,7 +348,7 @@ impl Evented for UdpSocket {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -368,7 +368,7 @@ impl Evented for UdpSocket {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
