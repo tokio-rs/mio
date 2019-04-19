@@ -1,5 +1,5 @@
 use mio::deprecated::{unix, EventLoop, Handler};
-use mio::{PollOpt, Ready, Token};
+use mio::{PollOpt, Ready, Token, Interests};
 use std::time::Duration;
 
 pub struct BrokenPipeHandler;
@@ -20,7 +20,7 @@ pub fn broken_pipe() {
     let (reader, _) = unix::pipe().unwrap();
 
     event_loop
-        .register(&reader, Token(1), Ready::all(), PollOpt::edge())
+        .register(&reader, Token(1), Interests::all(), PollOpt::edge())
         .unwrap();
 
     let mut handler = BrokenPipeHandler;

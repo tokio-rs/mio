@@ -1,5 +1,5 @@
 use mio::event::Event;
-use mio::{channel, Events, Poll, PollOpt, Ready, Token};
+use mio::{channel, Events, Poll, PollOpt, Ready, Token, Interests};
 use std::sync::mpsc::TryRecvError;
 use std::thread;
 use std::time::Duration;
@@ -11,7 +11,7 @@ pub fn test_poll_channel_edge() {
     let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
-    poll.register(&rx, Token(123), Ready::readable(), PollOpt::edge())
+    poll.register(&rx, Token(123), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     // Wait, but nothing should happen
@@ -91,7 +91,7 @@ pub fn test_poll_channel_oneshot() {
     poll.register(
         &rx,
         Token(123),
-        Ready::readable(),
+        Interests::readable(),
         PollOpt::edge() | PollOpt::oneshot(),
     )
     .unwrap();
@@ -144,7 +144,7 @@ pub fn test_poll_channel_oneshot() {
         poll.reregister(
             &rx,
             Token(123),
-            Ready::readable(),
+            Interests::readable(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();
@@ -166,7 +166,7 @@ pub fn test_poll_channel_oneshot() {
     poll.reregister(
         &rx,
         Token(123),
-        Ready::readable(),
+        Interests::readable(),
         PollOpt::edge() | PollOpt::oneshot(),
     )
     .unwrap();
@@ -180,7 +180,7 @@ pub fn test_poll_channel_oneshot() {
     poll.reregister(
         &rx,
         Token(123),
-        Ready::readable(),
+        Interests::readable(),
         PollOpt::edge() | PollOpt::oneshot(),
     )
     .unwrap();
@@ -198,7 +198,7 @@ pub fn test_poll_channel_level() {
     let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
-    poll.register(&rx, Token(123), Ready::readable(), PollOpt::level())
+    poll.register(&rx, Token(123), Interests::readable(), PollOpt::level())
         .unwrap();
 
     // Wait, but nothing should happen
@@ -238,7 +238,7 @@ pub fn test_poll_channel_writable() {
     let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
-    poll.register(&rx, Token(123), Ready::writable(), PollOpt::edge())
+    poll.register(&rx, Token(123), Interests::writable(), PollOpt::edge())
         .unwrap();
 
     // Wait, but nothing should happen
@@ -263,7 +263,7 @@ pub fn test_dropping_receive_before_poll() {
     let mut events = Events::with_capacity(1024);
     let (tx, rx) = channel::channel();
 
-    poll.register(&rx, Token(123), Ready::readable(), PollOpt::edge())
+    poll.register(&rx, Token(123), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     // Push the value
@@ -291,9 +291,9 @@ pub fn test_mixing_channel_with_socket() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Ready::readable(), PollOpt::edge())
+    poll.register(&l, Token(0), Interests::readable(), PollOpt::edge())
         .unwrap();
-    poll.register(&rx, Token(1), Ready::readable(), PollOpt::edge())
+    poll.register(&rx, Token(1), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     // Push a value onto the channel
@@ -303,7 +303,7 @@ pub fn test_mixing_channel_with_socket() {
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
 
     // Register the socket
-    poll.register(&s1, Token(2), Ready::readable(), PollOpt::edge())
+    poll.register(&s1, Token(2), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     // Sleep a bit to ensure it arrives at dest
@@ -331,7 +331,7 @@ pub fn test_sending_from_other_thread_while_polling() {
 
     for _ in 0..ITERATIONS {
         let (tx, rx) = channel::channel();
-        poll.register(&rx, Token(0), Ready::readable(), PollOpt::edge())
+        poll.register(&rx, Token(0), Interests::readable(), PollOpt::edge())
             .unwrap();
 
         for _ in 0..THREADS {

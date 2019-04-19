@@ -5,7 +5,7 @@
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use localhost;
 use mio::net::UdpSocket;
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::{Events, Poll, PollOpt, Ready, Token, Interests};
 use std::net::IpAddr;
 use std::str;
 
@@ -84,11 +84,11 @@ pub fn test_multicast() {
         .unwrap();
 
     info!("Registering SENDER");
-    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge())
+    poll.register(&tx, SENDER, Interests::writable(), PollOpt::edge())
         .unwrap();
 
     info!("Registering LISTENER");
-    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
+    poll.register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);

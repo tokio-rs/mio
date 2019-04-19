@@ -1,7 +1,7 @@
 use bytes::SliceBuf;
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::{Events, Poll, PollOpt, Interests, Token};
 use std::time::Duration;
 use {expect_events, localhost, TryWrite};
 
@@ -34,7 +34,7 @@ impl TestHandler {
                 trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                poll.reregister(&self.client, CLIENT, Ready::writable(), PollOpt::level())
+                poll.reregister(&self.client, CLIENT, Interests::writable(), PollOpt::level())
                     .unwrap();
             }
             _ => panic!("unexpected token"),
@@ -66,13 +66,13 @@ pub fn test_register_deregister() {
     let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
-    poll.register(&server, SERVER, Ready::readable(), PollOpt::edge())
+    poll.register(&server, SERVER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
-    poll.register(&client, CLIENT, Ready::readable(), PollOpt::level())
+    poll.register(&client, CLIENT, Interests::readable(), PollOpt::level())
         .unwrap();
 
     let mut handler = TestHandler::new(server, client);
@@ -97,6 +97,7 @@ pub fn test_register_deregister() {
     assert!(events.iter().next().is_none());
 }
 
+/* Since Interests is used in register, there's no reason to test this.
 #[test]
 pub fn test_register_empty_interest() {
     let poll = Poll::new().unwrap();
@@ -137,3 +138,4 @@ pub fn test_register_empty_interest() {
     poll.reregister(&sock, Token(0), Ready::empty(), PollOpt::edge())
         .unwrap();
 }
+*/

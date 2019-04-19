@@ -1,6 +1,6 @@
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::{Events, Poll, PollOpt, Ready, Token, Interests};
 use std::io::Write;
 use std::time::Duration;
 use {expect_events, sleep_ms, TryRead};
@@ -16,11 +16,11 @@ pub fn test_tcp_listener_level_triggered() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Ready::readable(), PollOpt::level())
+    poll.register(&l, Token(0), Interests::readable(), PollOpt::level())
         .unwrap();
 
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(&s1, Token(1), Ready::readable(), PollOpt::edge())
+    poll.register(&s1, Token(1), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     while filter(&pevents, Token(0)).is_empty() {
@@ -47,7 +47,7 @@ pub fn test_tcp_listener_level_triggered() {
     assert!(events.is_empty(), "actual={:?}", events);
 
     let s3 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(&s3, Token(2), Ready::readable(), PollOpt::edge())
+    poll.register(&s3, Token(2), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     while filter(&pevents, Token(0)).is_empty() {
@@ -77,14 +77,14 @@ pub fn test_tcp_stream_level_triggered() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Ready::readable(), PollOpt::edge())
+    poll.register(&l, Token(0), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
     poll.register(
         &s1,
         Token(1),
-        Ready::readable() | Ready::writable(),
+        Interests::readable() | Interests::writable(),
         PollOpt::level(),
     )
     .unwrap();
@@ -116,7 +116,7 @@ pub fn test_tcp_stream_level_triggered() {
     );
 
     // Register the socket
-    poll.register(&s1_tx, Token(123), Ready::readable(), PollOpt::edge())
+    poll.register(&s1_tx, Token(123), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     debug!("writing some data ----------");

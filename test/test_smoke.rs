@@ -1,7 +1,7 @@
 extern crate mio;
 
 use mio::net::TcpListener;
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::{Events, Poll, PollOpt, Interests, Token};
 use std::time::Duration;
 
 #[test]
@@ -20,7 +20,7 @@ fn add_then_drop() {
     poll.register(
         &l,
         Token(1),
-        Ready::readable() | Ready::writable(),
+        Interests::readable() | Interests::writable(),
         PollOpt::edge(),
     )
     .unwrap();

@@ -1157,6 +1157,22 @@ impl<T: Into<Interests>> ops::BitOrAssign<T> for Interests {
     }
 }
 
+impl<T: Into<Interests>> ops::Sub<T> for Interests {
+    type Output = Interests;
+
+    #[inline]
+    fn sub(self, other: T) -> Interests {
+        Interests(self.0 & !other.into().0)
+    }
+}
+
+impl<T: Into<Interests>> ops::SubAssign<T> for Interests {
+    #[inline]
+    fn sub_assign(&mut self, other: T) {
+        self.0 &= !other.into().0;
+    }
+}
+
 impl fmt::Debug for Interests {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.write_str(match (self.is_readable(), self.is_writable()) {
@@ -1171,8 +1187,8 @@ impl fmt::Debug for Interests {
 #[test]
 fn test_debug_interests() {
     assert_eq!("READABLE | WRITABLE", format!("{:?}", Interests::both()));
-    assert_eq!("Readable", format!("{:?}", Interests::readable()));
-    assert_eq!("Writable", format!("{:?}", Interests::writable()));
+    assert_eq!("READABLE", format!("{:?}", Interests::readable()));
+    assert_eq!("WRITABLE", format!("{:?}", Interests::writable()));
 }
 
 /// An readiness event returned by [`Poll::poll`].
