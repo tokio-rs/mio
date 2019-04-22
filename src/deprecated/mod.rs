@@ -8,7 +8,7 @@ mod notify;
 #[cfg(target_os = "redox")]
 pub mod redox;
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 pub mod unix;
 
 pub use self::event_loop::{
@@ -27,7 +27,7 @@ pub use self::handler::{
 pub use self::notify::{
     NotifyError,
 };
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 pub use self::unix::{
     pipe,
     PipeReader,

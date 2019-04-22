@@ -13,7 +13,7 @@ pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
 
 use std::io::{Error, Result};
-use std::os::unix::io::FromRawFd;
+use std::os::unix::io::{FromRawFd, RawFd};
 use syscall::{self, pipe2, O_NONBLOCK, O_CLOEXEC};
 
 pub fn pipe() -> Result<(Io, Io)> {
@@ -21,7 +21,7 @@ pub fn pipe() -> Result<(Io, Io)> {
     pipe2(&mut fds, O_NONBLOCK | O_CLOEXEC).map_err(from_syscall_error)?;
 
     unsafe {
-        Ok((Io::from_raw_fd(fds[0]), Io::from_raw_fd(fds[1])))
+        Ok((Io::from_raw_fd(fds[0] as RawFd), Io::from_raw_fd(fds[1] as RawFd)))
     }
 }
 

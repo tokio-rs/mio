@@ -119,7 +119,7 @@ impl UdpSocket {
         self.sys.recv(buf).map_non_block()
     }
 
-    /// Connects the UDP socket setting the default destination for `send()` 
+    /// Connects the UDP socket setting the default destination for `send()`
     /// and limiting packets that are read via `recv` from the address specified
     /// in `addr`.
     pub fn connect(&self, addr: SocketAddr)
@@ -298,24 +298,24 @@ impl Evented for UdpSocket {
  *
  */
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 use std::os::unix::io::{IntoRawFd, AsRawFd, FromRawFd, RawFd};
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 impl IntoRawFd for UdpSocket {
     fn into_raw_fd(self) -> RawFd {
         self.sys.into_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 impl AsRawFd for UdpSocket {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
         UdpSocket {

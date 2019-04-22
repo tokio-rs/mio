@@ -1,4 +1,4 @@
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 pub use self::unix::{
     Awakener,
     EventedFd,
@@ -12,14 +12,14 @@ pub use self::unix::{
     set_nonblock,
 };
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 pub use self::unix::READY_ALL;
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 #[cfg(feature = "with-deprecated")]
 pub use self::unix::UnixSocket;
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(all(unix, not(target_os = "fuchsia"), not(target_os = "redox")))]
 pub mod unix;
 
 #[cfg(windows)]
@@ -69,5 +69,5 @@ pub use self::redox::{
 #[cfg(target_os = "redox")]
 mod redox;
 
-#[cfg(not(all(unix, not(target_os = "fuchsia"))))]
+#[cfg(not(all(unix, not(target_os = "fuchsia"), not(target_os = "redox"))))]
 pub const READY_ALL: usize = 0;

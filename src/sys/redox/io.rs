@@ -6,8 +6,8 @@ use syscall::{fcntl, F_SETFL, F_GETFL, O_NONBLOCK};
 use {io, poll, Evented, Ready, Poll, PollOpt, Token};
 
 pub fn set_nonblock(fd: RawFd) -> io::Result<()> {
-    let flags = fcntl(fd, F_GETFL, 0).map_err(super::from_syscall_error)?;
-    fcntl(fd, F_SETFL, flags | O_NONBLOCK).map_err(super::from_syscall_error)
+    let flags = fcntl(fd as usize, F_GETFL, 0).map_err(super::from_syscall_error)?;
+    fcntl(fd as usize, F_SETFL, flags | O_NONBLOCK).map_err(super::from_syscall_error)
                                                      .map(|_| ())
 }
 
