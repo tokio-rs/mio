@@ -23,4 +23,3 @@ jobs:
     env:
       CI: 'True'
     displayName: cargo test
-    workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
