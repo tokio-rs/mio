@@ -29,6 +29,6 @@ jobs:
 # Cross compilation
 - template: ci/azure-cross-compile.yml
   parameters:
-    name: cross_x86_64-apple-ios
+    name: cross_x86_64_apple_ios
     displayName: Cross Compile iOS
     target: x86_64-apple-ios
