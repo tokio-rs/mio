@@ -19,8 +19,6 @@ jobs:
     parameters:
       rust_version: stable
 
-  - template: azure-is-release.yml
-
   - script: cargo test
     env:
       CI: 'True'
