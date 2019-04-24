@@ -5,7 +5,7 @@ jobs:
 - job: ${{ parameters.name }}
   displayName: ${{ parameters.displayName }}
   pool:
-    vmImage: ${{ parameters.displayName }}
+    vmImage: ${{ parameters.vmImage }}
   steps:
   - template: azure-install-rust.yml
     parameters:
