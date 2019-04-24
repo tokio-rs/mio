@@ -13,3 +13,15 @@ jobs:
     name: test_tokio
     displayName: Test tokio
     cross: true
+
+# This represents the minimum Rust version supported by
+# Mio. Updating this should be done in a dedicated PR.
+#
+# Tests are not run as tests may require newer versions of
+# rust.
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: minrust
+    rust_version: 1.18.0
+    cmd: check
+    cross: true
