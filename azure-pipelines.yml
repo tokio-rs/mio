@@ -25,3 +25,10 @@ jobs:
     rust_version: 1.18.0
     cmd: check
     cross: true
+
+# Cross compilation
+- template: ci/azure-cross-compile.yml
+  parameters:
+    name: cross_x86_64-apple-ios
+    displayName: Cross Compile iOS
+    target: x86_64-apple-ios
