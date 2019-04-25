@@ -3,10 +3,16 @@
 Mio is a lightweight I/O library for Rust with a focus on adding as little
 overhead as possible over the OS abstractions.
 
-[![crates.io](http://meritbadge.herokuapp.com/mio)](https://crates.io/crates/mio)
-[![Build Status](https://travis-ci.org/carllerche/mio.svg?branch=master)](https://travis-ci.org/carllerche/mio)
-[![Build status](https://ci.appveyor.com/api/projects/status/ok90r1tcgkyndnvw/branch/master?svg=true)](https://ci.appveyor.com/project/carllerche/mio/branch/master)
-[![Build Status](https://api.cirrus-ci.com/github/carllerche/mio.svg)](https://cirrus-ci.com/github/carllerche/mio)
+[![Crates.io][crates-badge]][crates-url]
+[![MIT licensed][mit-badge]][mit-url]
+[![Build Status][azure-badge]][azure-url]
+
+[crates-badge]: https://img.shields.io/crates/v/mio.svg
+[crates-url]: https://crates.io/crates/mio
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
+[mit-url]: LICENSE
+[azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.mio?branchName=master
+[azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=2&branchName=master
 
 **API documentation**
 
