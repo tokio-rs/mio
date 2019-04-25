@@ -18,8 +18,8 @@ run() {
       --env CARGO_TARGET_DIR=/checkout/target \
       --workdir /checkout \
       --privileged \
-      --interactive \
-      --tty \
+      # --interactive \
+      # --tty \
       libc \
       ci/run.sh $1
 }
