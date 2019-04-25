@@ -6,6 +6,7 @@ overhead as possible over the OS abstractions.
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Build Status][azure-badge]][azure-url]
+[![Build Status][cirrus-badge]][cirrus-url]
 
 [crates-badge]: https://img.shields.io/crates/v/mio.svg
 [crates-url]: https://crates.io/crates/mio
@@ -13,6 +14,8 @@ overhead as possible over the OS abstractions.
 [mit-url]: LICENSE
 [azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.mio?branchName=master
 [azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=2&branchName=master
+[cirrus-badge]: https://api.cirrus-ci.com/github/carllerche/mio.svg
+[cirrus-url]: https://cirrus-ci.com/github/carllerche/mio
 
 **API documentation**
 
