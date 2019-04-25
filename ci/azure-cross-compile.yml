@@ -22,9 +22,9 @@ jobs:
       parameters:
         rust_version: stable
 
-    - script: sudo apt-get install gcc-multilib
-      displayName: "Install gcc-multilib"
-      condition: and(succeeded(), eq($(vmImage), 'ubuntu-16.04'))
+    - ${{ if eq(variables['vmImage'], 'ubuntu-16.04') }}:
+      - script: sudo apt-get install gcc-multilib
+        displayName: "Install gcc-multilib"
 
     - script: rustup target add $(target)
       displayName: "Add target"
