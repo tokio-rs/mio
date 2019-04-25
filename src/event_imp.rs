@@ -30,7 +30,7 @@ use {Poll, Token};
 /// Implementing `Evented` on a struct containing a socket:
 ///
 /// ```
-/// use mio::{Ready, Poll, PollOpt, Token};
+/// use mio::{Interests, Poll, PollOpt, Token};
 /// use mio::event::Evented;
 /// use mio::net::TcpStream;
 ///
@@ -41,14 +41,14 @@ use {Poll, Token};
 /// }
 ///
 /// impl Evented for MyEvented {
-///     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///     fn register(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `register` call to `socket`
 ///         self.socket.register(poll, token, interest, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///     fn reregister(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `reregister` call to `socket`
@@ -65,7 +65,7 @@ use {Poll, Token};
 /// Implement `Evented` using [`Registration`] and [`SetReadiness`].
 ///
 /// ```
-/// use mio::{Ready, Registration, Poll, PollOpt, Token};
+/// use mio::{Ready, Interests, Registration, Poll, PollOpt, Token};
 /// use mio::event::Evented;
 ///
 /// use std::io;
@@ -103,13 +103,13 @@ use {Poll, Token};
 /// }
 ///
 /// impl Evented for Deadline {
-///     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///     fn register(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         self.registration.register(poll, token, interest, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///     fn reregister(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         self.registration.reregister(poll, token, interest, opts)
@@ -1088,7 +1088,7 @@ impl Interests {
     ///
     /// let interest = Interests::writable();
     ///
-    /// assert!(interest.writable());
+    /// assert!(interest.is_writable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html

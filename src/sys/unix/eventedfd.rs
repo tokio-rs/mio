@@ -31,7 +31,7 @@ use {io, poll, Poll, PollOpt, Interests, Token};
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Ready, Poll, PollOpt, Token};
+/// use mio::{Interests, Poll, PollOpt, Token};
 /// use mio::unix::EventedFd;
 ///
 /// use std::os::unix::io::AsRawFd;
@@ -44,7 +44,7 @@ use {io, poll, Poll, PollOpt, Interests, Token};
 ///
 /// // Register the listener
 /// poll.register(&EventedFd(&listener.as_raw_fd()),
-///              Token(0), Ready::readable(), PollOpt::edge())?;
+///              Token(0), Interests::readable(), PollOpt::edge())?;
 /// #     Ok(())
 /// # }
 /// #
@@ -56,7 +56,7 @@ use {io, poll, Poll, PollOpt, Interests, Token};
 /// Implementing [`Evented`] for a custom type backed by a [`RawFd`].
 ///
 /// ```
-/// use mio::{Ready, Poll, PollOpt, Token};
+/// use mio::{Interests, Poll, PollOpt, Token};
 /// use mio::event::Evented;
 /// use mio::unix::EventedFd;
 ///
@@ -68,13 +68,13 @@ use {io, poll, Poll, PollOpt, Interests, Token};
 /// }
 ///
 /// impl Evented for MyIo {
-///     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///     fn register(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         EventedFd(&self.fd).register(poll, token, interest, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///     fn reregister(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         EventedFd(&self.fd).reregister(poll, token, interest, opts)

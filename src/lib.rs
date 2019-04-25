@@ -69,14 +69,14 @@
 //! let poll = Poll::new().unwrap();
 //!
 //! // Start listening for incoming connections
-//! poll.register(&server, SERVER, Ready::readable(),
+//! poll.register(&server, SERVER, Interests::readable(),
 //!               PollOpt::edge()).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
-//! poll.register(&sock, CLIENT, Ready::readable(),
+//! poll.register(&sock, CLIENT, Interests::readable(),
 //!               PollOpt::edge()).unwrap();
 //!
 //! // Create storage for events

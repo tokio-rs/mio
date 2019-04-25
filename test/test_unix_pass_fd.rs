@@ -7,7 +7,7 @@ use std::io::{self, Read};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::PathBuf;
 use tempdir::TempDir;
-use {TryRead, TryWrite};
+use mio::unix::UnixReady;
 
 const SERVER: Token = Token(10_000_000);
 const CLIENT: Token = Token(10_000_001);
@@ -25,7 +25,7 @@ impl EchoConn {
             sock: sock,
             pipe_fd: None,
             token: None,
-            interest: Some(Interests::from_usize(Ready::hup().as_usize())),
+            interest: Some(Interests::from(UnixReady::hup())),
         }
     }
 
@@ -236,23 +236,20 @@ impl EchoClient {
         }
 
         if !self.interest.is_none() {
-<<<<<<< HEAD
+            //Interests can only be READABLE / WRITABLE.
+            /*
             assert!(
                 self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), 
                 "actual={:?}", 
                 self.interest
             );
+            */
             event_loop.reregister(
                 &self.sock, 
                 self.token, 
                 self.interest.unwrap(), 
                 PollOpt::edge() | PollOpt::oneshot(),
             )?;
-=======
-            //Interests can only be READABLE / WRITABLE.
-            //assert!(self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), "actual={:?}", self.interest);
-            event_loop.reregister(&self.sock, self.token, self.interest.unwrap(), PollOpt::edge() | PollOpt::oneshot())?;
->>>>>>> Fix Windows support(https://github.com/carllerche/mio/issues/908)
         }
 
         Ok(())

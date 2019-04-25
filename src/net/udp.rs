@@ -32,7 +32,7 @@ use iovec::IoVec;
 /// // ECHOER -> listens and prints the message received.
 ///
 /// use mio::net::UdpSocket;
-/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use mio::{Events, Interests, Poll, PollOpt, Token};
 /// use std::time::Duration;
 ///
 /// const SENDER: Token = Token(0);
@@ -52,8 +52,8 @@ use iovec::IoVec;
 /// let poll = Poll::new()?;
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// poll.register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
-/// poll.register(&echoer_socket, ECHOER, Ready::readable(), PollOpt::edge())?;
+/// poll.register(&sender_socket, SENDER, Interests::writable(), PollOpt::edge())?;
+/// poll.register(&echoer_socket, ECHOER, Interests::readable(), PollOpt::edge())?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];

@@ -36,7 +36,7 @@ use {io, sys, Poll, PollOpt, Interests, Token};
 /// #
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// #     let _listener = TcpListener::bind("127.0.0.1:34254")?;
-/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use mio::{Events, Interests, Poll, PollOpt, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
@@ -46,7 +46,7 @@ use {io, sys, Poll, PollOpt, Interests, Token};
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.register(&stream, Token(0), Ready::writable(),
+/// poll.register(&stream, Token(0), Interests::writable(),
 ///               PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
@@ -437,7 +437,7 @@ impl fmt::Debug for TcpStream {
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use mio::{Events, Interests, Poll, PollOpt, Token};
 /// use mio::net::TcpListener;
 /// use std::time::Duration;
 ///
@@ -447,7 +447,7 @@ impl fmt::Debug for TcpStream {
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.register(&listener, Token(0), Ready::readable(),
+/// poll.register(&listener, Token(0), Interests::readable(),
 ///               PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
