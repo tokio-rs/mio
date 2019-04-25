@@ -1,7 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/mio/0.6.16")]
 #![deny(missing_docs, missing_debug_implementations)]
 #![cfg_attr(test, deny(warnings))]
-
 // Many of mio's public methods violate this lint, but they can't be fixed
 // without a breaking change.
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::trivially_copy_pass_by_ref))]
@@ -105,8 +104,8 @@
 //!
 //! ```
 
-extern crate net2;
 extern crate iovec;
+extern crate net2;
 extern crate slab;
 
 #[cfg(unix)]
@@ -126,42 +125,31 @@ extern crate log;
 
 mod event_imp;
 mod io;
+mod lazycell;
 mod poll;
 mod sys;
 mod token;
-mod lazycell;
 
 pub mod net;
 
-pub use poll::{
-    Poll,
-    Registration,
-    SetReadiness,
-};
-pub use event_imp::{
-    PollOpt,
-    Ready,
-};
+pub use event_imp::{PollOpt, Ready};
+pub use poll::{Poll, Registration, SetReadiness};
 pub use token::Token;
 
 pub mod event {
     //! Readiness event types and utilities.
 
-    pub use super::poll::{Events, Iter};
     pub use super::event_imp::{Event, Evented};
+    pub use super::poll::{Events, Iter};
 }
 
-pub use event::{
-    Events,
-};
+pub use event::Events;
 
 #[cfg(unix)]
 pub mod unix {
     //! Unix only extensions
-    pub use sys::{
-        EventedFd,
-    };
     pub use sys::unix::UnixReady;
+    pub use sys::EventedFd;
 }
 
 /// Windows-only extensions to the mio crate.
@@ -217,5 +205,5 @@ pub mod unix {
 #[cfg(windows)]
 pub mod windows {
 
-    pub use sys::{Overlapped, Binding};
+    pub use sys::{Binding, Overlapped};
 }
