@@ -3,9 +3,9 @@ pr: ["master"]
 
 jobs:
 # Check formatting
-# - template: ci/azure-rustfmt.yml
-#   parameters:
-#     name: rustfmt
+- template: ci/azure-rustfmt.yml
+  parameters:
+    name: rustfmt
 
 # Stable
 - template: ci/azure-test-stable.yml
