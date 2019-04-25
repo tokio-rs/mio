@@ -8,6 +8,10 @@ set -ex
 
 TARGET="${1}"
 
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~"
+echo $HOME
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~"
+
 cargo test --no-default-features --target "${TARGET}"
 
 cargo test --target "${TARGET}"
