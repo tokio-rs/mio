@@ -1248,7 +1248,7 @@ impl AsRawFd for Poll {
 /// let mut events = Events::with_capacity(1024);
 /// let poll = Poll::new()?;
 ///
-/// assert_eq!(0, events.len());
+/// assert_eq!(0, events.iter().count());
 ///
 /// // Register `Evented` handles with `poll`
 ///
@@ -1361,18 +1361,6 @@ impl Events {
         Events {
             inner: sys::Events::with_capacity(capacity),
         }
-    }
-
-    #[deprecated(since="0.6.10", note="Index access removed in favor of iterator only API.")]
-    #[doc(hidden)]
-    pub fn get(&self, idx: usize) -> Option<Event> {
-        self.inner.get(idx)
-    }
-
-    #[doc(hidden)]
-    #[deprecated(since="0.6.10", note="Index access removed in favor of iterator only API.")]
-    pub fn len(&self) -> usize {
-        self.inner.len()
     }
 
     /// Returns the number of `Event` values that `self` can hold.
@@ -1608,15 +1596,6 @@ impl Registration {
         (registration, set_readiness)
     }
 
-    #[deprecated(since = "0.6.5", note = "use `new2` instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn new(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
-        -> (Registration, SetReadiness)
-    {
-        Registration::new_priv(poll, token, interest, opt)
-    }
-
     // TODO: Get rid of this (windows depends on it for now)
     fn new_priv(poll: &Poll, token: Token, interest: Ready, opt: PollOpt)
         -> (Registration, SetReadiness)
@@ -1650,20 +1629,6 @@ impl Registration {
         };
 
         (registration, set_readiness)
-    }
-
-    #[deprecated(since = "0.6.5", note = "use `Evented` impl")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn update(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt) -> io::Result<()> {
-        self.inner.update(poll, token, interest, opts)
-    }
-
-    #[deprecated(since = "0.6.5", note = "use `Poll::deregister` instead")]
-    #[cfg(feature = "with-deprecated")]
-    #[doc(hidden)]
-    pub fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.inner.update(poll, Token(0), Ready::empty(), PollOpt::empty())
     }
 }
 
@@ -1773,7 +1738,7 @@ impl SetReadiness {
     ///
     /// // There is NO guarantee that the following will work. It is possible
     /// // that the readiness event will be delivered at a later time.
-    /// let event = events.get(0).unwrap();
+    /// let event = events.iter().next().unwrap();
     /// assert_eq!(event.token(), Token(0));
     /// assert!(event.readiness().is_readable());
     /// #     Ok(())

@@ -1,7 +1,6 @@
-#![allow(deprecated)]
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{cmp, i32};
 
@@ -19,7 +18,7 @@ use sys::unix::io::set_cloexec;
 /// registered with the `Selector`. If a type that is previously associated with
 /// a `Selector` attempts to register itself with a different `Selector`, the
 /// operation will return with an error. This matches windows behavior.
-static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
+static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug)]
 pub struct Selector {

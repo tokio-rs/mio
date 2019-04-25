@@ -179,14 +179,6 @@ impl TcpStream {
         self.imp.inner.socket.ttl()
     }
 
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.imp.inner.socket.set_only_v6(only_v6)
-    }
-
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.imp.inner.socket.only_v6()
-    }
-
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.imp.inner.socket.set_linger(dur)
     }
@@ -699,16 +691,6 @@ impl TcpListener {
         self.imp.inner.socket.try_clone().map(|s| {
             TcpListener::new_family(s, self.imp.inner.family)
         })
-    }
-
-    #[allow(deprecated)]
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.imp.inner.socket.set_only_v6(only_v6)
-    }
-
-    #[allow(deprecated)]
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.imp.inner.socket.only_v6()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {

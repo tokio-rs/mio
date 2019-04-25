@@ -156,14 +156,6 @@ impl UnixReady {
         UnixReady(ready_from_usize(AIO))
     }
 
-    #[cfg(not(any(target_os = "dragonfly",
-        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
-    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
-    #[doc(hidden)]
-    pub fn aio() -> UnixReady {
-        UnixReady(Ready::empty())
-    }
-
     /// Returns a `Ready` representing error readiness.
     ///
     /// **Note that only readable and writable readiness is guaranteed to be
@@ -282,15 +274,6 @@ impl UnixReady {
         target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn is_aio(&self) -> bool {
         self.contains(ready_from_usize(AIO))
-    }
-
-    #[deprecated(since = "0.6.12", note = "this function is now platform specific")]
-    #[cfg(feature = "with-deprecated")]
-    #[cfg(not(any(target_os = "dragonfly",
-        target_os = "freebsd", target_os = "ios", target_os = "macos")))]
-    #[doc(hidden)]
-    pub fn is_aio(&self) -> bool {
-        false
     }
 
     /// Returns true if the value includes error readiness
@@ -452,18 +435,6 @@ impl ops::Sub for UnixReady {
     }
 }
 
-#[deprecated(since = "0.6.10", note = "removed")]
-#[cfg(feature = "with-deprecated")]
-#[doc(hidden)]
-impl ops::Not for UnixReady {
-    type Output = UnixReady;
-
-    #[inline]
-    fn not(self) -> UnixReady {
-        (!self.0).into()
-    }
-}
-
 impl fmt::Debug for UnixReady {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let mut one = false;
@@ -472,8 +443,6 @@ impl fmt::Debug for UnixReady {
             (UnixReady(Ready::writable()), "Writable"),
             (UnixReady::error(), "Error"),
             (UnixReady::hup(), "Hup"),
-            #[allow(deprecated)]
-            (UnixReady::aio(), "Aio"),
             #[cfg(any(target_os = "linux",
                 target_os = "android", target_os = "solaris"))]
             (UnixReady::priority(), "Priority"),

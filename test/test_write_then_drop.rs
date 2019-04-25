@@ -27,8 +27,8 @@ fn write_then_drop() {
     while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
-    assert_eq!(events.len(), 1);
-    assert_eq!(events.get(0).unwrap().token(), Token(1));
+    assert_eq!(events.iter().count(), 1);
+    assert_eq!(events.iter().next().unwrap().token(), Token(1));
 
     let mut s2 = a.accept().unwrap().0;
 
@@ -41,8 +41,8 @@ fn write_then_drop() {
     while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
-    assert_eq!(events.len(), 1);
-    assert_eq!(events.get(0).unwrap().token(), Token(2));
+    assert_eq!(events.iter().count(), 1);
+    assert_eq!(events.iter().next().unwrap().token(), Token(2));
 
     s2.write_all(&[1, 2, 3, 4]).unwrap();
     drop(s2);
@@ -55,8 +55,8 @@ fn write_then_drop() {
     while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
-    assert_eq!(events.len(), 1);
-    assert_eq!(events.get(0).unwrap().token(), Token(3));
+    assert_eq!(events.iter().count(), 1);
+    assert_eq!(events.iter().next().unwrap().token(), Token(3));
 
     let mut buf = [0; 10];
     assert_eq!(s.read(&mut buf).unwrap(), 4);
@@ -86,8 +86,8 @@ fn write_then_deregister() {
     while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
-    assert_eq!(events.len(), 1);
-    assert_eq!(events.get(0).unwrap().token(), Token(1));
+    assert_eq!(events.iter().count(), 1);
+    assert_eq!(events.iter().next().unwrap().token(), Token(1));
 
     let mut s2 = a.accept().unwrap().0;
 
@@ -100,8 +100,8 @@ fn write_then_deregister() {
     while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
-    assert_eq!(events.len(), 1);
-    assert_eq!(events.get(0).unwrap().token(), Token(2));
+    assert_eq!(events.iter().count(), 1);
+    assert_eq!(events.iter().next().unwrap().token(), Token(2));
 
     s2.write_all(&[1, 2, 3, 4]).unwrap();
     s2.deregister(&poll).unwrap();
@@ -114,8 +114,8 @@ fn write_then_deregister() {
     while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
     }
-    assert_eq!(events.len(), 1);
-    assert_eq!(events.get(0).unwrap().token(), Token(3));
+    assert_eq!(events.iter().count(), 1);
+    assert_eq!(events.iter().next().unwrap().token(), Token(3));
 
     let mut buf = [0; 10];
     assert_eq!(s.read(&mut buf).unwrap(), 4);
