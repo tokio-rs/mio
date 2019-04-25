@@ -13,10 +13,12 @@ jobs:
       Android:
         vmImage: ubuntu-16.04
         target: arm-linux-androideabi
+        docker: true
 
       Android_64:
         vmImage: ubuntu-16.04
         target: aarch64-linux-android
+        docker: true
 
       NetBSD:
         vmImage: ubuntu-16.04
@@ -36,6 +38,10 @@ jobs:
 
     - script: rustup target add $(target)
       displayName: "Add target"
+
+    - script: sh ci/run-docker.sh $(target)
+      displayName: sh ci/run-docker.sh
+      condition: and(succeeded(), variables['docker'])
 
     - script: cargo check --target $(target)
       displayName: Check source
