@@ -39,12 +39,12 @@ jobs:
     - script: rustup target add $(target)
       displayName: "Add target"
 
+    - script: cargo check --target $(target)
+      displayName: Check source
+
     - script: sh ci/run-docker.sh $(target)
       displayName: sh ci/run-docker.sh
       condition: and(succeeded(), variables['docker'])
-
-    - script: cargo check --target $(target)
-      displayName: Check source
 
     - script: cargo check --tests --target $(target)
       displayName: Check tests
