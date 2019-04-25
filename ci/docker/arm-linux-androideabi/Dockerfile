@@ -11,27 +11,35 @@ RUN dpkg --add-architecture i386 && \
   expect \
   openjdk-9-jre \
   libstdc++6:i386 \
+  libpulse0 \
   gcc \
   libc6-dev
 
-
-COPY cargo_config /etc/cargo_config
-
 WORKDIR /android/
+COPY android* /android/
 
-COPY install-ndk.sh /android/
-RUN sh /android/install-ndk.sh
+ENV ANDROID_ARCH=arm
+ENV PATH=$PATH:/android/ndk-$ANDROID_ARCH/bin:/android/sdk/tools:/android/sdk/platform-tools
 
-ENV PATH=$PATH:/android/ndk-arm/bin:/android/sdk/tools:/android/sdk/platform-tools
-
-COPY install-sdk.sh accept-licenses.sh /android/
-RUN sh /android/install-sdk.sh
+RUN sh /android/android-install-ndk.sh $ANDROID_ARCH
+RUN sh /android/android-install-sdk.sh $ANDROID_ARCH
+RUN mv /root/.android /tmp
+RUN chmod 777 -R /tmp/.android
+RUN chmod 755 /android/sdk/tools/* /android/sdk/emulator/qemu/linux-x86_64/*
 
 ENV PATH=$PATH:/rust/bin \
     CARGO_TARGET_ARM_LINUX_ANDROIDEABI_LINKER=arm-linux-androideabi-gcc \
-    ANDROID_EMULATOR_FORCE_32BIT=1 \
+    CARGO_TARGET_ARM_LINUX_ANDROIDEABI_RUNNER=/tmp/runtest \
     HOME=/tmp
-RUN chmod 755 /android/sdk/tools/* /android/sdk/tools/qemu/linux-x86_64/* /android/sdk/tools/qemu/linux-x86/*
 
-RUN cp -r /root/.android /tmp
-RUN chmod 777 -R /tmp/.android
+ADD runtest-android.rs /tmp/runtest.rs
+ENTRYPOINT [ \
+  "bash", \
+  "-c", \
+  # set SHELL so android can detect a 64bits system, see
+  # http://stackoverflow.com/a/41789144
+  "SHELL=/bin/dash /android/sdk/emulator/emulator @arm -no-window & \
+   rustc /tmp/runtest.rs -o /tmp/runtest && \
+   exec \"$@\"", \
+  "--" \
+]

@@ -1,11 +1,6 @@
 FROM ubuntu:16.04
 
-
-
-
-
 RUN dpkg --add-architecture i386 && \
-    dpkg --add-architecture amd64 && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
   file \
@@ -16,34 +11,35 @@ RUN dpkg --add-architecture i386 && \
   expect \
   openjdk-9-jre \
   libstdc++6:i386 \
-  libc++1 \
+  libpulse0 \
   gcc \
-  libc6-dev \
-  qt5-default zlib1g:i386 libx11-6:i386 \
-  libpulse0:amd64 libpulse0:i386
-
-
-
-
-
-
-COPY cargo_config /etc/cargo_config
+  libc6-dev
 
 WORKDIR /android/
+COPY android* /android/
 
-COPY install-ndk.sh /android/
-RUN sh /android/install-ndk.sh
+ENV ANDROID_ARCH=aarch64
+ENV PATH=$PATH:/android/ndk-$ANDROID_ARCH/bin:/android/sdk/tools:/android/sdk/platform-tools
 
-ENV PATH=$PATH:/android/ndk-arm64/bin:/android/sdk/tools:/android/sdk/tools/bin:/android/sdk/platform-tools:/android/sdk/emulator/qemu/linux-x86_64
-
-COPY install-sdk.sh /android/
-RUN sh /android/install-sdk.sh
-
-ENV PATH=$PATH:/rust/bin \
-    CARGO_TARGET_ARM_LINUX_ANDROIDEABI_LINKER=aarch64-linux-android-gcc \
-    ANDROID_EMULATOR_FORCE_32BIT=0 \
-    HOME=/tmp
+RUN sh /android/android-install-ndk.sh $ANDROID_ARCH
+RUN sh /android/android-install-sdk.sh $ANDROID_ARCH
+RUN mv /root/.android /tmp
+RUN chmod 777 -R /tmp/.android
 RUN chmod 755 /android/sdk/tools/* /android/sdk/emulator/qemu/linux-x86_64/*
 
-RUN cp -r /root/.android /tmp
-RUN chmod 777 -R /tmp/.android
+ENV PATH=$PATH:/rust/bin \
+    CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=aarch64-linux-android-gcc \
+    CARGO_TARGET_AARCH64_LINUX_ANDROID_RUNNER=/tmp/runtest \
+    HOME=/tmp
+
+ADD runtest-android.rs /tmp/runtest.rs
+ENTRYPOINT [ \
+  "bash", \
+  "-c", \
+  # set SHELL so android can detect a 64bits system, see
+  # http://stackoverflow.com/a/41789144
+  "SHELL=/bin/dash /android/sdk/emulator/emulator @aarch64 -no-window & \
+   rustc /tmp/runtest.rs -o /tmp/runtest && \
+   exec \"$@\"", \
+  "--" \
+]
