@@ -27,7 +27,8 @@ jobs:
     cross: true
 
 - template: ci/azure-cross-compile.yml
-  name: cross
+  parameters:
+    name: cross
 
     # # === Cross compilation ===
     # 
