@@ -2,7 +2,7 @@ use std::{fmt, io};
 use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use lazycell::AtomicLazyCell;
@@ -21,7 +21,7 @@ use {Token, PollOpt};
 /// registered with the `Selector`. If a type that is previously associated with
 /// a `Selector` attempts to register itself with a different `Selector`, the
 /// operation will return with an error. This matches windows behavior.
-static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
+static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
 /// The guts of the Windows event loop, this is the struct which actually owns
 /// a completion port.
