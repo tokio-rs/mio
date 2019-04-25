@@ -10,6 +10,10 @@ jobs:
         vmImage: macOS-10.13
         target: x86_64-apple-ios
 
+      Android_Arm:
+        vmImage: ubuntu-16.04
+        target: arm-linux-androideabi
+
   pool:
     vmImage: $(vmImage)
 
