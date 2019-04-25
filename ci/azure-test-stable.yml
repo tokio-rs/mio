@@ -36,3 +36,7 @@ jobs:
   - ${{ if eq(parameters.cmd, 'test') }}:
     - script: cargo doc --no-deps
       displayName: cargo doc --no-deps
+
+  - ${{ if parameters.benches }}:
+    - script: cargo check --benches
+      displayName: Check benchmarks
