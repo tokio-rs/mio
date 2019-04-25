@@ -10,8 +10,8 @@ jobs:
 # Test top level crate
 - template: ci/azure-test-stable.yml
   parameters:
-    name: test_tokio
-    displayName: Test tokio
+    name: stable
+    displayName: Test
     cross: true
 
 # This represents the minimum Rust version supported by
@@ -22,6 +22,7 @@ jobs:
 - template: ci/azure-test-stable.yml
   parameters:
     name: minrust
+    displayName: Min Rust
     rust_version: 1.18.0
     cmd: check
     cross: true
@@ -30,53 +31,10 @@ jobs:
   parameters:
     name: cross
 
-    # # === Cross compilation ===
-    # 
-    # # iOS
-    # - template: ci/azure-cross-compile.yml
-    #   parameters:
-    #     vmImage: macOS-10.13
-    #     name: cross_ios
-    #     displayName: Cross Compile iOS
-    #     target: x86_64-apple-ios
-    # 
-    # # Android (ARM)
-    # - template: ci/azure-cross-compile.yml
-    #   parameters:
-    #     name: cross_arm_android
-    #     displayName: Cross Compile Android
-    #     target: arm-linux-androideabi
-    # 
-    # # Android (ARM 64)
-    # - template: ci/azure-cross-compile.yml
-    #   parameters:
-    #     name: cross_arm_android_64
-    #     displayName: Cross Compile Android (64bit)
-    #     target: aarch64-linux-android
-    # 
-    # # NetBSD
-    # - template: ci/azure-cross-compile.yml
-    #   parameters:
-    #     name: cross_netbsd
-    #     displayName: Cross Compile NetBSD
-    #     target: x86_64-unknown-netbsd
-    # 
-    # # Solaris
-    # - template: ci/azure-cross-compile.yml
-    #   parameters:
-    #     name: cross_solaris
-    #     displayName: Cross Compile Solaris
-    #     target: x86_64-sun-solaris
-    # 
-    # - template: ci/azure-deploy-docs.yml
-    #   parameters:
-    #     dependsOn:
-    #       - rustfmt
-    #       - test_tokio
-    #       - test_sub_cross
-    #       - test_linux
-    #       - features
-    #       - async_await
-    #       - cross_32bit_linux
-    #       - minrust
-    #       - tsan
+- template: ci/azure-deploy-docs.yml
+  parameters:
+    dependsOn:
+      # - rustfmt
+      - stable
+      - minrust
+      - cross

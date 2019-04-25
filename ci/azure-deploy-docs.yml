@@ -30,7 +30,7 @@ jobs:
       git remote add origin https://github.com/tokio-rs/mio
       git checkout -b gh-pages
       git add .
-      git commit -m 'Deploy Tokio API documentation'
+      git commit -m 'Deploy Mio API documentation'
       git push -f origin gh-pages
     env:
       GITHUB_TOKEN: $(githubPersonalToken)
