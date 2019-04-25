@@ -27,6 +27,9 @@ jobs:
     env:
       CI: 'True'
 
+  - ${{ if eq(parameters.cmd, 'test') }}:
+    - script: cargo doc --no-deps
+
   - script: cargo ${{ parameters.cmd }} --no-default-features
     env:
       CI: 'True'

@@ -63,3 +63,16 @@ jobs:
     name: cross_solaris
     displayName: Cross Compile Solaris
     target: x86_64-sun-solaris
+
+    # - template: ci/azure-deploy-docs.yml
+    #   parameters:
+    #     dependsOn:
+    #       - rustfmt
+    #       - test_tokio
+    #       - test_sub_cross
+    #       - test_linux
+    #       - features
+    #       - async_await
+    #       - cross_32bit_linux
+    #       - minrust
+    #       - tsan

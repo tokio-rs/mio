@@ -23,3 +23,9 @@ jobs:
 
   - script: cargo check --tests --target ${{ parameters.target }}
     displayName: Check tests
+
+  - script: cargo check --target ${{ parameters.target }} --no-default-features
+    displayName: Check source (no default features)
+
+  - script: cargo check --tests --target ${{ parameters.target }} --no-default-features
+    displayName: Check tests (no default features)
