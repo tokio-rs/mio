@@ -2,7 +2,7 @@ trigger: ["master"]
 pr: ["master"]
 
 jobs:
-Check formatting
+# Check formatting
 - template: ci/azure-rustfmt.yml
   parameters:
     name: rustfmt
