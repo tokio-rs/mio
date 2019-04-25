@@ -1,12 +1,11 @@
 [package]
-
-name          = "mio"
+name = "mio"
 # When releasing to crates.io:
 # - Update html_root_url.
 # - Update CHANGELOG.md.
 # - Update doc URL.
 # - Create git tag
-version       = "0.6.16"
+version       = "0.7.0"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
@@ -21,33 +20,32 @@ exclude       = [
   ".travis.yml",
   "deploy.sh",
 ]
+publish = false
 
 [features]
-with-deprecated = []
-default = ["with-deprecated"]
 
 [dependencies]
-log      = "0.4"
-slab     = "0.4.0"
-net2     = "0.2.29"
-iovec    = "0.1.1"
+log = "0.4"
+slab = "0.4.0"
+net2 = "0.2.29"
+iovec = "0.1.1"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
 fuchsia-zircon = "0.3.2"
 fuchsia-zircon-sys = "0.3.2"
 
 [target.'cfg(unix)'.dependencies]
-libc   = "0.2.42"
+libc = "0.2.42"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2.6"
-miow   = "0.2.1"
+miow = "0.2.1"
 kernel32-sys = "0.2"
 
 [dev-dependencies]
 env_logger = { version = "0.4.0", default-features = false }
-tempdir    = "0.3.4"
-bytes      = "0.3.0"
+tempdir = "0.3.4"
+bytes = "0.3.0"
 
 [[test]]
 name = "test"

@@ -27,18 +27,12 @@ mod tcp;
 mod udp;
 mod uio;
 
-#[cfg(feature = "with-deprecated")]
-mod uds;
-
 pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
 pub use self::io::{Io, set_nonblock};
 pub use self::ready::{UnixReady, READY_ALL};
 pub use self::tcp::{TcpStream, TcpListener};
 pub use self::udp::UdpSocket;
-
-#[cfg(feature = "with-deprecated")]
-pub use self::uds::UnixSocket;
 
 pub use iovec::IoVec;
 

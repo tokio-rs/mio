@@ -18,7 +18,7 @@ fn smoke() {
     let n = poll.poll(&mut events, Some(Duration::from_millis(0))).unwrap();
     assert_eq!(n, 1);
 
-    assert_eq!(events.get(0).unwrap().token(), Token(0));
+    assert_eq!(events.iter().next().unwrap().token(), Token(0));
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn set_readiness_before_register() {
             }
 
             assert_eq!(n, 1);
-            assert_eq!(events.get(0).unwrap().token(), Token(123));
+            assert_eq!(events.iter().next().unwrap().token(), Token(123));
             break;
         }
 

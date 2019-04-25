@@ -24,5 +24,5 @@ pub fn test_reregister_different_without_poll() {
     poll.reregister(&l, Token(0), Ready::writable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 
     poll.poll(&mut events, Some(Duration::from_millis(MS))).unwrap();
-    assert_eq!(events.len(), 0);
+    assert!(events.iter().next().is_none());
 }
