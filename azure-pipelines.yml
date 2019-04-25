@@ -26,10 +26,26 @@ jobs:
     cmd: check
     cross: true
 
-# Cross compilation
+# === Cross compilation ===
+
+# iOS
 - template: ci/azure-cross-compile.yml
   parameters:
     vmImage: macOS-10.13
-    name: cross_x86_64_apple_ios
+    name: cross_ios
     displayName: Cross Compile iOS
     target: x86_64-apple-ios
+
+# Android (ARM)
+- template: ci/azure-cross-compile.yml
+  parameters:
+    name: cross_arm_android
+    displayName: Cross Compile Android
+    target: arm-linux-androideabi
+
+# Android (ARM 64)
+- template: ci/azure-cross-compile.yml
+  parameters:
+    name: cross_arm_android_64
+    displayName: Cross Compile Android (64bit)
+    target: aarch64-linux-android
