@@ -3,29 +3,55 @@ parameters:
 
 jobs:
 - job: ${{ parameters.name }}
-  displayName: ${{ parameters.displayName }}
+  displayName: Cross
+  strategy:
+    matrix:
+      iOS:
+        vmImage: macOS-10.13
+        target: x86_64-apple-ios
+
   pool:
-    vmImage: ${{ parameters.vmImage }}
+    vmImage: $(vmImage)
+
   steps:
-  - template: azure-install-rust.yml
-    parameters:
-      rust_version: stable
+    - template: azure-install-rust.yml
+      parameters:
+        rust_version: stable
 
-  - ${{ if eq(parameters.vmImage, 'ubuntu-16.04') }}:
-    - script: sudo apt-get install gcc-multilib
-      displayName: "Install gcc-multilib"
+    - ${{ if eq(vmImage, 'ubuntu-16.04') }}:
+      - script: sudo apt-get install gcc-multilib
+        displayName: "Install gcc-multilib"
 
-  - script: rustup target add ${{ parameters.target }}
-    displayName: "Add target"
+    - script: rustup target add ${{ parameters.target }}
+      displayName: "Add target"
 
-  - script: cargo check --target ${{ parameters.target }}
-    displayName: Check source
+    - script: cargo check --target ${{ parameters.target }}
+      displayName: Check source
 
-  - script: cargo check --tests --target ${{ parameters.target }}
-    displayName: Check tests
-
-  - script: cargo check --target ${{ parameters.target }} --no-default-features
-    displayName: Check source (no default features)
-
-  - script: cargo check --tests --target ${{ parameters.target }} --no-default-features
-    displayName: Check tests (no default features)
+  # - job: ${{ parameters.name }}
+  #   displayName: ${{ parameters.displayName }}
+  #   pool:
+  #     vmImage: ${{ parameters.vmImage }}
+  #   steps:
+  #   - template: azure-install-rust.yml
+  #     parameters:
+  #       rust_version: stable
+  #
+  #   - ${{ if eq(parameters.vmImage, 'ubuntu-16.04') }}:
+  #     - script: sudo apt-get install gcc-multilib
+  #       displayName: "Install gcc-multilib"
+  #
+  #   - script: rustup target add ${{ parameters.target }}
+  #     displayName: "Add target"
+  #
+  #   - script: cargo check --target ${{ parameters.target }}
+  #     displayName: Check source
+  #
+  #   - script: cargo check --tests --target ${{ parameters.target }}
+  #     displayName: Check tests
+  #
+  #   - script: cargo check --target ${{ parameters.target }} --no-default-features
+  #     displayName: Check source (no default features)
+  #
+  #   - script: cargo check --tests --target ${{ parameters.target }} --no-default-features
+  #     displayName: Check tests (no default features)

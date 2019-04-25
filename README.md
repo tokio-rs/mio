@@ -10,9 +10,8 @@ overhead as possible over the OS abstractions.
 
 **API documentation**
 
-* [master](https://carllerche.github.io/mio)
+* [master](https://tokio-rs.github.io/mio/doc/mio/)
 * [v0.6](https://docs.rs/mio/^0.6)
-* [v0.5](https://docs.rs/mio/^0.5)
 
 This is a low level library, if you are looking for something easier to get
 started with, see [Tokio](https://tokio.rs).
@@ -60,18 +59,9 @@ Currently supported platforms:
 * Solaris
 * Android
 * iOS
-* Fuchsia (experimental).
 
 There are potentially others. If you find that Mio works on another
 platform, submit a PR to update the list!
-
-### Libraries
-
-* [tokio-core](https://github.com/tokio-rs/tokio-core) – Underlying event loop
-  for the [Tokio project](https://github.com/tokio-rs/tokio).
-* [mioco](https://github.com/dpc/mioco) – Mio COroutines
-* [coio-rs](https://github.com/zonyitoo/coio-rs) – Coroutine I/O with work-stealing scheduler
-* [ws-rs](https://github.com/housleyjk/ws-rs) – WebSockets based on Mio
 
 ## Community
 
