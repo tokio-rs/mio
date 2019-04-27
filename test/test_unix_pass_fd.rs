@@ -25,7 +25,7 @@ impl EchoConn {
             sock: sock,
             pipe_fd: None,
             token: None,
-            interest: Some(Interests::from(UnixReady::hup())),
+            interest: Some(Interests::hup()),
         }
     }
 
@@ -106,14 +106,11 @@ impl EchoConn {
         }
         self.pipe_fd = Some(rd);
 
-        //Interests can only be READABLE / WRITABLE.
-        /*
         assert!(
             self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), 
             "actual={:?}", 
             self.interest
         );
-        */
         event_loop.reregister(
             &self.sock, 
             self.token.unwrap(), 
@@ -236,14 +233,11 @@ impl EchoClient {
         }
 
         if !self.interest.is_none() {
-            //Interests can only be READABLE / WRITABLE.
-            /*
             assert!(
                 self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), 
                 "actual={:?}", 
                 self.interest
             );
-            */
             event_loop.reregister(
                 &self.sock, 
                 self.token, 

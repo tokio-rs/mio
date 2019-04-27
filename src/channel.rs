@@ -271,7 +271,7 @@ impl Evented for ReceiverCtl {
 
     fn reregister(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt) -> io::Result<()> {
         match self.registration.borrow() {
-            Some(registration) => registration.update(poll, token, Ready::from_usize(interest.as_usize()), opts),
+            Some(registration) => registration.update(poll, token, Ready::from(interests), opts),
             None => Err(io::Error::new(io::ErrorKind::Other, "receiver not registered")),
         }
     }

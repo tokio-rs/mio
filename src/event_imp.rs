@@ -981,6 +981,19 @@ fn test_debug_ready() {
     assert_eq!("Writable", format!("{:?}", Ready::writable()));
 }
 
+#[cfg(any(
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "ios",
+    target_os = "macos"
+))]
+const AIO: usize = 0b01_0000;
+
+#[cfg(any(target_os = "freebsd"))]
+const LIO: usize = 0b10_0000;
+
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+const PRI: usize = 0b100_0000;
 
 /// Interests used in registering.
 ///
@@ -996,8 +1009,7 @@ fn test_debug_ready() {
 pub struct Interests(usize);
 
 impl Interests {
-
-    /// Returns a `Interests` representing readable readiness.
+    /// Returns `Interests` representing readable readiness.
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
@@ -1017,7 +1029,7 @@ impl Interests {
         Interests(READABLE)
     }
 
-    /// Returns a `Interests` representing writable readiness.
+    /// Returns `Interests` representing writable readiness.
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
@@ -1037,7 +1049,7 @@ impl Interests {
         Interests(WRITABLE)
     }
 
-    /// Returns a `Interests` representing readable and writable readiness.
+    /// Returns `Interests` representing readable and writable readiness.
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
@@ -1058,7 +1070,133 @@ impl Interests {
         Interests(READABLE | WRITABLE)
     }
     
-    /// Returns true if the value includes readable readiness
+    /// Returns `Interests` representing HUP readiness.
+    ///
+    /// A HUP (or hang-up) signifies that a stream socket **peer** closed the
+    /// connection, or shut down the writing half of the connection.
+    ///
+    /// **Note that only readable and writable readiness is guaranteed to be
+    /// supported on all platforms**. This means that `hup` readiness
+    /// should be treated as a hint. For more details, see [readiness] in the
+    /// poll documentation.
+    /// 
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::hup();
+    ///
+    /// assert!(interest.is_hup());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    /// [readiness]: ../struct.Poll.html#readiness-operations
+    #[inline]
+    #[cfg(unix)]
+    pub fn hup() -> Interests {
+        Interests(HUP)
+    }
+
+    /// Returns `Interests` representing error readiness.
+    ///
+    /// **Note that only readable and writable readiness is guaranteed to be
+    /// supported on all platforms**. This means that `error` readiness
+    /// should be treated as a hint. For more details, see [readiness] in the
+    /// poll documentation.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::error();
+    ///
+    /// assert!(interest.is_error());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    /// [readiness]: ../struct.Poll.html#readiness-operations
+    #[inline]
+    #[cfg(unix)]
+    pub fn error() -> Interests {
+        Interests(ERROR)
+    }
+
+    /// Returns `Interests` representing AIO completion readiness.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::aio();
+    ///
+    /// assert!(interest.is_aio());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    #[inline]
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos"
+    ))]
+    #[inline]
+    pub fn aio() -> Interests {
+        Interests(AIO)
+    }
+
+    /// Returns `Interests` representing LIO completion readiness.
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::lio();
+    ///
+    /// assert!(interest.is_lio());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    #[inline]
+    #[cfg(any(target_os = "freebsd"))]
+    pub fn lio() -> Interests {
+        Interests(LIO)
+    }
+
+    /// Returns `Interests` representing priority (`EPOLLPRI`) readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::priority();
+    ///
+    /// assert!(interest.is_priority());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    #[inline]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    pub fn priority() -> Interests {
+        Interests(PRI)
+    }
+
+    /// Returns true if the value includes readable readiness.
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
@@ -1077,7 +1215,7 @@ impl Interests {
         (self.0 & READABLE) != 0
     }
 
-    /// Returns true if the value includes writable readiness
+    /// Returns true if the value includes writable readiness.
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
@@ -1096,48 +1234,129 @@ impl Interests {
         (self.0 & WRITABLE) != 0
     }
 
-    /// Create a `Interests` instance using the given `usize` representation.
+    /// Returns true if `Interests` contains HUP readiness
     ///
-    /// The `usize` representation must be treated as opaque. There is no
-    /// guaranteed correlation between the returned value and platform defined
-    /// constants. Also, there is no guarantee that the `usize` representation
-    /// will remain constant across patch releases of Mio.
+    /// A HUP (or hang-up) signifies that a stream socket **peer** closed the
+    /// connection, or shut down the writing half of the connection.
+    ///
+    /// **Note that only readable and writable readiness is guaranteed to be
+    /// supported on all platforms**. This means that `hup` readiness
+    /// should be treated as a hint. For more details, see [readiness] in the
+    /// poll documentation.
+    ///
+    /// See [`Poll`] for more documentation on polling.
     ///
     /// # Examples
     ///
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::readable();
-    /// let interest_usize = interest.as_usize();
-    /// let interest2 = Interests::from_usize(interest_usize);
+    /// let interest = Interests::hup();
     ///
-    /// assert_eq!(interest, interest2);
+    /// assert!(interest.is_hup());
     /// ```
-    pub fn from_usize(val: usize) -> Interests {
-        Interests(val)
+    ///
+    /// [`Poll`]: struct.Poll.html
+    /// [readiness]: ../struct.Poll.html#readiness-operations
+    #[inline]
+    #[cfg(unix)]
+    pub fn is_hup(&self) -> bool {
+        (self.0 & HUP) != 0
     }
-    
-    /// Returns a `usize` representation of the `Interests` value.
+
+    /// Returns true if `Interests` contains error readiness
     ///
-    /// This `usize` representation must be treated as opaque. There is no
-    /// guaranteed correlation between the returned value and platform defined
-    /// constants. Also, there is no guarantee that the `usize` representation
-    /// will remain constant across patch releases of Mio.
+    /// **Note that only readable and writable readiness is guaranteed to be
+    /// supported on all platforms**. This means that `error` readiness should
+    /// be treated as a hint. For more details, see [readiness] in the poll
+    /// documentation.
+    ///
+    /// See [`Poll`] for more documentation on polling.
     ///
     /// # Examples
     ///
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::readable();
-    /// let interest_usize = interest.as_usize();
-    /// let interest2 = Interests::from_usize(interest_usize);
+    /// let interest = Interests::error();
     ///
-    /// assert_eq!(interest, interest2);
+    /// assert!(interest.is_error());
     /// ```
-    pub fn as_usize(&self) -> usize {
-        self.0
+    ///
+    /// [`Poll`]: ../struct.Poll.html
+    /// [readiness]: ../struct.Poll.html#readiness-operations
+    #[inline]
+    pub fn is_error(&self) -> bool {
+        (self.0 & ERROR) != 0
+    }
+
+    /// Returns true if `Interests` contains AIO readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::aio();
+    ///
+    /// assert!(interest.is_aio());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    #[inline]
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos"
+    ))]
+    #[inline]
+    pub fn is_aio(&self) -> bool {
+        (self.0 & AIO) != 0
+    }
+
+    /// Returns true if `Interests` contains LIO readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::lio();
+    ///
+    /// assert!(interest.is_lio());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    #[inline]
+    #[cfg(any(target_os = "freebsd"))]
+    pub fn is_lio(&self) -> bool {
+        (self.0 & LIO) != 0
+    }
+
+    /// Returns true if `Interests` contains priority (`EPOLLPRI`) readiness
+    ///
+    /// See [`Poll`] for more documentation on polling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// let interest = Interests::priority();
+    ///
+    /// assert!(interest.is_priority());
+    /// ```
+    ///
+    /// [`Poll`]: struct.Poll.html
+    #[inline]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    pub fn is_priority(&self) -> bool {
+        (self.0 & PRI) != 0
     }
 }
 
@@ -1181,6 +1400,12 @@ impl fmt::Debug for Interests {
             (false, true) => "WRITABLE",
             (false, false) => unreachable!(),
         })
+    }
+}
+
+impl From<Interests> for Ready {
+    fn from(src: Interests) -> Ready {
+        Ready(src.0)
     }
 }
 

@@ -1650,7 +1650,7 @@ impl Registration {
 
         // Allocate the registration node. The new node will have `ref_count`
         // set to 3: one SetReadiness, one Registration, and one Poll handle.
-        let node = Box::into_raw(Box::new(ReadinessNode::new(queue, token, Ready::from_usize(interest.as_usize()), opt, 3)));
+        let node = Box::into_raw(Box::new(ReadinessNode::new(queue, token, Ready::from(interest), opt, 3)));
 
         let registration = Registration {
             inner: RegistrationInner { node },
@@ -1672,7 +1672,7 @@ impl Evented for Registration {
         interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(poll, token, Ready::from_usize(interest.as_usize()), opts)
+        self.inner.update(poll, token, Ready::from(interest), opts)
     }
 
     fn reregister(
@@ -1682,7 +1682,7 @@ impl Evented for Registration {
         interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(poll, token, Ready::from_usize(interest.as_usize()), opts)
+        self.inner.update(poll, token, Ready::from(interest), opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {

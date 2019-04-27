@@ -402,7 +402,7 @@ impl<T> Evented for Timer<T> {
 
     fn reregister(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt) -> io::Result<()> {
         match self.inner.borrow() {
-            Some(inner) => inner.registration.update(poll, token, Ready::from_usize(interest.as_usize()), opts),
+            Some(inner) => inner.registration.update(poll, token, Ready::from(interest), opts),
             None => Err(io::Error::new(io::ErrorKind::Other, "receiver not registered")),
         }
     }

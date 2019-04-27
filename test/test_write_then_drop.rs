@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 
 use mio::event::Evented;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Interests, Token, Ready};
+use mio::{Events, Poll, PollOpt, Interests, Token};
 
 #[test]
 fn write_then_drop() {
@@ -18,11 +18,8 @@ fn write_then_drop() {
                Token(1),
                Interests::readable(),
                PollOpt::edge()).unwrap();
-    //To bypass Interests limit and complete this test case
-    s.register(&poll,
-               Token(3),
-               Interests::from_usize(Ready::empty().as_usize()),
-               PollOpt::edge()).unwrap();
+    s.register(&poll, Token(3), Interests::readable(), PollOpt::edge())
+        .unwrap();
 
     let mut events = Events::with_capacity(1024);
     while events.is_empty() {
@@ -74,11 +71,8 @@ fn write_then_deregister() {
                Token(1),
                Interests::readable(),
                PollOpt::edge()).unwrap();
-    //To bypass Interests limit and complete this test case
-    s.register(&poll,
-               Token(3),
-               Interests::from_usize(Ready::empty().as_usize()),
-               PollOpt::edge()).unwrap();
+    s.register(&poll, Token(3), Interests::readable(), PollOpt::edge())
+        .unwrap();
 
     let mut events = Events::with_capacity(1024);
     while events.is_empty() {

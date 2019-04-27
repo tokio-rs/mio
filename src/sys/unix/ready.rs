@@ -1,4 +1,4 @@
-use event_imp::{ready_as_usize, ready_from_usize, Ready, Interests};
+use event_imp::{ready_as_usize, ready_from_usize, Ready};
 
 use std::fmt;
 use std::ops;
@@ -68,7 +68,6 @@ use std::ops;
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// use mio::{Interests, Poll, PollOpt, Token};
 /// use mio::net::TcpStream;
-/// use mio::unix::UnixReady;
 ///
 /// let addr = "216.58.193.68:80".parse()?;
 /// let socket = TcpStream::connect(&addr)?;
@@ -77,7 +76,7 @@ use std::ops;
 ///
 /// poll.register(&socket,
 ///               Token(0),
-///               Interests::readable() | UnixReady::error(),
+///               Interests::readable() | Interests::error(),
 ///               PollOpt::edge())?;
 /// #     Ok(())
 /// # }
@@ -396,12 +395,6 @@ impl From<Ready> for UnixReady {
 impl From<UnixReady> for Ready {
     fn from(src: UnixReady) -> Ready {
         src.0
-    }
-}
-
-impl From<UnixReady> for Interests {
-    fn from(src: UnixReady) -> Interests {
-        Interests::from_usize(src.0.as_usize())
     }
 }
 
