@@ -1154,7 +1154,6 @@ impl Interests {
         target_os = "ios",
         target_os = "macos"
     ))]
-    #[inline]
     pub fn aio() -> Interests {
         Interests(AIO)
     }
@@ -1291,6 +1290,7 @@ impl Interests {
     /// [`Poll`]: ../struct.Poll.html
     /// [readiness]: ../struct.Poll.html#readiness-operations
     #[inline]
+    #[cfg(unix)]
     pub fn is_error(&self) -> bool {
         (self.0 & ERROR) != 0
     }

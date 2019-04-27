@@ -385,7 +385,7 @@ impl fmt::Debug for Events {
 #[test]
 fn does_not_register_rw() {
     use unix::EventedFd;
-    use {Poll, PollOpt, Ready, Token};
+    use {Poll, PollOpt, Token};
 
     let kq = unsafe { libc::kqueue() };
     let kqf = EventedFd(&kq);

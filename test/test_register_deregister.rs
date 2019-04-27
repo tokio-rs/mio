@@ -1,9 +1,8 @@
 use bytes::SliceBuf;
-use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, PollOpt, Token};
 use std::time::Duration;
-use {expect_events, localhost, TryWrite};
+use {localhost, TryWrite};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
