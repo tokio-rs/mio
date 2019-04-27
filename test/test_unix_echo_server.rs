@@ -224,15 +224,15 @@ impl EchoClient {
             //Interests can only be READABLE / WRITABLE.
             /*
             assert!(
-                x.is_readable() || x.is_writable(), 
-                "actual={:?}", 
+                x.is_readable() || x.is_writable(),
+                "actual={:?}",
                 x
             );
             */
             event_loop.reregister(
-                &self.sock, 
-                self.token, 
-                x, 
+                &self.sock,
+                self.token,
+                x,
                 PollOpt::edge() | PollOpt::oneshot(),
             )?;
         }
@@ -262,14 +262,14 @@ impl EchoClient {
         }
 
         assert!(
-            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), 
-            "actual={:?}", 
+            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(),
+            "actual={:?}",
             self.interest
         );
         event_loop.reregister(
-            &self.sock, 
-            self.token, 
-            self.interest.unwrap(), 
+            &self.sock,
+            self.token,
+            self.interest.unwrap(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -291,14 +291,14 @@ impl EchoClient {
             Some(i) => Some(i | Interests::writable()),
         };
         assert!(
-            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), 
-            "actual={:?}", 
+            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(),
+            "actual={:?}",
             self.interest
         );
         event_loop.reregister(
-            &self.sock, 
-            self.token, 
-            self.interest.unwrap(), 
+            &self.sock,
+            self.token,
+            self.interest.unwrap(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }

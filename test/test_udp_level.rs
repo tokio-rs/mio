@@ -1,6 +1,6 @@
 use mio::event::Event;
 use mio::net::UdpSocket;
-use mio::{Events, Poll, PollOpt, Ready, Token, Interests};
+use mio::{Events, Interests, Poll, PollOpt, Ready, Token};
 use {expect_events, sleep_ms};
 
 #[test]

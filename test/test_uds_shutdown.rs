@@ -155,7 +155,7 @@ struct EchoClient {
     rx: SliceBuf<'static>,
     mut_buf: Option<MutByteBuf>,
     token: Token,
-    interest: Option<Interests>
+    interest: Option<Interests>,
 }
 
 // Sends a message and expects to receive the same exact message, one at a time
@@ -170,7 +170,7 @@ impl EchoClient {
             rx: SliceBuf::wrap(curr.as_bytes()),
             mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: tok,
-            interest: None
+            interest: None,
         }
     }
 
@@ -189,7 +189,7 @@ impl EchoClient {
                     if let Some(x) = self.interest.as_mut() {
                         *x -= Interests::readable();
                     }
-                     event_loop.shutdown();
+                    event_loop.shutdown();
                 } else {
                     debug!("CLIENT : We read {} bytes!", r);
 

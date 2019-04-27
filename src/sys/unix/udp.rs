@@ -5,7 +5,7 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use sys::unix::uio::VecIo;
 use unix::EventedFd;
-use {io, Poll, PollOpt, Interests, Token};
+use {io, Interests, Poll, PollOpt, Token};
 
 use iovec::IoVec;
 #[allow(unused_imports)] // only here for Rust 1.8

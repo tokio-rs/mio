@@ -129,8 +129,13 @@ pub trait Evented {
     ///
     /// [`Poll::register`]: ../struct.Poll.html#method.register
     /// [`Registration`]: ../struct.Registration.html
-    fn register(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
-        -> io::Result<()>;
+    fn register(
+        &self,
+        poll: &Poll,
+        token: Token,
+        interest: Interests,
+        opts: PollOpt,
+    ) -> io::Result<()>;
 
     /// Re-register `self` with the given `Poll` instance.
     ///
@@ -1069,7 +1074,7 @@ impl Interests {
     pub fn both() -> Interests {
         Interests(READABLE | WRITABLE)
     }
-    
+
     /// Returns `Interests` representing HUP readiness.
     ///
     /// A HUP (or hang-up) signifies that a stream socket **peer** closed the
@@ -1079,7 +1084,7 @@ impl Interests {
     /// supported on all platforms**. This means that `hup` readiness
     /// should be treated as a hint. For more details, see [readiness] in the
     /// poll documentation.
-    /// 
+    ///
     /// See [`Poll`] for more documentation on polling.
     ///
     /// # Examples
@@ -1371,7 +1376,7 @@ impl<T: Into<Interests>> ops::BitOr<T> for Interests {
 
 impl<T: Into<Interests>> ops::BitOrAssign<T> for Interests {
     #[inline]
-    fn bitor_assign(&mut self, other: T){
+    fn bitor_assign(&mut self, other: T) {
         self.0 |= other.into().0;
     }
 }

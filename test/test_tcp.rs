@@ -10,7 +10,7 @@ use net2::{self, TcpStreamExt};
 
 use iovec::IoVec;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Interests, Token};
+use mio::{Events, Interests, Poll, PollOpt, Token};
 use {TryRead, TryWrite};
 
 #[test]

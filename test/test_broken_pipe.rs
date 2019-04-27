@@ -1,5 +1,5 @@
 use mio::deprecated::{unix, EventLoop, Handler};
-use mio::{PollOpt, Ready, Token, Interests};
+use mio::{Interests, PollOpt, Ready, Token};
 use std::time::Duration;
 
 pub struct BrokenPipeHandler;

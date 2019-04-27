@@ -5,7 +5,7 @@ mod pipe {
     use event::Evented;
     use std::io::{Read, Write};
     use sys::unix;
-    use {io, Poll, PollOpt, Interests, Token};
+    use {io, Interests, Poll, PollOpt, Token};
 
     /*
      *

@@ -1,7 +1,7 @@
 extern crate mio;
 
 use mio::net::TcpListener;
-use mio::{Events, Poll, PollOpt, Interests, Token};
+use mio::{Events, Interests, Poll, PollOpt, Token};
 use std::time::Duration;
 
 #[test]

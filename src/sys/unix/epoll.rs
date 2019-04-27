@@ -11,7 +11,7 @@ use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI};
 use event_imp::Event;
 use sys::unix::io::set_cloexec;
 use sys::unix::{cvt, UnixReady};
-use {io, PollOpt, Ready, Token, Interests};
+use {io, Interests, PollOpt, Ready, Token};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first

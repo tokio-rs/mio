@@ -1,6 +1,6 @@
 use bytes::ByteBuf;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Ready, Token, Interests};
+use mio::{Events, Interests, Poll, PollOpt, Ready, Token};
 use {localhost, TryRead};
 
 use self::TestState::{AfterRead, Initial};

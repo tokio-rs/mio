@@ -12,7 +12,7 @@ use libc::{self, time_t};
 use event_imp::{self as event, Event};
 use sys::unix::io::set_cloexec;
 use sys::unix::{cvt, UnixReady};
-use {io, PollOpt, Ready, Token, Interests};
+use {io, Interests, PollOpt, Ready, Token};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -122,7 +122,7 @@ impl Selector {
             } else {
                 libc::EV_DELETE
             };
-            let w = if interests.is_writable()) {
+            let w = if interests.is_writable() {
                 libc::EV_ADD
             } else {
                 libc::EV_DELETE

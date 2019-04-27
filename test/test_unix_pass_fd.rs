@@ -1,13 +1,13 @@
 use bytes::{Buf, ByteBuf, SliceBuf};
 use mio::deprecated::unix::*;
 use mio::deprecated::{EventLoop, Handler};
+use mio::unix::UnixReady;
 use mio::*;
 use slab::Slab;
 use std::io::{self, Read};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::PathBuf;
 use tempdir::TempDir;
-use mio::unix::UnixReady;
 
 const SERVER: Token = Token(10_000_000);
 const CLIENT: Token = Token(10_000_001);
@@ -107,14 +107,14 @@ impl EchoConn {
         self.pipe_fd = Some(rd);
 
         assert!(
-            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), 
-            "actual={:?}", 
+            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(),
+            "actual={:?}",
             self.interest
         );
         event_loop.reregister(
-            &self.sock, 
-            self.token.unwrap(), 
-            self.interest.unwrap(), 
+            &self.sock,
+            self.token.unwrap(),
+            self.interest.unwrap(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -234,14 +234,14 @@ impl EchoClient {
 
         if !self.interest.is_none() {
             assert!(
-                self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(), 
-                "actual={:?}", 
+                self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(),
+                "actual={:?}",
                 self.interest
             );
             event_loop.reregister(
-                &self.sock, 
-                self.token, 
-                self.interest.unwrap(), 
+                &self.sock,
+                self.token,
+                self.interest.unwrap(),
                 PollOpt::edge() | PollOpt::oneshot(),
             )?;
         }

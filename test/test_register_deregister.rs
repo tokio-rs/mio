@@ -1,7 +1,7 @@
 use bytes::SliceBuf;
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Interests, Token};
+use mio::{Events, Interests, Poll, PollOpt, Token};
 use std::time::Duration;
 use {expect_events, localhost, TryWrite};
 
@@ -34,8 +34,13 @@ impl TestHandler {
                 trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                poll.reregister(&self.client, CLIENT, Interests::writable(), PollOpt::level())
-                    .unwrap();
+                poll.reregister(
+                    &self.client,
+                    CLIENT,
+                    Interests::writable(),
+                    PollOpt::level(),
+                )
+                .unwrap();
             }
             _ => panic!("unexpected token"),
         }

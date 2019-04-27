@@ -1,6 +1,6 @@
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Token, Interests};
+use mio::{Events, Interests, Poll, PollOpt, Token};
 use slab::Slab;
 use std::io;
 use {localhost, TryRead, TryWrite};

@@ -10,7 +10,7 @@ use poll::SelectorId;
 use std::fmt;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 /// [portability guidelines]: ../struct.Poll.html#portability
-use {io, sys, Poll, PollOpt, Interests, Token};
+use {io, sys, Interests, Poll, PollOpt, Token};
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use iovec::IoVec;

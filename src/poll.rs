@@ -1,4 +1,4 @@
-use event_imp::{self as event, Event, Evented, PollOpt, Ready, Interests};
+use event_imp::{self as event, Event, Evented, Interests, PollOpt, Ready};
 use std::cell::UnsafeCell;
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::AsRawFd;
@@ -1650,7 +1650,13 @@ impl Registration {
 
         // Allocate the registration node. The new node will have `ref_count`
         // set to 3: one SetReadiness, one Registration, and one Poll handle.
-        let node = Box::into_raw(Box::new(ReadinessNode::new(queue, token, Ready::from(interest), opt, 3)));
+        let node = Box::into_raw(Box::new(ReadinessNode::new(
+            queue,
+            token,
+            Ready::from(interest),
+            opt,
+            3,
+        )));
 
         let registration = Registration {
             inner: RegistrationInner { node },

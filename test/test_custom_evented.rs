@@ -1,5 +1,5 @@
 use mio::event::Evented;
-use mio::{Events, Poll, PollOpt, Ready, Registration, SetReadiness, Token, Interests};
+use mio::{Events, Interests, Poll, PollOpt, Ready, Registration, SetReadiness, Token};
 use std::time::Duration;
 
 #[test]
@@ -74,7 +74,7 @@ fn set_readiness_before_register() {
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 mod stress {
     use mio::event::Evented;
-    use mio::{Events, Poll, PollOpt, Ready, Registration, SetReadiness, Token, Interests};
+    use mio::{Events, Interests, Poll, PollOpt, Ready, Registration, SetReadiness, Token};
     use std::time::Duration;
 
     #[test]
@@ -308,8 +308,13 @@ mod stress {
 
         for i in 0..N {
             let (registration, set_readiness) = Registration::new2();
-            poll.register(&registration, Token(i), Interests::readable(), PollOpt::edge())
-                .unwrap();
+            poll.register(
+                &registration,
+                Token(i),
+                Interests::readable(),
+                PollOpt::edge(),
+            )
+            .unwrap();
 
             registrations.push(registration);
 

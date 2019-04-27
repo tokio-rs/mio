@@ -20,7 +20,7 @@ use winapi::*;
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
-use {poll, Poll, PollOpt, Ready, Token, Interests};
+use {poll, Interests, Poll, PollOpt, Ready, Token};
 
 pub struct UdpSocket {
     imp: Imp,

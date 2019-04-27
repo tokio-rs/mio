@@ -11,7 +11,7 @@ use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 use winapi::*;
 
-use event_imp::{Event, Evented, Ready, Interests};
+use event_imp::{Event, Evented, Interests, Ready};
 use poll::{self, Poll};
 use sys::windows::buffer_pool::BufferPool;
 use {PollOpt, Token};

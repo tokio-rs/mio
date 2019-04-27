@@ -1,5 +1,5 @@
 use mio::event::Event;
-use mio::{channel, Events, Poll, PollOpt, Ready, Token, Interests};
+use mio::{channel, Events, Interests, Poll, PollOpt, Ready, Token};
 use std::sync::mpsc::TryRecvError;
 use std::thread;
 use std::time::Duration;

@@ -2,7 +2,7 @@ use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use iovec::IoVec;
 use localhost;
 use mio::net::UdpSocket;
-use mio::{Events, Poll, PollOpt, Interests, Token};
+use mio::{Events, Interests, Poll, PollOpt, Token};
 use std::io::ErrorKind;
 use std::str;
 use std::time;

@@ -9,7 +9,7 @@ use libc;
 use net2::TcpStreamExt;
 
 use event::Evented;
-use {io, Poll, PollOpt, Interests, Token};
+use {io, Interests, Poll, PollOpt, Token};
 
 use sys::unix::eventedfd::EventedFd;
 use sys::unix::io::set_nonblock;

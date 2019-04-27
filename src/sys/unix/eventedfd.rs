@@ -1,6 +1,6 @@
 use event::Evented;
 use std::os::unix::io::RawFd;
-use {io, poll, Poll, PollOpt, Interests, Token};
+use {io, poll, Interests, Poll, PollOpt, Token};
 
 /*
  *
