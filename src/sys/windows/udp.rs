@@ -239,11 +239,11 @@ impl UdpSocket {
         self.imp.inner.socket.set_ttl(ttl)
     }
 
-    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+    pub fn join_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
         self.imp
             .inner
             .socket
-            .join_multicast_v4(multiaddr, interface)
+            .join_multicast_v4(&multiaddr, &interface)
     }
 
     pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
@@ -253,11 +253,11 @@ impl UdpSocket {
             .join_multicast_v6(multiaddr, interface)
     }
 
-    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+    pub fn leave_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
         self.imp
             .inner
             .socket
-            .leave_multicast_v4(multiaddr, interface)
+            .leave_multicast_v4(&multiaddr, &interface)
     }
 
     pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {

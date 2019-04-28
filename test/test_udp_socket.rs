@@ -175,7 +175,7 @@ pub fn test_udp_socket_discard() {
     for event in &events {
         if event.readiness().is_readable() {
             if let LISTENER = event.token() {
-                assert!(false, "Expected to no receive a packet but got something")
+                panic!("Expected to no receive a packet but got something")
             }
         }
     }
