@@ -1,6 +1,6 @@
 use event::Evented;
-use std::fmt;
 use std;
+use std::fmt;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use sys::unix::uio::VecIo;
