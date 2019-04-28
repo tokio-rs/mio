@@ -12,7 +12,7 @@ use miow::iocp::{CompletionPort, CompletionStatus};
 use winapi::*;
 
 use event_imp::{Event, Evented, Ready};
-use poll::{self, Poll};
+use poll::{self, Register};
 use sys::windows::buffer_pool::BufferPool;
 use {PollOpt, Token};
 
@@ -180,13 +180,13 @@ impl Binding {
         &self,
         handle: &AsRawHandle,
         token: Token,
-        poll: &Poll,
+        register: &Register,
     ) -> io::Result<()> {
-        let selector = poll::selector(poll);
+        let selector = poll::selector(register);
 
         // Ignore errors, we'll see them on the next line.
         drop(self.selector.fill(selector.inner.clone()));
-        self.check_same_selector(poll)?;
+        self.check_same_selector(register)?;
 
         selector.inner.port.add_handle(usize::from(token), handle)
     }
@@ -196,11 +196,11 @@ impl Binding {
         &self,
         handle: &AsRawSocket,
         token: Token,
-        poll: &Poll,
+        register: &Register,
     ) -> io::Result<()> {
-        let selector = poll::selector(poll);
+        let selector = poll::selector(register);
         drop(self.selector.fill(selector.inner.clone()));
-        self.check_same_selector(poll)?;
+        self.check_same_selector(register)?;
         selector.inner.port.add_socket(usize::from(token), handle)
     }
 
@@ -225,9 +225,9 @@ impl Binding {
         &self,
         _handle: &AsRawHandle,
         _token: Token,
-        poll: &Poll,
+        register: &Register,
     ) -> io::Result<()> {
-        self.check_same_selector(poll)
+        self.check_same_selector(register)
     }
 
     /// Same as `reregister_handle`, but for sockets.
@@ -235,9 +235,9 @@ impl Binding {
         &self,
         _socket: &AsRawSocket,
         _token: Token,
-        poll: &Poll,
+        register: &Register,
     ) -> io::Result<()> {
-        self.check_same_selector(poll)
+        self.check_same_selector(register)
     }
 
     /// Deregisters the handle provided from the `Poll` provided.
@@ -253,17 +253,25 @@ impl Binding {
     ///
     /// This function is unsafe for similar reasons to `register`. That is,
     /// there may be pending I/O events and such which aren't handled correctly.
-    pub unsafe fn deregister_handle(&self, _handle: &AsRawHandle, poll: &Poll) -> io::Result<()> {
-        self.check_same_selector(poll)
+    pub unsafe fn deregister_handle(
+        &self,
+        _handle: &AsRawHandle,
+        register: &Register,
+    ) -> io::Result<()> {
+        self.check_same_selector(register)
     }
 
     /// Same as `deregister_handle`, but for sockets.
-    pub unsafe fn deregister_socket(&self, _socket: &AsRawSocket, poll: &Poll) -> io::Result<()> {
-        self.check_same_selector(poll)
+    pub unsafe fn deregister_socket(
+        &self,
+        _socket: &AsRawSocket,
+        register: &Register,
+    ) -> io::Result<()> {
+        self.check_same_selector(register)
     }
 
-    fn check_same_selector(&self, poll: &Poll) -> io::Result<()> {
-        let selector = poll::selector(poll);
+    fn check_same_selector(&self, register: &Register) -> io::Result<()> {
+        let selector = poll::selector(register);
         match self.selector.borrow() {
             Some(prev) if prev.identical(&selector.inner) => Ok(()),
             Some(_) | None => Err(other("socket already registered")),
@@ -353,7 +361,7 @@ impl ReadyBinding {
     pub fn register_socket(
         &mut self,
         socket: &AsRawSocket,
-        poll: &Poll,
+        register: &Register,
         token: Token,
         events: Ready,
         opts: PollOpt,
@@ -361,10 +369,10 @@ impl ReadyBinding {
     ) -> io::Result<()> {
         trace!("register {:?} {:?}", token, events);
         unsafe {
-            self.binding.register_socket(socket, token, poll)?;
+            self.binding.register_socket(socket, token, register)?;
         }
 
-        let (r, s) = poll::new_registration(poll, token, events, opts);
+        let (r, s) = poll::new_registration(register, token, events, opts);
         self.readiness = Some(s);
         *registration.lock().unwrap() = Some(r);
         Ok(())
@@ -374,7 +382,7 @@ impl ReadyBinding {
     pub fn reregister_socket(
         &mut self,
         socket: &AsRawSocket,
-        poll: &Poll,
+        register: &Register,
         token: Token,
         events: Ready,
         opts: PollOpt,
@@ -382,7 +390,7 @@ impl ReadyBinding {
     ) -> io::Result<()> {
         trace!("reregister {:?} {:?}", token, events);
         unsafe {
-            self.binding.reregister_socket(socket, token, poll)?;
+            self.binding.reregister_socket(socket, token, register)?;
         }
 
         registration
@@ -390,7 +398,7 @@ impl ReadyBinding {
             .unwrap()
             .as_mut()
             .unwrap()
-            .reregister(poll, token, events, opts)
+            .reregister(register, token, events, opts)
     }
 
     /// Implementation of the `Evented::deregister` function.
@@ -400,12 +408,12 @@ impl ReadyBinding {
     pub fn deregister(
         &mut self,
         socket: &AsRawSocket,
-        poll: &Poll,
+        register: &Register,
         registration: &Mutex<Option<poll::Registration>>,
     ) -> io::Result<()> {
         trace!("deregistering");
         unsafe {
-            self.binding.deregister_socket(socket, poll)?;
+            self.binding.deregister_socket(socket, register)?;
         }
 
         registration
@@ -413,7 +421,7 @@ impl ReadyBinding {
             .unwrap()
             .as_ref()
             .unwrap()
-            .deregister(poll)
+            .deregister(register)
     }
 }
 

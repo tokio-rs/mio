@@ -5,7 +5,7 @@ mod pipe {
     use event::Evented;
     use std::io::{Read, Write};
     use sys::unix;
-    use {io, Poll, PollOpt, Ready, Token};
+    use {io, PollOpt, Ready, Register, Token};
 
     /*
      *
@@ -61,26 +61,26 @@ mod pipe {
     impl Evented for Awakener {
         fn register(
             &self,
-            poll: &Poll,
+            register: &Register,
             token: Token,
             interest: Ready,
             opts: PollOpt,
         ) -> io::Result<()> {
-            self.reader().register(poll, token, interest, opts)
+            self.reader().register(register, token, interest, opts)
         }
 
         fn reregister(
             &self,
-            poll: &Poll,
+            register: &Register,
             token: Token,
             interest: Ready,
             opts: PollOpt,
         ) -> io::Result<()> {
-            self.reader().reregister(poll, token, interest, opts)
+            self.reader().reregister(register, token, interest, opts)
         }
 
-        fn deregister(&self, poll: &Poll) -> io::Result<()> {
-            self.reader().deregister(poll)
+        fn deregister(&self, register: &Register) -> io::Result<()> {
+            self.reader().deregister(register)
         }
     }
 }

@@ -1,6 +1,6 @@
 use event::Evented;
 use std::os::unix::io::RawFd;
-use {io, poll, Poll, PollOpt, Ready, Token};
+use {io, poll, PollOpt, Ready, Register, Token};
 
 /*
  *
@@ -40,11 +40,15 @@ use {io, poll, Poll, PollOpt, Ready, Token};
 /// // Bind a std listener
 /// let listener = TcpListener::bind("127.0.0.1:0")?;
 ///
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
+/// let register = poll.register().clone();
 ///
 /// // Register the listener
-/// poll.register(&EventedFd(&listener.as_raw_fd()),
-///              Token(0), Ready::readable(), PollOpt::edge())?;
+/// register.register(
+///     &EventedFd(&listener.as_raw_fd()),
+///     Token(0),
+///     Ready::readable(),
+///     PollOpt::edge())?;
 /// #     Ok(())
 /// # }
 /// #
@@ -56,7 +60,7 @@ use {io, poll, Poll, PollOpt, Ready, Token};
 /// Implementing [`Evented`] for a custom type backed by a [`RawFd`].
 ///
 /// ```
-/// use mio::{Ready, Poll, PollOpt, Token};
+/// use mio::{Ready, Register, PollOpt, Token};
 /// use mio::event::Evented;
 /// use mio::unix::EventedFd;
 ///
@@ -68,20 +72,20 @@ use {io, poll, Poll, PollOpt, Ready, Token};
 /// }
 ///
 /// impl Evented for MyIo {
-///     fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///     fn register(&self, register: &Register, token: Token, interest: Ready, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         EventedFd(&self.fd).register(poll, token, interest, opts)
+///         EventedFd(&self.fd).register(register, token, interest, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+///     fn reregister(&self, register: &Register, token: Token, interest: Ready, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         EventedFd(&self.fd).reregister(poll, token, interest, opts)
+///         EventedFd(&self.fd).reregister(register, token, interest, opts)
 ///     }
 ///
-///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-///         EventedFd(&self.fd).deregister(poll)
+///     fn deregister(&self, register: &Register) -> io::Result<()> {
+///         EventedFd(&self.fd).deregister(register)
 ///     }
 /// }
 /// ```
@@ -95,25 +99,25 @@ pub struct EventedFd<'a>(pub &'a RawFd);
 impl<'a> Evented for EventedFd<'a> {
     fn register(
         &self,
-        poll: &Poll,
+        register: &Register,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        poll::selector(poll).register(*self.0, token, interest, opts)
+        poll::selector(register).register(*self.0, token, interest, opts)
     }
 
     fn reregister(
         &self,
-        poll: &Poll,
+        register: &Register,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        poll::selector(poll).reregister(*self.0, token, interest, opts)
+        poll::selector(register).reregister(*self.0, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        poll::selector(poll).deregister(*self.0)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        poll::selector(register).deregister(*self.0)
     }
 }

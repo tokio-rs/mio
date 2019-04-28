@@ -4,7 +4,7 @@ use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use sys::unix::uio::VecIo;
 use unix::EventedFd;
-use {io, Poll, PollOpt, Ready, Token};
+use {io, PollOpt, Ready, Register, Token};
 
 use iovec::IoVec;
 #[allow(unused_imports)] // only here for Rust 1.8
@@ -128,26 +128,26 @@ impl UdpSocket {
 impl Evented for UdpSocket {
     fn register(
         &self,
-        poll: &Poll,
+        register: &Register,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(register, token, interest, opts)
     }
 
     fn reregister(
         &self,
-        poll: &Poll,
+        register: &Register,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).deregister(register)
     }
 }
 

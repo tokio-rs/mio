@@ -34,16 +34,17 @@
 /// let mut next_socket_index = 0;
 ///
 /// // The `Poll` instance
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
+/// let register = poll.register().clone();
 ///
 /// // Tcp listener
 /// let listener = TcpListener::bind(&"127.0.0.1:0".parse()?)?;
 ///
 /// // Register the listener
-/// poll.register(&listener,
-///               LISTENER,
-///               Ready::readable(),
-///               PollOpt::edge())?;
+/// register.register(&listener,
+///                   LISTENER,
+///                   Ready::readable(),
+///                   PollOpt::edge())?;
 ///
 /// // Spawn a thread that will connect a bunch of sockets then close them
 /// let addr = listener.local_addr()?;
@@ -86,10 +87,10 @@
 ///                             next_socket_index += 1;
 ///
 ///                             // Register the new socket w/ poll
-///                             poll.register(&socket,
-///                                          token,
-///                                          Ready::readable(),
-///                                          PollOpt::edge())?;
+///                             register.register(&socket,
+///                                               token,
+///                                               Ready::readable(),
+///                                               PollOpt::edge())?;
 ///
 ///                             // Store the socket
 ///                             sockets.insert(token, socket);

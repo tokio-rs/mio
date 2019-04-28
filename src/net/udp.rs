@@ -10,7 +10,7 @@ use poll::SelectorId;
 use std::fmt;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 /// [portability guidelines]: ../struct.Poll.html#portability
-use {io, sys, Poll, PollOpt, Ready, Token};
+use {io, sys, PollOpt, Ready, Register, Token};
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use iovec::IoVec;
@@ -49,11 +49,12 @@ use iovec::IoVec;
 ///
 /// // We need a Poll to check if SENDER is ready to be written into, and if ECHOER is ready to be
 /// // read from.
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
+/// let register = poll.register().clone();
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// poll.register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
-/// poll.register(&echoer_socket, ECHOER, Ready::readable(), PollOpt::edge())?;
+/// register.register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
+/// register.register(&echoer_socket, ECHOER, Ready::readable(), PollOpt::edge())?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];
@@ -580,27 +581,27 @@ impl UdpSocket {
 impl Evented for UdpSocket {
     fn register(
         &self,
-        poll: &Poll,
+        register: &Register,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interest, opts)
+        self.selector_id.associate_selector(register)?;
+        self.sys.register(register, token, interest, opts)
     }
 
     fn reregister(
         &self,
-        poll: &Poll,
+        register: &Register,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(poll, token, interest, opts)
+        self.sys.reregister(register, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.sys.deregister(poll)
+    fn deregister(&self, register: &Register) -> io::Result<()> {
+        self.sys.deregister(register)
     }
 }
 

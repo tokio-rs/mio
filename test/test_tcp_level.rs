@@ -9,18 +9,20 @@ const MS: u64 = 1_000;
 
 #[test]
 pub fn test_tcp_listener_level_triggered() {
-    let poll = Poll::new().unwrap();
+    let mut poll = Poll::new().unwrap();
     let mut pevents = Events::with_capacity(1024);
 
     // Create the listener
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Ready::readable(), PollOpt::level())
+    poll.register()
+        .register(&l, Token(0), Ready::readable(), PollOpt::level())
         .unwrap();
 
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(&s1, Token(1), Ready::readable(), PollOpt::edge())
+    poll.register()
+        .register(&s1, Token(1), Ready::readable(), PollOpt::edge())
         .unwrap();
 
     while filter(&pevents, Token(0)).is_empty() {
@@ -47,7 +49,8 @@ pub fn test_tcp_listener_level_triggered() {
     assert!(events.is_empty(), "actual={:?}", events);
 
     let s3 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(&s3, Token(2), Ready::readable(), PollOpt::edge())
+    poll.register()
+        .register(&s3, Token(2), Ready::readable(), PollOpt::edge())
         .unwrap();
 
     while filter(&pevents, Token(0)).is_empty() {
@@ -70,30 +73,32 @@ pub fn test_tcp_listener_level_triggered() {
 #[test]
 pub fn test_tcp_stream_level_triggered() {
     drop(::env_logger::init());
-    let poll = Poll::new().unwrap();
+    let mut poll = Poll::new().unwrap();
     let mut pevents = Events::with_capacity(1024);
 
     // Create the listener
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Ready::readable(), PollOpt::edge())
+    poll.register()
+        .register(&l, Token(0), Ready::readable(), PollOpt::edge())
         .unwrap();
 
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(
-        &s1,
-        Token(1),
-        Ready::readable() | Ready::writable(),
-        PollOpt::level(),
-    )
-    .unwrap();
+    poll.register()
+        .register(
+            &s1,
+            Token(1),
+            Ready::readable() | Ready::writable(),
+            PollOpt::level(),
+        )
+        .unwrap();
 
     // Sleep a bit to ensure it arrives at dest
     sleep_ms(250);
 
     expect_events(
-        &poll,
+        &mut poll,
         &mut pevents,
         2,
         vec![
@@ -109,14 +114,15 @@ pub fn test_tcp_stream_level_triggered() {
     sleep_ms(250);
 
     expect_events(
-        &poll,
+        &mut poll,
         &mut pevents,
         2,
         vec![Event::new(Ready::writable(), Token(1))],
     );
 
     // Register the socket
-    poll.register(&s1_tx, Token(123), Ready::readable(), PollOpt::edge())
+    poll.register()
+        .register(&s1_tx, Token(123), Ready::readable(), PollOpt::edge())
         .unwrap();
 
     debug!("writing some data ----------");
@@ -132,7 +138,7 @@ pub fn test_tcp_stream_level_triggered() {
 
     // Poll rx end
     expect_events(
-        &poll,
+        &mut poll,
         &mut pevents,
         2,
         vec![Event::new(Ready::readable(), Token(1))],
@@ -149,7 +155,7 @@ pub fn test_tcp_stream_level_triggered() {
     debug!("checking just read ----------");
 
     expect_events(
-        &poll,
+        &mut poll,
         &mut pevents,
         1,
         vec![Event::new(Ready::writable(), Token(1))],
