@@ -1,5 +1,7 @@
 # Unreleased (Unreleased)
 
+* The `join_multicast_v4` and `leave_multicast_v4` methods now take their
+  `Ipv4Addr` arguments by value rather than by reference.
 * Fix lazycell related compilation issues.
 
 # 0.6.16 (September 5, 2018)

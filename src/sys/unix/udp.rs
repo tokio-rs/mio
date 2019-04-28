@@ -1,6 +1,7 @@
 use event::Evented;
 use std::fmt;
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use sys::unix::uio::VecIo;
 use unix::EventedFd;
@@ -11,11 +12,11 @@ use iovec::IoVec;
 use net2::UdpSocketExt;
 
 pub struct UdpSocket {
-    io: net::UdpSocket,
+    io: std::net::UdpSocket,
 }
 
 impl UdpSocket {
-    pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
+    pub fn new(socket: std::net::UdpSocket) -> io::Result<UdpSocket> {
         socket.set_nonblocking(true)?;
         Ok(UdpSocket { io: socket })
     }
@@ -88,16 +89,16 @@ impl UdpSocket {
         self.io.set_ttl(ttl)
     }
 
-    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
-        self.io.join_multicast_v4(multiaddr, interface)
+    pub fn join_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
+        self.io.join_multicast_v4(&multiaddr, &interface)
     }
 
     pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.io.join_multicast_v6(multiaddr, interface)
     }
 
-    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
-        self.io.leave_multicast_v4(multiaddr, interface)
+    pub fn leave_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
+        self.io.leave_multicast_v4(&multiaddr, &interface)
     }
 
     pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
@@ -160,7 +161,7 @@ impl fmt::Debug for UdpSocket {
 impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
         UdpSocket {
-            io: net::UdpSocket::from_raw_fd(fd),
+            io: std::net::UdpSocket::from_raw_fd(fd),
         }
     }
 }
