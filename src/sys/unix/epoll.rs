@@ -97,7 +97,7 @@ impl Selector {
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut info = libc::epoll_event {
-            events: ioevent_to_epoll(Ready::from(interests), opts),
+            events: ioevent_to_epoll(interests.to_ready(), opts),
             u64: usize::from(token) as u64,
         };
 
@@ -121,7 +121,7 @@ impl Selector {
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut info = libc::epoll_event {
-            events: ioevent_to_epoll(Ready::from(interests), opts),
+            events: ioevent_to_epoll(interests.to_ready(), opts),
             u64: usize::from(token) as u64,
         };
 

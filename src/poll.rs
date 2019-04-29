@@ -1653,7 +1653,7 @@ impl Registration {
         let node = Box::into_raw(Box::new(ReadinessNode::new(
             queue,
             token,
-            Ready::from(interest),
+            interest.to_ready(),
             opt,
             3,
         )));
@@ -1678,7 +1678,7 @@ impl Evented for Registration {
         interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(poll, token, Ready::from(interest), opts)
+        self.inner.update(poll, token, interest.to_ready(), opts)
     }
 
     fn reregister(
@@ -1688,7 +1688,7 @@ impl Evented for Registration {
         interest: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(poll, token, Ready::from(interest), opts)
+        self.inner.update(poll, token, interest.to_ready(), opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {

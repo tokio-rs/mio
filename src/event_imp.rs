@@ -1363,6 +1363,21 @@ impl Interests {
     pub fn is_priority(&self) -> bool {
         (self.0 & PRI) != 0
     }
+
+    /// Returns `Ready` contains `Interests` readiness
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mio::{Interests, Ready};
+    ///
+    /// let interest = Interests::readable();
+    ///
+    /// assert_eq!(Ready::readable(),interest.to_ready());
+    /// ```
+    pub fn to_ready(&self) -> Ready {
+        Ready(self.0)
+    }
 }
 
 impl<T: Into<Interests>> ops::BitOr<T> for Interests {
@@ -1405,12 +1420,6 @@ impl fmt::Debug for Interests {
             (false, true) => "WRITABLE",
             (false, false) => unreachable!(),
         })
-    }
-}
-
-impl From<Interests> for Ready {
-    fn from(src: Interests) -> Ready {
-        Ready(src.0)
     }
 }
 
