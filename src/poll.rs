@@ -869,7 +869,7 @@ impl fmt::Debug for Poll {
 
 impl fmt::Debug for Register {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("Poll").finish()
+        fmt.debug_struct("Register").finish()
     }
 }
 
