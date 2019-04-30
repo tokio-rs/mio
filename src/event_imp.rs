@@ -41,18 +41,18 @@ use {Poll, Token};
 /// }
 ///
 /// impl Evented for MyEvented {
-///     fn register(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
+///     fn register(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `register` call to `socket`
-///         self.socket.register(poll, token, interest, opts)
+///         self.socket.register(poll, token, interests, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
+///     fn reregister(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `reregister` call to `socket`
-///         self.socket.reregister(poll, token, interest, opts)
+///         self.socket.reregister(poll, token, interests, opts)
 ///     }
 ///
 ///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
@@ -103,16 +103,16 @@ use {Poll, Token};
 /// }
 ///
 /// impl Evented for Deadline {
-///     fn register(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
+///     fn register(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.register(poll, token, interest, opts)
+///         self.registration.register(poll, token, interests, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
+///     fn reregister(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.reregister(poll, token, interest, opts)
+///         self.registration.reregister(poll, token, interests, opts)
 ///     }
 ///
 ///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
@@ -133,7 +133,7 @@ pub trait Evented {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()>;
 
@@ -150,7 +150,7 @@ pub trait Evented {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()>;
 
@@ -171,20 +171,20 @@ impl Evented for Box<Evented> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().register(poll, token, interest, opts)
+        self.as_ref().register(poll, token, interests, opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().reregister(poll, token, interest, opts)
+        self.as_ref().reregister(poll, token, interests, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
@@ -197,20 +197,20 @@ impl<T: Evented> Evented for Box<T> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().register(poll, token, interest, opts)
+        self.as_ref().register(poll, token, interests, opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().reregister(poll, token, interest, opts)
+        self.as_ref().reregister(poll, token, interests, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
@@ -223,20 +223,20 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().register(poll, token, interest, opts)
+        self.as_ref().register(poll, token, interests, opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().reregister(poll, token, interest, opts)
+        self.as_ref().reregister(poll, token, interests, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
@@ -997,9 +997,6 @@ const AIO: usize = 0b01_0000;
 #[cfg(any(target_os = "freebsd"))]
 const LIO: usize = 0b10_0000;
 
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-const PRI: usize = 0b100_0000;
-
 /// Interests used in registering.
 ///
 /// Interests are used in registering [`Evented`] handles with [`Poll`],
@@ -1023,9 +1020,9 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::readable();
+    /// let interests = Interests::readable();
     ///
-    /// assert!(interest.is_readable());
+    /// assert!(interests.is_readable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
@@ -1043,9 +1040,9 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::writable();
+    /// let interests = Interests::writable();
     ///
-    /// assert!(interest.is_writable());
+    /// assert!(interests.is_writable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
@@ -1063,73 +1060,16 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::both();
+    /// let interests = Interests::both();
     ///
-    /// assert!(interest.is_readable());
-    /// assert!(interest.is_writable());
+    /// assert!(interests.is_readable());
+    /// assert!(interests.is_writable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn both() -> Interests {
         Interests(READABLE | WRITABLE)
-    }
-
-    /// Returns `Interests` representing HUP readiness.
-    ///
-    /// A HUP (or hang-up) signifies that a stream socket **peer** closed the
-    /// connection, or shut down the writing half of the connection.
-    ///
-    /// **Note that only readable and writable readiness is guaranteed to be
-    /// supported on all platforms**. This means that `hup` readiness
-    /// should be treated as a hint. For more details, see [readiness] in the
-    /// poll documentation.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interest = Interests::hup();
-    ///
-    /// assert!(interest.is_hup());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    /// [readiness]: ../struct.Poll.html#readiness-operations
-    #[inline]
-    #[cfg(unix)]
-    pub fn hup() -> Interests {
-        Interests(HUP)
-    }
-
-    /// Returns `Interests` representing error readiness.
-    ///
-    /// **Note that only readable and writable readiness is guaranteed to be
-    /// supported on all platforms**. This means that `error` readiness
-    /// should be treated as a hint. For more details, see [readiness] in the
-    /// poll documentation.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interest = Interests::error();
-    ///
-    /// assert!(interest.is_error());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    /// [readiness]: ../struct.Poll.html#readiness-operations
-    #[inline]
-    #[cfg(unix)]
-    pub fn error() -> Interests {
-        Interests(ERROR)
     }
 
     /// Returns `Interests` representing AIO completion readiness.
@@ -1141,9 +1081,9 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::aio();
+    /// let interests = Interests::aio();
     ///
-    /// assert!(interest.is_aio());
+    /// assert!(interests.is_aio());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
@@ -1167,9 +1107,9 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::lio();
+    /// let interests = Interests::lio();
     ///
-    /// assert!(interest.is_lio());
+    /// assert!(interests.is_lio());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
@@ -1177,27 +1117,6 @@ impl Interests {
     #[cfg(any(target_os = "freebsd"))]
     pub fn lio() -> Interests {
         Interests(LIO)
-    }
-
-    /// Returns `Interests` representing priority (`EPOLLPRI`) readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interest = Interests::priority();
-    ///
-    /// assert!(interest.is_priority());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    pub fn priority() -> Interests {
-        Interests(PRI)
     }
 
     /// Returns true if the value includes readable readiness.
@@ -1209,9 +1128,9 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::readable();
+    /// let interests = Interests::readable();
     ///
-    /// assert!(interest.is_readable());
+    /// assert!(interests.is_readable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
@@ -1228,71 +1147,14 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::writable();
+    /// let interests = Interests::writable();
     ///
-    /// assert!(interest.is_writable());
+    /// assert!(interests.is_writable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
     pub fn is_writable(&self) -> bool {
         (self.0 & WRITABLE) != 0
-    }
-
-    /// Returns true if `Interests` contains HUP readiness
-    ///
-    /// A HUP (or hang-up) signifies that a stream socket **peer** closed the
-    /// connection, or shut down the writing half of the connection.
-    ///
-    /// **Note that only readable and writable readiness is guaranteed to be
-    /// supported on all platforms**. This means that `hup` readiness
-    /// should be treated as a hint. For more details, see [readiness] in the
-    /// poll documentation.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interest = Interests::hup();
-    ///
-    /// assert!(interest.is_hup());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    /// [readiness]: ../struct.Poll.html#readiness-operations
-    #[inline]
-    #[cfg(unix)]
-    pub fn is_hup(&self) -> bool {
-        (self.0 & HUP) != 0
-    }
-
-    /// Returns true if `Interests` contains error readiness
-    ///
-    /// **Note that only readable and writable readiness is guaranteed to be
-    /// supported on all platforms**. This means that `error` readiness should
-    /// be treated as a hint. For more details, see [readiness] in the poll
-    /// documentation.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interest = Interests::error();
-    ///
-    /// assert!(interest.is_error());
-    /// ```
-    ///
-    /// [`Poll`]: ../struct.Poll.html
-    /// [readiness]: ../struct.Poll.html#readiness-operations
-    #[inline]
-    #[cfg(unix)]
-    pub fn is_error(&self) -> bool {
-        (self.0 & ERROR) != 0
     }
 
     /// Returns true if `Interests` contains AIO readiness
@@ -1304,9 +1166,9 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::aio();
+    /// let interests = Interests::aio();
     ///
-    /// assert!(interest.is_aio());
+    /// assert!(interests.is_aio());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
@@ -1331,9 +1193,9 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interest = Interests::lio();
+    /// let interests = Interests::lio();
     ///
-    /// assert!(interest.is_lio());
+    /// assert!(interests.is_lio());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
@@ -1343,27 +1205,6 @@ impl Interests {
         (self.0 & LIO) != 0
     }
 
-    /// Returns true if `Interests` contains priority (`EPOLLPRI`) readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interest = Interests::priority();
-    ///
-    /// assert!(interest.is_priority());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    pub fn is_priority(&self) -> bool {
-        (self.0 & PRI) != 0
-    }
-
     /// Returns `Ready` contains `Interests` readiness
     ///
     /// # Examples
@@ -1371,55 +1212,93 @@ impl Interests {
     /// ```
     /// use mio::{Interests, Ready};
     ///
-    /// let interest = Interests::readable();
+    /// let interests = Interests::readable();
     ///
-    /// assert_eq!(Ready::readable(),interest.to_ready());
+    /// assert_eq!(Ready::readable(),interests.to_ready());
     /// ```
     pub fn to_ready(&self) -> Ready {
         Ready(self.0)
     }
 }
 
-impl<T: Into<Interests>> ops::BitOr<T> for Interests {
-    type Output = Interests;
+impl ops::BitOr for Interests {
+    type Output = Self;
 
     #[inline]
-    fn bitor(self, other: T) -> Interests {
-        Interests(self.0 | other.into().0)
+    fn bitor(self, other: Self) -> Self {
+        Interests(self.0 | other.0)
     }
 }
 
-impl<T: Into<Interests>> ops::BitOrAssign<T> for Interests {
+impl ops::BitOrAssign for Interests {
     #[inline]
-    fn bitor_assign(&mut self, other: T) {
-        self.0 |= other.into().0;
+    fn bitor_assign(&mut self, other: Self) {
+        self.0 |= other.0;
     }
 }
 
-impl<T: Into<Interests>> ops::Sub<T> for Interests {
-    type Output = Interests;
+impl ops::Sub for Interests {
+    type Output = Self;
 
     #[inline]
-    fn sub(self, other: T) -> Interests {
-        Interests(self.0 & !other.into().0)
+    fn sub(self, other: Self) -> Self {
+        Interests(self.0 & !other.0)
     }
 }
 
-impl<T: Into<Interests>> ops::SubAssign<T> for Interests {
+impl ops::SubAssign for Interests {
     #[inline]
-    fn sub_assign(&mut self, other: T) {
-        self.0 &= !other.into().0;
+    fn sub_assign(&mut self, other: Self) {
+        self.0 &= !other.0;
     }
 }
 
 impl fmt::Debug for Interests {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.write_str(match (self.is_readable(), self.is_writable()) {
-            (true, true) => "READABLE | WRITABLE",
-            (true, false) => "READABLE",
-            (false, true) => "WRITABLE",
-            (false, false) => unreachable!(),
-        })
+        let mut one = false;
+        if self.is_readable() {
+            if one {
+                write!(fmt, " | ")?
+            }
+            write!(fmt, "{}", "READABLE")?;
+            one = true
+        }
+        if self.is_writable() {
+            if one {
+                write!(fmt, " | ")?
+            }
+            write!(fmt, "{}", "WRITABLE")?;
+            one = true
+        }
+        #[cfg(any(
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos"
+        ))]
+        {
+            if self.is_aio() {
+                if one {
+                    write!(fmt, " | ")?
+                }
+                write!(fmt, "{}", "AIO")?;
+                one = true
+            }
+        }
+        #[cfg(any(target_os = "freebsd"))]
+        {
+            if self.is_lio() {
+                if one {
+                    write!(fmt, " | ")?
+                }
+                write!(fmt, "{}", "LIO")?;
+                one = true
+            }
+        }
+        if !one {
+            unreachable!();
+        }
+        Ok(())
     }
 }
 
@@ -1428,6 +1307,19 @@ fn test_debug_interests() {
     assert_eq!("READABLE | WRITABLE", format!("{:?}", Interests::both()));
     assert_eq!("READABLE", format!("{:?}", Interests::readable()));
     assert_eq!("WRITABLE", format!("{:?}", Interests::writable()));
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos"
+    ))]
+    {
+        assert_eq!("AIO", format!("{:?}", Interests::aio()));
+    }
+    #[cfg(any(target_os = "freebsd"))]
+    {
+        assert_eq!("LIO", format!("{:?}", Interests::lio()));
+    }
 }
 
 /// An readiness event returned by [`Poll::poll`].

@@ -16,7 +16,7 @@ struct EchoConn {
     buf: Option<ByteBuf>,
     mut_buf: Option<MutByteBuf>,
     token: Option<Token>,
-    interest: Option<Interests>,
+    interests: Option<Interests>,
 }
 
 impl EchoConn {
@@ -26,7 +26,7 @@ impl EchoConn {
             buf: None,
             mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: None,
-            interest: None,
+            interests: None,
         }
     }
 
@@ -38,7 +38,7 @@ impl EchoConn {
                 debug!("client flushing buf; WOULDBLOCK");
 
                 self.buf = Some(buf);
-                self.interest = match self.interest {
+                self.interests = match self.interests {
                     None => Some(Interests::writable()),
                     Some(i) => Some(i | Interests::writable()),
                 };
@@ -47,7 +47,7 @@ impl EchoConn {
                 debug!("CONN : we wrote {} bytes!", r);
 
                 self.mut_buf = Some(buf.flip());
-                self.interest = match self.interest {
+                self.interests = match self.interests {
                     None => Some(Interests::readable()),
                     Some(i) => Some((i | Interests::readable()) - Interests::writable()),
                 };
@@ -56,14 +56,14 @@ impl EchoConn {
         }
 
         assert!(
-            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(),
+            self.interests.unwrap().is_readable() || self.interests.unwrap().is_writable(),
             "actual={:?}",
-            self.interest
+            self.interests
         );
         event_loop.reregister(
             &self.sock,
             self.token.unwrap(),
-            self.interest.unwrap(),
+            self.interests.unwrap(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -82,28 +82,28 @@ impl EchoConn {
                 // prepare to provide this to writable
                 self.buf = Some(buf.flip());
 
-                self.interest = match self.interest {
+                self.interests = match self.interests {
                     None => Some(Interests::writable()),
                     Some(i) => Some((i | Interests::writable()) - Interests::readable()),
                 };
             }
             Err(e) => {
                 debug!("not implemented; client err={:?}", e);
-                if let Some(x) = self.interest.as_mut() {
+                if let Some(x) = self.interests.as_mut() {
                     *x -= Interests::readable();
                 }
             }
         };
 
         assert!(
-            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(),
+            self.interests.unwrap().is_readable() || self.interests.unwrap().is_writable(),
             "actual={:?}",
-            self.interest
+            self.interests
         );
         event_loop.reregister(
             &self.sock,
             self.token.unwrap(),
-            self.interest.unwrap(),
+            self.interests.unwrap(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -158,7 +158,7 @@ struct EchoClient {
     rx: SliceBuf<'static>,
     mut_buf: Option<MutByteBuf>,
     token: Token,
-    interest: Option<Interests>,
+    interests: Option<Interests>,
 }
 
 // Sends a message and expects to receive the same exact message, one at a time
@@ -173,7 +173,7 @@ impl EchoClient {
             rx: SliceBuf::wrap(curr.as_bytes()),
             mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: tok,
-            interest: None,
+            interests: None,
         }
     }
 
@@ -207,7 +207,7 @@ impl EchoClient {
 
                 self.mut_buf = Some(buf.flip());
 
-                if let Some(x) = self.interest.as_mut() {
+                if let Some(x) = self.interests.as_mut() {
                     *x -= Interests::readable();
                 }
 
@@ -220,7 +220,7 @@ impl EchoClient {
             }
         };
 
-        if let Some(x) = self.interest {
+        if let Some(x) = self.interests {
             event_loop.reregister(
                 &self.sock,
                 self.token,
@@ -238,14 +238,14 @@ impl EchoClient {
         match self.sock.try_write_buf(&mut self.tx) {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
-                self.interest = match self.interest {
+                self.interests = match self.interests {
                     None => Some(Interests::writable()),
                     Some(i) => Some(i | Interests::writable()),
                 };
             }
             Ok(Some(r)) => {
                 debug!("CLIENT : we wrote {} bytes!", r);
-                self.interest = match self.interest {
+                self.interests = match self.interests {
                     None => Some(Interests::readable()),
                     Some(i) => Some((i | Interests::readable()) - Interests::writable()),
                 };
@@ -254,14 +254,14 @@ impl EchoClient {
         }
 
         assert!(
-            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(),
+            self.interests.unwrap().is_readable() || self.interests.unwrap().is_writable(),
             "actual={:?}",
-            self.interest
+            self.interests
         );
         event_loop.reregister(
             &self.sock,
             self.token,
-            self.interest.unwrap(),
+            self.interests.unwrap(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -278,19 +278,19 @@ impl EchoClient {
         self.tx = SliceBuf::wrap(curr.as_bytes());
         self.rx = SliceBuf::wrap(curr.as_bytes());
 
-        self.interest = match self.interest {
+        self.interests = match self.interests {
             None => Some(Interests::writable()),
             Some(i) => Some(i | Interests::writable()),
         };
         assert!(
-            self.interest.unwrap().is_readable() || self.interest.unwrap().is_writable(),
+            self.interests.unwrap().is_readable() || self.interests.unwrap().is_writable(),
             "actual={:?}",
-            self.interest
+            self.interests
         );
         event_loop.reregister(
             &self.sock,
             self.token,
-            self.interest.unwrap(),
+            self.interests.unwrap(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }

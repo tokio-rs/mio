@@ -396,21 +396,21 @@ impl Evented for TcpStream {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interest, opts)
+        self.sys.register(poll, token, interests, opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(poll, token, interest, opts)
+        self.sys.reregister(poll, token, interests, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
@@ -591,21 +591,21 @@ impl Evented for TcpListener {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interest, opts)
+        self.sys.register(poll, token, interests, opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(poll, token, interest, opts)
+        self.sys.reregister(poll, token, interests, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {

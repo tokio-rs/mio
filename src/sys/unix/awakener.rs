@@ -63,20 +63,20 @@ mod pipe {
             &self,
             poll: &Poll,
             token: Token,
-            interest: Interests,
+            interests: Interests,
             opts: PollOpt,
         ) -> io::Result<()> {
-            self.reader().register(poll, token, interest, opts)
+            self.reader().register(poll, token, interests, opts)
         }
 
         fn reregister(
             &self,
             poll: &Poll,
             token: Token,
-            interest: Interests,
+            interests: Interests,
             opts: PollOpt,
         ) -> io::Result<()> {
-            self.reader().reregister(poll, token, interest, opts)
+            self.reader().reregister(poll, token, interests, opts)
         }
 
         fn deregister(&self, poll: &Poll) -> io::Result<()> {

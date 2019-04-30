@@ -410,16 +410,16 @@ pub struct Poll {
 /// }
 ///
 /// impl Evented for Deadline {
-///     fn register(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
+///     fn register(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.register(poll, token, interest, opts)
+///         self.registration.register(poll, token, interests, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
+///     fn reregister(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.reregister(poll, token, interest, opts)
+///         self.registration.reregister(poll, token, interests, opts)
 ///     }
 ///
 ///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
@@ -782,7 +782,7 @@ impl Poll {
         &self,
         handle: &E,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()>
     where
@@ -798,7 +798,7 @@ impl Poll {
         trace!("registering with poller");
 
         // Register interests for this socket
-        handle.register(self, token, interest, opts)?;
+        handle.register(self, token, interests, opts)?;
 
         Ok(())
     }
@@ -860,7 +860,7 @@ impl Poll {
         &self,
         handle: &E,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()>
     where
@@ -871,7 +871,7 @@ impl Poll {
         trace!("registering with poller");
 
         // Register interests for this socket
-        handle.reregister(self, token, interest, opts)?;
+        handle.reregister(self, token, interests, opts)?;
 
         Ok(())
     }
@@ -1555,10 +1555,10 @@ pub fn selector(poll: &Poll) -> &sys::Selector {
 pub fn new_registration(
     poll: &Poll,
     token: Token,
-    ready: Interests,
+    interests: Interests,
     opt: PollOpt,
 ) -> (Registration, SetReadiness) {
-    Registration::new_priv(poll, token, ready, opt)
+    Registration::new_priv(poll, token, interests, opt)
 }
 
 impl Registration {
@@ -1634,7 +1634,7 @@ impl Registration {
     fn new_priv(
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opt: PollOpt,
     ) -> (Registration, SetReadiness) {
         is_send::<Registration>();
@@ -1653,7 +1653,7 @@ impl Registration {
         let node = Box::into_raw(Box::new(ReadinessNode::new(
             queue,
             token,
-            interest.to_ready(),
+            interests.to_ready(),
             opt,
             3,
         )));
@@ -1675,20 +1675,20 @@ impl Evented for Registration {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(poll, token, interest.to_ready(), opts)
+        self.inner.update(poll, token, interests.to_ready(), opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(poll, token, interest.to_ready(), opts)
+        self.inner.update(poll, token, interests.to_ready(), opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {

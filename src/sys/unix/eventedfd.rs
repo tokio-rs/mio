@@ -68,16 +68,16 @@ use {io, poll, Interests, Poll, PollOpt, Token};
 /// }
 ///
 /// impl Evented for MyIo {
-///     fn register(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
+///     fn register(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         EventedFd(&self.fd).register(poll, token, interest, opts)
+///         EventedFd(&self.fd).register(poll, token, interests, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interest: Interests, opts: PollOpt)
+///     fn reregister(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         EventedFd(&self.fd).reregister(poll, token, interest, opts)
+///         EventedFd(&self.fd).reregister(poll, token, interests, opts)
 ///     }
 ///
 ///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
@@ -97,20 +97,20 @@ impl<'a> Evented for EventedFd<'a> {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        poll::selector(poll).register(*self.0, token, interest, opts)
+        poll::selector(poll).register(*self.0, token, interests, opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        poll::selector(poll).reregister(*self.0, token, interest, opts)
+        poll::selector(poll).reregister(*self.0, token, interests, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {

@@ -283,15 +283,15 @@ impl UdpSocket {
         self.imp.inner()
     }
 
-    fn post_register(&self, interest: Interests, me: &mut Inner) {
-        if interest.is_readable() {
+    fn post_register(&self, interests: Interests, me: &mut Inner) {
+        if interests.is_readable() {
             //We use recv_from here since it is well specified for both
             //connected and non-connected sockets and we can discard the address
             //when calling recv().
             self.imp.schedule_read_from(me);
         }
         // See comments in TcpSocket::post_register for what's going on here
-        if interest.is_writable() {
+        if interests.is_writable() {
             if let State::Empty = me.write {
                 self.imp.add_readiness(me, Ready::writable());
             }
@@ -348,7 +348,7 @@ impl Evented for UdpSocket {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -356,11 +356,11 @@ impl Evented for UdpSocket {
             &self.imp.inner.socket,
             poll,
             token,
-            interest,
+            interests,
             opts,
             &self.registration,
         )?;
-        self.post_register(interest, &mut me);
+        self.post_register(interests, &mut me);
         Ok(())
     }
 
@@ -368,7 +368,7 @@ impl Evented for UdpSocket {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Interests,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -376,11 +376,11 @@ impl Evented for UdpSocket {
             &self.imp.inner.socket,
             poll,
             token,
-            interest,
+            interests,
             opts,
             &self.registration,
         )?;
-        self.post_register(interest, &mut me);
+        self.post_register(interests, &mut me);
         Ok(())
     }
 
