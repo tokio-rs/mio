@@ -26,8 +26,7 @@ impl EchoConn {
             buf: None,
             mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
             token: None,
-            interest: Interests::from_usize(Ready::hup()),
-            interest: Some(Interests::hup()),
+            interest: None,
         }
     }
 

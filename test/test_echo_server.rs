@@ -215,14 +215,6 @@ impl EchoClient {
         };
 
         if let Some(x) = self.interest {
-            //Interests can only be READABLE / WRITABLE.
-            /*
-            assert!(
-                x.is_readable() || x.is_writable(),
-                "actual={:?}",
-                x
-            );
-            */
             poll.reregister(
                 &self.sock,
                 self.token,

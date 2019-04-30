@@ -25,7 +25,7 @@ impl EchoConn {
             sock: sock,
             pipe_fd: None,
             token: None,
-            interest: Some(Interests::hup()),
+            interest: None,
         }
     }
 

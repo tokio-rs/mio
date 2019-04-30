@@ -76,7 +76,7 @@ use std::ops;
 ///
 /// poll.register(&socket,
 ///               Token(0),
-///               Interests::readable() | Interests::error(),
+///               Interests::readable(),
 ///               PollOpt::edge())?;
 /// #     Ok(())
 /// # }
