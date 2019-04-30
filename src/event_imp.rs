@@ -1207,16 +1207,9 @@ impl Interests {
 
     /// Returns `Ready` contains `Interests` readiness
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::{Interests, Ready};
-    ///
-    /// let interests = Interests::readable();
-    ///
-    /// assert_eq!(Ready::readable(),interests.to_ready());
-    /// ```
-    pub fn to_ready(&self) -> Ready {
+    /// It should and only can be used in crate, and will be deprecated in the future.
+    /// So don't use it unless you have no other choice.
+    pub(crate) fn to_ready(&self) -> Ready {
         Ready(self.0)
     }
 }
