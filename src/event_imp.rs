@@ -1055,20 +1055,9 @@ impl Interests {
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::both();
-    ///
-    /// assert!(interests.is_readable());
-    /// assert!(interests.is_writable());
-    /// ```
-    ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
-    pub fn both() -> Interests {
+    pub(crate) fn both() -> Interests {
         Interests(READABLE | WRITABLE)
     }
 
@@ -1288,9 +1277,7 @@ impl fmt::Debug for Interests {
                 one = true
             }
         }
-        if !one {
-            unreachable!();
-        }
+        debug_assert!(one, "printing empty interests");
         Ok(())
     }
 }
