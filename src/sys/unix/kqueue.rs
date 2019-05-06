@@ -393,7 +393,7 @@ fn does_not_register_rw() {
 
     // registering kqueue fd will fail if write is requested (On anything but some versions of OS
     // X)
-    poll.register()
+    poll.registry()
         .register(
             &kqf,
             Token(1234),

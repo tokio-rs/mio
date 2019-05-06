@@ -9,7 +9,7 @@ fn smoke() {
 
     let (r, set) = Registration::new();
     r.register(
-        poll.register(),
+        poll.registry(),
         Token(0),
         Ready::readable(),
         PollOpt::edge(),
@@ -57,7 +57,7 @@ fn set_readiness_before_register() {
         b1.wait();
 
         // now register
-        poll.register()
+        poll.registry()
             .register(&r, Token(123), Ready::readable(), PollOpt::edge())
             .unwrap();
 
@@ -103,7 +103,7 @@ mod stress {
                 .map(|i| {
                     let (r, s) = Registration::new();
                     r.register(
-                        poll.register(),
+                        poll.registry(),
                         Token(i),
                         Ready::readable(),
                         PollOpt::edge(),
@@ -148,7 +148,7 @@ mod stress {
                 // Set interest
                 for (i, &(ref r, _)) in registrations.iter().enumerate() {
                     r.reregister(
-                        poll.register(),
+                        poll.registry(),
                         Token(i),
                         Ready::writable(),
                         PollOpt::edge(),
@@ -167,7 +167,7 @@ mod stress {
                 // Set interest
                 for (i, &(ref r, _)) in registrations.iter().enumerate() {
                     r.reregister(
-                        poll.register(),
+                        poll.registry(),
                         Token(i),
                         Ready::readable(),
                         PollOpt::edge(),
@@ -215,7 +215,7 @@ mod stress {
 
         for i in 0..N {
             let (registration, set_readiness) = Registration::new();
-            poll.register()
+            poll.registry()
                 .register(&registration, Token(i), Ready::readable(), PollOpt::edge())
                 .unwrap();
 
@@ -298,7 +298,7 @@ fn drop_registration_from_non_main_thread() {
         let (registration, set_readiness) = Registration::new();
         registration
             .register(
-                poll.register(),
+                poll.registry(),
                 Token(token_index),
                 Ready::readable(),
                 PollOpt::edge(),
@@ -314,7 +314,7 @@ fn drop_registration_from_non_main_thread() {
             let (registration, set_readiness) = Registration::new();
             registration
                 .register(
-                    poll.register(),
+                    poll.registry(),
                     Token(token_index),
                     Ready::readable(),
                     PollOpt::edge(),

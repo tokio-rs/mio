@@ -10,7 +10,7 @@ fn test_tcp_register_multiple_event_loops() {
 
     let poll1 = Poll::new().unwrap();
     poll1
-        .register()
+        .registry()
         .register(
             &listener,
             Token(0),
@@ -22,7 +22,7 @@ fn test_tcp_register_multiple_event_loops() {
     let poll2 = Poll::new().unwrap();
 
     // Try registering the same socket with the initial one
-    let res = poll2.register().register(
+    let res = poll2.registry().register(
         &listener,
         Token(0),
         Ready::readable() | Ready::writable(),
@@ -33,7 +33,7 @@ fn test_tcp_register_multiple_event_loops() {
 
     // Try cloning the socket and registering it again
     let listener2 = listener.try_clone().unwrap();
-    let res = poll2.register().register(
+    let res = poll2.registry().register(
         &listener2,
         Token(0),
         Ready::readable() | Ready::writable(),
@@ -46,7 +46,7 @@ fn test_tcp_register_multiple_event_loops() {
     let stream = TcpStream::connect(&addr).unwrap();
 
     poll1
-        .register()
+        .registry()
         .register(
             &stream,
             Token(1),
@@ -55,7 +55,7 @@ fn test_tcp_register_multiple_event_loops() {
         )
         .unwrap();
 
-    let res = poll2.register().register(
+    let res = poll2.registry().register(
         &stream,
         Token(1),
         Ready::readable() | Ready::writable(),
@@ -66,7 +66,7 @@ fn test_tcp_register_multiple_event_loops() {
 
     // Try cloning the socket and registering it again
     let stream2 = stream.try_clone().unwrap();
-    let res = poll2.register().register(
+    let res = poll2.registry().register(
         &stream2,
         Token(1),
         Ready::readable() | Ready::writable(),
@@ -83,7 +83,7 @@ fn test_udp_register_multiple_event_loops() {
 
     let poll1 = Poll::new().unwrap();
     poll1
-        .register()
+        .registry()
         .register(
             &socket,
             Token(0),
@@ -95,7 +95,7 @@ fn test_udp_register_multiple_event_loops() {
     let poll2 = Poll::new().unwrap();
 
     // Try registering the same socket with the initial one
-    let res = poll2.register().register(
+    let res = poll2.registry().register(
         &socket,
         Token(0),
         Ready::readable() | Ready::writable(),
@@ -106,7 +106,7 @@ fn test_udp_register_multiple_event_loops() {
 
     // Try cloning the socket and registering it again
     let socket2 = socket.try_clone().unwrap();
-    let res = poll2.register().register(
+    let res = poll2.registry().register(
         &socket2,
         Token(0),
         Ready::readable() | Ready::writable(),

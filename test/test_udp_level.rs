@@ -14,7 +14,7 @@ pub fn test_udp_level_triggered() {
     let tx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let rx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
-    poll.register()
+    poll.registry()
         .register(
             &tx,
             Token(0),
@@ -23,7 +23,7 @@ pub fn test_udp_level_triggered() {
         )
         .unwrap();
 
-    poll.register()
+    poll.registry()
         .register(
             &rx,
             Token(1),

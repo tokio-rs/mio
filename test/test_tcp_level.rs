@@ -16,12 +16,12 @@ pub fn test_tcp_listener_level_triggered() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register()
+    poll.registry()
         .register(&l, Token(0), Ready::readable(), PollOpt::level())
         .unwrap();
 
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register()
+    poll.registry()
         .register(&s1, Token(1), Ready::readable(), PollOpt::edge())
         .unwrap();
 
@@ -49,7 +49,7 @@ pub fn test_tcp_listener_level_triggered() {
     assert!(events.is_empty(), "actual={:?}", events);
 
     let s3 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register()
+    poll.registry()
         .register(&s3, Token(2), Ready::readable(), PollOpt::edge())
         .unwrap();
 
@@ -80,12 +80,12 @@ pub fn test_tcp_stream_level_triggered() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register()
+    poll.registry()
         .register(&l, Token(0), Ready::readable(), PollOpt::edge())
         .unwrap();
 
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register()
+    poll.registry()
         .register(
             &s1,
             Token(1),
@@ -121,7 +121,7 @@ pub fn test_tcp_stream_level_triggered() {
     );
 
     // Register the socket
-    poll.register()
+    poll.registry()
         .register(&s1_tx, Token(123), Ready::readable(), PollOpt::edge())
         .unwrap();
 

@@ -16,7 +16,7 @@ use net2::TcpBuilder;
 
 use event::Evented;
 use poll::SelectorId;
-use {io, sys, PollOpt, Ready, Register, Token};
+use {io, sys, PollOpt, Ready, Registry, Token};
 
 /*
  *
@@ -43,12 +43,12 @@ use {io, sys, PollOpt, Ready, Register, Token};
 /// let stream = TcpStream::connect(&"127.0.0.1:34254".parse()?)?;
 ///
 /// let mut poll = Poll::new()?;
-/// let register = poll.register().clone();
+/// let registry = poll.registry().clone();
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// register.register(&stream, Token(0), Ready::writable(),
-///                   PollOpt::edge())?;
+/// registry.register(&stream, Token(0), Ready::writable(),
+///                    PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -395,27 +395,27 @@ impl<'a> Write for &'a TcpStream {
 impl Evented for TcpStream {
     fn register(
         &self,
-        register: &Register,
+        registry: &Registry,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.selector_id.associate_selector(register)?;
-        self.sys.register(register, token, interest, opts)
+        self.selector_id.associate_selector(registry)?;
+        self.sys.register(registry, token, interest, opts)
     }
 
     fn reregister(
         &self,
-        register: &Register,
+        registry: &Registry,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(register, token, interest, opts)
+        self.sys.reregister(registry, token, interest, opts)
     }
 
-    fn deregister(&self, register: &Register) -> io::Result<()> {
-        self.sys.deregister(register)
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+        self.sys.deregister(registry)
     }
 }
 
@@ -445,11 +445,11 @@ impl fmt::Debug for TcpStream {
 /// let listener = TcpListener::bind(&"127.0.0.1:34255".parse()?)?;
 ///
 /// let mut poll = Poll::new()?;
-/// let register = poll.register().clone();
+/// let registry = poll.registry().clone();
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// register.register(&listener, Token(0), Ready::readable(),
+/// registry.register(&listener, Token(0), Ready::readable(),
 ///                   PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
@@ -591,27 +591,27 @@ impl TcpListener {
 impl Evented for TcpListener {
     fn register(
         &self,
-        register: &Register,
+        registry: &Registry,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.selector_id.associate_selector(register)?;
-        self.sys.register(register, token, interest, opts)
+        self.selector_id.associate_selector(registry)?;
+        self.sys.register(registry, token, interest, opts)
     }
 
     fn reregister(
         &self,
-        register: &Register,
+        registry: &Registry,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(register, token, interest, opts)
+        self.sys.reregister(registry, token, interest, opts)
     }
 
-    fn deregister(&self, register: &Register) -> io::Result<()> {
-        self.sys.deregister(register)
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+        self.sys.deregister(registry)
     }
 }
 

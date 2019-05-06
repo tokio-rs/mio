@@ -17,7 +17,7 @@ fn add_then_drop() {
     let mut events = Events::with_capacity(1024);
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let mut poll = Poll::new().unwrap();
-    poll.register()
+    poll.registry()
         .register(
             &l,
             Token(1),

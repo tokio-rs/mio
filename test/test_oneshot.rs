@@ -16,13 +16,13 @@ pub fn test_tcp_edge_oneshot() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register()
+    poll.registry()
         .register(&l, Token(0), Ready::readable(), PollOpt::level())
         .unwrap();
 
     // Connect a socket, we are going to write to it
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register()
+    poll.registry()
         .register(&s1, Token(1), Ready::writable(), PollOpt::level())
         .unwrap();
 
@@ -30,7 +30,7 @@ pub fn test_tcp_edge_oneshot() {
 
     // Get pair
     let (mut s2, _) = l.accept().unwrap();
-    poll.register()
+    poll.registry()
         .register(
             &s2,
             Token(2),
@@ -52,7 +52,7 @@ pub fn test_tcp_edge_oneshot() {
         assert_eq!(1, s2.read(&mut buf).unwrap());
         assert_eq!(*byte, buf[0]);
 
-        poll.register()
+        poll.registry()
             .reregister(
                 &s2,
                 Token(2),
@@ -62,7 +62,7 @@ pub fn test_tcp_edge_oneshot() {
             .unwrap();
 
         if *byte == b'o' {
-            poll.register()
+            poll.registry()
                 .reregister(
                     &s2,
                     Token(2),

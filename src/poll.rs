@@ -328,12 +328,12 @@ use {sys, Token};
 /// [`SetReadiness`]: struct.SetReadiness.html
 /// [`Poll::poll`]: struct.Poll.html#method.poll
 pub struct Poll {
-    register: Register,
+    registry: Registry,
 }
 
 /// Registers I/O resources.
 #[derive(Clone)]
-pub struct Register {
+pub struct Registry {
     inner: Arc<Inner>,
 }
 
@@ -659,22 +659,22 @@ impl Poll {
             readiness_queue: ReadinessQueue::new()?,
         });
 
-        let register = Register { inner };
+        let registry = Registry { inner };
 
         // Register the notification wakeup FD with the IO poller
-        register.inner.readiness_queue.inner.awakener.register(
-            &register,
+        registry.inner.readiness_queue.inner.awakener.register(
+            &registry,
             AWAKEN,
             Ready::readable(),
             PollOpt::edge(),
         )?;
 
-        Ok(Poll { register })
+        Ok(Poll { registry })
     }
 
-    /// Return a reference to the associated `Register`.
-    pub fn register(&self) -> &Register {
-        &self.register
+    /// Return a reference to the associated `Registry`.
+    pub fn registry(&self) -> &Registry {
+        &self.registry
     }
 
     /// Wait for readiness events
@@ -741,14 +741,14 @@ impl Poll {
     ///
     /// // Construct a new `Poll` handle as well as the `Events` we'll store into
     /// let mut poll = Poll::new()?;
-    /// let register = poll.register().clone();
+    /// let registry = poll.registry().clone();
     /// let mut events = Events::with_capacity(1024);
     ///
     /// // Connect the stream
     /// let stream = TcpStream::connect(&addr)?;
     ///
     /// // Register the stream with `Poll`
-    /// register.register(
+    /// registry.register(
     ///     &stream,
     ///     Token(0),
     ///     Ready::readable() | Ready::writable(),
@@ -798,7 +798,7 @@ impl Poll {
         mut timeout: Option<Duration>,
         interruptible: bool,
     ) -> io::Result<usize> {
-        let inner = &*self.register.inner;
+        let inner = &*self.registry.inner;
 
         // Compute the timeout value passed to the system selector. If the
         // readiness queue has pending nodes, we still want to poll the system
@@ -867,20 +867,20 @@ impl fmt::Debug for Poll {
     }
 }
 
-impl fmt::Debug for Register {
+impl fmt::Debug for Registry {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("Register").finish()
+        fmt.debug_struct("Registry").finish()
     }
 }
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
-        self.register.inner.selector.as_raw_fd()
+        self.registry.inner.selector.as_raw_fd()
     }
 }
 
-impl Register {
+impl Registry {
     /// Register an `Evented` handle with the `Poll` instance.
     ///
     /// Once registered, the `Poll` instance will monitor the `Evented` handle
@@ -954,11 +954,11 @@ impl Register {
     /// use std::time::{Duration, Instant};
     ///
     /// let mut poll = Poll::new()?;
-    /// let register = poll.register().clone();
+    /// let registry = poll.registry().clone();
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`
-    /// register.register(
+    /// registry.register(
     ///     &socket,
     ///     Token(0),
     ///     Ready::readable() | Ready::writable(),
@@ -1050,11 +1050,11 @@ impl Register {
     /// use mio::net::TcpStream;
     ///
     /// let mut poll = Poll::new()?;
-    /// let register = poll.register().clone();
+    /// let registry = poll.registry().clone();
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`, requesting readable
-    /// register.register(
+    /// registry.register(
     ///     &socket,
     ///     Token(0),
     ///     Ready::readable(),
@@ -1063,7 +1063,7 @@ impl Register {
     /// // Reregister the socket specifying a different token and write interest
     /// // instead. `PollOpt::edge()` must be specified even though that value
     /// // is not being changed.
-    /// register.reregister(
+    /// registry.reregister(
     ///     &socket,
     ///     Token(2),
     ///     Ready::writable(),
@@ -1124,17 +1124,17 @@ impl Register {
     /// use std::time::Duration;
     ///
     /// let mut poll = Poll::new()?;
-    /// let register = poll.register().clone();
+    /// let registry = poll.registry().clone();
     /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
     ///
     /// // Register the socket with `poll`
-    /// register.register(
+    /// registry.register(
     ///     &socket,
     ///     Token(0),
     ///     Ready::readable(),
     ///     PollOpt::edge())?;
     ///
-    /// register.deregister(&socket)?;
+    /// registry.deregister(&socket)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     ///
@@ -1443,8 +1443,8 @@ impl fmt::Debug for Events {
 
 // ===== Accessors for internal usage =====
 
-pub fn selector(register: &Register) -> &sys::Selector {
-    &register.inner.selector
+pub fn selector(registry: &Registry) -> &sys::Selector {
+    &registry.inner.selector
 }
 
 /*
@@ -1456,12 +1456,12 @@ pub fn selector(register: &Register) -> &sys::Selector {
 // TODO: get rid of this, windows depends on it for now
 #[allow(dead_code)]
 pub fn new_registration(
-    register: &Register,
+    registry: &Registry,
     token: Token,
     ready: Ready,
     opt: PollOpt,
 ) -> (Registration, SetReadiness) {
-    Registration::new_priv(register, token, ready, opt)
+    Registration::new_priv(registry, token, ready, opt)
 }
 
 impl Registration {
@@ -1489,9 +1489,9 @@ impl Registration {
     /// });
     ///
     /// let mut poll = Poll::new()?;
-    /// let register = poll.register().clone();
+    /// let registry = poll.register().clone();
     ///
-    /// register.register(
+    /// registry.register(
     ///     &registration,
     ///     Token(0),
     ///     Ready::readable() | Ready::writable(),
@@ -1541,7 +1541,7 @@ impl Registration {
 
     // TODO: Get rid of this (windows depends on it for now)
     fn new_priv(
-        register: &Register,
+        registry: &Registry,
         token: Token,
         interest: Ready,
         opt: PollOpt,
@@ -1552,7 +1552,7 @@ impl Registration {
         is_sync::<SetReadiness>();
 
         // Clone handle to the readiness queue, this bumps the ref count
-        let queue = register.inner.readiness_queue.inner.clone();
+        let queue = registry.inner.readiness_queue.inner.clone();
 
         // Convert to a *mut () pointer
         let queue: *mut () = unsafe { mem::transmute(queue) };
@@ -1576,27 +1576,27 @@ impl Registration {
 impl Evented for Registration {
     fn register(
         &self,
-        register: &Register,
+        registry: &Registry,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(register, token, interest, opts)
+        self.inner.update(registry, token, interest, opts)
     }
 
     fn reregister(
         &self,
-        register: &Register,
+        registry: &Registry,
         token: Token,
         interest: Ready,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(register, token, interest, opts)
+        self.inner.update(registry, token, interest, opts)
     }
 
-    fn deregister(&self, register: &Register) -> io::Result<()> {
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
         self.inner
-            .update(register, Token(0), Ready::empty(), PollOpt::empty())
+            .update(registry, Token(0), Ready::empty(), PollOpt::empty())
     }
 }
 
@@ -1675,10 +1675,10 @@ impl SetReadiness {
     /// use mio::{Events, Registration, Ready, Poll, PollOpt, Token};
     ///
     /// let mut poll = Poll::new()?;
-    /// let register = poll.register().clone();
+    /// let registry = poll.registry().clone();
     /// let (registration, set_readiness) = Registration::new();
     ///
-    /// register.register(&registration,
+    /// registry.register(&registration,
     ///                   Token(0),
     ///                   Ready::readable(),
     ///                   PollOpt::edge())?;
@@ -1795,20 +1795,20 @@ impl RegistrationInner {
     /// Update the registration details associated with the node
     fn update(
         &self,
-        register: &Register,
+        registry: &Registry,
         token: Token,
         interest: Ready,
         opt: PollOpt,
     ) -> io::Result<()> {
-        // First, ensure register instances match
+        // First, ensure registry instances match
         //
         // Load the queue pointer, `Relaxed` is sufficient here as only the
         // pointer is being operated on. The actual memory is guaranteed to be
-        // visible the `register: &Register` ref passed as an argument to the
+        // visible the `registry: &Registry` ref passed as an argument to the
         // function.
         let mut queue = self.readiness_queue.load(Relaxed);
         let other: &*mut () =
-            unsafe { &*(&register.inner.readiness_queue.inner as *const _ as *const *mut ()) };
+            unsafe { &*(&registry.inner.readiness_queue.inner as *const _ as *const *mut ()) };
         let other = *other;
 
         debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
@@ -1835,7 +1835,7 @@ impl RegistrationInner {
                 // Down below in `release_node` when we deallocate this
                 // `RegistrationInner` is where we'll transmute this back to an
                 // arc and decrement the reference count.
-                mem::forget(register.inner.readiness_queue.clone());
+                mem::forget(registry.inner.readiness_queue.clone());
             } else {
                 // The CAS failed, another thread set the queue pointer, so ensure
                 // that the pointer and `other` match
@@ -1856,7 +1856,7 @@ impl RegistrationInner {
         }
 
         unsafe {
-            let actual = &register.inner.readiness_queue.inner as *const _ as *const usize;
+            let actual = &registry.inner.readiness_queue.inner as *const _ as *const usize;
             debug_assert_eq!(queue as usize, *actual);
         }
 
@@ -2696,17 +2696,17 @@ impl SelectorId {
         }
     }
 
-    pub fn associate_selector(&self, register: &Register) -> io::Result<()> {
+    pub fn associate_selector(&self, registry: &Registry) -> io::Result<()> {
         let selector_id = self.id.load(Ordering::SeqCst);
 
-        if selector_id != 0 && selector_id != register.inner.selector.id() {
+        if selector_id != 0 && selector_id != registry.inner.selector.id() {
             Err(io::Error::new(
                 io::ErrorKind::Other,
                 "socket already registered",
             ))
         } else {
             self.id
-                .store(register.inner.selector.id(), Ordering::SeqCst);
+                .store(registry.inner.selector.id(), Ordering::SeqCst);
             Ok(())
         }
     }

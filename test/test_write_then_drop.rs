@@ -15,13 +15,13 @@ fn write_then_drop() {
     let mut poll = Poll::new().unwrap();
 
     a.register(
-        poll.register(),
+        poll.registry(),
         Token(1),
         Ready::readable(),
         PollOpt::edge(),
     )
     .unwrap();
-    s.register(poll.register(), Token(3), Ready::empty(), PollOpt::edge())
+    s.register(poll.registry(), Token(3), Ready::empty(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -34,7 +34,7 @@ fn write_then_drop() {
     let mut s2 = a.accept().unwrap().0;
 
     s2.register(
-        poll.register(),
+        poll.registry(),
         Token(2),
         Ready::writable(),
         PollOpt::edge(),
@@ -52,7 +52,7 @@ fn write_then_drop() {
     drop(s2);
 
     s.reregister(
-        poll.register(),
+        poll.registry(),
         Token(3),
         Ready::readable(),
         PollOpt::edge(),
@@ -81,13 +81,13 @@ fn write_then_deregister() {
     let mut poll = Poll::new().unwrap();
 
     a.register(
-        poll.register(),
+        poll.registry(),
         Token(1),
         Ready::readable(),
         PollOpt::edge(),
     )
     .unwrap();
-    s.register(poll.register(), Token(3), Ready::empty(), PollOpt::edge())
+    s.register(poll.registry(), Token(3), Ready::empty(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -100,7 +100,7 @@ fn write_then_deregister() {
     let mut s2 = a.accept().unwrap().0;
 
     s2.register(
-        poll.register(),
+        poll.registry(),
         Token(2),
         Ready::writable(),
         PollOpt::edge(),
@@ -115,10 +115,10 @@ fn write_then_deregister() {
     assert_eq!(events.iter().next().unwrap().token(), Token(2));
 
     s2.write_all(&[1, 2, 3, 4]).unwrap();
-    s2.deregister(poll.register()).unwrap();
+    s2.deregister(poll.registry()).unwrap();
 
     s.reregister(
-        poll.register(),
+        poll.registry(),
         Token(3),
         Ready::readable(),
         PollOpt::edge(),

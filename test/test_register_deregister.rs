@@ -1,7 +1,7 @@
 use bytes::SliceBuf;
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Ready, Register, Token};
+use mio::{Events, Poll, PollOpt, Ready, Registry, Token};
 use std::time::Duration;
 use {expect_events, localhost, TryWrite};
 
@@ -23,7 +23,7 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, register: &Register, token: Token) {
+    fn handle_read(&mut self, registry: &Registry, token: Token) {
         match token {
             SERVER => {
                 trace!("handle_read; token=SERVER");
@@ -34,7 +34,7 @@ impl TestHandler {
                 trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                register
+                registry
                     .reregister(&self.client, CLIENT, Ready::writable(), PollOpt::level())
                     .unwrap();
             }
@@ -42,15 +42,15 @@ impl TestHandler {
         }
     }
 
-    fn handle_write(&mut self, register: &Register, token: Token) {
+    fn handle_write(&mut self, registry: &Registry, token: Token) {
         debug!("handle_write; token={:?}; state={:?}", token, self.state);
 
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
         self.state = 2;
-        register.deregister(&self.client).unwrap();
-        register.deregister(&self.server).unwrap();
+        registry.deregister(&self.client).unwrap();
+        registry.deregister(&self.server).unwrap();
     }
 }
 
@@ -67,14 +67,14 @@ pub fn test_register_deregister() {
     let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
-    poll.register()
+    poll.registry()
         .register(&server, SERVER, Ready::readable(), PollOpt::edge())
         .unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
-    poll.register()
+    poll.registry()
         .register(&client, CLIENT, Ready::readable(), PollOpt::level())
         .unwrap();
 
@@ -85,11 +85,11 @@ pub fn test_register_deregister() {
 
         if let Some(event) = events.iter().next() {
             if event.readiness().is_readable() {
-                handler.handle_read(poll.register(), event.token());
+                handler.handle_read(poll.registry(), event.token());
             }
 
             if event.readiness().is_writable() {
-                handler.handle_write(poll.register(), event.token());
+                handler.handle_write(poll.registry(), event.token());
                 break;
             }
         }
@@ -108,7 +108,7 @@ pub fn test_register_empty_interest() {
 
     let sock = TcpListener::bind(&addr).unwrap();
 
-    poll.register()
+    poll.registry()
         .register(&sock, Token(0), Ready::empty(), PollOpt::edge())
         .unwrap();
 
@@ -116,7 +116,7 @@ pub fn test_register_empty_interest() {
 
     // The connect is not guaranteed to have started until it is registered
     // https://docs.rs/mio/0.6.10/mio/struct.Poll.html#registering-handles
-    poll.register()
+    poll.registry()
         .register(&client, Token(1), Ready::empty(), PollOpt::edge())
         .unwrap();
 
@@ -130,7 +130,7 @@ pub fn test_register_empty_interest() {
     );
 
     // now sock is reregistered with readable, we should receive the pending event
-    poll.register()
+    poll.registry()
         .reregister(&sock, Token(0), Ready::readable(), PollOpt::edge())
         .unwrap();
     expect_events(
@@ -140,7 +140,7 @@ pub fn test_register_empty_interest() {
         vec![Event::new(Ready::readable(), Token(0))],
     );
 
-    poll.register()
+    poll.registry()
         .reregister(&sock, Token(0), Ready::empty(), PollOpt::edge())
         .unwrap();
 }
