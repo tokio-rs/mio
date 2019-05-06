@@ -11,7 +11,7 @@ use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI};
 use event_imp::Event;
 use sys::unix::io::set_cloexec;
 use sys::unix::{cvt, UnixReady};
-use {io, PollOpt, Ready, Token};
+use {io, Interests, PollOpt, Ready, Token};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -93,11 +93,11 @@ impl Selector {
         &self,
         fd: RawFd,
         token: Token,
-        interests: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut info = libc::epoll_event {
-            events: ioevent_to_epoll(interests, opts),
+            events: interests_to_epoll(interests, opts),
             u64: usize::from(token) as u64,
         };
 
@@ -117,11 +117,11 @@ impl Selector {
         &self,
         fd: RawFd,
         token: Token,
-        interests: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut info = libc::epoll_event {
-            events: ioevent_to_epoll(interests, opts),
+            events: interests_to_epoll(interests, opts),
             u64: usize::from(token) as u64,
         };
 
@@ -155,7 +155,33 @@ impl Selector {
     }
 }
 
-fn ioevent_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
+fn interests_to_epoll(interests: Interests, opts: PollOpt) -> u32 {
+    let mut kind = 0;
+
+    if interests.is_readable() {
+        kind |= EPOLLIN;
+    }
+
+    if interests.is_writable() {
+        kind |= EPOLLOUT;
+    }
+
+    if opts.is_edge() {
+        kind |= EPOLLET;
+    }
+
+    if opts.is_oneshot() {
+        kind |= EPOLLONESHOT;
+    }
+
+    if opts.is_level() {
+        kind &= !EPOLLET;
+    }
+
+    kind as u32
+}
+
+fn ready_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
     let mut kind = 0;
 
     if interest.is_readable() {
@@ -264,7 +290,7 @@ impl Events {
 
     pub fn push_event(&mut self, event: Event) {
         self.events.push(libc::epoll_event {
-            events: ioevent_to_epoll(event.readiness(), PollOpt::empty()),
+            events: ready_to_epoll(event.readiness(), PollOpt::empty()),
             u64: usize::from(event.token()) as u64,
         });
     }

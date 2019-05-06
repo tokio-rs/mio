@@ -73,7 +73,7 @@
 //! registry.register(
 //!     &server,
 //!     SERVER,
-//!     Ready::readable(),
+//!     Interests::readable(),
 //!     PollOpt::edge()).unwrap();
 //!
 //! // Setup the client socket
@@ -83,7 +83,7 @@
 //! registry.register(
 //!     &sock,
 //!     CLIENT,
-//!     Ready::readable(),
+//!     Interests::readable(),
 //!     PollOpt::edge()).unwrap();
 //!
 //! // Create storage for events
@@ -139,7 +139,7 @@ mod token;
 
 pub mod net;
 
-pub use event_imp::{PollOpt, Ready};
+pub use event_imp::{Interests, PollOpt, Ready};
 pub use poll::{Poll, Registry, Registration, SetReadiness};
 pub use token::Token;
 

@@ -10,7 +10,7 @@ use poll::SelectorId;
 use std::fmt;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 /// [portability guidelines]: ../struct.Poll.html#portability
-use {io, sys, PollOpt, Ready, Registry, Token};
+use {io, sys, PollOpt, Interests, Registry, Token};
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use iovec::IoVec;
@@ -32,7 +32,7 @@ use iovec::IoVec;
 /// // ECHOER -> listens and prints the message received.
 ///
 /// use mio::net::UdpSocket;
-/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use mio::{Events, Interests, Poll, PollOpt, Token};
 /// use std::time::Duration;
 ///
 /// const SENDER: Token = Token(0);
@@ -53,8 +53,8 @@ use iovec::IoVec;
 /// let registry = poll.registry().clone();
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// registry.register(&sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
-/// registry.register(&echoer_socket, ECHOER, Ready::readable(), PollOpt::edge())?;
+/// registry.register(&sender_socket, SENDER, Interests::writable(), PollOpt::edge())?;
+/// registry.register(&echoer_socket, ECHOER, Interests::readable(), PollOpt::edge())?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];
@@ -472,7 +472,7 @@ impl UdpSocket {
     /// address of the local interface with which the system should join the
     /// multicast group. If it's equal to `INADDR_ANY` then an appropriate
     /// interface is chosen by the system.
-    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+    pub fn join_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
         self.sys.join_multicast_v4(multiaddr, interface)
     }
 
@@ -491,7 +491,7 @@ impl UdpSocket {
     /// [`join_multicast_v4`][link].
     ///
     /// [link]: #method.join_multicast_v4
-    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+    pub fn leave_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
         self.sys.leave_multicast_v4(multiaddr, interface)
     }
 
@@ -583,21 +583,21 @@ impl Evented for UdpSocket {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.selector_id.associate_selector(registry)?;
-        self.sys.register(registry, token, interest, opts)
+        self.sys.register(registry, token, interests, opts)
     }
 
     fn reregister(
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(registry, token, interest, opts)
+        self.sys.reregister(registry, token, interests, opts)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

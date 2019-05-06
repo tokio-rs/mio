@@ -5,7 +5,7 @@ mod pipe {
     use event::Evented;
     use std::io::{Read, Write};
     use sys::unix;
-    use {io, PollOpt, Ready, Registry, Token};
+    use {io, PollOpt, Interests, Registry, Token};
 
     /*
      *
@@ -63,20 +63,20 @@ mod pipe {
             &self,
             registry: &Registry,
             token: Token,
-            interest: Ready,
+            interests: Interests,
             opts: PollOpt,
         ) -> io::Result<()> {
-            self.reader().register(registry, token, interest, opts)
+            self.reader().register(registry, token, interests, opts)
         }
 
         fn reregister(
             &self,
             registry: &Registry,
             token: Token,
-            interest: Ready,
+            interests: Interests,
             opts: PollOpt,
         ) -> io::Result<()> {
-            self.reader().reregister(registry, token, interest, opts)
+            self.reader().reregister(registry, token, interests, opts)
         }
 
         fn deregister(&self, registry: &Registry) -> io::Result<()> {

@@ -1,9 +1,8 @@
 use bytes::SliceBuf;
-use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Ready, Registry, Token};
+use mio::{Events, Interests, Poll, PollOpt, Registry, Token};
 use std::time::Duration;
-use {expect_events, localhost, TryWrite};
+use {localhost, TryWrite};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -35,7 +34,7 @@ impl TestHandler {
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
                 registry
-                    .reregister(&self.client, CLIENT, Ready::writable(), PollOpt::level())
+                    .reregister(&self.client, CLIENT, Interests::writable(), PollOpt::level())
                     .unwrap();
             }
             _ => panic!("unexpected token"),
@@ -68,14 +67,14 @@ pub fn test_register_deregister() {
 
     info!("register server socket");
     poll.registry()
-        .register(&server, SERVER, Ready::readable(), PollOpt::edge())
+        .register(&server, SERVER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
     poll.registry()
-        .register(&client, CLIENT, Ready::readable(), PollOpt::level())
+        .register(&client, CLIENT, Interests::readable(), PollOpt::level())
         .unwrap();
 
     let mut handler = TestHandler::new(server, client);
@@ -98,49 +97,4 @@ pub fn test_register_deregister() {
     poll.poll(&mut events, Some(Duration::from_millis(100)))
         .unwrap();
     assert!(events.iter().next().is_none());
-}
-
-#[test]
-pub fn test_register_empty_interest() {
-    let mut poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(1024);
-    let addr = localhost();
-
-    let sock = TcpListener::bind(&addr).unwrap();
-
-    poll.registry()
-        .register(&sock, Token(0), Ready::empty(), PollOpt::edge())
-        .unwrap();
-
-    let client = TcpStream::connect(&addr).unwrap();
-
-    // The connect is not guaranteed to have started until it is registered
-    // https://docs.rs/mio/0.6.10/mio/struct.Poll.html#registering-handles
-    poll.registry()
-        .register(&client, Token(1), Ready::empty(), PollOpt::edge())
-        .unwrap();
-
-    // sock is registered with empty interest, we should not receive any event
-    poll.poll(&mut events, Some(Duration::from_millis(100)))
-        .unwrap();
-    assert!(
-        events.iter().next().is_none(),
-        "Received unexpected event: {:?}",
-        events.iter().next().unwrap()
-    );
-
-    // now sock is reregistered with readable, we should receive the pending event
-    poll.registry()
-        .reregister(&sock, Token(0), Ready::readable(), PollOpt::edge())
-        .unwrap();
-    expect_events(
-        &mut poll,
-        &mut events,
-        2,
-        vec![Event::new(Ready::readable(), Token(0))],
-    );
-
-    poll.registry()
-        .reregister(&sock, Token(0), Ready::empty(), PollOpt::edge())
-        .unwrap();
 }

@@ -16,7 +16,7 @@ use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
 use sys::windows::Family;
-use {poll, PollOpt, Ready, Registry, Token};
+use {poll, Interests, PollOpt, Ready, Registry, Token};
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`
@@ -254,15 +254,15 @@ impl TcpStream {
         Ok(me)
     }
 
-    fn post_register(&self, interest: Ready, me: &mut StreamInner) {
-        if interest.is_readable() {
+    fn post_register(&self, interests: Interests, me: &mut StreamInner) {
+        if interests.is_readable() {
             self.imp.schedule_read(me);
         }
 
         // At least with epoll, if a socket is registered with an interest in
         // writing and it's immediately writable then a writable event is
         // generated immediately, so do so here.
-        if interest.is_writable() {
+        if interests.is_writable() {
             if let State::Empty = me.write {
                 self.imp.add_readiness(me, Ready::writable());
             }
@@ -580,7 +580,7 @@ impl Evented for TcpStream {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -588,7 +588,7 @@ impl Evented for TcpStream {
             &self.imp.inner.socket,
             registry,
             token,
-            interest,
+            interests,
             opts,
             &self.registration,
         )?;
@@ -605,7 +605,7 @@ impl Evented for TcpStream {
         if let Some(addr) = me.deferred_connect.take() {
             return self.imp.schedule_connect(&addr).map(|_| ());
         }
-        self.post_register(interest, &mut me);
+        self.post_register(interests, &mut me);
         Ok(())
     }
 
@@ -613,7 +613,7 @@ impl Evented for TcpStream {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -621,11 +621,11 @@ impl Evented for TcpStream {
             &self.imp.inner.socket,
             registry,
             token,
-            interest,
+            interests,
             opts,
             &self.registration,
         )?;
-        self.post_register(interest, &mut me);
+        self.post_register(interests, &mut me);
         Ok(())
     }
 
@@ -818,7 +818,7 @@ impl Evented for TcpListener {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -826,7 +826,7 @@ impl Evented for TcpListener {
             &self.imp.inner.socket,
             registry,
             token,
-            interest,
+            interests,
             opts,
             &self.registration,
         )?;
@@ -844,7 +844,7 @@ impl Evented for TcpListener {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
@@ -852,7 +852,7 @@ impl Evented for TcpListener {
             &self.imp.inner.socket,
             registry,
             token,
-            interest,
+            interests,
             opts,
             &self.registration,
         )?;

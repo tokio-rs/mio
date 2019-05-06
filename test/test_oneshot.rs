@@ -17,13 +17,13 @@ pub fn test_tcp_edge_oneshot() {
 
     // Register the listener with `Poll`
     poll.registry()
-        .register(&l, Token(0), Ready::readable(), PollOpt::level())
+        .register(&l, Token(0), Interests::readable(), PollOpt::level())
         .unwrap();
 
     // Connect a socket, we are going to write to it
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
     poll.registry()
-        .register(&s1, Token(1), Ready::writable(), PollOpt::level())
+        .register(&s1, Token(1), Interests::writable(), PollOpt::level())
         .unwrap();
 
     wait_for(&mut poll, &mut events, Token(0));
@@ -34,7 +34,7 @@ pub fn test_tcp_edge_oneshot() {
         .register(
             &s2,
             Token(2),
-            Ready::readable(),
+            Interests::readable(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();
@@ -56,7 +56,7 @@ pub fn test_tcp_edge_oneshot() {
             .reregister(
                 &s2,
                 Token(2),
-                Ready::readable(),
+                Interests::readable(),
                 PollOpt::edge() | PollOpt::oneshot(),
             )
             .unwrap();
@@ -66,7 +66,7 @@ pub fn test_tcp_edge_oneshot() {
                 .reregister(
                     &s2,
                     Token(2),
-                    Ready::readable(),
+                    Interests::readable(),
                     PollOpt::edge() | PollOpt::oneshot(),
                 )
                 .unwrap();

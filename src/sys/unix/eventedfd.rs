@@ -1,6 +1,6 @@
 use event::Evented;
 use std::os::unix::io::RawFd;
-use {io, poll, PollOpt, Ready, Registry, Token};
+use {io, poll, PollOpt, Interests, Registry, Token};
 
 /*
  *
@@ -31,7 +31,7 @@ use {io, poll, PollOpt, Ready, Registry, Token};
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Ready, Poll, PollOpt, Token};
+/// use mio::{Interests, Poll, PollOpt, Token};
 /// use mio::unix::EventedFd;
 ///
 /// use std::os::unix::io::AsRawFd;
@@ -47,7 +47,7 @@ use {io, poll, PollOpt, Ready, Registry, Token};
 /// registry.register(
 ///     &EventedFd(&listener.as_raw_fd()),
 ///     Token(0),
-///     Ready::readable(),
+///     Interests::readable(),
 ///     PollOpt::edge())?;
 /// #     Ok(())
 /// # }
@@ -60,7 +60,7 @@ use {io, poll, PollOpt, Ready, Registry, Token};
 /// Implementing [`Evented`] for a custom type backed by a [`RawFd`].
 ///
 /// ```
-/// use mio::{Ready, Registry, PollOpt, Token};
+/// use mio::{Interests, Registry, PollOpt, Token};
 /// use mio::event::Evented;
 /// use mio::unix::EventedFd;
 ///
@@ -72,16 +72,16 @@ use {io, poll, PollOpt, Ready, Registry, Token};
 /// }
 ///
 /// impl Evented for MyIo {
-///     fn register(&self, registry: &Registry, token: Token, interest: Ready, opts: PollOpt)
+///     fn register(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         EventedFd(&self.fd).register(registry, token, interest, opts)
+///         EventedFd(&self.fd).register(registry, token, interests, opts)
 ///     }
 ///
-///     fn reregister(&self, registry: &Registry, token: Token, interest: Ready, opts: PollOpt)
+///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         EventedFd(&self.fd).reregister(registry, token, interest, opts)
+///         EventedFd(&self.fd).reregister(registry, token, interests, opts)
 ///     }
 ///
 ///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
@@ -101,20 +101,20 @@ impl<'a> Evented for EventedFd<'a> {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        poll::selector(registry).register(*self.0, token, interest, opts)
+        poll::selector(registry).register(*self.0, token, interests, opts)
     }
 
     fn reregister(
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        poll::selector(registry).reregister(*self.0, token, interest, opts)
+        poll::selector(registry).reregister(*self.0, token, interests, opts)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

@@ -5,7 +5,7 @@
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use localhost;
 use mio::net::UdpSocket;
-use mio::{Events, Poll, PollOpt, Ready, Registry, Token};
+use mio::{Events, Interests, Poll, PollOpt, Ready, Registry, Token};
 use std::net::IpAddr;
 use std::str;
 
@@ -76,21 +76,21 @@ pub fn test_multicast() {
 
     info!("Joining group 227.1.1.100");
     let any = "0.0.0.0".parse().unwrap();
-    rx.join_multicast_v4(&"227.1.1.100".parse().unwrap(), &any)
+    rx.join_multicast_v4("227.1.1.100".parse().unwrap(), any)
         .unwrap();
 
     info!("Joining group 227.1.1.101");
-    rx.join_multicast_v4(&"227.1.1.101".parse().unwrap(), &any)
+    rx.join_multicast_v4("227.1.1.101".parse().unwrap(), any)
         .unwrap();
 
     info!("Registering SENDER");
     poll.registry()
-        .register(&tx, SENDER, Ready::writable(), PollOpt::edge())
+        .register(&tx, SENDER, Interests::writable(), PollOpt::edge())
         .unwrap();
 
     info!("Registering LISTENER");
     poll.registry()
-        .register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
+        .register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);

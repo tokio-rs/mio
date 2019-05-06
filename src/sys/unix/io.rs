@@ -7,7 +7,7 @@ use libc;
 use event::Evented;
 use sys::unix::cvt;
 use unix::EventedFd;
-use {io, PollOpt, Ready, Registry, Token};
+use {io, PollOpt, Interests, Registry, Token};
 
 pub fn set_nonblock(fd: libc::c_int) -> io::Result<()> {
     unsafe {
@@ -69,20 +69,20 @@ impl Evented for Io {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(registry, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(registry, token, interests, opts)
     }
 
     fn reregister(
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(registry, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests, opts)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

@@ -1,21 +1,22 @@
 use event::Evented;
+use std;
 use std::fmt;
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use sys::unix::uio::VecIo;
 use unix::EventedFd;
-use {io, PollOpt, Ready, Registry, Token};
+use {io, PollOpt, Interests, Registry, Token};
 
 use iovec::IoVec;
 #[allow(unused_imports)] // only here for Rust 1.8
 use net2::UdpSocketExt;
 
 pub struct UdpSocket {
-    io: net::UdpSocket,
+    io: std::net::UdpSocket,
 }
 
 impl UdpSocket {
-    pub fn new(socket: net::UdpSocket) -> io::Result<UdpSocket> {
+    pub fn new(socket: std::net::UdpSocket) -> io::Result<UdpSocket> {
         socket.set_nonblocking(true)?;
         Ok(UdpSocket { io: socket })
     }
@@ -88,16 +89,16 @@ impl UdpSocket {
         self.io.set_ttl(ttl)
     }
 
-    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
-        self.io.join_multicast_v4(multiaddr, interface)
+    pub fn join_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
+        self.io.join_multicast_v4(&multiaddr, &interface)
     }
 
     pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.io.join_multicast_v6(multiaddr, interface)
     }
 
-    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
-        self.io.leave_multicast_v4(multiaddr, interface)
+    pub fn leave_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
+        self.io.leave_multicast_v4(&multiaddr, &interface)
     }
 
     pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
@@ -130,20 +131,20 @@ impl Evented for UdpSocket {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(registry, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(registry, token, interests, opts)
     }
 
     fn reregister(
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(registry, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests, opts)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
@@ -160,7 +161,7 @@ impl fmt::Debug for UdpSocket {
 impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
         UdpSocket {
-            io: net::UdpSocket::from_raw_fd(fd),
+            io: std::net::UdpSocket::from_raw_fd(fd),
         }
     }
 }

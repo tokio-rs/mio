@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 
 use mio::event::Evented;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::{Events, Interests, Poll, PollOpt, Token};
 
 #[test]
 fn write_then_drop() {
@@ -17,11 +17,12 @@ fn write_then_drop() {
     a.register(
         poll.registry(),
         Token(1),
-        Ready::readable(),
+        Interests::readable(),
         PollOpt::edge(),
     )
     .unwrap();
-    s.register(poll.registry(), Token(3), Ready::empty(), PollOpt::edge())
+
+    s.register(poll.registry(), Token(3), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -36,7 +37,7 @@ fn write_then_drop() {
     s2.register(
         poll.registry(),
         Token(2),
-        Ready::writable(),
+        Interests::writable(),
         PollOpt::edge(),
     )
     .unwrap();
@@ -54,10 +55,11 @@ fn write_then_drop() {
     s.reregister(
         poll.registry(),
         Token(3),
-        Ready::readable(),
+        Interests::readable(),
         PollOpt::edge(),
     )
     .unwrap();
+
     let mut events = Events::with_capacity(1024);
     while events.is_empty() {
         poll.poll(&mut events, None).unwrap();
@@ -83,11 +85,11 @@ fn write_then_deregister() {
     a.register(
         poll.registry(),
         Token(1),
-        Ready::readable(),
+        Interests::readable(),
         PollOpt::edge(),
     )
     .unwrap();
-    s.register(poll.registry(), Token(3), Ready::empty(), PollOpt::edge())
+    s.register(poll.registry(), Token(3), Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -102,7 +104,7 @@ fn write_then_deregister() {
     s2.register(
         poll.registry(),
         Token(2),
-        Ready::writable(),
+        Interests::writable(),
         PollOpt::edge(),
     )
     .unwrap();
@@ -120,10 +122,11 @@ fn write_then_deregister() {
     s.reregister(
         poll.registry(),
         Token(3),
-        Ready::readable(),
+        Interests::readable(),
         PollOpt::edge(),
     )
     .unwrap();
+
     let mut events = Events::with_capacity(1024);
     while events.is_empty() {
         poll.poll(&mut events, None).unwrap();

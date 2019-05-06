@@ -1,4 +1,4 @@
-use event_imp::{self as event, Event, Evented, PollOpt, Ready};
+use event_imp::{self as event, Event, Evented, Interests, PollOpt, Ready};
 use std::cell::UnsafeCell;
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::AsRawFd;
@@ -89,7 +89,7 @@ use {sys, Token};
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Events, Poll, Ready, PollOpt, Token};
+/// use mio::{Events, Poll, Interests, PollOpt, Token};
 /// use mio::net::TcpStream;
 ///
 /// use std::net::{TcpListener, SocketAddr};
@@ -107,7 +107,7 @@ use {sys, Token};
 /// let stream = TcpStream::connect(&server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// register.register(&stream, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
+/// register.register(&stream, Token(0), Interests::readable() | Interests::writable(), PollOpt::edge())?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -267,7 +267,7 @@ use {sys, Token};
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Poll, Ready, PollOpt, Token};
+/// use mio::{Poll, Interests, PollOpt, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 /// use std::thread;
@@ -281,7 +281,7 @@ use {sys, Token};
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// register.register(&sock, Token(0), Ready::readable() | Ready::writable(), PollOpt::edge())?;
+/// register.register(&sock, Token(0), Interests::readable() | Interests::writable(), PollOpt::edge())?;
 /// #     Ok(())
 /// # }
 /// #
@@ -374,7 +374,7 @@ struct Inner {
 /// # Examples
 ///
 /// ```
-/// use mio::{Ready, Registration, Register, Poll, PollOpt, Token};
+/// use mio::{Ready, Interests, Registration, Register, Poll, PollOpt, Token};
 /// use mio::event::Evented;
 ///
 /// use std::io;
@@ -412,16 +412,16 @@ struct Inner {
 /// }
 ///
 /// impl Evented for Deadline {
-///     fn register(&self, register: &Register, token: Token, interest: Ready, opts: PollOpt)
+///     fn register(&self, register: &Register, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.register(register, token, interest, opts)
+///         self.registration.register(register, token, interests, opts)
 ///     }
 ///
-///     fn reregister(&self, register: &Register, token: Token, interest: Ready, opts: PollOpt)
+///     fn reregister(&self, register: &Register, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.reregister(register, token, interest, opts)
+///         self.registration.reregister(register, token, interests, opts)
 ///     }
 ///
 ///     fn deregister(&self, register: &Register) -> io::Result<()> {
@@ -665,7 +665,7 @@ impl Poll {
         registry.inner.readiness_queue.inner.awakener.register(
             &registry,
             AWAKEN,
-            Ready::readable(),
+            Interests::readable(),
             PollOpt::edge(),
         )?;
 
@@ -711,8 +711,8 @@ impl Poll {
     /// See the [struct] level documentation for a higher level discussion of
     /// polling.
     ///
-    /// [`readable`]: struct.Ready.html#method.readable
-    /// [`writable`]: struct.Ready.html#method.writable
+    /// [`readable`]: struct.Interests.html#method.readable
+    /// [`writable`]: struct.Interests.html#method.writable
     /// [struct]: #
     /// [`iter`]: struct.Events.html#method.iter
     ///
@@ -723,7 +723,7 @@ impl Poll {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Poll, Ready, PollOpt, Token};
+    /// use mio::{Events, Poll, Interests, PollOpt, Token};
     /// use mio::net::TcpStream;
     ///
     /// use std::net::{TcpListener, SocketAddr};
@@ -751,7 +751,7 @@ impl Poll {
     /// registry.register(
     ///     &stream,
     ///     Token(0),
-    ///     Ready::readable() | Ready::writable(),
+    ///     Interests::readable() | Interests::writable(),
     ///     PollOpt::edge())?;
     ///
     /// // Wait for the socket to become ready. This has to happens in a loop to
@@ -949,7 +949,7 @@ impl Registry {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Poll, Ready, PollOpt, Token};
+    /// use mio::{Events, Poll, Interests, PollOpt, Token};
     /// use mio::net::TcpStream;
     /// use std::time::{Duration, Instant};
     ///
@@ -961,7 +961,7 @@ impl Registry {
     /// registry.register(
     ///     &socket,
     ///     Token(0),
-    ///     Ready::readable() | Ready::writable(),
+    ///     Interests::readable() | Interests::writable(),
     ///     PollOpt::edge())?;
     ///
     /// let mut events = Events::with_capacity(1024);
@@ -997,7 +997,7 @@ impl Registry {
         &self,
         handle: &E,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()>
     where
@@ -1013,7 +1013,7 @@ impl Registry {
         trace!("registering with poller");
 
         // Register interests for this socket
-        handle.register(self, token, interest, opts)?;
+        handle.register(self, token, interests, opts)?;
 
         Ok(())
     }
@@ -1046,7 +1046,7 @@ impl Registry {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Poll, Ready, PollOpt, Token};
+    /// use mio::{Poll, Interests, PollOpt, Token};
     /// use mio::net::TcpStream;
     ///
     /// let mut poll = Poll::new()?;
@@ -1057,7 +1057,7 @@ impl Registry {
     /// registry.register(
     ///     &socket,
     ///     Token(0),
-    ///     Ready::readable(),
+    ///     Interests::readable(),
     ///     PollOpt::edge())?;
     ///
     /// // Reregister the socket specifying a different token and write interest
@@ -1066,7 +1066,7 @@ impl Registry {
     /// registry.reregister(
     ///     &socket,
     ///     Token(2),
-    ///     Ready::writable(),
+    ///     Interests::writable(),
     ///     PollOpt::edge())?;
     /// #     Ok(())
     /// # }
@@ -1084,7 +1084,7 @@ impl Registry {
         &self,
         handle: &E,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()>
     where
@@ -1095,7 +1095,7 @@ impl Registry {
         trace!("registering with poller");
 
         // Register interests for this socket
-        handle.reregister(self, token, interest, opts)?;
+        handle.reregister(self, token, interests, opts)?;
 
         Ok(())
     }
@@ -1119,7 +1119,7 @@ impl Registry {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Poll, Ready, PollOpt, Token};
+    /// use mio::{Events, Poll, Interests, PollOpt, Token};
     /// use mio::net::TcpStream;
     /// use std::time::Duration;
     ///
@@ -1131,7 +1131,7 @@ impl Registry {
     /// registry.register(
     ///     &socket,
     ///     Token(0),
-    ///     Ready::readable(),
+    ///     Interests::readable(),
     ///     PollOpt::edge())?;
     ///
     /// registry.deregister(&socket)?;
@@ -1458,10 +1458,10 @@ pub fn selector(registry: &Registry) -> &sys::Selector {
 pub fn new_registration(
     registry: &Registry,
     token: Token,
-    ready: Ready,
+    interests: Interests,
     opt: PollOpt,
 ) -> (Registration, SetReadiness) {
-    Registration::new_priv(registry, token, ready, opt)
+    Registration::new_priv(registry, token, interests, opt)
 }
 
 impl Registration {
@@ -1476,7 +1476,7 @@ impl Registration {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Ready, Registration, Poll, PollOpt, Token};
+    /// use mio::{Events, Ready, Interests, Registration, Poll, PollOpt, Token};
     /// use std::thread;
     ///
     /// let (registration, set_readiness) = Registration::new();
@@ -1494,7 +1494,7 @@ impl Registration {
     /// registry.register(
     ///     &registration,
     ///     Token(0),
-    ///     Ready::readable() | Ready::writable(),
+    ///     Interests::readable() | Interests::writable(),
     ///     PollOpt::edge())?;
     ///
     /// let mut events = Events::with_capacity(256);
@@ -1543,7 +1543,7 @@ impl Registration {
     fn new_priv(
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opt: PollOpt,
     ) -> (Registration, SetReadiness) {
         is_send::<Registration>();
@@ -1559,7 +1559,13 @@ impl Registration {
 
         // Allocate the registration node. The new node will have `ref_count`
         // set to 3: one SetReadiness, one Registration, and one Poll handle.
-        let node = Box::into_raw(Box::new(ReadinessNode::new(queue, token, interest, opt, 3)));
+        let node = Box::into_raw(Box::new(ReadinessNode::new(
+            queue,
+            token,
+            interests.to_ready(),
+            opt,
+            3,
+        )));
 
         let registration = Registration {
             inner: RegistrationInner { node },
@@ -1578,20 +1584,20 @@ impl Evented for Registration {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(registry, token, interest, opts)
+        self.inner.update(registry, token, interests.to_ready(), opts)
     }
 
     fn reregister(
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(registry, token, interest, opts)
+        self.inner.update(registry, token, interests.to_ready(), opts)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
@@ -1672,7 +1678,7 @@ impl SetReadiness {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Registration, Ready, Poll, PollOpt, Token};
+    /// use mio::{Events, Registration, Ready, Interests, Poll, PollOpt, Token};
     ///
     /// let mut poll = Poll::new()?;
     /// let registry = poll.registry().clone();
@@ -1680,7 +1686,7 @@ impl SetReadiness {
     ///
     /// registry.register(&registration,
     ///                   Token(0),
-    ///                   Ready::readable(),
+    ///                   Interests::readable(),
     ///                   PollOpt::edge())?;
     ///
     /// // Set the readiness, then immediately poll to try to get the readiness

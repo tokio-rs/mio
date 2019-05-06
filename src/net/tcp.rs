@@ -16,7 +16,7 @@ use net2::TcpBuilder;
 
 use event::Evented;
 use poll::SelectorId;
-use {io, sys, PollOpt, Ready, Registry, Token};
+use {io, sys, PollOpt, Interests, Registry, Token};
 
 /*
  *
@@ -36,7 +36,7 @@ use {io, sys, PollOpt, Ready, Registry, Token};
 /// #
 /// # fn try_main() -> Result<(), Box<Error>> {
 /// #     let _listener = TcpListener::bind("127.0.0.1:34254")?;
-/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use mio::{Events, Interests, Poll, PollOpt, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
@@ -47,7 +47,7 @@ use {io, sys, PollOpt, Ready, Registry, Token};
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// registry.register(&stream, Token(0), Ready::writable(),
+/// registry.register(&stream, Token(0), Interests::writable(),
 ///                    PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
@@ -397,21 +397,21 @@ impl Evented for TcpStream {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.selector_id.associate_selector(registry)?;
-        self.sys.register(registry, token, interest, opts)
+        self.sys.register(registry, token, interests, opts)
     }
 
     fn reregister(
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(registry, token, interest, opts)
+        self.sys.reregister(registry, token, interests, opts)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
@@ -438,7 +438,7 @@ impl fmt::Debug for TcpStream {
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use mio::{Events, Interests, Poll, PollOpt, Token};
 /// use mio::net::TcpListener;
 /// use std::time::Duration;
 ///
@@ -449,7 +449,7 @@ impl fmt::Debug for TcpStream {
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// registry.register(&listener, Token(0), Ready::readable(),
+/// registry.register(&listener, Token(0), Interests::readable(),
 ///                   PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
@@ -593,21 +593,21 @@ impl Evented for TcpListener {
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         self.selector_id.associate_selector(registry)?;
-        self.sys.register(registry, token, interest, opts)
+        self.sys.register(registry, token, interests, opts)
     }
 
     fn reregister(
         &self,
         registry: &Registry,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(registry, token, interest, opts)
+        self.sys.reregister(registry, token, interests, opts)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

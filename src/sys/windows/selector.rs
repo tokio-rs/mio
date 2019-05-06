@@ -11,7 +11,7 @@ use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 use winapi::*;
 
-use event_imp::{Event, Evented, Ready};
+use event_imp::{Event, Evented, Interests, Ready};
 use poll::{self, Registry};
 use sys::windows::buffer_pool::BufferPool;
 use {PollOpt, Token};
@@ -363,7 +363,7 @@ impl ReadyBinding {
         socket: &AsRawSocket,
         registry: &Registry,
         token: Token,
-        events: Ready,
+        events: Interests,
         opts: PollOpt,
         registration: &Mutex<Option<poll::Registration>>,
     ) -> io::Result<()> {
@@ -384,7 +384,7 @@ impl ReadyBinding {
         socket: &AsRawSocket,
         registry: &Registry,
         token: Token,
-        events: Ready,
+        events: Interests,
         opts: PollOpt,
         registration: &Mutex<Option<poll::Registration>>,
     ) -> io::Result<()> {

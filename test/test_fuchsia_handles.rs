@@ -17,7 +17,7 @@ pub fn test_fuchsia_channel() {
     poll.register(
         &channel1_evented,
         Token(1),
-        Ready::readable(),
+        Interests::readable(),
         PollOpt::edge(),
     )
     .unwrap();

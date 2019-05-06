@@ -9,8 +9,9 @@ fn test_poll_closes_fd() {
         let (registration, set_readiness) = Registration::new();
 
         poll.registry()
-            .register(&registration, Token(0), Ready::readable(), PollOpt::edge())
+            .register(&registration, Token(0), Interests::readable(), PollOpt::edge())
             .unwrap();
+
         poll.poll(&mut events, Some(Duration::from_millis(0)))
             .unwrap();
 

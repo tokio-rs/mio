@@ -13,7 +13,7 @@
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Events, Ready, Poll, PollOpt, Token};
+/// use mio::{Events, Interests, Poll, PollOpt, Token};
 /// use mio::net::TcpListener;
 ///
 /// use std::thread;
@@ -43,7 +43,7 @@
 /// // Register the listener
 /// register.register(&listener,
 ///                   LISTENER,
-///                   Ready::readable(),
+///                   Interests::readable(),
 ///                   PollOpt::edge())?;
 ///
 /// // Spawn a thread that will connect a bunch of sockets then close them
@@ -89,7 +89,7 @@
 ///                             // Register the new socket w/ poll
 ///                             register.register(&socket,
 ///                                               token,
-///                                               Ready::readable(),
+///                                               Interests::readable(),
 ///                                               PollOpt::edge())?;
 ///
 ///                             // Store the socket

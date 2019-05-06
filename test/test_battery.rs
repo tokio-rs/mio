@@ -39,7 +39,7 @@ impl EchoConn {
         event_loop.reregister(
             &self.sock,
             self.token.unwrap(),
-            Ready::readable(),
+            Interests::readable(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -68,7 +68,7 @@ impl EchoConn {
         event_loop.reregister(
             &self.sock,
             self.token.unwrap(),
-            Ready::readable(),
+            Interests::readable(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -93,7 +93,7 @@ impl EchoServer {
             .register(
                 &self.conns[tok].sock,
                 Token(tok),
-                Ready::readable(),
+                Interests::readable(),
                 PollOpt::edge() | PollOpt::oneshot(),
             )
             .expect("could not register socket with event loop");
@@ -167,7 +167,7 @@ impl EchoClient {
                 .reregister(
                     &self.sock,
                     self.token,
-                    Ready::writable(),
+                    Interests::writable(),
                     PollOpt::edge() | PollOpt::oneshot(),
                 )
                 .unwrap();
@@ -230,7 +230,7 @@ impl Handler for Echo {
                     .reregister(
                         &self.client.sock,
                         self.client.token,
-                        Ready::writable(),
+                        Interests::writable(),
                         PollOpt::edge() | PollOpt::oneshot(),
                     )
                     .unwrap();
@@ -260,7 +260,7 @@ pub fn test_echo_server() {
         .register(
             &srv,
             SERVER,
-            Ready::readable(),
+            Interests::readable(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();
@@ -272,7 +272,7 @@ pub fn test_echo_server() {
         .register(
             &sock,
             CLIENT,
-            Ready::writable(),
+            Interests::writable(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();

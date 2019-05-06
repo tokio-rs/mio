@@ -2,7 +2,7 @@ use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use iovec::IoVec;
 use localhost;
 use mio::net::UdpSocket;
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::{Events, Interests, Poll, PollOpt, Token};
 use std::io::ErrorKind;
 use std::str;
 use std::time;
@@ -55,12 +55,12 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
     info!("Registering SENDER");
     poll.registry()
-        .register(&tx, SENDER, Ready::writable(), PollOpt::edge())
+        .register(&tx, SENDER, Interests::writable(), PollOpt::edge())
         .unwrap();
 
     info!("Registering LISTENER");
     poll.registry()
-        .register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
+        .register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -165,10 +165,10 @@ pub fn test_udp_socket_discard() {
     assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
     poll.registry()
-        .register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
+        .register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
         .unwrap();
     poll.registry()
-        .register(&tx, SENDER, Ready::writable(), PollOpt::edge())
+        .register(&tx, SENDER, Interests::writable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -179,7 +179,7 @@ pub fn test_udp_socket_discard() {
     for event in &events {
         if event.readiness().is_readable() {
             if let LISTENER = event.token() {
-                assert!(false, "Expected to no receive a packet but got something")
+                panic!("Expected to no receive a packet but got something")
             }
         }
     }
@@ -193,11 +193,11 @@ pub fn test_udp_socket_send_recv_bufs() {
     let mut poll = Poll::new().unwrap();
 
     poll.registry()
-        .register(&tx, SENDER, Ready::writable(), PollOpt::edge())
+        .register(&tx, SENDER, Interests::writable(), PollOpt::edge())
         .unwrap();
 
     poll.registry()
-        .register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
+        .register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
