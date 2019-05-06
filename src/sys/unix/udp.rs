@@ -5,7 +5,7 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use sys::unix::uio::VecIo;
 use unix::EventedFd;
-use {io, Poll, PollOpt, Ready, Token};
+use {io, Interests, Poll, PollOpt, Token};
 
 use iovec::IoVec;
 #[allow(unused_imports)] // only here for Rust 1.8
@@ -131,20 +131,20 @@ impl Evented for UdpSocket {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(poll, token, interests, opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(poll, token, interests, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {

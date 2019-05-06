@@ -66,9 +66,8 @@ use std::ops;
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Ready, Poll, PollOpt, Token};
+/// use mio::{Interests, Poll, PollOpt, Token};
 /// use mio::net::TcpStream;
-/// use mio::unix::UnixReady;
 ///
 /// let addr = "216.58.193.68:80".parse()?;
 /// let socket = TcpStream::connect(&addr)?;
@@ -77,7 +76,7 @@ use std::ops;
 ///
 /// poll.register(&socket,
 ///               Token(0),
-///               Ready::readable() | UnixReady::error(),
+///               Interests::readable(),
 ///               PollOpt::edge())?;
 /// #     Ok(())
 /// # }

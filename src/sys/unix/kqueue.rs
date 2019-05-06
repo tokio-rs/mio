@@ -12,7 +12,7 @@ use libc::{self, time_t};
 use event_imp::{self as event, Event};
 use sys::unix::io::set_cloexec;
 use sys::unix::{cvt, UnixReady};
-use {io, PollOpt, Ready, Token};
+use {io, Interests, PollOpt, Ready, Token};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -101,7 +101,7 @@ impl Selector {
         &self,
         fd: RawFd,
         token: Token,
-        interests: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
@@ -117,12 +117,12 @@ impl Selector {
         } | libc::EV_RECEIPT;
 
         unsafe {
-            let r = if interests.contains(Ready::readable()) {
+            let r = if interests.is_readable() {
                 libc::EV_ADD
             } else {
                 libc::EV_DELETE
             };
-            let w = if interests.contains(Ready::writable()) {
+            let w = if interests.is_writable() {
                 libc::EV_ADD
             } else {
                 libc::EV_DELETE
@@ -188,7 +188,7 @@ impl Selector {
         &self,
         fd: RawFd,
         token: Token,
-        interests: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
         // Just need to call register here since EV_ADD is a mod if already
@@ -385,7 +385,7 @@ impl fmt::Debug for Events {
 #[test]
 fn does_not_register_rw() {
     use unix::EventedFd;
-    use {Poll, PollOpt, Ready, Token};
+    use {Poll, PollOpt, Token};
 
     let kq = unsafe { libc::kqueue() };
     let kqf = EventedFd(&kq);
@@ -396,7 +396,7 @@ fn does_not_register_rw() {
     poll.register(
         &kqf,
         Token(1234),
-        Ready::readable(),
+        Interests::readable(),
         PollOpt::edge() | PollOpt::oneshot(),
     )
     .unwrap();

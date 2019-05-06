@@ -1,13 +1,13 @@
 use bytes::{Buf, ByteBuf, SliceBuf};
 use mio::deprecated::unix::*;
 use mio::deprecated::{EventLoop, Handler};
+use mio::unix::UnixReady;
 use mio::*;
 use slab::Slab;
 use std::io::{self, Read};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::PathBuf;
 use tempdir::TempDir;
-use {TryRead, TryWrite};
 
 const SERVER: Token = Token(10_000_000);
 const CLIENT: Token = Token(10_000_001);
@@ -16,7 +16,7 @@ struct EchoConn {
     sock: UnixStream,
     pipe_fd: Option<PipeReader>,
     token: Option<Token>,
-    interest: Ready,
+    interests: Option<Interests>,
 }
 
 impl EchoConn {
@@ -25,7 +25,7 @@ impl EchoConn {
             sock: sock,
             pipe_fd: None,
             token: None,
-            interest: Ready::hup(),
+            interests: None,
         }
     }
 
@@ -37,26 +37,31 @@ impl EchoConn {
                 debug!("client flushing buf; WOULDBLOCK");
 
                 self.pipe_fd = Some(fd);
-                self.interest.insert(Ready::writable());
+                self.interests = match self.interests {
+                    None => Some(Interests::writable()),
+                    Some(x) => Some(x | Interests::writable()),
+                }
             }
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
-                self.interest.insert(Ready::readable());
-                self.interest.remove(Ready::writable());
+                self.interests = match self.interests {
+                    None => Some(Interests::readable()),
+                    Some(x) => Some((x | Interests::readable()) - Interests::writable()),
+                }
             }
             Err(e) => debug!("not implemented; client err={:?}", e),
         }
 
         assert!(
-            self.interest.is_readable() || self.interest.is_writable(),
+            self.interests.is_readable() || self.interests.is_writable(),
             "actual={:?}",
-            self.interest
+            self.interests
         );
         event_loop.reregister(
             &self.sock,
             self.token.unwrap(),
-            self.interest,
+            self.interests,
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -70,12 +75,16 @@ impl EchoConn {
             }
             Ok(Some(r)) => {
                 debug!("CONN : we read {} bytes!", r);
-                self.interest.remove(Ready::readable());
-                self.interest.insert(Ready::writable());
+                self.interests = match self.interests {
+                    None => Some(Interests::writable()),
+                    Some(x) => Some((x | Interests::writable()) - Interests::readable()),
+                }
             }
             Err(e) => {
                 debug!("not implemented; client err={:?}", e);
-                self.interest.remove(Ready::readable());
+                if let Some(x) = self.interests.as_mut() {
+                    *x -= Interests::readable();
+                }
             }
         };
 
@@ -98,14 +107,14 @@ impl EchoConn {
         self.pipe_fd = Some(rd);
 
         assert!(
-            self.interest.is_readable() || self.interest.is_writable(),
+            self.interests.unwrap().is_readable() || self.interests.unwrap().is_writable(),
             "actual={:?}",
-            self.interest
+            self.interests
         );
         event_loop.reregister(
             &self.sock,
             self.token.unwrap(),
-            self.interest,
+            self.interests.unwrap(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -130,7 +139,7 @@ impl EchoServer {
             .register(
                 &self.conns[tok].sock,
                 Token(tok),
-                Ready::readable(),
+                Interests::readable(),
                 PollOpt::edge() | PollOpt::oneshot(),
             )
             .expect("could not register socket with event loop");
@@ -159,7 +168,7 @@ struct EchoClient {
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
     token: Token,
-    interest: Ready,
+    interests: Option<Interests>,
 }
 
 // Sends a message and expects to receive the same exact message, one at a time
@@ -173,7 +182,7 @@ impl EchoClient {
             tx: SliceBuf::wrap(curr.as_bytes()),
             rx: SliceBuf::wrap(curr.as_bytes()),
             token: tok,
-            interest: Ready::none(),
+            interests: None,
         }
     }
 
@@ -214,22 +223,25 @@ impl EchoClient {
             assert!(actual == expect, "actual={}; expect={}", actual, expect);
         }
 
-        self.interest.remove(Ready::readable());
+        self.interests = match self.interests {
+            None => None,
+            Some(i) => Some(i - Interests::readable()),
+        };
 
         if !self.rx.has_remaining() {
             self.next_msg(event_loop).unwrap();
         }
 
-        if !self.interest.is_none() {
+        if !self.interests.is_none() {
             assert!(
-                self.interest.is_readable() || self.interest.is_writable(),
+                self.interests.unwrap().is_readable() || self.interests.unwrap().is_writable(),
                 "actual={:?}",
-                self.interest
+                self.interests
             );
             event_loop.reregister(
                 &self.sock,
                 self.token,
-                self.interest,
+                self.interests.unwrap(),
                 PollOpt::edge() | PollOpt::oneshot(),
             )?;
         }
@@ -243,25 +255,30 @@ impl EchoClient {
         match self.sock.try_write_buf(&mut self.tx) {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
-                self.interest.insert(Ready::writable());
+                self.interests = match self.interests {
+                    None => Some(Interests::writable()),
+                    Some(i) => Some(i | Interests::writable()),
+                }
             }
             Ok(Some(r)) => {
                 debug!("CLIENT : we wrote {} bytes!", r);
-                self.interest.insert(Ready::readable());
-                self.interest.remove(Ready::writable());
+                self.interests = match self.interests {
+                    None => Some(Interests::readable()),
+                    Some(i) => Some((i | Interests::readable()) - Interests::writable()),
+                }
             }
             Err(e) => debug!("not implemented; client err={:?}", e),
         }
 
         assert!(
-            self.interest.is_readable() || self.interest.is_writable(),
+            self.interests.is_readable() || self.interests.is_writable(),
             "actual={:?}",
-            self.interest
+            self.interests
         );
         event_loop.reregister(
             &self.sock,
             self.token,
-            self.interest,
+            self.interests,
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -278,11 +295,14 @@ impl EchoClient {
         self.tx = SliceBuf::wrap(curr.as_bytes());
         self.rx = SliceBuf::wrap(curr.as_bytes());
 
-        self.interest.insert(Ready::writable());
+        self.interests = match self.interests {
+            None => Some(Interests::writable()),
+            Some(i) => Some(i | Interests::writable()),
+        };
         event_loop.reregister(
             &self.sock,
             self.token,
-            self.interest,
+            self.interests,
             PollOpt::edge() | PollOpt::oneshot(),
         )
     }
@@ -343,7 +363,7 @@ pub fn test_unix_pass_fd() {
         .register(
             &srv,
             SERVER,
-            Ready::readable(),
+            Interests::readable(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();
@@ -355,7 +375,7 @@ pub fn test_unix_pass_fd() {
         .register(
             &sock,
             CLIENT,
-            Ready::writable(),
+            Interests::writable(),
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();

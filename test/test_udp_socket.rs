@@ -2,7 +2,7 @@ use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use iovec::IoVec;
 use localhost;
 use mio::net::UdpSocket;
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::{Events, Interests, Poll, PollOpt, Token};
 use std::io::ErrorKind;
 use std::str;
 use std::time;
@@ -54,11 +54,11 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     );
 
     info!("Registering SENDER");
-    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge())
+    poll.register(&tx, SENDER, Interests::writable(), PollOpt::edge())
         .unwrap();
 
     info!("Registering LISTENER");
-    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
+    poll.register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -162,9 +162,9 @@ pub fn test_udp_socket_discard() {
     let r = udp_outside.send(b"hello world");
     assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
-    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
+    poll.register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
         .unwrap();
-    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge())
+    poll.register(&tx, SENDER, Interests::writable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -188,10 +188,10 @@ pub fn test_udp_socket_send_recv_bufs() {
 
     let poll = Poll::new().unwrap();
 
-    poll.register(&tx, SENDER, Ready::writable(), PollOpt::edge())
+    poll.register(&tx, SENDER, Interests::writable(), PollOpt::edge())
         .unwrap();
 
-    poll.register(&rx, LISTENER, Ready::readable(), PollOpt::edge())
+    poll.register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);

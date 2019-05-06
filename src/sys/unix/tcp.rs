@@ -9,7 +9,7 @@ use libc;
 use net2::TcpStreamExt;
 
 use event::Evented;
-use {io, Poll, PollOpt, Ready, Token};
+use {io, Interests, Poll, PollOpt, Token};
 
 use sys::unix::eventedfd::EventedFd;
 use sys::unix::io::set_nonblock;
@@ -150,20 +150,20 @@ impl Evented for TcpStream {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(poll, token, interests, opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(poll, token, interests, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {
@@ -233,20 +233,20 @@ impl Evented for TcpListener {
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).register(poll, token, interests, opts)
     }
 
     fn reregister(
         &self,
         poll: &Poll,
         token: Token,
-        interest: Ready,
+        interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
+        EventedFd(&self.as_raw_fd()).reregister(poll, token, interests, opts)
     }
 
     fn deregister(&self, poll: &Poll) -> io::Result<()> {

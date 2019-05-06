@@ -1,5 +1,5 @@
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::{Events, Interests, Poll, PollOpt, Token};
 use TryWrite;
 
 const LISTEN: Token = Token(0);
@@ -20,11 +20,11 @@ fn local_addr_ready() {
     let addr = server.local_addr().unwrap();
 
     let poll = Poll::new().unwrap();
-    poll.register(&server, LISTEN, Ready::readable(), PollOpt::edge())
+    poll.register(&server, LISTEN, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
-    poll.register(&sock, CLIENT, Ready::readable(), PollOpt::edge())
+    poll.register(&sock, CLIENT, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -43,7 +43,7 @@ fn local_addr_ready() {
             match event.token() {
                 LISTEN => {
                     let sock = handler.listener.accept().unwrap().0;
-                    poll.register(&sock, SERVER, Ready::writable(), PollOpt::edge())
+                    poll.register(&sock, SERVER, Interests::writable(), PollOpt::edge())
                         .unwrap();
                     handler.accepted = Some(sock);
                 }
