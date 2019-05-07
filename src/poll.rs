@@ -100,14 +100,14 @@ use {sys, Token};
 ///
 /// // Construct a new `Poll` handle as well as the `Events` we'll store into
 /// let mut poll = Poll::new()?;
-/// let register = poll.register().clone();
+/// let registry = poll.registry().clone();
 /// let mut events = Events::with_capacity(1024);
 ///
 /// // Connect the stream
 /// let stream = TcpStream::connect(&server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// register.register(&stream, Token(0), Interests::readable() | Interests::writable(), PollOpt::edge())?;
+/// registry.register(&stream, Token(0), Interests::readable() | Interests::writable(), PollOpt::edge())?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -277,11 +277,11 @@ use {sys, Token};
 /// thread::sleep(Duration::from_secs(1));
 ///
 /// let mut poll = Poll::new()?;
-/// let register = poll.register().clone();
+/// let registry = poll.registry().clone();
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// register.register(&sock, Token(0), Interests::readable() | Interests::writable(), PollOpt::edge())?;
+/// registry.register(&sock, Token(0), Interests::readable() | Interests::writable(), PollOpt::edge())?;
 /// #     Ok(())
 /// # }
 /// #
@@ -374,7 +374,7 @@ struct Inner {
 /// # Examples
 ///
 /// ```
-/// use mio::{Ready, Interests, Registration, Register, Poll, PollOpt, Token};
+/// use mio::{Ready, Interests, Registration, Registry, Poll, PollOpt, Token};
 /// use mio::event::Evented;
 ///
 /// use std::io;
@@ -412,20 +412,20 @@ struct Inner {
 /// }
 ///
 /// impl Evented for Deadline {
-///     fn register(&self, register: &Register, token: Token, interests: Interests, opts: PollOpt)
+///     fn register(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.register(register, token, interests, opts)
+///         self.registration.register(registry, token, interests, opts)
 ///     }
 ///
-///     fn reregister(&self, register: &Register, token: Token, interests: Interests, opts: PollOpt)
+///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.reregister(register, token, interests, opts)
+///         self.registration.reregister(registry, token, interests, opts)
 ///     }
 ///
-///     fn deregister(&self, register: &Register) -> io::Result<()> {
-///         register.deregister(&self.registration)
+///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
+///         registry.deregister(&self.registration)
 ///     }
 /// }
 /// ```
@@ -435,9 +435,9 @@ struct Inner {
 /// [`Registration::new`]: struct.Registration.html#method.new
 /// [`Evented`]: event/trait.Evented.html
 /// [`set_readiness`]: struct.SetReadiness.html#method.set_readiness
-/// [`register`]: struct.Poll.html#method.register
-/// [`reregister`]: struct.Poll.html#method.reregister
-/// [`deregister`]: struct.Poll.html#method.deregister
+/// [`register`]: struct.Registry.html#method.register
+/// [`reregister`]: struct.Registry.html#method.reregister
+/// [`deregister`]: struct.Registry.html#method.deregister
 /// [portability]: struct.Poll.html#portability
 pub struct Registration {
     inner: RegistrationInner,
@@ -1489,7 +1489,7 @@ impl Registration {
     /// });
     ///
     /// let mut poll = Poll::new()?;
-    /// let registry = poll.register().clone();
+    /// let registry = poll.registry().clone();
     ///
     /// registry.register(
     ///     &registration,

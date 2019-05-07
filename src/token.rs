@@ -1,7 +1,7 @@
 /// Associates readiness notifications with [`Evented`] handles.
 ///
 /// `Token` is a wrapper around `usize` and is used as an argument to
-/// [`Poll::register`] and [`Poll::reregister`].
+/// [`Registry::register`] and [`Registry::reregister`].
 ///
 /// See [`Poll`] for more documentation on polling.
 ///
@@ -35,13 +35,13 @@
 ///
 /// // The `Poll` instance
 /// let mut poll = Poll::new()?;
-/// let register = poll.register().clone();
+/// let registry = poll.registry().clone();
 ///
 /// // Tcp listener
 /// let listener = TcpListener::bind(&"127.0.0.1:0".parse()?)?;
 ///
 /// // Register the listener
-/// register.register(&listener,
+/// registry.register(&listener,
 ///                   LISTENER,
 ///                   Interests::readable(),
 ///                   PollOpt::edge())?;
@@ -87,7 +87,7 @@
 ///                             next_socket_index += 1;
 ///
 ///                             // Register the new socket w/ poll
-///                             register.register(&socket,
+///                             registry.register(&socket,
 ///                                               token,
 ///                                               Interests::readable(),
 ///                                               PollOpt::edge())?;
@@ -135,8 +135,8 @@
 ///
 /// [`Evented`]: event/trait.Evented.html
 /// [`Poll`]: struct.Poll.html
-/// [`Poll::register`]: struct.Poll.html#method.register
-/// [`Poll::reregister`]: struct.Poll.html#method.reregister
+/// [`Registry::register`]: struct.Registry.html#method.register
+/// [`Registry::reregister`]: struct.Registry.html#method.reregister
 /// [`slab`]: https://crates.io/crates/slab
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Token(pub usize);

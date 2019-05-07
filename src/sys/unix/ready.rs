@@ -73,9 +73,9 @@ use std::ops;
 /// let socket = TcpStream::connect(&addr)?;
 ///
 /// let mut poll = Poll::new()?;
-/// let register = poll.register().clone();
+/// let registry = poll.registry().clone();
 ///
-/// register.register(&socket,
+/// registry.register(&socket,
 ///                   Token(0),
 ///                   Interests::readable(),
 ///                   PollOpt::edge())?;
