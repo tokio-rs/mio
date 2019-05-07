@@ -7,7 +7,7 @@ use libc;
 use event::Evented;
 use sys::unix::cvt;
 use unix::EventedFd;
-use {io, PollOpt, Interests, Registry, Token};
+use {io, Interests, PollOpt, Registry, Token};
 
 pub fn set_nonblock(fd: libc::c_int) -> io::Result<()> {
     unsafe {

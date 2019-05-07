@@ -216,7 +216,12 @@ mod stress {
         for i in 0..N {
             let (registration, set_readiness) = Registration::new();
             poll.registry()
-                .register(&registration, Token(i), Interests::readable(), PollOpt::edge())
+                .register(
+                    &registration,
+                    Token(i),
+                    Interests::readable(),
+                    PollOpt::edge(),
+                )
                 .unwrap();
 
             registrations.push(registration);

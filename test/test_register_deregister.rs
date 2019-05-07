@@ -34,7 +34,12 @@ impl TestHandler {
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
                 registry
-                    .reregister(&self.client, CLIENT, Interests::writable(), PollOpt::level())
+                    .reregister(
+                        &self.client,
+                        CLIENT,
+                        Interests::writable(),
+                        PollOpt::level(),
+                    )
                     .unwrap();
             }
             _ => panic!("unexpected token"),

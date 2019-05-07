@@ -16,7 +16,7 @@ use net2::TcpBuilder;
 
 use event::Evented;
 use poll::SelectorId;
-use {io, sys, PollOpt, Interests, Registry, Token};
+use {io, sys, Interests, PollOpt, Registry, Token};
 
 /*
  *

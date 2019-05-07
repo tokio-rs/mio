@@ -1587,7 +1587,8 @@ impl Evented for Registration {
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(registry, token, interests.to_ready(), opts)
+        self.inner
+            .update(registry, token, interests.to_ready(), opts)
     }
 
     fn reregister(
@@ -1597,7 +1598,8 @@ impl Evented for Registration {
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner.update(registry, token, interests.to_ready(), opts)
+        self.inner
+            .update(registry, token, interests.to_ready(), opts)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

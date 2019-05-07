@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use event::Evented;
 use miow::iocp::CompletionStatus;
 use sys::windows::Selector;
-use {io, poll, PollOpt, Interests, Registry, Token};
+use {io, poll, Interests, PollOpt, Registry, Token};
 
 pub struct Awakener {
     inner: Mutex<Option<AwakenerInner>>,
