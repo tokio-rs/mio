@@ -30,10 +30,6 @@ slab = "0.4.0"
 net2 = "0.2.29"
 iovec = "0.1.1"
 
-[target.'cfg(target_os = "fuchsia")'.dependencies]
-fuchsia-zircon = "0.3.2"
-fuchsia-zircon-sys = "0.3.2"
-
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.42"
 

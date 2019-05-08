@@ -11,9 +11,6 @@ extern crate iovec;
 extern crate slab;
 extern crate tempdir;
 
-#[cfg(target_os = "fuchsia")]
-extern crate fuchsia_zircon as zircon;
-
 pub use ports::localhost;
 
 mod test_close_on_drop;
@@ -62,9 +59,6 @@ mod test_unix_echo_server;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[cfg(feature = "with-deprecated")]
 mod test_unix_pass_fd;
-
-#[cfg(any(target_os = "fuchsia"))]
-mod test_fuchsia_handles;
 
 use bytes::{Buf, MutBuf};
 use mio::event::Event;
