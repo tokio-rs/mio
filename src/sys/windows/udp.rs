@@ -3,10 +3,10 @@
 //! Note that most of this module is quite similar to the TCP module, so if
 //! something seems odd you may also want to try the docs over there.
 
-use crate::{poll, Interests, PollOpt, Ready, Registry, Token};
 use crate::event::Evented;
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
+use crate::{poll, Interests, PollOpt, Ready, Registry, Token};
 use log::trace;
 use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;

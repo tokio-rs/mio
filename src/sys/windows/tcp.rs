@@ -1,8 +1,8 @@
-use crate::{poll, Interests, PollOpt, Ready, Registry, Token};
 use crate::event::Evented;
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
 use crate::sys::windows::Family;
+use crate::{poll, Interests, PollOpt, Ready, Registry, Token};
 use iovec::IoVec;
 use log::trace;
 use miow::iocp::CompletionStatus;
@@ -16,7 +16,6 @@ use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use winapi::*;
-
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`

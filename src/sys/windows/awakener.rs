@@ -1,8 +1,8 @@
-use crate::{io, poll, Interests, PollOpt, Registry, Token};
 use crate::event::Evented;
 use crate::sys::windows::Selector;
-use std::sync::Mutex;
+use crate::{io, poll, Interests, PollOpt, Registry, Token};
 use miow::iocp::CompletionStatus;
+use std::sync::Mutex;
 
 pub struct Awakener {
     inner: Mutex<Option<AwakenerInner>>,
