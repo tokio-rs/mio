@@ -881,7 +881,11 @@ impl Poll {
     /// When an `Evented` handle is deregistered, the `Poll` instance will
     /// no longer monitor it for readiness state changes. Unlike disabling
     /// handles with oneshot, deregistering clears up any internal resources
-    /// needed to track the handle.
+    /// needed to track the handle.  After an explicit call to this
+    /// method completes, it is guaranteed that the token previously
+    /// registered to this handle will not be returned by a future
+    /// poll, so long as a happens-before relationship is established
+    /// between this call and the poll.
     ///
     /// A handle can be passed back to `register` after it has been
     /// deregistered; however, it must be passed back to the **same** `Poll`
