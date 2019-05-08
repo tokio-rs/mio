@@ -67,12 +67,6 @@ pub struct TcpStream {
 
 use std::net::Shutdown;
 
-// TODO: remove when fuchsia's set_nonblocking is fixed in libstd
-#[cfg(target_os = "fuchsia")]
-fn set_nonblocking(stream: &net::TcpStream) -> io::Result<()> {
-    sys::set_nonblock(::std::os::unix::io::AsRawFd::as_raw_fd(stream))
-}
-#[cfg(not(target_os = "fuchsia"))]
 fn set_nonblocking(stream: &net::TcpStream) -> io::Result<()> {
     stream.set_nonblocking(true)
 }
@@ -627,24 +621,24 @@ impl fmt::Debug for TcpListener {
  *
  */
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 impl IntoRawFd for TcpStream {
     fn into_raw_fd(self) -> RawFd {
         self.sys.into_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 impl AsRawFd for TcpStream {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream {
@@ -654,21 +648,21 @@ impl FromRawFd for TcpStream {
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 impl IntoRawFd for TcpListener {
     fn into_raw_fd(self) -> RawFd {
         self.sys.into_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener {

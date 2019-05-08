@@ -185,7 +185,7 @@ pub fn test_udp_socket_discard() {
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
+#[cfg(unix)]
 #[test]
 pub fn test_udp_socket_send_recv_bufs() {
     let (tx, rx) = connected_sockets();

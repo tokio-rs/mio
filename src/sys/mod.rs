@@ -18,10 +18,5 @@ pub use self::windows::{
 #[cfg(windows)]
 mod windows;
 
-#[cfg(target_os = "fuchsia")]
-pub use self::fuchsia::{
-    set_nonblock, Awakener, EventedHandle, Events, Selector, TcpListener, TcpStream, UdpSocket,
-};
-
 #[cfg(windows)]
 pub const READY_ALL: usize = 0;
