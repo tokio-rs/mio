@@ -20,7 +20,7 @@ use winapi::*;
 use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
-use {poll, Interests, Poll, PollOpt, Ready, Token};
+use {poll, Interests, PollOpt, Ready, Registry, Token};
 
 pub struct UdpSocket {
     imp: Imp,
@@ -346,7 +346,7 @@ impl Imp {
 impl Evented for UdpSocket {
     fn register(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
@@ -354,7 +354,7 @@ impl Evented for UdpSocket {
         let mut me = self.inner();
         me.iocp.register_socket(
             &self.imp.inner.socket,
-            poll,
+            registry,
             token,
             interests,
             opts,
@@ -366,7 +366,7 @@ impl Evented for UdpSocket {
 
     fn reregister(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
@@ -374,7 +374,7 @@ impl Evented for UdpSocket {
         let mut me = self.inner();
         me.iocp.reregister_socket(
             &self.imp.inner.socket,
-            poll,
+            registry,
             token,
             interests,
             opts,
@@ -384,10 +384,10 @@ impl Evented for UdpSocket {
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
         self.inner()
             .iocp
-            .deregister(&self.imp.inner.socket, poll, &self.registration)
+            .deregister(&self.imp.inner.socket, registry, &self.registration)
     }
 }
 

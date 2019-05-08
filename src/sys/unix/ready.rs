@@ -72,12 +72,13 @@ use std::ops;
 /// let addr = "216.58.193.68:80".parse()?;
 /// let socket = TcpStream::connect(&addr)?;
 ///
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
+/// let registry = poll.registry().clone();
 ///
-/// poll.register(&socket,
-///               Token(0),
-///               Interests::readable(),
-///               PollOpt::edge())?;
+/// registry.register(&socket,
+///                   Token(0),
+///                   Interests::readable(),
+///                   PollOpt::edge())?;
 /// #     Ok(())
 /// # }
 /// #

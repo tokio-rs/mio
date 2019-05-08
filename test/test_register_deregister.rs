@@ -1,6 +1,6 @@
 use bytes::SliceBuf;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, PollOpt, Token};
+use mio::{Events, Interests, Poll, PollOpt, Registry, Token};
 use std::time::Duration;
 use {localhost, TryWrite};
 
@@ -22,7 +22,7 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, poll: &mut Poll, token: Token) {
+    fn handle_read(&mut self, registry: &Registry, token: Token) {
         match token {
             SERVER => {
                 trace!("handle_read; token=SERVER");
@@ -33,27 +33,28 @@ impl TestHandler {
                 trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
-                poll.reregister(
-                    &self.client,
-                    CLIENT,
-                    Interests::writable(),
-                    PollOpt::level(),
-                )
-                .unwrap();
+                registry
+                    .reregister(
+                        &self.client,
+                        CLIENT,
+                        Interests::writable(),
+                        PollOpt::level(),
+                    )
+                    .unwrap();
             }
             _ => panic!("unexpected token"),
         }
     }
 
-    fn handle_write(&mut self, poll: &mut Poll, token: Token) {
+    fn handle_write(&mut self, registry: &Registry, token: Token) {
         debug!("handle_write; token={:?}; state={:?}", token, self.state);
 
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
         self.state = 2;
-        poll.deregister(&self.client).unwrap();
-        poll.deregister(&self.server).unwrap();
+        registry.deregister(&self.client).unwrap();
+        registry.deregister(&self.server).unwrap();
     }
 }
 
@@ -70,13 +71,15 @@ pub fn test_register_deregister() {
     let server = TcpListener::bind(&addr).unwrap();
 
     info!("register server socket");
-    poll.register(&server, SERVER, Interests::readable(), PollOpt::edge())
+    poll.registry()
+        .register(&server, SERVER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
-    poll.register(&client, CLIENT, Interests::readable(), PollOpt::level())
+    poll.registry()
+        .register(&client, CLIENT, Interests::readable(), PollOpt::level())
         .unwrap();
 
     let mut handler = TestHandler::new(server, client);
@@ -86,11 +89,11 @@ pub fn test_register_deregister() {
 
         if let Some(event) = events.iter().next() {
             if event.readiness().is_readable() {
-                handler.handle_read(&mut poll, event.token());
+                handler.handle_read(poll.registry(), event.token());
             }
 
             if event.readiness().is_writable() {
-                handler.handle_write(&mut poll, event.token());
+                handler.handle_write(poll.registry(), event.token());
                 break;
             }
         }

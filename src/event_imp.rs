@@ -1,13 +1,13 @@
 use std::{fmt, io, ops};
-use {Poll, Token};
+use {Registry, Token};
 
-/// A value that may be registered with `Poll`
+/// A value that may be registered with `Registry`
 ///
-/// Values that implement `Evented` can be registered with `Poll`. Users of Mio
-/// should not use the `Evented` trait functions directly. Instead, the
-/// equivalent functions on `Poll` should be used.
+/// Values that implement `Evented` can be registered with `Registry`. Users of
+/// Mio should not use the `Evented` trait functions directly. Instead, the
+/// equivalent functions on `Registry` should be used.
 ///
-/// See [`Poll`] for more details.
+/// See [`Registry`] for more details.
 ///
 /// # Implementing `Evented`
 ///
@@ -21,7 +21,7 @@ use {Poll, Token};
 /// [`Registration`] and [`SetReadiness`]. In this case, the implementer takes
 /// responsibility for driving the readiness state changes.
 ///
-/// [`Poll`]: ../struct.Poll.html
+/// [`Registry`]: ../struct.Registry.html
 /// [`Registration`]: ../struct.Registration.html
 /// [`SetReadiness`]: ../struct.SetReadiness.html
 ///
@@ -30,7 +30,7 @@ use {Poll, Token};
 /// Implementing `Evented` on a struct containing a socket:
 ///
 /// ```
-/// use mio::{Interests, Poll, PollOpt, Token};
+/// use mio::{Interests, Registry, PollOpt, Token};
 /// use mio::event::Evented;
 /// use mio::net::TcpStream;
 ///
@@ -41,23 +41,23 @@ use {Poll, Token};
 /// }
 ///
 /// impl Evented for MyEvented {
-///     fn register(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
+///     fn register(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `register` call to `socket`
-///         self.socket.register(poll, token, interests, opts)
+///         self.socket.register(registry, token, interests, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
+///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `reregister` call to `socket`
-///         self.socket.reregister(poll, token, interests, opts)
+///         self.socket.reregister(registry, token, interests, opts)
 ///     }
 ///
-///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
+///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
 ///         // Delegate the `deregister` call to `socket`
-///         self.socket.deregister(poll)
+///         self.socket.deregister(registry)
 ///     }
 /// }
 /// ```
@@ -65,7 +65,7 @@ use {Poll, Token};
 /// Implement `Evented` using [`Registration`] and [`SetReadiness`].
 ///
 /// ```
-/// use mio::{Ready, Interests, Registration, Poll, PollOpt, Token};
+/// use mio::{Ready, Interests, Registration, Registry, PollOpt, Token};
 /// use mio::event::Evented;
 ///
 /// use std::io;
@@ -79,7 +79,7 @@ use {Poll, Token};
 ///
 /// impl Deadline {
 ///     pub fn new(when: Instant) -> Deadline {
-///         let (registration, set_readiness) = Registration::new2();
+///         let (registration, set_readiness) = Registration::new();
 ///
 ///         thread::spawn(move || {
 ///             let now = Instant::now();
@@ -103,144 +103,144 @@ use {Poll, Token};
 /// }
 ///
 /// impl Evented for Deadline {
-///     fn register(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
+///     fn register(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.register(poll, token, interests, opts)
+///         self.registration.register(registry, token, interests, opts)
 ///     }
 ///
-///     fn reregister(&self, poll: &Poll, token: Token, interests: Interests, opts: PollOpt)
+///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
 ///         -> io::Result<()>
 ///     {
-///         self.registration.reregister(poll, token, interests, opts)
+///         self.registration.reregister(registry, token, interests, opts)
 ///     }
 ///
-///     fn deregister(&self, poll: &Poll) -> io::Result<()> {
-///         self.registration.deregister(poll)
+///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
+///         self.registration.deregister(registry)
 ///     }
 /// }
 /// ```
 pub trait Evented {
-    /// Register `self` with the given `Poll` instance.
+    /// Register `self` with the given `Registry` instance.
     ///
-    /// This function should not be called directly. Use [`Poll::register`]
+    /// This function should not be called directly. Use [`Registry::register`]
     /// instead. Implementors should handle registration by either delegating
     /// the call to another `Evented` type or creating a [`Registration`].
     ///
-    /// [`Poll::register`]: ../struct.Poll.html#method.register
+    /// [`Registry::register`]: ../struct.Registry.html#method.register
     /// [`Registration`]: ../struct.Registration.html
     fn register(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()>;
 
-    /// Re-register `self` with the given `Poll` instance.
+    /// Re-register `self` with the given `Registry` instance.
     ///
-    /// This function should not be called directly. Use [`Poll::reregister`]
+    /// This function should not be called directly. Use [`Registry::reregister`]
     /// instead. Implementors should handle re-registration by either delegating
     /// the call to another `Evented` type or calling
     /// [`SetReadiness::set_readiness`].
     ///
-    /// [`Poll::reregister`]: ../struct.Poll.html#method.reregister
+    /// [`Registry::reregister`]: ../struct.Registry.html#method.reregister
     /// [`SetReadiness::set_readiness`]: ../struct.SetReadiness.html#method.set_readiness
     fn reregister(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()>;
 
-    /// Deregister `self` from the given `Poll` instance
+    /// Deregister `self` from the given `Registry` instance
     ///
-    /// This function should not be called directly. Use [`Poll::deregister`]
+    /// This function should not be called directly. Use [`Registry::deregister`]
     /// instead. Implementors should handle deregistration by either delegating
     /// the call to another `Evented` type or by dropping the [`Registration`]
     /// associated with `self`.
     ///
-    /// [`Poll::deregister`]: ../struct.Poll.html#method.deregister
+    /// [`Registry::deregister`]: ../struct.Registry.html#method.deregister
     /// [`Registration`]: ../struct.Registration.html
-    fn deregister(&self, poll: &Poll) -> io::Result<()>;
+    fn deregister(&self, registry: &Registry) -> io::Result<()>;
 }
 
 impl Evented for Box<Evented> {
     fn register(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().register(poll, token, interests, opts)
+        self.as_ref().register(registry, token, interests, opts)
     }
 
     fn reregister(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().reregister(poll, token, interests, opts)
+        self.as_ref().reregister(registry, token, interests, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.as_ref().deregister(poll)
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+        self.as_ref().deregister(registry)
     }
 }
 
 impl<T: Evented> Evented for Box<T> {
     fn register(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().register(poll, token, interests, opts)
+        self.as_ref().register(registry, token, interests, opts)
     }
 
     fn reregister(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().reregister(poll, token, interests, opts)
+        self.as_ref().reregister(registry, token, interests, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.as_ref().deregister(poll)
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+        self.as_ref().deregister(registry)
     }
 }
 
 impl<T: Evented> Evented for ::std::sync::Arc<T> {
     fn register(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().register(poll, token, interests, opts)
+        self.as_ref().register(registry, token, interests, opts)
     }
 
     fn reregister(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().reregister(poll, token, interests, opts)
+        self.as_ref().reregister(registry, token, interests, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.as_ref().deregister(poll)
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+        self.as_ref().deregister(registry)
     }
 }
 

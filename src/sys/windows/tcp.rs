@@ -16,7 +16,7 @@ use event::Evented;
 use sys::windows::from_raw_arc::FromRawArc;
 use sys::windows::selector::{Overlapped, ReadyBinding};
 use sys::windows::Family;
-use {poll, Interests, Poll, PollOpt, Ready, Token};
+use {poll, Interests, PollOpt, Ready, Registry, Token};
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`
@@ -578,7 +578,7 @@ fn write_done(status: &OVERLAPPED_ENTRY) {
 impl Evented for TcpStream {
     fn register(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
@@ -586,7 +586,7 @@ impl Evented for TcpStream {
         let mut me = self.inner();
         me.iocp.register_socket(
             &self.imp.inner.socket,
-            poll,
+            registry,
             token,
             interests,
             opts,
@@ -611,7 +611,7 @@ impl Evented for TcpStream {
 
     fn reregister(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
@@ -619,7 +619,7 @@ impl Evented for TcpStream {
         let mut me = self.inner();
         me.iocp.reregister_socket(
             &self.imp.inner.socket,
-            poll,
+            registry,
             token,
             interests,
             opts,
@@ -629,10 +629,10 @@ impl Evented for TcpStream {
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
         self.inner()
             .iocp
-            .deregister(&self.imp.inner.socket, poll, &self.registration)
+            .deregister(&self.imp.inner.socket, registry, &self.registration)
     }
 }
 
@@ -816,7 +816,7 @@ fn accept_done(status: &OVERLAPPED_ENTRY) {
 impl Evented for TcpListener {
     fn register(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
@@ -824,7 +824,7 @@ impl Evented for TcpListener {
         let mut me = self.inner();
         me.iocp.register_socket(
             &self.imp.inner.socket,
-            poll,
+            registry,
             token,
             interests,
             opts,
@@ -842,7 +842,7 @@ impl Evented for TcpListener {
 
     fn reregister(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
@@ -850,7 +850,7 @@ impl Evented for TcpListener {
         let mut me = self.inner();
         me.iocp.reregister_socket(
             &self.imp.inner.socket,
-            poll,
+            registry,
             token,
             interests,
             opts,
@@ -860,10 +860,10 @@ impl Evented for TcpListener {
         Ok(())
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
         self.inner()
             .iocp
-            .deregister(&self.imp.inner.socket, poll, &self.registration)
+            .deregister(&self.imp.inner.socket, registry, &self.registration)
     }
 }
 

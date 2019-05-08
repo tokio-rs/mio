@@ -5,8 +5,8 @@ use {expect_events, sleep_ms};
 
 #[test]
 pub fn test_udp_level_triggered() {
-    let poll = Poll::new().unwrap();
-    let poll = &poll;
+    let mut poll = Poll::new().unwrap();
+    let poll = &mut poll;
     let mut events = Events::with_capacity(1024);
     let events = &mut events;
 
@@ -14,20 +14,23 @@ pub fn test_udp_level_triggered() {
     let tx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let rx = UdpSocket::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
-    poll.register(
-        &tx,
-        Token(0),
-        Interests::readable() | Interests::writable(),
-        PollOpt::level(),
-    )
-    .unwrap();
-    poll.register(
-        &rx,
-        Token(1),
-        Interests::readable() | Interests::writable(),
-        PollOpt::level(),
-    )
-    .unwrap();
+    poll.registry()
+        .register(
+            &tx,
+            Token(0),
+            Interests::readable() | Interests::writable(),
+            PollOpt::level(),
+        )
+        .unwrap();
+
+    poll.registry()
+        .register(
+            &rx,
+            Token(1),
+            Interests::readable() | Interests::writable(),
+            PollOpt::level(),
+        )
+        .unwrap();
 
     for _ in 0..2 {
         expect_events(

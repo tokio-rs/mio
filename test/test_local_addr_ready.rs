@@ -19,12 +19,14 @@ fn local_addr_ready() {
     let server = TcpListener::bind(&addr).unwrap();
     let addr = server.local_addr().unwrap();
 
-    let poll = Poll::new().unwrap();
-    poll.register(&server, LISTEN, Interests::readable(), PollOpt::edge())
+    let mut poll = Poll::new().unwrap();
+    poll.registry()
+        .register(&server, LISTEN, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
-    poll.register(&sock, CLIENT, Interests::readable(), PollOpt::edge())
+    poll.registry()
+        .register(&sock, CLIENT, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -43,7 +45,8 @@ fn local_addr_ready() {
             match event.token() {
                 LISTEN => {
                     let sock = handler.listener.accept().unwrap().0;
-                    poll.register(&sock, SERVER, Interests::writable(), PollOpt::edge())
+                    poll.registry()
+                        .register(&sock, SERVER, Interests::writable(), PollOpt::edge())
                         .unwrap();
                     handler.accepted = Some(sock);
                 }

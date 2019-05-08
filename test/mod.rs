@@ -189,7 +189,7 @@ pub fn sleep_ms(ms: u64) {
 }
 
 pub fn expect_events(
-    poll: &Poll,
+    poll: &mut Poll,
     event_buffer: &mut Events,
     poll_try_count: usize,
     mut expected: Vec<Event>,

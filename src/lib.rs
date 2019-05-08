@@ -66,18 +66,25 @@
 //! let server = TcpListener::bind(&addr).unwrap();
 //!
 //! // Create a poll instance
-//! let poll = Poll::new().unwrap();
+//! let mut poll = Poll::new().unwrap();
+//! let registry = poll.registry().clone();
 //!
 //! // Start listening for incoming connections
-//! poll.register(&server, SERVER, Interests::readable(),
-//!               PollOpt::edge()).unwrap();
+//! registry.register(
+//!     &server,
+//!     SERVER,
+//!     Interests::readable(),
+//!     PollOpt::edge()).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
 //!
 //! // Register the socket
-//! poll.register(&sock, CLIENT, Interests::readable(),
-//!               PollOpt::edge()).unwrap();
+//! registry.register(
+//!     &sock,
+//!     CLIENT,
+//!     Interests::readable(),
+//!     PollOpt::edge()).unwrap();
 //!
 //! // Create storage for events
 //! let mut events = Events::with_capacity(1024);
@@ -133,7 +140,7 @@ mod token;
 pub mod net;
 
 pub use event_imp::{Interests, PollOpt, Ready};
-pub use poll::{Poll, Registration, SetReadiness};
+pub use poll::{Poll, Registration, Registry, SetReadiness};
 pub use token::Token;
 
 pub mod event {

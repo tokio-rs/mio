@@ -5,7 +5,7 @@
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use localhost;
 use mio::net::UdpSocket;
-use mio::{Events, Interests, Poll, PollOpt, Ready, Token};
+use mio::{Events, Interests, Poll, PollOpt, Ready, Registry, Token};
 use std::net::IpAddr;
 use std::str;
 
@@ -36,7 +36,7 @@ impl UdpHandler {
         }
     }
 
-    fn handle_read(&mut self, _: &mut Poll, token: Token, _: Ready) {
+    fn handle_read(&mut self, _: &Registry, token: Token, _: Ready) {
         if let LISTENER = token {
             debug!("We are receiving a datagram now...");
             match unsafe { self.rx.recv_from(self.rx_buf.mut_bytes()) } {
@@ -53,7 +53,7 @@ impl UdpHandler {
         }
     }
 
-    fn handle_write(&mut self, _: &mut Poll, token: Token, _: Ready) {
+    fn handle_write(&mut self, _: &Registry, token: Token, _: Ready) {
         if let SENDER = token {
             let addr = self.rx.local_addr().unwrap();
             let cnt = self.tx.send_to(self.buf.bytes(), &addr).unwrap();
@@ -84,11 +84,13 @@ pub fn test_multicast() {
         .unwrap();
 
     info!("Registering SENDER");
-    poll.register(&tx, SENDER, Interests::writable(), PollOpt::edge())
+    poll.registry()
+        .register(&tx, SENDER, Interests::writable(), PollOpt::edge())
         .unwrap();
 
     info!("Registering LISTENER");
-    poll.register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
+    poll.registry()
+        .register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -102,11 +104,11 @@ pub fn test_multicast() {
 
         for event in &events {
             if event.readiness().is_readable() {
-                handler.handle_read(&mut poll, event.token(), event.readiness());
+                handler.handle_read(poll.registry(), event.token(), event.readiness());
             }
 
             if event.readiness().is_writable() {
-                handler.handle_write(&mut poll, event.token(), event.readiness());
+                handler.handle_write(poll.registry(), event.token(), event.readiness());
             }
         }
     }

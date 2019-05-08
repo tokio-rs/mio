@@ -16,25 +16,28 @@ pub fn test_tcp_edge_oneshot() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Interests::readable(), PollOpt::level())
+    poll.registry()
+        .register(&l, Token(0), Interests::readable(), PollOpt::level())
         .unwrap();
 
     // Connect a socket, we are going to write to it
     let mut s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
-    poll.register(&s1, Token(1), Interests::writable(), PollOpt::level())
+    poll.registry()
+        .register(&s1, Token(1), Interests::writable(), PollOpt::level())
         .unwrap();
 
     wait_for(&mut poll, &mut events, Token(0));
 
     // Get pair
     let (mut s2, _) = l.accept().unwrap();
-    poll.register(
-        &s2,
-        Token(2),
-        Interests::readable(),
-        PollOpt::edge() | PollOpt::oneshot(),
-    )
-    .unwrap();
+    poll.registry()
+        .register(
+            &s2,
+            Token(2),
+            Interests::readable(),
+            PollOpt::edge() | PollOpt::oneshot(),
+        )
+        .unwrap();
 
     wait_for(&mut poll, &mut events, Token(1));
 
@@ -49,22 +52,24 @@ pub fn test_tcp_edge_oneshot() {
         assert_eq!(1, s2.read(&mut buf).unwrap());
         assert_eq!(*byte, buf[0]);
 
-        poll.reregister(
-            &s2,
-            Token(2),
-            Interests::readable(),
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
-        .unwrap();
-
-        if *byte == b'o' {
-            poll.reregister(
+        poll.registry()
+            .reregister(
                 &s2,
                 Token(2),
                 Interests::readable(),
                 PollOpt::edge() | PollOpt::oneshot(),
             )
             .unwrap();
+
+        if *byte == b'o' {
+            poll.registry()
+                .reregister(
+                    &s2,
+                    Token(2),
+                    Interests::readable(),
+                    PollOpt::edge() | PollOpt::oneshot(),
+                )
+                .unwrap();
         }
     }
 }

@@ -10,7 +10,7 @@ use poll::SelectorId;
 use std::fmt;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 /// [portability guidelines]: ../struct.Poll.html#portability
-use {io, sys, Interests, Poll, PollOpt, Token};
+use {io, sys, Interests, PollOpt, Registry, Token};
 
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use iovec::IoVec;
@@ -49,11 +49,12 @@ use iovec::IoVec;
 ///
 /// // We need a Poll to check if SENDER is ready to be written into, and if ECHOER is ready to be
 /// // read from.
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
+/// let registry = poll.registry().clone();
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// poll.register(&sender_socket, SENDER, Interests::writable(), PollOpt::edge())?;
-/// poll.register(&echoer_socket, ECHOER, Interests::readable(), PollOpt::edge())?;
+/// registry.register(&sender_socket, SENDER, Interests::writable(), PollOpt::edge())?;
+/// registry.register(&echoer_socket, ECHOER, Interests::readable(), PollOpt::edge())?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];
@@ -580,27 +581,27 @@ impl UdpSocket {
 impl Evented for UdpSocket {
     fn register(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.selector_id.associate_selector(poll)?;
-        self.sys.register(poll, token, interests, opts)
+        self.selector_id.associate_selector(registry)?;
+        self.sys.register(registry, token, interests, opts)
     }
 
     fn reregister(
         &self,
-        poll: &Poll,
+        registry: &Registry,
         token: Token,
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(poll, token, interests, opts)
+        self.sys.reregister(registry, token, interests, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.sys.deregister(poll)
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+        self.sys.deregister(registry)
     }
 }
 

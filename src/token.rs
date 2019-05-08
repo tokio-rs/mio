@@ -1,7 +1,7 @@
 /// Associates readiness notifications with [`Evented`] handles.
 ///
 /// `Token` is a wrapper around `usize` and is used as an argument to
-/// [`Poll::register`] and [`Poll::reregister`].
+/// [`Registry::register`] and [`Registry::reregister`].
 ///
 /// See [`Poll`] for more documentation on polling.
 ///
@@ -34,16 +34,17 @@
 /// let mut next_socket_index = 0;
 ///
 /// // The `Poll` instance
-/// let poll = Poll::new()?;
+/// let mut poll = Poll::new()?;
+/// let registry = poll.registry().clone();
 ///
 /// // Tcp listener
 /// let listener = TcpListener::bind(&"127.0.0.1:0".parse()?)?;
 ///
 /// // Register the listener
-/// poll.register(&listener,
-///               LISTENER,
-///               Interests::readable(),
-///               PollOpt::edge())?;
+/// registry.register(&listener,
+///                   LISTENER,
+///                   Interests::readable(),
+///                   PollOpt::edge())?;
 ///
 /// // Spawn a thread that will connect a bunch of sockets then close them
 /// let addr = listener.local_addr()?;
@@ -86,10 +87,10 @@
 ///                             next_socket_index += 1;
 ///
 ///                             // Register the new socket w/ poll
-///                             poll.register(&socket,
-///                                          token,
-///                                          Interests::readable(),
-///                                          PollOpt::edge())?;
+///                             registry.register(&socket,
+///                                               token,
+///                                               Interests::readable(),
+///                                               PollOpt::edge())?;
 ///
 ///                             // Store the socket
 ///                             sockets.insert(token, socket);
@@ -134,8 +135,8 @@
 ///
 /// [`Evented`]: event/trait.Evented.html
 /// [`Poll`]: struct.Poll.html
-/// [`Poll::register`]: struct.Poll.html#method.register
-/// [`Poll::reregister`]: struct.Poll.html#method.reregister
+/// [`Registry::register`]: struct.Registry.html#method.register
+/// [`Registry::reregister`]: struct.Registry.html#method.reregister
 /// [`slab`]: https://crates.io/crates/slab
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Token(pub usize);
