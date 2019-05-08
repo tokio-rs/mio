@@ -1,5 +1,4 @@
-use event_imp::{ready_as_usize, ready_from_usize, Ready};
-
+use crate::event_imp::{ready_as_usize, ready_from_usize, Ready};
 use std::fmt;
 use std::ops;
 
@@ -450,7 +449,7 @@ impl ops::Sub for UnixReady {
 }
 
 impl fmt::Debug for UnixReady {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut one = false;
         let flags = [
             (UnixReady(Ready::readable()), "Readable"),

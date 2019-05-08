@@ -1,11 +1,11 @@
-use event::Evented;
+use crate::event::Evented;
+use crate::sys::unix::uio::VecIo;
+use crate::unix::EventedFd;
+use crate::{io, Interests, PollOpt, Registry, Token};
 use std;
 use std::fmt;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use sys::unix::uio::VecIo;
-use unix::EventedFd;
-use {io, Interests, PollOpt, Registry, Token};
 
 use iovec::IoVec;
 #[allow(unused_imports)] // only here for Rust 1.8
@@ -153,7 +153,7 @@ impl Evented for UdpSocket {
 }
 
 impl fmt::Debug for UdpSocket {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.io, f)
     }
 }

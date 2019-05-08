@@ -8,10 +8,10 @@ use std::time::Duration;
 
 use net2::{self, TcpStreamExt};
 
+use crate::{TryRead, TryWrite};
 use iovec::IoVec;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, PollOpt, Token};
-use {TryRead, TryWrite};
 
 #[test]
 fn accept() {

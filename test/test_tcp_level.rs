@@ -1,9 +1,9 @@
+use crate::{expect_events, sleep_ms, TryRead};
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, PollOpt, Ready, Token};
 use std::io::Write;
 use std::time::Duration;
-use {expect_events, sleep_ms, TryRead};
 
 const MS: u64 = 1_000;
 

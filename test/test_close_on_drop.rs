@@ -1,7 +1,7 @@
+use crate::{localhost, TryRead};
 use bytes::ByteBuf;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, PollOpt, Ready, Token};
-use {localhost, TryRead};
 
 use self::TestState::{AfterRead, Initial};
 

@@ -1,5 +1,5 @@
 #![doc(html_root_url = "https://docs.rs/mio/0.6.16")]
-#![deny(missing_docs, missing_debug_implementations)]
+#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 // Many of mio's public methods violate this lint, but they can't be fixed
 // without a breaking change.
@@ -111,25 +111,6 @@
 //!
 //! ```
 
-extern crate iovec;
-extern crate net2;
-extern crate slab;
-
-#[cfg(unix)]
-extern crate libc;
-
-#[cfg(windows)]
-extern crate miow;
-
-#[cfg(windows)]
-extern crate winapi;
-
-#[cfg(windows)]
-extern crate kernel32;
-
-#[macro_use]
-extern crate log;
-
 mod event_imp;
 mod io;
 mod lazycell;
@@ -155,8 +136,8 @@ pub use event::Events;
 #[cfg(unix)]
 pub mod unix {
     //! Unix only extensions
-    pub use sys::unix::UnixReady;
-    pub use sys::EventedFd;
+    pub use crate::sys::unix::UnixReady;
+    pub use crate::sys::EventedFd;
 }
 
 /// Windows-only extensions to the mio crate.
@@ -212,5 +193,5 @@ pub mod unix {
 #[cfg(windows)]
 pub mod windows {
 
-    pub use sys::{Binding, Overlapped};
+    pub use crate::sys::{Binding, Overlapped};
 }

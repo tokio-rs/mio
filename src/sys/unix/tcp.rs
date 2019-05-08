@@ -1,19 +1,17 @@
+use crate::event::Evented;
+use crate::sys::unix::eventedfd::EventedFd;
+use crate::sys::unix::io::set_nonblock;
+use crate::sys::unix::uio::VecIo;
+use crate::{io, Interests, PollOpt, Registry, Token};
 use std::fmt;
-use std::io::{Read, Write};
-use std::net::{self, SocketAddr};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::time::Duration;
 
 use iovec::IoVec;
 use libc;
 use net2::TcpStreamExt;
-
-use event::Evented;
-use {io, Interests, PollOpt, Registry, Token};
-
-use sys::unix::eventedfd::EventedFd;
-use sys::unix::io::set_nonblock;
-use sys::unix::uio::VecIo;
+use std::io::{Read, Write};
+use std::net::{self, SocketAddr};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::time::Duration;
 
 pub struct TcpStream {
     inner: net::TcpStream,
@@ -172,7 +170,7 @@ impl Evented for TcpStream {
 }
 
 impl fmt::Debug for TcpStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.inner, f)
     }
 }
@@ -255,7 +253,7 @@ impl Evented for TcpListener {
 }
 
 impl fmt::Debug for TcpListener {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.inner, f)
     }
 }

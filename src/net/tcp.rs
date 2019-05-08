@@ -6,17 +6,15 @@
 //! matter the target platform.
 //!
 /// [portability guidelines]: ../struct.Poll.html#portability
+use crate::event::Evented;
+use crate::poll::SelectorId;
+use crate::{io, sys, Interests, PollOpt, Registry, Token};
+use iovec::IoVec;
+use net2::TcpBuilder;
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
-
-use iovec::IoVec;
-use net2::TcpBuilder;
-
-use event::Evented;
-use poll::SelectorId;
-use {io, sys, Interests, PollOpt, Registry, Token};
 
 /*
  *
@@ -414,7 +412,7 @@ impl Evented for TcpStream {
 }
 
 impl fmt::Debug for TcpStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.sys, f)
     }
 }
@@ -525,7 +523,7 @@ impl TcpListener {
     /// If an accepted stream is returned, the remote address of the peer is
     /// returned along with it.
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        let (s, a) = try!(self.accept_std());
+        let (s, a) = self.accept_std()?;
         Ok((TcpStream::from_stream(s)?, a))
     }
 
@@ -610,7 +608,7 @@ impl Evented for TcpListener {
 }
 
 impl fmt::Debug for TcpListener {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.sys, f)
     }
 }
