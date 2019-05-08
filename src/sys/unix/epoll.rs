@@ -1,17 +1,15 @@
+use crate::event_imp::Event;
+use crate::sys::unix::io::set_cloexec;
+use crate::sys::unix::{cvt, UnixReady};
+use crate::{io, Interests, PollOpt, Ready, Token};
+use libc::{self, c_int};
+use libc::{EPOLLERR, EPOLLHUP, EPOLLONESHOT, EPOLLRDHUP};
+use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{cmp, i32};
-
-use libc::{self, c_int};
-use libc::{EPOLLERR, EPOLLHUP, EPOLLONESHOT, EPOLLRDHUP};
-use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI};
-
-use event_imp::Event;
-use sys::unix::io::set_cloexec;
-use sys::unix::{cvt, UnixReady};
-use {io, Interests, PollOpt, Ready, Token};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
