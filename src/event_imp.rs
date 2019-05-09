@@ -665,30 +665,6 @@ impl Ready {
         Ready(WRITABLE)
     }
 
-    /// Returns a `Ready` representing readiness for all operations.
-    ///
-    /// This includes platform specific operations as well (`hup`, `aio`,
-    /// `error`, `lio`, `pri`).
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::all();
-    ///
-    /// assert!(ready.is_readable());
-    /// assert!(ready.is_writable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    pub fn all() -> Ready {
-        Ready(READABLE | WRITABLE | crate::sys::READY_ALL)
-    }
-
     /// Returns true if `Ready` is the empty set
     ///
     /// See [`Poll`] for more documentation on polling.
@@ -1051,16 +1027,6 @@ impl Interests {
         Interests(WRITABLE)
     }
 
-    /// Returns `Interests` representing readable and writable readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    pub(crate) fn both() -> Interests {
-        Interests(READABLE | WRITABLE)
-    }
-
     /// Returns `Interests` representing AIO completion readiness.
     ///
     /// See [`Poll`] for more documentation on polling.
@@ -1284,7 +1250,10 @@ impl fmt::Debug for Interests {
 
 #[test]
 fn test_debug_interests() {
-    assert_eq!("READABLE | WRITABLE", format!("{:?}", Interests::both()));
+    assert_eq!(
+        "READABLE | WRITABLE",
+        format!("{:?}", Interests::readable() | Interests::writable())
+    );
     assert_eq!("READABLE", format!("{:?}", Interests::readable()));
     assert_eq!("WRITABLE", format!("{:?}", Interests::writable()));
     #[cfg(any(

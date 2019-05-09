@@ -20,7 +20,12 @@ pub fn broken_pipe() {
     let (reader, _) = unix::pipe().unwrap();
 
     event_loop
-        .register(&reader, Token(1), Interests::both(), PollOpt::edge())
+        .register(
+            &reader,
+            Token(1),
+            Interests::readable() | Interests::writable(),
+            PollOpt::edge(),
+        )
         .unwrap();
 
     let mut handler = BrokenPipeHandler;
