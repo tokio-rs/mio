@@ -1,5 +1,5 @@
+use crate::{Registry, Token};
 use std::{fmt, io, ops};
-use {Registry, Token};
 
 /// A value that may be registered with `Registry`
 ///
@@ -166,7 +166,7 @@ pub trait Evented {
     fn deregister(&self, registry: &Registry) -> io::Result<()>;
 }
 
-impl Evented for Box<Evented> {
+impl Evented for Box<dyn Evented> {
     fn register(
         &self,
         registry: &Registry,
@@ -528,7 +528,7 @@ impl ops::Sub for PollOpt {
 }
 
 impl fmt::Debug for PollOpt {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut one = false;
         let flags = [
             (PollOpt::edge(), "Edge-Triggered"),
@@ -686,7 +686,7 @@ impl Ready {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn all() -> Ready {
-        Ready(READABLE | WRITABLE | ::sys::READY_ALL)
+        Ready(READABLE | WRITABLE | crate::sys::READY_ALL)
     }
 
     /// Returns true if `Ready` is the empty set
@@ -951,7 +951,7 @@ impl<T: Into<Ready>> ops::SubAssign<T> for Ready {
 }
 
 impl fmt::Debug for Ready {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut one = false;
         let flags = [
             (Ready::readable(), "Readable"),
@@ -1236,7 +1236,7 @@ impl ops::SubAssign for Interests {
 }
 
 impl fmt::Debug for Interests {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut one = false;
         if self.is_readable() {
             if one {

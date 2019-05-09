@@ -1,20 +1,18 @@
+use crate::event_imp::{Event, Evented, Interests, Ready};
+use crate::lazycell::AtomicLazyCell;
+use crate::poll::{self, Registry};
+use crate::sys::windows::buffer_pool::BufferPool;
+use crate::{PollOpt, Token};
+use log::trace;
+use miow;
+use miow::iocp::{CompletionPort, CompletionStatus};
 use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{fmt, io};
-
-use lazycell::AtomicLazyCell;
-
-use miow;
-use miow::iocp::{CompletionPort, CompletionStatus};
 use winapi::*;
-
-use event_imp::{Event, Evented, Interests, Ready};
-use poll::{self, Registry};
-use sys::windows::buffer_pool::BufferPool;
-use {PollOpt, Token};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -178,7 +176,7 @@ impl Binding {
     /// `windows` module in this crate.
     pub unsafe fn register_handle(
         &self,
-        handle: &AsRawHandle,
+        handle: &dyn AsRawHandle,
         token: Token,
         registry: &Registry,
     ) -> io::Result<()> {
@@ -194,7 +192,7 @@ impl Binding {
     /// Same as `register_handle` but for sockets.
     pub unsafe fn register_socket(
         &self,
-        handle: &AsRawSocket,
+        handle: &dyn AsRawSocket,
         token: Token,
         registry: &Registry,
     ) -> io::Result<()> {
@@ -223,7 +221,7 @@ impl Binding {
     /// there may be pending I/O events and such which aren't handled correctly.
     pub unsafe fn reregister_handle(
         &self,
-        _handle: &AsRawHandle,
+        _handle: &dyn AsRawHandle,
         _token: Token,
         registry: &Registry,
     ) -> io::Result<()> {
@@ -233,7 +231,7 @@ impl Binding {
     /// Same as `reregister_handle`, but for sockets.
     pub unsafe fn reregister_socket(
         &self,
-        _socket: &AsRawSocket,
+        _socket: &dyn AsRawSocket,
         _token: Token,
         registry: &Registry,
     ) -> io::Result<()> {
@@ -255,7 +253,7 @@ impl Binding {
     /// there may be pending I/O events and such which aren't handled correctly.
     pub unsafe fn deregister_handle(
         &self,
-        _handle: &AsRawHandle,
+        _handle: &dyn AsRawHandle,
         registry: &Registry,
     ) -> io::Result<()> {
         self.check_same_selector(registry)
@@ -264,7 +262,7 @@ impl Binding {
     /// Same as `deregister_handle`, but for sockets.
     pub unsafe fn deregister_socket(
         &self,
-        _socket: &AsRawSocket,
+        _socket: &dyn AsRawSocket,
         registry: &Registry,
     ) -> io::Result<()> {
         self.check_same_selector(registry)
@@ -280,7 +278,7 @@ impl Binding {
 }
 
 impl fmt::Debug for Binding {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Binding").finish()
     }
 }
@@ -360,7 +358,7 @@ impl ReadyBinding {
     /// possible change tokens.
     pub fn register_socket(
         &mut self,
-        socket: &AsRawSocket,
+        socket: &dyn AsRawSocket,
         registry: &Registry,
         token: Token,
         events: Interests,
@@ -381,7 +379,7 @@ impl ReadyBinding {
     /// Implementation of `Evented::reregister` function.
     pub fn reregister_socket(
         &mut self,
-        socket: &AsRawSocket,
+        socket: &dyn AsRawSocket,
         registry: &Registry,
         token: Token,
         events: Interests,
@@ -407,7 +405,7 @@ impl ReadyBinding {
     /// readiness notifications and such.
     pub fn deregister(
         &mut self,
-        socket: &AsRawSocket,
+        socket: &dyn AsRawSocket,
         registry: &Registry,
         registration: &Mutex<Option<poll::Registration>>,
     ) -> io::Result<()> {
@@ -538,7 +536,7 @@ impl Overlapped {
 }
 
 impl fmt::Debug for Overlapped {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Overlapped").finish()
     }
 }

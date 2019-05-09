@@ -1,6 +1,6 @@
+use crate::localhost;
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
 use iovec::IoVec;
-use localhost;
 use mio::net::UdpSocket;
 use mio::{Events, Interests, Poll, PollOpt, Token};
 use std::io::ErrorKind;

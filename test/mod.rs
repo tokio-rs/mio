@@ -1,15 +1,9 @@
 #![allow(deprecated)]
 
-extern crate bytes;
-extern crate mio;
-extern crate net2;
+use net2;
 
 #[macro_use]
 extern crate log;
-extern crate env_logger;
-extern crate iovec;
-extern crate slab;
-extern crate tempdir;
 
 pub use ports::localhost;
 

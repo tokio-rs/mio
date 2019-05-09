@@ -3,24 +3,23 @@
 //! Note that most of this module is quite similar to the TCP module, so if
 //! something seems odd you may also want to try the docs over there.
 
+use crate::event::Evented;
+use crate::sys::windows::from_raw_arc::FromRawArc;
+use crate::sys::windows::selector::{Overlapped, ReadyBinding};
+use crate::{poll, Interests, PollOpt, Ready, Registry, Token};
+use log::trace;
+use miow::iocp::CompletionStatus;
+use miow::net::SocketAddrBuf;
+use miow::net::UdpSocketExt as MiowUdpSocketExt;
+#[allow(unused_imports)]
+use net2::{UdpBuilder, UdpSocketExt};
 use std::fmt;
 use std::io;
 use std::io::prelude::*;
 use std::mem;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::{Mutex, MutexGuard};
-
-use miow::iocp::CompletionStatus;
-use miow::net::SocketAddrBuf;
-use miow::net::UdpSocketExt as MiowUdpSocketExt;
-#[allow(unused_imports)]
-use net2::{UdpBuilder, UdpSocketExt};
 use winapi::*;
-
-use event::Evented;
-use sys::windows::from_raw_arc::FromRawArc;
-use sys::windows::selector::{Overlapped, ReadyBinding};
-use {poll, Interests, PollOpt, Ready, Registry, Token};
 
 pub struct UdpSocket {
     imp: Imp,
@@ -279,7 +278,7 @@ impl UdpSocket {
         self.imp.inner.socket.take_error()
     }
 
-    fn inner(&self) -> MutexGuard<Inner> {
+    fn inner(&self) -> MutexGuard<'_, Inner> {
         self.imp.inner()
     }
 
@@ -300,7 +299,7 @@ impl UdpSocket {
 }
 
 impl Imp {
-    fn inner(&self) -> MutexGuard<Inner> {
+    fn inner(&self) -> MutexGuard<'_, Inner> {
         self.inner.inner.lock().unwrap()
     }
 
@@ -392,7 +391,7 @@ impl Evented for UdpSocket {
 }
 
 impl fmt::Debug for UdpSocket {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("UdpSocket").finish()
     }
 }

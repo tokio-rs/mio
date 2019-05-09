@@ -1,6 +1,6 @@
+use crate::sleep_ms;
 use mio::net::{TcpListener, TcpStream};
 use mio::*;
-use sleep_ms;
 use std::time::Duration;
 
 const MS: u64 = 1_000;

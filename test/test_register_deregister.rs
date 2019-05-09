@@ -1,8 +1,8 @@
+use crate::{localhost, TryWrite};
 use bytes::SliceBuf;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, PollOpt, Registry, Token};
 use std::time::Duration;
-use {localhost, TryWrite};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);

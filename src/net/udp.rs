@@ -5,12 +5,12 @@
 //! [portability guidelines] are followed, the behavior should be identical no
 //! matter the target platform.
 //!
-use event::Evented;
-use poll::SelectorId;
+use crate::event::Evented;
+use crate::poll::SelectorId;
+/// [portability guidelines]: ../struct.Poll.html#portability
+use crate::{io, sys, Interests, PollOpt, Registry, Token};
 use std::fmt;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-/// [portability guidelines]: ../struct.Poll.html#portability
-use {io, sys, Interests, PollOpt, Registry, Token};
 
 #[cfg(unix)]
 use iovec::IoVec;
@@ -606,7 +606,7 @@ impl Evented for UdpSocket {
 }
 
 impl fmt::Debug for UdpSocket {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.sys, f)
     }
 }

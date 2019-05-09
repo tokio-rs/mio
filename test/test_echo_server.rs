@@ -1,9 +1,9 @@
+use crate::{localhost, TryRead, TryWrite};
 use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, PollOpt, Registry, Token};
 use slab::Slab;
 use std::io;
-use {localhost, TryRead, TryWrite};
 
 const SERVER: Token = Token(10_000_000);
 const CLIENT: Token = Token(10_000_001);
@@ -249,12 +249,12 @@ impl EchoClient {
         }
 
         if self.interests.unwrap().is_readable() || self.interests.unwrap().is_writable() {
-            try!(registry.reregister(
+            registry.reregister(
                 &self.sock,
                 self.token,
                 self.interests.unwrap(),
-                PollOpt::edge() | PollOpt::oneshot()
-            ));
+                PollOpt::edge() | PollOpt::oneshot(),
+            )?;
         }
 
         Ok(())

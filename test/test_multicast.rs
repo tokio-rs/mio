@@ -2,8 +2,8 @@
 // Figure out why!
 #![cfg(not(target_os = "android"))]
 
+use crate::localhost;
 use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
-use localhost;
 use mio::net::UdpSocket;
 use mio::{Events, Interests, Poll, PollOpt, Ready, Registry, Token};
 use std::net::IpAddr;
