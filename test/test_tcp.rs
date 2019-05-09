@@ -1,3 +1,8 @@
+use crate::{TryRead, TryWrite};
+use iovec::IoVec;
+use mio::net::{TcpListener, TcpStream};
+use mio::{Events, Interests, Poll, PollOpt, Token};
+use net2::{self, TcpStreamExt};
 use std::cmp;
 use std::io;
 use std::io::prelude::*;
@@ -5,13 +10,6 @@ use std::net;
 use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
-
-use net2::{self, TcpStreamExt};
-
-use crate::{TryRead, TryWrite};
-use iovec::IoVec;
-use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, PollOpt, Token};
 
 #[test]
 fn accept() {

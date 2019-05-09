@@ -3,11 +3,10 @@ use crate::sys::unix::eventedfd::EventedFd;
 use crate::sys::unix::io::set_nonblock;
 use crate::sys::unix::uio::VecIo;
 use crate::{io, Interests, PollOpt, Registry, Token};
-use std::fmt;
-
 use iovec::IoVec;
 use libc;
 use net2::TcpStreamExt;
+use std::fmt;
 use std::io::{Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
