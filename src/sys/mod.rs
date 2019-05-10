@@ -17,6 +17,3 @@ pub use self::windows::{
 
 #[cfg(windows)]
 mod windows;
-
-#[cfg(windows)]
-pub const READY_ALL: usize = 0;
