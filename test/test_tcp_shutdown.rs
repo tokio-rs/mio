@@ -10,16 +10,13 @@ macro_rules! wait {
 
         let now = Instant::now();
         let mut events = Events::with_capacity(16);
+        let mut found = false;
 
-        println!("~~~ WAIT ~~~");
-
-        'outer:
-        loop {
+        while !found {
             if now.elapsed() > Duration::from_secs(5) {
                 panic!("not ready");
             }
 
-            println!(" + poll");
             $poll.poll(&mut events, Some(Duration::from_secs(1))).unwrap();
 
             for event in &events {
@@ -29,16 +26,17 @@ macro_rules! wait {
                     assert!(!UnixReady::from(event.readiness()).is_hup());
                 }
 
-                println!("~~~ {:?}", event);
                 if event.token() == Token(0) && event.readiness().$ready() {
-                    break 'outer
+                    found = true;
+                    break;
                 }
             }
         }
     }};
 }
 
-fn setup() -> (Poll, std::net::TcpStream, TcpStream) {
+#[test]
+fn test_write_shutdown() {
     let poll = Poll::new().unwrap();
 
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -61,12 +59,6 @@ fn setup() -> (Poll, std::net::TcpStream, TcpStream) {
 
     wait!(poll, is_writable);
 
-    (poll, socket, client)
-}
-
-#[test]
-fn test_write_shutdown() {
-    let (poll, socket, _client) = setup();
     let mut events = Events::with_capacity(16);
 
     // Polling should not have any events
