@@ -90,7 +90,9 @@ impl EchoConn {
             }
             Err(e) => {
                 debug!("not implemented; client err={:?}", e);
-                if let Some(x) = self.interests.as_mut() {
+                if self.interests == Some(Interests::readable()) {
+                    self.interests = None;
+                } else if let Some(x) = self.interests.as_mut() {
                     *x -= Interests::readable();
                 }
             }
@@ -185,7 +187,9 @@ impl EchoClient {
             }
             Ok(Some(r)) => {
                 if r == 0 {
-                    if let Some(x) = self.interests.as_mut() {
+                    if self.interests == Some(Interests::readable()) {
+                        self.interests = None;
+                    } else if let Some(x) = self.interests.as_mut() {
                         *x -= Interests::readable();
                     }
                     event_loop.shutdown();

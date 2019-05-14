@@ -980,13 +980,13 @@ const LIO: usize = 0b10_0000;
 /// they indicate what readiness should be monitored for. For example if a
 /// socket is registered with readable interests and the socket becomes
 /// writable, no event will be returned from [`poll`].
-/// 
+///
 /// The size of `Option<Interests>` should be identical to itself.
 ///
 /// ```
 /// use std::mem::size_of;
 /// use mio::Interests;
-/// 
+///
 /// assert_eq!(size_of::<Option<Interests>>(), size_of::<usize>());
 /// ```
 ///
