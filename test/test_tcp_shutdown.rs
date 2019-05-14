@@ -31,6 +31,12 @@ macro_rules! wait {
             $poll.poll(&mut events, Some(Duration::from_secs(1))).unwrap();
 
             for event in &events {
+                #[cfg(unix)]
+                {
+                    use mio::unix::UnixReady;
+                    assert!(!event.readiness().is_hup());
+                }
+
                 println!("~~~ {:?}", event);
                 if event.token() == Token(0) && event.readiness().$ready() {
                     break 'outer

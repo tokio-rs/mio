@@ -306,7 +306,7 @@ impl Events {
                 }
             }
 
-            if e.flags & libc::EV_EOF != 0 {
+            if e.filter == libc::EVFILT_WRITE as Filter && e.flags & libc::EV_EOF != 0 {
                 event::kind_mut(&mut self.events[idx]).insert(UnixReady::hup());
 
                 // When the read end of the socket is closed, EV_EOF is set on
