@@ -198,7 +198,8 @@ impl UnixReady {
     /// **Note that only readable and writable readiness is guaranteed to be
     /// supported on all platforms**. This means that `hup` readiness
     /// should be treated as a hint. For more details, see [readiness] in the
-    /// poll documentation.
+    /// poll documentation. It is also unclear if HUP readiness will remain in 0.7. See
+    /// [here][issue-941].
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
@@ -214,6 +215,7 @@ impl UnixReady {
     ///
     /// [`Poll`]: ../struct.Poll.html
     /// [readiness]: ../struct.Poll.html#readiness-operations
+    /// [issue-941]: https://github.com/tokio-rs/mio/issues/941
     #[inline]
     pub fn hup() -> UnixReady {
         UnixReady(ready_from_usize(HUP))
