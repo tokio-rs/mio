@@ -44,10 +44,17 @@ fn setup() -> (Poll, std::net::TcpStream, TcpStream) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
 
+    let mut ready = Ready::readable() | Ready::writable();
+
+    #[cfg(unix)]
+    {
+        ready |= mio::unix::UnixReady::hup();
+    }
+
     let client = TcpStream::connect(&addr).unwrap();
     poll.register(&client,
                   Token(0),
-                  Ready::readable() | Ready::writable(),
+                  ready,
                   PollOpt::edge()).unwrap();
 
     let (socket, _) = listener.accept().unwrap();
