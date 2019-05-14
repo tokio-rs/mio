@@ -292,7 +292,6 @@ impl Events {
             } else if e.filter == libc::EVFILT_WRITE as Filter {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
 
-
                 // `EV_EOF` set with `EVFILT_WRITE` indicates the connection has been fully
                 // disconnected (read and write), but only sockets...
                 if e.flags & libc::EV_EOF != 0 {
