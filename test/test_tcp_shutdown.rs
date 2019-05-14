@@ -1,16 +1,8 @@
-use std::cmp;
-use std::io::prelude::*;
-use std::io;
 use std::net::Shutdown;
-use std::thread;
 use std::time::Duration;
 
-use net2::{self, TcpStreamExt};
-
-use {TryRead, TryWrite};
 use mio::{Token, Ready, PollOpt, Poll, Events};
-use iovec::IoVec;
-use mio::net::{TcpListener, TcpStream};
+use mio::net::TcpStream;
 
 macro_rules! wait {
     ($poll:ident, $ready:ident) => {{
@@ -34,7 +26,7 @@ macro_rules! wait {
                 #[cfg(unix)]
                 {
                     use mio::unix::UnixReady;
-                    assert!(!event.readiness().is_hup());
+                    assert!(!UnixReady::from(event.readiness()).is_hup());
                 }
 
                 println!("~~~ {:?}", event);
@@ -48,12 +40,11 @@ macro_rules! wait {
 
 fn setup() -> (Poll, std::net::TcpStream, TcpStream) {
     let poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(16);
 
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
 
-    let mut client = TcpStream::connect(&addr).unwrap();
+    let client = TcpStream::connect(&addr).unwrap();
     poll.register(&client,
                   Token(0),
                   Ready::readable() | Ready::writable(),
@@ -68,7 +59,7 @@ fn setup() -> (Poll, std::net::TcpStream, TcpStream) {
 
 #[test]
 fn test_write_shutdown() {
-    let (poll, socket, client) = setup();
+    let (poll, socket, _client) = setup();
     let mut events = Events::with_capacity(16);
 
     // Polling should not have any events
