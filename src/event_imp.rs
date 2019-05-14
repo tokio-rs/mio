@@ -1,4 +1,5 @@
 use crate::{Registry, Token};
+use std::num::NonZeroUsize;
 use std::{fmt, io, ops};
 
 /// A value that may be registered with `Registry`
@@ -979,12 +980,22 @@ const LIO: usize = 0b10_0000;
 /// they indicate what readiness should be monitored for. For example if a
 /// socket is registered with readable interests and the socket becomes
 /// writable, no event will be returned from [`poll`].
+/// 
+/// The size of `Option<Interests>` should be identical to itself.
+///
+/// ```
+/// use std::mem::size_of;
+/// use mio::Interests;
+/// 
+/// assert_eq!(size_of::<Option<Interests>>(), size_of::<usize>());
+/// ```
 ///
 /// [`Poll`]: struct.Poll.html                                                 
 /// [`readable`]: #method.readable
 /// [`writable`]: #method.writable
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct Interests(usize);
+#[repr(transparent)]
+pub struct Interests(NonZeroUsize);
 
 impl Interests {
     /// Returns `Interests` representing readable readiness.
@@ -1004,7 +1015,7 @@ impl Interests {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn readable() -> Interests {
-        Interests(READABLE)
+        Interests(NonZeroUsize::new(READABLE).unwrap())
     }
 
     /// Returns `Interests` representing writable readiness.
@@ -1024,7 +1035,7 @@ impl Interests {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn writable() -> Interests {
-        Interests(WRITABLE)
+        Interests(NonZeroUsize::new(WRITABLE).unwrap())
     }
 
     /// Returns `Interests` representing AIO completion readiness.
@@ -1050,7 +1061,7 @@ impl Interests {
         target_os = "macos"
     ))]
     pub fn aio() -> Interests {
-        Interests(AIO)
+        Interests(NonZeroUsize::new(AIO).unwrap())
     }
 
     /// Returns `Interests` representing LIO completion readiness.
@@ -1071,7 +1082,7 @@ impl Interests {
     #[inline]
     #[cfg(any(target_os = "freebsd"))]
     pub fn lio() -> Interests {
-        Interests(LIO)
+        Interests(NonZeroUsize::new(LIO).unwrap())
     }
 
     /// Returns true if the value includes readable readiness.
@@ -1090,7 +1101,7 @@ impl Interests {
     ///
     /// [`Poll`]: struct.Poll.html
     pub fn is_readable(&self) -> bool {
-        (self.0 & READABLE) != 0
+        (self.0.get() & READABLE) != 0
     }
 
     /// Returns true if the value includes writable readiness.
@@ -1109,7 +1120,7 @@ impl Interests {
     ///
     /// [`Poll`]: struct.Poll.html
     pub fn is_writable(&self) -> bool {
-        (self.0 & WRITABLE) != 0
+        (self.0.get() & WRITABLE) != 0
     }
 
     /// Returns true if `Interests` contains AIO readiness
@@ -1136,7 +1147,7 @@ impl Interests {
     ))]
     #[inline]
     pub fn is_aio(&self) -> bool {
-        (self.0 & AIO) != 0
+        (self.0.get() & AIO) != 0
     }
 
     /// Returns true if `Interests` contains LIO readiness
@@ -1157,7 +1168,7 @@ impl Interests {
     #[inline]
     #[cfg(any(target_os = "freebsd"))]
     pub fn is_lio(&self) -> bool {
-        (self.0 & LIO) != 0
+        (self.0.get() & LIO) != 0
     }
 
     /// Returns `Ready` contains `Interests` readiness
@@ -1165,7 +1176,7 @@ impl Interests {
     /// It should and only can be used in crate, and will be deprecated in the future.
     /// So don't use it unless you have no other choice.
     pub(crate) fn to_ready(&self) -> Ready {
-        Ready(self.0)
+        Ready(self.0.get())
     }
 }
 
@@ -1174,14 +1185,14 @@ impl ops::BitOr for Interests {
 
     #[inline]
     fn bitor(self, other: Self) -> Self {
-        Interests(self.0 | other.0)
+        Interests(NonZeroUsize::new(self.0.get() | other.0.get()).unwrap())
     }
 }
 
 impl ops::BitOrAssign for Interests {
     #[inline]
     fn bitor_assign(&mut self, other: Self) {
-        self.0 |= other.0;
+        self.0 = (*self | other).0;
     }
 }
 
@@ -1190,14 +1201,14 @@ impl ops::Sub for Interests {
 
     #[inline]
     fn sub(self, other: Self) -> Self {
-        Interests(self.0 & !other.0)
+        Interests(NonZeroUsize::new(self.0.get() & !other.0.get()).unwrap())
     }
 }
 
 impl ops::SubAssign for Interests {
     #[inline]
     fn sub_assign(&mut self, other: Self) {
-        self.0 &= !other.0;
+        self.0 = (*self - other).0;
     }
 }
 
