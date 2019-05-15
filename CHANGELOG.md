@@ -1,6 +1,13 @@
-# Unreleased (Unreleased)
+# 0.6.17 (May 15, 2018)
 
-* Fix lazycell related compilation issues.
+### Fixed
+- Don't report `RDHUP` as `HUP` (#939)
+- Fix lazycell related compilation issues.
+- Fix EPOLLPRI conflicting with READABLE
+- Abort process on ref count overflows
+
+### Added
+- Define PRI on all targets
 
 # 0.6.16 (September 5, 2018)
 

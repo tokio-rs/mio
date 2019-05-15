@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/mio/0.6.16")]
+#![doc(html_root_url = "https://docs.rs/mio/0.6.17")]
 // Mio targets old versions of the Rust compiler. In order to do this, uses
 // deprecated APIs.
 #![allow(deprecated)]
