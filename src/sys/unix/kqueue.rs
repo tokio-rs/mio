@@ -291,6 +291,18 @@ impl Events {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::readable());
             } else if e.filter == libc::EVFILT_WRITE as Filter {
                 event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
+
+                // `EV_EOF` set with `EVFILT_WRITE` indicates the connection has been fully
+                // disconnected (read and write), but only sockets...
+                if e.flags & libc::EV_EOF != 0 {
+                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::hup());
+
+                    // When the read end of the socket is closed, EV_EOF is set on
+                    // flags, and fflags contains the error if there is one.
+                    if e.fflags != 0 {
+                        event::kind_mut(&mut self.events[idx]).insert(UnixReady::error());
+                    }
+                }
             }
 #[cfg(any(target_os = "dragonfly",
     target_os = "freebsd", target_os = "ios", target_os = "macos"))]
@@ -303,16 +315,6 @@ impl Events {
             {
                 if e.filter == libc::EVFILT_LIO {
                     event::kind_mut(&mut self.events[idx]).insert(UnixReady::lio());
-                }
-            }
-
-            if e.flags & libc::EV_EOF != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(UnixReady::hup());
-
-                // When the read end of the socket is closed, EV_EOF is set on
-                // flags, and fflags contains the error if there is one.
-                if e.fflags != 0 {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::error());
                 }
             }
         }
