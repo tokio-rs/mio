@@ -1,5 +1,5 @@
 use crate::{Registry, Token};
-use std::num::NonZeroUsize;
+use std::num::NonZeroU8;
 use std::{fmt, io, ops};
 
 /// A value that may be registered with `Registry`
@@ -963,17 +963,6 @@ fn test_debug_ready() {
     assert_eq!("Writable", format!("{:?}", Ready::writable()));
 }
 
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "ios",
-    target_os = "macos"
-))]
-const AIO: usize = 0b01_0000;
-
-#[cfg(any(target_os = "freebsd"))]
-const LIO: usize = 0b10_0000;
-
 /// Interests used in registering.
 ///
 /// Interests are used in registering [`Evented`] handles with [`Poll`],
@@ -987,7 +976,7 @@ const LIO: usize = 0b10_0000;
 /// use std::mem::size_of;
 /// use mio::Interests;
 ///
-/// assert_eq!(size_of::<Option<Interests>>(), size_of::<usize>());
+/// assert_eq!(size_of::<Option<Interests>>(), size_of::<Interests>());
 /// ```
 ///
 /// [`Poll`]: struct.Poll.html                                                 
@@ -995,9 +984,24 @@ const LIO: usize = 0b10_0000;
 /// [`writable`]: #method.writable
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct Interests(NonZeroUsize);
+pub struct Interests(NonZeroU8);
 
 impl Interests {
+    const READABLE: u8 = 0b00001;
+
+    const WRITABLE: u8 = 0b00010;
+
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos"
+    ))]
+    const AIO: u8 = 0b01_0000;
+
+    #[cfg(any(target_os = "freebsd"))]
+    const LIO: u8 = 0b10_0000;
+
     /// Returns `Interests` representing readable readiness.
     ///
     /// See [`Poll`] for more documentation on polling.
@@ -1014,8 +1018,8 @@ impl Interests {
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
-    pub fn readable() -> Interests {
-        Interests(NonZeroUsize::new(READABLE).unwrap())
+    pub const fn readable() -> Interests {
+        Interests(unsafe { NonZeroU8::new_unchecked(Interests::READABLE) })
     }
 
     /// Returns `Interests` representing writable readiness.
@@ -1034,8 +1038,8 @@ impl Interests {
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
-    pub fn writable() -> Interests {
-        Interests(NonZeroUsize::new(WRITABLE).unwrap())
+    pub const fn writable() -> Interests {
+        Interests(unsafe { NonZeroU8::new_unchecked(Interests::WRITABLE) })
     }
 
     /// Returns `Interests` representing AIO completion readiness.
@@ -1060,8 +1064,8 @@ impl Interests {
         target_os = "ios",
         target_os = "macos"
     ))]
-    pub fn aio() -> Interests {
-        Interests(NonZeroUsize::new(AIO).unwrap())
+    pub const fn aio() -> Interests {
+        Interests(unsafe { NonZeroU8::new_unchecked(Interests::AIO) })
     }
 
     /// Returns `Interests` representing LIO completion readiness.
@@ -1081,8 +1085,8 @@ impl Interests {
     /// [`Poll`]: struct.Poll.html
     #[inline]
     #[cfg(any(target_os = "freebsd"))]
-    pub fn lio() -> Interests {
-        Interests(NonZeroUsize::new(LIO).unwrap())
+    pub const fn lio() -> Interests {
+        Interests(unsafe { NonZeroU8::new_unchecked(Interests::LIO) })
     }
 
     /// Returns true if the value includes readable readiness.
@@ -1101,7 +1105,7 @@ impl Interests {
     ///
     /// [`Poll`]: struct.Poll.html
     pub fn is_readable(&self) -> bool {
-        (self.0.get() & READABLE) != 0
+        (self.0.get() & Interests::READABLE) != 0
     }
 
     /// Returns true if the value includes writable readiness.
@@ -1120,7 +1124,7 @@ impl Interests {
     ///
     /// [`Poll`]: struct.Poll.html
     pub fn is_writable(&self) -> bool {
-        (self.0.get() & WRITABLE) != 0
+        (self.0.get() & Interests::WRITABLE) != 0
     }
 
     /// Returns true if `Interests` contains AIO readiness
@@ -1147,7 +1151,7 @@ impl Interests {
     ))]
     #[inline]
     pub fn is_aio(&self) -> bool {
-        (self.0.get() & AIO) != 0
+        (self.0.get() & Interests::AIO) != 0
     }
 
     /// Returns true if `Interests` contains LIO readiness
@@ -1168,7 +1172,7 @@ impl Interests {
     #[inline]
     #[cfg(any(target_os = "freebsd"))]
     pub fn is_lio(&self) -> bool {
-        (self.0.get() & LIO) != 0
+        (self.0.get() & Interests::LIO) != 0
     }
 
     /// Returns `Ready` contains `Interests` readiness
@@ -1176,7 +1180,7 @@ impl Interests {
     /// It should and only can be used in crate, and will be deprecated in the future.
     /// So don't use it unless you have no other choice.
     pub(crate) fn to_ready(&self) -> Ready {
-        Ready(self.0.get())
+        Ready(self.0.get() as usize)
     }
 }
 
@@ -1185,7 +1189,7 @@ impl ops::BitOr for Interests {
 
     #[inline]
     fn bitor(self, other: Self) -> Self {
-        Interests(NonZeroUsize::new(self.0.get() | other.0.get()).unwrap())
+        Interests(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
     }
 }
 
@@ -1201,7 +1205,7 @@ impl ops::Sub for Interests {
 
     #[inline]
     fn sub(self, other: Self) -> Self {
-        Interests(NonZeroUsize::new(self.0.get() & !other.0.get()).unwrap())
+        Interests(NonZeroU8::new(self.0.get() & !other.0.get()).unwrap())
     }
 }
 
