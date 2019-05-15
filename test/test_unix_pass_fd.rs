@@ -82,10 +82,9 @@ impl EchoConn {
             }
             Err(e) => {
                 debug!("not implemented; client err={:?}", e);
-                if self.interests == Some(Interests::readable()) {
-                    self.interests = None;
-                } else if let Some(x) = self.interests.as_mut() {
-                    *x -= Interests::readable();
+                self.interests = match self.interests {
+                    Interests::readable() | None => None,
+                    _ => self.interests - Interests::readable(),
                 }
             }
         };
