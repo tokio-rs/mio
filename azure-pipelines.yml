@@ -1,4 +1,4 @@
-trigger: ["master", "v0.6.x"]
+trigger: ["master", "v0.6.x", "wtf-shutdown"]
 pr: ["master", "v0.6.x"]
 
 jobs:

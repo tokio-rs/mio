@@ -71,3 +71,39 @@ fn test_write_shutdown() {
 
     wait!(poll, is_readable);
 }
+
+#[test]
+fn test_full_shutdown() {
+    let poll = Poll::new().unwrap();
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let mut ready = Ready::readable() | Ready::writable();
+
+    #[cfg(unix)]
+    {
+        ready |= mio::unix::UnixReady::hup();
+    }
+
+    let client = TcpStream::connect(&addr).unwrap();
+    poll.register(&client,
+                  Token(0),
+                  ready,
+                  PollOpt::edge()).unwrap();
+
+    let (socket, _) = listener.accept().unwrap();
+
+    wait!(poll, is_writable);
+
+    let mut events = Events::with_capacity(16);
+
+    // Polling should not have any events
+    poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
+    assert!(events.iter().next().is_none());
+
+    println!("SHUTTING DOWN");
+    drop(socket);
+
+    wait!(poll, is_readable);
+}
