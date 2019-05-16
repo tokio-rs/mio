@@ -26,6 +26,7 @@ publish = false
 [features]
 
 [dependencies]
+lazycell = "1.2"
 log = "0.4"
 slab = "0.4.0"
 net2 = "0.2.29"
