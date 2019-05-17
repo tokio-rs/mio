@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::net::Shutdown;
-use std::ops::Deref;
 use std::time::{Duration, Instant};
 
-use mio::{Token, Ready, PollOpt, Poll, Evented, Events};
+use mio::{Token, Ready, PollOpt, Poll, Events};
+use mio::event::Evented;
 use mio::net::TcpStream;
 
 struct TestPoll {
@@ -158,7 +158,7 @@ fn test_graceful_shutdown() {
 #[test]
 fn test_abrupt_shutdown() {
     use net2::TcpStreamExt;
-    use std::io::{self, Read, Write};
+    use std::io::{Read, Write};
 
     let mut poll = TestPoll::new();
     let mut buf = [0; 1024];
@@ -173,7 +173,7 @@ fn test_abrupt_shutdown() {
                   PollOpt::edge());
 
     let (mut socket, _) = listener.accept().unwrap();
-    socket.set_linger(None);
+    socket.set_linger(None).unwrap();
 
     // Wait to be connected
     poll.wait_for(Token(0), Ready::writable());
