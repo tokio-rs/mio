@@ -225,7 +225,7 @@ fn test_abrupt_shutdown() {
                   PollOpt::edge());
 
     let (mut socket, _) = assert_ok!(listener.accept());
-    // assert_ok!(socket.set_linger(None));
+    assert_ok!(socket.set_linger(None));
 
     // Wait to be connected
     assert_ready!(poll, Token(0), Ready::writable());
