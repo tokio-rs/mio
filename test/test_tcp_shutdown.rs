@@ -239,6 +239,7 @@ fn test_abrupt_shutdown() {
 
     drop(socket);
 
+    assert_hup_ready!(poll);
     assert_ready!(poll, Token(0), Ready::writable());
 
     let mut rem = 5; // Because we want to be able to trigger the err
