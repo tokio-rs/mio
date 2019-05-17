@@ -209,7 +209,7 @@ fn test_graceful_shutdown() {
 
 #[test]
 fn test_abrupt_shutdown() {
-    // use net2::TcpStreamExt;
+    use net2::TcpStreamExt;
     use std::io::{self, Read, Write};
 
     let mut poll = TestPoll::new();
