@@ -225,23 +225,31 @@ fn test_abrupt_shutdown() {
                   PollOpt::edge());
 
     let (mut socket, _) = assert_ok!(listener.accept());
-    assert_ok!(socket.set_linger(None));
+    assert_ok!(socket.set_linger(Some(Duration::from_millis(0))));
+    // assert_ok!(socket.set_linger(None));
 
     // Wait to be connected
     assert_ready!(poll, Token(0), Ready::writable());
 
     // Write some data
 
+    /*
     assert_ok!(client.write(b"junk"));
 
     assert_ok!(socket.write(b"junk"));
     assert_ok!(socket.read(&mut buf[..1]));
+    */
 
     drop(socket);
 
     assert_hup_ready!(poll);
     assert_ready!(poll, Token(0), Ready::writable());
+    assert_ready!(poll, Token(0), Ready::readable());
 
+    let res = client.read(&mut buf);
+    assert!(res.is_err(), "not err = {:?}", res);
+
+    /*
     let mut rem = 5; // Because we want to be able to trigger the err
 
     while rem > 0 {
@@ -258,4 +266,5 @@ fn test_abrupt_shutdown() {
     }
 
     panic!("reading too much");
+    */
 }
