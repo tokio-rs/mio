@@ -235,16 +235,23 @@ fn test_abrupt_shutdown() {
     assert_ok!(client.write(b"junk"));
 
     assert_ok!(socket.write(b"junk"));
-    // assert_ok!(socket.read(&mut buf[..1]));
+    assert_ok!(socket.read(&mut buf[..1]));
 
     drop(socket);
 
-    assert_ready!(poll, Token(0), Ready::readable());
     assert_ready!(poll, Token(0), Ready::writable());
 
-    let n = assert_ok!(client.read(&mut buf));
-    assert_eq!(n, 4);
+    let mut rem = 5; // Because we want to be able to trigger the err
 
-    let res = client.read(&mut buf);
-    assert!(res.is_err(), "res = {:?}", res);
+    while rem > 0 {
+        assert_ready!(poll, Token(0), Ready::readable());
+
+        match client.read(&mut buf) {
+            Ok(n) if n > 0 => rem -= n,
+            Ok(_) => panic!("read(buf) -> Ok(0)"),
+            Err(e) => return,
+        }
+    }
+
+    panic!("reading too much");
 }
