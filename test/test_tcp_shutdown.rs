@@ -210,7 +210,7 @@ fn test_graceful_shutdown() {
 #[test]
 fn test_abrupt_shutdown() {
     // use net2::TcpStreamExt;
-    use std::io::{Read, Write};
+    use std::io::{self, Read, Write};
 
     let mut poll = TestPoll::new();
     let mut buf = [0; 1024];
@@ -246,10 +246,13 @@ fn test_abrupt_shutdown() {
     while rem > 0 {
         assert_ready!(poll, Token(0), Ready::readable());
 
-        match client.read(&mut buf) {
-            Ok(n) if n > 0 => rem -= n,
-            Ok(_) => panic!("read(buf) -> Ok(0)"),
-            Err(e) => return,
+        loop {
+            match client.read(&mut buf) {
+                Ok(n) if n > 0 => rem -= n,
+                Ok(_) => panic!("read(buf) -> Ok(0)"),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(_) => return,
+            }
         }
     }
 
