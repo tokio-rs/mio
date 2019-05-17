@@ -31,7 +31,7 @@ impl TestPoll {
         let now = Instant::now();
 
         loop {
-            if now.elapsed() > Duration::from_secs(5) {
+            if now.elapsed() > Duration::from_secs(1) {
                 return Err("not ready");
             }
 
@@ -41,7 +41,7 @@ impl TestPoll {
                 }
             }
 
-            self.poll.poll(&mut self.events, Some(Duration::from_secs(1))).unwrap();
+            self.poll.poll(&mut self.events, Some(Duration::from_millis(250))).unwrap();
 
             for event in &self.events {
                 let curr = self.buf.entry(event.token())
@@ -64,13 +64,9 @@ impl TestPoll {
             Ok(())
         }
     }
-
-    fn readiness(&self, token: Token) -> Ready {
-        self.buf.get(&token).map(|r| *r).unwrap_or(Ready::empty())
-    }
 }
 
-macro_rules! wait_for {
+macro_rules! assert_ready {
     ($poll:expr, $token:expr, $ready:expr) => {{
         match $poll.wait_for($token, $ready) {
             Ok(_) => {}
@@ -79,12 +75,31 @@ macro_rules! wait_for {
     }}
 }
 
-macro_rules! wait_for_hup {
+macro_rules! assert_not_ready {
+    ($poll:expr, $token:expr, $ready:expr) => {{
+        match $poll.wait_for($token, $ready) {
+            Ok(_) => panic!("is ready; token = {:?}; interest = {:?}", $token, $ready),
+            Err(_) => {}
+        }
+    }}
+}
+
+macro_rules! assert_hup_ready {
     ($poll:expr) => {
         #[cfg(unix)]
         {
             use mio::unix::UnixReady;
-            wait_for!($poll, Token(0), Ready::from(UnixReady::hup()))
+            assert_ready!($poll, Token(0), Ready::from(UnixReady::hup()))
+        }
+    }
+}
+
+macro_rules! assert_not_hup_ready {
+    ($poll:expr) => {
+        #[cfg(unix)]
+        {
+            use mio::unix::UnixReady;
+            assert_not_ready!($poll, Token(0), Ready::from(UnixReady::hup()))
         }
     }
 }
@@ -103,6 +118,7 @@ fn test_write_shutdown() {
     use std::io::prelude::*;
 
     let mut poll = TestPoll::new();
+    let mut buf = [0; 1024];
 
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
@@ -115,7 +131,7 @@ fn test_write_shutdown() {
 
     let (socket, _) = listener.accept().unwrap();
 
-    wait_for!(poll, Token(0), Ready::writable());
+    assert_ready!(poll, Token(0), Ready::writable());
 
     // Polling should not have any events
     assert_idle!(poll);
@@ -123,17 +139,10 @@ fn test_write_shutdown() {
     // Now, shutdown the write half of the socket.
     socket.shutdown(Shutdown::Write).unwrap();
 
-    wait_for!(poll, Token(0), Ready::readable());
+    assert_ready!(poll, Token(0), Ready::readable());
 
-    #[cfg(unix)]
-    {
-        use mio::unix::UnixReady;
+    assert_not_hup_ready!(poll);
 
-        let readiness = poll.readiness(Token(0));
-        assert!(!UnixReady::from(readiness).is_hup());
-    }
-
-    let mut buf = [0; 1024];
     let n = client.read(&mut buf).unwrap();
     assert_eq!(n, 0);
 }
@@ -156,7 +165,7 @@ fn test_graceful_shutdown() {
 
     let (mut socket, _) = listener.accept().unwrap();
 
-    wait_for!(poll, Token(0), Ready::writable());
+    assert_ready!(poll, Token(0), Ready::writable());
 
     // Polling should not have any events
     assert_idle!(poll);
@@ -168,8 +177,8 @@ fn test_graceful_shutdown() {
     assert_eq!(0, n);
     drop(socket);
 
-    wait_for!(poll, Token(0), Ready::readable());
-    wait_for_hup!(poll);
+    assert_ready!(poll, Token(0), Ready::readable());
+    assert_hup_ready!(poll);
 
     let mut buf = [0; 1024];
     let n = client.read(&mut buf).unwrap();
@@ -178,7 +187,7 @@ fn test_graceful_shutdown() {
 
 #[test]
 fn test_abrupt_shutdown() {
-    use net2::TcpStreamExt;
+    // use net2::TcpStreamExt;
     use std::io::{Read, Write};
 
     let mut poll = TestPoll::new();
@@ -194,21 +203,25 @@ fn test_abrupt_shutdown() {
                   PollOpt::edge());
 
     let (mut socket, _) = listener.accept().unwrap();
-    socket.set_linger(None).unwrap();
+    // socket.set_linger(None).unwrap();
 
     // Wait to be connected
-    wait_for!(poll, Token(0), Ready::writable());
+    assert_ready!(poll, Token(0), Ready::writable());
 
     // Write some data
 
     client.write(b"junk").unwrap();
 
-    socket.read(&mut buf[..1]).unwrap();
+    socket.write(b"junk").unwrap();
+    // socket.read(&mut buf[..1]).unwrap();
 
     drop(socket);
 
-    wait_for!(poll, Token(0), Ready::readable());
-    wait_for!(poll, Token(0), Ready::writable());
+    assert_ready!(poll, Token(0), Ready::readable());
+    assert_ready!(poll, Token(0), Ready::writable());
+
+    let n = client.read(&mut buf).unwrap();
+    assert_eq!(n, 4);
 
     let res = client.read(&mut buf);
     assert!(res.is_err(), "res = {:?}", res);
