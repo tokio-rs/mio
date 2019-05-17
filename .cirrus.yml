@@ -15,7 +15,7 @@ task:
     - cargo build --no-default-features
   test_script:
     - . $HOME/.cargo/env
-    - cargo test
+    - RUST_BACKTRACE=1 cargo test
     - cargo test --no-default-features
   before_cache_script:
     - rm -rf $HOME/.cargo/registry/index

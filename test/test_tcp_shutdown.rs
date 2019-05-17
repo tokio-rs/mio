@@ -3,7 +3,7 @@ use std::net::Shutdown;
 use std::time::{Duration, Instant};
 
 use mio::{Token, Ready, PollOpt, Poll, Events};
-use mio::event::Evented;
+use mio::event::{Evented, Event};
 use mio::net::TcpStream;
 
 struct TestPoll {
@@ -27,12 +27,12 @@ impl TestPoll {
         self.poll.register(handle, token, interest, opts).unwrap();
     }
 
-    fn wait_for(&mut self, token: Token, ready: Ready) {
+    fn wait_for(&mut self, token: Token, ready: Ready) -> Result<(), &'static str> {
         let now = Instant::now();
 
         loop {
             if now.elapsed() > Duration::from_secs(5) {
-                panic!("not ready");
+                return Err("not ready");
             }
 
             if let Some(curr) = self.buf.get(&token) {
@@ -52,13 +52,16 @@ impl TestPoll {
         }
 
         *self.buf.get_mut(&token).unwrap() -= ready;
+        Ok(())
     }
 
-    fn assert_idle(&mut self) {
+    fn check_idle(&mut self) -> Result<(), Event> {
         self.poll.poll(&mut self.events, Some(Duration::from_millis(100))).unwrap();
 
         if let Some(e) = self.events.iter().next() {
-            panic!("expected idle; got = {:?}", e);
+            Err(e)
+        } else {
+            Ok(())
         }
     }
 
@@ -67,12 +70,30 @@ impl TestPoll {
     }
 }
 
+macro_rules! wait_for {
+    ($poll:expr, $token:expr, $ready:expr) => {{
+        match $poll.wait_for($token, $ready) {
+            Ok(_) => {}
+            Err(_) => panic!("not ready; token = {:?}; interest = {:?}", $token, $ready),
+        }
+    }}
+}
+
 macro_rules! wait_for_hup {
     ($poll:expr) => {
         #[cfg(unix)]
         {
             use mio::unix::UnixReady;
-            $poll.wait_for(Token(0), UnixReady::hup().into());
+            wait_for!($poll, Token(0), Ready::from(UnixReady::hup()))
+        }
+    }
+}
+
+macro_rules! assert_idle {
+    ($poll:expr) => {
+        match $poll.check_idle() {
+            Ok(()) => {}
+            Err(e) => panic!("not idle; event = {:?}", e),
         }
     }
 }
@@ -94,15 +115,15 @@ fn test_write_shutdown() {
 
     let (socket, _) = listener.accept().unwrap();
 
-    poll.wait_for(Token(0), Ready::writable());
+    wait_for!(poll, Token(0), Ready::writable());
 
     // Polling should not have any events
-    poll.assert_idle();
+    assert_idle!(poll);
 
     // Now, shutdown the write half of the socket.
     socket.shutdown(Shutdown::Write).unwrap();
 
-    poll.wait_for(Token(0), Ready::readable());
+    wait_for!(poll, Token(0), Ready::readable());
 
     #[cfg(unix)]
     {
@@ -135,10 +156,10 @@ fn test_graceful_shutdown() {
 
     let (mut socket, _) = listener.accept().unwrap();
 
-    poll.wait_for(Token(0), Ready::writable());
+    wait_for!(poll, Token(0), Ready::writable());
 
     // Polling should not have any events
-    poll.assert_idle();
+    assert_idle!(poll);
 
     // Now, shutdown the write half of the socket.
     client.shutdown(Shutdown::Write).unwrap();
@@ -147,7 +168,7 @@ fn test_graceful_shutdown() {
     assert_eq!(0, n);
     drop(socket);
 
-    poll.wait_for(Token(0), Ready::readable());
+    wait_for!(poll, Token(0), Ready::readable());
     wait_for_hup!(poll);
 
     let mut buf = [0; 1024];
@@ -186,9 +207,8 @@ fn test_abrupt_shutdown() {
 
     drop(socket);
 
-    poll.wait_for(Token(0), Ready::readable());
-    poll.wait_for(Token(0), Ready::writable());
-    wait_for_hup!(poll);
+    wait_for!(poll, Token(0), Ready::readable());
+    wait_for!(poll, Token(0), Ready::writable());
 
     let res = client.read(&mut buf);
     assert!(res.is_err(), "res = {:?}", res);
