@@ -197,7 +197,7 @@ fn test_abrupt_shutdown() {
     socket.set_linger(None).unwrap();
 
     // Wait to be connected
-    poll.wait_for(Token(0), Ready::writable());
+    wait_for!(poll, Token(0), Ready::writable());
 
     // Write some data
 
