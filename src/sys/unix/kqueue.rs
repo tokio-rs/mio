@@ -74,7 +74,11 @@ impl Selector {
         let timeout = timeout.map(|to| {
             libc::timespec {
                 tv_sec: cmp::min(to.as_secs(), time_t::max_value() as u64) as time_t,
-                tv_nsec: libc::c_long::from(to.subsec_nanos()),
+                // `Duration::subsec_nanos` is guaranteed to be less than one
+                // billion (the number of nanoseconds in a second), making the
+                // cast to i32 safe. The cast itself is needed for platforms
+                // where C's long is only 32 bits.
+                tv_nsec: libc::c_long::from(to.subsec_nanos() as i32),
             }
         });
         let timeout = timeout.as_ref().map(|s| s as *const _).unwrap_or(ptr::null_mut());
