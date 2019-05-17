@@ -113,6 +113,28 @@ macro_rules! assert_idle {
     }
 }
 
+// TODO: replace w/ assertive
+// https://github.com/carllerche/assertive
+macro_rules! assert_ok {
+    ($e:expr) => {
+        assert_ok!($e,)
+    };
+    ($e:expr,) => {{
+        use std::result::Result::*;
+        match $e {
+            Ok(v) => v,
+            Err(e) => panic!("assertion failed: error = {:?}", e),
+        }
+    }};
+    ($e:expr, $($arg:tt)+) => {{
+        use std::result::Result::*;
+        match $e {
+            Ok(v) => v,
+            Err(e) => panic!("assertion failed: error = {:?}: {}", e, format_args!($($arg)+)),
+        }
+    }};
+}
+
 #[test]
 fn test_write_shutdown() {
     use std::io::prelude::*;
@@ -120,16 +142,16 @@ fn test_write_shutdown() {
     let mut poll = TestPoll::new();
     let mut buf = [0; 1024];
 
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
+    let listener = assert_ok!(std::net::TcpListener::bind("127.0.0.1:0"));
+    let addr = assert_ok!(listener.local_addr());
 
-    let mut client = TcpStream::connect(&addr).unwrap();
+    let mut client = assert_ok!(TcpStream::connect(&addr));
     poll.register(&client,
                   Token(0),
                   Ready::readable() | Ready::writable(),
                   PollOpt::edge());
 
-    let (socket, _) = listener.accept().unwrap();
+    let (socket, _) = assert_ok!(listener.accept());
 
     assert_ready!(poll, Token(0), Ready::writable());
 
@@ -137,13 +159,13 @@ fn test_write_shutdown() {
     assert_idle!(poll);
 
     // Now, shutdown the write half of the socket.
-    socket.shutdown(Shutdown::Write).unwrap();
+    assert_ok!(socket.shutdown(Shutdown::Write));
 
     assert_ready!(poll, Token(0), Ready::readable());
 
     assert_not_hup_ready!(poll);
 
-    let n = client.read(&mut buf).unwrap();
+    let n = assert_ok!(client.read(&mut buf));
     assert_eq!(n, 0);
 }
 
@@ -154,16 +176,16 @@ fn test_graceful_shutdown() {
     let mut poll = TestPoll::new();
     let mut buf = [0; 1024];
 
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
+    let listener = assert_ok!(std::net::TcpListener::bind("127.0.0.1:0"));
+    let addr = assert_ok!(listener.local_addr());
 
-    let mut client = TcpStream::connect(&addr).unwrap();
+    let mut client = assert_ok!(TcpStream::connect(&addr));
     poll.register(&client,
                   Token(0),
                   Ready::readable() | Ready::writable(),
                   PollOpt::edge());
 
-    let (mut socket, _) = listener.accept().unwrap();
+    let (mut socket, _) = assert_ok!(listener.accept());
 
     assert_ready!(poll, Token(0), Ready::writable());
 
@@ -171,9 +193,9 @@ fn test_graceful_shutdown() {
     assert_idle!(poll);
 
     // Now, shutdown the write half of the socket.
-    client.shutdown(Shutdown::Write).unwrap();
+    assert_ok!(client.shutdown(Shutdown::Write));
 
-    let n = socket.read(&mut buf).unwrap();
+    let n = assert_ok!(socket.read(&mut buf));
     assert_eq!(0, n);
     drop(socket);
 
@@ -181,7 +203,7 @@ fn test_graceful_shutdown() {
     assert_hup_ready!(poll);
 
     let mut buf = [0; 1024];
-    let n = client.read(&mut buf).unwrap();
+    let n = assert_ok!(client.read(&mut buf));
     assert_eq!(n, 0);
 }
 
@@ -193,34 +215,34 @@ fn test_abrupt_shutdown() {
     let mut poll = TestPoll::new();
     let mut buf = [0; 1024];
 
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
+    let listener = assert_ok!(std::net::TcpListener::bind("127.0.0.1:0"));
+    let addr = assert_ok!(listener.local_addr());
 
-    let mut client = TcpStream::connect(&addr).unwrap();
+    let mut client = assert_ok!(TcpStream::connect(&addr));
     poll.register(&client,
                   Token(0),
                   Ready::readable() | Ready::writable(),
                   PollOpt::edge());
 
-    let (mut socket, _) = listener.accept().unwrap();
-    // socket.set_linger(None).unwrap();
+    let (mut socket, _) = assert_ok!(listener.accept());
+    // assert_ok!(socket.set_linger(None));
 
     // Wait to be connected
     assert_ready!(poll, Token(0), Ready::writable());
 
     // Write some data
 
-    client.write(b"junk").unwrap();
+    assert_ok!(client.write(b"junk"));
 
-    socket.write(b"junk").unwrap();
-    // socket.read(&mut buf[..1]).unwrap();
+    assert_ok!(socket.write(b"junk"));
+    // assert_ok!(socket.read(&mut buf[..1]));
 
     drop(socket);
 
     assert_ready!(poll, Token(0), Ready::readable());
     assert_ready!(poll, Token(0), Ready::writable());
 
-    let n = client.read(&mut buf).unwrap();
+    let n = assert_ok!(client.read(&mut buf));
     assert_eq!(n, 4);
 
     let res = client.read(&mut buf);
