@@ -231,15 +231,6 @@ fn test_abrupt_shutdown() {
     // Wait to be connected
     assert_ready!(poll, Token(0), Ready::writable());
 
-    // Write some data
-
-    /*
-    assert_ok!(client.write(b"junk"));
-
-    assert_ok!(socket.write(b"junk"));
-    assert_ok!(socket.read(&mut buf[..1]));
-    */
-
     drop(socket);
 
     assert_hup_ready!(poll);
@@ -248,23 +239,4 @@ fn test_abrupt_shutdown() {
 
     let res = client.read(&mut buf);
     assert!(res.is_err(), "not err = {:?}", res);
-
-    /*
-    let mut rem = 5; // Because we want to be able to trigger the err
-
-    while rem > 0 {
-        assert_ready!(poll, Token(0), Ready::readable());
-
-        loop {
-            match client.read(&mut buf) {
-                Ok(n) if n > 0 => rem -= n,
-                Ok(_) => panic!("read(buf) -> Ok(0)"),
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(_) => return,
-            }
-        }
-    }
-
-    panic!("reading too much");
-    */
 }
