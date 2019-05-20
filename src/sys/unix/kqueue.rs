@@ -164,7 +164,7 @@ impl Selector {
                 // after we've done this registration. As a result we just
                 // ignore `EPIPE` here instead of propagating it.
                 //
-                // More info can be found at carllerche/mio#582
+                // More info can be found at tokio-rs/mio#582
                 if change.data as i32 == libc::EPIPE
                     && change.filter == libc::EVFILT_WRITE as Filter
                 {
