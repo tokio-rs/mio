@@ -14,8 +14,8 @@ overhead as possible over the OS abstractions.
 [mit-url]: LICENSE
 [azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.mio?branchName=master
 [azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=2&branchName=master
-[cirrus-badge]: https://api.cirrus-ci.com/github/carllerche/mio.svg
-[cirrus-url]: https://cirrus-ci.com/github/carllerche/mio
+[cirrus-badge]: https://api.cirrus-ci.com/github/tokio-rs/mio.svg
+[cirrus-url]: https://cirrus-ci.com/github/tokio-rs/mio
 
 **API documentation**
 
