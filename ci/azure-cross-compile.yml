@@ -6,9 +6,17 @@ jobs:
   displayName: Cross
   strategy:
     matrix:
-      iOS:
+      iOS_64:
         vmImage: macOS-10.13
         target: x86_64-apple-ios
+
+      iOS_32:
+        vmImage: macOS-10.13
+        target: i386-apple-ios
+
+      iOS_ARM:
+        vmImage: macOS-10.13
+        target: armv7s-apple-ios
 
       Android:
         vmImage: ubuntu-16.04
@@ -26,6 +34,14 @@ jobs:
         vmImage: ubuntu-16.04
         target: x86_64-sun-solaris
 
+      Linux_ARM:
+        vmImage: ubuntu-16.04
+        target: arm-linux-androideabi
+
+      Linux_32:
+        vmImage: ubuntu-16.04
+        target: i686-unknown-linux-gnu
+
   pool:
     vmImage: $(vmImage)
 
@@ -37,7 +53,7 @@ jobs:
     - script: rustup target add $(target)
       displayName: "Add target"
 
-    - script: cargo check --target $(target)
+    - script: cargo build --target $(target)
       displayName: Check source
 
     - script: cargo check --tests --target $(target)
