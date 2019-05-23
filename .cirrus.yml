@@ -13,9 +13,11 @@ task:
     - . $HOME/.cargo/env
     - cargo build
     - cargo build --no-default-features
-  test_script:
+  amd64_test_script:
     - . $HOME/.cargo/env
     - cargo test
-    - cargo test --no-default-features
+  i386_test_script:
+    - . $HOME/.cargo/env
+    - cargo test --target i686-unknown-freebsd
   before_cache_script:
     - rm -rf $HOME/.cargo/registry/index
