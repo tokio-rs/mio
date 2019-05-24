@@ -1,3 +1,8 @@
+# 0.6.18 (May 24, 2018)
+
+### Fixed
+- Fix compilation on kqueue platforms with 32bit C long (#948).
+
 # 0.6.17 (May 15, 2018)
 
 ### Fixed

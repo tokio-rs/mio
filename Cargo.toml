@@ -6,11 +6,11 @@ name          = "mio"
 # - Update CHANGELOG.md.
 # - Update doc URL.
 # - Create git tag
-version       = "0.6.17"
+version       = "0.6.18"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
-documentation = "https://docs.rs/mio/0.6.17/mio/"
+documentation = "https://docs.rs/mio/0.6.18/mio/"
 homepage      = "https://github.com/carllerche/mio"
 repository    = "https://github.com/carllerche/mio"
 readme        = "README.md"
