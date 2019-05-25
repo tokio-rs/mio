@@ -767,7 +767,6 @@ impl ListenerImp {
                 self.inner.accept.as_mut_ptr(),
             )?;
             Ok((socket, ready))
-
         });
         match res {
             Ok((socket, _)) => {
