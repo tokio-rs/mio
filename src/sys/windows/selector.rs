@@ -12,7 +12,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{fmt, io};
-use winapi::*;
+use winapi::shared::winerror::WAIT_TIMEOUT;
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
+use winapi::um::minwinbase::OVERLAPPED;
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first

@@ -19,7 +19,8 @@ use std::io::prelude::*;
 use std::mem;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::{Mutex, MutexGuard};
-use winapi::*;
+use winapi::um::winsock2::WSAEMSGSIZE;
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 
 pub struct UdpSocket {
     imp: Imp,

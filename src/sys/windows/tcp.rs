@@ -15,7 +15,8 @@ use std::net::{self, Shutdown, SocketAddr};
 use std::os::windows::prelude::*;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
-use winapi::*;
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
+use winapi::um::winnt::HANDLE;
 
 pub struct TcpStream {
     /// Separately stored implementation to ensure that the `Drop`
@@ -759,11 +760,14 @@ impl ListenerImp {
         }
         .and_then(|builder| unsafe {
             trace!("scheduling an accept");
-            self.inner.socket.accept_overlapped(
-                &builder,
+            let socket = builder.to_tcp_stream()?;
+            let ready = self.inner.socket.accept_overlapped(
+                &socket,
                 &mut me.accept_buf,
                 self.inner.accept.as_mut_ptr(),
-            )
+            )?;
+            Ok((socket, ready))
+
         });
         match res {
             Ok((socket, _)) => {
