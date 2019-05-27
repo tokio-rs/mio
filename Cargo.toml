@@ -35,9 +35,8 @@ iovec = "0.1.1"
 libc = "0.2.42"
 
 [target.'cfg(windows)'.dependencies]
-winapi = "0.2.6"
-miow = "0.2.1"
-kernel32-sys = "0.2"
+winapi = { version = "0.3.7", features = ["minwindef", "minwinbase", "ioapiset", "winsock2"] }
+miow = "0.3.3"
 
 [dev-dependencies]
 env_logger = { version = "0.4.0", default-features = false }
