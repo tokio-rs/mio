@@ -1,3 +1,8 @@
+# 0.6.19 (May 28, 2018)
+
+### Fixed
+- Do not trigger HUP events on kqueue platforms (#958).
+
 # 0.6.18 (May 24, 2018)
 
 ### Fixed
