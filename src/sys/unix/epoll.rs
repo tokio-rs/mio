@@ -3,7 +3,7 @@ use crate::sys::unix::io::set_cloexec;
 use crate::sys::unix::{cvt, UnixReady};
 use crate::{io, Interests, PollOpt, Ready, Token};
 use libc::{self, c_int};
-use libc::{EPOLLERR, EPOLLHUP, EPOLLONESHOT, EPOLLRDHUP};
+use libc::{EPOLLERR, EPOLLHUP, EPOLLONESHOT};
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
@@ -190,10 +190,6 @@ fn ready_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
         kind |= EPOLLOUT;
     }
 
-    if UnixReady::from(interest).is_hup() {
-        kind |= EPOLLRDHUP;
-    }
-
     if UnixReady::from(interest).is_priority() {
         kind |= EPOLLPRI;
     }
@@ -276,7 +272,7 @@ impl Events {
                 kind = kind | UnixReady::error();
             }
 
-            if (epoll & EPOLLRDHUP) != 0 || (epoll & EPOLLHUP) != 0 {
+            if (epoll & EPOLLHUP) != 0 {
                 kind = kind | UnixReady::hup();
             }
 

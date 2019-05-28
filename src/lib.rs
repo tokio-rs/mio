@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/mio/0.6.16")]
+#![doc(html_root_url = "https://docs.rs/mio/0.7.0")]
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 // Many of mio's public methods violate this lint, but they can't be fixed

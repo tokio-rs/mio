@@ -19,6 +19,7 @@ mod test_reregister_without_poll;
 mod test_smoke;
 mod test_tcp;
 mod test_tcp_level;
+mod test_tcp_shutdown;
 mod test_udp_level;
 mod test_udp_socket;
 mod test_write_then_drop;
