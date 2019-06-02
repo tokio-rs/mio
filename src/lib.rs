@@ -128,8 +128,10 @@ pub use mio_common::{Interests, PollOpt, Ready, Token};
 pub mod event {
     //! Readiness event types and utilities.
 
-    pub use super::event_imp::{Event, Evented};
+    pub use super::event_imp::{Evented};
     pub use super::poll::{Events, Iter};
+
+    pub use mio_common::Event;
 }
 
 pub use event::Events;

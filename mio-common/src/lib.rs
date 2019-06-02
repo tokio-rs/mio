@@ -8,11 +8,13 @@
 // (mio) perspective, e.g. in examples don't use `mio_common::SomeType`, but
 // `mio::SomeType`.
 
+mod event;
 mod interests;
 mod poll_opt;
 mod ready;
 mod token;
 
+pub use event::Event;
 pub use interests::Interests;
 pub use poll_opt::PollOpt;
 pub use ready::Ready;

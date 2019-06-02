@@ -1,4 +1,5 @@
-use crate::event_imp::{Event, Evented, Interests};
+use crate::event_imp::{Evented, Interests};
+use crate::event::Event;
 use crate::Ready;
 use crate::lazycell::AtomicLazyCell;
 use crate::poll::{self, Registry};

@@ -1,6 +1,7 @@
 use std::io;
 
 use crate::{Interests, PollOpt, Ready, Registry, Token};
+use crate::event::Event;
 
 /// A value that may be registered with `Registry`
 ///
@@ -245,90 +246,6 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
     }
 }
 
-
-/// An readiness event returned by [`Poll::poll`].
-///
-/// `Event` is a [readiness state] paired with a [`Token`]. It is returned by
-/// [`Poll::poll`].
-///
-/// For more documentation on polling and events, see [`Poll`].
-///
-/// # Examples
-///
-/// ```
-/// use mio::{Ready, Token};
-/// use mio::event::Event;
-///
-/// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
-///
-/// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
-/// assert_eq!(event.token(), Token(0));
-/// ```
-///
-/// [`Poll::poll`]: ../struct.Poll.html#method.poll
-/// [`Poll`]: ../struct.Poll.html
-/// [readiness state]: ../struct.Ready.html
-/// [`Token`]: ../struct.Token.html
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct Event {
-    kind: Ready,
-    token: Token,
-}
-
-impl Event {
-    /// Creates a new `Event` containing `readiness` and `token`
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::{Ready, Token};
-    /// use mio::event::Event;
-    ///
-    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
-    ///
-    /// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
-    /// assert_eq!(event.token(), Token(0));
-    /// ```
-    pub fn new(readiness: Ready, token: Token) -> Event {
-        Event {
-            kind: readiness,
-            token,
-        }
-    }
-
-    /// Returns the event's readiness.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::{Ready, Token};
-    /// use mio::event::Event;
-    ///
-    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
-    ///
-    /// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
-    /// ```
-    pub fn readiness(&self) -> Ready {
-        self.kind
-    }
-
-    /// Returns the event's token.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::{Ready, Token};
-    /// use mio::event::Event;
-    ///
-    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
-    ///
-    /// assert_eq!(event.token(), Token(0));
-    /// ```
-    pub fn token(&self) -> Token {
-        self.token
-    }
-}
-
 /*
  *
  * ===== Mio internal helpers =====
@@ -355,5 +272,5 @@ pub fn opt_from_usize(opt: usize) -> PollOpt {
 // Not used on all platforms
 #[allow(dead_code)]
 pub fn kind_mut(event: &mut Event) -> &mut Ready {
-    &mut event.kind
+    event.readiness_mut()
 }

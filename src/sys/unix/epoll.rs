@@ -1,4 +1,4 @@
-use crate::event_imp::Event;
+use crate::event::Event;
 use crate::sys::unix::io::set_cloexec;
 use crate::sys::unix::{cvt, UnixReady};
 use crate::{io, Interests, PollOpt, Ready, Token};
