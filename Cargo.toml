@@ -49,3 +49,9 @@ bytes = "0.3.0"
 [[test]]
 name = "test"
 path = "test/mod.rs"
+
+[workspace]
+members = [
+  ".",
+  "mio-common",
+]
