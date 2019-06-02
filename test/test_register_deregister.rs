@@ -1,7 +1,7 @@
 use crate::localhost;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, PollOpt, Registry, Token};
-use std::io::Write;
+use std::io::{self, Write};
 use std::time::Duration;
 
 const SERVER: Token = Token(0);
@@ -27,7 +27,11 @@ impl TestHandler {
             SERVER => {
                 trace!("handle_read; token=SERVER");
                 let mut sock = self.server.accept().unwrap().0;
-                sock.write(b"foobar").unwrap();
+                if let Err(err) = sock.write(b"foobar") {
+                    if err.kind() != io::ErrorKind::WouldBlock {
+                        panic!("unexpected error writing to connection: {}", err);
+                    }
+                }
             }
             CLIENT => {
                 trace!("handle_read; token=CLIENT");
