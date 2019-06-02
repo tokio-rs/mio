@@ -24,6 +24,9 @@ exclude       = [
 publish = false
 
 [features]
+# Document the system module (normally hidden), useful when implementing a Mio
+# backend.
+doc-sys = []
 
 [dependencies]
 log = "0.4"

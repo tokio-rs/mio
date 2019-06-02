@@ -1,5 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/mio/0.7.0")]
-#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+// TODO(Thomas): add missing_docs once the sys module is documented.
+#![deny(missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(test, deny(warnings))]
 // Many of mio's public methods violate this lint, but they can't be fixed
 // without a breaking change.
@@ -115,10 +116,11 @@ mod event_imp;
 mod io;
 mod lazycell;
 mod poll;
-mod sys;
 mod token;
 
 pub mod net;
+#[cfg_attr(not(feature = "doc-sys"), doc(hidden))]
+pub mod sys;
 
 pub use event_imp::{Interests, PollOpt, Ready};
 pub use poll::{Poll, Registration, Registry, SetReadiness};
