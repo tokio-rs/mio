@@ -34,6 +34,8 @@ slab = "0.4.0"
 net2 = "0.2.29"
 iovec = "0.1.1"
 
+mio-common = { version = "0.1", path = "./mio-common" }
+
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.42"
 

@@ -116,7 +116,6 @@ mod event_imp;
 mod io;
 mod lazycell;
 mod poll;
-mod token;
 
 pub mod net;
 #[cfg_attr(not(feature = "doc-sys"), doc(hidden))]
@@ -124,7 +123,8 @@ pub mod sys;
 
 pub use event_imp::{Interests, PollOpt, Ready};
 pub use poll::{Poll, Registration, Registry, SetReadiness};
-pub use token::Token;
+
+pub use mio_common::Token;
 
 pub mod event {
     //! Readiness event types and utilities.
