@@ -13,6 +13,7 @@ mod pipe {
      *
      */
 
+    #[derive(Debug)]
     pub struct Awakener {
         reader: unix::Io,
         writer: unix::Io,

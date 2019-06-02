@@ -16,6 +16,7 @@ macro_rules! dlsym {
     )
 }
 
+#[derive(Debug)]
 pub struct DlSym<F> {
     pub name: &'static str,
     pub addr: AtomicUsize,
