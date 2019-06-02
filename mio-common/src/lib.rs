@@ -4,8 +4,10 @@
 // depend on mio-kqueue for the `Selector` and mio-kqueue would depend on mio
 // for the `Token`.
 
-mod token;
+mod interests;
 mod ready;
+mod token;
 
-pub use token::Token;
+pub use interests::Interests;
 pub use ready::Ready;
+pub use token::Token;
