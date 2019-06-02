@@ -121,10 +121,9 @@ pub mod net;
 #[cfg_attr(not(feature = "doc-sys"), doc(hidden))]
 pub mod sys;
 
-pub use event_imp::{PollOpt};
 pub use poll::{Poll, Registration, Registry, SetReadiness};
 
-pub use mio_common::{Interests, Ready, Token};
+pub use mio_common::{Interests, PollOpt, Ready, Token};
 
 pub mod event {
     //! Readiness event types and utilities.

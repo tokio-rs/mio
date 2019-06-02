@@ -5,9 +5,11 @@
 // for the `Token`.
 
 mod interests;
+mod poll_opt;
 mod ready;
 mod token;
 
 pub use interests::Interests;
+pub use poll_opt::PollOpt;
 pub use ready::Ready;
 pub use token::Token;
