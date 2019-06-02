@@ -6,7 +6,7 @@ use mio::{Events, Interests, Poll, PollOpt, Token};
 
 #[test]
 fn write_then_drop() {
-    drop(::env_logger::init());
+    drop(env_logger::try_init());
 
     let a = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = a.local_addr().unwrap();
@@ -79,7 +79,7 @@ fn write_then_drop() {
 
 #[test]
 fn write_then_deregister() {
-    drop(::env_logger::init());
+    drop(env_logger::try_init());
 
     let a = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = a.local_addr().unwrap();

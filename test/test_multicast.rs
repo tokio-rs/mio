@@ -64,7 +64,7 @@ impl UdpHandler {
 
 #[test]
 pub fn test_multicast() {
-    drop(::env_logger::init());
+    drop(env_logger::try_init());
     debug!("Starting TEST_UDP_CONNECTIONLESS");
     let mut poll = Poll::new().unwrap();
 

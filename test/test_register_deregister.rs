@@ -60,7 +60,7 @@ impl TestHandler {
 
 #[test]
 pub fn test_register_deregister() {
-    let _ = ::env_logger::init();
+    drop(env_logger::try_init());
 
     debug!("Starting TEST_REGISTER_DEREGISTER");
     let mut poll = Poll::new().unwrap();

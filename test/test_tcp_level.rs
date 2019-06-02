@@ -72,7 +72,7 @@ pub fn test_tcp_listener_level_triggered() {
 
 #[test]
 pub fn test_tcp_stream_level_triggered() {
-    drop(::env_logger::init());
+    drop(env_logger::try_init());
     let mut poll = Poll::new().unwrap();
     let mut pevents = Events::with_capacity(1024);
 
