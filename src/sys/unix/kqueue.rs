@@ -1,4 +1,4 @@
-use crate::event_imp::{self as event};
+use crate::event_imp as event;
 use crate::event::Event;
 use crate::sys::unix::io::set_cloexec;
 use crate::sys::unix::{cvt, UnixReady};

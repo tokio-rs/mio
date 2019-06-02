@@ -1,6 +1,6 @@
-use crate::event_imp::{self as event, Evented};
+use crate::event_imp as event;
 use crate::{sys, Interests, PollOpt, Ready, Token};
-use crate::event::Event;
+use crate::event::{Event, Evented};
 use log::trace;
 use std::cell::UnsafeCell;
 #[cfg(unix)]
