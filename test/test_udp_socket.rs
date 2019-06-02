@@ -1,5 +1,5 @@
 use crate::localhost;
-use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
+use bytes::{BufMut, Bytes, BytesMut};
 use mio::net::UdpSocket;
 use mio::{Events, Interests, Poll, PollOpt, Token};
 use std::io::ErrorKind;
@@ -13,8 +13,8 @@ pub struct UdpHandlerSendRecv {
     tx: UdpSocket,
     rx: UdpSocket,
     msg: &'static str,
-    buf: SliceBuf<'static>,
-    rx_buf: RingBuf,
+    buf: Bytes,
+    rx_buf: BytesMut,
     connected: bool,
     shutdown: bool,
 }
@@ -25,8 +25,8 @@ impl UdpHandlerSendRecv {
             tx,
             rx,
             msg,
-            buf: SliceBuf::wrap(msg.as_bytes()),
-            rx_buf: RingBuf::new(1024),
+            buf: Bytes::from_static(msg.as_bytes()),
+            rx_buf: BytesMut::with_capacity(1024),
             connected,
             shutdown: false,
         }
@@ -76,16 +76,16 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
                     debug!("We are receiving a datagram now...");
                     let cnt = unsafe {
                         if !handler.connected {
-                            handler.rx.recv_from(handler.rx_buf.mut_bytes()).unwrap().0
+                            handler.rx.recv_from(handler.rx_buf.bytes_mut()).unwrap().0
                         } else {
-                            handler.rx.recv(handler.rx_buf.mut_bytes()).unwrap()
+                            handler.rx.recv(handler.rx_buf.bytes_mut()).unwrap()
                         }
                     };
 
                     unsafe {
-                        MutBuf::advance(&mut handler.rx_buf, cnt);
+                        BufMut::advance_mut(&mut handler.rx_buf, cnt);
                     }
-                    assert!(str::from_utf8(handler.rx_buf.bytes()).unwrap() == handler.msg);
+                    assert!(str::from_utf8(handler.rx_buf.as_ref()).unwrap() == handler.msg);
                     handler.shutdown = true;
                 }
             }
@@ -94,9 +94,9 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
                 if let SENDER = event.token() {
                     let cnt = if !handler.connected {
                         let addr = handler.rx.local_addr().unwrap();
-                        handler.tx.send_to(handler.buf.bytes(), &addr).unwrap()
+                        handler.tx.send_to(handler.buf.as_ref(), &addr).unwrap()
                     } else {
-                        handler.tx.send(handler.buf.bytes()).unwrap()
+                        handler.tx.send(handler.buf.as_ref()).unwrap()
                     };
 
                     handler.buf.advance(cnt);

@@ -1,4 +1,4 @@
-use bytes::{Buf, ByteBuf, SliceBuf};
+use bytes::{Buf, BytesMut, SliceBuf};
 use mio::deprecated::unix::*;
 use mio::deprecated::{EventLoop, Handler};
 use mio::unix::UnixReady;
@@ -67,7 +67,7 @@ impl EchoConn {
     }
 
     fn readable(&mut self, event_loop: &mut EventLoop<Echo>) -> io::Result<()> {
-        let mut buf = ByteBuf::mut_with_capacity(2048);
+        let mut buf = BytesMut::with_capacity(2048);
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
@@ -93,7 +93,7 @@ impl EchoConn {
         // without blocking, for simplicity -- we're only testing that
         // the FD makes it through somehow
         let (rd, mut wr) = pipe().unwrap();
-        let mut buf = buf.flip();
+        let mut buf = buf.freeze();
         match wr.try_write_buf(&mut buf) {
             Ok(None) => {
                 panic!("writing to our own pipe blocked :(");

@@ -3,7 +3,7 @@
 #![cfg(not(target_os = "android"))]
 
 use crate::localhost;
-use bytes::{Buf, MutBuf, RingBuf, SliceBuf};
+use bytes::{BufMut, Bytes, BytesMut};
 use mio::net::UdpSocket;
 use mio::{Events, Interests, Poll, PollOpt, Ready, Registry, Token};
 use std::net::IpAddr;
@@ -16,8 +16,8 @@ pub struct UdpHandler {
     tx: UdpSocket,
     rx: UdpSocket,
     msg: &'static str,
-    buf: SliceBuf<'static>,
-    rx_buf: RingBuf,
+    buf: Bytes,
+    rx_buf: BytesMut,
     localhost: IpAddr,
     shutdown: bool,
 }
@@ -29,8 +29,8 @@ impl UdpHandler {
             tx,
             rx,
             msg,
-            buf: SliceBuf::wrap(msg.as_bytes()),
-            rx_buf: RingBuf::new(1024),
+            buf: Bytes::from_static(msg.as_bytes()),
+            rx_buf: BytesMut::with_capacity(1024),
             localhost: sock.local_addr().unwrap().ip(),
             shutdown: false,
         }
@@ -39,16 +39,16 @@ impl UdpHandler {
     fn handle_read(&mut self, _: &Registry, token: Token, _: Ready) {
         if let LISTENER = token {
             debug!("We are receiving a datagram now...");
-            match unsafe { self.rx.recv_from(self.rx_buf.mut_bytes()) } {
+            match unsafe { self.rx.recv_from(self.rx_buf.bytes_mut()) } {
                 Ok((cnt, addr)) => {
                     unsafe {
-                        MutBuf::advance(&mut self.rx_buf, cnt);
+                        BufMut::advance_mut(&mut self.rx_buf, cnt);
                     }
                     assert_eq!(addr.ip(), self.localhost);
                 }
                 res => panic!("unexpected result: {:?}", res),
             }
-            assert!(str::from_utf8(self.rx_buf.bytes()).unwrap() == self.msg);
+            assert!(str::from_utf8(self.rx_buf.as_ref()).unwrap() == self.msg);
             self.shutdown = true;
         }
     }
@@ -56,7 +56,7 @@ impl UdpHandler {
     fn handle_write(&mut self, _: &Registry, token: Token, _: Ready) {
         if let SENDER = token {
             let addr = self.rx.local_addr().unwrap();
-            let cnt = self.tx.send_to(self.buf.bytes(), &addr).unwrap();
+            let cnt = self.tx.send_to(self.buf.as_ref(), &addr).unwrap();
             self.buf.advance(cnt);
         }
     }
