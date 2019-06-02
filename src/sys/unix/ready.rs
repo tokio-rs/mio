@@ -1,4 +1,5 @@
-use crate::event_imp::{ready_as_usize, ready_from_usize, Ready};
+use crate::event_imp::{ready_as_usize, ready_from_usize};
+use crate::Ready;
 use std::fmt;
 use std::ops;
 

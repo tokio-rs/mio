@@ -1,4 +1,5 @@
-use crate::event_imp::{Event, Evented, Interests, Ready};
+use crate::event_imp::{Event, Evented, Interests};
+use crate::Ready;
 use crate::lazycell::AtomicLazyCell;
 use crate::poll::{self, Registry};
 use crate::sys::windows::buffer_pool::BufferPool;

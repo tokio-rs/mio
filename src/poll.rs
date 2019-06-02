@@ -1,4 +1,5 @@
-use crate::event_imp::{self as event, Event, Evented, Interests, PollOpt, Ready};
+use crate::event_imp::{self as event, Event, Evented, Interests, PollOpt};
+use crate::{Ready};
 use crate::{sys, Token};
 use log::trace;
 use std::cell::UnsafeCell;
