@@ -53,14 +53,14 @@ mod test_unix_echo_server;
 #[cfg(feature = "with-deprecated")]
 mod test_unix_pass_fd;
 
-use bytes::{Buf, MutBuf};
+use bytes::{Buf, BufMut};
 use mio::event::Event;
 use mio::{Events, Poll};
 use std::io::{self, Read, Write};
 use std::time::Duration;
 
 pub trait TryRead {
-    fn try_read_buf<B: MutBuf>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
+    fn try_read_buf<B: BufMut>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
     where
         Self: Sized,
     {
@@ -69,11 +69,11 @@ pub trait TryRead {
         // If your protocol is msg based (instead of continuous stream) you should
         // ensure that your buffer is large enough to hold an entire segment (1532 bytes if not jumbo
         // frames)
-        let res = self.try_read(unsafe { buf.mut_bytes() });
+        let res = self.try_read(unsafe { buf.bytes_mut() });
 
         if let Ok(Some(cnt)) = res {
             unsafe {
-                buf.advance(cnt);
+                buf.advance_mut(cnt);
             }
         }
 

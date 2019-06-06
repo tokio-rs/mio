@@ -1,17 +1,17 @@
 use crate::{localhost, TryRead, TryWrite};
-use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
+use bytes::{Buf, Bytes, BytesMut};
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, PollOpt, Registry, Token};
 use slab::Slab;
-use std::io;
+use std::io::{self, Cursor};
 
 const SERVER: Token = Token(10_000_000);
 const CLIENT: Token = Token(10_000_001);
 
 struct EchoConn {
     sock: TcpStream,
-    buf: Option<ByteBuf>,
-    mut_buf: Option<MutByteBuf>,
+    buf: Option<Cursor<Bytes>>,
+    mut_buf: Option<BytesMut>,
     token: Option<Token>,
     interests: Option<Interests>,
 }
@@ -21,7 +21,7 @@ impl EchoConn {
         EchoConn {
             sock,
             buf: None,
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
+            mut_buf: Some(BytesMut::with_capacity(2048)),
             token: None,
             interests: None,
         }
@@ -43,7 +43,7 @@ impl EchoConn {
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
-                self.mut_buf = Some(buf.flip());
+                self.mut_buf = Some(buf.into_inner().try_mut().unwrap());
 
                 self.interests = match self.interests {
                     None => Some(Interests::readable()),
@@ -68,6 +68,7 @@ impl EchoConn {
 
     fn readable(&mut self, registry: &Registry) -> io::Result<()> {
         let mut buf = self.mut_buf.take().unwrap();
+        buf.clear();
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
@@ -78,7 +79,7 @@ impl EchoConn {
                 debug!("CONN : we read {} bytes!", r);
 
                 // prepare to provide this to writable
-                self.buf = Some(buf.flip());
+                self.buf = Some(Cursor::new(buf.freeze()));
 
                 self.interests = match self.interests {
                     None => Some(Interests::writable()),
@@ -154,9 +155,9 @@ impl EchoServer {
 struct EchoClient {
     sock: TcpStream,
     msgs: Vec<&'static str>,
-    tx: SliceBuf<'static>,
-    rx: SliceBuf<'static>,
-    mut_buf: Option<MutByteBuf>,
+    tx: Cursor<Bytes>,
+    rx: Cursor<Bytes>,
+    mut_buf: Option<BytesMut>,
     token: Token,
     interests: Option<Interests>,
     shutdown: bool,
@@ -170,9 +171,9 @@ impl EchoClient {
         EchoClient {
             sock,
             msgs,
-            tx: SliceBuf::wrap(curr.as_bytes()),
-            rx: SliceBuf::wrap(curr.as_bytes()),
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
+            tx: Cursor::new(Bytes::from_static(curr.as_bytes())),
+            rx: Cursor::new(Bytes::from_static(curr.as_bytes())),
+            mut_buf: Some(BytesMut::with_capacity(2048)),
             token,
             interests: None,
             shutdown: false,
@@ -183,6 +184,7 @@ impl EchoClient {
         debug!("client socket readable");
 
         let mut buf = self.mut_buf.take().unwrap();
+        buf.clear();
 
         match self.sock.try_read_buf(&mut buf) {
             Ok(None) => {
@@ -193,16 +195,16 @@ impl EchoClient {
                 debug!("CLIENT : We read {} bytes!", r);
 
                 // prepare for reading
-                let mut buf = buf.flip();
+                let mut buf = Cursor::new(buf.freeze());
 
                 while buf.has_remaining() {
-                    let actual = buf.read_byte().unwrap();
-                    let expect = self.rx.read_byte().unwrap();
+                    let actual = buf.get_u8();
+                    let expect = self.rx.get_u8();
 
                     assert!(actual == expect, "actual={}; expect={}", actual, expect);
                 }
 
-                self.mut_buf = Some(buf.flip());
+                self.mut_buf = Some(buf.into_inner().try_mut().unwrap());
 
                 if self.interests == Some(Interests::readable()) {
                     self.interests = None;
@@ -273,8 +275,8 @@ impl EchoClient {
         let curr = self.msgs.remove(0);
 
         debug!("client prepping next message");
-        self.tx = SliceBuf::wrap(curr.as_bytes());
-        self.rx = SliceBuf::wrap(curr.as_bytes());
+        self.tx = Cursor::new(Bytes::from_static(curr.as_bytes()));
+        self.rx = Cursor::new(Bytes::from_static(curr.as_bytes()));
 
         self.interests = match self.interests {
             None => Some(Interests::writable()),

@@ -1,4 +1,4 @@
-use bytes::{Buf, ByteBuf, MutByteBuf, SliceBuf};
+use bytes::{Buf, BytesMut, MutBytesMut, SliceBuf};
 use mio::deprecated::unix::*;
 use mio::deprecated::{EventLoop, Handler};
 use mio::*;
@@ -13,8 +13,8 @@ const CLIENT: Token = Token(10_000_001);
 
 struct EchoConn {
     sock: UnixStream,
-    buf: Option<ByteBuf>,
-    mut_buf: Option<MutByteBuf>,
+    buf: Option<BytesMut>,
+    mut_buf: Option<MutBytesMut>,
     token: Option<Token>,
     interests: Option<Interests>,
 }
@@ -24,7 +24,7 @@ impl EchoConn {
         EchoConn {
             sock: sock,
             buf: None,
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
+            mut_buf: Some(BytesMut::with_capacity(2048)),
             token: None,
             interests: None,
         }
@@ -46,7 +46,7 @@ impl EchoConn {
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
-                self.mut_buf = Some(buf.flip());
+                self.mut_buf = Some(buf.freeze());
                 self.interests = match self.interests {
                     None => Some(Interests::readable()),
                     Some(i) => Some((i | Interests::readable()) - Interests::writable()),
@@ -80,7 +80,7 @@ impl EchoConn {
                 debug!("CONN : we read {} bytes!", r);
 
                 // prepare to provide this to writable
-                self.buf = Some(buf.flip());
+                self.buf = Some(buf.freeze());
 
                 self.interests = match self.interests {
                     None => Some(Interests::writable()),
@@ -158,7 +158,7 @@ struct EchoClient {
     msgs: Vec<&'static str>,
     tx: SliceBuf<'static>,
     rx: SliceBuf<'static>,
-    mut_buf: Option<MutByteBuf>,
+    mut_buf: Option<MutBytesMut>,
     token: Token,
     interests: Option<Interests>,
 }
@@ -173,7 +173,7 @@ impl EchoClient {
             msgs: msgs,
             tx: SliceBuf::wrap(curr.as_bytes()),
             rx: SliceBuf::wrap(curr.as_bytes()),
-            mut_buf: Some(ByteBuf::mut_with_capacity(2048)),
+            mut_buf: Some(BytesMut::with_capacity(2048)),
             token: tok,
             interests: None,
         }
@@ -193,7 +193,7 @@ impl EchoClient {
                 debug!("CLIENT : We read {} bytes!", r);
 
                 // prepare for reading
-                let mut buf = buf.flip();
+                let mut buf = buf.freeze();
 
                 debug!(
                     "CLIENT : buf = {:?} -- rx = {:?}",
@@ -207,7 +207,7 @@ impl EchoClient {
                     assert!(actual == expect, "actual={}; expect={}", actual, expect);
                 }
 
-                self.mut_buf = Some(buf.flip());
+                self.mut_buf = Some(buf.freeze());
 
                 if self.interests == Some(Interests::readable()) {
                     self.interests = None;

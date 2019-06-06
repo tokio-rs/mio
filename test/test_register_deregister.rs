@@ -1,7 +1,7 @@
-use crate::{localhost, TryWrite};
-use bytes::SliceBuf;
+use crate::localhost;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, PollOpt, Registry, Token};
+use std::io::{self, Write};
 use std::time::Duration;
 
 const SERVER: Token = Token(0);
@@ -27,7 +27,11 @@ impl TestHandler {
             SERVER => {
                 trace!("handle_read; token=SERVER");
                 let mut sock = self.server.accept().unwrap().0;
-                sock.try_write_buf(&mut SliceBuf::wrap(b"foobar")).unwrap();
+                if let Err(err) = sock.write(b"foobar") {
+                    if err.kind() != io::ErrorKind::WouldBlock {
+                        panic!("unexpected error writing to connection: {}", err);
+                    }
+                }
             }
             CLIENT => {
                 trace!("handle_read; token=CLIENT");
@@ -60,7 +64,7 @@ impl TestHandler {
 
 #[test]
 pub fn test_register_deregister() {
-    let _ = ::env_logger::init();
+    drop(env_logger::try_init());
 
     debug!("Starting TEST_REGISTER_DEREGISTER");
     let mut poll = Poll::new().unwrap();
