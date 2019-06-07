@@ -32,13 +32,13 @@ pub fn test_tcp_listener_level_triggered() {
     let events = filter(&pevents, Token(0));
 
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0], Event::new(Ready::readable(), Token(0)));
+    assert_eq!(events[0], Event::new(Ready::READABLE, Token(0)));
 
     poll.poll(&mut pevents, Some(Duration::from_millis(MS)))
         .unwrap();
     let events = filter(&pevents, Token(0));
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0], Event::new(Ready::readable(), Token(0)));
+    assert_eq!(events[0], Event::new(Ready::READABLE, Token(0)));
 
     // Accept the connection then test that the events stop
     let _ = l.accept().unwrap();
@@ -60,7 +60,7 @@ pub fn test_tcp_listener_level_triggered() {
     let events = filter(&pevents, Token(0));
 
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0], Event::new(Ready::readable(), Token(0)));
+    assert_eq!(events[0], Event::new(Ready::READABLE, Token(0)));
 
     drop(l);
 
@@ -102,8 +102,8 @@ pub fn test_tcp_stream_level_triggered() {
         &mut pevents,
         2,
         vec![
-            Event::new(Ready::readable(), Token(0)),
-            Event::new(Ready::writable(), Token(1)),
+            Event::new(Ready::READABLE, Token(0)),
+            Event::new(Ready::WRITABLE, Token(1)),
         ],
     );
 
@@ -117,7 +117,7 @@ pub fn test_tcp_stream_level_triggered() {
         &mut poll,
         &mut pevents,
         2,
-        vec![Event::new(Ready::writable(), Token(1))],
+        vec![Event::new(Ready::WRITABLE, Token(1))],
     );
 
     // Register the socket
@@ -141,7 +141,7 @@ pub fn test_tcp_stream_level_triggered() {
         &mut poll,
         &mut pevents,
         2,
-        vec![Event::new(Ready::readable(), Token(1))],
+        vec![Event::new(Ready::READABLE, Token(1))],
     );
 
     debug!("reading ----------");
@@ -158,7 +158,7 @@ pub fn test_tcp_stream_level_triggered() {
         &mut poll,
         &mut pevents,
         1,
-        vec![Event::new(Ready::writable(), Token(1))],
+        vec![Event::new(Ready::WRITABLE, Token(1))],
     );
 
     // Closing the socket clears all active level events

@@ -3,7 +3,7 @@ use std::{fmt, ops};
 /// A set of readiness event kinds
 ///
 /// `Ready` is a set of operation descriptors indicating which kind of an
-/// operation is ready to be performed. For example, `Ready::readable()`
+/// operation is ready to be performed. For example, `Ready::READABLE`
 /// indicates that the associated `Evented` handle is ready to perform a
 /// `read` operation.
 ///
@@ -26,12 +26,12 @@ use std::{fmt, ops};
 /// platforms. These indicators should be treated as a hint.
 ///
 ///
-/// [readable]: Ready::readable
-/// [writable]: Ready::writable
-/// [error]: Ready::error
-/// [hup]: Ready::hup
-/// [priority]: Ready::priority
-/// [AIO]: Ready::aio
+/// [readable]: Ready::READABLE
+/// [writable]: Ready::WRITABLE
+/// [error]: Ready::ERROR
+/// [hup]: Ready::HUP
+/// [priority]: Ready::PRIORITY
+/// [AIO]: Ready::AIO
 /// [LIO]: Ready::li0
 ///
 /// # Examples
@@ -39,7 +39,7 @@ use std::{fmt, ops};
 /// ```
 /// use mio::Ready;
 ///
-/// let ready = Ready::readable() | Ready::writable();
+/// let ready = Ready::READABLE | Ready::WRITABLE;
 ///
 /// assert!(ready.is_readable());
 /// assert!(ready.is_writable());
@@ -54,159 +54,44 @@ const WRITABLE: usize = 0b0_000_010;
 // The following are not available on all platforms.
 const ERROR:    usize = 0b0_000_100;
 const HUP:      usize = 0b0_001_000;
-const PRI:      usize = 0b0_010_000;
+const PRIORITY: usize = 0b0_010_000;
 const AIO:      usize = 0b0_100_000;
 const LIO:      usize = 0b1_000_000;
 
 impl Ready {
     /// Returns an empty `Ready` set.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::empty();
-    /// assert!(!ready.is_readable());
-    /// ```
-    pub fn empty() -> Ready {
-        Ready(EMPTY)
-    }
+    pub const EMPTY: Ready = Ready(EMPTY);
 
     /// Returns a `Ready` set representing readable readiness.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::readable();
-    /// assert!(ready.is_readable());
-    /// ```
-    #[inline]
-    pub fn readable() -> Ready {
-        Ready(READABLE)
-    }
+    pub const READABLE: Ready = Ready(READABLE);
 
     /// Returns a `Ready` set representing writable readiness.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::writable();
-    /// assert!(ready.is_writable());
-    /// ```
-    #[inline]
-    pub fn writable() -> Ready {
-        Ready(WRITABLE)
-    }
+    pub const WRITABLE: Ready = Ready(WRITABLE);
 
     /// Returns a `Ready` set representing error readiness.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::error();
-    /// assert!(ready.is_error());
-    /// ```
-    ///
-    /// # Notes
-    ///
-    /// Only available on Unix platforms.
-    #[inline]
     #[cfg(unix)]
-    pub fn error() -> Ready {
-        Ready(ERROR)
-    }
+    pub const ERROR: Ready = Ready(ERROR);
 
     /// Returns a `Ready` set representing HUP readiness.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::hup();
-    /// assert!(ready.is_hup());
-    /// ```
-    ///
-    /// # Notes
-    ///
-    /// Only available on Unix platforms.
-    #[inline]
     #[cfg(unix)]
-    pub fn hup() -> Ready {
-        Ready(HUP)
-    }
+    pub const HUP: Ready = Ready(HUP);
 
     /// Returns a `Ready` set representing priority readiness.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::priority();
-    /// assert!(ready.is_priority());
-    /// ```
-    ///
-    /// # Notes
-    ///
-    /// Only available on DragonFlyBSD, FreeBSD, iOS and macOS.
-    #[inline]
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    pub fn priority() -> Ready {
-        Ready(PRI)
-    }
+    pub const PRIORITY: Ready = Ready(PRIORITY);
 
     /// Returns a `Ready` set representing AIO completion readiness.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::aio();
-    /// assert!(ready.is_aio());
-    /// ```
-    ///
-    /// # Notes
-    ///
-    /// Only available on DragonFlyBSD, FreeBSD, iOS and macOS.
-    #[inline]
     #[cfg(any(
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "ios",
         target_os = "macos"
     ))]
-    pub fn aio() -> Ready {
-        Ready(AIO)
-    }
+    pub const AIO: Ready = Ready(AIO);
 
     /// Returns a `Ready` set representing LIO completion readiness.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::lio();
-    /// assert!(ready.is_lio());
-    /// ```
-    ///
-    /// # Notes
-    ///
-    /// Only available on FreeBSD.
-    #[inline]
     #[cfg(any(target_os = "freebsd"))]
-    pub fn lio() -> Ready {
-        Ready(LIO)
-    }
+    pub const LIO: Ready = Ready(LIO);
 
     /// Returns true if the `Ready` set is empty.
     ///
@@ -215,7 +100,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::empty();
+    /// let ready = Ready::EMPTY;
     /// assert!(ready.is_empty());
     /// ```
     #[inline]
@@ -230,12 +115,12 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     /// assert!(ready.is_readable());
     /// ```
     #[inline]
     pub fn is_readable(&self) -> bool {
-        self.contains(Ready::readable())
+        self.contains(Ready::READABLE)
     }
 
     /// Returns true if the `Ready` set contains writable readiness.
@@ -245,12 +130,12 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::writable();
+    /// let ready = Ready::WRITABLE;
     /// assert!(ready.is_writable());
     /// ```
     #[inline]
     pub fn is_writable(&self) -> bool {
-        self.contains(Ready::writable())
+        self.contains(Ready::WRITABLE)
     }
 
     /// Returns true if the `Ready` set contains error readiness.
@@ -264,7 +149,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::error();
+    /// let ready = Ready::ERROR;
     /// assert!(ready.is_error());
     /// ```
     ///
@@ -274,7 +159,7 @@ impl Ready {
     /// this indicator.
     #[inline]
     pub fn is_error(&self) -> bool {
-        self.contains(Ready::error())
+        self.contains(Ready::ERROR)
     }
 
     /// Returns true if the `Ready` set contains HUP readiness.
@@ -290,7 +175,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::hup();
+    /// let ready = Ready::HUP;
     /// assert!(ready.is_hup());
     /// ```
     ///
@@ -310,7 +195,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::priority();
+    /// let ready = Ready::PRIORITY;
     /// assert!(ready.is_priority());
     /// ```
     ///
@@ -320,7 +205,7 @@ impl Ready {
     /// this indicator.
     #[inline]
     pub fn is_priority(&self) -> bool {
-        self.contains(Ready(PRI))
+        self.contains(Ready(PRIORITY))
     }
 
     /// Returns true if the `Ready` set contains AIO readiness.
@@ -330,7 +215,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::aio();
+    /// let ready = Ready::AIO;
     /// assert!(ready.is_aio());
     /// ```
     ///
@@ -350,7 +235,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::lio();
+    /// let ready = Ready::LIO;
     /// assert!(ready.is_lio());
     /// ```
     ///
@@ -372,8 +257,8 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let mut readiness = Ready::empty();
-    /// readiness.insert(Ready::readable());
+    /// let mut readiness = Ready::EMPTY;
+    /// readiness.insert(Ready::READABLE);
     /// assert!(readiness.is_readable());
     /// ```
     #[inline]
@@ -390,8 +275,8 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let mut readiness = Ready::readable();
-    /// readiness.remove(Ready::readable());
+    /// let mut readiness = Ready::READABLE;
+    /// readiness.remove(Ready::READABLE);
     /// assert!(!readiness.is_readable());
     /// ```
     #[inline]
@@ -410,25 +295,25 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let readiness = Ready::readable();
-    /// assert!(readiness.contains(Ready::readable()));
-    /// assert!(!readiness.contains(Ready::writable()));
+    /// let readiness = Ready::READABLE;
+    /// assert!(readiness.contains(Ready::READABLE));
+    /// assert!(!readiness.contains(Ready::WRITABLE));
     /// ```
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let readiness = Ready::readable() | Ready::writable();
+    /// let readiness = Ready::READABLE | Ready::WRITABLE;
     ///
-    /// assert!(readiness.contains(Ready::readable()));
-    /// assert!(readiness.contains(Ready::writable()));
+    /// assert!(readiness.contains(Ready::READABLE));
+    /// assert!(readiness.contains(Ready::WRITABLE));
     /// ```
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let readiness = Ready::readable() | Ready::writable();
-    /// assert!(!Ready::readable().contains(readiness));
+    /// let readiness = Ready::READABLE | Ready::WRITABLE;
+    /// assert!(!Ready::READABLE.contains(readiness));
     /// assert!(readiness.contains(readiness));
     /// ```
     #[inline]
@@ -454,7 +339,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     /// let ready_usize = ready.as_usize();
     /// let ready2 = Ready::from_usize(ready_usize);
     /// assert_eq!(ready, ready2);
@@ -478,7 +363,7 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     /// let ready_usize = ready.as_usize();
     /// let ready2 = Ready::from_usize(ready_usize);
     /// assert_eq!(ready, ready2);
@@ -556,11 +441,11 @@ impl fmt::Debug for Ready {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (Ready::readable(), "Readable"),
-            (Ready::writable(), "Writable"),
+            (Ready(READABLE), "Readable"),
+            (Ready(WRITABLE), "Writable"),
             (Ready(ERROR), "Error"),
             (Ready(HUP), "Hup"),
-            (Ready(PRI), "Priority"),
+            (Ready(PRIORITY), "Priority"),
             (Ready(AIO), "AIO"),
             (Ready(LIO), "LIO"),
         ];
@@ -586,22 +471,22 @@ impl fmt::Debug for Ready {
 
 #[test]
 fn fmt_debug() {
-    assert_eq!("(empty)", format!("{:?}", Ready::empty()));
-    assert_eq!("Readable", format!("{:?}", Ready::readable()));
-    assert_eq!("Writable", format!("{:?}", Ready::writable()));
-    assert_eq!("Error", format!("{:?}", Ready::error()));
+    assert_eq!("(empty)", format!("{:?}", Ready::EMPTY));
+    assert_eq!("Readable", format!("{:?}", Ready::READABLE));
+    assert_eq!("Writable", format!("{:?}", Ready::WRITABLE));
+    assert_eq!("Error", format!("{:?}", Ready::ERROR));
     assert_eq!("Hup", format!("{:?}", Ready(HUP)));
     assert_eq!("Priority", format!("{:?}", Ready(PRI)));
     assert_eq!("AIO", format!("{:?}", Ready(AIO)));
     assert_eq!("LIO", format!("{:?}", Ready(LIO)));
-    assert_eq!("Readable | Writable", format!("{:?}", Ready::readable() | Ready::writable()));
+    assert_eq!("Readable | Writable", format!("{:?}", Ready::READABLE | Ready::WRITABLE));
 }
 
 /* TODO(Thomas): check if this is still relevant.
 #[test]
 fn test_ready_all() {
-    let readable = Ready::readable().as_usize();
-    let writable = Ready::writable().as_usize();
+    let readable = Ready::READABLE.as_usize();
+    let writable = Ready::WRITABLE.as_usize();
 
     assert_eq!(
         READY_ALL | readable | writable,
@@ -610,6 +495,6 @@ fn test_ready_all() {
 
     // Issue #896.
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    assert!(!Ready::from(Ready::priority()).is_writable());
+    assert!(!Ready::from(Ready::PRIORITY).is_writable());
 }
 */

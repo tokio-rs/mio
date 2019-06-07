@@ -21,7 +21,7 @@ fn smoke() {
         .unwrap();
     assert_eq!(n, 0);
 
-    set.set_readiness(Ready::readable()).unwrap();
+    set.set_readiness(Ready::READABLE).unwrap();
 
     let n = poll
         .poll(&mut events, Some(Duration::from_millis(0)))
@@ -47,7 +47,7 @@ fn set_readiness_before_register() {
 
         let th = thread::spawn(move || {
             // set readiness before register
-            set.set_readiness(Ready::readable()).unwrap();
+            set.set_readiness(Ready::READABLE).unwrap();
 
             // run into barrier so both can pass
             b2.wait();
@@ -113,7 +113,7 @@ mod stress {
                 })
                 .collect();
 
-            let mut ready: Vec<_> = (0..NUM_REGISTRATIONS).map(|_| Ready::empty()).collect();
+            let mut ready: Vec<_> = (0..NUM_REGISTRATIONS).map(|_| Ready::EMPTY).collect();
 
             let remaining = Arc::new(AtomicUsize::new(NUM_THREADS));
 
@@ -126,18 +126,18 @@ mod stress {
                 thread::spawn(move || {
                     for _ in 0..NUM_ITERS {
                         for i in 0..NUM_REGISTRATIONS {
-                            set_readiness[i].set_readiness(Ready::readable()).unwrap();
-                            set_readiness[i].set_readiness(Ready::empty()).unwrap();
-                            set_readiness[i].set_readiness(Ready::writable()).unwrap();
+                            set_readiness[i].set_readiness(Ready::READABLE).unwrap();
+                            set_readiness[i].set_readiness(Ready::EMPTY).unwrap();
+                            set_readiness[i].set_readiness(Ready::WRITABLE).unwrap();
                             set_readiness[i]
-                                .set_readiness(Ready::readable() | Ready::writable())
+                                .set_readiness(Ready::READABLE | Ready::WRITABLE)
                                 .unwrap();
-                            set_readiness[i].set_readiness(Ready::empty()).unwrap();
+                            set_readiness[i].set_readiness(Ready::EMPTY).unwrap();
                         }
                     }
 
                     for i in 0..NUM_REGISTRATIONS {
-                        set_readiness[i].set_readiness(Ready::readable()).unwrap();
+                        set_readiness[i].set_readiness(Ready::READABLE).unwrap();
                     }
 
                     remaining.fetch_sub(1, Release);
@@ -192,7 +192,7 @@ mod stress {
 
             // Everything should be flagged as readable
             for ready in ready {
-                assert_eq!(ready, Ready::readable());
+                assert_eq!(ready, Ready::READABLE);
             }
         }
     }
@@ -233,11 +233,11 @@ mod stress {
                 barrier.wait();
 
                 while !done.load(Acquire) {
-                    set_readiness.set_readiness(Ready::readable()).unwrap();
+                    set_readiness.set_readiness(Ready::READABLE).unwrap();
                 }
 
                 // Set one last time
-                set_readiness.set_readiness(Ready::readable()).unwrap();
+                set_readiness.set_readiness(Ready::READABLE).unwrap();
             });
         }
 
@@ -291,7 +291,7 @@ fn drop_registration_from_non_main_thread() {
 
         thread::spawn(move || {
             for (registration, set_readiness) in rx {
-                let _ = set_readiness.set_readiness(Ready::readable());
+                let _ = set_readiness.set_readiness(Ready::READABLE);
                 drop(registration);
                 drop(set_readiness);
             }
@@ -325,7 +325,7 @@ fn drop_registration_from_non_main_thread() {
                     PollOpt::edge(),
                 )
                 .unwrap();
-            let _ = set_readiness.set_readiness(Ready::readable());
+            let _ = set_readiness.set_readiness(Ready::READABLE);
             drop(registration);
             drop(set_readiness);
             token_index += 1;

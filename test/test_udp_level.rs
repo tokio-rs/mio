@@ -38,8 +38,8 @@ pub fn test_udp_level_triggered() {
             events,
             2,
             vec![
-                Event::new(Ready::writable(), Token(0)),
-                Event::new(Ready::writable(), Token(1)),
+                Event::new(Ready::WRITABLE, Token(0)),
+                Event::new(Ready::WRITABLE, Token(1)),
             ],
         );
     }
@@ -54,7 +54,7 @@ pub fn test_udp_level_triggered() {
             poll,
             events,
             2,
-            vec![Event::new(Ready::readable() | Ready::writable(), Token(1))],
+            vec![Event::new(Ready::READABLE | Ready::WRITABLE, Token(1))],
         );
     }
 
@@ -66,7 +66,7 @@ pub fn test_udp_level_triggered() {
             poll,
             events,
             4,
-            vec![Event::new(Ready::writable(), Token(1))],
+            vec![Event::new(Ready::WRITABLE, Token(1))],
         );
     }
 
@@ -78,7 +78,7 @@ pub fn test_udp_level_triggered() {
         poll,
         events,
         10,
-        vec![Event::new(Ready::readable() | Ready::writable(), Token(1))],
+        vec![Event::new(Ready::READABLE | Ready::WRITABLE, Token(1))],
     );
 
     drop(rx);

@@ -13,9 +13,9 @@ use crate::{Ready, Token};
 /// use mio::{Ready, Token};
 /// use mio::event::Event;
 ///
-/// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
+/// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
 ///
-/// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
+/// assert_eq!(event.readiness(), Ready::READABLE | Ready::WRITABLE);
 /// assert_eq!(event.token(), Token(0));
 /// ```
 ///
@@ -38,9 +38,9 @@ impl Event {
     /// use mio::{Ready, Token};
     /// use mio::event::Event;
     ///
-    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
+    /// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
     ///
-    /// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
+    /// assert_eq!(event.readiness(), Ready::READABLE | Ready::WRITABLE);
     /// assert_eq!(event.token(), Token(0));
     /// ```
     pub fn new(readiness: Ready, token: Token) -> Event {
@@ -58,9 +58,9 @@ impl Event {
     /// use mio::{Ready, Token};
     /// use mio::event::Event;
     ///
-    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
+    /// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
     ///
-    /// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
+    /// assert_eq!(event.readiness(), Ready::READABLE | Ready::WRITABLE);
     /// ```
     pub fn readiness(&self) -> Ready {
         self.kind
@@ -80,7 +80,7 @@ impl Event {
     /// use mio::{Ready, Token};
     /// use mio::event::Event;
     ///
-    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
+    /// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
     ///
     /// assert_eq!(event.token(), Token(0));
     /// ```
