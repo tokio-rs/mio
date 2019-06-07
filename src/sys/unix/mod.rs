@@ -50,6 +50,7 @@ pub use iovec::IoVec;
 
 use std::os::unix::io::FromRawFd;
 
+#[allow(dead_code)]
 pub fn pipe() -> std::io::Result<(Io, Io)> {
     // Use pipe2 for atomically setting O_CLOEXEC if we can, but otherwise
     // just fall back to using `pipe`.

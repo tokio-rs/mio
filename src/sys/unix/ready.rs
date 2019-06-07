@@ -114,15 +114,18 @@ const AIO: usize = 0b00_0000;
 const LIO: usize = 0b10_0000;
 
 #[cfg(not(any(target_os = "freebsd")))]
+#[allow(dead_code)]
 const LIO: usize = 0b00_0000;
 
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
 const PRI: usize = 0b100_0000;
 
 #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "solaris")))]
+#[allow(dead_code)]
 const PRI: usize = 0;
 
 // Export to support `Ready::all`
+#[allow(dead_code)]
 pub const READY_ALL: usize = ERROR | HUP | AIO | LIO | PRI;
 
 #[test]
