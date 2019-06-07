@@ -30,10 +30,12 @@ static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 /// the internals to I/O handles registered on this selector. This is
 /// required to schedule I/O operations independently of being inside the event
 /// loop (e.g. when a call to `write` is seen we're not "in the event loop").
+#[derive(Debug)]
 pub struct Selector {
     inner: Arc<SelectorInner>,
 }
 
+#[derive(Debug)]
 struct SelectorInner {
     /// Unique identifier of the `Selector`
     id: usize,

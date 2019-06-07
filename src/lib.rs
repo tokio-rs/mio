@@ -108,6 +108,7 @@
 //!
 //! ```
 
+mod awakener;
 mod event_imp;
 mod io;
 mod lazycell;
@@ -117,6 +118,7 @@ mod token;
 
 pub mod net;
 
+pub use awakener::Awakener;
 pub use event_imp::{Interests, PollOpt, Ready};
 pub use poll::{Poll, Registration, Registry, SetReadiness};
 pub use token::Token;

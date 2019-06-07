@@ -238,6 +238,78 @@ impl Selector {
             Ok(())
         }
     }
+
+    // Used by `Awakener`.
+    #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+    pub fn setup_awakener(&self, token: Token) -> io::Result<()> {
+        // First attempt to accept user space notifications.
+        let mut kevent = kevent!(
+            0,
+            libc::EVFILT_USER,
+            libc::EV_ADD | libc::EV_CLEAR | libc::EV_RECEIPT,
+            token.0
+        );
+
+        cvt(unsafe {
+            libc::kevent(
+                self.kq,
+                &kevent as *const libc::kevent,
+                1,
+                &mut kevent as *mut libc::kevent,
+                1,
+                ptr::null(),
+            )
+        })
+        .map(|_| ())?;
+
+        if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
+            Err(io::Error::from_raw_os_error(kevent.data as i32))
+        } else {
+            Ok(())
+        }
+    }
+
+    // Used by `Awakener`.
+    #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+    pub fn try_clone(&self) -> io::Result<Selector> {
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
+        let new_kq = unsafe { libc::dup(self.kq) };
+        if new_kq == -1 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(Selector { id, kq: new_kq })
+        }
+    }
+
+    // Used by `Awakener`.
+    #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+    pub fn wake(&self, token: Token) -> io::Result<()> {
+        let mut kevent = kevent!(
+            0,
+            libc::EVFILT_USER,
+            libc::EV_ADD | libc::EV_RECEIPT,
+            token.0
+        );
+        kevent.fflags = libc::NOTE_TRIGGER;
+
+        cvt(unsafe {
+            libc::kevent(
+                self.kq,
+                &kevent as *const libc::kevent,
+                1,
+                &mut kevent as *mut libc::kevent,
+                1,
+                ptr::null(),
+            )
+        })
+        .map(|_| ())?;
+
+        if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
+            Err(io::Error::from_raw_os_error(kevent.data as i32))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl fmt::Debug for Selector {
@@ -349,6 +421,15 @@ impl Events {
             {
                 if e.filter == libc::EVFILT_LIO {
                     event::kind_mut(&mut self.events[idx]).insert(Ready::LIO);
+                }
+            }
+
+            // Used by the `Awakener`. On platforms that use `eventfd` or a unix
+            // pipe it will emit a readable event so we'll fake that here as well.
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            {
+                if e.filter == libc::EVFILT_USER {
+                    event::kind_mut(&mut self.events[idx]).insert(Ready::READABLE);
                 }
             }
         }

@@ -5,6 +5,7 @@ extern crate log;
 
 pub use ports::localhost;
 
+mod test_awakener;
 mod test_close_on_drop;
 mod test_custom_evented;
 mod test_double_register;
@@ -207,5 +208,15 @@ pub fn expect_events(
         expected.is_empty(),
         "The following expected events were not found: {:?}",
         expected
+    );
+}
+
+pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
+    poll.poll(events, Some(Duration::from_millis(50)))
+        .expect("unable to poll");
+    assert_eq!(
+        events.iter().count(),
+        0,
+        "received events, but didn't expect any"
     );
 }
