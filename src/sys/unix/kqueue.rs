@@ -1,6 +1,6 @@
 use crate::event_imp::{self as event, Event};
+use crate::sys::unix::cvt;
 use crate::sys::unix::io::set_cloexec;
-use crate::sys::unix::{cvt, UnixReady};
 use crate::{io, Interests, PollOpt, Ready, Token};
 use libc::{self, time_t};
 use log::trace;
@@ -326,7 +326,7 @@ impl Events {
             }
 
             if e.flags & libc::EV_ERROR != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(*UnixReady::error());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::error());
             }
 
             if e.filter == libc::EVFILT_READ as Filter {
@@ -342,13 +342,13 @@ impl Events {
             ))]
             {
                 if e.filter == libc::EVFILT_AIO {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::aio());
+                    event::kind_mut(&mut self.events[idx]).insert(Ready::aio());
                 }
             }
             #[cfg(any(target_os = "freebsd"))]
             {
                 if e.filter == libc::EVFILT_LIO {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::lio());
+                    event::kind_mut(&mut self.events[idx]).insert(Ready::lio());
                 }
             }
         }
@@ -410,6 +410,6 @@ fn test_coalesce_aio() {
         .0
         .push(kevent!(0x1234, libc::EVFILT_AIO, 0, 42));
     events.coalesce(Token(0));
-    assert!(events.events[0].readiness() == UnixReady::aio().into());
+    assert!(events.events[0].readiness() == Ready::aio());
     assert!(events.events[0].token() == Token(42));
 }
