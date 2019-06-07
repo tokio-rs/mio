@@ -956,8 +956,7 @@ impl Ready {
     /// assert!(readiness.is_readable());
     /// ```
     #[inline]
-    pub fn insert<T: Into<Self>>(&mut self, other: T) {
-        let other = other.into();
+    pub fn insert(&mut self, other: Ready) {
         self.0 |= other.0;
     }
 
@@ -975,8 +974,7 @@ impl Ready {
     /// assert!(!readiness.is_readable());
     /// ```
     #[inline]
-    pub fn remove<T: Into<Self>>(&mut self, other: T) {
-        let other = other.into();
+    pub fn remove(&mut self, other: Ready) {
         self.0 &= !other.0;
     }
 
@@ -1013,8 +1011,7 @@ impl Ready {
     /// assert!(readiness.contains(readiness));
     /// ```
     #[inline]
-    pub fn contains<T: Into<Self>>(&self, other: T) -> bool {
-        let other = other.into();
+    pub fn contains(&self, other: Ready) -> bool {
         (self.0 & other.0) == other.0
     }
 
@@ -1070,67 +1067,67 @@ impl Ready {
     }
 }
 
-impl<T: Into<Ready>> ops::BitOr<T> for Ready {
+impl ops::BitOr for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitor(self, other: T) -> Ready {
-        Ready(self.0 | other.into().0)
+    fn bitor(self, other: Ready) -> Ready {
+        Ready(self.0 | other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::BitOrAssign<T> for Ready {
+impl ops::BitOrAssign for Ready {
     #[inline]
-    fn bitor_assign(&mut self, other: T) {
-        self.0 |= other.into().0;
+    fn bitor_assign(&mut self, other: Ready) {
+        self.0 |= other.0;
     }
 }
 
-impl<T: Into<Ready>> ops::BitXor<T> for Ready {
+impl ops::BitXor for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitxor(self, other: T) -> Ready {
-        Ready(self.0 ^ other.into().0)
+    fn bitxor(self, other: Ready) -> Ready {
+        Ready(self.0 ^ other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::BitXorAssign<T> for Ready {
+impl ops::BitXorAssign for Ready {
     #[inline]
-    fn bitxor_assign(&mut self, other: T) {
-        self.0 ^= other.into().0;
+    fn bitxor_assign(&mut self, other: Ready) {
+        self.0 ^= other.0;
     }
 }
 
-impl<T: Into<Ready>> ops::BitAnd<T> for Ready {
+impl ops::BitAnd for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitand(self, other: T) -> Ready {
-        Ready(self.0 & other.into().0)
+    fn bitand(self, other: Ready) -> Ready {
+        Ready(self.0 & other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::BitAndAssign<T> for Ready {
+impl ops::BitAndAssign for Ready {
     #[inline]
-    fn bitand_assign(&mut self, other: T) {
-        self.0 &= other.into().0
+    fn bitand_assign(&mut self, other: Ready) {
+        self.0 &= other.0
     }
 }
 
-impl<T: Into<Ready>> ops::Sub<T> for Ready {
+impl ops::Sub for Ready {
     type Output = Ready;
 
     #[inline]
-    fn sub(self, other: T) -> Ready {
-        Ready(self.0 & !other.into().0)
+    fn sub(self, other: Ready) -> Ready {
+        Ready(self.0 & !other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::SubAssign<T> for Ready {
+impl ops::SubAssign for Ready {
     #[inline]
-    fn sub_assign(&mut self, other: T) {
-        self.0 &= !other.into().0;
+    fn sub_assign(&mut self, other: Ready) {
+        self.0 &= !other.0;
     }
 }
 
