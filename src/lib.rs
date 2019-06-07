@@ -139,7 +139,7 @@ pub use event::Events;
 #[cfg(unix)]
 pub mod unix {
     //! Unix only extensions
-    pub use crate::sys::unix::UnixReady;
+
     pub use crate::sys::EventedFd;
 }
 

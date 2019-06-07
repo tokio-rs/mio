@@ -1,7 +1,6 @@
 use bytes::{Buf, ByteBuf, SliceBuf};
 use mio::deprecated::unix::*;
 use mio::deprecated::{EventLoop, Handler};
-use mio::unix::UnixReady;
 use mio::*;
 use slab::Slab;
 use std::io::{self, Read};

@@ -53,9 +53,6 @@ pub use self::unix::{
 };
 
 #[cfg(unix)]
-pub use self::unix::READY_ALL;
-
-#[cfg(unix)]
 pub mod unix;
 
 #[cfg(windows)]

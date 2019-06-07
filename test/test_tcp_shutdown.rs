@@ -24,8 +24,7 @@ macro_rules! wait {
             for event in &events {
                 #[cfg(unix)]
                 {
-                    use mio::unix::UnixReady;
-                    assert!(!UnixReady::from(event.readiness()).is_hup());
+                    assert!(!event.readiness().is_hup());
                 }
 
                 if event.token() == Token(0) && event.readiness().$ready() {

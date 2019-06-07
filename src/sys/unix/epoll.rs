@@ -1,6 +1,6 @@
 use crate::event::Event;
 use crate::sys::unix::io::set_cloexec;
-use crate::sys::unix::{cvt, UnixReady};
+use crate::sys::unix::cvt;
 use crate::{io, Interests, PollOpt, Ready, Token};
 use libc::{self, c_int};
 use libc::{EPOLLERR, EPOLLHUP, EPOLLONESHOT};
@@ -190,7 +190,7 @@ fn ready_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
         kind |= EPOLLOUT;
     }
 
-    if UnixReady::from(interest).is_priority() {
+    if interest.is_priority() {
         kind |= EPOLLPRI;
     }
 
@@ -260,7 +260,7 @@ impl Events {
             }
 
             if (epoll & EPOLLPRI) != 0 {
-                kind = kind | Ready::readable() | UnixReady::priority();
+                kind = kind | Ready::readable() | Ready::priority();
             }
 
             if (epoll & EPOLLOUT) != 0 {
@@ -269,11 +269,11 @@ impl Events {
 
             // EPOLLHUP - Usually means a socket error happened
             if (epoll & EPOLLERR) != 0 {
-                kind = kind | UnixReady::error();
+                kind = kind | Ready::error();
             }
 
             if (epoll & EPOLLHUP) != 0 {
-                kind = kind | UnixReady::hup();
+                kind = kind | Ready::hup();
             }
 
             let token = self.events[idx].u64;
