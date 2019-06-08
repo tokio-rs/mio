@@ -608,18 +608,18 @@ fn test_debug_pollopt() {
 /// assert!(ready.is_writable());
 /// ```
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct Ready(usize);
+pub struct Ready(u8);
 
 // These must be unique.
-const EMPTY: usize = 0b0_000_000;
-const READABLE: usize = 0b0_000_001;
-const WRITABLE: usize = 0b0_000_010;
+const EMPTY: u8 = 0b0_000_000;
+const READABLE: u8 = 0b0_000_001;
+const WRITABLE: u8 = 0b0_000_010;
 // The following are not available on all platforms.
-const ERROR: usize = 0b0_000_100;
-const HUP: usize = 0b0_001_000;
-const PRIORITY: usize = 0b0_010_000;
-const AIO: usize = 0b0_100_000;
-const LIO: usize = 0b1_000_000;
+const ERROR: u8 = 0b0_000_100;
+const HUP: u8 = 0b0_001_000;
+const PRIORITY: u8 = 0b0_010_000;
+const AIO: u8 = 0b0_100_000;
+const LIO: u8 = 0b1_000_000;
 
 impl Ready {
     /// Returns an empty `Ready` set.
@@ -919,7 +919,7 @@ impl Ready {
     /// assert_eq!(ready, ready2);
     /// ```
     pub fn from_usize(val: usize) -> Ready {
-        Ready(val)
+        Ready(val as u8)
     }
 
     /// Returns a `usize` representation of the `Ready` value.
@@ -943,7 +943,7 @@ impl Ready {
     /// assert_eq!(ready, ready2);
     /// ```
     pub fn as_usize(&self) -> usize {
-        self.0
+        self.0 as usize
     }
 }
 
@@ -1293,7 +1293,7 @@ impl Interests {
     /// It should and only can be used in crate, and will be deprecated in the future.
     /// So don't use it unless you have no other choice.
     pub(crate) fn to_ready(&self) -> Ready {
-        Ready(self.0.get() as usize)
+        Ready(self.0.get() as u8)
     }
 }
 
@@ -1489,7 +1489,7 @@ impl Event {
  */
 
 pub fn ready_as_usize(events: Ready) -> usize {
-    events.0
+    events.as_usize()
 }
 
 pub fn opt_as_usize(opt: PollOpt) -> usize {
@@ -1497,7 +1497,7 @@ pub fn opt_as_usize(opt: PollOpt) -> usize {
 }
 
 pub fn ready_from_usize(events: usize) -> Ready {
-    Ready(events)
+    Ready::from_usize(events)
 }
 
 pub fn opt_from_usize(opt: usize) -> PollOpt {
