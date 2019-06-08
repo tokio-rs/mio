@@ -725,7 +725,7 @@ impl Ready {
     /// this indicator.
     #[inline]
     pub fn is_error(&self) -> bool {
-        self.contains(Ready::ERROR)
+        self.contains(Ready(ERROR))
     }
 
     /// Returns true if the `Ready` set contains HUP readiness.
@@ -1052,7 +1052,7 @@ fn fmt_debug() {
     assert_eq!("(empty)", format!("{:?}", Ready::EMPTY));
     assert_eq!("Readable", format!("{:?}", Ready::READABLE));
     assert_eq!("Writable", format!("{:?}", Ready::WRITABLE));
-    assert_eq!("Error", format!("{:?}", Ready::ERROR));
+    assert_eq!("Error", format!("{:?}", Ready(ERROR)));
     assert_eq!("Hup", format!("{:?}", Ready(HUP)));
     assert_eq!("Priority", format!("{:?}", Ready(PRIORITY)));
     assert_eq!("AIO", format!("{:?}", Ready(AIO)));
