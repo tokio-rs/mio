@@ -38,12 +38,7 @@ impl TestHandler {
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
                 registry
-                    .reregister(
-                        &self.client,
-                        CLIENT,
-                        Interests::writable(),
-                        PollOpt::level(),
-                    )
+                    .reregister(&self.client, CLIENT, Interests::WRITABLE, PollOpt::level())
                     .unwrap();
             }
             _ => panic!("unexpected token"),
@@ -76,14 +71,14 @@ pub fn test_register_deregister() {
 
     info!("register server socket");
     poll.registry()
-        .register(&server, SERVER, Interests::readable(), PollOpt::edge())
+        .register(&server, SERVER, Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
     poll.registry()
-        .register(&client, CLIENT, Interests::readable(), PollOpt::level())
+        .register(&client, CLIENT, Interests::READABLE, PollOpt::level())
         .unwrap();
 
     let mut handler = TestHandler::new(server, client);

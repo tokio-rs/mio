@@ -70,7 +70,7 @@
 //! registry.register(
 //!     &server,
 //!     SERVER,
-//!     Interests::readable(),
+//!     Interests::READABLE,
 //!     PollOpt::edge()).unwrap();
 //!
 //! // Setup the client socket
@@ -80,7 +80,7 @@
 //! registry.register(
 //!     &sock,
 //!     CLIENT,
-//!     Interests::readable(),
+//!     Interests::READABLE,
 //!     PollOpt::edge()).unwrap();
 //!
 //! // Create storage for events

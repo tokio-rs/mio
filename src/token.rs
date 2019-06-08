@@ -43,7 +43,7 @@
 /// // Register the listener
 /// registry.register(&listener,
 ///                   LISTENER,
-///                   Interests::readable(),
+///                   Interests::READABLE,
 ///                   PollOpt::edge())?;
 ///
 /// // Spawn a thread that will connect a bunch of sockets then close them
@@ -89,7 +89,7 @@
 ///                             // Register the new socket w/ poll
 ///                             registry.register(&socket,
 ///                                               token,
-///                                               Interests::readable(),
+///                                               Interests::READABLE,
 ///                                               PollOpt::edge())?;
 ///
 ///                             // Store the socket

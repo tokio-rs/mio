@@ -390,7 +390,7 @@ fn does_not_register_rw() {
         .register(
             &kqf,
             Token(1234),
-            Interests::readable(),
+            Interests::READABLE,
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();

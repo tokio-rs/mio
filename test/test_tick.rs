@@ -44,12 +44,12 @@ pub fn test_tick() {
 
     let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
     event_loop
-        .register(&listener, Token(0), Interests::readable(), PollOpt::level())
+        .register(&listener, Token(0), Interests::READABLE, PollOpt::level())
         .unwrap();
 
     let client = TcpStream::connect(&listener.local_addr().unwrap()).unwrap();
     event_loop
-        .register(&client, Token(1), Interests::readable(), PollOpt::edge())
+        .register(&client, Token(1), Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     sleep_ms(250);

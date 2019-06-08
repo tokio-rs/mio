@@ -17,7 +17,7 @@ fn write_then_drop() {
     a.register(
         poll.registry(),
         Token(1),
-        Interests::readable(),
+        Interests::READABLE,
         PollOpt::edge(),
     )
     .unwrap();
@@ -25,7 +25,7 @@ fn write_then_drop() {
     s.register(
         poll.registry(),
         Token(3),
-        Interests::readable(),
+        Interests::READABLE,
         PollOpt::edge(),
     )
     .unwrap();
@@ -42,7 +42,7 @@ fn write_then_drop() {
     s2.register(
         poll.registry(),
         Token(2),
-        Interests::writable(),
+        Interests::WRITABLE,
         PollOpt::edge(),
     )
     .unwrap();
@@ -60,7 +60,7 @@ fn write_then_drop() {
     s.reregister(
         poll.registry(),
         Token(3),
-        Interests::readable(),
+        Interests::READABLE,
         PollOpt::edge(),
     )
     .unwrap();
@@ -90,14 +90,14 @@ fn write_then_deregister() {
     a.register(
         poll.registry(),
         Token(1),
-        Interests::readable(),
+        Interests::READABLE,
         PollOpt::edge(),
     )
     .unwrap();
     s.register(
         poll.registry(),
         Token(3),
-        Interests::readable(),
+        Interests::READABLE,
         PollOpt::edge(),
     )
     .unwrap();
@@ -114,7 +114,7 @@ fn write_then_deregister() {
     s2.register(
         poll.registry(),
         Token(2),
-        Interests::writable(),
+        Interests::WRITABLE,
         PollOpt::edge(),
     )
     .unwrap();
@@ -132,7 +132,7 @@ fn write_then_deregister() {
     s.reregister(
         poll.registry(),
         Token(3),
-        Interests::readable(),
+        Interests::READABLE,
         PollOpt::edge(),
     )
     .unwrap();

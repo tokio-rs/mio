@@ -18,14 +18,14 @@ pub fn test_reregister_different_without_poll() {
         .register(
             &l,
             Token(0),
-            Interests::readable(),
+            Interests::READABLE,
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();
 
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
     poll.registry()
-        .register(&s1, Token(2), Interests::readable(), PollOpt::edge())
+        .register(&s1, Token(2), Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     sleep_ms(MS);
@@ -34,7 +34,7 @@ pub fn test_reregister_different_without_poll() {
         .reregister(
             &l,
             Token(0),
-            Interests::writable(),
+            Interests::WRITABLE,
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();

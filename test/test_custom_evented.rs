@@ -11,7 +11,7 @@ fn smoke() {
     r.register(
         poll.registry(),
         Token(0),
-        Interests::readable(),
+        Interests::READABLE,
         PollOpt::edge(),
     )
     .unwrap();
@@ -58,7 +58,7 @@ fn set_readiness_before_register() {
 
         // now register
         poll.registry()
-            .register(&r, Token(123), Interests::readable(), PollOpt::edge())
+            .register(&r, Token(123), Interests::READABLE, PollOpt::edge())
             .unwrap();
 
         loop {
@@ -105,7 +105,7 @@ mod stress {
                     r.register(
                         poll.registry(),
                         Token(i),
-                        Interests::readable(),
+                        Interests::READABLE,
                         PollOpt::edge(),
                     )
                     .unwrap();
@@ -150,7 +150,7 @@ mod stress {
                     r.reregister(
                         poll.registry(),
                         Token(i),
-                        Interests::writable(),
+                        Interests::WRITABLE,
                         PollOpt::edge(),
                     )
                     .unwrap();
@@ -169,7 +169,7 @@ mod stress {
                     r.reregister(
                         poll.registry(),
                         Token(i),
-                        Interests::readable(),
+                        Interests::READABLE,
                         PollOpt::edge(),
                     )
                     .unwrap();
@@ -219,7 +219,7 @@ mod stress {
                 .register(
                     &registration,
                     Token(i),
-                    Interests::readable(),
+                    Interests::READABLE,
                     PollOpt::edge(),
                 )
                 .unwrap();
@@ -305,7 +305,7 @@ fn drop_registration_from_non_main_thread() {
             .register(
                 poll.registry(),
                 Token(token_index),
-                Interests::readable(),
+                Interests::READABLE,
                 PollOpt::edge(),
             )
             .unwrap();
@@ -321,7 +321,7 @@ fn drop_registration_from_non_main_thread() {
                 .register(
                     poll.registry(),
                     Token(token_index),
-                    Interests::readable(),
+                    Interests::READABLE,
                     PollOpt::edge(),
                 )
                 .unwrap();

@@ -53,8 +53,8 @@ use iovec::IoVec;
 /// let registry = poll.registry().clone();
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// registry.register(&sender_socket, SENDER, Interests::writable(), PollOpt::edge())?;
-/// registry.register(&echoer_socket, ECHOER, Interests::readable(), PollOpt::edge())?;
+/// registry.register(&sender_socket, SENDER, Interests::WRITABLE, PollOpt::edge())?;
+/// registry.register(&echoer_socket, ECHOER, Interests::READABLE, PollOpt::edge())?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];

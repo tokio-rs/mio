@@ -85,12 +85,12 @@ pub fn test_multicast() {
 
     info!("Registering SENDER");
     poll.registry()
-        .register(&tx, SENDER, Interests::writable(), PollOpt::edge())
+        .register(&tx, SENDER, Interests::WRITABLE, PollOpt::edge())
         .unwrap();
 
     info!("Registering LISTENER");
     poll.registry()
-        .register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
+        .register(&rx, LISTENER, Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);

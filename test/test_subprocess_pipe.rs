@@ -199,7 +199,7 @@ pub fn subprocess_communicate(mut process: Child, input: &[u8]) -> (Vec<u8>, Vec
             .register(
                 sub_stdout,
                 subprocess.stdout_token,
-                Interests::readable(),
+                Interests::READABLE,
                 PollOpt::level(),
             )
             .unwrap(),
@@ -211,7 +211,7 @@ pub fn subprocess_communicate(mut process: Child, input: &[u8]) -> (Vec<u8>, Vec
             .register(
                 sub_stderr,
                 subprocess.stderr_token,
-                Interests::readable(),
+                Interests::READABLE,
                 PollOpt::level(),
             )
             .unwrap(),
@@ -224,7 +224,7 @@ pub fn subprocess_communicate(mut process: Child, input: &[u8]) -> (Vec<u8>, Vec
             .register(
                 sub_stdin,
                 subprocess.stdin_token,
-                Interests::writable(),
+                Interests::WRITABLE,
                 PollOpt::level(),
             )
             .unwrap(),

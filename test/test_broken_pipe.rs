@@ -23,7 +23,7 @@ pub fn broken_pipe() {
         .register(
             &reader,
             Token(1),
-            Interests::readable() | Interests::writable(),
+            Interests::READABLE | Interests::WRITABLE,
             PollOpt::edge(),
         )
         .unwrap();

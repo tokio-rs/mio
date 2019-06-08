@@ -610,7 +610,7 @@ fn test_debug_pollopt() {
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Ready(u8);
 
-// These must be unique.
+// These must be unique. These are shared with `Interests`.
 const EMPTY: u8 = 0b0_000_000;
 const READABLE: u8 = 0b0_000_001;
 const WRITABLE: u8 = 0b0_000_010;
@@ -1104,107 +1104,24 @@ fn test_ready_all() {
 pub struct Interests(NonZeroU8);
 
 impl Interests {
-    const READABLE: u8 = 0b00001;
+    /// Returns a `Interests` set representing readable interests.
+    pub const READABLE: Interests = Interests(unsafe { NonZeroU8::new_unchecked(READABLE) });
 
-    const WRITABLE: u8 = 0b00010;
+    /// Returns a `Interests` set representing writable interests.
+    pub const WRITABLE: Interests = Interests(unsafe { NonZeroU8::new_unchecked(WRITABLE) });
 
+    /// Returns a `Interests` set representing AIO completion interests.
     #[cfg(any(
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "ios",
         target_os = "macos"
     ))]
-    const AIO: u8 = 0b01_0000;
+    pub const AIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(AIO) });
 
+    /// Returns a `Interests` set representing LIO completion interests.
     #[cfg(any(target_os = "freebsd"))]
-    const LIO: u8 = 0b10_0000;
-
-    /// Returns `Interests` representing readable readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::readable();
-    ///
-    /// assert!(interests.is_readable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    pub const fn readable() -> Interests {
-        Interests(unsafe { NonZeroU8::new_unchecked(Interests::READABLE) })
-    }
-
-    /// Returns `Interests` representing writable readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::writable();
-    ///
-    /// assert!(interests.is_writable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    pub const fn writable() -> Interests {
-        Interests(unsafe { NonZeroU8::new_unchecked(Interests::WRITABLE) })
-    }
-
-    /// Returns `Interests` representing AIO completion readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::aio();
-    ///
-    /// assert!(interests.is_aio());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    #[cfg(any(
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos"
-    ))]
-    pub const fn aio() -> Interests {
-        Interests(unsafe { NonZeroU8::new_unchecked(Interests::AIO) })
-    }
-
-    /// Returns `Interests` representing LIO completion readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::lio();
-    ///
-    /// assert!(interests.is_lio());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    #[cfg(any(target_os = "freebsd"))]
-    pub const fn lio() -> Interests {
-        Interests(unsafe { NonZeroU8::new_unchecked(Interests::LIO) })
-    }
+    pub const LIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(LIO) });
 
     /// Returns true if the value includes readable readiness.
     ///
@@ -1215,14 +1132,14 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interests = Interests::readable();
+    /// let interests = Interests::READABLE;
     ///
     /// assert!(interests.is_readable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
     pub fn is_readable(&self) -> bool {
-        (self.0.get() & Interests::READABLE) != 0
+        (self.0.get() & READABLE) != 0
     }
 
     /// Returns true if the value includes writable readiness.
@@ -1234,14 +1151,14 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interests = Interests::writable();
+    /// let interests = Interests::WRITABLE;
     ///
     /// assert!(interests.is_writable());
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
     pub fn is_writable(&self) -> bool {
-        (self.0.get() & Interests::WRITABLE) != 0
+        (self.0.get() & WRITABLE) != 0
     }
 
     /// Returns true if `Interests` contains AIO readiness
@@ -1253,7 +1170,7 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interests = Interests::aio();
+    /// let interests = Interests::AIO;
     ///
     /// assert!(interests.is_aio());
     /// ```
@@ -1268,7 +1185,7 @@ impl Interests {
     ))]
     #[inline]
     pub fn is_aio(&self) -> bool {
-        (self.0.get() & Interests::AIO) != 0
+        (self.0.get() & AIO) != 0
     }
 
     /// Returns true if `Interests` contains LIO readiness
@@ -1280,7 +1197,7 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// let interests = Interests::lio();
+    /// let interests = Interests::LIO;
     ///
     /// assert!(interests.is_lio());
     /// ```
@@ -1289,7 +1206,7 @@ impl Interests {
     #[inline]
     #[cfg(any(target_os = "freebsd"))]
     pub fn is_lio(&self) -> bool {
-        (self.0.get() & Interests::LIO) != 0
+        (self.0.get() & LIO) != 0
     }
 
     /// Returns `Ready` contains `Interests` readiness
@@ -1384,10 +1301,10 @@ impl fmt::Debug for Interests {
 fn test_debug_interests() {
     assert_eq!(
         "READABLE | WRITABLE",
-        format!("{:?}", Interests::readable() | Interests::writable())
+        format!("{:?}", Interests::READABLE | Interests::WRITABLE)
     );
-    assert_eq!("READABLE", format!("{:?}", Interests::readable()));
-    assert_eq!("WRITABLE", format!("{:?}", Interests::writable()));
+    assert_eq!("READABLE", format!("{:?}", Interests::READABLE));
+    assert_eq!("WRITABLE", format!("{:?}", Interests::WRITABLE));
     #[cfg(any(
         target_os = "dragonfly",
         target_os = "freebsd",
@@ -1395,11 +1312,11 @@ fn test_debug_interests() {
         target_os = "macos"
     ))]
     {
-        assert_eq!("AIO", format!("{:?}", Interests::aio()));
+        assert_eq!("AIO", format!("{:?}", Interests::AIO));
     }
     #[cfg(any(target_os = "freebsd"))]
     {
-        assert_eq!("LIO", format!("{:?}", Interests::lio()));
+        assert_eq!("LIO", format!("{:?}", Interests::LIO));
     }
 }
 

@@ -62,7 +62,7 @@ impl TestHandler {
             _ => panic!("received unknown token {:?}", tok),
         }
         poll.registry()
-            .reregister(&self.cli, CLIENT, Interests::readable(), PollOpt::edge())
+            .reregister(&self.cli, CLIENT, Interests::READABLE, PollOpt::edge())
             .unwrap();
     }
 
@@ -72,7 +72,7 @@ impl TestHandler {
             CLIENT => {
                 debug!("client connected");
                 poll.registry()
-                    .reregister(&self.cli, CLIENT, Interests::readable(), PollOpt::edge())
+                    .reregister(&self.cli, CLIENT, Interests::READABLE, PollOpt::edge())
                     .unwrap();
             }
             _ => panic!("received unknown token {:?}", tok),
@@ -93,14 +93,14 @@ pub fn test_close_on_drop() {
     let srv = TcpListener::bind(&addr).unwrap();
 
     poll.registry()
-        .register(&srv, SERVER, Interests::readable(), PollOpt::edge())
+        .register(&srv, SERVER, Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     // == Create & setup client socket
     let sock = TcpStream::connect(&addr).unwrap();
 
     poll.registry()
-        .register(&sock, CLIENT, Interests::writable(), PollOpt::edge())
+        .register(&sock, CLIENT, Interests::WRITABLE, PollOpt::edge())
         .unwrap();
 
     // == Create storage for events

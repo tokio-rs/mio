@@ -12,7 +12,7 @@ fn test_poll_closes_fd() {
             .register(
                 &registration,
                 Token(0),
-                Interests::readable(),
+                Interests::READABLE,
                 PollOpt::edge(),
             )
             .unwrap();

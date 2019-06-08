@@ -47,7 +47,7 @@ use std::os::unix::io::RawFd;
 /// registry.register(
 ///     &EventedFd(&listener.as_raw_fd()),
 ///     Token(0),
-///     Interests::readable(),
+///     Interests::READABLE,
 ///     PollOpt::edge())?;
 /// #     Ok(())
 /// # }

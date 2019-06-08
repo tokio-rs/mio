@@ -29,7 +29,7 @@ fn accept() {
     let mut poll = Poll::new().unwrap();
 
     poll.registry()
-        .register(&l, Token(1), Interests::readable(), PollOpt::edge())
+        .register(&l, Token(1), Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -81,7 +81,7 @@ fn connect() {
         .register(
             &s,
             Token(1),
-            Interests::readable() | Interests::writable(),
+            Interests::READABLE | Interests::WRITABLE,
             PollOpt::edge(),
         )
         .unwrap();
@@ -153,7 +153,7 @@ fn read() {
     let s = TcpStream::connect(&addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interests::readable(), PollOpt::edge())
+        .register(&s, Token(1), Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -210,7 +210,7 @@ fn peek() {
     let s = TcpStream::connect(&addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interests::readable(), PollOpt::edge())
+        .register(&s, Token(1), Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -270,7 +270,7 @@ fn read_bufs() {
     let s = TcpStream::connect(&addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interests::readable(), PollOpt::level())
+        .register(&s, Token(1), Interests::READABLE, PollOpt::level())
         .unwrap();
 
     let b1 = &mut [0; 10][..];
@@ -341,7 +341,7 @@ fn write() {
     let s = TcpStream::connect(&addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interests::writable(), PollOpt::edge())
+        .register(&s, Token(1), Interests::WRITABLE, PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -400,7 +400,7 @@ fn write_bufs() {
     let mut events = Events::with_capacity(128);
     let s = TcpStream::connect(&addr).unwrap();
     poll.registry()
-        .register(&s, Token(1), Interests::writable(), PollOpt::level())
+        .register(&s, Token(1), Interests::WRITABLE, PollOpt::level())
         .unwrap();
 
     let b1 = &[1; 10][..];
@@ -435,10 +435,10 @@ fn connect_then_close() {
     let s = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
 
     poll.registry()
-        .register(&l, Token(1), Interests::readable(), PollOpt::edge())
+        .register(&l, Token(1), Interests::READABLE, PollOpt::edge())
         .unwrap();
     poll.registry()
-        .register(&s, Token(2), Interests::readable(), PollOpt::edge())
+        .register(&s, Token(2), Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -457,7 +457,7 @@ fn connect_then_close() {
                     .register(
                         &s,
                         Token(3),
-                        Interests::readable() | Interests::writable(),
+                        Interests::READABLE | Interests::WRITABLE,
                         PollOpt::edge(),
                     )
                     .unwrap();
@@ -475,7 +475,7 @@ fn listen_then_close() {
     let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
 
     poll.registry()
-        .register(&l, Token(1), Interests::readable(), PollOpt::edge())
+        .register(&l, Token(1), Interests::READABLE, PollOpt::edge())
         .unwrap();
     drop(l);
 
@@ -535,7 +535,7 @@ fn multiple_writes_immediate_success() {
     let mut poll = Poll::new().unwrap();
     let mut s = TcpStream::connect(&addr).unwrap();
     poll.registry()
-        .register(&s, Token(1), Interests::writable(), PollOpt::level())
+        .register(&s, Token(1), Interests::WRITABLE, PollOpt::level())
         .unwrap();
     let mut events = Events::with_capacity(16);
 
@@ -577,7 +577,7 @@ fn connection_reset_by_peer() {
 
     // Register server
     poll.registry()
-        .register(&l, Token(0), Interests::readable(), PollOpt::edge())
+        .register(&l, Token(0), Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     // Register interest in the client
@@ -585,7 +585,7 @@ fn connection_reset_by_peer() {
         .register(
             &client,
             Token(1),
-            Interests::readable() | Interests::writable(),
+            Interests::READABLE | Interests::WRITABLE,
             PollOpt::edge(),
         )
         .unwrap();
@@ -617,7 +617,7 @@ fn connection_reset_by_peer() {
 
     // Register interest in the server socket
     poll.registry()
-        .register(&server, Token(3), Interests::readable(), PollOpt::edge())
+        .register(&server, Token(3), Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     loop {
@@ -655,7 +655,7 @@ fn connect_error() {
     };
 
     poll.registry()
-        .register(&l, Token(0), Interests::writable(), PollOpt::edge())
+        .register(&l, Token(0), Interests::WRITABLE, PollOpt::edge())
         .unwrap();
 
     'outer: loop {
@@ -691,7 +691,7 @@ fn write_error() {
         .register(
             &s,
             Token(0),
-            Interests::readable() | Interests::writable(),
+            Interests::READABLE | Interests::WRITABLE,
             PollOpt::edge(),
         )
         .unwrap();

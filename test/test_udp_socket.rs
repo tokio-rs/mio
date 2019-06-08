@@ -54,12 +54,12 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
     info!("Registering SENDER");
     poll.registry()
-        .register(&tx, SENDER, Interests::writable(), PollOpt::edge())
+        .register(&tx, SENDER, Interests::WRITABLE, PollOpt::edge())
         .unwrap();
 
     info!("Registering LISTENER");
     poll.registry()
-        .register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
+        .register(&rx, LISTENER, Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -164,10 +164,10 @@ pub fn test_udp_socket_discard() {
     assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
     poll.registry()
-        .register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
+        .register(&rx, LISTENER, Interests::READABLE, PollOpt::edge())
         .unwrap();
     poll.registry()
-        .register(&tx, SENDER, Interests::writable(), PollOpt::edge())
+        .register(&tx, SENDER, Interests::WRITABLE, PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -194,11 +194,11 @@ pub fn test_udp_socket_send_recv_bufs() {
     let mut poll = Poll::new().unwrap();
 
     poll.registry()
-        .register(&tx, SENDER, Interests::writable(), PollOpt::edge())
+        .register(&tx, SENDER, Interests::WRITABLE, PollOpt::edge())
         .unwrap();
 
     poll.registry()
-        .register(&rx, LISTENER, Interests::readable(), PollOpt::edge())
+        .register(&rx, LISTENER, Interests::READABLE, PollOpt::edge())
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
