@@ -652,6 +652,10 @@ impl Ready {
     ))]
     pub const AIO: Ready = Ready(AIO);
 
+    /// Returns a `Ready` set representing LIO completion readiness.
+    #[cfg(any(target_os = "freebsd"))]
+    pub const LIO: Ready = Ready(LIO);
+
     /// Returns true if the `Ready` set is empty.
     ///
     /// # Examples
