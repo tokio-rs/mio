@@ -1,6 +1,6 @@
 use crate::event_imp::{self as event, Event};
+use crate::sys::unix::cvt;
 use crate::sys::unix::io::set_cloexec;
-use crate::sys::unix::{cvt, UnixReady};
 use crate::{io, Interests, PollOpt, Ready, Token};
 use libc::{self, time_t};
 use log::trace;
@@ -322,17 +322,17 @@ impl Events {
 
             if idx == len {
                 // New entry, insert the default
-                self.events.push(Event::new(Ready::empty(), token));
+                self.events.push(Event::new(Ready::EMPTY, token));
             }
 
             if e.flags & libc::EV_ERROR != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(*UnixReady::error());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::ERROR);
             }
 
             if e.filter == libc::EVFILT_READ as Filter {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::readable());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::READABLE);
             } else if e.filter == libc::EVFILT_WRITE as Filter {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::writable());
+                event::kind_mut(&mut self.events[idx]).insert(Ready::WRITABLE);
             }
             #[cfg(any(
                 target_os = "dragonfly",
@@ -342,13 +342,13 @@ impl Events {
             ))]
             {
                 if e.filter == libc::EVFILT_AIO {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::aio());
+                    event::kind_mut(&mut self.events[idx]).insert(Ready::AIO);
                 }
             }
             #[cfg(any(target_os = "freebsd"))]
             {
                 if e.filter == libc::EVFILT_LIO {
-                    event::kind_mut(&mut self.events[idx]).insert(UnixReady::lio());
+                    event::kind_mut(&mut self.events[idx]).insert(Ready::LIO);
                 }
             }
         }
@@ -410,6 +410,6 @@ fn test_coalesce_aio() {
         .0
         .push(kevent!(0x1234, libc::EVFILT_AIO, 0, 42));
     events.coalesce(Token(0));
-    assert!(events.events[0].readiness() == UnixReady::aio().into());
+    assert!(events.events[0].readiness() == Ready::AIO);
     assert!(events.events[0].token() == Token(42));
 }

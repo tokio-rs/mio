@@ -253,10 +253,10 @@ use std::{isize, mem, ops};
 /// able to handle an error or HUP situation when performing the actual read
 /// operation.
 ///
-/// [`readable`]: struct.Ready.html#method.readable
-/// [`writable`]: struct.Ready.html#method.writable
-/// [`error`]: unix/struct.UnixReady.html#method.error
-/// [`hup`]: unix/struct.UnixReady.html#method.hup
+/// [`readable`]: Ready::READABLE
+/// [`writable`]: Ready::WRITABLE
+/// [`error`]: Ready::ERROR
+/// [`hup`]: Ready::HUP
 ///
 /// ### Registering handles
 ///
@@ -398,7 +398,7 @@ struct Inner {
 ///                 thread::sleep(when - now);
 ///             }
 ///
-///             set_readiness.set_readiness(Ready::readable());
+///             set_readiness.set_readiness(Ready::READABLE);
 ///         });
 ///
 ///         Deadline {
@@ -1079,8 +1079,8 @@ impl Registry {
     ///
     /// [`struct`]: #
     /// [`register`]: #method.register
-    /// [`readable`]: struct.Ready.html#method.readable
-    /// [`writable`]: struct.Ready.html#method.writable
+    /// [`readable`]: Ready::READABLE
+    /// [`writable`]: Ready::WRITABLE
     pub fn reregister<E: ?Sized>(
         &self,
         handle: &E,
@@ -1490,7 +1490,7 @@ impl Registration {
     ///     use std::time::Duration;
     ///     thread::sleep(Duration::from_millis(500));
     ///
-    ///     set_readiness.set_readiness(Ready::readable());
+    ///     set_readiness.set_readiness(Ready::READABLE);
     /// });
     ///
     /// let mut poll = Poll::new()?;
@@ -1528,7 +1528,7 @@ impl Registration {
         let node = Box::into_raw(Box::new(ReadinessNode::new(
             ptr::null_mut(),
             Token(0),
-            Ready::empty(),
+            Ready::EMPTY,
             PollOpt::empty(),
             2,
         )));
@@ -1609,7 +1609,7 @@ impl Evented for Registration {
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
         self.inner
-            .update(registry, Token(0), Ready::empty(), PollOpt::empty())
+            .update(registry, Token(0), Ready::EMPTY, PollOpt::empty())
     }
 }
 
@@ -1651,7 +1651,7 @@ impl SetReadiness {
     ///
     /// assert!(set_readiness.readiness().is_empty());
     ///
-    /// set_readiness.set_readiness(Ready::readable())?;
+    /// set_readiness.set_readiness(Ready::READABLE)?;
     /// assert!(set_readiness.readiness().is_readable());
     /// #     Ok(())
     /// # }
@@ -1698,7 +1698,7 @@ impl SetReadiness {
     ///
     /// // Set the readiness, then immediately poll to try to get the readiness
     /// // event
-    /// set_readiness.set_readiness(Ready::readable())?;
+    /// set_readiness.set_readiness(Ready::READABLE)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// poll.poll(&mut events, None)?;
@@ -1730,7 +1730,7 @@ impl SetReadiness {
     ///
     /// assert!(set_readiness.readiness().is_empty());
     ///
-    /// set_readiness.set_readiness(Ready::readable())?;
+    /// set_readiness.set_readiness(Ready::READABLE)?;
     /// assert!(set_readiness.readiness().is_readable());
     /// #     Ok(())
     /// # }
@@ -2438,7 +2438,7 @@ impl ReadinessNode {
 
     fn marker() -> ReadinessNode {
         ReadinessNode {
-            state: AtomicState::new(Ready::empty(), PollOpt::empty()),
+            state: AtomicState::new(Ready::EMPTY, PollOpt::empty()),
             token_0: UnsafeCell::new(Token(0)),
             token_1: UnsafeCell::new(Token(0)),
             token_2: UnsafeCell::new(Token(0)),
@@ -2597,7 +2597,7 @@ impl ReadinessState {
 
     #[inline]
     fn disarm(&mut self) {
-        self.set_interest(Ready::empty());
+        self.set_interest(Ready::EMPTY);
     }
 
     /// Get the poll options

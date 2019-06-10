@@ -31,7 +31,7 @@ pub fn test_poll_channel_edge() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.readiness(), Ready::readable());
+    assert_eq!(event.readiness(), Ready::READABLE);
 
     // Poll again and there should be no events
     let num = poll
@@ -59,7 +59,7 @@ pub fn test_poll_channel_edge() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.readiness(), Ready::readable());
+    assert_eq!(event.readiness(), Ready::READABLE);
 
     // Read the value
     rx.try_recv().unwrap();
@@ -74,7 +74,7 @@ pub fn test_poll_channel_edge() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.readiness(), Ready::readable());
+    assert_eq!(event.readiness(), Ready::READABLE);
 
     match rx.try_recv() {
         Err(TryRecvError::Disconnected) => {}
@@ -113,7 +113,7 @@ pub fn test_poll_channel_oneshot() {
 
     let event = events.get(0).unwrap();
     assert_eq!(event.token(), Token(123));
-    assert_eq!(event.readiness(), Ready::readable());
+    assert_eq!(event.readiness(), Ready::READABLE);
 
     // Poll again and there should be no events
     let num = poll
@@ -157,7 +157,7 @@ pub fn test_poll_channel_oneshot() {
 
         let event = events.get(0).unwrap();
         assert_eq!(event.token(), Token(123));
-        assert_eq!(event.readiness(), Ready::readable());
+        assert_eq!(event.readiness(), Ready::READABLE);
     }
 
     // Get the value
@@ -219,7 +219,7 @@ pub fn test_poll_channel_level() {
 
         let event = events.get(0).unwrap();
         assert_eq!(event.token(), Token(123));
-        assert_eq!(event.readiness(), Ready::readable());
+        assert_eq!(event.readiness(), Ready::READABLE);
     }
 
     // Read the value
@@ -314,8 +314,8 @@ pub fn test_mixing_channel_with_socket() {
         &mut events,
         2,
         vec![
-            Event::new(Ready::empty(), Token(0)),
-            Event::new(Ready::empty(), Token(1)),
+            Event::new(Ready::EMPTY, Token(0)),
+            Event::new(Ready::EMPTY, Token(1)),
         ],
     );
 }

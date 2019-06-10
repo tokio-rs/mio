@@ -89,7 +89,7 @@ use std::{fmt, io, ops};
 ///                 thread::sleep(when - now);
 ///             }
 ///
-///             set_readiness.set_readiness(Ready::readable());
+///             set_readiness.set_readiness(Ready::READABLE);
 ///         });
 ///
 ///         Deadline {
@@ -567,165 +567,266 @@ fn test_debug_pollopt() {
 /// A set of readiness event kinds
 ///
 /// `Ready` is a set of operation descriptors indicating which kind of an
-/// operation is ready to be performed. For example, `Ready::readable()`
+/// operation is ready to be performed. For example, `Ready::READABLE`
 /// indicates that the associated `Evented` handle is ready to perform a
 /// `read` operation.
-///
-/// This struct only represents portable event kinds. Since only readable and
-/// writable events are guaranteed to be raised on all systems, those are the
-/// only ones available via the `Ready` struct. There are also platform specific
-/// extensions to `Ready`, i.e. `UnixReady`, which provide additional readiness
-/// event kinds only available on unix platforms.
 ///
 /// `Ready` values can be combined together using the various bitwise operators.
 ///
 /// For high level documentation on polling and readiness, see [`Poll`].
+///
+/// [`Poll`]: crate::Poll
+///
+/// # Notes
+///
+/// This struct represents both portable an non-portable readiness indicators.
+/// Only [readable] and [writable] events are guaranteed to be raised on
+/// all systems, and so those are available on all systems.
+///
+/// But this also provides a number of non-portable readiness indicators, such
+/// as [error], [hup], [priority], [AIO] and [LIO]. These are **not** available
+/// on all platforms, and can only be created on platforms that support it.
+/// However it is possible to check for there presence in a set on all
+/// platforms. These indicators should be treated as a hint.
+///
+/// [readable]: Ready::READABLE
+/// [writable]: Ready::WRITABLE
+/// [error]: Ready::ERROR
+/// [hup]: Ready::HUP
+/// [priority]: Ready::PRIORITY
+/// [AIO]: Ready::AIO
+/// [LIO]: Ready::LIO
 ///
 /// # Examples
 ///
 /// ```
 /// use mio::Ready;
 ///
-/// let ready = Ready::readable() | Ready::writable();
+/// let ready = Ready::READABLE | Ready::WRITABLE;
 ///
 /// assert!(ready.is_readable());
 /// assert!(ready.is_writable());
 /// ```
-///
-/// [`Poll`]: struct.Poll.html
-/// [`readable`]: #method.readable
-/// [`writable`]: #method.writable
-/// [readiness]: struct.Poll.html#readiness-operations
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct Ready(usize);
+pub struct Ready(u8);
 
-const READABLE: usize = 0b00001;
-const WRITABLE: usize = 0b00010;
-
-// These are deprecated and are moved into platform specific implementations.
-const ERROR: usize = 0b00100;
-const HUP: usize = 0b01000;
+// These must be unique.
+const EMPTY: u8 = 0b0_000_000;
+const READABLE: u8 = 0b0_000_001;
+const WRITABLE: u8 = 0b0_000_010;
+// The following are not available on all platforms.
+const ERROR: u8 = 0b0_000_100;
+const HUP: u8 = 0b0_001_000;
+const PRIORITY: u8 = 0b0_010_000;
+const AIO: u8 = 0b0_100_000;
+const LIO: u8 = 0b1_000_000;
 
 impl Ready {
-    /// Returns the empty `Ready` set.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::empty();
-    ///
-    /// assert!(!ready.is_readable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    pub fn empty() -> Ready {
-        Ready(0)
-    }
+    /// Returns an empty `Ready` set.
+    pub const EMPTY: Ready = Ready(EMPTY);
 
-    /// Returns a `Ready` representing readable readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::readable();
-    ///
-    /// assert!(ready.is_readable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    pub fn readable() -> Ready {
-        Ready(READABLE)
-    }
+    /// Returns a `Ready` set representing readable readiness.
+    pub const READABLE: Ready = Ready(READABLE);
 
-    /// Returns a `Ready` representing writable readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Ready;
-    ///
-    /// let ready = Ready::writable();
-    ///
-    /// assert!(ready.is_writable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    pub fn writable() -> Ready {
-        Ready(WRITABLE)
-    }
+    /// Returns a `Ready` set representing writable readiness.
+    pub const WRITABLE: Ready = Ready(WRITABLE);
 
-    /// Returns true if `Ready` is the empty set
-    ///
-    /// See [`Poll`] for more documentation on polling.
+    /// Returns a `Ready` set representing error readiness.
+    #[cfg(unix)]
+    pub const ERROR: Ready = Ready(ERROR);
+
+    /// Returns a `Ready` set representing HUP readiness.
+    #[cfg(unix)]
+    pub const HUP: Ready = Ready(HUP);
+
+    /// Returns a `Ready` set representing priority readiness.
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    pub const PRIORITY: Ready = Ready(PRIORITY);
+
+    /// Returns a `Ready` set representing AIO completion readiness.
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos"
+    ))]
+    pub const AIO: Ready = Ready(AIO);
+
+    /// Returns a `Ready` set representing LIO completion readiness.
+    #[cfg(any(target_os = "freebsd"))]
+    pub const LIO: Ready = Ready(LIO);
+
+    /// Returns true if the `Ready` set is empty.
     ///
     /// # Examples
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::empty();
+    /// let ready = Ready::EMPTY;
     /// assert!(ready.is_empty());
     /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_empty(&self) -> bool {
-        *self == Ready::empty()
+        self.0 == EMPTY
     }
 
-    /// Returns true if the value includes readable readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
+    /// Returns true if the `Ready` set contains readable readiness.
     ///
     /// # Examples
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
-    ///
+    /// let ready = Ready::READABLE;
     /// assert!(ready.is_readable());
     /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_readable(&self) -> bool {
-        self.contains(Ready::readable())
+        self.contains(Ready::READABLE)
     }
 
-    /// Returns true if the value includes writable readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
+    /// Returns true if the `Ready` set contains writable readiness.
     ///
     /// # Examples
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::writable();
-    ///
+    /// let ready = Ready::WRITABLE;
     /// assert!(ready.is_writable());
     /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_writable(&self) -> bool {
-        self.contains(Ready::writable())
+        self.contains(Ready::WRITABLE)
     }
 
-    /// Adds all readiness represented by `other` into `self`.
+    /// Returns true if the `Ready` set contains error readiness.
+    ///
+    /// Error events occur when the socket enters an error state. In this case,
+    /// the socket will also receive a readable or writable event. Reading or
+    /// writing to the socket will result in an error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(unix)]
+    /// # {
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::ERROR;
+    /// assert!(ready.is_error());
+    /// # }
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// Method is available on all platforms, but not all platforms (can) use
+    /// this indicator.
+    #[inline]
+    pub fn is_error(&self) -> bool {
+        self.contains(Ready(ERROR))
+    }
+
+    /// Returns true if the `Ready` set contains HUP readiness.
+    ///
+    /// HUP events occur when the remote end of a socket hangs up. In the TCP
+    /// case, this occurs when the remote end of a TCP socket shuts down writes.
+    ///
+    /// It is also unclear if HUP readiness will remain in 0.7. See
+    /// [here](https://github.com/tokio-rs/mio/issues/941)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(unix)]
+    /// # {
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::HUP;
+    /// assert!(ready.is_hup());
+    /// # }
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// Method is available on all platforms, but not all platforms (can) use
+    /// this indicator.
+    #[inline]
+    pub fn is_hup(&self) -> bool {
+        self.contains(Ready(HUP))
+    }
+
+    /// Returns true if the `Ready` set contains priority readiness.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    /// # {
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::PRIORITY;
+    /// assert!(ready.is_priority());
+    /// # }
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// Method is available on all platforms, but not all platforms (can) use
+    /// this indicator.
+    #[inline]
+    pub fn is_priority(&self) -> bool {
+        self.contains(Ready(PRIORITY))
+    }
+
+    /// Returns true if the `Ready` set contains AIO readiness.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(any( target_os = "dragonfly", target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+    /// # {
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::AIO;
+    /// assert!(ready.is_aio());
+    /// # }
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// Method is available on all platforms, but not all platforms (can) use
+    /// this indicator.
+    #[inline]
+    pub fn is_aio(&self) -> bool {
+        self.contains(Ready(AIO))
+    }
+
+    /// Returns true if the `Ready` set contains LIO readiness.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(any(target_os = "freebsd"))]
+    /// # {
+    /// use mio::Ready;
+    ///
+    /// let ready = Ready::LIO;
+    /// assert!(ready.is_lio());
+    /// # }
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// Method is available on all platforms, but not all platforms (can) use
+    /// this indicator.
+    #[inline]
+    pub fn is_lio(&self) -> bool {
+        self.contains(Ready(LIO))
+    }
+
+    /// Adds all readiness in the `other` set into `self`.
     ///
     /// This is equivalent to `*self = *self | other`.
     ///
@@ -734,14 +835,12 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let mut readiness = Ready::empty();
-    /// readiness.insert(Ready::readable());
-    ///
+    /// let mut readiness = Ready::EMPTY;
+    /// readiness.insert(Ready::READABLE);
     /// assert!(readiness.is_readable());
     /// ```
     #[inline]
-    pub fn insert<T: Into<Self>>(&mut self, other: T) {
-        let other = other.into();
+    pub fn insert(&mut self, other: Ready) {
         self.0 |= other.0;
     }
 
@@ -754,59 +853,50 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let mut readiness = Ready::readable();
-    /// readiness.remove(Ready::readable());
-    ///
+    /// let mut readiness = Ready::READABLE;
+    /// readiness.remove(Ready::READABLE);
     /// assert!(!readiness.is_readable());
     /// ```
     #[inline]
-    pub fn remove<T: Into<Self>>(&mut self, other: T) {
-        let other = other.into();
+    pub fn remove(&mut self, other: Ready) {
         self.0 &= !other.0;
     }
 
     /// Returns true if `self` is a superset of `other`.
     ///
-    /// `other` may represent more than one readiness operations, in which case
-    /// the function only returns true if `self` contains all readiness
-    /// specified in `other`.
-    ///
-    /// See [`Poll`] for more documentation on polling.
+    /// The `other` set may represent more than one readiness operations, in
+    /// which case the function only returns true if `self` contains **all**
+    /// readiness specified in `other`.
     ///
     /// # Examples
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let readiness = Ready::readable();
-    ///
-    /// assert!(readiness.contains(Ready::readable()));
-    /// assert!(!readiness.contains(Ready::writable()));
+    /// let readiness = Ready::READABLE;
+    /// assert!(readiness.contains(Ready::READABLE));
+    /// assert!(!readiness.contains(Ready::WRITABLE));
     /// ```
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let readiness = Ready::readable() | Ready::writable();
+    /// let readiness = Ready::READABLE | Ready::WRITABLE;
     ///
-    /// assert!(readiness.contains(Ready::readable()));
-    /// assert!(readiness.contains(Ready::writable()));
+    /// assert!(readiness.contains(Ready::READABLE));
+    /// assert!(readiness.contains(Ready::WRITABLE));
     /// ```
     ///
     /// ```
     /// use mio::Ready;
     ///
-    /// let readiness = Ready::readable() | Ready::writable();
-    ///
-    /// assert!(!Ready::readable().contains(readiness));
+    /// let readiness = Ready::READABLE | Ready::WRITABLE;
+    /// assert!(!Ready::READABLE.contains(readiness));
     /// assert!(readiness.contains(readiness));
     /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     #[inline]
-    pub fn contains<T: Into<Self>>(&self, other: T) -> bool {
-        let other = other.into();
-        (*self & other) == other
+    pub fn contains(&self, other: Ready) -> bool {
+        (self.0 & other.0) == other.0
     }
 
     /// Create a `Ready` instance using the given `usize` representation.
@@ -827,14 +917,13 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     /// let ready_usize = ready.as_usize();
     /// let ready2 = Ready::from_usize(ready_usize);
-    ///
     /// assert_eq!(ready, ready2);
     /// ```
     pub fn from_usize(val: usize) -> Ready {
-        Ready(val)
+        Ready(val as u8)
     }
 
     /// Returns a `usize` representation of the `Ready` value.
@@ -852,78 +941,77 @@ impl Ready {
     /// ```
     /// use mio::Ready;
     ///
-    /// let ready = Ready::readable();
+    /// let ready = Ready::READABLE;
     /// let ready_usize = ready.as_usize();
     /// let ready2 = Ready::from_usize(ready_usize);
-    ///
     /// assert_eq!(ready, ready2);
     /// ```
     pub fn as_usize(&self) -> usize {
-        self.0
+        self.0 as usize
     }
 }
 
-impl<T: Into<Ready>> ops::BitOr<T> for Ready {
+impl ops::BitOr for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitor(self, other: T) -> Ready {
-        Ready(self.0 | other.into().0)
+    fn bitor(self, other: Ready) -> Ready {
+        Ready(self.0 | other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::BitOrAssign<T> for Ready {
+impl ops::BitOrAssign for Ready {
     #[inline]
-    fn bitor_assign(&mut self, other: T) {
-        self.0 |= other.into().0;
+    fn bitor_assign(&mut self, other: Ready) {
+        self.0 |= other.0;
     }
 }
 
-impl<T: Into<Ready>> ops::BitXor<T> for Ready {
+impl ops::BitXor for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitxor(self, other: T) -> Ready {
-        Ready(self.0 ^ other.into().0)
+    fn bitxor(self, other: Ready) -> Ready {
+        Ready(self.0 ^ other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::BitXorAssign<T> for Ready {
+impl ops::BitXorAssign for Ready {
     #[inline]
-    fn bitxor_assign(&mut self, other: T) {
-        self.0 ^= other.into().0;
+    fn bitxor_assign(&mut self, other: Ready) {
+        self.0 ^= other.0;
     }
 }
 
-impl<T: Into<Ready>> ops::BitAnd<T> for Ready {
+impl ops::BitAnd for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitand(self, other: T) -> Ready {
-        Ready(self.0 & other.into().0)
+    fn bitand(self, other: Ready) -> Ready {
+        Ready(self.0 & other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::BitAndAssign<T> for Ready {
+impl ops::BitAndAssign for Ready {
     #[inline]
-    fn bitand_assign(&mut self, other: T) {
-        self.0 &= other.into().0
+    fn bitand_assign(&mut self, other: Ready) {
+        self.0 &= other.0
     }
 }
 
-impl<T: Into<Ready>> ops::Sub<T> for Ready {
+impl ops::Sub for Ready {
     type Output = Ready;
 
     #[inline]
-    fn sub(self, other: T) -> Ready {
-        Ready(self.0 & !other.into().0)
+    fn sub(self, other: Ready) -> Ready {
+        Ready(self.0 & !other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::SubAssign<T> for Ready {
+impl ops::SubAssign for Ready {
     #[inline]
-    fn sub_assign(&mut self, other: T) {
-        self.0 &= !other.into().0;
+    fn sub_assign(&mut self, other: Ready) {
+        self.0 &= !other.0;
     }
 }
 
@@ -931,10 +1019,13 @@ impl fmt::Debug for Ready {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut one = false;
         let flags = [
-            (Ready::readable(), "Readable"),
-            (Ready::writable(), "Writable"),
+            (Ready(READABLE), "Readable"),
+            (Ready(WRITABLE), "Writable"),
             (Ready(ERROR), "Error"),
             (Ready(HUP), "Hup"),
+            (Ready(PRIORITY), "Priority"),
+            (Ready(AIO), "AIO"),
+            (Ready(LIO), "LIO"),
         ];
 
         for &(flag, msg) in &flags {
@@ -957,11 +1048,37 @@ impl fmt::Debug for Ready {
 }
 
 #[test]
-fn test_debug_ready() {
-    assert_eq!("(empty)", format!("{:?}", Ready::empty()));
-    assert_eq!("Readable", format!("{:?}", Ready::readable()));
-    assert_eq!("Writable", format!("{:?}", Ready::writable()));
+fn fmt_debug() {
+    assert_eq!("(empty)", format!("{:?}", Ready::EMPTY));
+    assert_eq!("Readable", format!("{:?}", Ready::READABLE));
+    assert_eq!("Writable", format!("{:?}", Ready::WRITABLE));
+    assert_eq!("Error", format!("{:?}", Ready(ERROR)));
+    assert_eq!("Hup", format!("{:?}", Ready(HUP)));
+    assert_eq!("Priority", format!("{:?}", Ready(PRIORITY)));
+    assert_eq!("AIO", format!("{:?}", Ready(AIO)));
+    assert_eq!("LIO", format!("{:?}", Ready(LIO)));
+    assert_eq!(
+        "Readable | Writable",
+        format!("{:?}", Ready::READABLE | Ready::WRITABLE)
+    );
 }
+
+/* TODO(Thomas): check if this is still relevant.
+#[test]
+fn test_ready_all() {
+    let readable = Ready::READABLE.as_usize();
+    let writable = Ready::WRITABLE.as_usize();
+
+    assert_eq!(
+        READY_ALL | readable | writable,
+        ERROR + HUP + AIO + LIO + PRI + readable + writable
+    );
+
+    // Issue #896.
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    assert!(!Ready::from(Ready::PRIORITY).is_writable());
+}
+*/
 
 /// Interests used in registering.
 ///
@@ -979,7 +1096,7 @@ fn test_debug_ready() {
 /// assert_eq!(size_of::<Option<Interests>>(), size_of::<Interests>());
 /// ```
 ///
-/// [`Poll`]: struct.Poll.html                                                 
+/// [`Poll`]: struct.Poll.html
 /// [`readable`]: #method.readable
 /// [`writable`]: #method.writable
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
@@ -1180,7 +1297,7 @@ impl Interests {
     /// It should and only can be used in crate, and will be deprecated in the future.
     /// So don't use it unless you have no other choice.
     pub(crate) fn to_ready(&self) -> Ready {
-        Ready(self.0.get() as usize)
+        Ready(self.0.get() as u8)
     }
 }
 
@@ -1299,9 +1416,9 @@ fn test_debug_interests() {
 /// use mio::{Ready, Token};
 /// use mio::event::Event;
 ///
-/// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
+/// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
 ///
-/// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
+/// assert_eq!(event.readiness(), Ready::READABLE | Ready::WRITABLE);
 /// assert_eq!(event.token(), Token(0));
 /// ```
 ///
@@ -1324,9 +1441,9 @@ impl Event {
     /// use mio::{Ready, Token};
     /// use mio::event::Event;
     ///
-    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
+    /// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
     ///
-    /// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
+    /// assert_eq!(event.readiness(), Ready::READABLE | Ready::WRITABLE);
     /// assert_eq!(event.token(), Token(0));
     /// ```
     pub fn new(readiness: Ready, token: Token) -> Event {
@@ -1344,9 +1461,9 @@ impl Event {
     /// use mio::{Ready, Token};
     /// use mio::event::Event;
     ///
-    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
+    /// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
     ///
-    /// assert_eq!(event.readiness(), Ready::readable() | Ready::writable());
+    /// assert_eq!(event.readiness(), Ready::READABLE | Ready::WRITABLE);
     /// ```
     pub fn readiness(&self) -> Ready {
         self.kind
@@ -1360,7 +1477,7 @@ impl Event {
     /// use mio::{Ready, Token};
     /// use mio::event::Event;
     ///
-    /// let event = Event::new(Ready::readable() | Ready::writable(), Token(0));
+    /// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
     ///
     /// assert_eq!(event.token(), Token(0));
     /// ```
@@ -1376,7 +1493,7 @@ impl Event {
  */
 
 pub fn ready_as_usize(events: Ready) -> usize {
-    events.0
+    events.as_usize()
 }
 
 pub fn opt_as_usize(opt: PollOpt) -> usize {
@@ -1384,7 +1501,7 @@ pub fn opt_as_usize(opt: PollOpt) -> usize {
 }
 
 pub fn ready_from_usize(events: usize) -> Ready {
-    Ready(events)
+    Ready::from_usize(events)
 }
 
 pub fn opt_from_usize(opt: usize) -> PollOpt {

@@ -38,8 +38,8 @@ pub fn test_udp_level_triggered() {
             events,
             2,
             vec![
-                Event::new(Ready::writable(), Token(0)),
-                Event::new(Ready::writable(), Token(1)),
+                Event::new(Ready::WRITABLE, Token(0)),
+                Event::new(Ready::WRITABLE, Token(1)),
             ],
         );
     }
@@ -54,7 +54,7 @@ pub fn test_udp_level_triggered() {
             poll,
             events,
             2,
-            vec![Event::new(Ready::readable() | Ready::writable(), Token(1))],
+            vec![Event::new(Ready::READABLE | Ready::WRITABLE, Token(1))],
         );
     }
 
@@ -62,12 +62,7 @@ pub fn test_udp_level_triggered() {
     while rx.recv_from(&mut buf).is_ok() {}
 
     for _ in 0..2 {
-        expect_events(
-            poll,
-            events,
-            4,
-            vec![Event::new(Ready::writable(), Token(1))],
-        );
+        expect_events(poll, events, 4, vec![Event::new(Ready::WRITABLE, Token(1))]);
     }
 
     tx.send_to(b"hello world!", &rx.local_addr().unwrap())
@@ -78,7 +73,7 @@ pub fn test_udp_level_triggered() {
         poll,
         events,
         10,
-        vec![Event::new(Ready::readable() | Ready::writable(), Token(1))],
+        vec![Event::new(Ready::READABLE | Ready::WRITABLE, Token(1))],
     );
 
     drop(rx);

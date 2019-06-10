@@ -16,6 +16,7 @@ macro_rules! dlsym {
     )
 }
 
+#[allow(dead_code)]
 pub struct DlSym<F> {
     pub name: &'static str,
     pub addr: AtomicUsize,
@@ -23,6 +24,7 @@ pub struct DlSym<F> {
 }
 
 impl<F> DlSym<F> {
+    #[allow(dead_code)]
     pub fn get(&self) -> Option<&F> {
         assert_eq!(mem::size_of::<F>(), mem::size_of::<usize>());
         unsafe {
@@ -38,6 +40,7 @@ impl<F> DlSym<F> {
     }
 }
 
+#[allow(dead_code)]
 unsafe fn fetch(name: &str) -> usize {
     assert_eq!(name.as_bytes()[name.len() - 1], 0);
     match libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr() as *const _) as usize {
