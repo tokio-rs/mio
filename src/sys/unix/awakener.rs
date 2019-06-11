@@ -130,7 +130,7 @@ mod pipe {
             selector.register(
                 receiver.as_raw_fd(),
                 token,
-                Interests::readable(),
+                Interests::READABLE,
                 PollOpt::edge(),
             )?;
             Ok(Awakener { sender, receiver })
