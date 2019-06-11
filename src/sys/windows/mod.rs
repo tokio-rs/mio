@@ -149,7 +149,7 @@ mod from_raw_arc;
 mod tcp;
 mod udp;
 
-pub use self::awakener::Awakener;
+pub use self::awakener::Waker;
 pub use self::selector::{Binding, Events, Overlapped, Selector};
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;

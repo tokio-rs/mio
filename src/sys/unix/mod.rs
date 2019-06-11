@@ -38,7 +38,7 @@ mod tcp;
 mod udp;
 mod uio;
 
-pub use self::awakener::Awakener;
+pub use self::awakener::Waker;
 pub use self::eventedfd::EventedFd;
 pub use self::io::{set_nonblock, Io};
 pub use self::tcp::{TcpListener, TcpStream};

@@ -427,7 +427,7 @@ unsafe impl Sync for ReadinessQueue {}
 
 struct ReadinessQueueInner {
     // Used to wake up `Poll` when readiness is set in another thread.
-    awakener: sys::Awakener,
+    waker: sys::Waker,
 
     // Head of the MPSC queue used to signal readiness to `Poll::poll`.
     head_readiness: AtomicPtr<ReadinessNode>,
@@ -749,7 +749,7 @@ impl Poll {
             // The readiness queue is empty. The call to `prepare_for_sleep`
             // inserts `sleep_marker` into the queue. This signals to any
             // threads setting readiness that the `Poll::poll` is going to
-            // sleep, so the awakener should be used.
+            // sleep, so the waker should be used.
         } else {
             // The readiness queue is not empty, so do not block the thread.
             timeout = Some(Duration::from_millis(0));
@@ -1827,7 +1827,7 @@ impl ReadinessQueue {
 
         Ok(ReadinessQueue {
             inner: Arc::new(ReadinessQueueInner {
-                awakener: sys::Awakener::new(&selector, AWAKEN)?,
+                waker: sys::Waker::new(&selector, AWAKEN)?,
                 head_readiness: AtomicPtr::new(ptr),
                 tail_readiness: UnsafeCell::new(ptr),
                 end_marker,
@@ -2035,7 +2035,7 @@ impl Drop for ReadinessQueue {
 
 impl ReadinessQueueInner {
     fn wakeup(&self) -> io::Result<()> {
-        self.awakener.wake()
+        self.waker.wake()
     }
 
     /// Prepend the given node to the head of the readiness queue. This is done

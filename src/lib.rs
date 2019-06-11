@@ -118,7 +118,7 @@ mod token;
 
 pub mod net;
 
-pub use awakener::Awakener;
+pub use awakener::Waker;
 pub use event_imp::{Interests, PollOpt, Ready};
 pub use poll::{Poll, Registry};
 pub use token::Token;

@@ -67,7 +67,7 @@ impl Selector {
     pub fn select(
         &self,
         events: &mut Events,
-        awakener: Token,
+        waker: Token,
         timeout: Option<Duration>,
     ) -> io::Result<bool> {
         trace!("select; timeout={:?}", timeout);
@@ -84,10 +84,10 @@ impl Selector {
 
         let mut ret = false;
         for status in events.statuses[..n].iter() {
-            // This should only ever happen from the awakener.
+            // This should only ever happen from the waker.
             if status.overlapped() as usize == 0 {
                 let token = Token(status.token());
-                if token == awakener {
+                if token == waker {
                     continue;
                 }
                 events.events.push(Event::new(Ready::READABLE, token));
@@ -442,7 +442,7 @@ pub struct Events {
     statuses: Box<[CompletionStatus]>,
 
     /// Literal events returned by `get` to the upwards `EventLoop`. This file
-    /// doesn't really modify this (except for the awakener), instead almost all
+    /// doesn't really modify this (except for the waker), instead almost all
     /// events are filled in by the `ReadinessQueue` from the `poll` module.
     events: Vec<Event>,
 }
