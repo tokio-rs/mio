@@ -37,16 +37,16 @@ impl EchoConn {
 
                 self.pipe_fd = Some(fd);
                 self.interests = match self.interests {
-                    None => Some(Interests::writable()),
-                    Some(x) => Some(x | Interests::writable()),
+                    None => Some(Interests::WRITABLE),
+                    Some(x) => Some(x | Interests::WRITABLE),
                 }
             }
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
                 self.interests = match self.interests {
-                    None => Some(Interests::readable()),
-                    Some(x) => Some((x | Interests::readable()) - Interests::writable()),
+                    None => Some(Interests::READABLE),
+                    Some(x) => Some((x | Interests::READABLE) - Interests::WRITABLE),
                 }
             }
             Err(e) => debug!("not implemented; client err={:?}", e),
@@ -75,15 +75,15 @@ impl EchoConn {
             Ok(Some(r)) => {
                 debug!("CONN : we read {} bytes!", r);
                 self.interests = match self.interests {
-                    None => Some(Interests::writable()),
-                    Some(x) => Some((x | Interests::writable()) - Interests::readable()),
+                    None => Some(Interests::WRITABLE),
+                    Some(x) => Some((x | Interests::WRITABLE) - Interests::READABLE),
                 }
             }
             Err(e) => {
                 debug!("not implemented; client err={:?}", e);
                 self.interests = match self.interests {
-                    Interests::readable() | None => None,
-                    _ => self.interests - Interests::readable(),
+                    Interests::READABLE | None => None,
+                    _ => self.interests - Interests::READABLE,
                 }
             }
         };
@@ -139,7 +139,7 @@ impl EchoServer {
             .register(
                 &self.conns[tok].sock,
                 Token(tok),
-                Interests::readable(),
+                Interests::READABLE,
                 PollOpt::edge() | PollOpt::oneshot(),
             )
             .expect("could not register socket with event loop");
@@ -225,7 +225,7 @@ impl EchoClient {
 
         self.interests = match self.interests {
             None => None,
-            Some(i) => Some(i - Interests::readable()),
+            Some(i) => Some(i - Interests::READABLE),
         };
 
         if !self.rx.has_remaining() {
@@ -256,15 +256,15 @@ impl EchoClient {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
                 self.interests = match self.interests {
-                    None => Some(Interests::writable()),
-                    Some(i) => Some(i | Interests::writable()),
+                    None => Some(Interests::WRITABLE),
+                    Some(i) => Some(i | Interests::WRITABLE),
                 }
             }
             Ok(Some(r)) => {
                 debug!("CLIENT : we wrote {} bytes!", r);
                 self.interests = match self.interests {
-                    None => Some(Interests::readable()),
-                    Some(i) => Some((i | Interests::readable()) - Interests::writable()),
+                    None => Some(Interests::READABLE),
+                    Some(i) => Some((i | Interests::READABLE) - Interests::WRITABLE),
                 }
             }
             Err(e) => debug!("not implemented; client err={:?}", e),
@@ -296,8 +296,8 @@ impl EchoClient {
         self.rx = SliceBuf::wrap(curr.as_bytes());
 
         self.interests = match self.interests {
-            None => Some(Interests::writable()),
-            Some(i) => Some(i | Interests::writable()),
+            None => Some(Interests::WRITABLE),
+            Some(i) => Some(i | Interests::WRITABLE),
         };
         event_loop.reregister(
             &self.sock,
@@ -363,7 +363,7 @@ pub fn test_unix_pass_fd() {
         .register(
             &srv,
             SERVER,
-            Interests::readable(),
+            Interests::READABLE,
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();
@@ -375,7 +375,7 @@ pub fn test_unix_pass_fd() {
         .register(
             &sock,
             CLIENT,
-            Interests::writable(),
+            Interests::WRITABLE,
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();

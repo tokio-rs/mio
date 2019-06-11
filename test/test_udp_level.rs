@@ -18,7 +18,7 @@ pub fn test_udp_level_triggered() {
         .register(
             &tx,
             Token(0),
-            Interests::readable() | Interests::writable(),
+            Interests::READABLE | Interests::WRITABLE,
             PollOpt::level(),
         )
         .unwrap();
@@ -27,7 +27,7 @@ pub fn test_udp_level_triggered() {
         .register(
             &rx,
             Token(1),
-            Interests::readable() | Interests::writable(),
+            Interests::READABLE | Interests::WRITABLE,
             PollOpt::level(),
         )
         .unwrap();

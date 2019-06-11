@@ -21,7 +21,7 @@ fn add_then_drop() {
         .register(
             &l,
             Token(1),
-            Interests::readable() | Interests::writable(),
+            Interests::READABLE | Interests::WRITABLE,
             PollOpt::edge(),
         )
         .unwrap();

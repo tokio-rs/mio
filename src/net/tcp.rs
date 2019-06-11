@@ -45,7 +45,7 @@ use std::time::Duration;
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// registry.register(&stream, Token(0), Interests::writable(),
+/// registry.register(&stream, Token(0), Interests::WRITABLE,
 ///                    PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
@@ -441,7 +441,7 @@ impl fmt::Debug for TcpStream {
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// registry.register(&listener, Token(0), Interests::readable(),
+/// registry.register(&listener, Token(0), Interests::READABLE,
 ///                   PollOpt::edge())?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;

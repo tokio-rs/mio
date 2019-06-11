@@ -39,8 +39,8 @@ impl EchoConn {
 
                 self.buf = Some(buf);
                 self.interests = match self.interests {
-                    None => Some(Interests::writable()),
-                    Some(i) => Some(i | Interests::writable()),
+                    None => Some(Interests::WRITABLE),
+                    Some(i) => Some(i | Interests::WRITABLE),
                 };
             }
             Ok(Some(r)) => {
@@ -49,8 +49,8 @@ impl EchoConn {
                 self.mut_buf = Some(buf.freeze());
 
                 self.interests = match self.interests {
-                    None => Some(Interests::readable()),
-                    Some(i) => Some((i | Interests::readable()) - Interests::writable()),
+                    None => Some(Interests::READABLE),
+                    Some(i) => Some((i | Interests::READABLE) - Interests::WRITABLE),
                 };
 
                 match self.sock.shutdown(Shutdown::Write) {
@@ -84,16 +84,16 @@ impl EchoConn {
                 self.buf = Some(buf.freeze());
 
                 self.interests = match self.interests {
-                    None => Some(Interests::writable()),
-                    Some(i) => Some((i | Interests::writable()) - Interests::readable()),
+                    None => Some(Interests::WRITABLE),
+                    Some(i) => Some((i | Interests::WRITABLE) - Interests::READABLE),
                 };
             }
             Err(e) => {
                 debug!("not implemented; client err={:?}", e);
-                if self.interests == Some(Interests::readable()) {
+                if self.interests == Some(Interests::READABLE) {
                     self.interests = None;
                 } else if let Some(x) = self.interests.as_mut() {
-                    *x -= Interests::readable();
+                    *x -= Interests::READABLE;
                 }
             }
         };
@@ -126,7 +126,7 @@ impl EchoServer {
             .register(
                 &self.conns[tok].sock,
                 Token(tok),
-                Interests::readable(),
+                Interests::READABLE,
                 PollOpt::edge() | PollOpt::oneshot(),
             )
             .expect("could not register socket with event loop");
@@ -187,10 +187,10 @@ impl EchoClient {
             }
             Ok(Some(r)) => {
                 if r == 0 {
-                    if self.interests == Some(Interests::readable()) {
+                    if self.interests == Some(Interests::READABLE) {
                         self.interests = None;
                     } else if let Some(x) = self.interests.as_mut() {
-                        *x -= Interests::readable();
+                        *x -= Interests::READABLE;
                     }
                     event_loop.shutdown();
                 } else {
@@ -232,15 +232,15 @@ impl EchoClient {
             Ok(None) => {
                 debug!("client flushing buf; WOULDBLOCK");
                 self.interests = match self.interests {
-                    None => Some(Interests::writable()),
-                    Some(i) => Some(i | Interests::writable()),
+                    None => Some(Interests::WRITABLE),
+                    Some(i) => Some(i | Interests::WRITABLE),
                 };
             }
             Ok(Some(r)) => {
                 debug!("CLIENT : we wrote {} bytes!", r);
                 self.interests = match self.interests {
-                    None => Some(Interests::readable()),
-                    Some(i) => Some((i | Interests::readable()) - Interests::writable()),
+                    None => Some(Interests::READABLE),
+                    Some(i) => Some((i | Interests::READABLE) - Interests::WRITABLE),
                 };
             }
             Err(e) => debug!("not implemented; client err={:?}", e),
@@ -266,8 +266,8 @@ impl EchoClient {
         self.rx = SliceBuf::wrap(curr.as_bytes());
 
         self.interests = match self.interests {
-            None => Some(Interests::writable()),
-            Some(i) => Some(i | Interests::writable()),
+            None => Some(Interests::WRITABLE),
+            Some(i) => Some(i | Interests::WRITABLE),
         };
         event_loop.reregister(
             &self.sock,
@@ -333,7 +333,7 @@ pub fn test_echo_server() {
         .register(
             &srv,
             SERVER,
-            Interests::readable(),
+            Interests::READABLE,
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();
@@ -345,7 +345,7 @@ pub fn test_echo_server() {
         .register(
             &sock,
             CLIENT,
-            Interests::writable(),
+            Interests::WRITABLE,
             PollOpt::edge() | PollOpt::oneshot(),
         )
         .unwrap();

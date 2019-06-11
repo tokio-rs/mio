@@ -26,7 +26,7 @@ mod eventfd {
                 return Err(io::Error::last_os_error());
             }
 
-            selector.register(fd, token, Interests::readable(), PollOpt::edge())?;
+            selector.register(fd, token, Interests::READABLE, PollOpt::edge())?;
             Ok(Awakener {
                 fd: unsafe { File::from_raw_fd(fd) },
             })
@@ -130,7 +130,7 @@ mod pipe {
             selector.register(
                 receiver.as_raw_fd(),
                 token,
-                Interests::readable(),
+                Interests::READABLE,
                 PollOpt::edge(),
             )?;
             Ok(Awakener { sender, receiver })

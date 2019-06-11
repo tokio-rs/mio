@@ -108,7 +108,7 @@ use std::{isize, mem, ops};
 /// let stream = TcpStream::connect(&server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// registry.register(&stream, Token(0), Interests::readable() | Interests::writable(), PollOpt::edge())?;
+/// registry.register(&stream, Token(0), Interests::READABLE | Interests::WRITABLE, PollOpt::edge())?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -282,7 +282,7 @@ use std::{isize, mem, ops};
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// registry.register(&sock, Token(0), Interests::readable() | Interests::writable(), PollOpt::edge())?;
+/// registry.register(&sock, Token(0), Interests::READABLE | Interests::WRITABLE, PollOpt::edge())?;
 /// #     Ok(())
 /// # }
 /// #
@@ -604,6 +604,7 @@ impl Poll {
         });
 
         let registry = Registry { inner };
+
         Ok(Poll { registry })
     }
 
@@ -686,7 +687,7 @@ impl Poll {
     /// registry.register(
     ///     &stream,
     ///     Token(0),
-    ///     Interests::readable() | Interests::writable(),
+    ///     Interests::READABLE | Interests::WRITABLE,
     ///     PollOpt::edge())?;
     ///
     /// // Wait for the socket to become ready. This has to happens in a loop to
@@ -894,7 +895,7 @@ impl Registry {
     /// registry.register(
     ///     &socket,
     ///     Token(0),
-    ///     Interests::readable() | Interests::writable(),
+    ///     Interests::READABLE | Interests::WRITABLE,
     ///     PollOpt::edge())?;
     ///
     /// let mut events = Events::with_capacity(1024);
@@ -990,7 +991,7 @@ impl Registry {
     /// registry.register(
     ///     &socket,
     ///     Token(0),
-    ///     Interests::readable(),
+    ///     Interests::READABLE,
     ///     PollOpt::edge())?;
     ///
     /// // Reregister the socket specifying a different token and write interest
@@ -999,7 +1000,7 @@ impl Registry {
     /// registry.reregister(
     ///     &socket,
     ///     Token(2),
-    ///     Interests::writable(),
+    ///     Interests::WRITABLE,
     ///     PollOpt::edge())?;
     /// #     Ok(())
     /// # }
@@ -1068,7 +1069,7 @@ impl Registry {
     /// registry.register(
     ///     &socket,
     ///     Token(0),
-    ///     Interests::readable(),
+    ///     Interests::READABLE,
     ///     PollOpt::edge())?;
     ///
     /// registry.deregister(&socket)?;

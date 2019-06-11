@@ -50,7 +50,7 @@ pub fn test_notify() {
         .register(
             &srv,
             Token(0),
-            Interests::readable() | Interests::writable(),
+            Interests::READABLE | Interests::WRITABLE,
             PollOpt::edge(),
         )
         .unwrap();
