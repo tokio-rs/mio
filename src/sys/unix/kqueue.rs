@@ -276,7 +276,10 @@ impl Selector {
         if new_kq == -1 {
             Err(io::Error::last_os_error())
         } else {
-            Ok(Selector { id: self.id, kq: new_kq })
+            Ok(Selector {
+                id: self.id,
+                kq: new_kq,
+            })
         }
     }
 
