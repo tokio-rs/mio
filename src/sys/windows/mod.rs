@@ -141,7 +141,7 @@ use std::os::windows::prelude::*;
 
 use winapi;
 
-mod awakener;
+mod waker;
 #[macro_use]
 mod selector;
 mod buffer_pool;
@@ -149,10 +149,10 @@ mod from_raw_arc;
 mod tcp;
 mod udp;
 
-pub use self::awakener::Waker;
 pub use self::selector::{Binding, Events, Overlapped, Selector};
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
+pub use self::waker::Waker;
 
 #[derive(Copy, Clone)]
 enum Family {
