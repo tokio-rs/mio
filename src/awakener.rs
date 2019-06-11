@@ -69,6 +69,7 @@ use crate::{poll, sys, Registry, Token};
 ///
 /// // After about 500 milliseconds we should we awoken by the other thread we
 /// // started, getting a single event.
+/// assert!(!events.is_empty());
 /// for event in &events {
 ///     assert_eq!(event, Event::new(Ready::READABLE, WAKE_TOKEN));
 /// }

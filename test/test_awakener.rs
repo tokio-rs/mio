@@ -14,7 +14,6 @@ fn awakener() {
     let token = Token(10);
     let awakener = Awakener::new(poll.registry(), token).expect("unable to create awakener");
 
-    // Waking on the same thread.
     awakener.wake().expect("unable to wake");
     expect_events(
         &mut poll,
@@ -22,8 +21,16 @@ fn awakener() {
         1,
         vec![Event::new(Ready::READABLE, token)],
     );
+}
 
-    // Multiple wakes between polls.
+#[test]
+fn awakener_multiple_wakeups_same_thread() {
+    let mut poll = Poll::new().expect("unable to create new Poll instance");
+    let mut events = Events::with_capacity(10);
+
+    let token = Token(10);
+    let awakener = Awakener::new(poll.registry(), token).expect("unable to create awakener");
+
     for _ in 0..3 {
         awakener.wake().expect("unable to wake");
     }
@@ -33,8 +40,16 @@ fn awakener() {
         1,
         vec![Event::new(Ready::READABLE, token)],
     );
+}
 
-    // Waking on another thread.
+#[test]
+fn awakener_wakeup_different_thread() {
+    let mut poll = Poll::new().expect("unable to create new Poll instance");
+    let mut events = Events::with_capacity(10);
+
+    let token = Token(10);
+    let awakener = Awakener::new(poll.registry(), token).expect("unable to create awakener");
+
     let awakener = Arc::new(awakener);
     let awakener1 = Arc::clone(&awakener);
     let handle = thread::spawn(move || {
@@ -54,7 +69,7 @@ fn awakener() {
 }
 
 #[test]
-fn awakener_multiple_wakeups() {
+fn awakener_multiple_wakeups_different_thread() {
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
