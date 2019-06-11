@@ -295,13 +295,19 @@ use std::{isize, mem, ops};
 ///
 /// `Poll` is backed by the selector provided by the operating system.
 ///
-/// |      OS    |  Selector |
-/// |------------|-----------|
-/// | Linux      | [epoll]   |
-/// | OS X, iOS  | [kqueue]  |
-/// | Windows    | [IOCP]    |
-/// | FreeBSD    | [kqueue]  |
-/// | Android    | [epoll]   |
+/// |      OS       |  Selector |
+/// |---------------|-----------|
+/// | Android       | [epoll]   |
+/// | Bitrig        | [kqueue]  |
+/// | DragonFly BSD | [kqueue]  |
+/// | FreeBSD       | [kqueue]  |
+/// | Linux         | [epoll]   |
+/// | NetBSD        | [kqueue]  |
+/// | OpenBSD       | [kqueue]  |
+/// | Solaris       | [epoll]   |
+/// | Windows       | [IOCP]    |
+/// | iOS           | [kqueue]  |
+/// | macOS         | [kqueue]  |
 ///
 /// On all supported platforms, socket operations are handled by using the
 /// system selector. Platform specific extensions (e.g. [`EventedFd`]) allow
