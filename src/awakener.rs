@@ -4,8 +4,10 @@ use crate::{poll, sys, Registry, Token};
 
 /// Awakener allows cross-thread waking of [`Poll`].
 ///
-/// When created it will cause events with [`Ready::readable()`] and the provided
+/// When created it will cause events with [`Ready::READABLE`] and the provided
 /// `token` if [`wake`] is called, possibly from another thread.
+///
+/// [`Poll`]: crate::Poll
 ///
 /// # Notes
 ///
@@ -17,7 +19,7 @@ use crate::{poll, sys, Registry, Token};
 /// What happens if multiple `Awakener`s are registered with the same `Poll` is
 /// undefined.
 ///
-/// [`Ready::readable()`]: crate::Ready::readable
+/// [`Ready::READABLE`]: crate::Ready::READABLE
 /// [`wake`]: Awakener::wake
 ///
 /// # Implementation notes
@@ -86,6 +88,8 @@ impl Awakener {
     }
 
     /// Wake up the [`Poll`] associated with this `Awakener`.
+    ///
+    /// [`Poll`]: crate::Poll
     pub fn wake(&self) -> io::Result<()> {
         self.inner.wake()
     }
