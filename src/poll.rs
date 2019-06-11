@@ -382,6 +382,7 @@ impl Poll {
         self.poll2(events, timeout, true)
     }
 
+    #[allow(clippy::if_same_then_else)]
     fn poll2(
         &mut self,
         events: &mut Events,
