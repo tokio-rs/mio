@@ -9,11 +9,8 @@ use crate::{poll, sys, Registry, Token};
 ///
 /// # Notes
 ///
-/// The `Awakener` needs to be kept alive as long as wake up notifications are
-/// required. This is due to an implementation detail where if all copies of the
-/// `Awakener` are dropped it will also drop all wake up notifications from the
-/// system queue, including wake up notifications that have been added before
-/// the `Awakener` that was dropped, resulting the [`Poll`] not being woken up.
+/// `Awakener` events are only guaranteed to be delivered while the `Awakener`
+/// value is alive.
 ///
 /// Only a single `Awakener` should active per [`Poll`], if multiple threads
 /// need access to the `Awakener` it can be shared via for example an `Arc`.
