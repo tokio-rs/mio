@@ -67,7 +67,7 @@ impl Selector {
     pub fn select(
         &self,
         events: &mut Events,
-        awakener: Token,
+        _awakener: Token,
         timeout: Option<Duration>,
     ) -> io::Result<bool> {
         trace!("select; timeout={:?}", timeout);
@@ -84,10 +84,10 @@ impl Selector {
 
         let mut ret = false;
         for status in events.statuses[..n].iter() {
-            // This should only ever happen from the awakener, and we should
-            // only ever have one awakener right now, so assert as such.
+            // This should only ever happen from the awakener.
             if status.overlapped() as usize == 0 {
-                assert_eq!(status.token(), usize::from(awakener));
+                let token = Token(status.token());
+                events.events.push(Event::new(Ready::READABLE, token));
                 ret = true;
                 continue;
             }
