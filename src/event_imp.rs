@@ -24,7 +24,7 @@ use std::{fmt, io, ops};
 /// Implementing `Evented` on a struct containing a socket:
 ///
 /// ```
-/// use mio::{Interests, Registry, PollOpt, Token};
+/// use mio::{Interests, Registry, Token};
 /// use mio::event::Evented;
 /// use mio::net::TcpStream;
 ///
@@ -35,18 +35,18 @@ use std::{fmt, io, ops};
 /// }
 ///
 /// impl Evented for MyEvented {
-///     fn register(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
+///     fn register(&self, registry: &Registry, token: Token, interests: Interests)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `register` call to `socket`
-///         self.socket.register(registry, token, interests, opts)
+///         self.socket.register(registry, token, interests)
 ///     }
 ///
-///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
+///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `reregister` call to `socket`
-///         self.socket.reregister(registry, token, interests, opts)
+///         self.socket.reregister(registry, token, interests)
 ///     }
 ///
 ///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
@@ -63,13 +63,7 @@ pub trait Evented {
     /// the call to another `Evented` type.
     ///
     /// [`Registry::register`]: ../struct.Registry.html#method.register
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()>;
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()>;
 
     /// Re-register `self` with the given `Registry` instance.
     ///
@@ -80,13 +74,8 @@ pub trait Evented {
     ///
     /// [`Registry::reregister`]: ../struct.Registry.html#method.reregister
     /// [`SetReadiness::set_readiness`]: ../struct.SetReadiness.html#method.set_readiness
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()>;
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interests)
+        -> io::Result<()>;
 
     /// Deregister `self` from the given `Registry` instance
     ///
@@ -99,14 +88,8 @@ pub trait Evented {
 }
 
 impl Evented for Box<dyn Evented> {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        self.as_ref().register(registry, token, interests, opts)
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+        self.as_ref().register(registry, token, interests)
     }
 
     fn reregister(
@@ -114,9 +97,8 @@ impl Evented for Box<dyn Evented> {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().reregister(registry, token, interests, opts)
+        self.as_ref().reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
@@ -125,14 +107,8 @@ impl Evented for Box<dyn Evented> {
 }
 
 impl<T: Evented> Evented for Box<T> {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        self.as_ref().register(registry, token, interests, opts)
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+        self.as_ref().register(registry, token, interests)
     }
 
     fn reregister(
@@ -140,9 +116,8 @@ impl<T: Evented> Evented for Box<T> {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().reregister(registry, token, interests, opts)
+        self.as_ref().reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
@@ -151,14 +126,8 @@ impl<T: Evented> Evented for Box<T> {
 }
 
 impl<T: Evented> Evented for ::std::sync::Arc<T> {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        self.as_ref().register(registry, token, interests, opts)
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+        self.as_ref().register(registry, token, interests)
     }
 
     fn reregister(
@@ -166,15 +135,17 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
-        self.as_ref().reregister(registry, token, interests, opts)
+        self.as_ref().reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
         self.as_ref().deregister(registry)
     }
 }
+
+// FIXME: `PollOpt` is only here because it's used in the custom readiness
+// queue, once that is gone remove `PollOpt` as well.
 
 /// Options supplied when registering an `Evented` handle with `Poll`
 ///
@@ -183,36 +154,14 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
 ///
 /// For high level documentation on polling and poll options, see [`Poll`].
 ///
-/// # Examples
-///
-/// ```
-/// use mio::PollOpt;
-///
-/// let opts = PollOpt::edge() | PollOpt::oneshot();
-///
-/// assert!(opts.is_edge());
-/// assert!(opts.is_oneshot());
-/// assert!(!opts.is_level());
-/// ```
-///
 /// [`Poll`]: struct.Poll.html
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct PollOpt(usize);
+pub(crate) struct PollOpt(usize);
 
 impl PollOpt {
     /// Return a `PollOpt` representing no set options.
     ///
     /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::empty();
-    ///
-    /// assert!(!opt.is_level());
-    /// ```
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
@@ -224,16 +173,6 @@ impl PollOpt {
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::edge();
-    ///
-    /// assert!(opt.is_edge());
-    /// ```
-    ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn edge() -> PollOpt {
@@ -243,16 +182,6 @@ impl PollOpt {
     /// Return a `PollOpt` representing level-triggered notifications.
     ///
     /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::level();
-    ///
-    /// assert!(opt.is_level());
-    /// ```
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
@@ -264,16 +193,6 @@ impl PollOpt {
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::oneshot();
-    ///
-    /// assert!(opt.is_oneshot());
-    /// ```
-    ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn oneshot() -> PollOpt {
@@ -284,55 +203,15 @@ impl PollOpt {
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::edge();
-    ///
-    /// assert!(opt.is_edge());
-    /// ```
-    ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn is_edge(&self) -> bool {
         self.contains(PollOpt::edge())
     }
 
-    /// Returns true if the options include level-triggered notifications.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::level();
-    ///
-    /// assert!(opt.is_level());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    pub fn is_level(&self) -> bool {
-        self.contains(PollOpt::level())
-    }
-
     /// Returns true if the options includes oneshot.
     ///
     /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::oneshot();
-    ///
-    /// assert!(opt.is_oneshot());
-    /// ```
     ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
@@ -348,78 +227,10 @@ impl PollOpt {
     ///
     /// See [`Poll`] for more documentation on polling.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::oneshot();
-    ///
-    /// assert!(opt.contains(PollOpt::oneshot()));
-    /// assert!(!opt.contains(PollOpt::edge()));
-    /// ```
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::oneshot() | PollOpt::edge();
-    ///
-    /// assert!(opt.contains(PollOpt::oneshot()));
-    /// assert!(opt.contains(PollOpt::edge()));
-    /// ```
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let opt = PollOpt::oneshot() | PollOpt::edge();
-    ///
-    /// assert!(!PollOpt::oneshot().contains(opt));
-    /// assert!(opt.contains(opt));
-    /// assert!((opt | PollOpt::level()).contains(opt));
-    /// ```
-    ///
     /// [`Poll`]: struct.Poll.html
     #[inline]
     pub fn contains(&self, other: PollOpt) -> bool {
         (*self & other) == other
-    }
-
-    /// Adds all options represented by `other` into `self`.
-    ///
-    /// This is equivalent to `*self = *self | other`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let mut opt = PollOpt::empty();
-    /// opt.insert(PollOpt::oneshot());
-    ///
-    /// assert!(opt.is_oneshot());
-    /// ```
-    #[inline]
-    pub fn insert(&mut self, other: PollOpt) {
-        self.0 |= other.0;
-    }
-
-    /// Removes all options represented by `other` from `self`.
-    ///
-    /// This is equivalent to `*self = *self & !other`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::PollOpt;
-    ///
-    /// let mut opt = PollOpt::oneshot();
-    /// opt.remove(PollOpt::oneshot());
-    ///
-    /// assert!(!opt.is_oneshot());
-    /// ```
-    #[inline]
-    pub fn remove(&mut self, other: PollOpt) {
-        self.0 &= !other.0;
     }
 }
 
@@ -1344,7 +1155,7 @@ pub fn ready_as_usize(events: Ready) -> usize {
     events.as_usize()
 }
 
-pub fn opt_as_usize(opt: PollOpt) -> usize {
+pub(crate) fn opt_as_usize(opt: PollOpt) -> usize {
     opt.0
 }
 
@@ -1352,7 +1163,7 @@ pub fn ready_from_usize(events: usize) -> Ready {
     Ready::from_usize(events)
 }
 
-pub fn opt_from_usize(opt: usize) -> PollOpt {
+pub(crate) fn opt_from_usize(opt: usize) -> PollOpt {
     PollOpt(opt)
 }
 

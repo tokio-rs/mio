@@ -1,5 +1,5 @@
 use crate::event::Evented;
-use crate::{io, poll, Interests, PollOpt, Registry, Token};
+use crate::{io, poll, Interests, Registry, Token};
 use std::os::unix::io::RawFd;
 
 /*
@@ -31,7 +31,7 @@ use std::os::unix::io::RawFd;
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Interests, Poll, PollOpt, Token};
+/// use mio::{Interests, Poll, Token};
 /// use mio::unix::EventedFd;
 ///
 /// use std::os::unix::io::AsRawFd;
@@ -47,8 +47,7 @@ use std::os::unix::io::RawFd;
 /// registry.register(
 ///     &EventedFd(&listener.as_raw_fd()),
 ///     Token(0),
-///     Interests::READABLE,
-///     PollOpt::edge())?;
+///     Interests::READABLE)?;
 /// #     Ok(())
 /// # }
 /// #
@@ -60,7 +59,7 @@ use std::os::unix::io::RawFd;
 /// Implementing [`Evented`] for a custom type backed by a [`RawFd`].
 ///
 /// ```
-/// use mio::{Interests, Registry, PollOpt, Token};
+/// use mio::{Interests, Registry, Token};
 /// use mio::event::Evented;
 /// use mio::unix::EventedFd;
 ///
@@ -72,16 +71,16 @@ use std::os::unix::io::RawFd;
 /// }
 ///
 /// impl Evented for MyIo {
-///     fn register(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
+///     fn register(&self, registry: &Registry, token: Token, interests: Interests)
 ///         -> io::Result<()>
 ///     {
-///         EventedFd(&self.fd).register(registry, token, interests, opts)
+///         EventedFd(&self.fd).register(registry, token, interests)
 ///     }
 ///
-///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
+///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests)
 ///         -> io::Result<()>
 ///     {
-///         EventedFd(&self.fd).reregister(registry, token, interests, opts)
+///         EventedFd(&self.fd).reregister(registry, token, interests)
 ///     }
 ///
 ///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
@@ -97,14 +96,8 @@ use std::os::unix::io::RawFd;
 pub struct EventedFd<'a>(pub &'a RawFd);
 
 impl<'a> Evented for EventedFd<'a> {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        poll::selector(registry).register(*self.0, token, interests, opts)
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+        poll::selector(registry).register(*self.0, token, interests)
     }
 
     fn reregister(
@@ -112,9 +105,8 @@ impl<'a> Evented for EventedFd<'a> {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
-        poll::selector(registry).reregister(*self.0, token, interests, opts)
+        poll::selector(registry).reregister(*self.0, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

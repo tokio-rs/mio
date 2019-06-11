@@ -2,7 +2,7 @@ use std::net::Shutdown;
 use std::time::Duration;
 
 use mio::net::TcpStream;
-use mio::{Events, Interests, Poll, PollOpt, Token};
+use mio::{Events, Interests, Poll, Token};
 
 macro_rules! wait {
     ($poll:ident, $ready:ident) => {{
@@ -47,7 +47,7 @@ fn test_write_shutdown() {
 
     let client = TcpStream::connect(&addr).unwrap();
     poll.registry()
-        .register(&client, Token(0), interests, PollOpt::edge())
+        .register(&client, Token(0), interests)
         .unwrap();
 
     let (socket, _) = listener.accept().unwrap();

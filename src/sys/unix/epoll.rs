@@ -1,9 +1,9 @@
 use crate::event_imp::Event;
 use crate::sys::unix::cvt;
 use crate::sys::unix::io::set_cloexec;
-use crate::{io, Interests, PollOpt, Ready, Token};
+use crate::{io, Interests, Ready, Token};
 use libc::{self, c_int};
-use libc::{EPOLLERR, EPOLLHUP, EPOLLONESHOT};
+use libc::{EPOLLERR, EPOLLHUP};
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
@@ -87,15 +87,9 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn register(
-        &self,
-        fd: RawFd,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    pub fn register(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
         let mut info = libc::epoll_event {
-            events: interests_to_epoll(interests, opts),
+            events: interests_to_epoll(interests),
             u64: usize::from(token) as u64,
         };
 
@@ -111,15 +105,9 @@ impl Selector {
     }
 
     /// Register event interests for the given IO handle with the OS
-    pub fn reregister(
-        &self,
-        fd: RawFd,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
         let mut info = libc::epoll_event {
-            events: interests_to_epoll(interests, opts),
+            events: interests_to_epoll(interests),
             u64: usize::from(token) as u64,
         };
 
@@ -153,8 +141,8 @@ impl Selector {
     }
 }
 
-fn interests_to_epoll(interests: Interests, opts: PollOpt) -> u32 {
-    let mut kind = 0;
+fn interests_to_epoll(interests: Interests) -> u32 {
+    let mut kind = EPOLLET;
 
     if interests.is_readable() {
         kind |= EPOLLIN;
@@ -164,23 +152,11 @@ fn interests_to_epoll(interests: Interests, opts: PollOpt) -> u32 {
         kind |= EPOLLOUT;
     }
 
-    if opts.is_edge() {
-        kind |= EPOLLET;
-    }
-
-    if opts.is_oneshot() {
-        kind |= EPOLLONESHOT;
-    }
-
-    if opts.is_level() {
-        kind &= !EPOLLET;
-    }
-
     kind as u32
 }
 
-fn ready_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
-    let mut kind = 0;
+fn ready_to_epoll(interest: Ready) -> u32 {
+    let mut kind = EPOLLET;
 
     if interest.is_readable() {
         kind |= EPOLLIN;
@@ -192,18 +168,6 @@ fn ready_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
 
     if interest.is_priority() {
         kind |= EPOLLPRI;
-    }
-
-    if opts.is_edge() {
-        kind |= EPOLLET;
-    }
-
-    if opts.is_oneshot() {
-        kind |= EPOLLONESHOT;
-    }
-
-    if opts.is_level() {
-        kind &= !EPOLLET;
     }
 
     kind as u32
@@ -284,7 +248,7 @@ impl Events {
 
     pub fn push_event(&mut self, event: Event) {
         self.events.push(libc::epoll_event {
-            events: ready_to_epoll(event.readiness(), PollOpt::empty()),
+            events: ready_to_epoll(event.readiness()),
             u64: usize::from(event.token()) as u64,
         });
     }

@@ -6,7 +6,7 @@ mod eventfd {
     use std::os::unix::io::FromRawFd;
 
     use crate::sys::Selector;
-    use crate::{Interests, PollOpt, Token};
+    use crate::{Interests, Token};
 
     /// Awakener backed by `eventfd`.
     ///
@@ -26,7 +26,7 @@ mod eventfd {
                 return Err(io::Error::last_os_error());
             }
 
-            selector.register(fd, token, Interests::READABLE, PollOpt::edge())?;
+            selector.register(fd, token, Interests::READABLE)?;
             Ok(Awakener {
                 fd: unsafe { File::from_raw_fd(fd) },
             })
@@ -112,7 +112,7 @@ mod pipe {
     use std::os::unix::io::AsRawFd;
 
     use crate::sys::{pipe, Io, Selector};
-    use crate::{Interests, PollOpt, Token};
+    use crate::{Interests, Token};
 
     /// Awakener backed by a unix pipe.
     ///
@@ -127,12 +127,7 @@ mod pipe {
     impl Awakener {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Awakener> {
             let (sender, receiver) = pipe()?;
-            selector.register(
-                receiver.as_raw_fd(),
-                token,
-                Interests::READABLE,
-                PollOpt::edge(),
-            )?;
+            selector.register(receiver.as_raw_fd(), token, Interests::READABLE)?;
             Ok(Awakener { sender, receiver })
         }
 

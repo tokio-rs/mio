@@ -14,6 +14,8 @@ use std::time::{Duration, Instant};
 use std::{fmt, io, ptr, usize};
 use std::{isize, mem, ops};
 
+// FIXME: One the custom readiness queue is removed remove `PollOpt` as well.
+
 // Poll is backed by two readiness queues. The first is a system readiness queue
 // represented by `sys::Selector`. The system readiness queue handles events
 // provided by the system, such as TCP and UDP. The second readiness queue is
@@ -90,7 +92,7 @@ use std::{isize, mem, ops};
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Events, Poll, Interests, PollOpt, Token};
+/// use mio::{Events, Poll, Interests, Token};
 /// use mio::net::TcpStream;
 ///
 /// use std::net::{TcpListener, SocketAddr};
@@ -108,7 +110,7 @@ use std::{isize, mem, ops};
 /// let stream = TcpStream::connect(&server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// registry.register(&stream, Token(0), Interests::READABLE | Interests::WRITABLE, PollOpt::edge())?;
+/// registry.register(&stream, Token(0), Interests::READABLE | Interests::WRITABLE)?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -131,81 +133,6 @@ use std::{isize, mem, ops};
 /// # }
 /// ```
 ///
-/// # Edge-triggered and level-triggered
-///
-/// An [`Evented`] registration may request edge-triggered events or
-/// level-triggered events. This is done by setting `register`'s
-/// [`PollOpt`] argument to either [`edge`] or [`level`].
-///
-/// The difference between the two can be described as follows. Supposed that
-/// this scenario happens:
-///
-/// 1. A [`TcpStream`] is registered with `Poll`.
-/// 2. The socket receives 2kb of data.
-/// 3. A call to [`Poll::poll`] returns the token associated with the socket
-///    indicating readable readiness.
-/// 4. 1kb is read from the socket.
-/// 5. Another call to [`Poll::poll`] is made.
-///
-/// If when the socket was registered, edge triggered events were requested,
-/// then the call to [`Poll::poll`] done in step **5** will (probably) hang
-/// despite there being another 1kb still present in the socket read buffer. The
-/// reason for this is that edge-triggered mode delivers events only when
-/// changes occur on the monitored [`Evented`]. So, in step *5* the caller might
-/// end up waiting for some data that is already present inside the socket
-/// buffer.
-///
-/// With edge-triggered events, operations **must** be performed on the
-/// `Evented` type until [`WouldBlock`] is returned. In other words, after
-/// receiving an event indicating readiness for a certain operation, one should
-/// assume that [`Poll::poll`] may never return another event for the same token
-/// and readiness until the operation returns [`WouldBlock`].
-///
-/// By contrast, when level-triggered notifications was requested, each call to
-/// [`Poll::poll`] will return an event for the socket as long as data remains
-/// in the socket buffer. Generally, level-triggered events should be avoided if
-/// high performance is a concern.
-///
-/// Since even with edge-triggered events, multiple events can be generated upon
-/// receipt of multiple chunks of data, the caller has the option to set the
-/// [`oneshot`] flag. This tells `Poll` to disable the associated [`Evented`]
-/// after the event is returned from [`Poll::poll`]. The subsequent calls to
-/// [`Poll::poll`] will no longer include events for [`Evented`] handles that
-/// are disabled even if the readiness state changes. The handle can be
-/// re-enabled by calling [`reregister`]. When handles are disabled, internal
-/// resources used to monitor the handle are maintained until the handle is
-/// dropped or deregistered. This makes re-registering the handle a fast
-/// operation.
-///
-/// For example, in the following scenario:
-///
-/// 1. A [`TcpStream`] is registered with `Poll`.
-/// 2. The socket receives 2kb of data.
-/// 3. A call to [`Poll::poll`] returns the token associated with the socket
-///    indicating readable readiness.
-/// 4. 2kb is read from the socket.
-/// 5. Another call to read is issued and [`WouldBlock`] is returned
-/// 6. The socket receives another 2kb of data.
-/// 7. Another call to [`Poll::poll`] is made.
-///
-/// Assuming the socket was registered with the [`edge`] and [`oneshot`]
-/// options, then the call to [`Poll::poll`] in step 7 would block. This is
-/// because, [`oneshot`] tells `Poll` to disable events for the socket after
-/// returning an event.
-///
-/// In order to receive the event for the data received in step 6, the socket
-/// would need to be reregistered using [`reregister`].
-///
-/// [`PollOpt`]: struct.PollOpt.html
-/// [`edge`]: struct.PollOpt.html#method.edge
-/// [`level`]: struct.PollOpt.html#method.level
-/// [`Poll::poll`]: struct.Poll.html#method.poll
-/// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock
-/// [`Evented`]: event/trait.Evented.html
-/// [`TcpStream`]: tcp/struct.TcpStream.html
-/// [`reregister`]: #method.reregister
-/// [`oneshot`]: struct.PollOpt.html#method.oneshot
-///
 /// # Portability
 ///
 /// Using `Poll` provides a portable interface across supported platforms as
@@ -225,15 +152,12 @@ use std::{isize, mem, ops};
 ///
 /// ### Draining readiness
 ///
-/// When using edge-triggered mode, once a readiness event is received, the
-/// corresponding operation must be performed repeatedly until it returns
-/// [`WouldBlock`]. Unless this is done, there is no guarantee that another
-/// readiness event will be delivered, even if further data is received for the
-/// [`Evented`] handle.
+/// Once a readiness event is received, the corresponding operation must be
+/// performed repeatedly until it returns [`WouldBlock`]. Unless this is done,
+/// there is no guarantee that another readiness event will be delivered, even
+/// if further data is received for the [`Evented`] handle.
 ///
-/// For example, in the first scenario described above, after step 5, even if
-/// the socket receives more data there is no guarantee that another readiness
-/// event will be delivered.
+/// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
 ///
 /// ### Readiness operations
 ///
@@ -268,7 +192,7 @@ use std::{isize, mem, ops};
 /// ```
 /// # use std::error::Error;
 /// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Poll, Interests, PollOpt, Token};
+/// use mio::{Poll, Interests, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 /// use std::thread;
@@ -282,7 +206,7 @@ use std::{isize, mem, ops};
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// registry.register(&sock, Token(0), Interests::READABLE | Interests::WRITABLE, PollOpt::edge())?;
+/// registry.register(&sock, Token(0), Interests::READABLE | Interests::WRITABLE)?;
 /// #     Ok(())
 /// # }
 /// #
@@ -665,7 +589,7 @@ impl Poll {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Poll, Interests, PollOpt, Token};
+    /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     ///
     /// use std::net::{TcpListener, SocketAddr};
@@ -693,8 +617,7 @@ impl Poll {
     /// registry.register(
     ///     &stream,
     ///     Token(0),
-    ///     Interests::READABLE | Interests::WRITABLE,
-    ///     PollOpt::edge())?;
+    ///     Interests::READABLE | Interests::WRITABLE)?;
     ///
     /// // Wait for the socket to become ready. This has to happens in a loop to
     /// // handle spurious wakeups.
@@ -857,10 +780,6 @@ impl Registry {
     /// The readiness interest for an `Evented` handle can be changed at any
     /// time by calling [`reregister`].
     ///
-    /// `opts: PollOpt`: Specifies the registration options. The most common
-    /// options being [`level`] for level-triggered events, [`edge`] for
-    /// edge-triggered events, and [`oneshot`].
-    ///
     /// The registration options for an `Evented` handle can be changed at any
     /// time by calling [`reregister`].
     ///
@@ -889,7 +808,7 @@ impl Registry {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Poll, Interests, PollOpt, Token};
+    /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     /// use std::time::{Duration, Instant};
     ///
@@ -901,8 +820,7 @@ impl Registry {
     /// registry.register(
     ///     &socket,
     ///     Token(0),
-    ///     Interests::READABLE | Interests::WRITABLE,
-    ///     PollOpt::edge())?;
+    ///     Interests::READABLE | Interests::WRITABLE)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// let start = Instant::now();
@@ -938,7 +856,6 @@ impl Registry {
         handle: &E,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()>
     where
         E: Evented,
@@ -953,7 +870,7 @@ impl Registry {
         trace!("registering with poller");
 
         // Register interests for this socket
-        handle.register(self, token, interests, opts)?;
+        handle.register(self, token, interests)?;
 
         Ok(())
     }
@@ -986,7 +903,7 @@ impl Registry {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Poll, Interests, PollOpt, Token};
+    /// use mio::{Poll, Interests, Token};
     /// use mio::net::TcpStream;
     ///
     /// let mut poll = Poll::new()?;
@@ -997,17 +914,14 @@ impl Registry {
     /// registry.register(
     ///     &socket,
     ///     Token(0),
-    ///     Interests::READABLE,
-    ///     PollOpt::edge())?;
+    ///     Interests::READABLE)?;
     ///
-    /// // Reregister the socket specifying a different token and write interest
-    /// // instead. `PollOpt::edge()` must be specified even though that value
-    /// // is not being changed.
+    /// // Reregister the socket specifying write interest instead. Even though
+    /// // the token is the same it must be specified.
     /// registry.reregister(
     ///     &socket,
     ///     Token(2),
-    ///     Interests::WRITABLE,
-    ///     PollOpt::edge())?;
+    ///     Interests::WRITABLE)?;
     /// #     Ok(())
     /// # }
     /// #
@@ -1025,7 +939,6 @@ impl Registry {
         handle: &E,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()>
     where
         E: Evented,
@@ -1035,7 +948,7 @@ impl Registry {
         trace!("registering with poller");
 
         // Register interests for this socket
-        handle.reregister(self, token, interests, opts)?;
+        handle.reregister(self, token, interests)?;
 
         Ok(())
     }
@@ -1063,7 +976,7 @@ impl Registry {
     /// ```
     /// # use std::error::Error;
     /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Poll, Interests, PollOpt, Token};
+    /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     /// use std::time::Duration;
     ///
@@ -1075,8 +988,7 @@ impl Registry {
     /// registry.register(
     ///     &socket,
     ///     Token(0),
-    ///     Interests::READABLE,
-    ///     PollOpt::edge())?;
+    ///     Interests::READABLE)?;
     ///
     /// registry.deregister(&socket)?;
     ///
@@ -1450,15 +1362,9 @@ impl Registration {
 }
 
 impl Evented for Registration {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         self.inner
-            .update(registry, token, interests.to_ready(), opts)
+            .update(registry, token, interests.to_ready(), PollOpt::empty())
     }
 
     fn reregister(
@@ -1466,10 +1372,9 @@ impl Evented for Registration {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
         self.inner
-            .update(registry, token, interests.to_ready(), opts)
+            .update(registry, token, interests.to_ready(), PollOpt::empty())
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

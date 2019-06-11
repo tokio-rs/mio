@@ -47,12 +47,7 @@ pub fn test_notify() {
     let srv = TcpListener::bind(&addr).unwrap();
 
     event_loop
-        .register(
-            &srv,
-            Token(0),
-            Interests::READABLE | Interests::WRITABLE,
-            PollOpt::edge(),
-        )
+        .register(&srv, Token(0), Interests::READABLE | Interests::WRITABLE)
         .unwrap();
 
     let sender = event_loop.channel();

@@ -13,11 +13,11 @@ pub fn test_double_register() {
 
     // Register the listener with `Poll`
     poll.registry()
-        .register(&l, Token(0), Interests::READABLE, PollOpt::edge())
+        .register(&l, Token(0), Interests::READABLE)
         .unwrap();
 
     assert!(poll
         .registry()
-        .register(&l, Token(1), Interests::READABLE, PollOpt::edge())
+        .register(&l, Token(1), Interests::READABLE)
         .is_err());
 }

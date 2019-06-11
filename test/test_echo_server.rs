@@ -1,7 +1,7 @@
 use crate::{localhost, TryRead, TryWrite};
 use bytes::{Buf, Bytes, BytesMut};
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, PollOpt, Registry, Token};
+use mio::{Events, Interests, Poll, Registry, Token};
 use slab::Slab;
 use std::io::{self, Cursor};
 
@@ -58,12 +58,7 @@ impl EchoConn {
             "actual={:?}",
             self.interests
         );
-        registry.reregister(
-            &self.sock,
-            self.token.unwrap(),
-            self.interests.unwrap(),
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
+        registry.reregister(&self.sock, self.token.unwrap(), self.interests.unwrap())
     }
 
     fn readable(&mut self, registry: &Registry) -> io::Result<()> {
@@ -101,12 +96,7 @@ impl EchoConn {
             "actual={:?}",
             self.interests
         );
-        registry.reregister(
-            &self.sock,
-            self.token.unwrap(),
-            self.interests.unwrap(),
-            PollOpt::edge(),
-        )
+        registry.reregister(&self.sock, self.token.unwrap(), self.interests.unwrap())
     }
 }
 
@@ -126,12 +116,7 @@ impl EchoServer {
         // Register the connection
         self.conns[tok].token = Some(Token(tok));
         registry
-            .register(
-                &self.conns[tok].sock,
-                Token(tok),
-                Interests::READABLE,
-                PollOpt::edge() | PollOpt::oneshot(),
-            )
+            .register(&self.conns[tok].sock, Token(tok), Interests::READABLE)
             .expect("could not register socket with event loop");
 
         Ok(())
@@ -222,12 +207,7 @@ impl EchoClient {
         };
 
         if let Some(x) = self.interests {
-            registry.reregister(
-                &self.sock,
-                self.token,
-                x,
-                PollOpt::edge() | PollOpt::oneshot(),
-            )?;
+            registry.reregister(&self.sock, self.token, x)?;
         }
 
         Ok(())
@@ -255,12 +235,7 @@ impl EchoClient {
         }
 
         if self.interests.unwrap().is_readable() || self.interests.unwrap().is_writable() {
-            registry.reregister(
-                &self.sock,
-                self.token,
-                self.interests.unwrap(),
-                PollOpt::edge() | PollOpt::oneshot(),
-            )?;
+            registry.reregister(&self.sock, self.token, self.interests.unwrap())?;
         }
 
         Ok(())
@@ -282,12 +257,7 @@ impl EchoClient {
             None => Some(Interests::WRITABLE),
             Some(i) => Some(i | Interests::WRITABLE),
         };
-        registry.reregister(
-            &self.sock,
-            self.token,
-            self.interests.unwrap(),
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
+        registry.reregister(&self.sock, self.token, self.interests.unwrap())
     }
 }
 
@@ -318,24 +288,14 @@ pub fn test_echo_server() {
 
     info!("listen for connections");
     poll.registry()
-        .register(
-            &srv,
-            SERVER,
-            Interests::READABLE,
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
+        .register(&srv, SERVER, Interests::READABLE)
         .unwrap();
 
     let sock = TcpStream::connect(&addr).unwrap();
 
     // Connect to the server
     poll.registry()
-        .register(
-            &sock,
-            CLIENT,
-            Interests::WRITABLE,
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
+        .register(&sock, CLIENT, Interests::WRITABLE)
         .unwrap();
 
     // == Create storage for events

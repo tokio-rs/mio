@@ -1,8 +1,8 @@
-use crate::event_imp::{Event, Evented, Interests, Ready};
+use crate::event_imp::{Event, Evented, Interests, PollOpt, Ready};
 use crate::lazycell::AtomicLazyCell;
 use crate::poll::{self, Registry};
 use crate::sys::windows::buffer_pool::BufferPool;
-use crate::{PollOpt, Token};
+use crate::Token;
 use log::trace;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
@@ -369,7 +369,6 @@ impl ReadyBinding {
         registry: &Registry,
         token: Token,
         events: Interests,
-        opts: PollOpt,
         registration: &Mutex<Option<poll::Registration>>,
     ) -> io::Result<()> {
         trace!("register {:?} {:?}", token, events);
@@ -377,7 +376,7 @@ impl ReadyBinding {
             self.binding.register_socket(socket, token, registry)?;
         }
 
-        let (r, s) = poll::new_registration(registry, token, events, opts);
+        let (r, s) = poll::new_registration(registry, token, events, PollOpt::empty());
         self.readiness = Some(s);
         *registration.lock().unwrap() = Some(r);
         Ok(())
@@ -390,7 +389,6 @@ impl ReadyBinding {
         registry: &Registry,
         token: Token,
         events: Interests,
-        opts: PollOpt,
         registration: &Mutex<Option<poll::Registration>>,
     ) -> io::Result<()> {
         trace!("reregister {:?} {:?}", token, events);
@@ -403,7 +401,7 @@ impl ReadyBinding {
             .unwrap()
             .as_mut()
             .unwrap()
-            .reregister(registry, token, events, opts)
+            .reregister(registry, token, events)
     }
 
     /// Implementation of the `Evented::deregister` function.
