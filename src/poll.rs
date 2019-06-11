@@ -372,65 +372,6 @@ struct Inner {
 ///
 /// For high level documentation, see [`Poll`].
 ///
-/// # Examples
-///
-/// ```
-/// use mio::{Ready, Interests, Registration, Registry, Poll, PollOpt, Token};
-/// use mio::event::Evented;
-///
-/// use std::io;
-/// use std::time::Instant;
-/// use std::thread;
-///
-/// pub struct Deadline {
-///     when: Instant,
-///     registration: Registration,
-/// }
-///
-/// impl Deadline {
-///     pub fn new(when: Instant) -> Deadline {
-///         let (registration, set_readiness) = Registration::new();
-///
-///         thread::spawn(move || {
-///             let now = Instant::now();
-///
-///             if now < when {
-///                 thread::sleep(when - now);
-///             }
-///
-///             set_readiness.set_readiness(Ready::READABLE);
-///         });
-///
-///         Deadline {
-///             when: when,
-///             registration: registration,
-///         }
-///     }
-///
-///     pub fn is_elapsed(&self) -> bool {
-///         Instant::now() >= self.when
-///     }
-/// }
-///
-/// impl Evented for Deadline {
-///     fn register(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
-///         -> io::Result<()>
-///     {
-///         self.registration.register(registry, token, interests, opts)
-///     }
-///
-///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
-///         -> io::Result<()>
-///     {
-///         self.registration.reregister(registry, token, interests, opts)
-///     }
-///
-///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-///         registry.deregister(&self.registration)
-///     }
-/// }
-/// ```
-///
 /// [system selector]: struct.Poll.html#implementation-notes
 /// [`Poll`]: struct.Poll.html
 /// [`Registration::new`]: struct.Registration.html#method.new
@@ -440,7 +381,7 @@ struct Inner {
 /// [`reregister`]: struct.Registry.html#method.reregister
 /// [`deregister`]: struct.Registry.html#method.deregister
 /// [portability]: struct.Poll.html#portability
-pub struct Registration {
+pub(crate) struct Registration {
     inner: RegistrationInner,
 }
 
@@ -455,7 +396,7 @@ unsafe impl Sync for Registration {}
 /// [`Poll`]: struct.Poll.html
 /// [`Registration`]: struct.Registration.html
 #[derive(Clone)]
-pub struct SetReadiness {
+pub(crate) struct SetReadiness {
     inner: RegistrationInner,
 }
 
@@ -1460,7 +1401,7 @@ pub fn selector(registry: &Registry) -> &sys::Selector {
 
 // TODO: get rid of this, windows depends on it for now
 #[allow(dead_code)]
-pub fn new_registration(
+pub(crate) fn new_registration(
     registry: &Registry,
     token: Token,
     interests: Interests,
@@ -1470,80 +1411,6 @@ pub fn new_registration(
 }
 
 impl Registration {
-    /// Create and return a new `Registration` and the associated
-    /// `SetReadiness`.
-    ///
-    /// See [struct] documentation for more detail and [`Poll`]
-    /// for high level documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Ready, Interests, Registration, Poll, PollOpt, Token};
-    /// use std::thread;
-    ///
-    /// let (registration, set_readiness) = Registration::new();
-    ///
-    /// thread::spawn(move || {
-    ///     use std::time::Duration;
-    ///     thread::sleep(Duration::from_millis(500));
-    ///
-    ///     set_readiness.set_readiness(Ready::READABLE);
-    /// });
-    ///
-    /// let mut poll = Poll::new()?;
-    /// let registry = poll.registry().clone();
-    ///
-    /// registry.register(
-    ///     &registration,
-    ///     Token(0),
-    ///     Interests::readable() | Interests::writable(),
-    ///     PollOpt::edge())?;
-    ///
-    /// let mut events = Events::with_capacity(256);
-    ///
-    /// loop {
-    ///     poll.poll(&mut events, None);
-    ///
-    ///     for event in &events {
-    ///         if event.token() == Token(0) && event.readiness().is_readable() {
-    ///             return Ok(());
-    ///         }
-    ///     }
-    /// }
-    /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
-    /// [struct]: #
-    /// [`Poll`]: struct.Poll.html
-    pub fn new() -> (Registration, SetReadiness) {
-        // Allocate the registration node. The new node will have `ref_count`
-        // set to 2: one SetReadiness, one Registration.
-        let node = Box::into_raw(Box::new(ReadinessNode::new(
-            ptr::null_mut(),
-            Token(0),
-            Ready::EMPTY,
-            PollOpt::empty(),
-            2,
-        )));
-
-        let registration = Registration {
-            inner: RegistrationInner { node },
-        };
-
-        let set_readiness = SetReadiness {
-            inner: RegistrationInner { node },
-        };
-
-        (registration, set_readiness)
-    }
-
     // TODO: Get rid of this (windows depends on it for now)
     fn new_priv(
         registry: &Registry,
@@ -1639,27 +1506,7 @@ impl SetReadiness {
     /// There is no guarantee that `readiness` establishes any sort of memory
     /// ordering. Any concurrent data access must be synchronized using another
     /// strategy.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Registration, Ready};
-    ///
-    /// let (registration, set_readiness) = Registration::new();
-    ///
-    /// assert!(set_readiness.readiness().is_empty());
-    ///
-    /// set_readiness.set_readiness(Ready::READABLE)?;
-    /// assert!(set_readiness.readiness().is_readable());
-    /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
+    #[allow(dead_code)] // Used by Windows.
     pub fn readiness(&self) -> Ready {
         self.inner.readiness()
     }
@@ -1682,68 +1529,11 @@ impl SetReadiness {
     /// "timely" fashion. For example, the following is **not** guaranteed to
     /// work:
     ///
-    /// ```
-    /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Events, Registration, Ready, Interests, Poll, PollOpt, Token};
-    ///
-    /// let mut poll = Poll::new()?;
-    /// let registry = poll.registry().clone();
-    /// let (registration, set_readiness) = Registration::new();
-    ///
-    /// registry.register(&registration,
-    ///                   Token(0),
-    ///                   Interests::readable(),
-    ///                   PollOpt::edge())?;
-    ///
-    /// // Set the readiness, then immediately poll to try to get the readiness
-    /// // event
-    /// set_readiness.set_readiness(Ready::READABLE)?;
-    ///
-    /// let mut events = Events::with_capacity(1024);
-    /// poll.poll(&mut events, None)?;
-    ///
-    /// // There is NO guarantee that the following will work. It is possible
-    /// // that the readiness event will be delivered at a later time.
-    /// let event = events.iter().next().unwrap();
-    /// assert_eq!(event.token(), Token(0));
-    /// assert!(event.readiness().is_readable());
-    /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
-    ///
-    /// # Examples
-    ///
-    /// A simple example, for a more elaborate example, see the [`Evented`]
-    /// documentation.
-    ///
-    /// ```
-    /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
-    /// use mio::{Registration, Ready};
-    ///
-    /// let (registration, set_readiness) = Registration::new();
-    ///
-    /// assert!(set_readiness.readiness().is_empty());
-    ///
-    /// set_readiness.set_readiness(Ready::READABLE)?;
-    /// assert!(set_readiness.readiness().is_readable());
-    /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
-    ///
     /// [`Registration`]: struct.Registration.html
     /// [`Evented`]: event/trait.Evented.html#examples
     /// [`Poll`]: struct.Poll.html
     /// [`Poll::poll`]: struct.Poll.html#method.poll
+    #[allow(dead_code)] // Used by Windows.
     pub fn set_readiness(&self, ready: Ready) -> io::Result<()> {
         self.inner.set_readiness(ready)
     }
@@ -2578,6 +2368,7 @@ impl ReadinessState {
 
     /// Set the readiness
     #[inline]
+    #[allow(dead_code)] // Used by Windows.
     fn set_readiness(&mut self, v: Ready) {
         self.set(event::ready_as_usize(v), MASK_4, READINESS_SHIFT);
     }
