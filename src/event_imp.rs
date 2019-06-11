@@ -517,7 +517,7 @@ fn test_debug_pollopt() {
 /// But this also provides a number of non-portable readiness indicators, such
 /// as [error], [hup], [priority], [AIO] and [LIO]. These are **not** available
 /// on all platforms, and can only be created on platforms that support it.
-/// However it is possible to check for there presence in a set on all
+/// However it is possible to check for their presence in a set on all
 /// platforms. These indicators should be treated as a hint.
 ///
 /// [readable]: Ready::READABLE
