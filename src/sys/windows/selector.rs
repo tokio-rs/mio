@@ -30,10 +30,12 @@ static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 /// the internals to I/O handles registered on this selector. This is
 /// required to schedule I/O operations independently of being inside the event
 /// loop (e.g. when a call to `write` is seen we're not "in the event loop").
+#[derive(Debug)]
 pub struct Selector {
     inner: Arc<SelectorInner>,
 }
 
+#[derive(Debug)]
 struct SelectorInner {
     /// Unique identifier of the `Selector`
     id: usize,
@@ -82,10 +84,13 @@ impl Selector {
 
         let mut ret = false;
         for status in events.statuses[..n].iter() {
-            // This should only ever happen from the awakener, and we should
-            // only ever have one awakener right now, so assert as such.
+            // This should only ever happen from the awakener.
             if status.overlapped() as usize == 0 {
-                assert_eq!(status.token(), usize::from(awakener));
+                let token = Token(status.token());
+                if token == awakener {
+                    continue;
+                }
+                events.events.push(Event::new(Ready::READABLE, token));
                 ret = true;
                 continue;
             }

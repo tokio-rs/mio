@@ -596,21 +596,14 @@ impl Poll {
         is_send::<Poll>();
         is_sync::<Poll>();
 
+        let selector = sys::Selector::new()?;
+        let readiness_queue = ReadinessQueue::new(&selector)?;
         let inner = Arc::new(Inner {
-            selector: sys::Selector::new()?,
-            readiness_queue: ReadinessQueue::new()?,
+            selector,
+            readiness_queue,
         });
 
         let registry = Registry { inner };
-
-        // Register the notification wakeup FD with the IO poller
-        registry.inner.readiness_queue.inner.awakener.register(
-            &registry,
-            AWAKEN,
-            Interests::readable(),
-            PollOpt::edge(),
-        )?;
-
         Ok(Poll { registry })
     }
 
@@ -767,8 +760,6 @@ impl Poll {
             let res = inner.selector.select(&mut events.inner, AWAKEN, timeout);
             match res {
                 Ok(true) => {
-                    // Some awakeners require reading from a FD.
-                    inner.readiness_queue.inner.awakener.cleanup();
                     break;
                 }
                 Ok(false) => break,
@@ -1823,7 +1814,7 @@ impl Drop for RegistrationInner {
 
 impl ReadinessQueue {
     /// Create a new `ReadinessQueue`.
-    fn new() -> io::Result<ReadinessQueue> {
+    fn new(selector: &sys::Selector) -> io::Result<ReadinessQueue> {
         is_send::<Self>();
         is_sync::<Self>();
 
@@ -1835,7 +1826,7 @@ impl ReadinessQueue {
 
         Ok(ReadinessQueue {
             inner: Arc::new(ReadinessQueueInner {
-                awakener: sys::Awakener::new()?,
+                awakener: sys::Awakener::new(&selector, AWAKEN)?,
                 head_readiness: AtomicPtr::new(ptr),
                 tail_readiness: UnsafeCell::new(ptr),
                 end_marker,
@@ -2043,7 +2034,7 @@ impl Drop for ReadinessQueue {
 
 impl ReadinessQueueInner {
     fn wakeup(&self) -> io::Result<()> {
-        self.awakener.wakeup()
+        self.awakener.wake()
     }
 
     /// Prepend the given node to the head of the readiness queue. This is done

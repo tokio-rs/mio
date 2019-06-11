@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct BufferPool {
     pool: Vec<Vec<u8>>,
 }
