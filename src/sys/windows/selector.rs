@@ -358,7 +358,7 @@ impl ReadyBinding {
     /// Returns an error if we're already registered with another event loop,
     /// and otherwise just reassociates ourselves with the event loop to
     /// possible change tokens.
-    pub fn register_socket(
+    pub(crate) fn register_socket(
         &mut self,
         socket: &dyn AsRawSocket,
         registry: &Registry,
@@ -379,7 +379,7 @@ impl ReadyBinding {
     }
 
     /// Implementation of `Evented::reregister` function.
-    pub fn reregister_socket(
+    pub(crate) fn reregister_socket(
         &mut self,
         socket: &dyn AsRawSocket,
         registry: &Registry,
@@ -405,7 +405,7 @@ impl ReadyBinding {
     ///
     /// Doesn't allow registration with another event loop, just shuts down
     /// readiness notifications and such.
-    pub fn deregister(
+    pub(crate) fn deregister(
         &mut self,
         socket: &dyn AsRawSocket,
         registry: &Registry,

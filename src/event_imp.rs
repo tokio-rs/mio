@@ -12,19 +12,12 @@ use std::{fmt, io, ops};
 ///
 /// # Implementing `Evented`
 ///
-/// There are two types of `Evented` values.
-///
-/// * **System** handles, which are backed by sockets or other system handles.
-/// These `Evented` handles will be monitored by the system selector. In this
-/// case, an implementation of `Evented` delegates to a lower level handle.
-///
-/// * **User** handles, which are driven entirely in user space using
-/// [`Registration`] and [`SetReadiness`]. In this case, the implementer takes
-/// responsibility for driving the readiness state changes.
+/// `Evented` values are always backed by **system** handles, which are backed
+/// by sockets or other system handles. These `Evented` handles will be
+/// monitored by the system selector. An implementation of `Evented` will almost
+/// always delegates to a lower level handle.
 ///
 /// [`Registry`]: ../struct.Registry.html
-/// [`Registration`]: ../struct.Registration.html
-/// [`SetReadiness`]: ../struct.SetReadiness.html
 ///
 /// # Examples
 ///
@@ -62,74 +55,14 @@ use std::{fmt, io, ops};
 ///     }
 /// }
 /// ```
-///
-/// Implement `Evented` using [`Registration`] and [`SetReadiness`].
-///
-/// ```
-/// use mio::{Ready, Interests, Registration, Registry, PollOpt, Token};
-/// use mio::event::Evented;
-///
-/// use std::io;
-/// use std::time::Instant;
-/// use std::thread;
-///
-/// pub struct Deadline {
-///     when: Instant,
-///     registration: Registration,
-/// }
-///
-/// impl Deadline {
-///     pub fn new(when: Instant) -> Deadline {
-///         let (registration, set_readiness) = Registration::new();
-///
-///         thread::spawn(move || {
-///             let now = Instant::now();
-///
-///             if now < when {
-///                 thread::sleep(when - now);
-///             }
-///
-///             set_readiness.set_readiness(Ready::READABLE);
-///         });
-///
-///         Deadline {
-///             when: when,
-///             registration: registration,
-///         }
-///     }
-///
-///     pub fn is_elapsed(&self) -> bool {
-///         Instant::now() >= self.when
-///     }
-/// }
-///
-/// impl Evented for Deadline {
-///     fn register(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
-///         -> io::Result<()>
-///     {
-///         self.registration.register(registry, token, interests, opts)
-///     }
-///
-///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests, opts: PollOpt)
-///         -> io::Result<()>
-///     {
-///         self.registration.reregister(registry, token, interests, opts)
-///     }
-///
-///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-///         self.registration.deregister(registry)
-///     }
-/// }
-/// ```
 pub trait Evented {
     /// Register `self` with the given `Registry` instance.
     ///
     /// This function should not be called directly. Use [`Registry::register`]
-    /// instead. Implementors should handle registration by either delegating
-    /// the call to another `Evented` type or creating a [`Registration`].
+    /// instead. Implementors should handle registration by delegating
+    /// the call to another `Evented` type.
     ///
     /// [`Registry::register`]: ../struct.Registry.html#method.register
-    /// [`Registration`]: ../struct.Registration.html
     fn register(
         &self,
         registry: &Registry,
@@ -158,12 +91,10 @@ pub trait Evented {
     /// Deregister `self` from the given `Registry` instance
     ///
     /// This function should not be called directly. Use [`Registry::deregister`]
-    /// instead. Implementors should handle deregistration by either delegating
-    /// the call to another `Evented` type or by dropping the [`Registration`]
-    /// associated with `self`.
+    /// instead. Implementors should handle deregistration by delegating
+    /// the call to another `Evented` type.
     ///
     /// [`Registry::deregister`]: ../struct.Registry.html#method.deregister
-    /// [`Registration`]: ../struct.Registration.html
     fn deregister(&self, registry: &Registry) -> io::Result<()>;
 }
 
@@ -586,7 +517,7 @@ fn test_debug_pollopt() {
 /// But this also provides a number of non-portable readiness indicators, such
 /// as [error], [hup], [priority], [AIO] and [LIO]. These are **not** available
 /// on all platforms, and can only be created on platforms that support it.
-/// However it is possible to check for there presence in a set on all
+/// However it is possible to check for their presence in a set on all
 /// platforms. These indicators should be treated as a hint.
 ///
 /// [readable]: Ready::READABLE
