@@ -271,13 +271,12 @@ impl Selector {
 
     // Used by `Awakener`.
     #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
-    pub fn try_clone(&self) -> io::Result<Selector> {
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
+    pub fn try_clone_awakener(&self) -> io::Result<Selector> {
         let new_kq = unsafe { libc::dup(self.kq) };
         if new_kq == -1 {
             Err(io::Error::last_os_error())
         } else {
-            Ok(Selector { id, kq: new_kq })
+            Ok(Selector { id: self.id, kq: new_kq })
         }
     }
 

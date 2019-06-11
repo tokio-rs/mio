@@ -84,7 +84,7 @@ mod kqueue {
 
     impl Awakener {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Awakener> {
-            selector.try_clone().and_then(|selector| {
+            selector.try_clone_awakener().and_then(|selector| {
                 selector
                     .setup_awakener(token)
                     .map(|()| Awakener { selector, token })
