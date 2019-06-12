@@ -1,18 +1,14 @@
-use crate::event_imp::{self as event, Event, Evented, Interests, PollOpt, Ready};
+use crate::event_imp::{Event, Evented, Interests, PollOpt};
 use crate::{sys, Token};
 use log::trace;
-use std::cell::UnsafeCell;
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
-use std::process;
-use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
-use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use std::{fmt, io, ptr, usize};
-use std::{isize, mem, ops};
+use std::{fmt, io, usize};
 
 // Poll is backed by two readiness queues. The first is a system readiness queue
 // represented by `sys::Selector`. The system readiness queue handles events
@@ -344,12 +340,6 @@ pub struct SelectorId {
     id: AtomicUsize,
 }
 
-/// Stores the ReadinessNode state in an AtomicUsize. This wrapper around the
-/// atomic variable handles encoding / decoding `ReadinessState` values.
-struct AtomicState {
-    inner: AtomicUsize,
-}
-
 const AWAKEN: Token = Token(usize::MAX);
 
 /*
@@ -585,7 +575,7 @@ impl fmt::Debug for Registry {
 #[cfg(unix)]
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
-        self.registry.inner.selector.as_raw_fd()
+        self.registry.selector.as_raw_fd()
     }
 }
 

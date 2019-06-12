@@ -282,13 +282,6 @@ impl Events {
         })
     }
 
-    pub fn push_event(&mut self, event: Event) {
-        self.events.push(libc::epoll_event {
-            events: ready_to_epoll(event.readiness(), PollOpt::empty()),
-            u64: usize::from(event.token()) as u64,
-        });
-    }
-
     pub fn clear(&mut self) {
         unsafe {
             self.events.set_len(0);
