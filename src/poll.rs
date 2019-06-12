@@ -1169,8 +1169,7 @@ impl SelectorId {
                 "socket already registered",
             ))
         } else {
-            self.id
-                .store(registry.selector.id(), Ordering::SeqCst);
+            self.id.store(registry.selector.id(), Ordering::SeqCst);
             Ok(())
         }
     }

@@ -144,9 +144,9 @@ use winapi;
 mod awakener;
 #[macro_use]
 mod selector;
-mod queue;
 mod buffer_pool;
 mod from_raw_arc;
+mod queue;
 mod tcp;
 mod udp;
 
@@ -155,8 +155,8 @@ pub use self::selector::{Binding, Events, Overlapped, Selector};
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
 
-use self::selector::SelectorInner;
 use self::queue::{ReadinessQueue, Registration, SetReadiness};
+use self::selector::SelectorInner;
 
 #[derive(Copy, Clone)]
 enum Family {

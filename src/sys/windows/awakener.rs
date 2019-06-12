@@ -21,10 +21,7 @@ impl Awakener {
 
     pub(super) fn new_priv(selector: Arc<SelectorInner>, token: Token) -> Awakener {
         Awakener {
-            inner: Mutex::new(AwakenerInner {
-                selector,
-                token,
-            }),
+            inner: Mutex::new(AwakenerInner { selector, token }),
         }
     }
 

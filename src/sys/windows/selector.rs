@@ -1,8 +1,8 @@
 use crate::event_imp::{Event, Evented, Interests, Ready};
 use crate::lazycell::AtomicLazyCell;
 use crate::poll::{self, Registry};
-use crate::sys::windows::{ReadinessQueue, Registration, SetReadiness};
 use crate::sys::windows::buffer_pool::BufferPool;
+use crate::sys::windows::{ReadinessQueue, Registration, SetReadiness};
 use crate::{PollOpt, Token};
 use log::trace;
 use miow;
@@ -419,7 +419,12 @@ impl ReadyBinding {
             self.binding.register_socket(socket, token, registry)?;
         }
 
-        let (r, s) = Registration::new(&poll::selector(registry).readiness_queue, token, events, opts);
+        let (r, s) = Registration::new(
+            &poll::selector(registry).readiness_queue,
+            token,
+            events,
+            opts,
+        );
         self.readiness = Some(s);
         *registration.lock().unwrap() = Some(r);
         Ok(())

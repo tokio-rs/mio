@@ -4,9 +4,9 @@
 //! something seems odd you may also want to try the docs over there.
 
 use crate::event::Evented;
-use crate::sys::windows::{Registration, SetReadiness};
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
+use crate::sys::windows::{Registration, SetReadiness};
 use crate::{poll, Interests, PollOpt, Ready, Registry, Token};
 use log::trace;
 use miow::iocp::CompletionStatus;

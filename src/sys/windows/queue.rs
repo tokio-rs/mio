@@ -1,12 +1,12 @@
-use crate::{poll, sys, Interests, PollOpt, Ready, Token};
-use crate::event_imp::{self as event, Event, Evented};
 use super::{Awakener, SelectorInner};
+use crate::event_imp::{self as event, Event, Evented};
+use crate::{poll, sys, Interests, PollOpt, Ready, Token};
 
-use std::{fmt, io, isize, mem, ops, process, ptr, usize};
 use std::cell::UnsafeCell;
-use std::sync::Arc;
+use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize};
-use std::sync::atomic::Ordering::{self, Acquire, Release, AcqRel, Relaxed};
+use std::sync::Arc;
+use std::{fmt, io, isize, mem, ops, process, ptr, usize};
 
 #[derive(Clone)]
 pub(crate) struct ReadinessQueue {
@@ -211,8 +211,12 @@ impl Evented for Registration {
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner
-            .update(&poll::selector(registry).readiness_queue, token, interests.to_ready(), opts)
+        self.inner.update(
+            &poll::selector(registry).readiness_queue,
+            token,
+            interests.to_ready(),
+            opts,
+        )
     }
 
     fn reregister(
@@ -222,13 +226,21 @@ impl Evented for Registration {
         interests: Interests,
         opts: PollOpt,
     ) -> io::Result<()> {
-        self.inner
-            .update(&poll::selector(registry).readiness_queue, token, interests.to_ready(), opts)
+        self.inner.update(
+            &poll::selector(registry).readiness_queue,
+            token,
+            interests.to_ready(),
+            opts,
+        )
     }
 
     fn deregister(&self, registry: &poll::Registry) -> io::Result<()> {
-        self.inner
-            .update(&poll::selector(registry).readiness_queue, Token(0), Ready::EMPTY, PollOpt::empty())
+        self.inner.update(
+            &poll::selector(registry).readiness_queue,
+            Token(0),
+            Ready::EMPTY,
+            PollOpt::empty(),
+        )
     }
 }
 
@@ -362,8 +374,7 @@ impl RegistrationInner {
         // visible the `registry: &Registry` ref passed as an argument to the
         // function.
         let mut queue = self.readiness_queue.load(Relaxed);
-        let other: &*mut () =
-            unsafe { &*(&readiness_queue.inner as *const _ as *const *mut ()) };
+        let other: &*mut () = unsafe { &*(&readiness_queue.inner as *const _ as *const *mut ()) };
         let other = *other;
 
         debug_assert!(mem::size_of::<Arc<ReadinessQueueInner>>() == mem::size_of::<*mut ()>());
