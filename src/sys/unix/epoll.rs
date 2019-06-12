@@ -179,36 +179,6 @@ fn interests_to_epoll(interests: Interests, opts: PollOpt) -> u32 {
     kind as u32
 }
 
-fn ready_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
-    let mut kind = 0;
-
-    if interest.is_readable() {
-        kind |= EPOLLIN;
-    }
-
-    if interest.is_writable() {
-        kind |= EPOLLOUT;
-    }
-
-    if interest.is_priority() {
-        kind |= EPOLLPRI;
-    }
-
-    if opts.is_edge() {
-        kind |= EPOLLET;
-    }
-
-    if opts.is_oneshot() {
-        kind |= EPOLLONESHOT;
-    }
-
-    if opts.is_level() {
-        kind &= !EPOLLET;
-    }
-
-    kind as u32
-}
-
 impl AsRawFd for Selector {
     fn as_raw_fd(&self) -> RawFd {
         self.epfd
