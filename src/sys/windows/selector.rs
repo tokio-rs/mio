@@ -11,7 +11,7 @@ use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{fmt, io};
 use winapi::shared::winerror::WAIT_TIMEOUT;
 use winapi::um::minwinbase::OVERLAPPED;
