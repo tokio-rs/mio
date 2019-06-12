@@ -1,7 +1,7 @@
-use crate::sys::windows::Selector;
+use crate::sys::windows::{Selector, SelectorInner};
 use crate::{io, Token};
 use miow::iocp::CompletionStatus;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 pub struct Awakener {
@@ -11,17 +11,21 @@ pub struct Awakener {
 #[derive(Debug)]
 struct AwakenerInner {
     token: Token,
-    selector: Selector,
+    selector: Arc<SelectorInner>,
 }
 
 impl Awakener {
     pub fn new(selector: &Selector, token: Token) -> io::Result<Awakener> {
-        Ok(Awakener {
+        Ok(Awakener::new_priv(selector.clone_inner(), token))
+    }
+
+    pub(super) fn new_priv(selector: Arc<SelectorInner>, token: Token) -> Awakener {
+        Awakener {
             inner: Mutex::new(AwakenerInner {
-                selector: selector.clone_ref(),
+                selector,
                 token,
             }),
-        })
+        }
     }
 
     pub fn wake(&self) -> io::Result<()> {

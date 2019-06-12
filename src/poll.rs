@@ -381,7 +381,7 @@ struct Inner {
 /// [`reregister`]: struct.Registry.html#method.reregister
 /// [`deregister`]: struct.Registry.html#method.deregister
 /// [portability]: struct.Poll.html#portability
-pub(crate) struct Registration {
+struct Registration {
     inner: RegistrationInner,
 }
 
@@ -396,7 +396,7 @@ unsafe impl Sync for Registration {}
 /// [`Poll`]: struct.Poll.html
 /// [`Registration`]: struct.Registration.html
 #[derive(Clone)]
-pub(crate) struct SetReadiness {
+struct SetReadiness {
     inner: RegistrationInner,
 }
 
@@ -1393,7 +1393,7 @@ pub fn selector(registry: &Registry) -> &sys::Selector {
 
 // TODO: get rid of this, windows depends on it for now
 #[allow(dead_code)]
-pub(crate) fn new_registration(
+fn new_registration(
     registry: &Registry,
     token: Token,
     interests: Interests,
