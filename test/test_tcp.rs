@@ -644,7 +644,7 @@ fn connect_error() {
     let mut events = Events::with_capacity(16);
 
     // Pick a "random" port that shouldn't be in use.
-    let l = match TcpStream::connect(&"127.0.0.1:38381".parse().unwrap()) {
+    let l = match TcpStream::connect("127.0.0.1:38381") {
         Ok(l) => l,
         Err(ref e) if e.kind() == io::ErrorKind::ConnectionRefused => {
             // Connection failed synchronously.  This is not a bug, but it

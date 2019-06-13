@@ -13,7 +13,7 @@ use iovec::IoVec;
 use net2::TcpBuilder;
 use std::fmt;
 use std::io::{Read, Write};
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs};
 use std::time::Duration;
 
 /*
@@ -38,7 +38,7 @@ use std::time::Duration;
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
-/// let stream = TcpStream::connect(&"127.0.0.1:34254".parse()?)?;
+/// let stream = TcpStream::connect("127.0.0.1:34254")?;
 ///
 /// let mut poll = Poll::new()?;
 /// let registry = poll.registry().clone();
@@ -79,7 +79,26 @@ impl TcpStream {
     /// `net2::TcpBuilder` to configure a socket and then pass its socket to
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
-    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
+    pub fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
+        let addrs = addr.to_socket_addrs()?;
+        let mut last_error = None;
+
+        for addr in addrs {
+            match Self::try_connect(&addr) {
+                Ok(stream) => return Ok(stream),
+                Err(error) => last_error = Some(error),
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "could not resolve to any addresses",
+            )
+        }))
+    }
+
+    fn try_connect(addr: &SocketAddr) -> io::Result<TcpStream> {
         let sock = match *addr {
             SocketAddr::V4(..) => TcpBuilder::new_v4(),
             SocketAddr::V6(..) => TcpBuilder::new_v6(),

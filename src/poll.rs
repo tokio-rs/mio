@@ -273,7 +273,7 @@ use std::{isize, mem, ops};
 /// use std::time::Duration;
 /// use std::thread;
 ///
-/// let sock = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
+/// let sock = TcpStream::connect("216.58.193.100:80")?;
 ///
 /// thread::sleep(Duration::from_secs(1));
 ///
@@ -889,7 +889,7 @@ impl Registry {
     ///
     /// let mut poll = Poll::new()?;
     /// let registry = poll.registry().clone();
-    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
+    /// let socket = TcpStream::connect("216.58.193.100:80")?;
     ///
     /// // Register the socket with `poll`
     /// registry.register(
@@ -985,7 +985,7 @@ impl Registry {
     ///
     /// let mut poll = Poll::new()?;
     /// let registry = poll.registry().clone();
-    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
+    /// let socket = TcpStream::connect("216.58.193.100:80")?;
     ///
     /// // Register the socket with `poll`, requesting readable
     /// registry.register(
@@ -1063,7 +1063,7 @@ impl Registry {
     ///
     /// let mut poll = Poll::new()?;
     /// let registry = poll.registry().clone();
-    /// let socket = TcpStream::connect(&"216.58.193.100:80".parse()?)?;
+    /// let socket = TcpStream::connect("216.58.193.100:80")?;
     ///
     /// // Register the socket with `poll`
     /// registry.register(
