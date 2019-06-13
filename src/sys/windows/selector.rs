@@ -39,7 +39,7 @@ pub struct Selector {
     pub(super) readiness_queue: ReadinessQueue,
 }
 
-// Public to allow `Awakener` access
+// Public to allow `Waker` access
 #[derive(Debug)]
 pub(super) struct SelectorInner {
     /// Unique identifier of the `Selector`
@@ -78,7 +78,7 @@ impl Selector {
     pub fn select(
         &self,
         events: &mut Events,
-        awakener: Token,
+        waker: Token,
         mut timeout: Option<Duration>,
     ) -> io::Result<bool> {
         // Compute the timeout value passed to the system selector. If the
@@ -94,13 +94,13 @@ impl Selector {
             // The readiness queue is empty. The call to `prepare_for_sleep`
             // inserts `sleep_marker` into the queue. This signals to any
             // threads setting readiness that the `Poll::poll` is going to
-            // sleep, so the awakener should be used.
+            // sleep, so the waker should be used.
         } else {
             // The readiness queue is not empty, so do not block the thread.
             timeout = Some(Duration::from_millis(0));
         }
 
-        let ret = self.select2(events, awakener, timeout)?;
+        let ret = self.select2(events, waker, timeout)?;
 
         // Poll custom event queue
         self.readiness_queue.poll(events);
@@ -112,7 +112,7 @@ impl Selector {
     pub fn select2(
         &self,
         events: &mut Events,
-        awakener: Token,
+        waker: Token,
         timeout: Option<Duration>,
     ) -> io::Result<bool> {
         trace!("select; timeout={:?}", timeout);
@@ -129,10 +129,10 @@ impl Selector {
 
         let mut ret = false;
         for status in events.statuses[..n].iter() {
-            // This should only ever happen from the awakener.
+            // This should only ever happen from the waker.
             if status.overlapped() as usize == 0 {
                 let token = Token(status.token());
-                if token == awakener {
+                if token == waker {
                     continue;
                 }
                 events.events.push(Event::new(Ready::READABLE, token));
@@ -489,7 +489,7 @@ pub struct Events {
     statuses: Box<[CompletionStatus]>,
 
     /// Literal events returned by `get` to the upwards `EventLoop`. This file
-    /// doesn't really modify this (except for the awakener), instead almost all
+    /// doesn't really modify this (except for the waker), instead almost all
     /// events are filled in by the `ReadinessQueue` from the `poll` module.
     events: Vec<Event>,
 }

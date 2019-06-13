@@ -141,7 +141,7 @@ use std::os::windows::prelude::*;
 
 use winapi;
 
-mod awakener;
+mod waker;
 #[macro_use]
 mod selector;
 mod buffer_pool;
@@ -150,10 +150,10 @@ mod queue;
 mod tcp;
 mod udp;
 
-pub use self::awakener::Awakener;
 pub use self::selector::{Binding, Events, Overlapped, Selector};
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
+pub use self::waker::Waker;
 
 use self::queue::{ReadinessQueue, Registration, SetReadiness};
 use self::selector::SelectorInner;

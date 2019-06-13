@@ -1,4 +1,4 @@
-use super::{Awakener, SelectorInner};
+use super::{Waker, SelectorInner};
 use crate::event_imp::{self as event, Event, Evented};
 use crate::{poll, sys, Interests, PollOpt, Ready, Token};
 
@@ -41,7 +41,7 @@ struct RegistrationInner {
 
 struct ReadinessQueueInner {
     // Used to wake up `Poll` when readiness is set in another thread.
-    awakener: Awakener,
+    waker: Waker,
 
     // Head of the MPSC queue used to signal readiness to `Poll::poll`.
     head_readiness: AtomicPtr<ReadinessNode>,
@@ -159,7 +159,7 @@ enum Dequeue {
     Inconsistent,
 }
 
-const AWAKEN: Token = Token(usize::MAX);
+const WAKE: Token = Token(usize::MAX);
 const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 
 impl Registration {
@@ -598,7 +598,7 @@ impl ReadinessQueue {
 
         Ok(ReadinessQueue {
             inner: Arc::new(ReadinessQueueInner {
-                awakener: sys::Awakener::new_priv(selector, AWAKEN),
+                waker: sys::Waker::new_priv(selector, WAKE),
                 head_readiness: AtomicPtr::new(ptr),
                 tail_readiness: UnsafeCell::new(ptr),
                 end_marker,
@@ -812,7 +812,7 @@ impl Drop for ReadinessQueue {
 
 impl ReadinessQueueInner {
     fn wakeup(&self) -> io::Result<()> {
-        self.awakener.wake()
+        self.waker.wake()
     }
 
     /// Prepend the given node to the head of the readiness queue. This is done

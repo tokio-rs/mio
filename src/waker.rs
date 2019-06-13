@@ -2,7 +2,7 @@ use std::io;
 
 use crate::{poll, sys, Registry, Token};
 
-/// Awakener allows cross-thread waking of [`Poll`].
+/// Waker allows cross-thread waking of [`Poll`].
 ///
 /// When created it will cause events with [`Ready::READABLE`] and the provided
 /// `token` if [`wake`] is called, possibly from another thread.
@@ -11,16 +11,16 @@ use crate::{poll, sys, Registry, Token};
 ///
 /// # Notes
 ///
-/// `Awakener` events are only guaranteed to be delivered while the `Awakener`
-/// value is alive.
+/// `Waker` events are only guaranteed to be delivered while the `Waker` value
+/// is alive.
 ///
-/// Only a single `Awakener` should active per [`Poll`], if multiple threads
-/// need access to the `Awakener` it can be shared via for example an `Arc`.
-/// What happens if multiple `Awakener`s are registered with the same `Poll` is
+/// Only a single `Waker` should active per [`Poll`], if multiple threads need
+/// access to the `Waker` it can be shared via for example an `Arc`. What
+/// happens if multiple `Waker`s are registered with the same `Poll` is
 /// undefined.
 ///
 /// [`Ready::READABLE`]: crate::Ready::READABLE
-/// [`wake`]: Awakener::wake
+/// [`wake`]: Waker::wake
 ///
 /// # Implementation notes
 ///
@@ -43,24 +43,24 @@ use crate::{poll, sys, Registry, Token};
 /// use std::sync::Arc;
 ///
 /// use mio::event::Event;
-/// use mio::{Events, Ready, Token, Poll, Awakener};
+/// use mio::{Events, Ready, Token, Poll, Waker};
 ///
 /// const WAKE_TOKEN: Token = Token(10);
 ///
 /// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(2);
 ///
-/// let awakener = Arc::new(Awakener::new(poll.registry(), WAKE_TOKEN)?);
+/// let waker = Arc::new(Waker::new(poll.registry(), WAKE_TOKEN)?);
 ///
-/// // We need to keep the Awakener alive, so we'll create a clone for the
+/// // We need to keep the Waker alive, so we'll create a clone for the
 /// // thread we create below.
-/// let awakener1 = awakener.clone();
+/// let waker1 = waker.clone();
 /// let handle = thread::spawn(move || {
 ///     // Working hard, or hardly working?
 ///     thread::sleep(Duration::from_millis(500));
 ///
 ///     // Now we'll wake the queue on the other thread.
-///     awakener1.wake().expect("unable to wake");
+///     waker1.wake().expect("unable to wake");
 /// });
 ///
 /// // On our current thread we'll poll for events, without a timeout.
@@ -77,17 +77,17 @@ use crate::{poll, sys, Registry, Token};
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Awakener {
-    inner: sys::Awakener,
+pub struct Waker {
+    inner: sys::Waker,
 }
 
-impl Awakener {
-    /// Create a new `Awakener`.
-    pub fn new(registry: &Registry, token: Token) -> io::Result<Awakener> {
-        sys::Awakener::new(poll::selector(&registry), token).map(|inner| Awakener { inner })
+impl Waker {
+    /// Create a new `Waker`.
+    pub fn new(registry: &Registry, token: Token) -> io::Result<Waker> {
+        sys::Waker::new(poll::selector(&registry), token).map(|inner| Waker { inner })
     }
 
-    /// Wake up the [`Poll`] associated with this `Awakener`.
+    /// Wake up the [`Poll`] associated with this `Waker`.
     ///
     /// [`Poll`]: crate::Poll
     pub fn wake(&self) -> io::Result<()> {

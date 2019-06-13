@@ -340,7 +340,7 @@ pub struct SelectorId {
     id: AtomicUsize,
 }
 
-const AWAKEN: Token = Token(usize::MAX);
+const WAKE: Token = Token(usize::MAX);
 
 /*
  *
@@ -528,7 +528,7 @@ impl Poll {
         loop {
             let now = Instant::now();
             // First get selector events
-            let res = selector.select(&mut events.inner, AWAKEN, timeout);
+            let res = selector.select(&mut events.inner, WAKE, timeout);
 
             match res {
                 Ok(_) => break,
@@ -553,7 +553,7 @@ impl Poll {
 }
 
 fn validate_args(token: Token) -> io::Result<()> {
-    if token == AWAKEN {
+    if token == WAKE {
         return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
     }
 
