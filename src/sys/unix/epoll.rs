@@ -179,36 +179,6 @@ fn interests_to_epoll(interests: Interests, opts: PollOpt) -> u32 {
     kind as u32
 }
 
-fn ready_to_epoll(interest: Ready, opts: PollOpt) -> u32 {
-    let mut kind = 0;
-
-    if interest.is_readable() {
-        kind |= EPOLLIN;
-    }
-
-    if interest.is_writable() {
-        kind |= EPOLLOUT;
-    }
-
-    if interest.is_priority() {
-        kind |= EPOLLPRI;
-    }
-
-    if opts.is_edge() {
-        kind |= EPOLLET;
-    }
-
-    if opts.is_oneshot() {
-        kind |= EPOLLONESHOT;
-    }
-
-    if opts.is_level() {
-        kind &= !EPOLLET;
-    }
-
-    kind as u32
-}
-
 impl AsRawFd for Selector {
     fn as_raw_fd(&self) -> RawFd {
         self.epfd
@@ -280,13 +250,6 @@ impl Events {
 
             Event::new(kind, Token(token as usize))
         })
-    }
-
-    pub fn push_event(&mut self, event: Event) {
-        self.events.push(libc::epoll_event {
-            events: ready_to_epoll(event.readiness(), PollOpt::empty()),
-            u64: usize::from(event.token()) as u64,
-        });
     }
 
     pub fn clear(&mut self) {

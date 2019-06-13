@@ -6,7 +6,8 @@
 use crate::event::Evented;
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
-use crate::{poll, Interests, PollOpt, Ready, Registry, Token};
+use crate::sys::windows::Registration;
+use crate::{Interests, PollOpt, Ready, Registry, Token};
 use log::trace;
 use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
@@ -24,7 +25,7 @@ use winapi::um::winsock2::WSAEMSGSIZE;
 
 pub struct UdpSocket {
     imp: Imp,
-    registration: Mutex<Option<poll::Registration>>,
+    registration: Mutex<Option<Registration>>,
 }
 
 #[derive(Clone)]

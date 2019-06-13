@@ -1140,10 +1140,7 @@ impl Interests {
         (self.0.get() & LIO) != 0
     }
 
-    /// Returns `Ready` contains `Interests` readiness
-    ///
-    /// It should and only can be used in crate, and will be deprecated in the future.
-    /// So don't use it unless you have no other choice.
+    #[cfg(windows)]
     pub(crate) fn to_ready(&self) -> Ready {
         Ready(self.0.get() as u8)
     }
@@ -1340,18 +1337,22 @@ impl Event {
  *
  */
 
+#[cfg(windows)]
 pub fn ready_as_usize(events: Ready) -> usize {
     events.as_usize()
 }
 
+#[cfg(windows)]
 pub fn opt_as_usize(opt: PollOpt) -> usize {
     opt.0
 }
 
+#[cfg(windows)]
 pub fn ready_from_usize(events: usize) -> Ready {
     Ready::from_usize(events)
 }
 
+#[cfg(windows)]
 pub fn opt_from_usize(opt: usize) -> PollOpt {
     PollOpt(opt)
 }

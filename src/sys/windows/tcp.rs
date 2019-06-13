@@ -1,8 +1,8 @@
 use crate::event::Evented;
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
-use crate::sys::windows::Family;
-use crate::{poll, Interests, PollOpt, Ready, Registry, Token};
+use crate::sys::windows::{Family, Registration};
+use crate::{Interests, PollOpt, Ready, Registry, Token};
 use iovec::IoVec;
 use log::trace;
 use miow::iocp::CompletionStatus;
@@ -23,12 +23,12 @@ pub struct TcpStream {
     /// implementation on this type is only executed when it's actually dropped
     /// (many clones of this `imp` are made).
     imp: StreamImp,
-    registration: Mutex<Option<poll::Registration>>,
+    registration: Mutex<Option<Registration>>,
 }
 
 pub struct TcpListener {
     imp: ListenerImp,
-    registration: Mutex<Option<poll::Registration>>,
+    registration: Mutex<Option<Registration>>,
 }
 
 #[derive(Clone)]

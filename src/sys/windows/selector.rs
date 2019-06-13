@@ -2,6 +2,7 @@ use crate::event_imp::{Event, Evented, Interests, Ready};
 use crate::lazycell::AtomicLazyCell;
 use crate::poll::{self, Registry};
 use crate::sys::windows::buffer_pool::BufferPool;
+use crate::sys::windows::{ReadinessQueue, Registration, SetReadiness};
 use crate::{PollOpt, Token};
 use log::trace;
 use miow;
@@ -33,10 +34,14 @@ static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 #[derive(Debug)]
 pub struct Selector {
     inner: Arc<SelectorInner>,
+
+    // Custom readiness queue
+    pub(super) readiness_queue: ReadinessQueue,
 }
 
+// Public to allow `Waker` access
 #[derive(Debug)]
-struct SelectorInner {
+pub(super) struct SelectorInner {
     /// Unique identifier of the `Selector`
     id: usize,
 
@@ -54,17 +59,57 @@ impl Selector {
     pub fn new() -> io::Result<Selector> {
         // offset by 1 to avoid choosing 0 as the id of a selector
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
+        let cp = CompletionPort::new(1)?;
 
-        CompletionPort::new(1).map(|cp| Selector {
-            inner: Arc::new(SelectorInner {
-                id: id,
-                port: cp,
-                buffers: Mutex::new(BufferPool::new(256)),
-            }),
+        let inner = Arc::new(SelectorInner {
+            id: id,
+            port: cp,
+            buffers: Mutex::new(BufferPool::new(256)),
+        });
+
+        let readiness_queue = ReadinessQueue::new(inner.clone())?;
+
+        Ok(Selector {
+            inner,
+            readiness_queue,
         })
     }
 
     pub fn select(
+        &self,
+        events: &mut Events,
+        waker: Token,
+        mut timeout: Option<Duration>,
+    ) -> io::Result<bool> {
+        // Compute the timeout value passed to the system selector. If the
+        // readiness queue has pending nodes, we still want to poll the system
+        // selector for new events, but we don't want to block the thread to
+        // wait for new events.
+        if timeout == Some(Duration::from_millis(0)) {
+            // If blocking is not requested, then there is no need to prepare
+            // the queue for sleep
+            //
+            // The sleep_marker should be removed by readiness_queue.poll().
+        } else if self.readiness_queue.prepare_for_sleep() {
+            // The readiness queue is empty. The call to `prepare_for_sleep`
+            // inserts `sleep_marker` into the queue. This signals to any
+            // threads setting readiness that the `Poll::poll` is going to
+            // sleep, so the waker should be used.
+        } else {
+            // The readiness queue is not empty, so do not block the thread.
+            timeout = Some(Duration::from_millis(0));
+        }
+
+        let ret = self.select2(events, waker, timeout)?;
+
+        // Poll custom event queue
+        self.readiness_queue.poll(events);
+
+        // Return number of polled events
+        Ok(ret)
+    }
+
+    pub fn select2(
         &self,
         events: &mut Events,
         waker: Token,
@@ -105,17 +150,10 @@ impl Selector {
         Ok(ret)
     }
 
-    /// Gets a reference to the underlying `CompletionPort` structure.
-    pub fn port(&self) -> &CompletionPort {
-        &self.inner.port
-    }
-
     /// Gets a new reference to this selector, although all underlying data
     /// structures will refer to the same completion port.
-    pub fn clone_ref(&self) -> Selector {
-        Selector {
-            inner: self.inner.clone(),
-        }
+    pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
+        self.inner.clone()
     }
 
     /// Return the `Selector`'s identifier
@@ -127,6 +165,10 @@ impl Selector {
 impl SelectorInner {
     fn identical(&self, other: &SelectorInner) -> bool {
         (self as *const SelectorInner) == (other as *const SelectorInner)
+    }
+
+    pub fn port(&self) -> &CompletionPort {
+        &self.port
     }
 }
 
@@ -294,7 +336,7 @@ impl fmt::Debug for Binding {
 /// `SetReadiness` handle.
 pub struct ReadyBinding {
     binding: Binding,
-    readiness: Option<poll::SetReadiness>,
+    readiness: Option<SetReadiness>,
 }
 
 impl ReadyBinding {
@@ -370,14 +412,19 @@ impl ReadyBinding {
         token: Token,
         events: Interests,
         opts: PollOpt,
-        registration: &Mutex<Option<poll::Registration>>,
+        registration: &Mutex<Option<Registration>>,
     ) -> io::Result<()> {
         trace!("register {:?} {:?}", token, events);
         unsafe {
             self.binding.register_socket(socket, token, registry)?;
         }
 
-        let (r, s) = poll::new_registration(registry, token, events, opts);
+        let (r, s) = Registration::new(
+            &poll::selector(registry).readiness_queue,
+            token,
+            events,
+            opts,
+        );
         self.readiness = Some(s);
         *registration.lock().unwrap() = Some(r);
         Ok(())
@@ -391,7 +438,7 @@ impl ReadyBinding {
         token: Token,
         events: Interests,
         opts: PollOpt,
-        registration: &Mutex<Option<poll::Registration>>,
+        registration: &Mutex<Option<Registration>>,
     ) -> io::Result<()> {
         trace!("reregister {:?} {:?}", token, events);
         unsafe {
@@ -414,7 +461,7 @@ impl ReadyBinding {
         &mut self,
         socket: &dyn AsRawSocket,
         registry: &Registry,
-        registration: &Mutex<Option<poll::Registration>>,
+        registration: &Mutex<Option<Registration>>,
     ) -> io::Result<()> {
         trace!("deregistering");
         unsafe {

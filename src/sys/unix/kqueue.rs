@@ -440,10 +440,6 @@ impl Events {
         ret
     }
 
-    pub fn push_event(&mut self, event: Event) {
-        self.events.push(event);
-    }
-
     pub fn clear(&mut self) {
         self.sys_events.0.truncate(0);
         self.events.truncate(0);
