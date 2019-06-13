@@ -56,7 +56,7 @@ impl Selector {
     pub fn select(
         &self,
         evts: &mut Events,
-        awakener: Token,
+        waker: Token,
         timeout: Option<Duration>,
     ) -> io::Result<bool> {
         let timeout_ms = timeout
@@ -76,7 +76,7 @@ impl Selector {
             evts.events.set_len(cnt);
 
             for i in 0..cnt {
-                if evts.events[i].u64 as usize == awakener.into() {
+                if evts.events[i].u64 as usize == waker.into() {
                     evts.events.remove(i);
                     return Ok(true);
                 }
