@@ -307,7 +307,7 @@ fn read_bufs() {
                 }
                 Err(e) => {
                     assert_eq!(e.kind(), io::ErrorKind::WouldBlock);
-                    continue 'read_loop;
+                    break 'read_loop;
                 }
             }
         }
