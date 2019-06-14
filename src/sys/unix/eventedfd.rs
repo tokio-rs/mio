@@ -1,5 +1,7 @@
 use crate::event::Evented;
-use crate::{io, poll, Interests, Registry, Token};
+use crate::{poll, Interests, Registry, Token};
+
+use std::io;
 use std::os::unix::io::RawFd;
 
 /*

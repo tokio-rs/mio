@@ -107,7 +107,6 @@
 //! ```
 
 mod event_imp;
-mod io;
 mod poll;
 mod sys;
 mod token;

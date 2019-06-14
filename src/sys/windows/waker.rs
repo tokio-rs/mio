@@ -1,6 +1,8 @@
 use crate::sys::windows::{Selector, SelectorInner};
-use crate::{io, Token};
+use crate::Token;
+
 use miow::iocp::CompletionStatus;
+use std::io;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]

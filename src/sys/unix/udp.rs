@@ -1,9 +1,11 @@
 use crate::event::Evented;
 use crate::sys::unix::uio::VecIo;
 use crate::unix::EventedFd;
-use crate::{io, Interests, Registry, Token};
+use crate::{Interests, Registry, Token};
+
 use std;
 use std::fmt;
+use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 

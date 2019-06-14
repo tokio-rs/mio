@@ -8,8 +8,10 @@
 use crate::event::Evented;
 use crate::poll::SelectorId;
 /// [portability guidelines]: ../struct.Poll.html#portability
-use crate::{io, sys, Interests, Registry, Token};
+use crate::{sys, Interests, Registry, Token};
+
 use std::fmt;
+use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 #[cfg(unix)]

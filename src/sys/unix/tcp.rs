@@ -2,12 +2,13 @@ use crate::event::Evented;
 use crate::sys::unix::eventedfd::EventedFd;
 use crate::sys::unix::io::set_nonblock;
 use crate::sys::unix::uio::VecIo;
-use crate::{io, Interests, Registry, Token};
+use crate::{Interests, Registry, Token};
+
 use iovec::IoVec;
 use libc;
 use net2::TcpStreamExt;
 use std::fmt;
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::time::Duration;
