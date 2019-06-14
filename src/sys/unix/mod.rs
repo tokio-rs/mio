@@ -31,18 +31,18 @@ mod kqueue;
 ))]
 pub use self::kqueue::{Events, Selector};
 
-mod awakener;
 mod eventedfd;
 mod io;
 mod tcp;
 mod udp;
 mod uio;
+mod waker;
 
-pub use self::awakener::Awakener;
 pub use self::eventedfd::EventedFd;
 pub use self::io::{set_nonblock, Io};
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
+pub use self::waker::Waker;
 
 pub use iovec::IoVec;
 

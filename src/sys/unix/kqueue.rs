@@ -69,7 +69,7 @@ impl Selector {
     pub fn select(
         &self,
         evts: &mut Events,
-        awakener: Token,
+        waker: Token,
         timeout: Option<Duration>,
     ) -> io::Result<bool> {
         let timeout = timeout.map(|to| libc::timespec {
@@ -96,7 +96,7 @@ impl Selector {
                 timeout,
             ))?;
             evts.sys_events.0.set_len(cnt as usize);
-            Ok(evts.coalesce(awakener))
+            Ok(evts.coalesce(waker))
         }
     }
 
@@ -219,9 +219,9 @@ impl Selector {
         }
     }
 
-    // Used by `Awakener`.
+    // Used by `Waker`.
     #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
-    pub fn setup_awakener(&self, token: Token) -> io::Result<()> {
+    pub fn setup_waker(&self, token: Token) -> io::Result<()> {
         // First attempt to accept user space notifications.
         let mut kevent = kevent!(
             0,
@@ -249,9 +249,9 @@ impl Selector {
         }
     }
 
-    // Used by `Awakener`.
+    // Used by `Waker`.
     #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
-    pub fn try_clone_awakener(&self) -> io::Result<Selector> {
+    pub fn try_clone_waker(&self) -> io::Result<Selector> {
         let new_kq = unsafe { libc::dup(self.kq) };
         if new_kq == -1 {
             Err(io::Error::last_os_error())
@@ -263,7 +263,7 @@ impl Selector {
         }
     }
 
-    // Used by `Awakener`.
+    // Used by `Waker`.
     #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn wake(&self, token: Token) -> io::Result<()> {
         let mut kevent = kevent!(
@@ -356,7 +356,7 @@ impl Events {
         self.events.get(idx).cloned()
     }
 
-    fn coalesce(&mut self, awakener: Token) -> bool {
+    fn coalesce(&mut self, waker: Token) -> bool {
         let mut ret = false;
         self.events.clear();
         self.event_map.clear();
@@ -365,7 +365,7 @@ impl Events {
             let token = Token(e.udata as usize);
             let len = self.events.len();
 
-            if token == awakener {
+            if token == waker {
                 // TODO: Should this return an error if event is an error. It
                 // is not critical as spurious wakeups are permitted.
                 ret = true;
@@ -406,8 +406,9 @@ impl Events {
                 }
             }
 
-            // Used by the `Awakener`. On platforms that use `eventfd` or a unix
-            // pipe it will emit a readable event so we'll fake that here as well.
+            // Used by the `Waker`. On platforms that use `eventfd` or a unix
+            // pipe it will emit a readable event so we'll fake that here as
+            // well.
             #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
             {
                 if e.filter == libc::EVFILT_USER {
@@ -417,10 +418,6 @@ impl Events {
         }
 
         ret
-    }
-
-    pub fn push_event(&mut self, event: Event) {
-        self.events.push(event);
     }
 
     pub fn clear(&mut self) {

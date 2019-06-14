@@ -2,19 +2,19 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 
 use mio::event::Event;
-use mio::{Awakener, Events, Poll, Ready, Token};
+use mio::{Events, Poll, Ready, Token, Waker};
 
 use super::{expect_events, expect_no_events};
 
 #[test]
-fn awakener() {
+fn waker() {
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
     let token = Token(10);
-    let awakener = Awakener::new(poll.registry(), token).expect("unable to create awakener");
+    let waker = Waker::new(poll.registry(), token).expect("unable to create waker");
 
-    awakener.wake().expect("unable to wake");
+    waker.wake().expect("unable to wake");
     expect_events(
         &mut poll,
         &mut events,
@@ -24,15 +24,15 @@ fn awakener() {
 }
 
 #[test]
-fn awakener_multiple_wakeups_same_thread() {
+fn waker_multiple_wakeups_same_thread() {
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
     let token = Token(10);
-    let awakener = Awakener::new(poll.registry(), token).expect("unable to create awakener");
+    let waker = Waker::new(poll.registry(), token).expect("unable to create waker");
 
     for _ in 0..3 {
-        awakener.wake().expect("unable to wake");
+        waker.wake().expect("unable to wake");
     }
     expect_events(
         &mut poll,
@@ -43,17 +43,17 @@ fn awakener_multiple_wakeups_same_thread() {
 }
 
 #[test]
-fn awakener_wakeup_different_thread() {
+fn waker_wakeup_different_thread() {
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
     let token = Token(10);
-    let awakener = Awakener::new(poll.registry(), token).expect("unable to create awakener");
+    let waker = Waker::new(poll.registry(), token).expect("unable to create waker");
 
-    let awakener = Arc::new(awakener);
-    let awakener1 = Arc::clone(&awakener);
+    let waker = Arc::new(waker);
+    let waker1 = Arc::clone(&waker);
     let handle = thread::spawn(move || {
-        awakener1.wake().expect("unable to wake");
+        waker1.wake().expect("unable to wake");
     });
 
     expect_events(
@@ -69,25 +69,25 @@ fn awakener_wakeup_different_thread() {
 }
 
 #[test]
-fn awakener_multiple_wakeups_different_thread() {
+fn waker_multiple_wakeups_different_thread() {
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
     let token = Token(10);
-    let awakener = Awakener::new(poll.registry(), token).expect("unable to create awakener");
-    let awakener = Arc::new(awakener);
-    let awakener1 = Arc::clone(&awakener);
-    let awakener2 = Arc::clone(&awakener1);
+    let waker = Waker::new(poll.registry(), token).expect("unable to create waker");
+    let waker = Arc::new(waker);
+    let waker1 = Arc::clone(&waker);
+    let waker2 = Arc::clone(&waker1);
 
     let handle1 = thread::spawn(move || {
-        awakener1.wake().expect("unable to wake");
+        waker1.wake().expect("unable to wake");
     });
 
     let barrier = Arc::new(Barrier::new(2));
     let barrier2 = barrier.clone();
     let handle2 = thread::spawn(move || {
         barrier2.wait();
-        awakener2.wake().expect("unable to wake");
+        waker2.wake().expect("unable to wake");
     });
 
     // Receive the event from thread 1.

@@ -56,7 +56,7 @@ impl Selector {
     pub fn select(
         &self,
         evts: &mut Events,
-        awakener: Token,
+        waker: Token,
         timeout: Option<Duration>,
     ) -> io::Result<bool> {
         let timeout_ms = timeout
@@ -76,7 +76,7 @@ impl Selector {
             evts.events.set_len(cnt);
 
             for i in 0..cnt {
-                if evts.events[i].u64 as usize == awakener.into() {
+                if evts.events[i].u64 as usize == waker.into() {
                     evts.events.remove(i);
                     return Ok(true);
                 }
@@ -155,24 +155,6 @@ fn interests_to_epoll(interests: Interests) -> u32 {
     kind as u32
 }
 
-fn ready_to_epoll(interest: Ready) -> u32 {
-    let mut kind = EPOLLET;
-
-    if interest.is_readable() {
-        kind |= EPOLLIN;
-    }
-
-    if interest.is_writable() {
-        kind |= EPOLLOUT;
-    }
-
-    if interest.is_priority() {
-        kind |= EPOLLPRI;
-    }
-
-    kind as u32
-}
-
 impl AsRawFd for Selector {
     fn as_raw_fd(&self) -> RawFd {
         self.epfd
@@ -244,13 +226,6 @@ impl Events {
 
             Event::new(kind, Token(token as usize))
         })
-    }
-
-    pub fn push_event(&mut self, event: Event) {
-        self.events.push(libc::epoll_event {
-            events: ready_to_epoll(event.readiness()),
-            u64: usize::from(event.token()) as u64,
-        });
     }
 
     pub fn clear(&mut self) {

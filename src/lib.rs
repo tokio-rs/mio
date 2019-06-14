@@ -106,20 +106,20 @@
 //!
 //! ```
 
-mod awakener;
 mod event_imp;
 mod io;
 mod lazycell;
 mod poll;
 mod sys;
 mod token;
+mod waker;
 
 pub mod net;
 
-pub use awakener::Awakener;
 pub use event_imp::{Interests, Ready};
 pub use poll::{Poll, Registry};
 pub use token::Token;
+pub use waker::Waker;
 
 pub mod event {
     //! Readiness event types and utilities.

@@ -5,7 +5,6 @@ extern crate log;
 
 pub use ports::localhost;
 
-mod test_awakener;
 mod test_close_on_drop;
 mod test_double_register;
 mod test_echo_server;
@@ -19,6 +18,7 @@ mod test_smoke;
 mod test_tcp;
 mod test_tcp_shutdown;
 mod test_udp_socket;
+mod test_waker;
 mod test_write_then_drop;
 
 #[cfg(feature = "with-deprecated")]

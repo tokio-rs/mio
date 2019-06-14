@@ -8,26 +8,26 @@ mod eventfd {
     use crate::sys::Selector;
     use crate::{Interests, Token};
 
-    /// Awakener backed by `eventfd`.
+    /// Waker backed by `eventfd`.
     ///
     /// `eventfd` is effectively an 64 bit counter. All writes must be of 8
     /// bytes (64 bits) and are converted (native endian) into an 64 bit
     /// unsigned integer and added to the count. Reads must also be 8 bytes and
     /// reset the count to 0, returning the count.
     #[derive(Debug)]
-    pub struct Awakener {
+    pub struct Waker {
         fd: File,
     }
 
-    impl Awakener {
-        pub fn new(selector: &Selector, token: Token) -> io::Result<Awakener> {
+    impl Waker {
+        pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             let fd = unsafe { libc::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK) };
             if fd == -1 {
                 return Err(io::Error::last_os_error());
             }
 
             selector.register(fd, token, Interests::READABLE)?;
-            Ok(Awakener {
+            Ok(Waker {
                 fd: unsafe { File::from_raw_fd(fd) },
             })
         }
@@ -51,7 +51,7 @@ mod eventfd {
             let mut buf: [u8; 8] = [0; 8];
             match (&self.fd).read(&mut buf) {
                 Ok(_) => Ok(()),
-                // If the `Awakener` hasn't been awoken yet this will return a
+                // If the `Waker` hasn't been awoken yet this will return a
                 // `WouldBlock` error which we can safely ignore.
                 Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => Ok(()),
                 Err(err) => Err(err),
@@ -61,7 +61,7 @@ mod eventfd {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-pub use self::eventfd::Awakener;
+pub use self::eventfd::Waker;
 
 #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
 mod kqueue {
@@ -70,24 +70,24 @@ mod kqueue {
     use crate::sys::Selector;
     use crate::Token;
 
-    /// Awakener backed by kqueue user space notifications (`EVFILT_USER`).
+    /// Waker backed by kqueue user space notifications (`EVFILT_USER`).
     ///
     /// The implementation is fairly simple, first the kqueue must be setup to
-    /// receive awakener events this done by calling `Selector.setup_awakener`.
-    /// Next we need access to kqueue, thus we need to duplicate the file
-    /// descriptor. Now waking is as simple as adding an event to the kqueue.
+    /// receive waker events this done by calling `Selector.setup_waker`. Next
+    /// we need access to kqueue, thus we need to duplicate the file descriptor.
+    /// Now waking is as simple as adding an event to the kqueue.
     #[derive(Debug)]
-    pub struct Awakener {
+    pub struct Waker {
         selector: Selector,
         token: Token,
     }
 
-    impl Awakener {
-        pub fn new(selector: &Selector, token: Token) -> io::Result<Awakener> {
-            selector.try_clone_awakener().and_then(|selector| {
+    impl Waker {
+        pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+            selector.try_clone_waker().and_then(|selector| {
                 selector
-                    .setup_awakener(token)
-                    .map(|()| Awakener { selector, token })
+                    .setup_waker(token)
+                    .map(|()| Waker { selector, token })
             })
         }
 
@@ -98,7 +98,7 @@ mod kqueue {
 }
 
 #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
-pub use self::kqueue::Awakener;
+pub use self::kqueue::Waker;
 
 #[cfg(any(
     target_os = "bitrig",
@@ -114,21 +114,21 @@ mod pipe {
     use crate::sys::{pipe, Io, Selector};
     use crate::{Interests, Token};
 
-    /// Awakener backed by a unix pipe.
+    /// Waker backed by a unix pipe.
     ///
-    /// Awakener controls both the sending and receiving ends and empties the
-    /// pipe if writing to it (waking) fails.
+    /// Waker controls both the sending and receiving ends and empties the pipe
+    /// if writing to it (waking) fails.
     #[derive(Debug)]
-    pub struct Awakener {
+    pub struct Waker {
         sender: Io,
         receiver: Io,
     }
 
-    impl Awakener {
-        pub fn new(selector: &Selector, token: Token) -> io::Result<Awakener> {
+    impl Waker {
+        pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             let (sender, receiver) = pipe()?;
             selector.register(receiver.as_raw_fd(), token, Interests::READABLE)?;
-            Ok(Awakener { sender, receiver })
+            Ok(Waker { sender, receiver })
         }
 
         pub fn wake(&self) -> io::Result<()> {
@@ -166,4 +166,4 @@ mod pipe {
     target_os = "openbsd",
     target_os = "solaris"
 ))]
-pub use self::pipe::Awakener;
+pub use self::pipe::Waker;

@@ -1,6 +1,9 @@
 freebsd_instance:
   image: freebsd-11-2-release-amd64
 
+env:
+  RUST_BACKTRACE: full
+
 task:
   name: FreeBSD 11.2 amd64
   setup_script:
