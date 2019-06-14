@@ -35,7 +35,7 @@ use crate::{poll, sys, Registry, Token};
 ///
 /// Wake an [`Poll`] from another thread.
 ///
-/// ```
+/// ```ignore
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use std::io;
 /// use std::thread;

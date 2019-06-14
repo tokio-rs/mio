@@ -1,7 +1,7 @@
 use crate::{localhost, TryRead};
 use bytes::BytesMut;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, Ready, Token};
+use mio::{Events, Interests, Poll, Token};
 
 use self::TestState::{AfterRead, Initial};
 
@@ -31,8 +31,8 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, poll: &mut Poll, tok: Token, events: Ready) {
-        debug!("readable; tok={:?}; hint={:?}", tok, events);
+    fn handle_read(&mut self, poll: &mut Poll, tok: Token) {
+        debug!("readable; tok={:?}", tok);
 
         match tok {
             SERVER => {
@@ -66,7 +66,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    fn handle_write(&mut self, poll: &mut Poll, tok: Token, _: Ready) {
+    fn handle_write(&mut self, poll: &mut Poll, tok: Token) {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {
@@ -114,12 +114,12 @@ pub fn test_close_on_drop() {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
-            if event.readiness().is_readable() {
-                handler.handle_read(&mut poll, event.token(), event.readiness());
+            if event.is_readable() {
+                handler.handle_read(&mut poll, event.token());
             }
 
-            if event.readiness().is_writable() {
-                handler.handle_write(&mut poll, event.token(), event.readiness());
+            if event.is_writable() {
+                handler.handle_write(&mut poll, event.token());
             }
         }
     }

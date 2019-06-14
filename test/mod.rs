@@ -18,11 +18,10 @@ mod test_smoke;
 mod test_tcp;
 mod test_tcp_shutdown;
 mod test_udp_socket;
-mod test_waker;
+//mod test_waker;
 mod test_write_then_drop;
 
 use bytes::{Buf, BufMut};
-use mio::event::Event;
 use mio::{Events, Poll};
 use std::io::{self, Read, Write};
 use std::time::Duration;
@@ -142,6 +141,7 @@ pub fn sleep_ms(ms: u64) {
     thread::sleep(Duration::from_millis(ms));
 }
 
+/*
 pub fn expect_events(
     poll: &mut Poll,
     event_buffer: &mut Events,
@@ -177,6 +177,7 @@ pub fn expect_events(
         expected
     );
 }
+*/
 
 pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))

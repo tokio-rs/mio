@@ -87,11 +87,11 @@ pub fn test_register_deregister() {
         poll.poll(&mut events, None).unwrap();
 
         if let Some(event) = events.iter().next() {
-            if event.readiness().is_readable() {
+            if event.is_readable() {
                 handler.handle_read(poll.registry(), event.token());
             }
 
-            if event.readiness().is_writable() {
+            if event.is_writable() {
                 handler.handle_write(poll.registry(), event.token());
                 break;
             }

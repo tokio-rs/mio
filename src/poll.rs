@@ -114,7 +114,7 @@ use std::{fmt, io, usize};
 ///     poll.poll(&mut events, None)?;
 ///
 ///     for event in &events {
-///         if event.token() == Token(0) && event.readiness().is_writable() {
+///         if event.token() == Token(0) && event.is_writable() {
 ///             // The socket connected (probably, it could still be a spurious
 ///             // wakeup)
 ///             return Ok(());
@@ -377,7 +377,7 @@ impl Poll {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     ///
@@ -414,7 +414,7 @@ impl Poll {
     ///     poll.poll(&mut events, None)?;
     ///
     ///     for event in &events {
-    ///         if event.token() == Token(0) && event.readiness().is_writable() {
+    ///         if event.token() == Token(0) && event.is_writable() {
     ///             // The socket connected (probably, it could still be a spurious
     ///             // wakeup)
     ///             return Ok(());
@@ -1026,7 +1026,7 @@ impl<'a> Iterator for Iter<'a> {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.inner.get(self.pos);
+        let ret = self.inner.inner.get(self.pos).map(Event::from_raw_event);
         self.pos += 1;
         ret
     }
@@ -1048,7 +1048,7 @@ impl Iterator for IntoIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.inner.get(self.pos);
+        let ret = self.inner.inner.get(self.pos).map(Event::from_raw_event);
         self.pos += 1;
         ret
     }
