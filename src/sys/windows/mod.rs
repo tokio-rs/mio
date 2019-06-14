@@ -145,6 +145,7 @@ mod waker;
 mod selector;
 mod buffer_pool;
 mod from_raw_arc;
+mod lazycell;
 mod poll_opt;
 mod queue;
 mod tcp;
