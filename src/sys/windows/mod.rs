@@ -145,6 +145,7 @@ mod waker;
 mod selector;
 mod buffer_pool;
 mod from_raw_arc;
+mod poll_opt;
 mod queue;
 mod tcp;
 mod udp;
@@ -154,6 +155,7 @@ pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
 pub use self::waker::Waker;
 
+use self::poll_opt::PollOpt;
 use self::queue::{ReadinessQueue, Registration, SetReadiness};
 use self::selector::SelectorInner;
 

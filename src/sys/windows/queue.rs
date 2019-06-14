@@ -1,5 +1,5 @@
-use super::{SelectorInner, Waker};
-use crate::event_imp::{self as event, Event, Evented, PollOpt};
+use super::{SelectorInner, Waker, PollOpt};
+use crate::event_imp::{self as event, Event, Evented};
 use crate::{poll, sys, Interests, Ready, Token};
 
 use std::cell::UnsafeCell;
@@ -1100,7 +1100,7 @@ impl ReadinessState {
     #[inline]
     fn new(interest: Ready, opt: PollOpt) -> ReadinessState {
         let interest = event::ready_as_usize(interest);
-        let opt = event::opt_as_usize(opt);
+        let opt: usize = opt.into();
 
         debug_assert!(interest <= MASK_4);
         debug_assert!(opt <= MASK_4);
@@ -1162,13 +1162,13 @@ impl ReadinessState {
     #[inline]
     fn poll_opt(self) -> PollOpt {
         let v = self.get(MASK_4, POLL_OPT_SHIFT);
-        event::opt_from_usize(v)
+        v.into()
     }
 
     /// Set the poll options
     #[inline]
     fn set_poll_opt(&mut self, v: PollOpt) {
-        self.set(event::opt_as_usize(v), MASK_4, POLL_OPT_SHIFT);
+        self.set(v.into(), MASK_4, POLL_OPT_SHIFT);
     }
 
     #[inline]
