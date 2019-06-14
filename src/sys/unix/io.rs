@@ -1,10 +1,10 @@
 use crate::event::Evented;
 use crate::sys::unix::cvt;
 use crate::unix::EventedFd;
-use crate::{io, Interests, PollOpt, Registry, Token};
+use crate::{Interests, PollOpt, Registry, Token};
 use libc;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
 pub fn set_nonblock(fd: libc::c_int) -> io::Result<()> {

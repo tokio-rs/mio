@@ -1,10 +1,11 @@
 use crate::event_imp::{self as event, Event};
 use crate::sys::unix::cvt;
 use crate::sys::unix::io::set_cloexec;
-use crate::{io, Interests, PollOpt, Ready, Token};
+use crate::{Interests, PollOpt, Ready, Token};
 use libc::{self, time_t};
 use log::trace;
 use std::collections::HashMap;
+use std::io;
 #[cfg(not(target_os = "netbsd"))]
 use std::os::raw::{c_int, c_short};
 use std::os::unix::io::AsRawFd;

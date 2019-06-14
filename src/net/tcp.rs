@@ -8,11 +8,11 @@
 /// [portability guidelines]: ../struct.Poll.html#portability
 use crate::event::Evented;
 use crate::poll::SelectorId;
-use crate::{io, sys, Interests, PollOpt, Registry, Token};
+use crate::{sys, Interests, PollOpt, Registry, Token};
 use iovec::IoVec;
 use net2::TcpBuilder;
 use std::fmt;
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
 
