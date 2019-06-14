@@ -7,7 +7,7 @@ use crate::event::Evented;
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
 use crate::sys::windows::Registration;
-use crate::{Interests, PollOpt, Ready, Registry, Token};
+use crate::{Interests, Ready, Registry, Token};
 use log::trace;
 use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
@@ -345,20 +345,13 @@ impl Imp {
 }
 
 impl Evented for UdpSocket {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         let mut me = self.inner();
         me.iocp.register_socket(
             &self.imp.inner.socket,
             registry,
             token,
             interests,
-            opts,
             &self.registration,
         )?;
         self.post_register(interests, &mut me);
@@ -370,7 +363,6 @@ impl Evented for UdpSocket {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
         let mut me = self.inner();
         me.iocp.reregister_socket(
@@ -378,7 +370,6 @@ impl Evented for UdpSocket {
             registry,
             token,
             interests,
-            opts,
             &self.registration,
         )?;
         self.post_register(interests, &mut me);

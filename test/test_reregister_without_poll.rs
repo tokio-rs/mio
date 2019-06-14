@@ -15,28 +15,18 @@ pub fn test_reregister_different_without_poll() {
 
     // Register the listener with `Poll`
     poll.registry()
-        .register(
-            &l,
-            Token(0),
-            Interests::READABLE,
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
+        .register(&l, Token(0), Interests::READABLE)
         .unwrap();
 
     let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
     poll.registry()
-        .register(&s1, Token(2), Interests::READABLE, PollOpt::edge())
+        .register(&s1, Token(2), Interests::READABLE)
         .unwrap();
 
     sleep_ms(MS);
 
     poll.registry()
-        .reregister(
-            &l,
-            Token(0),
-            Interests::WRITABLE,
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
+        .reregister(&l, Token(0), Interests::WRITABLE)
         .unwrap();
 
     poll.poll(&mut events, Some(Duration::from_millis(MS)))

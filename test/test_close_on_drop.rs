@@ -1,7 +1,7 @@
 use crate::{localhost, TryRead};
 use bytes::BytesMut;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, PollOpt, Ready, Token};
+use mio::{Events, Interests, Poll, Ready, Token};
 
 use self::TestState::{AfterRead, Initial};
 
@@ -62,7 +62,7 @@ impl TestHandler {
             _ => panic!("received unknown token {:?}", tok),
         }
         poll.registry()
-            .reregister(&self.cli, CLIENT, Interests::READABLE, PollOpt::edge())
+            .reregister(&self.cli, CLIENT, Interests::READABLE)
             .unwrap();
     }
 
@@ -72,7 +72,7 @@ impl TestHandler {
             CLIENT => {
                 debug!("client connected");
                 poll.registry()
-                    .reregister(&self.cli, CLIENT, Interests::READABLE, PollOpt::edge())
+                    .reregister(&self.cli, CLIENT, Interests::READABLE)
                     .unwrap();
             }
             _ => panic!("received unknown token {:?}", tok),
@@ -93,14 +93,14 @@ pub fn test_close_on_drop() {
     let srv = TcpListener::bind(&addr).unwrap();
 
     poll.registry()
-        .register(&srv, SERVER, Interests::READABLE, PollOpt::edge())
+        .register(&srv, SERVER, Interests::READABLE)
         .unwrap();
 
     // == Create & setup client socket
     let sock = TcpStream::connect(&addr).unwrap();
 
     poll.registry()
-        .register(&sock, CLIENT, Interests::WRITABLE, PollOpt::edge())
+        .register(&sock, CLIENT, Interests::WRITABLE)
         .unwrap();
 
     // == Create storage for events

@@ -8,7 +8,7 @@
 use crate::event::Evented;
 use crate::poll::SelectorId;
 /// [portability guidelines]: ../struct.Poll.html#portability
-use crate::{io, sys, Interests, PollOpt, Registry, Token};
+use crate::{io, sys, Interests, Registry, Token};
 use std::fmt;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 
@@ -32,7 +32,7 @@ use iovec::IoVec;
 /// // ECHOER -> listens and prints the message received.
 ///
 /// use mio::net::UdpSocket;
-/// use mio::{Events, Interests, Poll, PollOpt, Token};
+/// use mio::{Events, Interests, Poll, Token};
 /// use std::time::Duration;
 ///
 /// const SENDER: Token = Token(0);
@@ -53,8 +53,8 @@ use iovec::IoVec;
 /// let registry = poll.registry().clone();
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// registry.register(&sender_socket, SENDER, Interests::WRITABLE, PollOpt::edge())?;
-/// registry.register(&echoer_socket, ECHOER, Interests::READABLE, PollOpt::edge())?;
+/// registry.register(&sender_socket, SENDER, Interests::WRITABLE)?;
+/// registry.register(&echoer_socket, ECHOER, Interests::READABLE)?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];
@@ -579,15 +579,9 @@ impl UdpSocket {
 }
 
 impl Evented for UdpSocket {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         self.selector_id.associate_selector(registry)?;
-        self.sys.register(registry, token, interests, opts)
+        self.sys.register(registry, token, interests)
     }
 
     fn reregister(
@@ -595,9 +589,8 @@ impl Evented for UdpSocket {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
-        self.sys.reregister(registry, token, interests, opts)
+        self.sys.reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

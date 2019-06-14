@@ -1,6 +1,6 @@
 use crate::localhost;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, PollOpt, Registry, Token};
+use mio::{Events, Interests, Poll, Registry, Token};
 use std::io::{self, Write};
 use std::time::Duration;
 
@@ -38,7 +38,7 @@ impl TestHandler {
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
                 registry
-                    .reregister(&self.client, CLIENT, Interests::WRITABLE, PollOpt::level())
+                    .reregister(&self.client, CLIENT, Interests::WRITABLE)
                     .unwrap();
             }
             _ => panic!("unexpected token"),
@@ -71,14 +71,14 @@ pub fn test_register_deregister() {
 
     info!("register server socket");
     poll.registry()
-        .register(&server, SERVER, Interests::READABLE, PollOpt::edge())
+        .register(&server, SERVER, Interests::READABLE)
         .unwrap();
 
     let client = TcpStream::connect(&addr).unwrap();
 
     // Register client socket only as writable
     poll.registry()
-        .register(&client, CLIENT, Interests::READABLE, PollOpt::level())
+        .register(&client, CLIENT, Interests::READABLE)
         .unwrap();
 
     let mut handler = TestHandler::new(server, client);
