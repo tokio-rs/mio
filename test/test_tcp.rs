@@ -414,9 +414,14 @@ fn write_bufs() {
     while so_far < N {
         poll.poll(&mut events, None).unwrap();
 
-        match s.write_bufs(&b) {
-            Ok(n) => so_far += n,
-            Err(e) => assert_eq!(e.kind(), io::ErrorKind::WouldBlock),
+        loop {
+            match s.write_bufs(&b) {
+                Ok(n) => so_far += n,
+                Err(e) => {
+                    assert_eq!(e.kind(), io::ErrorKind::WouldBlock);
+                    break;
+                }
+            }
         }
     }
 
