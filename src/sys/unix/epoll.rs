@@ -1,10 +1,12 @@
 use crate::event_imp::Event;
 use crate::sys::unix::cvt;
 use crate::sys::unix::io::set_cloexec;
-use crate::{io, Interests, Ready, Token};
+use crate::{Interests, Ready, Token};
+
 use libc::{self, c_int};
 use libc::{EPOLLERR, EPOLLHUP};
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI};
+use std::io;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
