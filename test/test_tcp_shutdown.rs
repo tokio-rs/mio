@@ -59,7 +59,9 @@ fn test_write_shutdown() {
     // Polling should not have any events
     poll.poll(&mut events, Some(Duration::from_millis(100)))
         .unwrap();
-    assert!(events.iter().next().is_none());
+
+    let next = events.iter().next();
+    assert_eq!(next, None);
 
     println!("SHUTTING DOWN");
     // Now, shutdown the write half of the socket.
