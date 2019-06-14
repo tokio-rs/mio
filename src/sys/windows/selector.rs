@@ -1,7 +1,7 @@
 use crate::event_imp::{Event, Evented, Interests, Ready};
-use crate::lazycell::AtomicLazyCell;
 use crate::poll::{self, Registry};
 use crate::sys::windows::buffer_pool::BufferPool;
+use crate::sys::windows::lazycell::AtomicLazyCell;
 use crate::sys::windows::{PollOpt, ReadinessQueue, Registration, SetReadiness};
 use crate::Token;
 use log::trace;
