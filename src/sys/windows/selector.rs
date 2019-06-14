@@ -422,7 +422,7 @@ impl ReadyBinding {
             &poll::selector(registry).readiness_queue,
             token,
             events,
-            PollOpt::empty(),
+            PollOpt::edge(),
         );
         self.readiness = Some(s);
         *registration.lock().unwrap() = Some(r);
