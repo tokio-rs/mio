@@ -1,4 +1,4 @@
-use super::{SelectorInner, Waker, PollOpt};
+use super::{PollOpt, SelectorInner, Waker};
 use crate::event_imp::{self as event, Event, Evented};
 use crate::{poll, sys, Interests, Ready, Token};
 
