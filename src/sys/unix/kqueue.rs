@@ -1,7 +1,8 @@
 use crate::event_imp::{self as event, Event};
 use crate::sys::unix::cvt;
 use crate::sys::unix::io::set_cloexec;
-use crate::{Interests, PollOpt, Ready, Token};
+use crate::{Interests, Ready, Token};
+
 use libc::{self, time_t};
 use log::trace;
 use std::collections::HashMap;
@@ -101,24 +102,10 @@ impl Selector {
         }
     }
 
-    pub fn register(
-        &self,
-        fd: RawFd,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    pub fn register(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        let flags = if opts.contains(PollOpt::edge()) {
-            libc::EV_CLEAR
-        } else {
-            0
-        } | if opts.contains(PollOpt::oneshot()) {
-            libc::EV_ONESHOT
-        } else {
-            0
-        } | libc::EV_RECEIPT;
+        let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
 
         unsafe {
             let r = if interests.is_readable() {
@@ -188,16 +175,10 @@ impl Selector {
         }
     }
 
-    pub fn reregister(
-        &self,
-        fd: RawFd,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
         // Just need to call register here since EV_ADD is a mod if already
         // registered
-        self.register(fd, token, interests, opts)
+        self.register(fd, token, interests)
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
@@ -459,7 +440,7 @@ impl fmt::Debug for Events {
 #[test]
 fn does_not_register_rw() {
     use crate::unix::EventedFd;
-    use crate::{Poll, PollOpt, Token};
+    use crate::{Poll, Token};
 
     let kq = unsafe { libc::kqueue() };
     let kqf = EventedFd(&kq);
@@ -468,12 +449,7 @@ fn does_not_register_rw() {
     // registering kqueue fd will fail if write is requested (On anything but some versions of OS
     // X)
     poll.registry()
-        .register(
-            &kqf,
-            Token(1234),
-            Interests::READABLE,
-            PollOpt::edge() | PollOpt::oneshot(),
-        )
+        .register(&kqf, Token(1234), Interests::READABLE)
         .unwrap();
 }
 

@@ -2,7 +2,7 @@ use crate::event::Evented;
 use crate::sys::unix::eventedfd::EventedFd;
 use crate::sys::unix::io::set_nonblock;
 use crate::sys::unix::uio::VecIo;
-use crate::{Interests, PollOpt, Registry, Token};
+use crate::{Interests, Registry, Token};
 
 use iovec::IoVec;
 use libc;
@@ -144,14 +144,8 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl Evented for TcpStream {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(registry, token, interests, opts)
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
     fn reregister(
@@ -159,9 +153,8 @@ impl Evented for TcpStream {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests, opts)
+        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
@@ -227,14 +220,8 @@ impl TcpListener {
 }
 
 impl Evented for TcpListener {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(registry, token, interests, opts)
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
     fn reregister(
@@ -242,9 +229,8 @@ impl Evented for TcpListener {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests, opts)
+        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

@@ -70,8 +70,7 @@
 //! registry.register(
 //!     &server,
 //!     SERVER,
-//!     Interests::READABLE,
-//!     PollOpt::edge()).unwrap();
+//!     Interests::READABLE).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(&addr).unwrap();
@@ -80,8 +79,7 @@
 //! registry.register(
 //!     &sock,
 //!     CLIENT,
-//!     Interests::READABLE,
-//!     PollOpt::edge()).unwrap();
+//!     Interests::READABLE).unwrap();
 //!
 //! // Create storage for events
 //! let mut events = Events::with_capacity(1024);
@@ -117,7 +115,7 @@ mod waker;
 
 pub mod net;
 
-pub use event_imp::{Interests, PollOpt, Ready};
+pub use event_imp::{Interests, Ready};
 pub use poll::{Poll, Registry};
 pub use token::Token;
 pub use waker::Waker;

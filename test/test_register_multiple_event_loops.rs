@@ -15,7 +15,6 @@ fn test_tcp_register_multiple_event_loops() {
             &listener,
             Token(0),
             Interests::READABLE | Interests::WRITABLE,
-            PollOpt::edge(),
         )
         .unwrap();
 
@@ -26,7 +25,6 @@ fn test_tcp_register_multiple_event_loops() {
         &listener,
         Token(0),
         Interests::READABLE | Interests::WRITABLE,
-        PollOpt::edge(),
     );
     assert!(res.is_err());
     assert_eq!(res.unwrap_err().kind(), ErrorKind::Other);
@@ -37,7 +35,6 @@ fn test_tcp_register_multiple_event_loops() {
         &listener2,
         Token(0),
         Interests::READABLE | Interests::WRITABLE,
-        PollOpt::edge(),
     );
     assert!(res.is_err());
     assert_eq!(res.unwrap_err().kind(), ErrorKind::Other);
@@ -47,20 +44,13 @@ fn test_tcp_register_multiple_event_loops() {
 
     poll1
         .registry()
-        .register(
-            &stream,
-            Token(1),
-            Interests::READABLE | Interests::WRITABLE,
-            PollOpt::edge(),
-        )
+        .register(&stream, Token(1), Interests::READABLE | Interests::WRITABLE)
         .unwrap();
 
-    let res = poll2.registry().register(
-        &stream,
-        Token(1),
-        Interests::READABLE | Interests::WRITABLE,
-        PollOpt::edge(),
-    );
+    let res =
+        poll2
+            .registry()
+            .register(&stream, Token(1), Interests::READABLE | Interests::WRITABLE);
     assert!(res.is_err());
     assert_eq!(res.unwrap_err().kind(), ErrorKind::Other);
 
@@ -70,7 +60,6 @@ fn test_tcp_register_multiple_event_loops() {
         &stream2,
         Token(1),
         Interests::READABLE | Interests::WRITABLE,
-        PollOpt::edge(),
     );
     assert!(res.is_err());
     assert_eq!(res.unwrap_err().kind(), ErrorKind::Other);
@@ -84,23 +73,16 @@ fn test_udp_register_multiple_event_loops() {
     let poll1 = Poll::new().unwrap();
     poll1
         .registry()
-        .register(
-            &socket,
-            Token(0),
-            Interests::READABLE | Interests::WRITABLE,
-            PollOpt::edge(),
-        )
+        .register(&socket, Token(0), Interests::READABLE | Interests::WRITABLE)
         .unwrap();
 
     let poll2 = Poll::new().unwrap();
 
     // Try registering the same socket with the initial one
-    let res = poll2.registry().register(
-        &socket,
-        Token(0),
-        Interests::READABLE | Interests::WRITABLE,
-        PollOpt::edge(),
-    );
+    let res =
+        poll2
+            .registry()
+            .register(&socket, Token(0), Interests::READABLE | Interests::WRITABLE);
     assert!(res.is_err());
     assert_eq!(res.unwrap_err().kind(), ErrorKind::Other);
 
@@ -110,7 +92,6 @@ fn test_udp_register_multiple_event_loops() {
         &socket2,
         Token(0),
         Interests::READABLE | Interests::WRITABLE,
-        PollOpt::edge(),
     );
     assert!(res.is_err());
     assert_eq!(res.unwrap_err().kind(), ErrorKind::Other);

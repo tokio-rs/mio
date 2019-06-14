@@ -1,7 +1,8 @@
 use crate::event::Evented;
 use crate::sys::unix::cvt;
 use crate::unix::EventedFd;
-use crate::{Interests, PollOpt, Registry, Token};
+use crate::{Interests, Registry, Token};
+
 use libc;
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -63,14 +64,8 @@ impl AsRawFd for Io {
 }
 
 impl Evented for Io {
-    fn register(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(registry, token, interests, opts)
+    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+        EventedFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
     fn reregister(
@@ -78,9 +73,8 @@ impl Evented for Io {
         registry: &Registry,
         token: Token,
         interests: Interests,
-        opts: PollOpt,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests, opts)
+        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {

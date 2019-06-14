@@ -117,7 +117,6 @@
 //!
 //! First up, let's take a look at unimplemented portions of this module:
 //!
-//! * The `PollOpt::level()` option is currently entirely unimplemented.
 //! * Each `EventLoop` currently owns its completion port, but this prevents an
 //!   I/O handle from being added to multiple event loops (something that can be
 //!   done on Unix). Additionally, it hinders event loops moving across threads.
@@ -146,6 +145,7 @@ mod waker;
 mod selector;
 mod buffer_pool;
 mod from_raw_arc;
+mod poll_opt;
 mod queue;
 mod tcp;
 mod udp;
@@ -155,6 +155,7 @@ pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
 pub use self::waker::Waker;
 
+use self::poll_opt::PollOpt;
 use self::queue::{ReadinessQueue, Registration, SetReadiness};
 use self::selector::SelectorInner;
 
