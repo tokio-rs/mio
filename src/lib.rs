@@ -108,7 +108,6 @@
 
 mod event_imp;
 mod io;
-mod lazycell;
 mod poll;
 mod sys;
 mod token;
