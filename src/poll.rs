@@ -535,8 +535,8 @@ impl Registry {
     /// See documentation on [`Token`] for an example showing how to pick
     /// [`Token`] values.
     ///
-    /// `interest: Ready`: Specifies which operations `Poll` should monitor for
-    /// readiness. `Poll` will only return readiness events for operations
+    /// `interest: Interests`: Specifies which operations `Poll` should monitor
+    /// for readiness. `Poll` will only return readiness events for operations
     /// specified by this argument.
     ///
     /// If a socket is registered with readable interest and the socket becomes

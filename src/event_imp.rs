@@ -287,11 +287,6 @@ impl Interests {
     pub fn is_lio(&self) -> bool {
         (self.0.get() & LIO) != 0
     }
-
-    #[cfg(windows)]
-    pub(crate) fn to_ready(&self) -> Ready {
-        Ready(self.0.get() as u8)
-    }
 }
 
 impl ops::BitOr for Interests {
@@ -398,15 +393,14 @@ fn test_debug_interests() {
 
 /// An readiness event returned by [`Poll::poll`].
 ///
-/// `Event` is a [readiness state] paired with a [`Token`]. It is returned by
+/// `Event` is a readiness state paired with a [`Token`]. It is returned by
 /// [`Poll::poll`].
 ///
 /// For more documentation on polling and events, see [`Poll`].
 ///
-/// [`Poll::poll`]: ../struct.Poll.html#method.poll
-/// [`Poll`]: ../struct.Poll.html
-/// [readiness state]: ../struct.Ready.html
-/// [`Token`]: ../struct.Token.html
+/// [`Poll::poll`]: crate::Poll::poll
+/// [`Poll`]: crate::Poll
+/// [`Token`]: crate::Token
 #[repr(transparent)]
 pub struct Event {
     inner: sys::Event,
@@ -418,19 +412,19 @@ impl Event {
         self.inner.token()
     }
 
-    /// Returns true if the `Ready` set contains readable readiness.
+    /// Returns true if the event contains readable readiness.
     #[inline]
     pub fn is_readable(&self) -> bool {
         self.inner.is_readable()
     }
 
-    /// Returns true if the `Ready` set contains writable readiness.
+    /// Returns true if the event contains writable readiness.
     #[inline]
     pub fn is_writable(&self) -> bool {
         self.inner.is_writable()
     }
 
-    /// Returns true if the `Ready` set contains error readiness.
+    /// Returns true if the event contains error readiness.
     ///
     /// Error events occur when the socket enters an error state. In this case,
     /// the socket will also receive a readable or writable event. Reading or
@@ -445,7 +439,7 @@ impl Event {
         self.inner.is_error()
     }
 
-    /// Returns true if the `Ready` set contains HUP readiness.
+    /// Returns true if the event contains HUP readiness.
     ///
     /// HUP events occur when the remote end of a socket hangs up. In the TCP
     /// case, this occurs when the remote end of a TCP socket shuts down writes.
@@ -462,7 +456,7 @@ impl Event {
         self.inner.is_hup()
     }
 
-    /// Returns true if the `Ready` set contains priority readiness.
+    /// Returns true if the event contains priority readiness.
     ///
     /// # Notes
     ///
@@ -473,7 +467,7 @@ impl Event {
         self.inner.is_priority()
     }
 
-    /// Returns true if the `Ready` set contains AIO readiness.
+    /// Returns true if the event contains AIO readiness.
     ///
     /// # Notes
     ///
@@ -484,7 +478,7 @@ impl Event {
         self.inner.is_aio()
     }
 
-    /// Returns true if the `Ready` set contains LIO readiness.
+    /// Returns true if the event contains LIO readiness.
     ///
     /// # Notes
     ///
