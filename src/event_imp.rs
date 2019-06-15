@@ -403,18 +403,6 @@ fn test_debug_interests() {
 ///
 /// For more documentation on polling and events, see [`Poll`].
 ///
-/// # Examples
-///
-/// ```ignore
-/// use mio::{Ready, Token};
-/// use mio::event::Event;
-///
-/// let event = Event::new(Ready::READABLE | Ready::WRITABLE, Token(0));
-///
-/// assert_eq!(event.readiness(), Ready::READABLE | Ready::WRITABLE);
-/// assert_eq!(event.token(), Token(0));
-/// ```
-///
 /// [`Poll::poll`]: ../struct.Poll.html#method.poll
 /// [`Poll`]: ../struct.Poll.html
 /// [readiness state]: ../struct.Ready.html
