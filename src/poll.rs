@@ -173,10 +173,10 @@ use std::{fmt, io, usize};
 /// able to handle an error or HUP situation when performing the actual read
 /// operation.
 ///
-/// [`readable`]: Ready::READABLE
-/// [`writable`]: Ready::WRITABLE
-/// [`error`]: Ready::ERROR
-/// [`hup`]: Ready::HUP
+/// [`readable`]: crate::event::Event::is_readable
+/// [`writable`]: crate::event::Event::is_writable
+/// [`error`]: crate::event::Event::is_error
+/// [`hup`]: crate::event::Event::is_hup
 ///
 /// ### Registering handles
 ///
@@ -697,8 +697,8 @@ impl Registry {
     ///
     /// [`struct`]: #
     /// [`register`]: #method.register
-    /// [`readable`]: Ready::READABLE
-    /// [`writable`]: Ready::WRITABLE
+    /// [`readable`]: crate::event::Event::is_readable
+    /// [`writable`]: crate::event::Event::is_writable
     pub fn reregister<E: ?Sized>(
         &self,
         handle: &E,

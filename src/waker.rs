@@ -4,10 +4,12 @@ use crate::{poll, sys, Registry, Token};
 
 /// Waker allows cross-thread waking of [`Poll`].
 ///
-/// When created it will cause events with [`Ready::READABLE`] and the provided
-/// `token` if [`wake`] is called, possibly from another thread.
+/// When created it will cause events with [`readable`] readiness and the
+/// provided `token` if [`wake`] is called, possibly from another thread.
 ///
 /// [`Poll`]: crate::Poll
+/// [`readable`]: crate::event::Event::is_readable
+/// [`wake`]: Waker::wake
 ///
 /// # Notes
 ///
@@ -19,13 +21,10 @@ use crate::{poll, sys, Registry, Token};
 /// happens if multiple `Waker`s are registered with the same `Poll` is
 /// undefined.
 ///
-/// [`Ready::READABLE`]: crate::Ready::READABLE
-/// [`wake`]: Waker::wake
-///
 /// # Implementation notes
 ///
 /// On platforms that support kqueue this will use the `EVFILT_USER` event
-/// filter, see [implementation notes of `Poll`] to see what platform supports
+/// filter, see [implementation notes of `Poll`] to see what platforms support
 /// kqueue. On Linux it uses [eventfd].
 ///
 /// [implementation notes of `Poll`]: ../index.html#implementation-notes
@@ -33,7 +32,7 @@ use crate::{poll, sys, Registry, Token};
 ///
 /// # Examples
 ///
-/// Wake an [`Poll`] from another thread.
+/// Wake a [`Poll`] instance from another thread.
 ///
 /// ```
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
