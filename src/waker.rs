@@ -35,7 +35,7 @@ use crate::{poll, sys, Registry, Token};
 ///
 /// Wake an [`Poll`] from another thread.
 ///
-/// ```ignore
+/// ```
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use std::io;
 /// use std::thread;
@@ -43,7 +43,7 @@ use crate::{poll, sys, Registry, Token};
 /// use std::sync::Arc;
 ///
 /// use mio::event::Event;
-/// use mio::{Events, Ready, Token, Poll, Waker};
+/// use mio::{Events, Token, Poll, Waker};
 ///
 /// const WAKE_TOKEN: Token = Token(10);
 ///
@@ -69,9 +69,9 @@ use crate::{poll, sys, Registry, Token};
 /// // After about 500 milliseconds we should we awoken by the other thread we
 /// // started, getting a single event.
 /// assert!(!events.is_empty());
-/// for event in &events {
-///     assert_eq!(event, Event::new(Ready::READABLE, WAKE_TOKEN));
-/// }
+/// let waker_event = events.iter().next().unwrap();
+/// assert!(waker_event.is_readable());
+/// assert_eq!(waker_event.token(), WAKE_TOKEN);
 /// # handle.join().unwrap();
 /// #     Ok(())
 /// # }
