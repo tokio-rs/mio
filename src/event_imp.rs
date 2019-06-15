@@ -287,6 +287,11 @@ impl Interests {
     pub fn is_lio(&self) -> bool {
         (self.0.get() & LIO) != 0
     }
+
+    #[cfg(windows)]
+    pub(crate) fn as_u8(self) -> u8 {
+        self.0.get()
+    }
 }
 
 impl ops::BitOr for Interests {
