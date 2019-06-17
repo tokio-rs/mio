@@ -88,7 +88,7 @@ impl UdpSocket {
     /// TODO: This... may be wrong in the long run. We're reporting that we
     ///       successfully wrote all of the bytes in `buf` but it's possible
     ///       that we don't actually end up writing all of them!
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+    pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
 
@@ -110,7 +110,7 @@ impl UdpSocket {
             trace!("scheduling a send");
             self.imp.inner.socket.send_to_overlapped(
                 &owned_buf,
-                target,
+                &target,
                 self.imp.inner.write.as_mut_ptr(),
             )
         }?;

@@ -22,7 +22,7 @@ pub struct TcpListener {
 }
 
 impl TcpStream {
-    pub fn connect(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
+    pub fn connect(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
         set_nonblock(stream.as_raw_fd())?;
 
         match stream.connect(addr) {

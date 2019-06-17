@@ -124,7 +124,7 @@ impl UdpSocket {
     /// #   try_main().unwrap();
     /// # }
     /// ```
-    pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
+    pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
         let socket = net::UdpSocket::bind(addr)?;
         UdpSocket::from_socket(socket)
     }
@@ -235,7 +235,7 @@ impl UdpSocket {
     /// #   try_main().unwrap();
     /// # }
     /// ```
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+    pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
         self.sys.send_to(buf, target)
     }
 
