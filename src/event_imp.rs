@@ -690,6 +690,10 @@ impl Interests {
     /// Returns a `Interests` set representing writable interests.
     pub const WRITABLE: Interests = Interests(unsafe { NonZeroU8::new_unchecked(WRITABLE) });
 
+    /// Both readable and writable.
+    pub(crate) const BOTH: Interests =
+        Interests(unsafe { NonZeroU8::new_unchecked(READABLE | WRITABLE) });
+
     /// Returns a `Interests` set representing AIO completion interests.
     #[cfg(any(
         target_os = "dragonfly",

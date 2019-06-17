@@ -97,6 +97,10 @@ pub struct UdpSocket {
 }
 
 impl UdpSocket {
+    /// The interests to use when registering to receive both readable and
+    /// writable events.
+    pub const INTERESTS: Interests = Interests::BOTH;
+
     /// Creates a UDP socket from the given address.
     ///
     /// # Examples
