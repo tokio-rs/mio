@@ -496,7 +496,7 @@ impl Event {
     }
 
     /// Create an `Event` from a platform specific event.
-    pub fn from_sys_event(sys_event: SysEvent) -> Event {
+    pub(crate) fn from_sys_event(sys_event: SysEvent) -> Event {
         Event {
             inner: sys::Event::from_sys_event(sys_event),
         }
