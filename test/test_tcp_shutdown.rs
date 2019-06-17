@@ -33,9 +33,9 @@ macro_rules! wait {
                     target_os = "openbsd"
                 ))]
                 {
-                if $expect_hup {
-                    assert!(event.is_hup());
-                }
+                    if $expect_hup {
+                        assert!(event.is_hup());
+                    }
                 }
 
                 if !$expect_hup {
