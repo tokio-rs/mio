@@ -5,7 +5,7 @@ use mio::net::TcpStream;
 use mio::{Events, Interests, Poll, Token};
 
 macro_rules! wait {
-    ($poll:ident, $ready:ident) => {{
+    ($poll:ident, $ready:ident, $expect_hup: expr) => {{
         use std::time::Instant;
 
         let now = Instant::now();
@@ -24,7 +24,7 @@ macro_rules! wait {
             for event in &events {
                 #[cfg(unix)]
                 {
-                    assert!(!event.is_hup());
+                    assert!(event.is_hup() == $expect_hup);
                 }
 
                 if event.token() == Token(0) && event.$ready() {
@@ -37,7 +37,6 @@ macro_rules! wait {
 }
 
 #[test]
-#[ignore = "FIXME(Thomas): !event.is_hup() fails"]
 fn test_write_shutdown() {
     let mut poll = Poll::new().unwrap();
 
@@ -53,7 +52,7 @@ fn test_write_shutdown() {
 
     let (socket, _) = listener.accept().unwrap();
 
-    wait!(poll, is_writable);
+    wait!(poll, is_writable, false);
 
     let mut events = Events::with_capacity(16);
 
@@ -68,5 +67,5 @@ fn test_write_shutdown() {
     // Now, shutdown the write half of the socket.
     socket.shutdown(Shutdown::Write).unwrap();
 
-    wait!(poll, is_readable);
+    wait!(poll, is_readable, true);
 }
