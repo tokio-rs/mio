@@ -47,10 +47,6 @@ impl Event {
         self.readiness.is_lio()
     }
 
-    pub fn sys_event(&self) -> &SysEvent {
-        self
-    }
-
     pub fn from_sys_event(event: SysEvent) -> Event {
         event
     }

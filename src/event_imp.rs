@@ -495,12 +495,6 @@ impl Event {
         self.inner.is_lio()
     }
 
-    /// Get access to the platform specific event, the returned value differs
-    /// per platform.
-    pub fn sys_event(&self) -> &SysEvent {
-        &self.inner.sys_event()
-    }
-
     /// Create an `Event` from a platform specific event.
     pub fn from_sys_event(sys_event: SysEvent) -> Event {
         Event {

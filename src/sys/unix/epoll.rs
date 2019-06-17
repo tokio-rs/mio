@@ -212,10 +212,6 @@ impl Event {
         false
     }
 
-    pub fn sys_event(&self) -> &SysEvent {
-        &self.inner
-    }
-
     pub fn from_sys_event(epoll_event: SysEvent) -> Event {
         Event { inner: epoll_event }
     }
