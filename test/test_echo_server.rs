@@ -45,10 +45,7 @@ impl EchoConn {
 
                 self.mut_buf = Some(buf.into_inner().try_mut().unwrap());
 
-                self.interests = match self.interests {
-                    None => Some(Interests::READABLE),
-                    Some(i) => Some((i | Interests::READABLE) - Interests::WRITABLE),
-                };
+                self.interests = Some(Interests::READABLE);
             }
             Err(e) => debug!("not implemented; client err={:?}", e),
         }
@@ -76,17 +73,14 @@ impl EchoConn {
                 // prepare to provide this to writable
                 self.buf = Some(Cursor::new(buf.freeze()));
 
-                self.interests = match self.interests {
-                    None => Some(Interests::WRITABLE),
-                    Some(i) => Some((i | Interests::WRITABLE) - Interests::READABLE),
-                }
+                self.interests = Some(Interests::WRITABLE);
             }
             Err(e) => {
                 debug!("not implemented; client err={:?}", e);
                 if self.interests == Some(Interests::READABLE) {
                     self.interests = None;
                 } else if let Some(x) = self.interests.as_mut() {
-                    *x -= Interests::READABLE;
+                    *x = Interests::WRITABLE;
                 }
             }
         };
@@ -194,7 +188,7 @@ impl EchoClient {
                 if self.interests == Some(Interests::READABLE) {
                     self.interests = None;
                 } else if let Some(x) = self.interests.as_mut() {
-                    *x -= Interests::READABLE;
+                    *x = Interests::WRITABLE;
                 }
 
                 if !self.rx.has_remaining() {
@@ -228,7 +222,7 @@ impl EchoClient {
                 debug!("CLIENT : we wrote {} bytes!", r);
                 self.interests = match self.interests {
                     None => Some(Interests::READABLE),
-                    Some(i) => Some((i | Interests::READABLE) - Interests::WRITABLE),
+                    Some(_) => Some(Interests::READABLE),
                 };
             }
             Err(e) => debug!("not implemented; client err={:?}", e),

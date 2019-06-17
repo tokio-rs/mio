@@ -811,22 +811,6 @@ impl ops::BitOrAssign for Interests {
     }
 }
 
-impl ops::Sub for Interests {
-    type Output = Self;
-
-    #[inline]
-    fn sub(self, other: Self) -> Self {
-        Interests(NonZeroU8::new(self.0.get() & !other.0.get()).unwrap())
-    }
-}
-
-impl ops::SubAssign for Interests {
-    #[inline]
-    fn sub_assign(&mut self, other: Self) {
-        self.0 = (*self - other).0;
-    }
-}
-
 impl fmt::Debug for Interests {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut one = false;
