@@ -511,6 +511,15 @@ impl Event {
 
 impl fmt::Debug for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
+        f.debug_struct("Event")
+            .field("token", &self.token())
+            .field("readable", &self.is_readable())
+            .field("writable", &self.is_writable())
+            .field("error", &self.is_error())
+            .field("hup", &self.is_hup())
+            .field("priority", &self.is_priority())
+            .field("aio", &self.is_aio())
+            .field("lio", &self.is_lio())
+            .finish()
     }
 }

@@ -406,16 +406,6 @@ impl Event {
     }
 }
 
-impl fmt::Debug for Event {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO: add readiness.
-        f.debug_struct("Event")
-            .field("token", &self.token())
-            //.field("readiness", &self.readiness())
-            .finish()
-    }
-}
-
 pub struct Events {
     events: Vec<SysEvent>,
 }

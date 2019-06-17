@@ -4,7 +4,7 @@ use super::Ready;
 
 pub type SysEvent = Event;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Event {
     token: Token,
     readiness: Ready,
