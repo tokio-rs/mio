@@ -7,6 +7,7 @@ use std::cmp;
 use std::io;
 use std::io::prelude::*;
 use std::net;
+use std::ops::DerefMut;
 use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
@@ -278,7 +279,7 @@ fn read_bufs() {
     let mut so_far = 0;
     'event_loop: loop {
         for buf in b.iter_mut() {
-            for byte in buf.as_mut_bytes() {
+            for byte in buf.deref_mut().iter_mut() {
                 *byte = 0;
             }
         }
@@ -294,8 +295,7 @@ fn read_bufs() {
                 Ok(mut n) => {
                     so_far += n;
                     for buf in b.iter() {
-                        let buf = buf.as_bytes();
-                        for byte in buf[..cmp::min(n, buf.len())].iter() {
+                        for byte in (&buf[..cmp::min(n, buf.len())]).iter() {
                             assert_eq!(*byte, 1);
                         }
                         n = n.saturating_sub(buf.len());
