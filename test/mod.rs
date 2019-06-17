@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 #[macro_use]
 extern crate log;
 
@@ -113,12 +111,12 @@ impl<T> MapNonBlock<T> for io::Result<T> {
 mod ports {
     use std::net::SocketAddr;
     use std::str::FromStr;
+    use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::SeqCst;
-    use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 
     // Helper for getting a unique port for the task run
     // TODO: Reuse ports to not spam the system
-    static mut NEXT_PORT: AtomicUsize = ATOMIC_USIZE_INIT;
+    static mut NEXT_PORT: AtomicUsize = AtomicUsize::new(0);
     const FIRST_PORT: usize = 18080;
 
     fn next_port() -> usize {
