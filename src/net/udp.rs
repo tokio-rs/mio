@@ -42,8 +42,8 @@ use iovec::IoVec;
 ///
 /// // This operation will fail if the address is in use, so we select different ports for each
 /// // socket.
-/// let sender_socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
-/// let echoer_socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
+/// let sender_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
+/// let echoer_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
 ///
 /// // If we do not use connect here, SENDER and ECHOER would need to call send_to and recv_from
 /// // respectively.
@@ -108,7 +108,7 @@ impl UdpSocket {
     /// use mio::net::UdpSocket;
     ///
     /// // We must bind it to an open address.
-    /// let socket = match UdpSocket::bind(&"127.0.0.1:0".parse()?) {
+    /// let socket = match UdpSocket::bind("127.0.0.1:0".parse()?) {
     ///     Ok(new_socket) => new_socket,
     ///     Err(fail) => {
     ///         // We panic! here, but you could try to bind it again on another address.
@@ -161,7 +161,7 @@ impl UdpSocket {
     /// use mio::net::UdpSocket;
     ///
     /// let addr = "127.0.0.1:0".parse()?;
-    /// let socket = UdpSocket::bind(&addr)?;
+    /// let socket = UdpSocket::bind(addr)?;
     /// #    Ok(())
     /// # }
     /// #
@@ -188,7 +188,7 @@ impl UdpSocket {
     /// use mio::net::UdpSocket;
     ///
     /// // We must bind it to an open address.
-    /// let socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
+    /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
     /// let cloned_socket = socket.try_clone()?;
     ///
     /// assert_eq!(socket.local_addr()?, cloned_socket.local_addr()?);
@@ -220,12 +220,12 @@ impl UdpSocket {
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::net::UdpSocket;
     ///
-    /// let socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
+    /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
     ///
     /// // We must check if the socket is writable before calling send_to,
     /// // or we could run into a WouldBlock error.
     ///
-    /// let bytes_sent = socket.send_to(&[9; 9], &"127.0.0.1:11100".parse()?)?;
+    /// let bytes_sent = socket.send_to(&[9; 9], "127.0.0.1:11100".parse()?)?;
     /// assert_eq!(bytes_sent, 9);
     /// #
     /// #    Ok(())
@@ -250,7 +250,7 @@ impl UdpSocket {
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::net::UdpSocket;
     ///
-    /// let socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
+    /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
     ///
     /// // We must check if the socket is readable before calling recv_from,
     /// // or we could run into a WouldBlock error.
@@ -302,7 +302,7 @@ impl UdpSocket {
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::net::UdpSocket;
     ///
-    /// let broadcast_socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
+    /// let broadcast_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
     /// if broadcast_socket.broadcast()? == false {
     ///     broadcast_socket.set_broadcast(true)?;
     /// }
@@ -335,7 +335,7 @@ impl UdpSocket {
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::net::UdpSocket;
     ///
-    /// let broadcast_socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
+    /// let broadcast_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
     /// assert_eq!(broadcast_socket.broadcast()?, false);
     /// #
     /// #    Ok(())
@@ -419,7 +419,7 @@ impl UdpSocket {
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::net::UdpSocket;
     ///
-    /// let socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
+    /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
     /// if socket.ttl()? < 255 {
     ///     socket.set_ttl(255)?;
     /// }
@@ -451,7 +451,7 @@ impl UdpSocket {
     /// # fn try_main() -> Result<(), Box<Error>> {
     /// use mio::net::UdpSocket;
     ///
-    /// let socket = UdpSocket::bind(&"127.0.0.1:0".parse()?)?;
+    /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
     /// socket.set_ttl(255)?;
     ///
     /// assert_eq!(socket.ttl()?, 255);

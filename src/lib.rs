@@ -60,7 +60,7 @@
 //! let addr = "127.0.0.1:13265".parse().unwrap();
 //!
 //! // Setup the server socket
-//! let server = TcpListener::bind(&addr).unwrap();
+//! let server = TcpListener::bind(addr).unwrap();
 //!
 //! // Create a poll instance
 //! let mut poll = Poll::new().unwrap();
@@ -73,7 +73,7 @@
 //!     Interests::READABLE).unwrap();
 //!
 //! // Setup the client socket
-//! let sock = TcpStream::connect(&addr).unwrap();
+//! let sock = TcpStream::connect(addr).unwrap();
 //!
 //! // Register the socket
 //! registry.register(

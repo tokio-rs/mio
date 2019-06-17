@@ -24,7 +24,7 @@ pub struct UdpHandler {
 
 impl UdpHandler {
     fn new(tx: UdpSocket, rx: UdpSocket, msg: &'static str) -> UdpHandler {
-        let sock = UdpSocket::bind(&"127.0.0.1:12345".parse().unwrap()).unwrap();
+        let sock = UdpSocket::bind("127.0.0.1:12345".parse().unwrap()).unwrap();
         UdpHandler {
             tx,
             rx,
@@ -56,7 +56,7 @@ impl UdpHandler {
     fn handle_write(&mut self, _: &Registry, token: Token, _: Ready) {
         if let SENDER = token {
             let addr = self.rx.local_addr().unwrap();
-            let cnt = self.tx.send_to(self.buf.as_ref(), &addr).unwrap();
+            let cnt = self.tx.send_to(self.buf.as_ref(), addr).unwrap();
             self.buf.advance(cnt);
         }
     }
@@ -71,8 +71,8 @@ pub fn test_multicast() {
     let addr = localhost();
     let any = "0.0.0.0:0".parse().unwrap();
 
-    let tx = UdpSocket::bind(&any).unwrap();
-    let rx = UdpSocket::bind(&addr).unwrap();
+    let tx = UdpSocket::bind(any).unwrap();
+    let rx = UdpSocket::bind(addr).unwrap();
 
     info!("Joining group 227.1.1.100");
     let any = "0.0.0.0".parse().unwrap();

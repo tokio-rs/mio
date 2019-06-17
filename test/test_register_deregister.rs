@@ -67,14 +67,14 @@ pub fn test_register_deregister() {
 
     let addr = localhost();
 
-    let server = TcpListener::bind(&addr).unwrap();
+    let server = TcpListener::bind(addr).unwrap();
 
     info!("register server socket");
     poll.registry()
         .register(&server, SERVER, Interests::READABLE)
         .unwrap();
 
-    let client = TcpStream::connect(&addr).unwrap();
+    let client = TcpStream::connect(addr).unwrap();
 
     // Register client socket only as writable
     poll.registry()

@@ -39,7 +39,7 @@ use std::time::Duration;
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
-/// let stream = TcpStream::connect(&"127.0.0.1:34254".parse()?)?;
+/// let stream = TcpStream::connect("127.0.0.1:34254".parse()?)?;
 ///
 /// let mut poll = Poll::new()?;
 /// let registry = poll.registry().clone();
@@ -427,7 +427,7 @@ impl fmt::Debug for TcpStream {
 /// use mio::net::TcpListener;
 /// use std::time::Duration;
 ///
-/// let listener = TcpListener::bind(&"127.0.0.1:34255".parse()?)?;
+/// let listener = TcpListener::bind("127.0.0.1:34255".parse()?)?;
 ///
 /// let mut poll = Poll::new()?;
 /// let registry = poll.registry().clone();

@@ -11,14 +11,14 @@ pub fn test_reregister_different_without_poll() {
     let mut poll = Poll::new().unwrap();
 
     // Create the listener
-    let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
     poll.registry()
         .register(&l, Token(0), Interests::READABLE)
         .unwrap();
 
-    let s1 = TcpStream::connect(&l.local_addr().unwrap()).unwrap();
+    let s1 = TcpStream::connect(l.local_addr().unwrap()).unwrap();
     poll.registry()
         .register(&s1, Token(2), Interests::READABLE)
         .unwrap();

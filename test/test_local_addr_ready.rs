@@ -16,7 +16,7 @@ struct MyHandler {
 #[test]
 fn local_addr_ready() {
     let addr = "127.0.0.1:0".parse().unwrap();
-    let server = TcpListener::bind(&addr).unwrap();
+    let server = TcpListener::bind(addr).unwrap();
     let addr = server.local_addr().unwrap();
 
     let mut poll = Poll::new().unwrap();
@@ -24,7 +24,7 @@ fn local_addr_ready() {
         .register(&server, LISTEN, Interests::READABLE)
         .unwrap();
 
-    let sock = TcpStream::connect(&addr).unwrap();
+    let sock = TcpStream::connect(addr).unwrap();
     poll.registry()
         .register(&sock, CLIENT, Interests::READABLE)
         .unwrap();

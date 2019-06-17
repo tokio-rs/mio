@@ -9,7 +9,7 @@ pub fn test_double_register() {
     let poll = Poll::new().unwrap();
 
     // Create the listener
-    let l = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
     poll.registry()
