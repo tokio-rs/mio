@@ -92,9 +92,9 @@ fn waker_multiple_wakeups_different_thread() {
 
 fn expect_waker_event(poll: &mut Poll, events: &mut Events, token: Token) {
     poll.poll(events, Some(Duration::from_millis(100))).unwrap();
-    let mut events = events.iter();
-    let event = events.next().unwrap();
-    assert_eq!(event.token(), token);
-    assert!(event.is_readable());
-    assert!(events.next().is_none());
+    assert!(!events.is_empty());
+    for event in events.iter() {
+        assert_eq!(event.token(), token);
+        assert!(event.is_readable());
+    }
 }
