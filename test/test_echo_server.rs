@@ -284,14 +284,14 @@ pub fn test_echo_server() {
     let mut poll = Poll::new().unwrap();
 
     let addr = localhost();
-    let srv = TcpListener::bind(&addr).unwrap();
+    let srv = TcpListener::bind(addr).unwrap();
 
     info!("listen for connections");
     poll.registry()
         .register(&srv, SERVER, Interests::READABLE)
         .unwrap();
 
-    let sock = TcpStream::connect(&addr).unwrap();
+    let sock = TcpStream::connect(addr).unwrap();
 
     // Connect to the server
     poll.registry()

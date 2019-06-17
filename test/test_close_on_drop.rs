@@ -90,14 +90,14 @@ pub fn test_close_on_drop() {
     let addr = localhost();
 
     // == Create & setup server socket
-    let srv = TcpListener::bind(&addr).unwrap();
+    let srv = TcpListener::bind(addr).unwrap();
 
     poll.registry()
         .register(&srv, SERVER, Interests::READABLE)
         .unwrap();
 
     // == Create & setup client socket
-    let sock = TcpStream::connect(&addr).unwrap();
+    let sock = TcpStream::connect(addr).unwrap();
 
     poll.registry()
         .register(&sock, CLIENT, Interests::WRITABLE)

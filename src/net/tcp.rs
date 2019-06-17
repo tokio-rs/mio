@@ -39,7 +39,7 @@ use std::time::Duration;
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
-/// let stream = TcpStream::connect(&"127.0.0.1:34254".parse()?)?;
+/// let stream = TcpStream::connect("127.0.0.1:34254".parse()?)?;
 ///
 /// let mut poll = Poll::new()?;
 /// let registry = poll.registry().clone();
@@ -79,15 +79,15 @@ impl TcpStream {
     /// `net2::TcpBuilder` to configure a socket and then pass its socket to
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
-    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
-        let sock = match *addr {
+    pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
+        let sock = match addr {
             SocketAddr::V4(..) => TcpBuilder::new_v4(),
             SocketAddr::V6(..) => TcpBuilder::new_v6(),
         }?;
         // Required on Windows for a future `connect_overlapped` operation to be
         // executed successfully.
         if cfg!(windows) {
-            sock.bind(&inaddr_any(addr))?;
+            sock.bind(inaddr_any(addr))?;
         }
         TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
     }
@@ -110,7 +110,7 @@ impl TcpStream {
     ///   loop. Note that on Windows you must `bind` a socket before it can be
     ///   connected, so if a custom `TcpBuilder` is used it should be bound
     ///   (perhaps to `INADDR_ANY`) before this method is called.
-    pub fn connect_stream(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
+    pub fn connect_stream(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
         Ok(TcpStream {
             sys: sys::TcpStream::connect(stream, addr)?,
             selector_id: SelectorId::new(),
@@ -337,8 +337,8 @@ impl TcpStream {
     }
 }
 
-fn inaddr_any(other: &SocketAddr) -> SocketAddr {
-    match *other {
+fn inaddr_any(other: SocketAddr) -> SocketAddr {
+    match other {
         SocketAddr::V4(..) => {
             let any = Ipv4Addr::new(0, 0, 0, 0);
             let addr = SocketAddrV4::new(any, 0);
@@ -427,7 +427,7 @@ impl fmt::Debug for TcpStream {
 /// use mio::net::TcpListener;
 /// use std::time::Duration;
 ///
-/// let listener = TcpListener::bind(&"127.0.0.1:34255".parse()?)?;
+/// let listener = TcpListener::bind("127.0.0.1:34255".parse()?)?;
 ///
 /// let mut poll = Poll::new()?;
 /// let registry = poll.registry().clone();
@@ -466,9 +466,9 @@ impl TcpListener {
     /// socket is desired then the `net2::TcpBuilder` methods can be used in
     /// combination with the `TcpListener::from_listener` method to transfer
     /// ownership into mio.
-    pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
+    pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
         // Create the socket
-        let sock = match *addr {
+        let sock = match addr {
             SocketAddr::V4(..) => TcpBuilder::new_v4(),
             SocketAddr::V6(..) => TcpBuilder::new_v6(),
         }?;

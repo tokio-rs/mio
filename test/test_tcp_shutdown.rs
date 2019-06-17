@@ -45,7 +45,7 @@ fn test_write_shutdown() {
 
     let interests = Interests::READABLE | Interests::WRITABLE;
 
-    let client = TcpStream::connect(&addr).unwrap();
+    let client = TcpStream::connect(addr).unwrap();
     poll.registry()
         .register(&client, Token(0), interests)
         .unwrap();

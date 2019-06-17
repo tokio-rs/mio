@@ -31,7 +31,7 @@ impl UdpSocket {
         self.io.try_clone().map(|io| UdpSocket { io })
     }
 
-    pub fn send_to(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+    pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
         self.io.send_to(buf, target)
     }
 

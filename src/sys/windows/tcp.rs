@@ -112,9 +112,9 @@ impl TcpStream {
         }
     }
 
-    pub fn connect(socket: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
+    pub fn connect(socket: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
         socket.set_nonblocking(true)?;
-        Ok(TcpStream::new(socket, Some(*addr)))
+        Ok(TcpStream::new(socket, Some(addr)))
     }
 
     pub fn from_stream(stream: net::TcpStream) -> TcpStream {
@@ -387,12 +387,12 @@ impl StreamImp {
         self.inner.inner.lock().unwrap()
     }
 
-    fn schedule_connect(&self, addr: &SocketAddr) -> io::Result<()> {
+    fn schedule_connect(&self, addr: SocketAddr) -> io::Result<()> {
         unsafe {
             trace!("scheduling a connect");
             self.inner
                 .socket
-                .connect_overlapped(addr, &[], self.inner.read.as_mut_ptr())?;
+                .connect_overlapped(&addr, &[], self.inner.read.as_mut_ptr())?;
         }
         // see docs above on StreamImp.inner for rationale on forget
         mem::forget(self.clone());
@@ -594,7 +594,7 @@ impl Evented for TcpStream {
         // successful connect will worry about generating writable/readable
         // events and scheduling a new read.
         if let Some(addr) = me.deferred_connect.take() {
-            return self.imp.schedule_connect(&addr).map(|_| ());
+            return self.imp.schedule_connect(addr).map(|_| ());
         }
         self.post_register(interests, &mut me);
         Ok(())
