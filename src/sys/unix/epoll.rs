@@ -8,7 +8,7 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{cmp, fmt, i32, io};
+use std::{cmp, i32, io};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -212,11 +212,11 @@ impl Event {
         false
     }
 
-    pub fn raw_event(&self) -> &SysEvent {
+    pub fn sys_event(&self) -> &SysEvent {
         &self.inner
     }
 
-    pub fn from_raw_event(epoll_event: SysEvent) -> Event {
+    pub fn from_sys_event(epoll_event: SysEvent) -> Event {
         Event { inner: epoll_event }
     }
 }

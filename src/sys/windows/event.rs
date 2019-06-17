@@ -4,7 +4,7 @@ use super::Ready;
 
 pub type SysEvent = Event;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Event {
     token: Token,
     readiness: Ready,
@@ -47,11 +47,11 @@ impl Event {
         self.readiness.is_lio()
     }
 
-    pub fn raw_event(&self) -> &SysEvent {
+    pub fn sys_event(&self) -> &SysEvent {
         self
     }
 
-    pub fn from_raw_event(event: SysEvent) -> Event {
+    pub fn from_sys_event(event: SysEvent) -> Event {
         event
     }
 }

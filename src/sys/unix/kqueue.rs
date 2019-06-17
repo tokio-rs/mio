@@ -397,11 +397,11 @@ impl Event {
         }
     }
 
-    pub fn raw_event(&self) -> &SysEvent {
+    pub fn sys_event(&self) -> &SysEvent {
         &self.inner
     }
 
-    pub fn from_raw_event(kevent: SysEvent) -> Event {
+    pub fn from_sys_event(kevent: SysEvent) -> Event {
         Event { inner: kevent }
     }
 }

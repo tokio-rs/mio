@@ -1026,7 +1026,7 @@ impl<'a> Iterator for Iter<'a> {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.inner.get(self.pos).map(Event::from_raw_event);
+        let ret = self.inner.inner.get(self.pos).map(Event::from_sys_event);
         self.pos += 1;
         ret
     }
@@ -1048,7 +1048,7 @@ impl Iterator for IntoIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.inner.get(self.pos).map(Event::from_raw_event);
+        let ret = self.inner.inner.get(self.pos).map(Event::from_sys_event);
         self.pos += 1;
         ret
     }

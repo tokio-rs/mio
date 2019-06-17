@@ -497,14 +497,14 @@ impl Event {
 
     /// Get access to the platform specific event, the returned value differs
     /// per platform.
-    pub fn raw_event(&self) -> &SysEvent {
-        &self.inner.raw_event()
+    pub fn sys_event(&self) -> &SysEvent {
+        &self.inner.sys_event()
     }
 
     /// Create an `Event` from a platform specific event.
-    pub fn from_raw_event(raw_event: SysEvent) -> Event {
+    pub fn from_sys_event(sys_event: SysEvent) -> Event {
         Event {
-            inner: sys::Event::from_raw_event(raw_event),
+            inner: sys::Event::from_sys_event(sys_event),
         }
     }
 }
