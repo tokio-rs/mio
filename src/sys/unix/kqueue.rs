@@ -317,11 +317,11 @@ impl Drop for Selector {
     }
 }
 
-pub type RawEvent = libc::kevent;
+pub type SysEvent = libc::kevent;
 
 #[repr(transparent)]
 pub struct Event {
-    inner: RawEvent,
+    inner: SysEvent,
 }
 
 impl Event {
@@ -397,11 +397,11 @@ impl Event {
         }
     }
 
-    pub fn raw_event(&self) -> &RawEvent {
+    pub fn raw_event(&self) -> &SysEvent {
         &self.inner
     }
 
-    pub fn from_raw_event(kevent: RawEvent) -> Event {
+    pub fn from_raw_event(kevent: SysEvent) -> Event {
         Event { inner: kevent }
     }
 }
@@ -417,7 +417,7 @@ impl fmt::Debug for Event {
 }
 
 pub struct Events {
-    events: Vec<RawEvent>,
+    events: Vec<SysEvent>,
 }
 
 impl Events {
@@ -442,7 +442,7 @@ impl Events {
         self.events.is_empty()
     }
 
-    pub fn get(&self, idx: usize) -> Option<RawEvent> {
+    pub fn get(&self, idx: usize) -> Option<SysEvent> {
         self.events.get(idx).cloned()
     }
 

@@ -1,6 +1,6 @@
 #[cfg(unix)]
 pub use self::unix::{
-    pipe, set_nonblock, Event, EventedFd, Events, Io, RawEvent, Selector, TcpListener, TcpStream,
+    pipe, set_nonblock, Event, EventedFd, Events, Io, Selector, SysEvent, TcpListener, TcpStream,
     UdpSocket, Waker,
 };
 
@@ -9,7 +9,7 @@ pub mod unix;
 
 #[cfg(windows)]
 pub use self::windows::{
-    Binding, Event, Events, Overlapped, RawEvent, Selector, TcpListener, TcpStream, UdpSocket,
+    Binding, Event, Events, Overlapped, Selector, SysEvent, TcpListener, TcpStream, UdpSocket,
     Waker,
 };
 

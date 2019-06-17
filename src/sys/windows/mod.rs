@@ -153,7 +153,7 @@ mod tcp;
 mod udp;
 mod waker;
 
-pub use self::event::{Event, RawEvent};
+pub use self::event::{Event, SysEvent};
 pub use self::selector::{Binding, Events, Overlapped, Selector};
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;

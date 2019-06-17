@@ -168,11 +168,11 @@ impl Drop for Selector {
     }
 }
 
-pub type RawEvent = libc::epoll_event;
+pub type SysEvent = libc::epoll_event;
 
 #[repr(transparent)]
 pub struct Event {
-    inner: RawEvent,
+    inner: SysEvent,
 }
 
 impl Event {
@@ -212,11 +212,11 @@ impl Event {
         false
     }
 
-    pub fn raw_event(&self) -> &RawEvent {
+    pub fn raw_event(&self) -> &SysEvent {
         &self.inner
     }
 
-    pub fn from_raw_event(epoll_event: RawEvent) -> Event {
+    pub fn from_raw_event(epoll_event: SysEvent) -> Event {
         Event { inner: epoll_event }
     }
 }
@@ -258,7 +258,7 @@ impl Events {
     }
 
     #[inline]
-    pub fn get(&self, idx: usize) -> Option<RawEvent> {
+    pub fn get(&self, idx: usize) -> Option<SysEvent> {
         self.events.get(idx).cloned()
     }
 

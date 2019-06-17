@@ -1,3 +1,4 @@
+use crate::sys::SysEvent;
 use crate::{sys, Registry, Token};
 use std::num::NonZeroU8;
 use std::{fmt, io, ops};
@@ -496,12 +497,12 @@ impl Event {
 
     /// Get access to the platform specific event, the returned value differs
     /// per platform.
-    pub fn raw_event(&self) -> &sys::RawEvent {
+    pub fn raw_event(&self) -> &SysEvent {
         &self.inner.raw_event()
     }
 
     /// Create an `Event` from a platform specific event.
-    pub fn from_raw_event(raw_event: sys::RawEvent) -> Event {
+    pub fn from_raw_event(raw_event: SysEvent) -> Event {
         Event {
             inner: sys::Event::from_raw_event(raw_event),
         }

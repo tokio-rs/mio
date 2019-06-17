@@ -2,7 +2,7 @@ use crate::Token;
 
 use super::Ready;
 
-pub type RawEvent = Event;
+pub type SysEvent = Event;
 
 #[derive(Debug, Clone)]
 pub struct Event {
@@ -47,11 +47,11 @@ impl Event {
         self.readiness.is_lio()
     }
 
-    pub fn raw_event(&self) -> &RawEvent {
+    pub fn raw_event(&self) -> &SysEvent {
         self
     }
 
-    pub fn from_raw_event(event: RawEvent) -> Event {
+    pub fn from_raw_event(event: SysEvent) -> Event {
         event
     }
 }
