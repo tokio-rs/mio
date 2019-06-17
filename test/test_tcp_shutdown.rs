@@ -22,9 +22,24 @@ macro_rules! wait {
                 .unwrap();
 
             for event in &events {
-                #[cfg(unix)]
+                // Hup is only generated on kqueue platforms.
+                #[cfg(any(
+                    target_os = "bitrig",
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "netbsd",
+                    target_os = "openbsd"
+                ))]
                 {
-                    assert!(event.is_hup() == $expect_hup);
+                if $expect_hup {
+                    assert!(event.is_hup());
+                }
+                }
+
+                if !$expect_hup {
+                    assert!(!event.is_hup());
                 }
 
                 if event.token() == Token(0) && event.$ready() {
