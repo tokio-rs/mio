@@ -5,7 +5,7 @@ use mio::net::TcpStream;
 use mio::{Events, Interests, Poll, Token};
 
 macro_rules! wait {
-    ($poll:ident, $ready:ident) => {{
+    ($poll:ident, $ready:ident, $expect_hup: expr) => {{
         use std::time::Instant;
 
         let now = Instant::now();
@@ -22,12 +22,27 @@ macro_rules! wait {
                 .unwrap();
 
             for event in &events {
-                #[cfg(unix)]
+                // Hup is only generated on kqueue platforms.
+                #[cfg(any(
+                    target_os = "bitrig",
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "netbsd",
+                    target_os = "openbsd"
+                ))]
                 {
-                    assert!(!event.readiness().is_hup());
+                    if $expect_hup {
+                        assert!(event.is_hup());
+                    }
                 }
 
-                if event.token() == Token(0) && event.readiness().$ready() {
+                if !$expect_hup {
+                    assert!(!event.is_hup());
+                }
+
+                if event.token() == Token(0) && event.$ready() {
                     found = true;
                     break;
                 }
@@ -52,7 +67,7 @@ fn test_write_shutdown() {
 
     let (socket, _) = listener.accept().unwrap();
 
-    wait!(poll, is_writable);
+    wait!(poll, is_writable, false);
 
     let mut events = Events::with_capacity(16);
 
@@ -61,11 +76,11 @@ fn test_write_shutdown() {
         .unwrap();
 
     let next = events.iter().next();
-    assert_eq!(next, None);
+    assert!(next.is_none());
 
     println!("SHUTTING DOWN");
     // Now, shutdown the write half of the socket.
     socket.shutdown(Shutdown::Write).unwrap();
 
-    wait!(poll, is_readable);
+    wait!(poll, is_readable, true);
 }

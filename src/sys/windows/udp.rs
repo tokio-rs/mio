@@ -6,8 +6,8 @@
 use crate::event::Evented;
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
-use crate::sys::windows::Registration;
-use crate::{Interests, Ready, Registry, Token};
+use crate::sys::windows::{Ready, Registration};
+use crate::{Interests, Registry, Token};
 use log::trace;
 use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;

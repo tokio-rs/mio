@@ -46,7 +46,7 @@ fn accept() {
         for event in &events {
             h.hit = true;
             assert_eq!(event.token(), Token(1));
-            assert!(event.readiness().is_readable());
+            assert!(event.is_readable());
             assert!(h.listener.accept().is_ok());
             h.shutdown = true;
         }
@@ -94,8 +94,8 @@ fn connect() {
         for event in &events {
             assert_eq!(event.token(), Token(1));
             match h.hit {
-                0 => assert!(event.readiness().is_writable()),
-                1 => assert!(event.readiness().is_readable()),
+                0 => assert!(event.is_writable()),
+                1 => assert!(event.is_readable()),
                 _ => panic!(),
             }
             h.hit += 1;
@@ -112,8 +112,8 @@ fn connect() {
         for event in &events {
             assert_eq!(event.token(), Token(1));
             match h.hit {
-                0 => assert!(event.readiness().is_writable()),
-                1 => assert!(event.readiness().is_readable()),
+                0 => assert!(event.is_writable()),
+                1 => assert!(event.is_readable()),
                 _ => panic!(),
             }
             h.hit += 1;
@@ -543,7 +543,7 @@ fn multiple_writes_immediate_success() {
     'outer: loop {
         poll.poll(&mut events, None).unwrap();
         for event in events.iter() {
-            if event.token() == Token(1) && event.readiness().is_writable() {
+            if event.token() == Token(1) && event.is_writable() {
                 break 'outer;
             }
         }
@@ -620,7 +620,7 @@ fn connection_reset_by_peer() {
 
         for event in &events {
             if event.token() == Token(3) {
-                assert!(event.readiness().is_readable());
+                assert!(event.is_readable());
 
                 match server.read(&mut buf) {
                     Ok(0) | Err(_) => {}
@@ -658,7 +658,7 @@ fn connect_error() {
 
         for event in &events {
             if event.token() == Token(0) {
-                assert!(event.readiness().is_writable());
+                assert!(event.is_writable());
                 break 'outer;
             }
         }
@@ -690,7 +690,7 @@ fn write_error() {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
-            if event.token() == Token(0) && event.readiness().is_writable() {
+            if event.token() == Token(0) && event.is_writable() {
                 break 'outer;
             }
         }

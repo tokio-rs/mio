@@ -1,6 +1,6 @@
-use super::{PollOpt, SelectorInner, Waker};
-use crate::event_imp::{self as event, Event, Evented};
-use crate::{poll, sys, Interests, Ready, Token};
+use super::{Event, PollOpt, Ready, SelectorInner, Waker};
+use crate::event_imp::Evented;
+use crate::{poll, sys, Interests, Token};
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
@@ -186,7 +186,7 @@ impl Registration {
         let node = Box::into_raw(Box::new(ReadinessNode::new(
             queue,
             token,
-            interests.to_ready(),
+            Ready::from_interests(interests),
             opt,
             3,
         )));
@@ -213,7 +213,7 @@ impl Evented for Registration {
         self.inner.update(
             &poll::selector(registry).readiness_queue,
             token,
-            interests.to_ready(),
+            Ready::from_interests(interests),
             PollOpt::edge(),
         )
     }
@@ -227,7 +227,7 @@ impl Evented for Registration {
         self.inner.update(
             &poll::selector(registry).readiness_queue,
             token,
-            interests.to_ready(),
+            Ready::from_interests(interests),
             PollOpt::edge(),
         )
     }
@@ -1099,7 +1099,7 @@ impl ReadinessState {
     // Create a `ReadinessState` initialized with the provided arguments
     #[inline]
     fn new(interest: Ready, opt: PollOpt) -> ReadinessState {
-        let interest = event::ready_as_usize(interest);
+        let interest = interest.as_usize();
         let opt: usize = opt.into();
 
         debug_assert!(interest <= MASK_4);
@@ -1125,7 +1125,7 @@ impl ReadinessState {
     #[inline]
     fn readiness(self) -> Ready {
         let v = self.get(MASK_4, READINESS_SHIFT);
-        event::ready_from_usize(v)
+        Ready::from_usize(v)
     }
 
     #[inline]
@@ -1137,20 +1137,20 @@ impl ReadinessState {
     #[inline]
     #[allow(dead_code)] // Used by Windows.
     fn set_readiness(&mut self, v: Ready) {
-        self.set(event::ready_as_usize(v), MASK_4, READINESS_SHIFT);
+        self.set(v.as_usize(), MASK_4, READINESS_SHIFT);
     }
 
     /// Get the interest
     #[inline]
     fn interest(self) -> Ready {
         let v = self.get(MASK_4, INTEREST_SHIFT);
-        event::ready_from_usize(v)
+        Ready::from_usize(v)
     }
 
     /// Set the interest
     #[inline]
     fn set_interest(&mut self, v: Ready) {
-        self.set(event::ready_as_usize(v), MASK_4, INTEREST_SHIFT);
+        self.set(v.as_usize(), MASK_4, INTEREST_SHIFT);
     }
 
     #[inline]

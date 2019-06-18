@@ -1,17 +1,14 @@
-use crate::event_imp::Event;
 use crate::sys::unix::cvt;
 use crate::sys::unix::io::set_cloexec;
-use crate::{Interests, Ready, Token};
+use crate::{Interests, Token};
 
 use libc::{self, c_int};
-use libc::{EPOLLERR, EPOLLHUP};
-use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI};
-use std::io;
+use libc::{EPOLLET, EPOLLIN, EPOLLOUT};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{cmp, i32};
+use std::{cmp, i32, io};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -171,6 +168,55 @@ impl Drop for Selector {
     }
 }
 
+pub type SysEvent = libc::epoll_event;
+
+#[repr(transparent)]
+pub struct Event {
+    inner: SysEvent,
+}
+
+impl Event {
+    pub fn token(&self) -> Token {
+        Token(self.inner.u64 as usize)
+    }
+
+    pub fn is_readable(&self) -> bool {
+        (self.inner.events as libc::c_int & libc::EPOLLIN) != 0
+            || (self.inner.events as libc::c_int & libc::EPOLLPRI) != 0
+    }
+
+    pub fn is_writable(&self) -> bool {
+        (self.inner.events as libc::c_int & libc::EPOLLOUT) != 0
+    }
+
+    pub fn is_error(&self) -> bool {
+        (self.inner.events as libc::c_int & libc::EPOLLERR) != 0
+    }
+
+    pub fn is_hup(&self) -> bool {
+        (self.inner.events as libc::c_int & libc::EPOLLHUP) != 0
+            || (self.inner.events as libc::c_int & libc::EPOLLRDHUP) != 0
+    }
+
+    pub fn is_priority(&self) -> bool {
+        (self.inner.events as libc::c_int & libc::EPOLLPRI) != 0
+    }
+
+    pub fn is_aio(&self) -> bool {
+        // Not supported in the kernel, only in libc.
+        false
+    }
+
+    pub fn is_lio(&self) -> bool {
+        // Not supported.
+        false
+    }
+
+    pub fn from_sys_event(epoll_event: SysEvent) -> Event {
+        Event { inner: epoll_event }
+    }
+}
+
 pub struct Events {
     events: Vec<libc::epoll_event>,
 }
@@ -198,36 +244,8 @@ impl Events {
     }
 
     #[inline]
-    pub fn get(&self, idx: usize) -> Option<Event> {
-        self.events.get(idx).map(|event| {
-            let epoll = event.events as c_int;
-            let mut kind = Ready::EMPTY;
-
-            if (epoll & EPOLLIN) != 0 {
-                kind = kind | Ready::READABLE;
-            }
-
-            if (epoll & EPOLLPRI) != 0 {
-                kind = kind | Ready::READABLE | Ready::PRIORITY;
-            }
-
-            if (epoll & EPOLLOUT) != 0 {
-                kind = kind | Ready::WRITABLE;
-            }
-
-            // EPOLLHUP - Usually means a socket error happened
-            if (epoll & EPOLLERR) != 0 {
-                kind = kind | Ready::ERROR;
-            }
-
-            if (epoll & EPOLLHUP) != 0 {
-                kind = kind | Ready::HUP;
-            }
-
-            let token = self.events[idx].u64;
-
-            Event::new(kind, Token(token as usize))
-        })
+    pub fn get(&self, idx: usize) -> Option<SysEvent> {
+        self.events.get(idx).cloned()
     }
 
     pub fn clear(&mut self) {

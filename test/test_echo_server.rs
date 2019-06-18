@@ -302,8 +302,8 @@ pub fn test_echo_server() {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
-            debug!("ready {:?} {:?}", event.token(), event.readiness());
-            if event.readiness().is_readable() {
+            debug!("ready {:?} {:?}", event.token(), event);
+            if event.is_readable() {
                 match event.token() {
                     SERVER => handler.server.accept(poll.registry()).unwrap(),
                     CLIENT => handler.client.readable(poll.registry()).unwrap(),
@@ -311,7 +311,7 @@ pub fn test_echo_server() {
                 }
             }
 
-            if event.readiness().is_writable() {
+            if event.is_writable() {
                 match event.token() {
                     SERVER => panic!("received writable for token 0"),
                     CLIENT => handler.client.writable(poll.registry()).unwrap(),

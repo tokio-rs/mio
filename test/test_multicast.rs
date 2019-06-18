@@ -5,7 +5,7 @@
 use crate::localhost;
 use bytes::{BufMut, Bytes, BytesMut};
 use mio::net::UdpSocket;
-use mio::{Events, Interests, Poll, Ready, Registry, Token};
+use mio::{Events, Interests, Poll, Registry, Token};
 use std::net::IpAddr;
 use std::str;
 
@@ -36,7 +36,7 @@ impl UdpHandler {
         }
     }
 
-    fn handle_read(&mut self, _: &Registry, token: Token, _: Ready) {
+    fn handle_read(&mut self, _: &Registry, token: Token) {
         if let LISTENER = token {
             debug!("We are receiving a datagram now...");
             match unsafe { self.rx.recv_from(self.rx_buf.bytes_mut()) } {
@@ -53,7 +53,7 @@ impl UdpHandler {
         }
     }
 
-    fn handle_write(&mut self, _: &Registry, token: Token, _: Ready) {
+    fn handle_write(&mut self, _: &Registry, token: Token) {
         if let SENDER = token {
             let addr = self.rx.local_addr().unwrap();
             let cnt = self.tx.send_to(self.buf.as_ref(), addr).unwrap();
@@ -103,12 +103,12 @@ pub fn test_multicast() {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
-            if event.readiness().is_readable() {
-                handler.handle_read(poll.registry(), event.token(), event.readiness());
+            if event.is_readable() {
+                handler.handle_read(poll.registry(), event.token());
             }
 
-            if event.readiness().is_writable() {
-                handler.handle_write(poll.registry(), event.token(), event.readiness());
+            if event.is_writable() {
+                handler.handle_write(poll.registry(), event.token());
             }
         }
     }

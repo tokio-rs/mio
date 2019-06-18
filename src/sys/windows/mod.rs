@@ -140,17 +140,20 @@ use std::os::windows::prelude::*;
 
 use winapi;
 
-mod waker;
 #[macro_use]
 mod selector;
 mod buffer_pool;
+mod event;
 mod from_raw_arc;
 mod lazycell;
 mod poll_opt;
 mod queue;
+mod ready;
 mod tcp;
 mod udp;
+mod waker;
 
+pub use self::event::{Event, SysEvent};
 pub use self::selector::{Binding, Events, Overlapped, Selector};
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
@@ -158,6 +161,7 @@ pub use self::waker::Waker;
 
 use self::poll_opt::PollOpt;
 use self::queue::{ReadinessQueue, Registration, SetReadiness};
+use self::ready::Ready;
 use self::selector::SelectorInner;
 
 #[derive(Copy, Clone)]

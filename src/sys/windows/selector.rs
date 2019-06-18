@@ -1,8 +1,10 @@
-use crate::event_imp::{Event, Evented, Interests, Ready};
+use crate::event_imp::{Evented, Interests};
 use crate::poll::{self, Registry};
 use crate::sys::windows::buffer_pool::BufferPool;
 use crate::sys::windows::lazycell::AtomicLazyCell;
-use crate::sys::windows::{PollOpt, ReadinessQueue, Registration, SetReadiness};
+use crate::sys::windows::{
+    Event, PollOpt, ReadinessQueue, Ready, Registration, SetReadiness, SysEvent,
+};
 use crate::Token;
 use log::trace;
 use miow;
@@ -489,7 +491,7 @@ pub struct Events {
     /// Literal events returned by `get` to the upwards `EventLoop`. This file
     /// doesn't really modify this (except for the waker), instead almost all
     /// events are filled in by the `ReadinessQueue` from the `poll` module.
-    events: Vec<Event>,
+    events: Vec<SysEvent>,
 }
 
 impl Events {
@@ -515,8 +517,8 @@ impl Events {
         self.events.capacity()
     }
 
-    pub fn get(&self, idx: usize) -> Option<Event> {
-        self.events.get(idx).map(|e| *e)
+    pub fn get(&self, idx: usize) -> Option<SysEvent> {
+        self.events.get(idx).cloned()
     }
 
     pub fn push_event(&mut self, event: Event) {

@@ -1,11 +1,9 @@
-use crate::event_imp::{self as event, Event};
 use crate::sys::unix::cvt;
 use crate::sys::unix::io::set_cloexec;
-use crate::{Interests, Ready, Token};
+use crate::{Interests, Token};
 
 use libc::{self, time_t};
 use log::trace;
-use std::collections::HashMap;
 use std::io;
 #[cfg(not(target_os = "netbsd"))]
 use std::os::raw::{c_int, c_short};
@@ -71,7 +69,7 @@ impl Selector {
     pub fn select(
         &self,
         evts: &mut Events,
-        waker: Token,
+        _waker: Token,
         timeout: Option<Duration>,
     ) -> io::Result<bool> {
         let timeout = timeout.map(|to| libc::timespec {
@@ -93,12 +91,12 @@ impl Selector {
                 self.kq,
                 ptr::null(),
                 0,
-                evts.sys_events.0.as_mut_ptr(),
-                evts.sys_events.0.capacity() as Count,
+                evts.events.as_mut_ptr(),
+                evts.events.capacity() as Count,
                 timeout,
             ))?;
-            evts.sys_events.0.set_len(cnt as usize);
-            Ok(evts.coalesce(waker))
+            evts.events.set_len(cnt as usize);
+            Ok(true)
         }
     }
 
@@ -319,23 +317,99 @@ impl Drop for Selector {
     }
 }
 
-pub struct Events {
-    sys_events: KeventList,
-    events: Vec<Event>,
-    event_map: HashMap<Token, usize>,
+pub type SysEvent = libc::kevent;
+
+#[repr(transparent)]
+pub struct Event {
+    inner: SysEvent,
 }
 
-struct KeventList(Vec<libc::kevent>);
+impl Event {
+    pub fn token(&self) -> Token {
+        Token(self.inner.udata as usize)
+    }
 
-unsafe impl Send for KeventList {}
-unsafe impl Sync for KeventList {}
+    pub fn is_readable(&self) -> bool {
+        self.inner.filter == libc::EVFILT_READ || {
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            // Used by the `Awakener`. On platforms that use `eventfd` or a unix
+            // pipe it will emit a readable event so we'll fake that here as
+            // well.
+            {
+                self.inner.filter == libc::EVFILT_USER
+            }
+            #[cfg(not(any(target_os = "freebsd", target_os = "ios", target_os = "macos")))]
+            {
+                false
+            }
+        }
+    }
+
+    pub fn is_writable(&self) -> bool {
+        self.inner.filter == libc::EVFILT_WRITE
+    }
+
+    pub fn is_error(&self) -> bool {
+        (self.inner.flags & libc::EV_ERROR) != 0 ||
+            // When the read end of the socket is closed, EV_EOF is set on
+            // flags, and fflags contains the error if there is one.
+            (self.inner.flags & libc::EV_EOF) != 0 && self.inner.fflags != 0
+    }
+
+    pub fn is_hup(&self) -> bool {
+        (self.inner.flags & libc::EV_EOF) != 0
+    }
+
+    pub fn is_priority(&self) -> bool {
+        // kqueue doesn't have priority indicators.
+        false
+    }
+
+    pub fn is_aio(&self) -> bool {
+        #[cfg(any(
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos"
+        ))]
+        {
+            self.inner.filter == libc::EVFILT_AIO
+        }
+        #[cfg(not(any(
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos"
+        )))]
+        {
+            false
+        }
+    }
+
+    pub fn is_lio(&self) -> bool {
+        #[cfg(target_os = "freebsd")]
+        {
+            self.inner.filter == libc::EVFILT_LIO
+        }
+        #[cfg(not(target_os = "freebsd"))]
+        {
+            false
+        }
+    }
+
+    pub fn from_sys_event(kevent: SysEvent) -> Event {
+        Event { inner: kevent }
+    }
+}
+
+pub struct Events {
+    events: Vec<SysEvent>,
+}
 
 impl Events {
     pub fn with_capacity(cap: usize) -> Events {
         Events {
-            sys_events: KeventList(Vec::with_capacity(cap)),
             events: Vec::with_capacity(cap),
-            event_map: HashMap::with_capacity(cap),
         }
     }
 
@@ -354,85 +428,19 @@ impl Events {
         self.events.is_empty()
     }
 
-    pub fn get(&self, idx: usize) -> Option<Event> {
+    pub fn get(&self, idx: usize) -> Option<SysEvent> {
         self.events.get(idx).cloned()
     }
 
-    fn coalesce(&mut self, waker: Token) -> bool {
-        let mut ret = false;
-        self.events.clear();
-        self.event_map.clear();
-
-        for e in self.sys_events.0.iter() {
-            let token = Token(e.udata as usize);
-            let len = self.events.len();
-
-            if token == waker {
-                // TODO: Should this return an error if event is an error. It
-                // is not critical as spurious wakeups are permitted.
-                ret = true;
-                continue;
-            }
-
-            let idx = *self.event_map.entry(token).or_insert(len);
-
-            if idx == len {
-                // New entry, insert the default
-                self.events.push(Event::new(Ready::EMPTY, token));
-            }
-
-            if e.flags & libc::EV_ERROR != 0 {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::ERROR);
-            }
-
-            if e.filter == libc::EVFILT_READ as Filter {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::READABLE);
-            } else if e.filter == libc::EVFILT_WRITE as Filter {
-                event::kind_mut(&mut self.events[idx]).insert(Ready::WRITABLE);
-            }
-            #[cfg(any(
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos"
-            ))]
-            {
-                if e.filter == libc::EVFILT_AIO {
-                    event::kind_mut(&mut self.events[idx]).insert(Ready::AIO);
-                }
-            }
-            #[cfg(any(target_os = "freebsd"))]
-            {
-                if e.filter == libc::EVFILT_LIO {
-                    event::kind_mut(&mut self.events[idx]).insert(Ready::LIO);
-                }
-            }
-
-            // Used by the `Waker`. On platforms that use `eventfd` or a unix
-            // pipe it will emit a readable event so we'll fake that here as
-            // well.
-            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
-            {
-                if e.filter == libc::EVFILT_USER {
-                    event::kind_mut(&mut self.events[idx]).insert(Ready::READABLE);
-                }
-            }
-        }
-
-        ret
-    }
-
     pub fn clear(&mut self) {
-        self.sys_events.0.truncate(0);
-        self.events.truncate(0);
-        self.event_map.clear();
+        self.events.clear();
     }
 }
 
 impl fmt::Debug for Events {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Events")
-            .field("len", &self.sys_events.0.len())
+            .field("len", &self.events.len())
             .finish()
     }
 }
@@ -451,22 +459,4 @@ fn does_not_register_rw() {
     poll.registry()
         .register(&kqf, Token(1234), Interests::READABLE)
         .unwrap();
-}
-
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "ios",
-    target_os = "macos"
-))]
-#[test]
-fn test_coalesce_aio() {
-    let mut events = Events::with_capacity(1);
-    events
-        .sys_events
-        .0
-        .push(kevent!(0x1234, libc::EVFILT_AIO, 0, 42));
-    events.coalesce(Token(0));
-    assert!(events.events[0].readiness() == Ready::AIO);
-    assert!(events.events[0].token() == Token(42));
 }

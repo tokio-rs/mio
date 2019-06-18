@@ -114,7 +114,7 @@ mod waker;
 
 pub mod net;
 
-pub use event_imp::{Interests, Ready};
+pub use event_imp::Interests;
 pub use poll::{Poll, Registry};
 pub use token::Token;
 pub use waker::Waker;

@@ -1,8 +1,8 @@
 use crate::event::Evented;
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
-use crate::sys::windows::{Family, Registration};
-use crate::{Interests, Ready, Registry, Token};
+use crate::sys::windows::{Family, Ready, Registration};
+use crate::{Interests, Registry, Token};
 use iovec::IoVec;
 use log::trace;
 use miow::iocp::CompletionStatus;

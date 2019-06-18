@@ -71,7 +71,7 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
-            if event.readiness().is_readable() {
+            if event.is_readable() {
                 if let LISTENER = event.token() {
                     debug!("We are receiving a datagram now...");
                     let cnt = unsafe {
@@ -90,7 +90,7 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
                 }
             }
 
-            if event.readiness().is_writable() {
+            if event.is_writable() {
                 if let SENDER = event.token() {
                     let cnt = if !handler.connected {
                         let addr = handler.rx.local_addr().unwrap();
@@ -176,7 +176,7 @@ pub fn test_udp_socket_discard() {
         .unwrap();
 
     for event in &events {
-        if event.readiness().is_readable() {
+        if event.is_readable() {
             if let LISTENER = event.token() {
                 panic!("Expected to no receive a packet but got something")
             }
@@ -226,7 +226,7 @@ pub fn test_udp_socket_send_recv_bufs() {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
-            if event.readiness().is_readable() {
+            if event.is_readable() {
                 if let LISTENER = event.token() {
                     loop {
                         let cnt = match rx.recv_bufs(read_bufs.as_mut()) {
@@ -249,7 +249,7 @@ pub fn test_udp_socket_send_recv_bufs() {
                 }
             }
 
-            if event.readiness().is_writable() {
+            if event.is_writable() {
                 if let SENDER = event.token() {
                     while wtimes < times {
                         let cnt = match tx.send_bufs(write_bufs.as_slice()) {

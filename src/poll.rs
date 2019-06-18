@@ -114,7 +114,7 @@ use std::{fmt, io, usize};
 ///     poll.poll(&mut events, None)?;
 ///
 ///     for event in &events {
-///         if event.token() == Token(0) && event.readiness().is_writable() {
+///         if event.token() == Token(0) && event.is_writable() {
 ///             // The socket connected (probably, it could still be a spurious
 ///             // wakeup)
 ///             return Ok(());
@@ -173,10 +173,10 @@ use std::{fmt, io, usize};
 /// able to handle an error or HUP situation when performing the actual read
 /// operation.
 ///
-/// [`readable`]: Ready::READABLE
-/// [`writable`]: Ready::WRITABLE
-/// [`error`]: Ready::ERROR
-/// [`hup`]: Ready::HUP
+/// [`readable`]: crate::event::Event::is_readable
+/// [`writable`]: crate::event::Event::is_writable
+/// [`error`]: crate::event::Event::is_error
+/// [`hup`]: crate::event::Event::is_hup
 ///
 /// ### Registering handles
 ///
@@ -377,7 +377,7 @@ impl Poll {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     ///
@@ -414,7 +414,7 @@ impl Poll {
     ///     poll.poll(&mut events, None)?;
     ///
     ///     for event in &events {
-    ///         if event.token() == Token(0) && event.readiness().is_writable() {
+    ///         if event.token() == Token(0) && event.is_writable() {
     ///             // The socket connected (probably, it could still be a spurious
     ///             // wakeup)
     ///             return Ok(());
@@ -535,8 +535,8 @@ impl Registry {
     /// See documentation on [`Token`] for an example showing how to pick
     /// [`Token`] values.
     ///
-    /// `interest: Ready`: Specifies which operations `Poll` should monitor for
-    /// readiness. `Poll` will only return readiness events for operations
+    /// `interest: Interests`: Specifies which operations `Poll` should monitor
+    /// for readiness. `Poll` will only return readiness events for operations
     /// specified by this argument.
     ///
     /// If a socket is registered with readable interest and the socket becomes
@@ -697,8 +697,8 @@ impl Registry {
     ///
     /// [`struct`]: #
     /// [`register`]: #method.register
-    /// [`readable`]: Ready::READABLE
-    /// [`writable`]: Ready::WRITABLE
+    /// [`readable`]: crate::event::Event::is_readable
+    /// [`writable`]: crate::event::Event::is_writable
     pub fn reregister<E: ?Sized>(
         &self,
         handle: &E,
@@ -1026,7 +1026,7 @@ impl<'a> Iterator for Iter<'a> {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.inner.get(self.pos);
+        let ret = self.inner.inner.get(self.pos).map(Event::from_sys_event);
         self.pos += 1;
         ret
     }
@@ -1048,7 +1048,7 @@ impl Iterator for IntoIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.inner.get(self.pos);
+        let ret = self.inner.inner.get(self.pos).map(Event::from_sys_event);
         self.pos += 1;
         ret
     }
