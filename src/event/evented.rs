@@ -72,31 +72,29 @@ pub trait Evented {
     /// Register `self` with the given `Registry` instance.
     ///
     /// This function should not be called directly. Use [`Registry::register`]
-    /// instead. Implementors should handle registration by delegating
-    /// the call to another `Evented` type.
+    /// instead. Implementors should handle registration by delegating the call
+    /// to another `Evented` type.
     ///
-    /// [`Registry::register`]: ../struct.Registry.html#method.register
+    /// [`Registry::register`]: crate::Registry::register
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()>;
 
     /// Re-register `self` with the given `Registry` instance.
     ///
-    /// This function should not be called directly. Use [`Registry::reregister`]
-    /// instead. Implementors should handle re-registration by either delegating
-    /// the call to another `Evented` type or calling
-    /// [`SetReadiness::set_readiness`].
+    /// This function should not be called directly. Use
+    /// [`Registry::reregister`] instead. Implementors should handle
+    /// re-registration by either delegating the call to another `Evented` type.
     ///
-    /// [`Registry::reregister`]: ../struct.Registry.html#method.reregister
-    /// [`SetReadiness::set_readiness`]: ../struct.SetReadiness.html#method.set_readiness
+    /// [`Registry::reregister`]: crate::Registry::reregister
     fn reregister(&self, registry: &Registry, token: Token, interests: Interests)
         -> io::Result<()>;
 
-    /// Deregister `self` from the given `Registry` instance
+    /// Deregister `self` from the given `Registry` instance.
     ///
-    /// This function should not be called directly. Use [`Registry::deregister`]
-    /// instead. Implementors should handle deregistration by delegating
-    /// the call to another `Evented` type.
+    /// This function should not be called directly. Use
+    /// [`Registry::deregister`] instead. Implementors should handle
+    /// deregistration by delegating the call to another `Evented` type.
     ///
-    /// [`Registry::deregister`]: ../struct.Registry.html#method.deregister
+    /// [`Registry::deregister`]: crate::Registry::deregister
     fn deregister(&self, registry: &Registry) -> io::Result<()>;
 }
 
