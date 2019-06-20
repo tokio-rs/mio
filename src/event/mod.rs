@@ -2,8 +2,8 @@
 
 mod event;
 mod evented;
+mod events;
 
 pub use self::event::Event;
 pub use self::evented::Evented;
-
-pub use super::poll::{Events, Iter};
+pub use self::events::{Events, Iter};
