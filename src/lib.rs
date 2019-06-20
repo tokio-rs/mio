@@ -9,7 +9,7 @@
 //! # Features
 //!
 //! * Non-blocking TCP, UDP
-//! * I/O event notification queue backed by epoll, kqueue, and IOCP
+//! * I/O event queue backed by epoll, kqueue, and IOCP
 //! * Zero allocations at runtime
 //! * Platform specific extensions
 //!
@@ -33,8 +33,9 @@
 //! * Android
 //! * iOS
 //!
-//! mio can handle interfacing with each of the event notification systems of the aforementioned platforms. The details of
-//! their implementation are further discussed in [`Poll`].
+//! Mio can handle interfacing with each of the event systems of the
+//! aforementioned platforms. The details of their implementation are further
+//! discussed in [`Poll`].
 //!
 //! # Usage
 //!

@@ -3,22 +3,36 @@ use crate::{sys, Registry, Token};
 use std::num::NonZeroU8;
 use std::{fmt, io, ops};
 
-/// A value that may be registered with `Registry`
+/// A value that may be registered with [`Registry`].
 ///
-/// Values that implement `Evented` can be registered with `Registry`. Users of
-/// Mio should not use the `Evented` trait functions directly. Instead, the
+/// Handles that implement `Evented` can be registered with `Registry`. Users of
+/// Mio **should not** use the `Evented` trait functions directly. Instead, the
 /// equivalent functions on `Registry` should be used.
 ///
 /// See [`Registry`] for more details.
+///
+/// [`Registry`]: crate::Registry
 ///
 /// # Implementing `Evented`
 ///
 /// `Evented` values are always backed by **system** handles, which are backed
 /// by sockets or other system handles. These `Evented` handles will be
 /// monitored by the system selector. An implementation of `Evented` will almost
-/// always delegates to a lower level handle.
+/// always delegates to a lower level handle. Examples of this are
+/// [`TcpStream`]s, or the *unix only* [`EventedFd`].
 ///
-/// [`Registry`]: ../struct.Registry.html
+/// [`TcpStream`]: crate::net::TcpStream
+/// [`EventedFd`]: crate::unix::EventedFd
+///
+/// # Dropping `Evented` types
+///
+/// All `Evented` types, unless otherwise specified, need to be [deregistered]
+/// before being dropped for them to not leak resources. This goes against the
+/// normal drop behaviour of types in Rust which cleanup after themselves, e.g.
+/// a `File` will close itself. However since deregistering needs access to
+/// [`Registry`] this cannot be done while being dropped.
+///
+/// [deregistered]: crate::Registry::deregister
 ///
 /// # Examples
 ///
@@ -147,10 +161,10 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
 
 /// Interests used in registering.
 ///
-/// Interests are used in registering [`Evented`] handles with [`Poll`],
+/// Interests are used in [registering] [`Evented`] handles with [`Poll`],
 /// they indicate what readiness should be monitored for. For example if a
-/// socket is registered with readable interests and the socket becomes
-/// writable, no event will be returned from [`poll`].
+/// socket is registered with [readable] interests and the socket becomes
+/// writable, no event will be returned from a call to [`poll`].
 ///
 /// The size of `Option<Interests>` should be identical to itself.
 ///
@@ -161,27 +175,30 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
 /// assert_eq!(size_of::<Option<Interests>>(), size_of::<Interests>());
 /// ```
 ///
-/// [`Poll`]: struct.Poll.html
-/// [`readable`]: #method.readable
-/// [`writable`]: #method.writable
+/// [registering]: crate::Registry::register
+/// [`Poll`]: crate::Poll
+/// [readable]: Interests::READABLE
+/// [`poll`]: crate::Poll::poll
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Interests(NonZeroU8);
 
 // These must be unique.
-const READABLE: u8 = 0b0_000_001;
-const WRITABLE: u8 = 0b0_000_010;
+const READABLE: u8 = 0b0_001;
+const WRITABLE: u8 = 0b0_010;
 // The following are not available on all platforms.
-#[allow(dead_code)]
-const ERROR: u8 = 0b0_000_100;
-#[allow(dead_code)]
-const HUP: u8 = 0b0_001_000;
-#[allow(dead_code)]
-const PRIORITY: u8 = 0b0_010_000;
-#[allow(dead_code)]
-const AIO: u8 = 0b0_100_000;
-#[allow(dead_code)]
-const LIO: u8 = 0b1_000_000;
+#[cfg_attr(
+    not(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos"
+    )),
+    allow(dead_code)
+)]
+const AIO: u8 = 0b0_100;
+#[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
+const LIO: u8 = 0b1_000;
 
 impl Interests {
     /// Returns a `Interests` set representing readable interests.
@@ -204,87 +221,21 @@ impl Interests {
     pub const LIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(LIO) });
 
     /// Returns true if the value includes readable readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::READABLE;
-    ///
-    /// assert!(interests.is_readable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     pub fn is_readable(&self) -> bool {
         (self.0.get() & READABLE) != 0
     }
 
     /// Returns true if the value includes writable readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::WRITABLE;
-    ///
-    /// assert!(interests.is_writable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     pub fn is_writable(&self) -> bool {
         (self.0.get() & WRITABLE) != 0
     }
 
     /// Returns true if `Interests` contains AIO readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::AIO;
-    ///
-    /// assert!(interests.is_aio());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    #[cfg(any(
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos"
-    ))]
-    #[inline]
     pub fn is_aio(&self) -> bool {
         (self.0.get() & AIO) != 0
     }
 
     /// Returns true if `Interests` contains LIO readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::LIO;
-    ///
-    /// assert!(interests.is_lio());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
-    #[inline]
-    #[cfg(any(target_os = "freebsd"))]
     pub fn is_lio(&self) -> bool {
         (self.0.get() & LIO) != 0
     }
@@ -358,30 +309,7 @@ impl fmt::Debug for Interests {
     }
 }
 
-#[test]
-fn test_debug_interests() {
-    assert_eq!(
-        "READABLE | WRITABLE",
-        format!("{:?}", Interests::READABLE | Interests::WRITABLE)
-    );
-    assert_eq!("READABLE", format!("{:?}", Interests::READABLE));
-    assert_eq!("WRITABLE", format!("{:?}", Interests::WRITABLE));
-    #[cfg(any(
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos"
-    ))]
-    {
-        assert_eq!("AIO", format!("{:?}", Interests::AIO));
-    }
-    #[cfg(any(target_os = "freebsd"))]
-    {
-        assert_eq!("LIO", format!("{:?}", Interests::LIO));
-    }
-}
-
-/// An readiness event returned by [`Poll::poll`].
+/// A readiness event.
 ///
 /// `Event` is a readiness state paired with a [`Token`]. It is returned by
 /// [`Poll::poll`].
@@ -398,6 +326,7 @@ pub struct Event {
 
 impl Event {
     /// Returns the event's token.
+    #[inline]
     pub fn token(&self) -> Token {
         self.inner.token()
     }
@@ -507,5 +436,50 @@ impl fmt::Debug for Event {
             .field("aio", &self.is_aio())
             .field("lio", &self.is_lio())
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod interests_tests {
+    use super::Interests;
+
+    #[test]
+    fn is_tests() {
+        assert!(Interests::READABLE.is_readable());
+        assert!(!Interests::READABLE.is_writable());
+        assert!(!Interests::WRITABLE.is_readable());
+        assert!(Interests::WRITABLE.is_writable());
+        assert!(!Interests::WRITABLE.is_aio());
+        assert!(!Interests::WRITABLE.is_lio());
+    }
+
+    #[test]
+    fn bit_or() {
+        let interests = Interests::READABLE | Interests::WRITABLE;
+        assert!(interests.is_readable());
+        assert!(interests.is_writable());
+    }
+
+    #[test]
+    fn fmt_debug() {
+        assert_eq!(format!("{:?}", Interests::READABLE), "READABLE");
+        assert_eq!(format!("{:?}", Interests::WRITABLE), "WRITABLE");
+        assert_eq!(
+            format!("{:?}", Interests::READABLE | Interests::WRITABLE),
+            "READABLE | WRITABLE"
+        );
+        #[cfg(any(
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos"
+        ))]
+        {
+            assert_eq!(format!("{:?}", Interests::AIO), "AIO");
+        }
+        #[cfg(any(target_os = "freebsd"))]
+        {
+            assert_eq!(format!("{:?}", Interests::LIO), "LIO");
+        }
     }
 }
