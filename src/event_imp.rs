@@ -431,16 +431,24 @@ impl Event {
 
     /// Returns true if the event contains HUP readiness.
     ///
-    /// HUP events occur when the remote end of a socket hangs up. In the TCP
-    /// case, this occurs when the remote end of a TCP socket shuts down writes.
-    ///
-    /// It is also unclear if HUP readiness will remain in 0.7. See
-    /// [here](https://github.com/tokio-rs/mio/issues/941)
-    ///
     /// # Notes
     ///
     /// Method is available on all platforms, but not all platforms (can) use
     /// this indicator.
+    ///
+    /// When HUP events are received is different per platform. For example on
+    /// epoll platforms HUP will be received when a TCP socket reached EOF,
+    /// however on kqueue platforms a HUP event will be received when `shutdown`
+    /// is called on the connection (both when shutting down the reading
+    /// **and/or** writing side). Meaning that even though this function might
+    /// return true on one platform in a given situation, it might return false
+    /// on a different platform in the same situation. Furthermore even if true
+    /// was returned on both platforms it could simply mean something different
+    /// on the two platforms.
+    ///
+    /// Because of the above be cautions when using this in cross-platform
+    /// applications, Mio makes no attempt at normalising this indicator and
+    /// only provides a convenience method to read it.
     #[inline]
     pub fn is_hup(&self) -> bool {
         self.inner.is_hup()
