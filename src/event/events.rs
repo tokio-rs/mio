@@ -84,42 +84,6 @@ pub struct Iter<'a> {
     pos: usize,
 }
 
-/// Owned [`Events`] iterator.
-///
-/// This struct is created by the `into_iter` method on [`Events`].
-///
-/// # Examples
-///
-/// ```
-/// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<Error>> {
-/// use mio::{Events, Poll};
-/// use std::time::Duration;
-///
-/// let mut events = Events::with_capacity(1024);
-/// let mut poll = Poll::new()?;
-///
-/// // Register handles with `poll`
-///
-/// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
-///
-/// for event in events {
-///     println!("event={:?}", event);
-/// }
-/// #     Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #     try_main().unwrap();
-/// # }
-/// ```
-/// [`Events`]: struct.Events.html
-#[derive(Debug)]
-pub struct IntoIter {
-    inner: Events,
-    pos: usize,
-}
-
 impl Events {
     /// Return a new `Events` capable of holding up to `capacity` events.
     ///
@@ -239,7 +203,7 @@ impl Events {
 }
 
 impl<'a> IntoIterator for &'a Events {
-    type Item = Event;
+    type Item = &'a Event;
     type IntoIter = Iter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -248,32 +212,10 @@ impl<'a> IntoIterator for &'a Events {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = Event;
+    type Item = &'a Event;
 
-    fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.inner.get(self.pos).map(Event::from_sys_event);
-        self.pos += 1;
-        ret
-    }
-}
-
-impl IntoIterator for Events {
-    type Item = Event;
-    type IntoIter = IntoIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        IntoIter {
-            inner: self,
-            pos: 0,
-        }
-    }
-}
-
-impl Iterator for IntoIter {
-    type Item = Event;
-
-    fn next(&mut self) -> Option<Event> {
-        let ret = self.inner.inner.get(self.pos).map(Event::from_sys_event);
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = self.inner.inner.get(self.pos).map(Event::from_sys_event_ref);
         self.pos += 1;
         ret
     }

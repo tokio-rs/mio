@@ -211,10 +211,6 @@ impl Event {
         // Not supported.
         false
     }
-
-    pub fn from_sys_event(epoll_event: SysEvent) -> Event {
-        Event { inner: epoll_event }
-    }
 }
 
 pub struct Events {
@@ -244,8 +240,8 @@ impl Events {
     }
 
     #[inline]
-    pub fn get(&self, idx: usize) -> Option<SysEvent> {
-        self.events.get(idx).cloned()
+    pub fn get(&self, idx: usize) -> Option<&SysEvent> {
+        self.events.get(idx)
     }
 
     pub fn clear(&mut self) {
