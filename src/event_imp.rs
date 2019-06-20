@@ -3,22 +3,36 @@ use crate::{sys, Registry, Token};
 use std::num::NonZeroU8;
 use std::{fmt, io, ops};
 
-/// A value that may be registered with `Registry`
+/// A value that may be registered with [`Registry`].
 ///
-/// Values that implement `Evented` can be registered with `Registry`. Users of
-/// Mio should not use the `Evented` trait functions directly. Instead, the
+/// Handles that implement `Evented` can be registered with `Registry`. Users of
+/// Mio **should not** use the `Evented` trait functions directly. Instead, the
 /// equivalent functions on `Registry` should be used.
 ///
 /// See [`Registry`] for more details.
+///
+/// [`Registry`]: crate::Registry
 ///
 /// # Implementing `Evented`
 ///
 /// `Evented` values are always backed by **system** handles, which are backed
 /// by sockets or other system handles. These `Evented` handles will be
 /// monitored by the system selector. An implementation of `Evented` will almost
-/// always delegates to a lower level handle.
+/// always delegates to a lower level handle. Examples of this are
+/// [`TcpStream`]s, or the *unix only* [`EventedFd`].
 ///
-/// [`Registry`]: ../struct.Registry.html
+/// [`TcpStream`]: crate::net::TcpStream
+/// [`EventedFd`]: crate::unix::EventedFd
+///
+/// # Dropping `Evented` types
+///
+/// All `Evented` types, unless otherwise specified, need to be [deregistered]
+/// before being dropped for them to not leak resources. This goes against the
+/// normal drop behaviour of types in Rust which cleanup after themselves, e.g.
+/// a `File` will close itself. However since deregistering needs access to
+/// [`Registry`] this cannot be done while being dropped.
+///
+/// [deregistered]: crate::Registry::deregister
 ///
 /// # Examples
 ///
