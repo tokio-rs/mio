@@ -6,6 +6,7 @@ pub use ports::localhost;
 mod test_close_on_drop;
 mod test_double_register;
 mod test_echo_server;
+mod test_interests;
 mod test_local_addr_ready;
 mod test_multicast;
 mod test_poll;
