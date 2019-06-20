@@ -1,5 +1,6 @@
 use crate::{Interests, Registry, Token};
 use std::io;
+use std::ops::Deref;
 
 /// A value that may be registered with [`Registry`].
 ///

@@ -1,10 +1,11 @@
+use std::rc::Rc;
+use std::sync::Arc;
+
+use mio::event::Evented;
+use mio::net::TcpStream;
+
 #[test]
 fn assert_evented_implemented_for() {
-    use std::rc::Rc;
-    use std::sync::Arc;
-
-    use crate::net::TcpStream;
-
     fn assert_evented<E: Evented>() {}
 
     assert_evented::<Box<dyn Evented>>();
