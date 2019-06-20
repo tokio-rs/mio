@@ -100,9 +100,13 @@ pub trait Evented {
     fn deregister(&self, registry: &Registry) -> io::Result<()>;
 }
 
-impl Evented for Box<dyn Evented> {
+impl<T, E> Evented for T
+where
+    T: Deref<Target = E>,
+    E: Evented + ?Sized,
+{
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        self.as_ref().register(registry, token, interests)
+        self.deref().register(registry, token, interests)
     }
 
     fn reregister(
@@ -111,48 +115,10 @@ impl Evented for Box<dyn Evented> {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        self.as_ref().reregister(registry, token, interests)
+        self.deref().reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        self.as_ref().deregister(registry)
-    }
-}
-
-impl<T: Evented> Evented for Box<T> {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        self.as_ref().register(registry, token, interests)
-    }
-
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
-        self.as_ref().reregister(registry, token, interests)
-    }
-
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        self.as_ref().deregister(registry)
-    }
-}
-
-impl<T: Evented> Evented for ::std::sync::Arc<T> {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        self.as_ref().register(registry, token, interests)
-    }
-
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
-        self.as_ref().reregister(registry, token, interests)
-    }
-
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        self.as_ref().deregister(registry)
+        self.deref().deregister(registry)
     }
 }
