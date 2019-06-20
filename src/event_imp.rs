@@ -256,14 +256,6 @@ impl Interests {
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
-    #[inline]
-    #[cfg(any(
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos"
-    ))]
-    #[inline]
     pub fn is_aio(&self) -> bool {
         (self.0.get() & AIO) != 0
     }
@@ -283,8 +275,6 @@ impl Interests {
     /// ```
     ///
     /// [`Poll`]: struct.Poll.html
-    #[inline]
-    #[cfg(any(target_os = "freebsd"))]
     pub fn is_lio(&self) -> bool {
         (self.0.get() & LIO) != 0
     }
