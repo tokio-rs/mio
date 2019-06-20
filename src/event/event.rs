@@ -110,10 +110,13 @@ impl Event {
         self.inner.is_lio()
     }
 
-    /// Create an `Event` from a platform specific event.
-    pub(crate) fn from_sys_event(sys_event: SysEvent) -> Event {
-        Event {
-            inner: sys::Event::from_sys_event(sys_event),
+    /// Create a reference to an `Event` from a platform specific event.
+    pub(crate) fn from_sys_event_ref(sys_event: &SysEvent) -> &Event {
+        unsafe {
+            // This is safe because `Event` only because the memory layout of
+            // `SysEvent` is the same as `Event`, also see the comments in the
+            // `sys` module.
+            std::mem::transmute(sys_event)
         }
     }
 }

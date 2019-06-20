@@ -518,8 +518,8 @@ impl Events {
         self.events.capacity()
     }
 
-    pub fn get(&self, idx: usize) -> Option<SysEvent> {
-        self.events.get(idx).cloned()
+    pub fn get(&self, idx: usize) -> Option<&SysEvent> {
+        self.events.get(idx)
     }
 
     pub fn push_event(&mut self, event: Event) {

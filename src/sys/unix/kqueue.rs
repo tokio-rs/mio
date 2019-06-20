@@ -396,10 +396,6 @@ impl Event {
             false
         }
     }
-
-    pub fn from_sys_event(kevent: SysEvent) -> Event {
-        Event { inner: kevent }
-    }
 }
 
 pub struct Events {
@@ -428,8 +424,8 @@ impl Events {
         self.events.is_empty()
     }
 
-    pub fn get(&self, idx: usize) -> Option<SysEvent> {
-        self.events.get(idx).cloned()
+    pub fn get(&self, idx: usize) -> Option<&SysEvent> {
+        self.events.get(idx)
     }
 
     pub fn clear(&mut self) {
