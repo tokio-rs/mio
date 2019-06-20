@@ -169,13 +169,13 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
 pub struct Interests(NonZeroU8);
 
 // These must be unique.
-const READABLE: u8 = 0b0_000_001;
-const WRITABLE: u8 = 0b0_000_010;
+const READABLE: u8 = 0b0_001;
+const WRITABLE: u8 = 0b0_010;
 // The following are not available on all platforms.
 #[cfg_attr(not(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios", target_os = "macos")), allow(dead_code))]
-const AIO: u8 = 0b0_100_000;
+const AIO: u8 = 0b0_100;
 #[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
-const LIO: u8 = 0b1_000_000;
+const LIO: u8 = 0b1_000;
 
 impl Interests {
     /// Returns a `Interests` set representing readable interests.
