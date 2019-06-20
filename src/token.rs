@@ -1,4 +1,4 @@
-/// Associates readiness notifications with [`Evented`] handles.
+/// Associates readiness events with [`Evented`] handles.
 ///
 /// `Token` is a wrapper around `usize` and is used as an argument to
 /// [`Registry::register`] and [`Registry::reregister`].
@@ -12,8 +12,8 @@
 ///
 /// # Example
 ///
-/// Using `Token` to track which socket generated the notification. In this
-/// example, `HashMap` is used, but usually something like [`slab`] is better.
+/// Using `Token` to track which socket generated the event. In this example,
+/// `HashMap` is used, but usually something like [`slab`] is better.
 ///
 /// [`slab`]: https://crates.io/crates/slab
 ///

@@ -509,8 +509,7 @@ impl TcpListener {
     ///
     /// This may return an `Err(e)` where `e.kind()` is
     /// `io::ErrorKind::WouldBlock`. This means a stream may be ready at a later
-    /// point and one should wait for a notification before calling `accept`
-    /// again.
+    /// point and one should wait for an event before calling `accept` again.
     ///
     /// If an accepted stream is returned, the remote address of the peer is
     /// returned along with it.
