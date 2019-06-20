@@ -1,5 +1,5 @@
 use super::{Event, PollOpt, Ready, SelectorInner, Waker};
-use crate::event_imp::Evented;
+use crate::event::Evented;
 use crate::{poll, sys, Interests, Token};
 
 use std::cell::UnsafeCell;

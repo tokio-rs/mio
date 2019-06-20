@@ -107,27 +107,20 @@
 //!
 //! ```
 
-mod event_imp;
+mod interests;
 mod poll;
 mod sys;
 mod token;
 mod waker;
 
+pub mod event;
 pub mod net;
 
-pub use event_imp::Interests;
+pub use event::Events;
+pub use interests::Interests;
 pub use poll::{Poll, Registry};
 pub use token::Token;
 pub use waker::Waker;
-
-pub mod event {
-    //! Readiness event types and utilities.
-
-    pub use super::event_imp::{Event, Evented};
-    pub use super::poll::{Events, Iter};
-}
-
-pub use event::Events;
 
 #[cfg(unix)]
 pub mod unix {

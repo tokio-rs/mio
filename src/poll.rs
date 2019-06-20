@@ -1,4 +1,5 @@
-use crate::event_imp::{Event, Evented, Interests};
+use crate::event::{Event, Evented};
+use crate::Interests;
 use crate::{sys, Token};
 use log::trace;
 #[cfg(unix)]
