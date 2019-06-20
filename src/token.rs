@@ -5,10 +5,17 @@
 ///
 /// See [`Poll`] for more documentation on polling.
 ///
+/// [`Evented`]: crate::event::Evented
+/// [`Poll`]: crate::Poll
+/// [`Registry::register`]: crate::Registry::register
+/// [`Registry::reregister`]: crate::Registry::reregister
+///
 /// # Example
 ///
 /// Using `Token` to track which socket generated the notification. In this
 /// example, `HashMap` is used, but usually something like [`slab`] is better.
+///
+/// [`slab`]: https://crates.io/crates/slab
 ///
 /// ```
 /// # use std::error::Error;
@@ -130,12 +137,6 @@
 /// #     try_main().unwrap();
 /// # }
 /// ```
-///
-/// [`Evented`]: event/trait.Evented.html
-/// [`Poll`]: struct.Poll.html
-/// [`Registry::register`]: struct.Registry.html#method.register
-/// [`Registry::reregister`]: struct.Registry.html#method.reregister
-/// [`slab`]: https://crates.io/crates/slab
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Token(pub usize);
 
