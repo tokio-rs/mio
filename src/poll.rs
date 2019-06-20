@@ -11,57 +11,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{fmt, io, usize};
 
-// FIXME: One the custom readiness queue is removed remove `PollOpt` as well.
-
-// Poll is backed by two readiness queues. The first is a system readiness queue
-// represented by `sys::Selector`. The system readiness queue handles events
-// provided by the system, such as TCP and UDP. The second readiness queue is
-// implemented in user space by `ReadinessQueue`. It provides a way to implement
-// purely user space `Evented` types.
-//
-// `ReadinessQueue` is backed by a MPSC queue that supports reuse of linked
-// list nodes. This significantly reduces the number of required allocations.
-// Each `Registration` / `SetReadiness` pair allocates a single readiness node
-// that is used for the lifetime of the registration.
-//
-// The readiness node also includes a single atomic variable, `state` that
-// tracks most of the state associated with the registration. This includes the
-// current readiness, interest, poll options, and internal state. When the node
-// state is mutated, it is queued in the MPSC channel. A call to
-// `ReadinessQueue::poll` will dequeue and process nodes. The node state can
-// still be mutated while it is queued in the channel for processing.
-// Intermediate state values do not matter as long as the final state is
-// included in the call to `poll`. This is the eventually consistent nature of
-// the readiness queue.
-//
-// The readiness node is ref counted using the `ref_count` field. On creation,
-// the ref_count is initialized to 3: one `Registration` handle, one
-// `SetReadiness` handle, and one for the readiness queue. Since the readiness queue
-// doesn't *always* hold a handle to the node, we don't use the Arc type for
-// managing ref counts (this is to avoid constantly incrementing and
-// decrementing the ref count when pushing & popping from the queue). When the
-// `Registration` handle is dropped, the `dropped` flag is set on the node, then
-// the node is pushed into the registration queue. When Poll::poll pops the
-// node, it sees the drop flag is set, and decrements it's ref count.
-//
-// The MPSC queue is a modified version of the intrusive MPSC node based queue
-// described by 1024cores [1].
-//
-// The first modification is that two markers are used instead of a single
-// `stub`. The second marker is a `sleep_marker` which is used to signal to
-// producers that the consumer is going to sleep. This sleep_marker is only used
-// when the queue is empty, implying that the only node in the queue is
-// `end_marker`.
-//
-// The second modification is an `until` argument passed to the dequeue
-// function. When `poll` encounters a level-triggered node, the node will be
-// immediately pushed back into the queue. In order to avoid an infinite loop,
-// `poll` before pushing the node, the pointer is saved off and then passed
-// again as the `until` argument. If the next node to pop is `until`, then
-// `Dequeue::Empty` is returned.
-//
-// [1] http://www.1024cores.net/home/lock-free-algorithms/queues/intrusive-mpsc-node-based-queue
-
 /// Polls for readiness events on all registered values.
 ///
 /// `Poll` allows a program to monitor a large number of `Evented` types,
@@ -564,9 +513,6 @@ impl Registry {
     /// [`reregister`]: #method.reregister
     /// [`deregister`]: #method.deregister
     /// [`poll`]: #method.poll
-    /// [`level`]: struct.PollOpt.html#method.level
-    /// [`edge`]: struct.PollOpt.html#method.edge
-    /// [`oneshot`]: struct.PollOpt.html#method.oneshot
     /// [`Token`]: struct.Token.html
     ///
     /// # Examples
