@@ -204,77 +204,21 @@ impl Interests {
     pub const LIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(LIO) });
 
     /// Returns true if the value includes readable readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::READABLE;
-    ///
-    /// assert!(interests.is_readable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     pub fn is_readable(&self) -> bool {
         (self.0.get() & READABLE) != 0
     }
 
     /// Returns true if the value includes writable readiness.
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::WRITABLE;
-    ///
-    /// assert!(interests.is_writable());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     pub fn is_writable(&self) -> bool {
         (self.0.get() & WRITABLE) != 0
     }
 
     /// Returns true if `Interests` contains AIO readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::AIO;
-    ///
-    /// assert!(interests.is_aio());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     pub fn is_aio(&self) -> bool {
         (self.0.get() & AIO) != 0
     }
 
     /// Returns true if `Interests` contains LIO readiness
-    ///
-    /// See [`Poll`] for more documentation on polling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mio::Interests;
-    ///
-    /// let interests = Interests::LIO;
-    ///
-    /// assert!(interests.is_lio());
-    /// ```
-    ///
-    /// [`Poll`]: struct.Poll.html
     pub fn is_lio(&self) -> bool {
         (self.0.get() & LIO) != 0
     }
@@ -371,7 +315,7 @@ fn test_debug_interests() {
     }
 }
 
-/// An readiness event returned by [`Poll::poll`].
+/// A readiness event.
 ///
 /// `Event` is a readiness state paired with a [`Token`]. It is returned by
 /// [`Poll::poll`].
