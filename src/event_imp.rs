@@ -147,10 +147,10 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
 
 /// Interests used in registering.
 ///
-/// Interests are used in registering [`Evented`] handles with [`Poll`],
+/// Interests are used in [registering] [`Evented`] handles with [`Poll`],
 /// they indicate what readiness should be monitored for. For example if a
-/// socket is registered with readable interests and the socket becomes
-/// writable, no event will be returned from [`poll`].
+/// socket is registered with [readable] interests and the socket becomes
+/// writable, no event will be returned from a call to [`poll`].
 ///
 /// The size of `Option<Interests>` should be identical to itself.
 ///
@@ -161,9 +161,10 @@ impl<T: Evented> Evented for ::std::sync::Arc<T> {
 /// assert_eq!(size_of::<Option<Interests>>(), size_of::<Interests>());
 /// ```
 ///
-/// [`Poll`]: struct.Poll.html
-/// [`readable`]: #method.readable
-/// [`writable`]: #method.writable
+/// [registering]: crate::Registry::register
+/// [`Poll`]: crate::Poll
+/// [readable]: Interests::READABLE
+/// [`poll`]: crate::Poll::poll
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Interests(NonZeroU8);
