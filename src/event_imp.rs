@@ -398,6 +398,7 @@ pub struct Event {
 
 impl Event {
     /// Returns the event's token.
+    #[inline]
     pub fn token(&self) -> Token {
         self.inner.token()
     }
