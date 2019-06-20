@@ -286,29 +286,6 @@ impl fmt::Debug for Interests {
     }
 }
 
-#[test]
-fn test_debug_interests() {
-    assert_eq!(
-        "READABLE | WRITABLE",
-        format!("{:?}", Interests::READABLE | Interests::WRITABLE)
-    );
-    assert_eq!("READABLE", format!("{:?}", Interests::READABLE));
-    assert_eq!("WRITABLE", format!("{:?}", Interests::WRITABLE));
-    #[cfg(any(
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos"
-    ))]
-    {
-        assert_eq!("AIO", format!("{:?}", Interests::AIO));
-    }
-    #[cfg(any(target_os = "freebsd"))]
-    {
-        assert_eq!("LIO", format!("{:?}", Interests::LIO));
-    }
-}
-
 /// A readiness event.
 ///
 /// `Event` is a readiness state paired with a [`Token`]. It is returned by
@@ -428,5 +405,47 @@ impl fmt::Debug for Event {
             .field("aio", &self.is_aio())
             .field("lio", &self.is_lio())
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod interests_tests {
+    use super::Interests;
+
+    #[test]
+    fn is_tests() {
+        assert!(Interests::READABLE.is_readable());
+        assert!(!Interests::READABLE.is_writable());
+        assert!(!Interests::WRITABLE.is_readable());
+        assert!(Interests::WRITABLE.is_writable());
+        assert!(!Interests::WRITABLE.is_aio());
+        assert!(!Interests::WRITABLE.is_lio());
+    }
+
+    #[test]
+    fn bit_or() {
+        let interests = Interests::READABLE | Interests::WRITABLE;
+        assert!(interests.is_readable());
+        assert!(interests.is_writable());
+    }
+
+    #[test]
+    fn fmt_debug() {
+        assert_eq!(format!("{:?}", Interests::READABLE), "READABLE");
+        assert_eq!(format!("{:?}", Interests::WRITABLE), "WRITABLE");
+        assert_eq!(format!("{:?}", Interests::READABLE | Interests::WRITABLE), "READABLE | WRITABLE");
+        #[cfg(any(
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos"
+        ))]
+        {
+            assert_eq!(format!("{:?}", Interests::AIO), "AIO");
+        }
+        #[cfg(any(target_os = "freebsd"))]
+        {
+            assert_eq!(format!("{:?}", Interests::LIO), "LIO");
+        }
     }
 }
