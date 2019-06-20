@@ -172,15 +172,9 @@ pub struct Interests(NonZeroU8);
 const READABLE: u8 = 0b0_000_001;
 const WRITABLE: u8 = 0b0_000_010;
 // The following are not available on all platforms.
-#[allow(dead_code)]
-const ERROR: u8 = 0b0_000_100;
-#[allow(dead_code)]
-const HUP: u8 = 0b0_001_000;
-#[allow(dead_code)]
-const PRIORITY: u8 = 0b0_010_000;
-#[allow(dead_code)]
+#[cfg_attr(not(any(target_os = "dragonfly", target_os = "freebsd", target_os = "ios", target_os = "macos")), allow(dead_code))]
 const AIO: u8 = 0b0_100_000;
-#[allow(dead_code)]
+#[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
 const LIO: u8 = 0b1_000_000;
 
 impl Interests {
