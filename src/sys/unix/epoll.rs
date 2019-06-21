@@ -52,12 +52,7 @@ impl Selector {
     }
 
     /// Wait for events from the OS
-    pub fn select(
-        &self,
-        evts: &mut Events,
-        waker: Token,
-        timeout: Option<Duration>,
-    ) -> io::Result<bool> {
+    pub fn select(&self, evts: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         let timeout_ms = timeout
             .map(|to| cmp::min(millis(to), i32::MAX as u64) as i32)
             .unwrap_or(-1);
@@ -73,16 +68,9 @@ impl Selector {
             ))?;
             let cnt = cnt as usize;
             evts.events.set_len(cnt);
-
-            for i in 0..cnt {
-                if evts.events[i].u64 as usize == waker.into() {
-                    evts.events.remove(i);
-                    return Ok(true);
-                }
-            }
         }
 
-        Ok(false)
+        Ok(())
     }
 
     /// Register event interests for the given IO handle with the OS

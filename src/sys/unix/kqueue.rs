@@ -66,12 +66,7 @@ impl Selector {
         self.id
     }
 
-    pub fn select(
-        &self,
-        evts: &mut Events,
-        _waker: Token,
-        timeout: Option<Duration>,
-    ) -> io::Result<bool> {
+    pub fn select(&self, evts: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         let timeout = timeout.map(|to| libc::timespec {
             tv_sec: cmp::min(to.as_secs(), time_t::max_value() as u64) as time_t,
             // `Duration::subsec_nanos` is guaranteed to be less than one
@@ -96,8 +91,8 @@ impl Selector {
                 timeout,
             ))?;
             evts.events.set_len(cnt as usize);
-            Ok(true)
         }
+        Ok(())
     }
 
     pub fn register(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {

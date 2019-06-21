@@ -407,10 +407,10 @@ impl Poll {
         loop {
             let now = Instant::now();
             // First get selector events
-            let res = selector.select(events.sys(), WAKE, timeout);
+            let res = selector.select(events.sys(), timeout);
 
             match res {
-                Ok(_) => break,
+                Ok(()) => break,
                 Err(ref e) if e.kind() == io::ErrorKind::Interrupted && !interruptible => {
                     // Interrupted by a signal; update timeout if necessary and retry
                     if let Some(to) = timeout {
