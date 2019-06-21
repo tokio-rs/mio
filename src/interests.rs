@@ -18,6 +18,7 @@ use std::{fmt, ops};
 /// ```
 ///
 /// [registering]: crate::Registry::register
+/// [`Evented`]: crate::event::Evented
 /// [`Poll`]: crate::Poll
 /// [readable]: Interests::READABLE
 /// [`poll`]: crate::Poll::poll

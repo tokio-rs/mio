@@ -1,13 +1,14 @@
-//! Primitives for working with UDP
+//! Primitives for working with UDP.
 //!
 //! The types provided in this module are non-blocking by default and are
 //! designed to be portable across all supported Mio platforms. As long as the
 //! [portability guidelines] are followed, the behavior should be identical no
 //! matter the target platform.
 //!
+//! [portability guidelines]: ../struct.Poll.html#portability
+
 use crate::event::Evented;
 use crate::poll::SelectorId;
-/// [portability guidelines]: ../struct.Poll.html#portability
 use crate::{sys, Interests, Registry, Token};
 
 use std::fmt;

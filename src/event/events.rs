@@ -12,6 +12,9 @@ use std::fmt;
 ///
 /// See [`Poll`] for more documentation on polling.
 ///
+/// [`Poll::poll`]: crate::Poll::poll
+/// [`Poll`]: crate::Poll
+///
 /// # Examples
 ///
 /// ```
@@ -39,9 +42,6 @@ use std::fmt;
 /// #     try_main().unwrap();
 /// # }
 /// ```
-///
-/// [`Poll::poll`]: struct.Poll.html#method.poll
-/// [`Poll`]: struct.Poll.html
 pub struct Events {
     inner: sys::Events,
 }
@@ -49,6 +49,9 @@ pub struct Events {
 /// [`Events`] iterator.
 ///
 /// This struct is created by the [`iter`] method on [`Events`].
+///
+/// [`Events`]: crate::event::Events
+/// [`iter`]: crate::event::Events::iter
 ///
 /// # Examples
 ///
@@ -75,9 +78,6 @@ pub struct Events {
 /// #     try_main().unwrap();
 /// # }
 /// ```
-///
-/// [`Events`]: struct.Events.html
-/// [`iter`]: struct.Events.html#method.iter
 #[derive(Debug, Clone)]
 pub struct Iter<'a> {
     inner: &'a Events,

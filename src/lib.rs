@@ -15,7 +15,8 @@
 //!
 //! # Non-goals
 //!
-//! The following are specifically omitted from Mio and are left to the user or higher-level libraries.
+//! The following are specifically omitted from Mio and are left to the user or
+//! higher-level libraries.
 //!
 //! * File operations
 //! * Thread pools / multi-threaded event loop
@@ -25,13 +26,18 @@
 //!
 //! Currently supported platforms:
 //!
-//! * Linux
-//! * OS X
-//! * Windows
-//! * FreeBSD
-//! * NetBSD
 //! * Android
+//! * Bitrig
+//! * DragonFly BSD
+//! * FreeBSD
+//! * FreeBSD
+//! * Linux
+//! * NetBSD
+//! * OpenBSD
+//! * Solaris
+//! * Windows
 //! * iOS
+//! * macOS
 //!
 //! Mio can handle interfacing with each of the event systems of the
 //! aforementioned platforms. The details of their implementation are further
@@ -39,8 +45,8 @@
 //!
 //! # Usage
 //!
-//! Using mio starts by creating a [`Poll`], which reads events from the OS and
-//! put them into [`Events`]. You can handle IO events from the OS with it.
+//! Using Mio starts by creating a [`Poll`], which reads events from the OS and
+//! puts them into [`Events`]. You can handle IO events from the OS with it.
 //!
 //! For more detail, see [`Poll`].
 //!
@@ -181,6 +187,5 @@ pub mod unix {
 /// later hooked into the mio event loop.
 #[cfg(windows)]
 pub mod windows {
-
     pub use crate::sys::{Binding, Overlapped};
 }
