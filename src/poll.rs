@@ -220,8 +220,6 @@ pub struct SelectorId {
     id: AtomicUsize,
 }
 
-const WAKE: Token = Token(usize::MAX);
-
 /*
  *
  * ===== Poll =====
@@ -431,14 +429,6 @@ impl Poll {
     }
 }
 
-fn validate_args(token: Token) -> io::Result<()> {
-    if token == WAKE {
-        return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
-    }
-
-    Ok(())
-}
-
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Poll").finish()
@@ -572,18 +562,8 @@ impl Registry {
     where
         E: Evented,
     {
-        validate_args(token)?;
-
-        /*
-         * Undefined behavior:
-         * - Reusing a token with a different `Evented` without deregistering
-         * (or closing) the original `Evented`.
-         */
         trace!("registering with poller");
-
-        // Register interests for this socket
         handle.register(self, token, interests)?;
-
         Ok(())
     }
 
@@ -655,13 +635,8 @@ impl Registry {
     where
         E: Evented,
     {
-        validate_args(token)?;
-
         trace!("registering with poller");
-
-        // Register interests for this socket
         handle.reregister(self, token, interests)?;
-
         Ok(())
     }
 
@@ -721,10 +696,7 @@ impl Registry {
         E: Evented,
     {
         trace!("deregistering handle with poller");
-
-        // Deregister interests for this socket
         handle.deregister(self)?;
-
         Ok(())
     }
 }
