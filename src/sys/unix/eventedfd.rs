@@ -32,7 +32,7 @@ use std::os::unix::io::RawFd;
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<Error>> {
+/// # fn try_main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Interests, Poll, Token};
 /// use mio::unix::EventedFd;
 ///
@@ -42,7 +42,7 @@ use std::os::unix::io::RawFd;
 /// // Bind a std listener
 /// let listener = TcpListener::bind("127.0.0.1:0")?;
 ///
-/// let mut poll = Poll::new()?;
+/// let poll = Poll::new()?;
 /// let registry = poll.registry().clone();
 ///
 /// // Register the listener
@@ -68,6 +68,7 @@ use std::os::unix::io::RawFd;
 /// use std::os::unix::io::RawFd;
 /// use std::io;
 ///
+/// # #[allow(dead_code)]
 /// pub struct MyIo {
 ///     fd: RawFd,
 /// }

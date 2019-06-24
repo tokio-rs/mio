@@ -33,7 +33,7 @@ use std::time::Duration;
 /// # use std::net::TcpListener;
 /// # use std::error::Error;
 /// #
-/// # fn try_main() -> Result<(), Box<Error>> {
+/// # fn try_main() -> Result<(), Box<dyn Error>> {
 /// #     let _listener = TcpListener::bind("127.0.0.1:34254")?;
 /// use mio::{Events, Interests, Poll, Token};
 /// use mio::net::TcpStream;
@@ -422,7 +422,7 @@ impl fmt::Debug for TcpStream {
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<Error>> {
+/// # fn try_main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Interests, Poll, Token};
 /// use mio::net::TcpListener;
 /// use std::time::Duration;

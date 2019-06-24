@@ -37,7 +37,7 @@ use std::{fmt, io, usize};
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<Error>> {
+/// # fn try_main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Poll, Interests, Token};
 /// use mio::net::TcpStream;
 ///
@@ -71,7 +71,6 @@ use std::{fmt, io, usize};
 ///         }
 ///     }
 /// }
-/// #     Ok(())
 /// # }
 /// #
 /// # fn main() {
@@ -137,7 +136,7 @@ use std::{fmt, io, usize};
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<Error>> {
+/// # fn try_main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Poll, Interests, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
@@ -147,7 +146,7 @@ use std::{fmt, io, usize};
 ///
 /// thread::sleep(Duration::from_secs(1));
 ///
-/// let mut poll = Poll::new()?;
+/// let poll = Poll::new()?;
 /// let registry = poll.registry().clone();
 ///
 /// // The connect is not guaranteed to have started until it is registered at
@@ -243,7 +242,7 @@ impl Poll {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Poll, Events};
     /// use std::time::Duration;
     ///
@@ -371,7 +370,6 @@ impl Poll {
     ///         }
     ///     }
     /// }
-    /// #     Ok(())
     /// # }
     /// #
     /// # fn main() {
@@ -519,7 +517,7 @@ impl Registry {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     /// use std::time::{Duration, Instant};
@@ -556,7 +554,6 @@ impl Registry {
     ///         }
     ///     }
     /// }
-    /// #     Ok(())
     /// # }
     /// #
     /// # fn main() {
@@ -614,11 +611,11 @@ impl Registry {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Poll, Interests, Token};
     /// use mio::net::TcpStream;
     ///
-    /// let mut poll = Poll::new()?;
+    /// let poll = Poll::new()?;
     /// let registry = poll.registry().clone();
     /// let socket = TcpStream::connect("216.58.193.100:80".parse()?)?;
     ///
@@ -687,7 +684,7 @@ impl Registry {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     /// use std::time::Duration;

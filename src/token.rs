@@ -19,7 +19,7 @@
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<Error>> {
+/// # fn try_main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Interests, Poll, Token};
 /// use mio::net::TcpListener;
 ///
@@ -130,7 +130,6 @@
 ///         }
 ///     }
 /// }
-/// #     Ok(())
 /// # }
 /// #
 /// # fn main() {
