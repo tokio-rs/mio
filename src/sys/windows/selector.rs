@@ -20,6 +20,8 @@ use winapi::shared::winerror::WAIT_TIMEOUT;
 use winapi::um::minwinbase::OVERLAPPED;
 use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 
+const WAKE: Token = Token(std::usize::MAX);
+
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
 /// registered with the `Selector`. If a type that is previously associated with
@@ -78,12 +80,7 @@ impl Selector {
         })
     }
 
-    pub fn select(
-        &self,
-        events: &mut Events,
-        waker: Token,
-        mut timeout: Option<Duration>,
-    ) -> io::Result<bool> {
+    pub fn select(&self, events: &mut Events, mut timeout: Option<Duration>) -> io::Result<()> {
         // Compute the timeout value passed to the system selector. If the
         // readiness queue has pending nodes, we still want to poll the system
         // selector for new events, but we don't want to block the thread to
@@ -103,7 +100,7 @@ impl Selector {
             timeout = Some(Duration::from_millis(0));
         }
 
-        let ret = self.select2(events, waker, timeout)?;
+        let ret = self.select2(events, timeout)?;
 
         // Poll custom event queue
         self.readiness_queue.poll(events);
@@ -112,12 +109,7 @@ impl Selector {
         Ok(ret)
     }
 
-    pub fn select2(
-        &self,
-        events: &mut Events,
-        waker: Token,
-        timeout: Option<Duration>,
-    ) -> io::Result<bool> {
+    pub fn select2(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         trace!("select; timeout={:?}", timeout);
 
         // Clear out the previous list of I/O events and get some more!
@@ -130,16 +122,14 @@ impl Selector {
             Err(e) => return Err(e),
         };
 
-        let mut ret = false;
         for status in events.statuses[..n].iter() {
             // This should only ever happen from the waker.
             if status.overlapped() as usize == 0 {
                 let token = Token(status.token());
-                if token == waker {
+                if token == WAKE {
                     continue;
                 }
                 events.events.push(Event::new(Ready::READABLE, token));
-                ret = true;
                 continue;
             }
 
@@ -150,7 +140,7 @@ impl Selector {
         }
 
         trace!("returning");
-        Ok(ret)
+        Ok(())
     }
 
     /// Gets a new reference to this selector, although all underlying data

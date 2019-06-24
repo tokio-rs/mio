@@ -211,8 +211,6 @@ pub struct SelectorId {
     id: AtomicUsize,
 }
 
-const WAKE: Token = Token(usize::MAX);
-
 /*
  *
  * ===== Poll =====
@@ -389,10 +387,10 @@ impl Poll {
         loop {
             let now = Instant::now();
             // First get selector events
-            let res = selector.select(events.sys(), WAKE, timeout);
+            let res = selector.select(events.sys(), timeout);
 
             match res {
-                Ok(_) => break,
+                Ok(()) => break,
                 Err(ref e) if e.kind() == io::ErrorKind::Interrupted && !interruptible => {
                     // Interrupted by a signal; update timeout if necessary and retry
                     if let Some(to) = timeout {
@@ -411,14 +409,6 @@ impl Poll {
         // Return number of polled events
         Ok(events.sys().len())
     }
-}
-
-fn validate_args(token: Token) -> io::Result<()> {
-    if token == WAKE {
-        return Err(io::Error::new(io::ErrorKind::Other, "invalid token"));
-    }
-
-    Ok(())
 }
 
 impl fmt::Debug for Poll {
@@ -549,18 +539,8 @@ impl Registry {
     where
         E: Evented,
     {
-        validate_args(token)?;
-
-        /*
-         * Undefined behavior:
-         * - Reusing a token with a different `Evented` without deregistering
-         * (or closing) the original `Evented`.
-         */
         trace!("registering with poller");
-
-        // Register interests for this socket
         handle.register(self, token, interests)?;
-
         Ok(())
     }
 
@@ -628,13 +608,8 @@ impl Registry {
     where
         E: Evented,
     {
-        validate_args(token)?;
-
         trace!("registering with poller");
-
-        // Register interests for this socket
         handle.reregister(self, token, interests)?;
-
         Ok(())
     }
 
@@ -690,10 +665,7 @@ impl Registry {
         E: Evented,
     {
         trace!("deregistering handle with poller");
-
-        // Deregister interests for this socket
         handle.deregister(self)?;
-
         Ok(())
     }
 }
