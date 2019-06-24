@@ -199,9 +199,7 @@ impl UdpSocket {
     /// # }
     /// ```
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        self.sys.try_clone().map(|s| UdpSocket {
-            sys: s,
-        })
+        self.sys.try_clone().map(|s| UdpSocket { sys: s })
     }
 
     /// Sends data on the socket to the given address. On success, returns the

@@ -150,9 +150,7 @@ impl TcpStream {
     /// data, and options set on one stream will be propagated to the other
     /// stream.
     pub fn try_clone(&self) -> io::Result<TcpStream> {
-        self.sys.try_clone().map(|s| TcpStream {
-            sys: s,
-        })
+        self.sys.try_clone().map(|s| TcpStream { sys: s })
     }
 
     /// Shuts down the read, write, or both halves of this connection.
@@ -492,9 +490,7 @@ impl TcpListener {
     ///
     /// The address provided must be the address that the listener is bound to.
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
-        sys::TcpListener::new(listener).map(|s| TcpListener {
-            sys: s,
-        })
+        sys::TcpListener::new(listener).map(|s| TcpListener { sys: s })
     }
 
     /// Accepts a new `TcpStream`.
@@ -530,9 +526,7 @@ impl TcpListener {
     /// object references. Both handles can be used to accept incoming
     /// connections and options set on one listener will affect the other.
     pub fn try_clone(&self) -> io::Result<TcpListener> {
-        self.sys.try_clone().map(|s| TcpListener {
-            sys: s,
-        })
+        self.sys.try_clone().map(|s| TcpListener { sys: s })
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.

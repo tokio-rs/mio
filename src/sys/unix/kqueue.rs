@@ -241,9 +241,7 @@ impl Selector {
         if new_kq == -1 {
             Err(io::Error::last_os_error())
         } else {
-            Ok(Selector {
-                kq: new_kq,
-            })
+            Ok(Selector { kq: new_kq })
         }
     }
 
@@ -280,9 +278,7 @@ impl Selector {
 
 impl fmt::Debug for Selector {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Selector")
-            .field("kq", &self.kq)
-            .finish()
+        fmt.debug_struct("Selector").field("kq", &self.kq).finish()
     }
 }
 
