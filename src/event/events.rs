@@ -19,7 +19,7 @@ use std::fmt;
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Poll};
 /// use std::time::Duration;
 ///
@@ -37,10 +37,6 @@ use std::fmt;
 /// }
 /// #     Ok(())
 /// # }
-/// #
-/// # fn main() {
-/// #     try_main().unwrap();
-/// # }
 /// ```
 pub struct Events {
     inner: sys::Events,
@@ -57,7 +53,7 @@ pub struct Events {
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Poll};
 /// use std::time::Duration;
 ///
@@ -72,10 +68,6 @@ pub struct Events {
 ///     println!("event={:?}", event);
 /// }
 /// #     Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #     try_main().unwrap();
 /// # }
 /// ```
 #[derive(Debug, Clone)]
@@ -136,7 +128,7 @@ impl Events {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<dyn Error>> {
+    /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll};
     /// use std::time::Duration;
     ///
@@ -152,10 +144,6 @@ impl Events {
     /// }
     /// #     Ok(())
     /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
     /// ```
     pub fn iter(&self) -> Iter<'_> {
         Iter {
@@ -170,7 +158,7 @@ impl Events {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<dyn Error>> {
+    /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll};
     /// use std::time::Duration;
     ///
@@ -187,10 +175,6 @@ impl Events {
     ///     }
     /// }
     /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn clear(&mut self) {

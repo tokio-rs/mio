@@ -19,7 +19,7 @@
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Interests, Poll, Token};
 /// use mio::net::TcpListener;
 ///
@@ -130,10 +130,6 @@
 ///         }
 ///     }
 /// }
-/// # }
-/// #
-/// # fn main() {
-/// #     try_main().unwrap();
 /// # }
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

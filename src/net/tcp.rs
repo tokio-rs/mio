@@ -33,7 +33,7 @@ use std::time::Duration;
 /// # use std::net::TcpListener;
 /// # use std::error::Error;
 /// #
-/// # fn try_main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn Error>> {
 /// #     let _listener = TcpListener::bind("127.0.0.1:34254")?;
 /// use mio::{Events, Interests, Poll, Token};
 /// use mio::net::TcpStream;
@@ -52,10 +52,6 @@ use std::time::Duration;
 ///
 /// // The socket might be ready at this point
 /// #     Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #     try_main().unwrap();
 /// # }
 /// ```
 pub struct TcpStream {
@@ -422,7 +418,7 @@ impl fmt::Debug for TcpStream {
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Interests, Poll, Token};
 /// use mio::net::TcpListener;
 /// use std::time::Duration;
@@ -440,10 +436,6 @@ impl fmt::Debug for TcpStream {
 ///
 /// // There may be a socket ready to be accepted
 /// #     Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #     try_main().unwrap();
 /// # }
 /// ```
 pub struct TcpListener {
