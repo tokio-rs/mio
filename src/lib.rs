@@ -1,6 +1,9 @@
 #![doc(html_root_url = "https://docs.rs/mio/0.7.0")]
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+// Disallow warnings when running tests.
 #![cfg_attr(test, deny(warnings))]
+// Disallow warnings in examples.
+#![doc(test(attr(deny(warnings))))]
 
 //! A fast, low-level IO library for Rust focusing on non-blocking APIs, event
 //! notification, and other useful utilities for building high performance IO
