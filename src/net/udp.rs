@@ -8,7 +8,6 @@
 //! [portability guidelines]: ../struct.Poll.html#portability
 
 use crate::event::Evented;
-use crate::poll::SelectorId;
 use crate::{sys, Interests, Registry, Token};
 
 use std::fmt;
@@ -94,7 +93,6 @@ use iovec::IoVec;
 /// ```
 pub struct UdpSocket {
     sys: sys::UdpSocket,
-    selector_id: SelectorId,
 }
 
 impl UdpSocket {
@@ -143,7 +141,6 @@ impl UdpSocket {
     pub fn from_socket(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         Ok(UdpSocket {
             sys: sys::UdpSocket::new(socket)?,
-            selector_id: SelectorId::new(),
         })
     }
 
@@ -204,7 +201,6 @@ impl UdpSocket {
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
         self.sys.try_clone().map(|s| UdpSocket {
             sys: s,
-            selector_id: self.selector_id.clone(),
         })
     }
 
@@ -583,7 +579,6 @@ impl UdpSocket {
 
 impl Evented for UdpSocket {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
@@ -635,7 +630,6 @@ impl FromRawFd for UdpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
         UdpSocket {
             sys: FromRawFd::from_raw_fd(fd),
-            selector_id: SelectorId::new(),
         }
     }
 }

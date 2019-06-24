@@ -12,20 +12,12 @@ use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{fmt, io};
 use winapi::shared::winerror::WAIT_TIMEOUT;
 use winapi::um::minwinbase::OVERLAPPED;
 use winapi::um::minwinbase::OVERLAPPED_ENTRY;
-
-/// Each Selector has a globally unique(ish) ID associated with it. This ID
-/// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
-/// registered with the `Selector`. If a type that is previously associated with
-/// a `Selector` attempts to register itself with a different `Selector`, the
-/// operation will return with an error. This matches windows behavior.
-static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
 /// The guts of the Windows event loop, this is the struct which actually owns
 /// a completion port.
@@ -45,9 +37,6 @@ pub struct Selector {
 // Public to allow `Waker` access
 #[derive(Debug)]
 pub(super) struct SelectorInner {
-    /// Unique identifier of the `Selector`
-    id: usize,
-
     /// The actual completion port that's used to manage all I/O
     port: CompletionPort,
 
@@ -60,12 +49,9 @@ pub(super) struct SelectorInner {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        // offset by 1 to avoid choosing 0 as the id of a selector
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
         let cp = CompletionPort::new(1)?;
 
         let inner = Arc::new(SelectorInner {
-            id: id,
             port: cp,
             buffers: Mutex::new(BufferPool::new(256)),
         });
@@ -157,11 +143,6 @@ impl Selector {
     /// structures will refer to the same completion port.
     pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
         self.inner.clone()
-    }
-
-    /// Return the `Selector`'s identifier
-    pub fn id(&self) -> usize {
-        self.inner.id
     }
 }
 

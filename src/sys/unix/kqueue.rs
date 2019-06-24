@@ -9,16 +9,8 @@ use std::io;
 use std::os::raw::{c_int, c_short};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{cmp, fmt, ptr};
-
-/// Each Selector has a globally unique(ish) ID associated with it. This ID
-/// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
-/// registered with the `Selector`. If a type that is previously associated with
-/// a `Selector` attempts to register itself with a different `Selector`, the
-/// operation will return with an error. This matches windows behavior.
-static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(not(target_os = "netbsd"))]
 type Filter = c_short;
@@ -48,22 +40,15 @@ macro_rules! kevent {
 }
 
 pub struct Selector {
-    id: usize,
     kq: RawFd,
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        // offset by 1 to avoid choosing 0 as the id of a selector
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
         let kq = unsafe { cvt(libc::kqueue())? };
         drop(set_cloexec(kq));
 
-        Ok(Selector { id, kq })
-    }
-
-    pub fn id(&self) -> usize {
-        self.id
+        Ok(Selector { kq })
     }
 
     pub fn select(
@@ -257,7 +242,6 @@ impl Selector {
             Err(io::Error::last_os_error())
         } else {
             Ok(Selector {
-                id: self.id,
                 kq: new_kq,
             })
         }
@@ -297,7 +281,6 @@ impl Selector {
 impl fmt::Debug for Selector {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Selector")
-            .field("id", &self.id)
             .field("kq", &self.kq)
             .finish()
     }

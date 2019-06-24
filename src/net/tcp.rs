@@ -5,9 +5,9 @@
 //! [portability guidelines] are followed, the behavior should be identical no
 //! matter the target platform.
 //!
-/// [portability guidelines]: ../struct.Poll.html#portability
+//! [portability guidelines]: ../struct.Poll.html#portability
+
 use crate::event::Evented;
-use crate::poll::SelectorId;
 use crate::{sys, Interests, Registry, Token};
 
 use iovec::IoVec;
@@ -60,7 +60,6 @@ use std::time::Duration;
 /// ```
 pub struct TcpStream {
     sys: sys::TcpStream,
-    selector_id: SelectorId,
 }
 
 use std::net::Shutdown;
@@ -113,7 +112,6 @@ impl TcpStream {
     pub fn connect_stream(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
         Ok(TcpStream {
             sys: sys::TcpStream::connect(stream, addr)?,
-            selector_id: SelectorId::new(),
         })
     }
 
@@ -132,7 +130,6 @@ impl TcpStream {
 
         Ok(TcpStream {
             sys: sys::TcpStream::from_stream(stream),
-            selector_id: SelectorId::new(),
         })
     }
 
@@ -155,7 +152,6 @@ impl TcpStream {
     pub fn try_clone(&self) -> io::Result<TcpStream> {
         self.sys.try_clone().map(|s| TcpStream {
             sys: s,
-            selector_id: self.selector_id.clone(),
         })
     }
 
@@ -386,7 +382,6 @@ impl<'a> Write for &'a TcpStream {
 
 impl Evented for TcpStream {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
@@ -448,7 +443,6 @@ impl fmt::Debug for TcpStream {
 /// ```
 pub struct TcpListener {
     sys: sys::TcpListener,
-    selector_id: SelectorId,
 }
 
 impl TcpListener {
@@ -485,7 +479,6 @@ impl TcpListener {
         let listener = sock.listen(1024)?;
         Ok(TcpListener {
             sys: sys::TcpListener::new(listener)?,
-            selector_id: SelectorId::new(),
         })
     }
 
@@ -501,7 +494,6 @@ impl TcpListener {
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
         sys::TcpListener::new(listener).map(|s| TcpListener {
             sys: s,
-            selector_id: SelectorId::new(),
         })
     }
 
@@ -540,7 +532,6 @@ impl TcpListener {
     pub fn try_clone(&self) -> io::Result<TcpListener> {
         self.sys.try_clone().map(|s| TcpListener {
             sys: s,
-            selector_id: self.selector_id.clone(),
         })
     }
 
@@ -573,7 +564,6 @@ impl TcpListener {
 
 impl Evented for TcpListener {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
@@ -625,7 +615,6 @@ impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream {
             sys: FromRawFd::from_raw_fd(fd),
-            selector_id: SelectorId::new(),
         }
     }
 }
@@ -649,7 +638,6 @@ impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener {
             sys: FromRawFd::from_raw_fd(fd),
-            selector_id: SelectorId::new(),
         }
     }
 }

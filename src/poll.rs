@@ -6,7 +6,6 @@ use log::trace;
 use std::os::unix::io::AsRawFd;
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{fmt, io, usize};
@@ -212,12 +211,6 @@ pub struct Poll {
 #[derive(Clone)]
 pub struct Registry {
     selector: Arc<sys::Selector>,
-}
-
-/// Used to associate an IO type with a Selector
-#[derive(Debug)]
-pub struct SelectorId {
-    id: AtomicUsize,
 }
 
 const WAKE: Token = Token(usize::MAX);
@@ -737,36 +730,6 @@ pub fn selector(registry: &Registry) -> &sys::Selector {
 
 fn is_send<T: Send>() {}
 fn is_sync<T: Sync>() {}
-
-impl SelectorId {
-    pub fn new() -> SelectorId {
-        SelectorId {
-            id: AtomicUsize::new(0),
-        }
-    }
-
-    pub fn associate_selector(&self, registry: &Registry) -> io::Result<()> {
-        let selector_id = self.id.load(Ordering::SeqCst);
-
-        if selector_id != 0 && selector_id != registry.selector.id() {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "socket already registered",
-            ))
-        } else {
-            self.id.store(registry.selector.id(), Ordering::SeqCst);
-            Ok(())
-        }
-    }
-}
-
-impl Clone for SelectorId {
-    fn clone(&self) -> SelectorId {
-        SelectorId {
-            id: AtomicUsize::new(self.id.load(Ordering::SeqCst)),
-        }
-    }
-}
 
 #[test]
 #[cfg(unix)]

@@ -12,7 +12,6 @@ mod test_local_addr_ready;
 mod test_multicast;
 mod test_poll;
 mod test_register_deregister;
-mod test_register_multiple_event_loops;
 mod test_reregister_without_poll;
 mod test_smoke;
 mod test_tcp;
