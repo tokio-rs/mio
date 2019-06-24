@@ -37,7 +37,7 @@ use std::{fmt, io, usize};
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Poll, Interests, Token};
 /// use mio::net::TcpStream;
 ///
@@ -71,10 +71,6 @@ use std::{fmt, io, usize};
 ///         }
 ///     }
 /// }
-/// # }
-/// #
-/// # fn main() {
-/// #     try_main().unwrap();
 /// # }
 /// ```
 ///
@@ -136,7 +132,7 @@ use std::{fmt, io, usize};
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Poll, Interests, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
@@ -153,10 +149,6 @@ use std::{fmt, io, usize};
 /// // this point
 /// registry.register(&sock, Token(0), Interests::READABLE | Interests::WRITABLE)?;
 /// #     Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #     try_main().unwrap();
 /// # }
 /// ```
 ///
@@ -242,7 +234,7 @@ impl Poll {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<dyn Error>> {
+    /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Poll, Events};
     /// use std::time::Duration;
     ///
@@ -259,10 +251,6 @@ impl Poll {
     /// let n = poll.poll(&mut events, Some(Duration::from_millis(500)))?;
     /// assert_eq!(n, 0);
     /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn new() -> io::Result<Poll> {
@@ -326,7 +314,7 @@ impl Poll {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<dyn Error>> {
+    /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     ///
@@ -370,10 +358,6 @@ impl Poll {
     ///         }
     ///     }
     /// }
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
     /// # }
     /// ```
     ///
@@ -517,7 +501,7 @@ impl Registry {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<dyn Error>> {
+    /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     /// use std::time::{Duration, Instant};
@@ -554,10 +538,6 @@ impl Registry {
     ///         }
     ///     }
     /// }
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn register<E: ?Sized>(
@@ -611,7 +591,7 @@ impl Registry {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<dyn Error>> {
+    /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Poll, Interests, Token};
     /// use mio::net::TcpStream;
     ///
@@ -632,10 +612,6 @@ impl Registry {
     ///     Token(2),
     ///     Interests::WRITABLE)?;
     /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
     /// # }
     /// ```
     ///
@@ -684,7 +660,7 @@ impl Registry {
     ///
     /// ```
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<dyn Error>> {
+    /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
     /// use std::time::Duration;
@@ -707,10 +683,6 @@ impl Registry {
     /// let n = poll.poll(&mut events, Some(Duration::from_secs(1)))?;
     /// assert_eq!(0, n);
     /// #     Ok(())
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn deregister<E: ?Sized>(&self, handle: &E) -> io::Result<()>

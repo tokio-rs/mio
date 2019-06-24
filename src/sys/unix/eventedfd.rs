@@ -32,7 +32,7 @@ use std::os::unix::io::RawFd;
 ///
 /// ```
 /// # use std::error::Error;
-/// # fn try_main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Interests, Poll, Token};
 /// use mio::unix::EventedFd;
 ///
@@ -51,10 +51,6 @@ use std::os::unix::io::RawFd;
 ///     Token(0),
 ///     Interests::READABLE)?;
 /// #     Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #     try_main().unwrap();
 /// # }
 /// ```
 ///
