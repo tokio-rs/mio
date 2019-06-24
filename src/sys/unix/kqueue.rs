@@ -230,17 +230,8 @@ impl Selector {
             token.0
         );
 
-        cvt(unsafe {
-            libc::kevent(
-                self.kq,
-                &kevent as *const libc::kevent,
-                1,
-                &mut kevent as *mut libc::kevent,
-                1,
-                ptr::null(),
-            )
-        })
-        .map(|_| ())?;
+        cvt(unsafe { libc::kevent(self.kq, &kevent, 1, &mut kevent, 1, ptr::null()) })
+            .map(|_| ())?;
 
         if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
             Err(io::Error::from_raw_os_error(kevent.data as i32))
@@ -274,17 +265,8 @@ impl Selector {
         );
         kevent.fflags = libc::NOTE_TRIGGER;
 
-        cvt(unsafe {
-            libc::kevent(
-                self.kq,
-                &kevent as *const libc::kevent,
-                1,
-                &mut kevent as *mut libc::kevent,
-                1,
-                ptr::null(),
-            )
-        })
-        .map(|_| ())?;
+        cvt(unsafe { libc::kevent(self.kq, &kevent, 1, &mut kevent, 1, ptr::null()) })
+            .map(|_| ())?;
 
         if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
             Err(io::Error::from_raw_os_error(kevent.data as i32))
