@@ -36,12 +36,10 @@ use crate::{poll, sys, Registry, Token};
 ///
 /// ```
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use std::io;
 /// use std::thread;
 /// use std::time::Duration;
 /// use std::sync::Arc;
 ///
-/// use mio::event::Event;
 /// use mio::{Events, Token, Poll, Waker};
 ///
 /// const WAKE_TOKEN: Token = Token(10);

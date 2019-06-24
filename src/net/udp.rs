@@ -29,7 +29,7 @@ use iovec::IoVec;
 /// ```
 /// # use std::error::Error;
 /// #
-/// # fn try_main() -> Result<(), Box<Error>> {
+/// # fn try_main() -> Result<(), Box<dyn Error>> {
 /// // An Echo program:
 /// // SENDER -> sends a message.
 /// // ECHOER -> listens and prints the message received.
@@ -78,14 +78,13 @@ use iovec::IoVec;
 ///                 let num_recv = echoer_socket.recv(&mut buffer)?;
 ///                 println!("echo {:?} -> {:?}", buffer, num_recv);
 ///                 buffer = [0; 9];
+///                 # drop(buffer); // Silence unused assignment warning.
 ///                 # return Ok(());
 ///             }
 ///             _ => unreachable!()
 ///         }
 ///     }
 /// }
-/// #
-/// #   Ok(())
 /// # }
 /// #
 /// # fn main() {
@@ -105,7 +104,7 @@ impl UdpSocket {
     /// ```
     /// # use std::error::Error;
     /// #
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
     ///
     /// // We must bind it to an open address.
@@ -118,6 +117,7 @@ impl UdpSocket {
     /// };
     ///
     /// // Our socket was created, but we should not use it before checking it's readiness.
+    /// #    drop(socket); // Silence unused variable warning.
     /// #    Ok(())
     /// # }
     /// #
@@ -158,11 +158,12 @@ impl UdpSocket {
     #[cfg_attr(target_os = "freebsd", doc = " ```no_run")]
     /// # use std::error::Error;
     /// #
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
     ///
     /// let addr = "127.0.0.1:0".parse()?;
     /// let socket = UdpSocket::bind(addr)?;
+    /// assert_eq!(socket.local_addr()?.ip(), addr.ip());
     /// #    Ok(())
     /// # }
     /// #
@@ -185,7 +186,7 @@ impl UdpSocket {
     /// ```
     /// # use std::error::Error;
     /// #
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
     ///
     /// // We must bind it to an open address.
@@ -218,7 +219,7 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// # use std::error::Error;
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
     ///
     /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
@@ -248,7 +249,7 @@ impl UdpSocket {
     /// ```no_run
     /// # use std::error::Error;
     /// #
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
     ///
     /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
@@ -300,7 +301,7 @@ impl UdpSocket {
     /// ```
     /// # use std::error::Error;
     /// #
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
     ///
     /// let broadcast_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
@@ -333,7 +334,7 @@ impl UdpSocket {
     /// ```
     /// # use std::error::Error;
     /// #
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
     ///
     /// let broadcast_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
@@ -417,7 +418,7 @@ impl UdpSocket {
     /// ```
     /// # use std::error::Error;
     /// #
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
     ///
     /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
@@ -449,7 +450,7 @@ impl UdpSocket {
     /// ```
     /// # use std::error::Error;
     /// #
-    /// # fn try_main() -> Result<(), Box<Error>> {
+    /// # fn try_main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
     ///
     /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;

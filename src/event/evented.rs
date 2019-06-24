@@ -44,6 +44,7 @@ use std::ops::Deref;
 ///
 /// use std::io;
 ///
+/// # #[allow(dead_code)]
 /// pub struct MyEvented {
 ///     socket: TcpStream,
 /// }
