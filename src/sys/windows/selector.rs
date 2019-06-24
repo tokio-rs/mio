@@ -20,6 +20,8 @@ use winapi::shared::winerror::WAIT_TIMEOUT;
 use winapi::um::minwinbase::OVERLAPPED;
 use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 
+const WAKE: Token = Token(std::usize::MAX);
+
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
 /// registered with the `Selector`. If a type that is previously associated with
@@ -124,6 +126,9 @@ impl Selector {
             // This should only ever happen from the waker.
             if status.overlapped() as usize == 0 {
                 let token = Token(status.token());
+                if token == WAKE {
+                    continue;
+                }
                 events.events.push(Event::new(Ready::READABLE, token));
                 continue;
             }
