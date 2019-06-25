@@ -133,7 +133,7 @@ pub use waker::Waker;
 
 #[cfg(unix)]
 pub mod unix {
-    //! Unix only extensions
+    //! Unix only extensions.
 
     pub use crate::sys::EventedFd;
 }

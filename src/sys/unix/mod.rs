@@ -39,7 +39,6 @@ mod uio;
 mod waker;
 
 pub use self::eventedfd::EventedFd;
-pub use self::io::{set_nonblock, Io};
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
 pub use self::waker::Waker;
