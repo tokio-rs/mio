@@ -1,6 +1,3 @@
-#[macro_use]
-pub mod dlsym;
-
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
 mod epoll;
 
