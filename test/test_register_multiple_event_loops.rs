@@ -4,6 +4,7 @@ use mio::*;
 use std::io::ErrorKind;
 
 #[test]
+#[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.
 fn test_tcp_register_multiple_event_loops() {
     let addr = localhost();
     let listener = TcpListener::bind(addr).unwrap();
@@ -66,6 +67,7 @@ fn test_tcp_register_multiple_event_loops() {
 }
 
 #[test]
+#[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.
 fn test_udp_register_multiple_event_loops() {
     let addr = localhost();
     let socket = UdpSocket::bind(addr).unwrap();

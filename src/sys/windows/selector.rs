@@ -12,6 +12,7 @@ use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};
 use std::cell::UnsafeCell;
 use std::os::windows::prelude::*;
+#[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -27,6 +28,7 @@ const WAKE: Token = Token(std::usize::MAX);
 /// registered with the `Selector`. If a type that is previously associated with
 /// a `Selector` attempts to register itself with a different `Selector`, the
 /// operation will return with an error. This matches windows behavior.
+#[cfg(debug_assertions)]
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
 /// The guts of the Windows event loop, this is the struct which actually owns
@@ -48,6 +50,7 @@ pub struct Selector {
 #[derive(Debug)]
 pub(super) struct SelectorInner {
     /// Unique identifier of the `Selector`
+    #[cfg(debug_assertions)]
     id: usize,
 
     /// The actual completion port that's used to manage all I/O
@@ -63,10 +66,12 @@ pub(super) struct SelectorInner {
 impl Selector {
     pub fn new() -> io::Result<Selector> {
         // offset by 1 to avoid choosing 0 as the id of a selector
+        #[cfg(debug_assertions)]
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
         let cp = CompletionPort::new(1)?;
 
         let inner = Arc::new(SelectorInner {
+            #[cfg(debug_assertions)]
             id: id,
             port: cp,
             buffers: Mutex::new(BufferPool::new(256)),
@@ -150,6 +155,7 @@ impl Selector {
     }
 
     /// Return the `Selector`'s identifier
+    #[cfg(debug_assertions)]
     pub fn id(&self) -> usize {
         self.inner.id
     }
