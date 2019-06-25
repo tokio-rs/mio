@@ -15,6 +15,15 @@ pub fn set_nonblock(fd: libc::c_int) -> io::Result<()> {
     }
 }
 
+#[cfg(any(
+    target_os = "bitrig",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "ios",
+    target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 pub fn set_cloexec(fd: libc::c_int) -> io::Result<()> {
     unsafe {
         let flags = libc::fcntl(fd, libc::F_GETFD);
