@@ -6,6 +6,7 @@ use log::trace;
 use std::os::unix::io::AsRawFd;
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
+#[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -207,6 +208,7 @@ pub struct Registry {
 
 /// Used to associate an IO type with a Selector
 #[derive(Debug)]
+#[cfg(debug_assertions)]
 pub struct SelectorId {
     id: AtomicUsize,
 }
@@ -679,6 +681,7 @@ pub fn selector(registry: &Registry) -> &sys::Selector {
 fn is_send<T: Send>() {}
 fn is_sync<T: Sync>() {}
 
+#[cfg(debug_assertions)]
 impl SelectorId {
     pub fn new() -> SelectorId {
         SelectorId {
@@ -701,6 +704,7 @@ impl SelectorId {
     }
 }
 
+#[cfg(debug_assertions)]
 impl Clone for SelectorId {
     fn clone(&self) -> SelectorId {
         SelectorId {
