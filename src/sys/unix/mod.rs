@@ -1,5 +1,3 @@
-use libc::{self, c_int};
-
 #[macro_use]
 pub mod dlsym;
 
@@ -44,32 +42,6 @@ pub use self::udp::UdpSocket;
 pub use self::waker::Waker;
 
 pub use iovec::IoVec;
-
-use std::os::unix::io::FromRawFd;
-
-#[allow(dead_code)]
-pub fn pipe() -> std::io::Result<(Io, Io)> {
-    // Use pipe2 for atomically setting O_CLOEXEC if we can, but otherwise
-    // just fall back to using `pipe`.
-    dlsym!(fn pipe2(*mut c_int, c_int) -> c_int);
-
-    let mut pipes = [0; 2];
-    let flags = libc::O_NONBLOCK | libc::O_CLOEXEC;
-    unsafe {
-        match pipe2.get() {
-            Some(pipe2_fn) => {
-                cvt(pipe2_fn(pipes.as_mut_ptr(), flags))?;
-            }
-            None => {
-                cvt(libc::pipe(pipes.as_mut_ptr()))?;
-                libc::fcntl(pipes[0], libc::F_SETFL, flags);
-                libc::fcntl(pipes[1], libc::F_SETFL, flags);
-            }
-        }
-    }
-
-    unsafe { Ok((Io::from_raw_fd(pipes[0]), Io::from_raw_fd(pipes[1]))) }
-}
 
 trait IsMinusOne {
     fn is_minus_one(&self) -> bool;
