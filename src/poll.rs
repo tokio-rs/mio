@@ -133,13 +133,16 @@ use std::{fmt, io, usize};
 ///
 /// ```
 /// # use std::error::Error;
+/// # use std::net;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Poll, Interests, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 /// use std::thread;
 ///
-/// let sock = TcpStream::connect("216.58.193.100:80".parse()?)?;
+/// let address = "127.0.0.1:9001".parse()?;
+/// # let _listener = net::TcpListener::bind(address)?;
+/// let sock = TcpStream::connect(address)?;
 ///
 /// thread::sleep(Duration::from_secs(1));
 ///
@@ -493,6 +496,7 @@ impl Registry {
     ///
     /// ```
     /// # use std::error::Error;
+    /// # use std::net;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
@@ -500,7 +504,10 @@ impl Registry {
     ///
     /// let mut poll = Poll::new()?;
     /// let registry = poll.registry().clone();
-    /// let socket = TcpStream::connect("216.58.193.100:80".parse()?)?;
+    ///
+    /// let address = "127.0.0.1:9002".parse()?;
+    /// # let _listener = net::TcpListener::bind(address)?;
+    /// let socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`
     /// registry.register(
@@ -573,13 +580,17 @@ impl Registry {
     ///
     /// ```
     /// # use std::error::Error;
+    /// # use std::net;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Poll, Interests, Token};
     /// use mio::net::TcpStream;
     ///
     /// let poll = Poll::new()?;
     /// let registry = poll.registry().clone();
-    /// let socket = TcpStream::connect("216.58.193.100:80".parse()?)?;
+    ///
+    /// let address = "127.0.0.1:9003".parse()?;
+    /// # let _listener = net::TcpListener::bind(address)?;
+    /// let socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`, requesting readable
     /// registry.register(
@@ -637,6 +648,7 @@ impl Registry {
     ///
     /// ```
     /// # use std::error::Error;
+    /// # use std::net;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interests, Token};
     /// use mio::net::TcpStream;
@@ -644,7 +656,10 @@ impl Registry {
     ///
     /// let mut poll = Poll::new()?;
     /// let registry = poll.registry().clone();
-    /// let socket = TcpStream::connect("216.58.193.100:80".parse()?)?;
+    ///
+    /// let address = "127.0.0.1:9004".parse()?;
+    /// # let _listener = net::TcpListener::bind(address)?;
+    /// let socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`
     /// registry.register(
