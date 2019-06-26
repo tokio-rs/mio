@@ -1,8 +1,6 @@
 use crate::sys::unix::cvt;
-use crate::sys::unix::io::set_cloexec;
 use crate::{Interests, Token};
 
-use libc::{self, c_int};
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
@@ -28,31 +26,23 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        let epfd = unsafe {
-            // Emulate `epoll_create` by using `epoll_create1` if it's available
-            // and otherwise falling back to `epoll_create` followed by a call to
-            // set the CLOEXEC flag.
-            dlsym!(fn epoll_create1(c_int) -> c_int);
-
-            match epoll_create1.get() {
-                Some(epoll_create1_fn) => cvt(epoll_create1_fn(libc::EPOLL_CLOEXEC))?,
-                None => {
-                    let fd = cvt(libc::epoll_create(1024))?;
-                    drop(set_cloexec(fd));
-                    fd
-                }
-            }
-        };
-
-        // offset by 1 to avoid choosing 0 as the id of a selector
-        #[cfg(debug_assertions)]
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
-
-        Ok(Selector {
+        // According to libuv `EPOLL_CLOEXEC` is not defined on Android API <
+        // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on all platforms,
+        // so we use that instead.
+        let epfd = unsafe { libc::epoll_create1(libc::O_CLOEXEC) };
+        if epfd == -1 {
+            Err(io::Error::last_os_error())
+        } else {
+            // offset by 1 to avoid choosing 0 as the id of a selector
             #[cfg(debug_assertions)]
-            id,
-            epfd,
-        })
+            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
+
+            Ok(Selector {
+                #[cfg(debug_assertions)]
+                id,
+                epfd,
+            })
+        }
     }
 
     #[cfg(debug_assertions)]
@@ -263,4 +253,10 @@ pub fn millis(duration: Duration) -> u64 {
         .as_secs()
         .saturating_mul(MILLIS_PER_SEC)
         .saturating_add(millis as u64)
+}
+
+#[test]
+fn assert_close_on_exec_flag() {
+    // This assertion need to be true for Selector::new.
+    assert_eq!(libc::O_CLOEXEC, libc::EPOLL_CLOEXEC);
 }

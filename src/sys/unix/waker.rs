@@ -108,10 +108,11 @@ pub use self::kqueue::Waker;
     target_os = "solaris"
 ))]
 mod pipe {
+    use std::fs::File;
     use std::io::{self, Read, Write};
-    use std::os::unix::io::AsRawFd;
+    use std::os::unix::io::FromRawFd;
 
-    use crate::sys::{pipe, Io, Selector};
+    use crate::sys::unix::Selector;
     use crate::{Interests, Token};
 
     /// Waker backed by a unix pipe.
@@ -120,15 +121,26 @@ mod pipe {
     /// if writing to it (waking) fails.
     #[derive(Debug)]
     pub struct Waker {
-        sender: Io,
-        receiver: Io,
+        sender: File,
+        receiver: File,
     }
 
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
-            let (sender, receiver) = pipe()?;
-            selector.register(receiver.as_raw_fd(), token, Interests::READABLE)?;
-            Ok(Waker { sender, receiver })
+            let mut fds = [-1; 2];
+            let flags = libc::O_NONBLOCK | libc::O_CLOEXEC;
+            if unsafe { libc::pipe2(fds.as_mut_ptr(), flags) } == -1 {
+                Err(io::Error::last_os_error())
+            } else {
+                selector.register(fds[0], token, Interests::READABLE)?;
+
+                unsafe {
+                    Ok(Waker {
+                        sender: File::from_raw_fd(fds[1]),
+                        receiver: File::from_raw_fd(fds[0]),
+                    })
+                }
+            }
         }
 
         pub fn wake(&self) -> io::Result<()> {
