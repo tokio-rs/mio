@@ -91,4 +91,4 @@ If you want to propose an API change, create an issue to start a
 discussion with the community. Also, feel free to talk with us in the
 IRC channel.
 
-Finally, be kind. We support the [Rust Code of Conduct](https://www.rust-lang.org/conduct.html).
+Finally, be kind. We support the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct).
