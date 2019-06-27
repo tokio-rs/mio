@@ -42,10 +42,10 @@ extern crate mio;
 
 ## Features
 
-* Non-blocking TCP, UDP.
-* I/O event queue backed by epoll, kqueue, and IOCP.
+* Non-blocking TCP, UDP
+* I/O event queue backed by epoll, kqueue, and IOCP
 * Zero allocations at runtime
-* Platform specific extensions.
+* Platform specific extensions
 
 ## Non-goals
 
@@ -60,14 +60,18 @@ or higher-level libraries.
 
 Currently supported platforms:
 
-* Linux
-* OS X
-* Windows
-* FreeBSD
-* NetBSD
-* Solaris
 * Android
+* Bitrig
+* DragonFly BSD
+* FreeBSD
+* FreeBSD
+* Linux
+* NetBSD
+* OpenBSD
+* Solaris
+* Windows
 * iOS
+* macOS
 
 There are potentially others. If you find that Mio works on another
 platform, submit a PR to update the list!
