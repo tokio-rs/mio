@@ -248,16 +248,12 @@ impl Selector {
     // Used by `Waker`.
     #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn try_clone_waker(&self) -> io::Result<Selector> {
-        let new_kq = unsafe { libc::dup(self.kq) };
-        if new_kq == -1 {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(Selector {
-                #[cfg(debug_assertions)]
-                id: self.id,
-                kq: new_kq,
-            })
-        }
+        let new_kq = cvt(unsafe { libc::dup(self.kq) })?;
+        Ok(Selector {
+            #[cfg(debug_assertions)]
+            id: self.id,
+            kq: new_kq,
+        })
     }
 
     // Used by `Waker`.
