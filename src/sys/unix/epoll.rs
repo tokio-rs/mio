@@ -29,20 +29,17 @@ impl Selector {
         // According to libuv `EPOLL_CLOEXEC` is not defined on Android API <
         // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on all platforms,
         // so we use that instead.
-        let epfd = unsafe { libc::epoll_create1(libc::O_CLOEXEC) };
-        if epfd == -1 {
-            Err(io::Error::last_os_error())
-        } else {
-            // offset by 1 to avoid choosing 0 as the id of a selector
-            #[cfg(debug_assertions)]
-            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
+        let epfd = cvt(unsafe { libc::epoll_create1(libc::O_CLOEXEC) })?;
 
-            Ok(Selector {
-                #[cfg(debug_assertions)]
-                id,
-                epfd,
-            })
-        }
+        // offset by 1 to avoid choosing 0 as the id of a selector
+        #[cfg(debug_assertions)]
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
+
+        Ok(Selector {
+            #[cfg(debug_assertions)]
+            id,
+            epfd,
+        })
     }
 
     #[cfg(debug_assertions)]
