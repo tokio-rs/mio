@@ -292,26 +292,24 @@ impl Drop for Selector {
     }
 }
 
-pub type SysEvent = libc::kevent;
+pub type Event = libc::kevent;
 
-#[repr(transparent)]
-pub struct Event {
-    inner: SysEvent,
-}
+pub mod event {
+    use crate::sys::Event;
+    use crate::Token;
 
-impl Event {
-    pub fn token(&self) -> Token {
-        Token(self.inner.udata as usize)
+    pub fn token(event: &Event) -> Token {
+        Token(event.udata as usize)
     }
 
-    pub fn is_readable(&self) -> bool {
-        self.inner.filter == libc::EVFILT_READ || {
+    pub fn is_readable(event: &Event) -> bool {
+        event.filter == libc::EVFILT_READ || {
             #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
             // Used by the `Awakener`. On platforms that use `eventfd` or a unix
             // pipe it will emit a readable event so we'll fake that here as
             // well.
             {
-                self.inner.filter == libc::EVFILT_USER
+                event.filter == libc::EVFILT_USER
             }
             #[cfg(not(any(target_os = "freebsd", target_os = "ios", target_os = "macos")))]
             {
@@ -320,27 +318,28 @@ impl Event {
         }
     }
 
-    pub fn is_writable(&self) -> bool {
-        self.inner.filter == libc::EVFILT_WRITE
+    pub fn is_writable(event: &Event) -> bool {
+        event.filter == libc::EVFILT_WRITE
     }
 
-    pub fn is_error(&self) -> bool {
-        (self.inner.flags & libc::EV_ERROR) != 0 ||
+    pub fn is_error(event: &Event) -> bool {
+        (event.flags & libc::EV_ERROR) != 0 ||
             // When the read end of the socket is closed, EV_EOF is set on
             // flags, and fflags contains the error if there is one.
-            (self.inner.flags & libc::EV_EOF) != 0 && self.inner.fflags != 0
+            (event.flags & libc::EV_EOF) != 0 && event.fflags != 0
     }
 
-    pub fn is_hup(&self) -> bool {
-        (self.inner.flags & libc::EV_EOF) != 0
+    pub fn is_hup(event: &Event) -> bool {
+        (event.flags & libc::EV_EOF) != 0
     }
 
-    pub fn is_priority(&self) -> bool {
+    pub fn is_priority(_: &Event) -> bool {
         // kqueue doesn't have priority indicators.
         false
     }
 
-    pub fn is_aio(&self) -> bool {
+    #[allow(unused_variables)] // `event` is not used on some platforms.
+    pub fn is_aio(event: &Event) -> bool {
         #[cfg(any(
             target_os = "dragonfly",
             target_os = "freebsd",
@@ -348,7 +347,7 @@ impl Event {
             target_os = "macos"
         ))]
         {
-            self.inner.filter == libc::EVFILT_AIO
+            event.filter == libc::EVFILT_AIO
         }
         #[cfg(not(any(
             target_os = "dragonfly",
@@ -361,10 +360,11 @@ impl Event {
         }
     }
 
-    pub fn is_lio(&self) -> bool {
+    #[allow(unused_variables)] // `event` is only used on FreeBSD.
+    pub fn is_lio(event: &Event) -> bool {
         #[cfg(target_os = "freebsd")]
         {
-            self.inner.filter == libc::EVFILT_LIO
+            event.filter == libc::EVFILT_LIO
         }
         #[cfg(not(target_os = "freebsd"))]
         {
@@ -374,7 +374,7 @@ impl Event {
 }
 
 pub struct Events {
-    events: Vec<SysEvent>,
+    events: Vec<Event>,
 }
 
 impl Events {
@@ -399,7 +399,7 @@ impl Events {
         self.events.is_empty()
     }
 
-    pub fn get(&self, idx: usize) -> Option<&SysEvent> {
+    pub fn get(&self, idx: usize) -> Option<&Event> {
         self.events.get(idx)
     }
 

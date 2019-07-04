@@ -152,46 +152,44 @@ impl Drop for Selector {
     }
 }
 
-pub type SysEvent = libc::epoll_event;
+pub type Event = libc::epoll_event;
 
-#[repr(transparent)]
-pub struct Event {
-    inner: SysEvent,
-}
+pub mod event {
+    use crate::sys::Event;
+    use crate::Token;
 
-impl Event {
-    pub fn token(&self) -> Token {
-        Token(self.inner.u64 as usize)
+    pub fn token(event: &Event) -> Token {
+        Token(event.u64 as usize)
     }
 
-    pub fn is_readable(&self) -> bool {
-        (self.inner.events as libc::c_int & libc::EPOLLIN) != 0
-            || (self.inner.events as libc::c_int & libc::EPOLLPRI) != 0
+    pub fn is_readable(event: &Event) -> bool {
+        (event.events as libc::c_int & libc::EPOLLIN) != 0
+            || (event.events as libc::c_int & libc::EPOLLPRI) != 0
     }
 
-    pub fn is_writable(&self) -> bool {
-        (self.inner.events as libc::c_int & libc::EPOLLOUT) != 0
+    pub fn is_writable(event: &Event) -> bool {
+        (event.events as libc::c_int & libc::EPOLLOUT) != 0
     }
 
-    pub fn is_error(&self) -> bool {
-        (self.inner.events as libc::c_int & libc::EPOLLERR) != 0
+    pub fn is_error(event: &Event) -> bool {
+        (event.events as libc::c_int & libc::EPOLLERR) != 0
     }
 
-    pub fn is_hup(&self) -> bool {
-        (self.inner.events as libc::c_int & libc::EPOLLHUP) != 0
-            || (self.inner.events as libc::c_int & libc::EPOLLRDHUP) != 0
+    pub fn is_hup(event: &Event) -> bool {
+        (event.events as libc::c_int & libc::EPOLLHUP) != 0
+            || (event.events as libc::c_int & libc::EPOLLRDHUP) != 0
     }
 
-    pub fn is_priority(&self) -> bool {
-        (self.inner.events as libc::c_int & libc::EPOLLPRI) != 0
+    pub fn is_priority(event: &Event) -> bool {
+        (event.events as libc::c_int & libc::EPOLLPRI) != 0
     }
 
-    pub fn is_aio(&self) -> bool {
+    pub fn is_aio(_: &Event) -> bool {
         // Not supported in the kernel, only in libc.
         false
     }
 
-    pub fn is_lio(&self) -> bool {
+    pub fn is_lio(_: &Event) -> bool {
         // Not supported.
         false
     }
@@ -224,7 +222,7 @@ impl Events {
     }
 
     #[inline]
-    pub fn get(&self, idx: usize) -> Option<&SysEvent> {
+    pub fn get(&self, idx: usize) -> Option<&Event> {
         self.events.get(idx)
     }
 

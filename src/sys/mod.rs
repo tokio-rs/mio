@@ -1,16 +1,13 @@
 //! Module with system specific types.
 //!
-//! `SysEvent`: must be a type alias for the system specific event, e.g.
-//!             `kevent` or `epoll_event`.
-//! `Event`: **must be** a `transparent` wrapper around `SysEvent`, i.e. the
-//!          type must have `#[repr(transparent)]` with only `SysEvent` as
-//!          field. This is safety requirement, see `Event::from_sys_event_ref`.
-//!          Furthermore on this type a number of methods must be implemented
-//!          that are used by `Event` (in the `event` module).
+//! `Event`: a type alias for the system specific event, e.g.
+//!          `kevent` or `epoll_event`.
+//! `event`: a module with various helper functions for `Event`, see
+//!          `crate::event::Event` for the required functions.
 
 #[cfg(unix)]
 pub use self::unix::{
-    Event, EventedFd, Events, Selector, SysEvent, TcpListener, TcpStream, UdpSocket, Waker,
+    event, Event, EventedFd, Events, Selector, TcpListener, TcpStream, UdpSocket, Waker,
 };
 
 #[cfg(unix)]
@@ -18,8 +15,7 @@ pub mod unix;
 
 #[cfg(windows)]
 pub use self::windows::{
-    Binding, Event, Events, Overlapped, Selector, SysEvent, TcpListener, TcpStream, UdpSocket,
-    Waker,
+    event, Binding, Event, Events, Overlapped, Selector, TcpListener, TcpStream, UdpSocket, Waker,
 };
 
 #[cfg(windows)]
