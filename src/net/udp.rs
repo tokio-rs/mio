@@ -7,10 +7,9 @@
 //!
 //! [portability guidelines]: ../struct.Poll.html#portability
 
-use crate::event::Evented;
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
-use crate::{sys, Interests, Registry, Token};
+use crate::{event, sys, Interests, Registry, Token};
 
 use std::fmt;
 use std::io;
@@ -546,7 +545,7 @@ impl UdpSocket {
     }
 }
 
-impl Evented for UdpSocket {
+impl event::Source for UdpSocket {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;

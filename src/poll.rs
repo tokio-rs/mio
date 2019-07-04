@@ -1,6 +1,4 @@
-use crate::event::{Evented, Events};
-use crate::Interests;
-use crate::{sys, Token};
+use crate::{event, sys, Events, Interests, Token};
 use log::trace;
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd;
@@ -14,20 +12,21 @@ use std::{fmt, io, usize};
 
 /// Polls for readiness events on all registered values.
 ///
-/// `Poll` allows a program to monitor a large number of `Evented` types,
+/// `Poll` allows a program to monitor a large number of [`event::Source`]s,
 /// waiting until one or more become "ready" for some class of operations; e.g.
-/// reading and writing. An `Evented` type is considered ready if it is possible
+/// reading and writing. An event source is considered ready if it is possible
 /// to immediately perform a corresponding operation; e.g. [`read`] or
 /// [`write`].
 ///
-/// To use `Poll`, an `Evented` type must first be registered with the `Poll`
+/// To use `Poll`, an `event::Source` must first be registered with the `Poll`
 /// instance using the [`register`] method on its associated `Register`,
 /// supplying readiness interest. The readiness interest tells `Poll` which
 /// specific operations on the handle to monitor for readiness. A `Token` is
 /// also passed to the [`register`] function. When `Poll` returns a readiness
 /// event, it will include this token.  This associates the event with the
-/// `Evented` handle that generated the event.
+/// event source that generated the event.
 ///
+/// [`event::Source`]: crate::event::Source
 /// [`read`]: tcp/struct.TcpStream.html#method.read
 /// [`write`]: tcp/struct.TcpStream.html#method.write
 /// [`register`]: #method.register
@@ -83,7 +82,7 @@ use std::{fmt, io, usize};
 /// ### Spurious events
 ///
 /// [`Poll::poll`] may return readiness events even if the associated
-/// [`Evented`] handle is not actually ready. Given the same code, this may
+/// event source is not actually ready. Given the same code, this may
 /// happen more on some platforms than others. It is important to never assume
 /// that, just because a readiness event was received, that the associated
 /// operation will succeed as well.
@@ -97,7 +96,7 @@ use std::{fmt, io, usize};
 /// Once a readiness event is received, the corresponding operation must be
 /// performed repeatedly until it returns [`WouldBlock`]. Unless this is done,
 /// there is no guarantee that another readiness event will be delivered, even
-/// if further data is received for the [`Evented`] handle.
+/// if further data is received for the event source.
 ///
 /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
 ///
@@ -127,7 +126,8 @@ use std::{fmt, io, usize};
 /// ### Registering handles
 ///
 /// Unless otherwise noted, it should be assumed that types implementing
-/// [`Evented`] will never become ready unless they are registered with `Poll`.
+/// [`event::Source`] will never become ready unless they are registered with
+/// `Poll`.
 ///
 /// For example:
 ///
@@ -175,10 +175,10 @@ use std::{fmt, io, usize};
 /// | macOS         | [kqueue]  |
 ///
 /// On all supported platforms, socket operations are handled by using the
-/// system selector. Platform specific extensions (e.g. [`EventedFd`]) allow
+/// system selector. Platform specific extensions (e.g. [`SourceFd`]) allow
 /// accessing other features provided by individual system selectors. For
 /// example, Linux's [`signalfd`] feature can be used by registering the FD with
-/// `Poll` via [`EventedFd`].
+/// `Poll` via [`SourceFd`].
 ///
 /// On all platforms except windows, a call to [`Poll::poll`] is mostly just a
 /// direct call to the system selector. However, [IOCP] uses a completion model
@@ -196,7 +196,7 @@ use std::{fmt, io, usize};
 /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
 /// [IOCP]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365198(v=vs.85).aspx
 /// [`signalfd`]: http://man7.org/linux/man-pages/man2/signalfd.2.html
-/// [`EventedFd`]: unix/struct.EventedFd.html
+/// [`SourceFd`]: unix/struct.SourceFd.html
 /// [`SetReadiness`]: struct.SetReadiness.html
 /// [`Poll::poll`]: struct.Poll.html#method.poll
 pub struct Poll {
@@ -249,8 +249,8 @@ impl Poll {
     /// // Create a structure to receive polled events
     /// let mut events = Events::with_capacity(1024);
     ///
-    /// // Wait for events, but none will be received because no `Evented`
-    /// // handles have been registered with this `Poll` instance.
+    /// // Wait for events, but none will be received because no
+    /// // `event::Source`s have been registered with this `Poll` instance.
     /// let n = poll.poll(&mut events, Some(Duration::from_millis(500)))?;
     /// assert_eq!(n, 0);
     /// #     Ok(())
@@ -275,7 +275,7 @@ impl Poll {
     /// Wait for readiness events
     ///
     /// Blocks the current thread and waits for readiness events for any of the
-    /// `Evented` handles that have been registered with this `Poll` instance.
+    /// [`event::Source`]s that have been registered with this `Poll` instance.
     /// The function will block until either at least one readiness event has
     /// been received or `timeout` has elapsed. A `timeout` of `None` means that
     /// `poll` will block until a readiness event has been received.
@@ -286,11 +286,11 @@ impl Poll {
     /// returned on the next call to `poll`.
     ///
     /// A single call to `poll` may result in multiple readiness events being
-    /// returned for a single `Evented` handle. For example, if a TCP socket
-    /// becomes both readable and writable, it may be possible for a single
-    /// readiness event to be returned with both [`readable`] and [`writable`]
-    /// readiness **OR** two separate events may be returned, one with
-    /// [`readable`] set and one with [`writable`] set.
+    /// returned for a single event source. For example, if a TCP socket becomes
+    /// both readable and writable, it may be possible for a single readiness
+    /// event to be returned with both [`readable`] and [`writable`] readiness
+    /// **OR** two separate events may be returned, one with [`readable`] set
+    /// and one with [`writable`] set.
     ///
     /// Note that the `timeout` will be rounded up to the system clock
     /// granularity (usually 1ms), and kernel scheduling delays mean that
@@ -306,6 +306,7 @@ impl Poll {
     /// See the [struct] level documentation for a higher level discussion of
     /// polling.
     ///
+    /// [`event::Source`]: crate::event::Source
     /// [`readable`]: struct.Interests.html#method.readable
     /// [`writable`]: struct.Interests.html#method.writable
     /// [struct]: #
@@ -436,24 +437,23 @@ impl AsRawFd for Poll {
 }
 
 impl Registry {
-    /// Register an `Evented` handle with the `Poll` instance.
+    /// Register an [`event::Source`] with the `Poll` instance.
     ///
-    /// Once registered, the `Poll` instance will monitor the `Evented` handle
-    /// for readiness state changes. When it notices a state change, it will
-    /// return a readiness event for the handle the next time [`poll`] is
-    /// called.
+    /// Once registered, the `Poll` instance will monitor the event source for
+    /// readiness state changes. When it notices a state change, it will return
+    /// a readiness event for the handle the next time [`poll`] is called.
     ///
     /// See the [`struct`] docs for a high level overview.
     ///
     /// # Arguments
     ///
-    /// `handle: &E: Evented`: This is the handle that the `Poll` instance
-    /// should monitor for readiness state changes.
+    /// `source: &S: event::Source`: This is the source of events that the
+    /// `Poll` instance should monitor for readiness state changes.
     ///
     /// `token: Token`: The caller picks a token to associate with the socket.
     /// When [`poll`] returns an event for the handle, this token is included.
     /// This allows the caller to map the event to its handle. The token
-    /// associated with the `Evented` handle can be changed at any time by
+    /// associated with the `event::Source` can be changed at any time by
     /// calling [`reregister`].
     ///
     /// `token` cannot be `Token(usize::MAX)` as it is reserved for internal
@@ -469,23 +469,21 @@ impl Registry {
     /// If a socket is registered with readable interest and the socket becomes
     /// writable, no event will be returned from [`poll`].
     ///
-    /// The readiness interest for an `Evented` handle can be changed at any
-    /// time by calling [`reregister`].
-    ///
-    /// The registration options for an `Evented` handle can be changed at any
-    /// time by calling [`reregister`].
+    /// The readiness interest for an `event::Source` can be changed at any time
+    /// by calling [`reregister`].
     ///
     /// # Notes
     ///
-    /// Unless otherwise specified, the caller should assume that once an
-    /// `Evented` handle is registered with a `Poll` instance, it is bound to
-    /// that `Poll` instance for the lifetime of the `Evented` handle. This
-    /// remains true even if the `Evented` handle is deregistered from the poll
-    /// instance using [`deregister`].
+    /// Unless otherwise specified, the caller should assume that once an event
+    /// source is registered with a `Poll` instance, it is bound to that `Poll`
+    /// instance for the lifetime of the event source. This remains true even
+    /// if the event source is deregistered from the poll instance using
+    /// [`deregister`].
     ///
     /// This function is **thread safe**. It can be called concurrently from
     /// multiple threads.
     ///
+    /// [`event::Source`]: crate::event::Source
     /// [`struct`]: #
     /// [`reregister`]: #method.reregister
     /// [`deregister`]: #method.deregister
@@ -539,35 +537,28 @@ impl Registry {
     /// }
     /// # }
     /// ```
-    pub fn register<E: ?Sized>(
-        &self,
-        handle: &E,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()>
+    pub fn register<S>(&self, source: &S, token: Token, interests: Interests) -> io::Result<()>
     where
-        E: Evented,
+        S: event::Source + ?Sized,
     {
-        trace!("registering with poller");
-        handle.register(self, token, interests)?;
+        trace!("registering event source with poller");
+        source.register(self, token, interests)?;
         Ok(())
     }
 
-    /// Re-register an `Evented` handle with the `Poll` instance.
+    /// Re-register an [`event::Source`] with the `Poll` instance.
     ///
-    /// Re-registering an `Evented` handle allows changing the details of the
-    /// registration. Specifically, it allows updating the associated `token`,
-    /// `interest`, and `opts` specified in previous `register` and `reregister`
-    /// calls.
+    /// Re-registering an event source allows changing the details of the
+    /// registration. Specifically, it allows updating the associated `token`
+    /// and `interests` specified in previous `register` and `reregister` calls.
     ///
     /// The `reregister` arguments fully override the previous values. In other
     /// words, if a socket is registered with [`readable`] interest and the call
     /// to `reregister` specifies [`writable`], then read interest is no longer
     /// requested for the handle.
     ///
-    /// The `Evented` handle must have previously been registered with this
-    /// instance of `Poll` otherwise the call to `reregister` will return with
-    /// an error.
+    /// The event source must have previously been registered with this instance
+    /// of `Poll` otherwise the call to `reregister` will return with an error.
     ///
     /// See the [`register`] documentation for details about the function
     /// arguments and see the [`struct`] docs for a high level overview of
@@ -605,34 +596,29 @@ impl Registry {
     /// # }
     /// ```
     ///
+    /// [`event::Source`]: crate::event::Source
     /// [`struct`]: #
     /// [`register`]: #method.register
     /// [`readable`]: crate::event::Event::is_readable
     /// [`writable`]: crate::event::Event::is_writable
-    pub fn reregister<E: ?Sized>(
-        &self,
-        handle: &E,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()>
+    pub fn reregister<S>(&self, source: &S, token: Token, interests: Interests) -> io::Result<()>
     where
-        E: Evented,
+        S: event::Source + ?Sized,
     {
-        trace!("registering with poller");
-        handle.reregister(self, token, interests)?;
+        trace!("reregistering event source with poller");
+        source.reregister(self, token, interests)?;
         Ok(())
     }
 
-    /// Deregister an `Evented` handle with the `Poll` instance.
+    /// Deregister an [`event::Source`] with the `Poll` instance.
     ///
-    /// When an `Evented` handle is deregistered, the `Poll` instance will
-    /// no longer monitor it for readiness state changes. Unlike disabling
-    /// handles with oneshot, deregistering clears up any internal resources
-    /// needed to track the handle.  After an explicit call to this
-    /// method completes, it is guaranteed that the token previously
-    /// registered to this handle will not be returned by a future
-    /// poll, so long as a happens-before relationship is established
-    /// between this call and the poll.
+    /// When an event source is deregistered, the `Poll` instance will no longer
+    /// monitor it for readiness state changes. Deregistering clears up any
+    /// internal resources needed to track the handle.  After an explicit call
+    /// to this method completes, it is guaranteed that the token previously
+    /// registered to this handle will not be returned by a future poll, so long
+    /// as a happens-before relationship is established between this call and
+    /// the poll.
     ///
     /// A handle can be passed back to `register` after it has been
     /// deregistered; however, it must be passed back to the **same** `Poll`
@@ -671,12 +657,12 @@ impl Registry {
     /// #     Ok(())
     /// # }
     /// ```
-    pub fn deregister<E: ?Sized>(&self, handle: &E) -> io::Result<()>
+    pub fn deregister<S>(&self, source: &S) -> io::Result<()>
     where
-        E: Evented,
+        S: event::Source + ?Sized,
     {
-        trace!("deregistering handle with poller");
-        handle.deregister(self)?;
+        trace!("deregistering event source with poller");
+        source.deregister(self)?;
         Ok(())
     }
 }

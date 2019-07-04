@@ -1,6 +1,5 @@
 use std::io::{Read, Write};
 
-use mio::event::Evented;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, Token};
 
@@ -13,11 +12,14 @@ fn write_then_drop() {
     let mut s = TcpStream::connect(addr).unwrap();
 
     let mut poll = Poll::new().unwrap();
+    let registry = poll.registry().clone();
 
-    a.register(poll.registry(), Token(1), Interests::READABLE)
+    registry
+        .register(&a, Token(1), Interests::READABLE)
         .unwrap();
 
-    s.register(poll.registry(), Token(3), Interests::READABLE)
+    registry
+        .register(&s, Token(3), Interests::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -29,7 +31,8 @@ fn write_then_drop() {
 
     let mut s2 = a.accept().unwrap().0;
 
-    s2.register(poll.registry(), Token(2), Interests::WRITABLE)
+    registry
+        .register(&s2, Token(2), Interests::WRITABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -42,7 +45,8 @@ fn write_then_drop() {
     s2.write_all(&[1, 2, 3, 4]).unwrap();
     drop(s2);
 
-    s.reregister(poll.registry(), Token(3), Interests::READABLE)
+    registry
+        .reregister(&s, Token(3), Interests::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -66,10 +70,13 @@ fn write_then_deregister() {
     let mut s = TcpStream::connect(addr).unwrap();
 
     let mut poll = Poll::new().unwrap();
+    let registry = poll.registry().clone();
 
-    a.register(poll.registry(), Token(1), Interests::READABLE)
+    registry
+        .register(&a, Token(1), Interests::READABLE)
         .unwrap();
-    s.register(poll.registry(), Token(3), Interests::READABLE)
+    registry
+        .register(&s, Token(3), Interests::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -81,7 +88,8 @@ fn write_then_deregister() {
 
     let mut s2 = a.accept().unwrap().0;
 
-    s2.register(poll.registry(), Token(2), Interests::WRITABLE)
+    registry
+        .register(&s2, Token(2), Interests::WRITABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -92,9 +100,10 @@ fn write_then_deregister() {
     assert_eq!(events.iter().next().unwrap().token(), Token(2));
 
     s2.write_all(&[1, 2, 3, 4]).unwrap();
-    s2.deregister(poll.registry()).unwrap();
+    registry.deregister(&s2).unwrap();
 
-    s.reregister(poll.registry(), Token(3), Interests::READABLE)
+    registry
+        .reregister(&s, Token(3), Interests::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);

@@ -1,8 +1,7 @@
-use crate::event::Evented;
-use crate::sys::unix::eventedfd::EventedFd;
 use crate::sys::unix::io::set_nonblock;
 use crate::sys::unix::uio::VecIo;
-use crate::{Interests, Registry, Token};
+use crate::sys::unix::SourceFd;
+use crate::{event, Interests, Registry, Token};
 
 use iovec::IoVec;
 use libc;
@@ -135,9 +134,9 @@ impl<'a> Write for &'a TcpStream {
     }
 }
 
-impl Evented for TcpStream {
+impl event::Source for TcpStream {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(registry, token, interests)
+        SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
     fn reregister(
@@ -146,11 +145,11 @@ impl Evented for TcpStream {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests)
+        SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(registry)
+        SourceFd(&self.as_raw_fd()).deregister(registry)
     }
 }
 
@@ -211,9 +210,9 @@ impl TcpListener {
     }
 }
 
-impl Evented for TcpListener {
+impl event::Source for TcpListener {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(registry, token, interests)
+        SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
     fn reregister(
@@ -222,11 +221,11 @@ impl Evented for TcpListener {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests)
+        SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(registry)
+        SourceFd(&self.as_raw_fd()).deregister(registry)
     }
 }
 

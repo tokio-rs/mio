@@ -7,10 +7,9 @@
 //!
 //! [portability guidelines]: ../struct.Poll.html#portability
 
-use crate::event::Evented;
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
-use crate::{sys, Interests, Registry, Token};
+use crate::{event, sys, Interests, Registry, Token};
 
 use iovec::IoVec;
 use net2::TcpBuilder;
@@ -386,7 +385,7 @@ impl<'a> Write for &'a TcpStream {
     }
 }
 
-impl Evented for TcpStream {
+impl event::Source for TcpStream {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
@@ -574,7 +573,7 @@ impl TcpListener {
     }
 }
 
-impl Evented for TcpListener {
+impl event::Source for TcpListener {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;

@@ -1,10 +1,9 @@
-use crate::event::Evented;
+use crate::event::Source;
 use crate::poll::{self, Registry};
 use crate::sys::windows::buffer_pool::BufferPool;
 use crate::sys::windows::lazycell::AtomicLazyCell;
 use crate::sys::windows::{Event, PollOpt, ReadinessQueue, Ready, Registration, SetReadiness};
-use crate::Interests;
-use crate::Token;
+use crate::{Interests, Token};
 use log::trace;
 use miow;
 use miow::iocp::{CompletionPort, CompletionStatus};

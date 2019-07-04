@@ -418,11 +418,11 @@ impl fmt::Debug for Events {
 
 #[test]
 fn does_not_register_rw() {
-    use crate::unix::EventedFd;
+    use crate::unix::SourceFd;
     use crate::{Poll, Token};
 
     let kq = unsafe { libc::kqueue() };
-    let kqf = EventedFd(&kq);
+    let kqf = SourceFd(&kq);
     let poll = Poll::new().unwrap();
 
     // registering kqueue fd will fail if write is requested (On anything but some versions of OS

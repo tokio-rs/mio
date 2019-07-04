@@ -1,7 +1,6 @@
-use crate::event::Evented;
 use crate::sys::unix::uio::VecIo;
-use crate::unix::EventedFd;
-use crate::{Interests, Registry, Token};
+use crate::unix::SourceFd;
+use crate::{event, Interests, Registry, Token};
 
 use std;
 use std::fmt;
@@ -128,9 +127,9 @@ impl UdpSocket {
     }
 }
 
-impl Evented for UdpSocket {
+impl event::Source for UdpSocket {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(registry, token, interests)
+        SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
     fn reregister(
@@ -139,11 +138,11 @@ impl Evented for UdpSocket {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(registry, token, interests)
+        SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(registry)
+        SourceFd(&self.as_raw_fd()).deregister(registry)
     }
 }
 
