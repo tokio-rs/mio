@@ -569,9 +569,6 @@ impl Registry {
     /// instance of `Poll` otherwise the call to `reregister` will return with
     /// an error.
     ///
-    /// `token` cannot be `Token(usize::MAX)` as it is reserved for internal
-    /// usage.
-    ///
     /// See the [`register`] documentation for details about the function
     /// arguments and see the [`struct`] docs for a high level overview of
     /// polling.
@@ -640,9 +637,6 @@ impl Registry {
     /// A handle can be passed back to `register` after it has been
     /// deregistered; however, it must be passed back to the **same** `Poll`
     /// instance.
-    ///
-    /// `Evented` handles are automatically deregistered when they are dropped.
-    /// It is common to never need to explicitly call `deregister`.
     ///
     /// # Examples
     ///
