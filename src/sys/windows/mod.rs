@@ -143,7 +143,6 @@ use winapi;
 #[macro_use]
 mod selector;
 mod buffer_pool;
-mod event;
 mod from_raw_arc;
 mod lazycell;
 mod poll_opt;
@@ -153,7 +152,9 @@ mod tcp;
 mod udp;
 mod waker;
 
-pub use self::event::{Event, SysEvent};
+pub mod event;
+
+pub use self::event::Event;
 pub use self::selector::{Binding, Events, Overlapped, Selector};
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;

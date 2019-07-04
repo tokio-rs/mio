@@ -1,4 +1,3 @@
-use crate::sys::SysEvent;
 use crate::{sys, Token};
 
 use std::fmt;
@@ -22,19 +21,19 @@ impl Event {
     /// Returns the event's token.
     #[inline]
     pub fn token(&self) -> Token {
-        self.inner.token()
+        sys::event::token(&self.inner)
     }
 
     /// Returns true if the event contains readable readiness.
     #[inline]
     pub fn is_readable(&self) -> bool {
-        self.inner.is_readable()
+        sys::event::is_readable(&self.inner)
     }
 
     /// Returns true if the event contains writable readiness.
     #[inline]
     pub fn is_writable(&self) -> bool {
-        self.inner.is_writable()
+        sys::event::is_writable(&self.inner)
     }
 
     /// Returns true if the event contains error readiness.
@@ -49,7 +48,7 @@ impl Event {
     /// this indicator.
     #[inline]
     pub fn is_error(&self) -> bool {
-        self.inner.is_error()
+        sys::event::is_error(&self.inner)
     }
 
     /// Returns true if the event contains HUP readiness.
@@ -74,7 +73,7 @@ impl Event {
     /// only provides a convenience method to read it.
     #[inline]
     pub fn is_hup(&self) -> bool {
-        self.inner.is_hup()
+        sys::event::is_hup(&self.inner)
     }
 
     /// Returns true if the event contains priority readiness.
@@ -85,7 +84,7 @@ impl Event {
     /// this indicator.
     #[inline]
     pub fn is_priority(&self) -> bool {
-        self.inner.is_priority()
+        sys::event::is_priority(&self.inner)
     }
 
     /// Returns true if the event contains AIO readiness.
@@ -96,7 +95,7 @@ impl Event {
     /// this indicator.
     #[inline]
     pub fn is_aio(&self) -> bool {
-        self.inner.is_aio()
+        sys::event::is_aio(&self.inner)
     }
 
     /// Returns true if the event contains LIO readiness.
@@ -107,15 +106,14 @@ impl Event {
     /// this indicator.
     #[inline]
     pub fn is_lio(&self) -> bool {
-        self.inner.is_lio()
+        sys::event::is_lio(&self.inner)
     }
 
     /// Create a reference to an `Event` from a platform specific event.
-    pub(crate) fn from_sys_event_ref(sys_event: &SysEvent) -> &Event {
+    pub(crate) fn from_sys_event_ref(sys_event: &sys::Event) -> &Event {
         unsafe {
-            // This is safe because `Event` only because the memory layout of
-            // `SysEvent` is the same as `Event`, also see the comments in the
-            // `sys` module.
+            // This is safe because only because the memory layout of `Event` is
+            // the same as `sys::Event` due to the `repr(transparent)` attribute.
             std::mem::transmute(sys_event)
         }
     }

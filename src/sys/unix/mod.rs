@@ -2,7 +2,7 @@
 mod epoll;
 
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-pub use self::epoll::{Event, Events, Selector, SysEvent};
+pub use self::epoll::{event, Event, Events, Selector};
 
 #[cfg(any(
     target_os = "bitrig",
@@ -24,7 +24,7 @@ mod kqueue;
     target_os = "netbsd",
     target_os = "openbsd"
 ))]
-pub use self::kqueue::{Event, Events, Selector, SysEvent};
+pub use self::kqueue::{event, Event, Events, Selector};
 
 mod eventedfd;
 mod io;
