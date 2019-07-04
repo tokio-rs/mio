@@ -108,7 +108,7 @@ impl Selector {
     pub fn register(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
         trace!("registering; token={:?}; interests={:?}", token, interests);
 
-        let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
+        let flags = libc::EV_RECEIPT;
 
         unsafe {
             let r = if interests.is_readable() {
