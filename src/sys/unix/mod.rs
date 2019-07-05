@@ -26,14 +26,14 @@ mod kqueue;
 ))]
 pub use self::kqueue::{event, Event, Events, Selector};
 
-mod eventedfd;
 mod io;
+mod sourcefd;
 mod tcp;
 mod udp;
 mod uio;
 mod waker;
 
-pub use self::eventedfd::EventedFd;
+pub use self::sourcefd::SourceFd;
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
 pub use self::waker::Waker;

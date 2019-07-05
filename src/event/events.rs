@@ -28,7 +28,7 @@ use std::fmt;
 ///
 /// assert_eq!(0, events.iter().count());
 ///
-/// // Register `Evented` handles with `poll`
+/// // Register `event::Source`s with `poll`.
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///

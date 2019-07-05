@@ -1,6 +1,5 @@
 use super::{Event, PollOpt, Ready, SelectorInner, Waker};
-use crate::event::Evented;
-use crate::{poll, sys, Interests, Token};
+use crate::{event, poll, sys, Interests, Token};
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
@@ -203,7 +202,7 @@ impl Registration {
     }
 }
 
-impl Evented for Registration {
+impl event::Source for Registration {
     fn register(
         &self,
         registry: &poll::Registry,
@@ -292,7 +291,6 @@ impl SetReadiness {
     /// work:
     ///
     /// [`Registration`]: struct.Registration.html
-    /// [`Evented`]: event/trait.Evented.html#examples
     /// [`Poll`]: struct.Poll.html
     /// [`Poll::poll`]: struct.Poll.html#method.poll
     #[allow(dead_code)] // Used by Windows.

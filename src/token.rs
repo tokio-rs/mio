@@ -1,11 +1,11 @@
-/// Associates readiness events with [`Evented`] handles.
+/// Associates readiness events with [`event::Source`]s.
 ///
 /// `Token` is a wrapper around `usize` and is used as an argument to
 /// [`Registry::register`] and [`Registry::reregister`].
 ///
 /// See [`Poll`] for more documentation on polling.
 ///
-/// [`Evented`]: crate::event::Evented
+/// [`event::Source`]: crate::event::Source
 /// [`Poll`]: crate::Poll
 /// [`Registry::register`]: crate::Registry::register
 /// [`Registry::reregister`]: crate::Registry::reregister

@@ -1,8 +1,7 @@
-use crate::event::Evented;
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
 use crate::sys::windows::{Family, Ready, Registration};
-use crate::{Interests, Registry, Token};
+use crate::{event, Interests, Registry, Token};
 use iovec::IoVec;
 use log::trace;
 use miow::iocp::CompletionStatus;
@@ -573,7 +572,7 @@ fn write_done(status: &OVERLAPPED_ENTRY) {
     }
 }
 
-impl Evented for TcpStream {
+impl event::Source for TcpStream {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         let mut me = self.inner();
         me.iocp.register_socket(
@@ -803,7 +802,7 @@ fn accept_done(status: &OVERLAPPED_ENTRY) {
     me2.add_readiness(&mut me, Ready::READABLE);
 }
 
-impl Evented for TcpListener {
+impl event::Source for TcpListener {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         let mut me = self.inner();
         me.iocp.register_socket(

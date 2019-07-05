@@ -1,6 +1,6 @@
 use std::{fmt, ops};
 
-/// Options supplied when registering an `Evented` handle with `Poll`
+/// Options supplied when registering an `event::Source`s handle with `Poll`.
 ///
 /// `PollOpt` values can be combined together using the various bitwise
 /// operators.

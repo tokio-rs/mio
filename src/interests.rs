@@ -3,10 +3,10 @@ use std::{fmt, ops};
 
 /// Interests used in registering.
 ///
-/// Interests are used in [registering] [`Evented`] handles with [`Poll`],
-/// they indicate what readiness should be monitored for. For example if a
-/// socket is registered with [readable] interests and the socket becomes
-/// writable, no event will be returned from a call to [`poll`].
+/// Interests are used in [registering] [`event::Source`]s with [`Poll`], they
+/// indicate what readiness should be monitored for. For example if a socket is
+/// registered with [readable] interests and the socket becomes writable, no
+/// event will be returned from a call to [`poll`].
 ///
 /// The size of `Option<Interests>` should be identical to itself.
 ///
@@ -18,7 +18,7 @@ use std::{fmt, ops};
 /// ```
 ///
 /// [registering]: crate::Registry::register
-/// [`Evented`]: crate::event::Evented
+/// [`event::Source`]: crate::event::Source
 /// [`Poll`]: crate::Poll
 /// [readable]: Interests::READABLE
 /// [`poll`]: crate::Poll::poll

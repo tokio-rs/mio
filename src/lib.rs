@@ -77,19 +77,13 @@
 //! let registry = poll.registry().clone();
 //!
 //! // Start listening for incoming connections
-//! registry.register(
-//!     &server,
-//!     SERVER,
-//!     Interests::READABLE).unwrap();
+//! registry.register(&server, SERVER, Interests::READABLE).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(addr).unwrap();
 //!
 //! // Register the socket
-//! registry.register(
-//!     &sock,
-//!     CLIENT,
-//!     Interests::READABLE).unwrap();
+//! registry.register(&sock, CLIENT, Interests::READABLE).unwrap();
 //!
 //! // Create storage for events
 //! let mut events = Events::with_capacity(1024);
@@ -135,7 +129,7 @@ pub use waker::Waker;
 pub mod unix {
     //! Unix only extensions.
 
-    pub use crate::sys::EventedFd;
+    pub use crate::sys::SourceFd;
 }
 
 /// Windows-only extensions to the mio crate.
@@ -144,7 +138,7 @@ pub mod unix {
 /// implementation of asynchronous I/O. Mio then provides TCP and UDP as sample
 /// bindings for the system to connect networking types to asynchronous I/O. On
 /// Unix this scheme is then also extensible to all other file descriptors with
-/// the `EventedFd` type, but on Windows no such analog is available. The
+/// the `SourceFd` type, but on Windows no such analog is available. The
 /// purpose of this module, however, is to similarly provide a mechanism for
 /// foreign I/O types to get hooked up into the IOCP event loop.
 ///
@@ -152,15 +146,15 @@ pub mod unix {
 ///
 /// * `Binding` - this type is intended to govern binding with mio's `Poll`
 ///   type. Each I/O object should contain an instance of `Binding` that's
-///   interfaced with for the implementation of the `Evented` trait. The
-///   `register`, `reregister`, and `deregister` methods for the `Evented` trait
+///   interfaced with for the implementation of the `Source` trait. The
+///   `register`, `reregister`, and `deregister` methods for the `Source` trait
 ///   all have rough analogs with `Binding`.
 ///
 ///   Note that this type **does not handle readiness**. That is, this type does
 ///   not handle whether sockets are readable/writable/etc. It's intended that
 ///   IOCP types will internally manage this state with a `SetReadiness` type
 ///   from the `poll` module. The `SetReadiness` is typically lazily created on
-///   the first time that `Evented::register` is called and then stored in the
+///   the first time that `Source::register` is called and then stored in the
 ///   I/O object.
 ///
 ///   Also note that for types which represent streams of bytes the mio
@@ -186,7 +180,7 @@ pub mod unix {
 /// registered with mio's event loops. The `Binding` type is used to associate
 /// handles and the `Overlapped` type is used to execute I/O operations. When
 /// the I/O operations are completed a custom function pointer is called which
-/// typically modifies a `SetReadiness` set by `Evented` methods which will get
+/// typically modifies a `SetReadiness` set by `Source` methods which will get
 /// later hooked into the mio event loop.
 #[cfg(windows)]
 pub mod windows {

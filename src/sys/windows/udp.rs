@@ -3,11 +3,10 @@
 //! Note that most of this module is quite similar to the TCP module, so if
 //! something seems odd you may also want to try the docs over there.
 
-use crate::event::Evented;
 use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
 use crate::sys::windows::{Ready, Registration};
-use crate::{Interests, Registry, Token};
+use crate::{event, Interests, Registry, Token};
 use log::trace;
 use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
@@ -344,7 +343,7 @@ impl Imp {
     }
 }
 
-impl Evented for UdpSocket {
+impl event::Source for UdpSocket {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         let mut me = self.inner();
         me.iocp.register_socket(

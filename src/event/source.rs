@@ -2,30 +2,31 @@ use crate::{Interests, Registry, Token};
 use std::io;
 use std::ops::Deref;
 
-/// A value that may be registered with [`Registry`].
+/// An event source that may be registered with [`Registry`].
 ///
-/// Handles that implement `Evented` can be registered with `Registry`. Users of
-/// Mio **should not** use the `Evented` trait functions directly. Instead, the
-/// equivalent functions on `Registry` should be used.
+/// Types that implement `event::Source` can be registered with
+/// `Registry`. Users of Mio **should not** use the `event::Source` trait
+/// functions directly. Instead, the equivalent functions on `Registry` should
+/// be used.
 ///
 /// See [`Registry`] for more details.
 ///
 /// [`Registry`]: crate::Registry
 ///
-/// # Implementing `Evented`
+/// # Implementing `event::Source`
 ///
-/// `Evented` values are always backed by **system** handles, which are backed
-/// by sockets or other system handles. These `Evented` handles will be
-/// monitored by the system selector. An implementation of `Evented` will almost
-/// always delegates to a lower level handle. Examples of this are
-/// [`TcpStream`]s, or the *unix only* [`EventedFd`].
+/// Event sources are always backed by system handles, such as sockets or other
+/// system handles. These `event::Source`s will be monitored by the system
+/// selector. An implementation of `Source` will almost always delegates to a
+/// lower level handle. Examples of this are [`TcpStream`]s, or the *unix only*
+/// [`SourceFd`].
 ///
 /// [`TcpStream`]: crate::net::TcpStream
-/// [`EventedFd`]: crate::unix::EventedFd
+/// [`SourceFd`]: crate::unix::SourceFd
 ///
-/// # Dropping `Evented` types
+/// # Dropping `event::Source`s
 ///
-/// All `Evented` types, unless otherwise specified, need to be [deregistered]
+/// All `event::Source`s, unless otherwise specified, need to be [deregistered]
 /// before being dropped for them to not leak resources. This goes against the
 /// normal drop behaviour of types in Rust which cleanup after themselves, e.g.
 /// a `File` will close itself. However since deregistering needs access to
@@ -35,21 +36,21 @@ use std::ops::Deref;
 ///
 /// # Examples
 ///
-/// Implementing `Evented` on a struct containing a socket:
+/// Implementing `Source` on a struct containing a socket:
 ///
 /// ```
 /// use mio::{Interests, Registry, Token};
-/// use mio::event::Evented;
+/// use mio::event::Source;
 /// use mio::net::TcpStream;
 ///
 /// use std::io;
 ///
 /// # #[allow(dead_code)]
-/// pub struct MyEvented {
+/// pub struct MySource {
 ///     socket: TcpStream,
 /// }
 ///
-/// impl Evented for MyEvented {
+/// impl Source for MySource {
 ///     fn register(&self, registry: &Registry, token: Token, interests: Interests)
 ///         -> io::Result<()>
 ///     {
@@ -70,12 +71,12 @@ use std::ops::Deref;
 ///     }
 /// }
 /// ```
-pub trait Evented {
+pub trait Source {
     /// Register `self` with the given `Registry` instance.
     ///
     /// This function should not be called directly. Use [`Registry::register`]
     /// instead. Implementors should handle registration by delegating the call
-    /// to another `Evented` type.
+    /// to another `Source` type.
     ///
     /// [`Registry::register`]: crate::Registry::register
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()>;
@@ -84,7 +85,7 @@ pub trait Evented {
     ///
     /// This function should not be called directly. Use
     /// [`Registry::reregister`] instead. Implementors should handle
-    /// re-registration by either delegating the call to another `Evented` type.
+    /// re-registration by either delegating the call to another `Source` type.
     ///
     /// [`Registry::reregister`]: crate::Registry::reregister
     fn reregister(&self, registry: &Registry, token: Token, interests: Interests)
@@ -94,16 +95,16 @@ pub trait Evented {
     ///
     /// This function should not be called directly. Use
     /// [`Registry::deregister`] instead. Implementors should handle
-    /// deregistration by delegating the call to another `Evented` type.
+    /// deregistration by delegating the call to another `Source` type.
     ///
     /// [`Registry::deregister`]: crate::Registry::deregister
     fn deregister(&self, registry: &Registry) -> io::Result<()>;
 }
 
-impl<T, E> Evented for T
+impl<T, S> Source for T
 where
-    T: Deref<Target = E>,
-    E: Evented + ?Sized,
+    T: Deref<Target = S>,
+    S: Source + ?Sized,
 {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         self.deref().register(registry, token, interests)
