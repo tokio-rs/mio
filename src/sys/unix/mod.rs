@@ -44,7 +44,6 @@ mod io;
 mod sourcefd;
 mod tcp;
 mod udp;
-mod uio;
 mod waker;
 
 pub use self::sourcefd::SourceFd;

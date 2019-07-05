@@ -1,4 +1,3 @@
-use crate::sys::unix::uio::VecIo;
 use crate::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
 
@@ -8,7 +7,6 @@ use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
-use iovec::IoVec;
 #[allow(unused_imports)] // only here for Rust 1.8
 use net2::UdpSocketExt;
 
@@ -116,14 +114,6 @@ impl UdpSocket {
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.io.take_error()
-    }
-
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
-        self.io.readv(bufs)
-    }
-
-    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
-        self.io.writev(bufs)
     }
 }
 
