@@ -2,7 +2,6 @@ use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
 use crate::sys::windows::{Family, Ready, Registration};
 use crate::{event, Interests, Registry, Token};
-use iovec::IoVec;
 use log::trace;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
@@ -279,87 +278,6 @@ impl TcpStream {
                 Err(e)
             }
         }
-    }
-
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
-        let mut me = self.before_read()?;
-
-        // TODO: Does WSARecv work on a nonblocking sockets? We ideally want to
-        //       call that instead of looping over all the buffers and calling
-        //       `recv` on each buffer. I'm not sure though if an overlapped
-        //       socket in nonblocking mode would work with that use case,
-        //       however, so for now we just call `recv`.
-
-        let mut amt = 0;
-        for buf in bufs {
-            match (&self.imp.inner.socket).read(buf) {
-                // If we did a partial read, then return what we've read so far
-                Ok(n) if n < buf.len() => return Ok(amt + n),
-
-                // Otherwise filled this buffer entirely, so try to fill the
-                // next one as well.
-                Ok(n) => amt += n,
-
-                // If we hit an error then things get tricky if we've already
-                // read some data. If the error is "would block" then we just
-                // return the data we've read so far while scheduling another
-                // 0-byte read.
-                //
-                // If we've read data and the error kind is not "would block",
-                // then we stash away the error to get returned later and return
-                // the data that we've read.
-                //
-                // Finally if we haven't actually read any data we just
-                // reschedule a 0-byte read to happen again and then return the
-                // error upwards.
-                Err(e) => {
-                    if amt > 0 && e.kind() == io::ErrorKind::WouldBlock {
-                        me.read = State::Empty;
-                        self.imp.schedule_read(&mut me);
-                        return Ok(amt);
-                    } else if amt > 0 {
-                        me.read = State::Error(e);
-                        return Ok(amt);
-                    } else {
-                        me.read = State::Empty;
-                        self.imp.schedule_read(&mut me);
-                        return Err(e);
-                    }
-                }
-            }
-        }
-
-        Ok(amt)
-    }
-
-    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
-        let mut me = self.inner();
-        let me = &mut *me;
-
-        match mem::replace(&mut me.write, State::Empty) {
-            State::Empty => {}
-            State::Error(e) => return Err(e),
-            other => {
-                me.write = other;
-                return Err(io::ErrorKind::WouldBlock.into());
-            }
-        }
-
-        if !me.iocp.registered() {
-            return Err(io::ErrorKind::WouldBlock.into());
-        }
-
-        if bufs.is_empty() {
-            return Ok(0);
-        }
-
-        let len = bufs.iter().map(|b| b.len()).fold(0, |a, b| a + b);
-        let mut intermediate = me.iocp.get_buffer(len);
-        for buf in bufs {
-            intermediate.extend_from_slice(buf);
-        }
-        self.imp.schedule_write(intermediate, 0, me);
-        Ok(len)
     }
 }
 
