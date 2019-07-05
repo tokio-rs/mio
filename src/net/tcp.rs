@@ -14,7 +14,7 @@ use crate::{event, sys, Interests, Registry, Token};
 use iovec::IoVec;
 use net2::TcpBuilder;
 use std::fmt;
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
 
@@ -357,17 +357,29 @@ impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         (&self.sys).read(buf)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        (&self.sys).read_vectored(bufs)
+    }
 }
 
 impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         (&self.sys).read(buf)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        (&self.sys).read_vectored(bufs)
+    }
 }
 
 impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         (&self.sys).write(buf)
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        (&self.sys).write_vectored(bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -378,6 +390,10 @@ impl Write for TcpStream {
 impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         (&self.sys).write(buf)
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        (&self.sys).write_vectored(bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {

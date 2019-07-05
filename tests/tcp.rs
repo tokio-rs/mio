@@ -1,4 +1,4 @@
-use std::io::{self, Cursor, Read, Write};
+use std::io::{self, Cursor, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 use std::ops::DerefMut;
 use std::sync::mpsc::channel;
@@ -6,7 +6,6 @@ use std::time::Duration;
 use std::{cmp, net, thread};
 
 use bytes::{Buf, Bytes, BytesMut};
-use iovec::IoVec;
 use log::{debug, info};
 use net2::{self, TcpStreamExt};
 use slab::Slab;
@@ -255,7 +254,7 @@ fn peek() {
 }
 
 #[test]
-fn read_bufs() {
+fn read_vectored() {
     const N: usize = 16 * 1024 * 1024;
 
     let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -284,7 +283,13 @@ fn read_bufs() {
     let b3 = &mut [0; 28][..];
     let b4 = &mut [0; 8][..];
     let b5 = &mut [0; 128][..];
-    let mut b: [&mut IoVec; 5] = [b1.into(), b2.into(), b3.into(), b4.into(), b5.into()];
+    let mut b: [IoSliceMut; 5] = [
+        IoSliceMut::new(b1),
+        IoSliceMut::new(b2),
+        IoSliceMut::new(b3),
+        IoSliceMut::new(b4),
+        IoSliceMut::new(b5),
+    ];
 
     let mut so_far = 0;
     'event_loop: loop {
@@ -297,7 +302,7 @@ fn read_bufs() {
         poll.poll(&mut events, None).unwrap();
 
         'read_loop: loop {
-            match s.read_bufs(&mut b) {
+            match (&s).read_vectored(&mut b) {
                 Ok(0) => {
                     assert_eq!(so_far, N);
                     break 'event_loop;
@@ -384,7 +389,7 @@ fn write() {
 }
 
 #[test]
-fn write_bufs() {
+fn write_vectored() {
     const N: usize = 16 * 1024 * 1024;
 
     let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -413,19 +418,25 @@ fn write_bufs() {
         .register(&s, Token(1), Interests::WRITABLE)
         .unwrap();
 
-    let b1 = &[1; 10][..];
-    let b2 = &[1; 383][..];
-    let b3 = &[1; 28][..];
-    let b4 = &[1; 8][..];
-    let b5 = &[1; 128][..];
-    let b: [&IoVec; 5] = [b1.into(), b2.into(), b3.into(), b4.into(), b5.into()];
+    let b1 = &mut [1; 10][..];
+    let b2 = &mut [1; 383][..];
+    let b3 = &mut [1; 28][..];
+    let b4 = &mut [1; 8][..];
+    let b5 = &mut [1; 128][..];
+    let b: [IoSlice; 5] = [
+        IoSlice::new(b1),
+        IoSlice::new(b2),
+        IoSlice::new(b3),
+        IoSlice::new(b4),
+        IoSlice::new(b5),
+    ];
 
     let mut so_far = 0;
     while so_far < N {
         poll.poll(&mut events, None).unwrap();
 
         loop {
-            match s.write_bufs(&b) {
+            match (&s).write_vectored(&b) {
                 Ok(n) => so_far += n,
                 Err(e) => {
                     assert_eq!(e.kind(), io::ErrorKind::WouldBlock);

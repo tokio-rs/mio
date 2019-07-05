@@ -7,7 +7,7 @@ use iovec::IoVec;
 use libc;
 use net2::TcpStreamExt;
 use std::fmt;
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::time::Duration;
@@ -122,11 +122,19 @@ impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         (&self.inner).read(buf)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        (&self.inner).read_vectored(bufs)
+    }
 }
 
 impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         (&self.inner).write(buf)
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        (&self.inner).write_vectored(bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
