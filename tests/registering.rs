@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use std::thread::sleep;
 use std::time::Duration;
 
 use log::{debug, info, trace};
@@ -8,7 +9,7 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::{localhost, sleep_ms};
+use util::localhost;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -109,8 +110,6 @@ pub fn test_register_deregister() {
     assert!(events.iter().next().is_none());
 }
 
-const MS: u64 = 1_000;
-
 #[test]
 pub fn test_reregister_different_without_poll() {
     let mut events = Events::with_capacity(1024);
@@ -129,14 +128,14 @@ pub fn test_reregister_different_without_poll() {
         .register(&s1, Token(2), Interests::READABLE)
         .unwrap();
 
-    sleep_ms(MS);
+    const TIMEOUT: Duration = Duration::from_millis(1000);
+    sleep(TIMEOUT);
 
     poll.registry()
         .reregister(&l, Token(0), Interests::WRITABLE)
         .unwrap();
 
-    poll.poll(&mut events, Some(Duration::from_millis(MS)))
-        .unwrap();
+    poll.poll(&mut events, Some(TIMEOUT)).unwrap();
     assert!(events.iter().next().is_none());
 }
 

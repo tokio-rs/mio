@@ -119,11 +119,6 @@ mod ports {
     }
 }
 
-pub fn sleep_ms(ms: u64) {
-    use std::thread;
-    thread::sleep(Duration::from_millis(ms));
-}
-
 pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))
         .expect("unable to poll");
