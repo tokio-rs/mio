@@ -122,9 +122,5 @@ mod ports {
 pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))
         .expect("unable to poll");
-    assert_eq!(
-        events.iter().count(),
-        0,
-        "received events, but didn't expect any"
-    );
+    assert!(events.is_empty(), "received events, but didn't expect any");
 }
