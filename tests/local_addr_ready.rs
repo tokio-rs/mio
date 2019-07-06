@@ -1,6 +1,9 @@
-use crate::TryWrite;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, Token};
+
+mod util;
+
+use util::TryWrite;
 
 const LISTEN: Token = Token(0);
 const CLIENT: Token = Token(1);

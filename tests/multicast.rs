@@ -2,12 +2,18 @@
 // Figure out why!
 #![cfg(not(target_os = "android"))]
 
-use crate::localhost;
-use bytes::{BufMut, Bytes, BytesMut};
-use mio::net::UdpSocket;
-use mio::{Events, Interests, Poll, Registry, Token};
 use std::net::IpAddr;
 use std::str;
+
+use bytes::{BufMut, Bytes, BytesMut};
+use log::{debug, info};
+
+use mio::net::UdpSocket;
+use mio::{Events, Interests, Poll, Registry, Token};
+
+mod util;
+
+use util::localhost;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);

@@ -1,10 +1,16 @@
-use crate::localhost;
-use bytes::{BufMut, Bytes, BytesMut};
-use mio::net::UdpSocket;
-use mio::{Events, Interests, Poll, Token};
 use std::io::ErrorKind;
 use std::str;
 use std::time;
+
+use bytes::{BufMut, Bytes, BytesMut};
+use log::{debug, info};
+
+use mio::net::UdpSocket;
+use mio::{Events, Interests, Poll, Token};
+
+mod util;
+
+use util::localhost;
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
