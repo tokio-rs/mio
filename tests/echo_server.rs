@@ -1,9 +1,15 @@
-use crate::{localhost, TryRead, TryWrite};
+use std::io::{self, Cursor};
+
 use bytes::{Buf, Bytes, BytesMut};
+use log::{debug, info};
+use slab::Slab;
+
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, Registry, Token};
-use slab::Slab;
-use std::io::{self, Cursor};
+
+mod util;
+
+use util::{localhost, TryRead, TryWrite};
 
 const SERVER: Token = Token(10_000_000);
 const CLIENT: Token = Token(10_000_001);

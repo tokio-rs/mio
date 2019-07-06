@@ -1,7 +1,11 @@
-use crate::localhost;
-use mio::net::{TcpListener, TcpStream, UdpSocket};
-use mio::*;
 use std::io::ErrorKind;
+
+use mio::net::{TcpListener, TcpStream, UdpSocket};
+use mio::{Interests, Poll, Token};
+
+mod util;
+
+use util::localhost;
 
 #[test]
 #[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.

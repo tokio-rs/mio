@@ -1,8 +1,14 @@
-use crate::localhost;
-use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, Registry, Token};
 use std::io::{self, Write};
 use std::time::Duration;
+
+use log::{debug, info, trace};
+
+use mio::net::{TcpListener, TcpStream};
+use mio::{Events, Interests, Poll, Registry, Token};
+
+mod util;
+
+use util::localhost;
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);

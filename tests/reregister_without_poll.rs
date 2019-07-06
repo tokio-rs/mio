@@ -1,7 +1,11 @@
-use crate::sleep_ms;
-use mio::net::{TcpListener, TcpStream};
-use mio::*;
 use std::time::Duration;
+
+use mio::net::{TcpListener, TcpStream};
+use mio::{Events, Interests, Poll, Token};
+
+mod util;
+
+use util::sleep_ms;
 
 const MS: u64 = 1_000;
 
