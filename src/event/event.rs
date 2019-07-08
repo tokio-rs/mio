@@ -111,11 +111,7 @@ impl Event {
 
     /// Create a reference to an `Event` from a platform specific event.
     pub(crate) fn from_sys_event_ref(sys_event: &sys::Event) -> &Event {
-        unsafe {
-            // This is safe because only because the memory layout of `Event` is
-            // the same as `sys::Event` due to the `repr(transparent)` attribute.
-            std::mem::transmute(sys_event)
-        }
+        unsafe { &*(sys_event as *const sys::Event as *const Event) }
     }
 }
 
