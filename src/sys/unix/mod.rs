@@ -38,8 +38,6 @@ pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
 pub use self::waker::Waker;
 
-pub use iovec::IoVec;
-
 trait IsMinusOne {
     fn is_minus_one(&self) -> bool;
 }
