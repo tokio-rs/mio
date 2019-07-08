@@ -64,7 +64,6 @@ Currently supported platforms:
 * Bitrig
 * DragonFly BSD
 * FreeBSD
-* FreeBSD
 * Linux
 * NetBSD
 * OpenBSD
