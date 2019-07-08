@@ -207,6 +207,26 @@ impl<'a> Iterator for Iter<'a> {
         self.pos += 1;
         ret
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let length = self.len();
+        (length, Some(length))
+    }
+
+    fn count(self) -> usize {
+        self.len()
+    }
+}
+
+impl<'a> ExactSizeIterator for Iter<'a> {
+    fn len(&self) -> usize {
+        let n_events = self.inner.inner.len();
+        if n_events <= self.pos {
+            0
+        } else {
+            n_events - self.pos
+        }
+    }
 }
 
 impl fmt::Debug for Events {
@@ -215,5 +235,46 @@ impl fmt::Debug for Events {
             .field("length", &self.inner.len())
             .field("capacity", &self.inner.capacity())
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::{Events, Poll, Token, Waker};
+
+    #[test]
+    fn iter() {
+        let mut poll = Poll::new().unwrap();
+        let waker = Waker::new(&poll.registry(), Token(0)).unwrap();
+
+        waker.wake().unwrap();
+
+        let mut events = Events::with_capacity(2);
+        let res = poll
+            .poll(&mut events, Some(Duration::from_millis(50)))
+            .unwrap();
+        assert_eq!(res, 1);
+
+        let iter = events.iter();
+        assert_eq!(iter.len(), 1);
+        assert_eq!(iter.size_hint(), (1, Some(1)));
+        assert_eq!(iter.count(), 1);
+
+        let mut iter = (&events).into_iter();
+        assert!(iter.next().is_some());
+        assert_eq!(iter.len(), 0);
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+
+        // Call next shouldn't break any size hints etc.
+        assert!(iter.next().is_none());
+        assert_eq!(iter.len(), 0);
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+        // And again for good measure
+        assert!(iter.next().is_none());
+        assert_eq!(iter.len(), 0);
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+        assert_eq!(iter.count(), 0);
     }
 }
