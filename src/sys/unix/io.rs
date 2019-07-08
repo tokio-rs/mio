@@ -3,10 +3,9 @@ use std::io;
 use crate::sys::unix::cvt;
 
 pub fn set_nonblock(fd: libc::c_int) -> io::Result<()> {
-    unsafe {
-        let flags = libc::fcntl(fd, libc::F_GETFL);
-        cvt(libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK)).map(|_| ())
-    }
+    syscall!(libc::fcntl(fd, libc::F_GETFL)).and_then(|flags| {
+        syscall!(libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK)).map(|_| ())
+    })
 }
 
 #[cfg(any(

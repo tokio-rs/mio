@@ -1,3 +1,17 @@
+/// Helper macro to execute a system call that returns an `io::Result`.
+//
+// Macro must be defined before any modules that uses them.
+macro_rules! syscall {
+    ($e:expr) => {{
+        let res = unsafe { $e };
+        if res == -1 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(res)
+        }
+    }};
+}
+
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
 mod epoll;
 
