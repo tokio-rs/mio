@@ -5,8 +5,6 @@ use crate::{Interests, Token};
 use libc::{self, time_t};
 use log::trace;
 use std::io;
-#[cfg(not(target_os = "netbsd"))]
-use std::os::raw::{c_int, c_short};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 #[cfg(debug_assertions)]
@@ -22,24 +20,30 @@ use std::{cmp, fmt, ptr};
 #[cfg(debug_assertions)]
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
+// Type of the `nchanges` and `nevents` parameters in the `kevent` function.
 #[cfg(not(target_os = "netbsd"))]
-type Filter = c_short;
-#[cfg(not(target_os = "netbsd"))]
-type UData = *mut ::libc::c_void;
-#[cfg(not(target_os = "netbsd"))]
-type Count = c_int;
+type Count = libc::c_int;
+#[cfg(target_os = "netbsd")]
+type Count = libc::size_t;
 
+// Type of the `filter` field in the `kevent` structure.
+#[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
+type Filter = libc::c_short;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+type Filter = i16;
 #[cfg(target_os = "netbsd")]
 type Filter = u32;
+
+// Type of the `udata` field in the `kevent` structure.
+#[cfg(not(target_os = "netbsd"))]
+type UData = *mut libc::c_void;
 #[cfg(target_os = "netbsd")]
-type UData = ::libc::intptr_t;
-#[cfg(target_os = "netbsd")]
-type Count = usize;
+type UData = libc::intptr_t;
 
 macro_rules! kevent {
     ($id: expr, $filter: expr, $flags: expr, $data: expr) => {
         libc::kevent {
-            ident: $id as ::libc::uintptr_t,
+            ident: $id as libc::uintptr_t,
             filter: $filter as Filter,
             flags: $flags,
             fflags: 0,
