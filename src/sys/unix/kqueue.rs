@@ -1,5 +1,4 @@
-use std::os::unix::io::AsRawFd;
-use std::os::unix::io::RawFd;
+use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -9,13 +8,9 @@ use log::error;
 
 use crate::{Interests, Token};
 
-/// Each Selector has a globally unique(ish) ID associated with it. This ID
-/// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
-/// registered with the `Selector`. If a type that is previously associated with
-/// a `Selector` attempts to register itself with a different `Selector`, the
-/// operation will return with an error. This matches windows behavior.
+/// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
-static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 
 // Type of the `nchanges` and `nevents` parameters in the `kevent` function.
 #[cfg(not(target_os = "netbsd"))]
@@ -73,9 +68,8 @@ impl Selector {
         syscall!(libc::kqueue())
             .and_then(|kq| syscall!(libc::fcntl(kq, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| kq))
             .map(|kq| Selector {
-                // Offset by 1 to avoid choosing 0 as the id of a selector.
                 #[cfg(debug_assertions)]
-                id: NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1,
+                id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
                 kq,
             })
     }
