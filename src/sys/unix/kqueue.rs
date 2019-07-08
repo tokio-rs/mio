@@ -1,16 +1,13 @@
-use crate::sys::unix::cvt;
-use crate::sys::unix::io::set_cloexec;
-use crate::{Interests, Token};
-
-use libc::{self, time_t};
-use log::trace;
-use std::io;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{cmp, fmt, ptr};
+use std::{cmp, fmt, io, mem, ptr};
+
+use log::error;
+
+use crate::{Interests, Token};
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -33,6 +30,17 @@ type Filter = libc::c_short;
 type Filter = i16;
 #[cfg(target_os = "netbsd")]
 type Filter = u32;
+
+// Type of the `data` field in the `kevent` structure.
+#[cfg(any(
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "ios",
+    target_os = "macos"
+))]
+type Data = libc::intptr_t;
+#[cfg(any(target_os = "bitrig", target_os = "netbsd", target_os = "openbsd",))]
+type Data = i64;
 
 // Type of the `udata` field in the `kevent` structure.
 #[cfg(not(target_os = "netbsd"))]
@@ -62,17 +70,14 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        // offset by 1 to avoid choosing 0 as the id of a selector
-        #[cfg(debug_assertions)]
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
-        let kq = unsafe { cvt(libc::kqueue())? };
-        drop(set_cloexec(kq));
-
-        Ok(Selector {
-            #[cfg(debug_assertions)]
-            id,
-            kq,
-        })
+        syscall!(libc::kqueue())
+            .and_then(|kq| syscall!(libc::fcntl(kq, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| kq))
+            .map(|kq| Selector {
+                // Offset by 1 to avoid choosing 0 as the id of a selector.
+                #[cfg(debug_assertions)]
+                id: NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1,
+                kq,
+            })
     }
 
     #[cfg(debug_assertions)]
@@ -82,7 +87,7 @@ impl Selector {
 
     pub fn select(&self, evts: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         let timeout = timeout.map(|to| libc::timespec {
-            tv_sec: cmp::min(to.as_secs(), time_t::max_value() as u64) as time_t,
+            tv_sec: cmp::min(to.as_secs(), libc::time_t::max_value() as u64) as libc::time_t,
             // `Duration::subsec_nanos` is guaranteed to be less than one
             // billion (the number of nanoseconds in a second), making the
             // cast to i32 safe. The cast itself is needed for platforms
@@ -95,137 +100,102 @@ impl Selector {
             .unwrap_or(ptr::null_mut());
 
         evts.clear();
-        unsafe {
-            let cnt = cvt(libc::kevent(
-                self.kq,
-                ptr::null(),
-                0,
-                evts.events.as_mut_ptr(),
-                evts.events.capacity() as Count,
-                timeout,
-            ))?;
-            evts.events.set_len(cnt as usize);
-        }
-        Ok(())
+        syscall!(libc::kevent(
+            self.kq,
+            ptr::null(),
+            0,
+            evts.events.as_mut_ptr(),
+            evts.events.capacity() as Count,
+            timeout,
+        ))
+        .map(|n_events| {
+            // This is safe because `kevent` ensures that `n_events` are
+            // assigned.
+            unsafe { evts.events.set_len(n_events as usize) };
+        })
     }
 
     pub fn register(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
-        trace!("registering; token={:?}; interests={:?}", token, interests);
+        let flags = libc::EV_CLEAR | libc::EV_RECEIPT | libc::EV_ADD;
+        // At most we need two changes, but maybe we only need 1.
+        // FIXME: replace this with `MaybeUninit` once that become usable with
+        // arrays.
+        let mut changes: [libc::kevent; 2] = unsafe { mem::uninitialized() };
+        let mut n_changes = 0;
 
-        let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
-
-        unsafe {
-            let r = if interests.is_readable() {
-                libc::EV_ADD
-            } else {
-                libc::EV_DELETE
-            };
-            let w = if interests.is_writable() {
-                libc::EV_ADD
-            } else {
-                libc::EV_DELETE
-            };
-            let mut changes = [
-                kevent!(fd, libc::EVFILT_READ, flags | r, usize::from(token)),
-                kevent!(fd, libc::EVFILT_WRITE, flags | w, usize::from(token)),
-            ];
-
-            cvt(libc::kevent(
-                self.kq,
-                changes.as_ptr(),
-                changes.len() as Count,
-                changes.as_mut_ptr(),
-                changes.len() as Count,
-                ::std::ptr::null(),
-            ))?;
-
-            for change in changes.iter() {
-                debug_assert_eq!(change.flags & libc::EV_ERROR, libc::EV_ERROR);
-
-                // Test to see if an error happened
-                if change.data == 0 {
-                    continue;
-                }
-
-                // Older versions of OSX (10.11 and 10.10 have been witnessed)
-                // can return EPIPE when registering a pipe file descriptor
-                // where the other end has already disappeared. For example code
-                // that creates a pipe, closes a file descriptor, and then
-                // registers the other end will see an EPIPE returned from
-                // `register`.
-                //
-                // It also turns out that kevent will still report events on the
-                // file descriptor, telling us that it's readable/hup at least
-                // after we've done this registration. As a result we just
-                // ignore `EPIPE` here instead of propagating it.
-                //
-                // More info can be found at tokio-rs/mio#582
-                if change.data as i32 == libc::EPIPE
-                    && change.filter == libc::EVFILT_WRITE as Filter
-                {
-                    continue;
-                }
-
-                // ignore ENOENT error for EV_DELETE
-                let orig_flags = if change.filter == libc::EVFILT_READ as Filter {
-                    r
-                } else {
-                    w
-                };
-                if change.data as i32 == libc::ENOENT && orig_flags & libc::EV_DELETE != 0 {
-                    continue;
-                }
-
-                return Err(::std::io::Error::from_raw_os_error(change.data as i32));
-            }
-            Ok(())
+        if interests.is_writable() {
+            let kevent = kevent!(fd, libc::EVFILT_WRITE, flags, token.0);
+            unsafe { ptr::write(&mut changes[n_changes], kevent) };
+            n_changes += 1;
         }
+
+        if interests.is_readable() {
+            let kevent = kevent!(fd, libc::EVFILT_READ, flags, token.0);
+            unsafe { ptr::write(&mut changes[n_changes], kevent) };
+            n_changes += 1;
+        }
+
+        // Older versions of macOS (OS X 10.11 and 10.10 have been witnessed)
+        // can return EPIPE when registering a pipe file descriptor where the
+        // other end has already disappeared. For example code that creates a
+        // pipe, closes a file descriptor, and then registers the other end will
+        // see an EPIPE returned from `register`.
+        //
+        // It also turns out that kevent will still report events on the file
+        // descriptor, telling us that it's readable/hup at least after we've
+        // done this registration. As a result we just ignore `EPIPE` here
+        // instead of propagating it.
+        //
+        // More info can be found at tokio-rs/mio#582.
+        kevent_register(self.kq, &mut changes[0..n_changes], &[libc::EPIPE as Data])
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
-        // Just need to call register here since EV_ADD is a mod if already
-        // registered
-        self.register(fd, token, interests)
+        let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
+        let write_flags = if interests.is_writable() {
+            flags | libc::EV_ADD
+        } else {
+            flags | libc::EV_DELETE
+        };
+        let read_flags = if interests.is_readable() {
+            flags | libc::EV_ADD
+        } else {
+            flags | libc::EV_DELETE
+        };
+
+        let mut changes: [libc::kevent; 2] = [
+            kevent!(fd, libc::EVFILT_WRITE, write_flags, token.0),
+            kevent!(fd, libc::EVFILT_READ, read_flags, token.0),
+        ];
+
+        // Since there is no way to check with which interests the fd was
+        // registered we modify both readable and write, adding it when required
+        // and removing it otherwise, ignoring the ENOENT error when it comes
+        // up. The ENOENT error informs us that a filter we're trying to remove
+        // wasn't there in first place, but we don't really care since our goal
+        // is accomplished.
+        //
+        // For the explanation of ignoring `EPIPE` see `register`.
+        kevent_register(
+            self.kq,
+            &mut changes,
+            &[libc::ENOENT as Data, libc::EPIPE as Data],
+        )
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        unsafe {
-            // EV_RECEIPT is a nice way to apply changes and get back per-event results while not
-            // draining the actual changes.
-            let filter = libc::EV_DELETE | libc::EV_RECEIPT;
-            #[cfg(not(target_os = "netbsd"))]
-            let mut changes = [
-                kevent!(fd, libc::EVFILT_READ, filter, ptr::null_mut()),
-                kevent!(fd, libc::EVFILT_WRITE, filter, ptr::null_mut()),
-            ];
+        let flags = libc::EV_DELETE | libc::EV_RECEIPT;
+        let mut changes: [libc::kevent; 2] = [
+            kevent!(fd, libc::EVFILT_WRITE, flags, 0),
+            kevent!(fd, libc::EVFILT_READ, flags, 0),
+        ];
 
-            #[cfg(target_os = "netbsd")]
-            let mut changes = [
-                kevent!(fd, libc::EVFILT_READ, filter, 0),
-                kevent!(fd, libc::EVFILT_WRITE, filter, 0),
-            ];
-
-            cvt(libc::kevent(
-                self.kq,
-                changes.as_ptr(),
-                changes.len() as Count,
-                changes.as_mut_ptr(),
-                changes.len() as Count,
-                ::std::ptr::null(),
-            ))
-            .map(|_| ())?;
-
-            if changes[0].data as i32 == libc::ENOENT && changes[1].data as i32 == libc::ENOENT {
-                return Err(::std::io::Error::from_raw_os_error(changes[0].data as i32));
-            }
-            for change in changes.iter() {
-                debug_assert_eq!(libc::EV_ERROR & change.flags, libc::EV_ERROR);
-                if change.data != 0 && change.data as i32 != libc::ENOENT {
-                    return Err(::std::io::Error::from_raw_os_error(changes[0].data as i32));
-                }
-            }
-            Ok(())
-        }
+        // Since there is no way to check with which interests the fd was
+        // registered we remove both filters (readable and writeable) and ignore
+        // the ENOENT error when it comes up. The ENOENT error informs us that
+        // the filter wasn't there in first place, but we don't really care
+        // about that since our goal is to remove it.
+        kevent_register(self.kq, &mut changes, &[libc::ENOENT as Data])
     }
 
     // Used by `Waker`.
@@ -239,21 +209,20 @@ impl Selector {
             token.0
         );
 
-        cvt(unsafe { libc::kevent(self.kq, &kevent, 1, &mut kevent, 1, ptr::null()) })
-            .map(|_| ())?;
-
-        if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
-            Err(io::Error::from_raw_os_error(kevent.data as i32))
-        } else {
-            Ok(())
-        }
+        let kq = self.kq; // Force the next line to be a single line (thank you rustfmt).
+        syscall!(libc::kevent(kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
+            if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
+                Err(io::Error::from_raw_os_error(kevent.data as i32))
+            } else {
+                Ok(())
+            }
+        })
     }
 
     // Used by `Waker`.
     #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn try_clone_waker(&self) -> io::Result<Selector> {
-        let new_kq = cvt(unsafe { libc::dup(self.kq) })?;
-        Ok(Selector {
+        syscall!(libc::dup(self.kq)).map(|new_kq| Selector {
             #[cfg(debug_assertions)]
             id: self.id,
             kq: new_kq,
@@ -271,15 +240,58 @@ impl Selector {
         );
         kevent.fflags = libc::NOTE_TRIGGER;
 
-        cvt(unsafe { libc::kevent(self.kq, &kevent, 1, &mut kevent, 1, ptr::null()) })
-            .map(|_| ())?;
+        let kq = self.kq; // Force the next line to be a single line (thank you rustfmt).
+        syscall!(libc::kevent(kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
+            if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
+                Err(io::Error::from_raw_os_error(kevent.data as i32))
+            } else {
+                Ok(())
+            }
+        })
+    }
+}
 
-        if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
-            Err(io::Error::from_raw_os_error(kevent.data as i32))
-        } else {
+/// Register `changes` with `kq`ueue.
+fn kevent_register(
+    kq: RawFd,
+    changes: &mut [libc::kevent],
+    ignored_errors: &[Data],
+) -> io::Result<()> {
+    syscall!(libc::kevent(
+        kq,
+        changes.as_ptr(),
+        changes.len() as Count,
+        changes.as_mut_ptr(),
+        changes.len() as Count,
+        ptr::null(),
+    ))
+    .map(|_| ())
+    .or_else(|err| {
+        // According to the manual page of FreeBSD: "When kevent() call fails
+        // with EINTR error, all changes in the changelist have been applied",
+        // so we can safely ignore it.
+        if err.raw_os_error() == Some(libc::EINTR) {
             Ok(())
+        } else {
+            Err(err)
+        }
+    })
+    .and_then(|()| check_errors(&changes, ignored_errors))
+}
+
+/// Check all events for possible errors, it returns the first error found.
+fn check_errors(events: &[libc::kevent], ignored_errors: &[Data]) -> io::Result<()> {
+    for event in events {
+        // We can't use references to packed structures (in checking the ignored
+        // errors), so we need copy the data out before use.
+        let data = event.data;
+        // Check for the error flag, the actual error will be in the `data`
+        // field.
+        if (event.flags & libc::EV_ERROR != 0) && data != 0 && !ignored_errors.contains(&data) {
+            return Err(io::Error::from_raw_os_error(data as i32));
         }
     }
+    Ok(())
 }
 
 impl AsRawFd for Selector {
@@ -290,8 +302,8 @@ impl AsRawFd for Selector {
 
 impl Drop for Selector {
     fn drop(&mut self) {
-        unsafe {
-            let _ = libc::close(self.kq);
+        if let Err(err) = syscall!(libc::close(self.kq)) {
+            error!("error closing kqueue: {}", err);
         }
     }
 }
@@ -429,8 +441,8 @@ fn does_not_register_rw() {
     let kqf = SourceFd(&kq);
     let poll = Poll::new().unwrap();
 
-    // registering kqueue fd will fail if write is requested (On anything but some versions of OS
-    // X)
+    // Registering kqueue fd will fail if write is requested (On anything but
+    // some versions of macOS).
     poll.registry()
         .register(&kqf, Token(1234), Interests::READABLE)
         .unwrap();

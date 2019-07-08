@@ -67,6 +67,7 @@ impl IsMinusOne for isize {
     }
 }
 
+#[allow(dead_code)] // Still used in some places.
 fn cvt<T: IsMinusOne>(t: T) -> std::io::Result<T> {
     use std::io;
 
