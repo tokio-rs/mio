@@ -64,22 +64,22 @@ impl Interests {
     pub const LIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(LIO) });
 
     /// Returns true if the value includes readable readiness.
-    pub fn is_readable(&self) -> bool {
+    pub fn is_readable(self) -> bool {
         (self.0.get() & READABLE) != 0
     }
 
     /// Returns true if the value includes writable readiness.
-    pub fn is_writable(&self) -> bool {
+    pub fn is_writable(self) -> bool {
         (self.0.get() & WRITABLE) != 0
     }
 
     /// Returns true if `Interests` contains AIO readiness
-    pub fn is_aio(&self) -> bool {
+    pub fn is_aio(self) -> bool {
         (self.0.get() & AIO) != 0
     }
 
     /// Returns true if `Interests` contains LIO readiness
-    pub fn is_lio(&self) -> bool {
+    pub fn is_lio(self) -> bool {
         (self.0.get() & LIO) != 0
     }
 
