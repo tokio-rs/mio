@@ -2,8 +2,8 @@
 //
 // Macro must be defined before any modules that uses them.
 macro_rules! syscall {
-    ($e:expr) => {{
-        let res = unsafe { $e };
+    ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
+        let res = unsafe { libc::$fn($($arg, )*) };
         if res == -1 {
             Err(io::Error::last_os_error())
         } else {

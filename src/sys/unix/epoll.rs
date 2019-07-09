@@ -25,7 +25,7 @@ impl Selector {
         // According to libuv `EPOLL_CLOEXEC` is not defined on Android API <
         // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on all platforms,
         // so we use that instead.
-        syscall!(libc::epoll_create1(libc::O_CLOEXEC)).map(|ep| Selector {
+        syscall!(epoll_create1(libc::O_CLOEXEC)).map(|ep| Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             ep,
@@ -43,7 +43,7 @@ impl Selector {
             .unwrap_or(-1);
 
         evts.clear();
-        syscall!(libc::epoll_wait(
+        syscall!(epoll_wait(
             self.ep,
             evts.events.as_mut_ptr(),
             evts.events.capacity() as i32,
@@ -62,13 +62,7 @@ impl Selector {
             u64: usize::from(token) as u64,
         };
 
-        syscall!(libc::epoll_ctl(
-            self.ep,
-            libc::EPOLL_CTL_ADD,
-            fd,
-            &mut event
-        ))
-        .map(|_| ())
+        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
@@ -77,23 +71,11 @@ impl Selector {
             u64: usize::from(token) as u64,
         };
 
-        syscall!(libc::epoll_ctl(
-            self.ep,
-            libc::EPOLL_CTL_MOD,
-            fd,
-            &mut event
-        ))
-        .map(|_| ())
+        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_MOD, fd, &mut event)).map(|_| ())
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        syscall!(libc::epoll_ctl(
-            self.ep,
-            libc::EPOLL_CTL_DEL,
-            fd,
-            ptr::null_mut()
-        ))
-        .map(|_| ())
+        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_DEL, fd, ptr::null_mut())).map(|_| ())
     }
 }
 
@@ -119,7 +101,7 @@ impl AsRawFd for Selector {
 
 impl Drop for Selector {
     fn drop(&mut self) {
-        if let Err(err) = syscall!(libc::close(self.ep)) {
+        if let Err(err) = syscall!(close(self.ep)) {
             error!("error closing epoll: {}", err);
         }
     }

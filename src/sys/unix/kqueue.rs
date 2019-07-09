@@ -65,8 +65,8 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        syscall!(libc::kqueue())
-            .and_then(|kq| syscall!(libc::fcntl(kq, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| kq))
+        syscall!(kqueue())
+            .and_then(|kq| syscall!(fcntl(kq, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| kq))
             .map(|kq| Selector {
                 #[cfg(debug_assertions)]
                 id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
@@ -94,7 +94,7 @@ impl Selector {
             .unwrap_or(ptr::null_mut());
 
         evts.clear();
-        syscall!(libc::kevent(
+        syscall!(kevent(
             self.kq,
             ptr::null(),
             0,
@@ -203,8 +203,7 @@ impl Selector {
             token.0
         );
 
-        let kq = self.kq; // Force the next line to be a single line (thank you rustfmt).
-        syscall!(libc::kevent(kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
+        syscall!(kevent(self.kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
             if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
                 Err(io::Error::from_raw_os_error(kevent.data as i32))
             } else {
@@ -216,7 +215,7 @@ impl Selector {
     // Used by `Waker`.
     #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn try_clone_waker(&self) -> io::Result<Selector> {
-        syscall!(libc::dup(self.kq)).map(|new_kq| Selector {
+        syscall!(dup(self.kq)).map(|new_kq| Selector {
             #[cfg(debug_assertions)]
             id: self.id,
             kq: new_kq,
@@ -234,8 +233,7 @@ impl Selector {
         );
         kevent.fflags = libc::NOTE_TRIGGER;
 
-        let kq = self.kq; // Force the next line to be a single line (thank you rustfmt).
-        syscall!(libc::kevent(kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
+        syscall!(kevent(self.kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
             if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
                 Err(io::Error::from_raw_os_error(kevent.data as i32))
             } else {
@@ -251,7 +249,7 @@ fn kevent_register(
     changes: &mut [libc::kevent],
     ignored_errors: &[Data],
 ) -> io::Result<()> {
-    syscall!(libc::kevent(
+    syscall!(kevent(
         kq,
         changes.as_ptr(),
         changes.len() as Count,
@@ -296,7 +294,7 @@ impl AsRawFd for Selector {
 
 impl Drop for Selector {
     fn drop(&mut self) {
-        if let Err(err) = syscall!(libc::close(self.kq)) {
+        if let Err(err) = syscall!(close(self.kq)) {
             error!("error closing kqueue: {}", err);
         }
     }
