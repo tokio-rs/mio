@@ -2,7 +2,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{ptr, cmp, i32, io};
+use std::{cmp, i32, io, ptr};
 
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT};
 use log::error;
@@ -62,8 +62,13 @@ impl Selector {
             u64: usize::from(token) as u64,
         };
 
-        syscall!(libc::epoll_ctl(self.ep, libc::EPOLL_CTL_ADD, fd, &mut event))
-            .map(|_| ())
+        syscall!(libc::epoll_ctl(
+            self.ep,
+            libc::EPOLL_CTL_ADD,
+            fd,
+            &mut event
+        ))
+        .map(|_| ())
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
@@ -72,13 +77,23 @@ impl Selector {
             u64: usize::from(token) as u64,
         };
 
-        syscall!(libc::epoll_ctl(self.ep, libc::EPOLL_CTL_MOD, fd, &mut event))
-            .map(|_| ())
+        syscall!(libc::epoll_ctl(
+            self.ep,
+            libc::EPOLL_CTL_MOD,
+            fd,
+            &mut event
+        ))
+        .map(|_| ())
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        syscall!(libc::epoll_ctl(self.ep, libc::EPOLL_CTL_DEL, fd, ptr::null_mut()))
-            .map(|_| ())
+        syscall!(libc::epoll_ctl(
+            self.ep,
+            libc::EPOLL_CTL_DEL,
+            fd,
+            ptr::null_mut()
+        ))
+        .map(|_| ())
     }
 }
 
