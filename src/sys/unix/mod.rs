@@ -1,3 +1,17 @@
+/// Helper macro to execute a system call that returns an `io::Result`.
+//
+// Macro must be defined before any modules that uses them.
+macro_rules! syscall {
+    ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
+        let res = unsafe { libc::$fn($($arg, )*) };
+        if res == -1 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(res)
+        }
+    }};
+}
+
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
 mod epoll;
 
@@ -38,8 +52,6 @@ pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
 pub use self::waker::Waker;
 
-pub use iovec::IoVec;
-
 trait IsMinusOne {
     fn is_minus_one(&self) -> bool;
 }
@@ -55,6 +67,7 @@ impl IsMinusOne for isize {
     }
 }
 
+#[allow(dead_code)] // Still used in some places.
 fn cvt<T: IsMinusOne>(t: T) -> std::io::Result<T> {
     use std::io;
 
