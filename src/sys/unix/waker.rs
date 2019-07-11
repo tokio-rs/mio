@@ -128,12 +128,10 @@ mod pipe {
             syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
             selector.register(fds[0], token, Interests::READABLE)?;
 
-            unsafe {
-                Ok(Waker {
-                    sender: File::from_raw_fd(fds[1]),
-                    receiver: File::from_raw_fd(fds[0]),
-                })
-            }
+            Ok(Waker {
+                sender: unsafe { File::from_raw_fd(fds[1]) },
+                receiver: unsafe { File::from_raw_fd(fds[0]) },
+            })
         }
 
         pub fn wake(&self) -> io::Result<()> {
