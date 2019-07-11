@@ -5,7 +5,6 @@ mod eventfd {
     use std::mem;
     use std::os::unix::io::FromRawFd;
 
-    use crate::sys::unix::cvt;
     use crate::sys::Selector;
     use crate::{Interests, Token};
 
@@ -22,7 +21,7 @@ mod eventfd {
 
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
-            let fd = cvt(unsafe { libc::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK) })?;
+            let fd = syscall!(eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK))?;
 
             selector.register(fd, token, Interests::READABLE)?;
             Ok(Waker {
@@ -110,7 +109,7 @@ mod pipe {
     use std::io::{self, Read, Write};
     use std::os::unix::io::FromRawFd;
 
-    use crate::sys::unix::{cvt, Selector};
+    use crate::sys::unix::Selector;
     use crate::{Interests, Token};
 
     /// Waker backed by a unix pipe.
@@ -126,8 +125,7 @@ mod pipe {
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             let mut fds = [-1; 2];
-            let flags = libc::O_NONBLOCK | libc::O_CLOEXEC;
-            cvt(unsafe { libc::pipe2(fds.as_mut_ptr(), flags) })?;
+            syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
             selector.register(fds[0], token, Interests::READABLE)?;
 
             unsafe {
