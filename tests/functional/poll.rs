@@ -1,4 +1,4 @@
-use mio::*;
+use mio::{Events, Poll};
 use std::time::Duration;
 
 #[test]
