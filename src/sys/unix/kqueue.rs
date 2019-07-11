@@ -2,10 +2,11 @@ use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{cmp, fmt, io, mem, ptr};
+use std::{cmp, io, mem, ptr};
 
 use log::error;
 
+use crate::sys::Events;
 use crate::{Interests, Token};
 
 /// Unique id for use as `SelectorId`.
@@ -79,7 +80,7 @@ impl Selector {
         self.id
     }
 
-    pub fn select(&self, evts: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         let timeout = timeout.map(|to| libc::timespec {
             tv_sec: cmp::min(to.as_secs(), libc::time_t::max_value() as u64) as libc::time_t,
             // `Duration::subsec_nanos` is guaranteed to be less than one
@@ -93,19 +94,19 @@ impl Selector {
             .map(|s| s as *const _)
             .unwrap_or(ptr::null_mut());
 
-        evts.clear();
+        events.clear();
         syscall!(kevent(
             self.kq,
             ptr::null(),
             0,
-            evts.events.as_mut_ptr(),
-            evts.events.capacity() as Count,
+            events.as_mut_ptr(),
+            events.capacity() as Count,
             timeout,
         ))
         .map(|n_events| {
             // This is safe because `kevent` ensures that `n_events` are
             // assigned.
-            unsafe { evts.events.set_len(n_events as usize) };
+            unsafe { events.set_len(n_events as usize) };
         })
     }
 
@@ -378,49 +379,6 @@ pub mod event {
         {
             false
         }
-    }
-}
-
-pub struct Events {
-    events: Vec<Event>,
-}
-
-impl Events {
-    pub fn with_capacity(cap: usize) -> Events {
-        Events {
-            events: Vec::with_capacity(cap),
-        }
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.events.len()
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.events.capacity()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.events.is_empty()
-    }
-
-    pub fn get(&self, idx: usize) -> Option<&Event> {
-        self.events.get(idx)
-    }
-
-    pub fn clear(&mut self) {
-        self.events.clear();
-    }
-}
-
-impl fmt::Debug for Events {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Events")
-            .field("len", &self.events.len())
-            .finish()
     }
 }
 
