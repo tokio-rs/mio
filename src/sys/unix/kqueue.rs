@@ -1,8 +1,9 @@
+use std::mem::MaybeUninit;
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{cmp, io, mem, ptr};
+use std::{cmp, io, ptr, slice};
 
 use log::error;
 
@@ -113,20 +114,19 @@ impl Selector {
     pub fn register(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
         let flags = libc::EV_CLEAR | libc::EV_RECEIPT | libc::EV_ADD;
         // At most we need two changes, but maybe we only need 1.
-        // FIXME: replace this with `MaybeUninit` once that become usable with
-        // arrays.
-        let mut changes: [libc::kevent; 2] = unsafe { mem::uninitialized() };
+        let mut changes: [MaybeUninit<libc::kevent>; 2] =
+            [MaybeUninit::uninit(), MaybeUninit::uninit()];
         let mut n_changes = 0;
 
         if interests.is_writable() {
             let kevent = kevent!(fd, libc::EVFILT_WRITE, flags, token.0);
-            unsafe { ptr::write(&mut changes[n_changes], kevent) };
+            changes[n_changes] = MaybeUninit::new(kevent);
             n_changes += 1;
         }
 
         if interests.is_readable() {
             let kevent = kevent!(fd, libc::EVFILT_READ, flags, token.0);
-            unsafe { ptr::write(&mut changes[n_changes], kevent) };
+            changes[n_changes] = MaybeUninit::new(kevent);
             n_changes += 1;
         }
 
@@ -142,7 +142,12 @@ impl Selector {
         // instead of propagating it.
         //
         // More info can be found at tokio-rs/mio#582.
-        kevent_register(self.kq, &mut changes[0..n_changes], &[libc::EPIPE as Data])
+        let changes = unsafe {
+            // This is safe because we ensure that at least `n_changes` are in
+            // the array.
+            slice::from_raw_parts_mut(changes[0].as_mut_ptr(), n_changes)
+        };
+        kevent_register(self.kq, changes, &[libc::EPIPE as Data])
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
