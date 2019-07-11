@@ -2,7 +2,6 @@
 mod eventfd {
     use std::fs::File;
     use std::io::{self, Read, Write};
-    use std::mem;
     use std::os::unix::io::FromRawFd;
 
     use crate::sys::Selector;
