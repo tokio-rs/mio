@@ -16,7 +16,7 @@ macro_rules! syscall {
 mod epoll;
 
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-pub use self::epoll::{event, Event, Events, Selector};
+pub use self::epoll::{event, Event, Selector};
 
 #[cfg(any(
     target_os = "bitrig",
@@ -38,7 +38,7 @@ mod kqueue;
     target_os = "netbsd",
     target_os = "openbsd"
 ))]
-pub use self::kqueue::{event, Event, Events, Selector};
+pub use self::kqueue::{event, Event, Selector};
 
 mod io;
 mod sourcefd;
@@ -51,3 +51,5 @@ pub use self::sourcefd::SourceFd;
 pub use self::tcp::{TcpListener, TcpStream};
 pub use self::udp::UdpSocket;
 pub use self::waker::Waker;
+
+pub type Events = Vec<Event>;

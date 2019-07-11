@@ -7,6 +7,7 @@ use std::{cmp, i32, io, ptr};
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT};
 use log::error;
 
+use crate::sys::Events;
 use crate::{Interests, Token};
 
 /// Unique id for use as `SelectorId`.
@@ -37,22 +38,22 @@ impl Selector {
         self.id
     }
 
-    pub fn select(&self, evts: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         let timeout = timeout
             .map(|to| cmp::min(to.as_millis(), libc::c_int::max_value() as u128) as libc::c_int)
             .unwrap_or(-1);
 
-        evts.clear();
+        events.clear();
         syscall!(epoll_wait(
             self.ep,
-            evts.events.as_mut_ptr(),
-            evts.events.capacity() as i32,
+            events.as_mut_ptr(),
+            events.capacity() as i32,
             timeout,
         ))
         .map(|n_events| {
             // This is safe because `epoll_wait` ensures that `n_events` are
             // assigned.
-            unsafe { evts.events.set_len(n_events as usize) };
+            unsafe { events.set_len(n_events as usize) };
         })
     }
 
@@ -147,44 +148,6 @@ pub mod event {
     pub fn is_lio(_: &Event) -> bool {
         // Not supported.
         false
-    }
-}
-
-pub struct Events {
-    events: Vec<libc::epoll_event>,
-}
-
-impl Events {
-    pub fn with_capacity(u: usize) -> Events {
-        Events {
-            events: Vec::with_capacity(u),
-        }
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.events.len()
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.events.capacity()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.events.is_empty()
-    }
-
-    #[inline]
-    pub fn get(&self, idx: usize) -> Option<&Event> {
-        self.events.get(idx)
-    }
-
-    pub fn clear(&mut self) {
-        unsafe {
-            self.events.set_len(0);
-        }
     }
 }
 
