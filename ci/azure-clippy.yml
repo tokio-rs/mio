@@ -1,0 +1,20 @@
+parameters:
+  vmImage: ubuntu-16.04
+
+jobs:
+- job: ${{ parameters.name }}
+  displayName: Clippy
+
+  pool:
+    vmImage: $(vmImage)
+
+  steps:
+    - template: azure-install-rust.yml
+      parameters:
+        rust_version: stable
+
+    - script: rustup component add clippy
+      displayName: "Add component"
+
+    - script: cargo clippy --all-targets -- -D warnings -A clippy::cognitive-complexity
+      displayName: "Run Clippy"
