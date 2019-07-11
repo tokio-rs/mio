@@ -22,6 +22,8 @@ steps:
 
   # All platforms.
   - script: |
+        rustup update # Force update to make sure we have the latests versions.
+        rustup toolchain list
         rustc -Vv
         cargo -V
     displayName: Query rust and cargo versions
