@@ -5,6 +5,7 @@ pub use ports::localhost;
 
 mod test_close_on_drop;
 mod test_double_register;
+mod test_drop_cancels_interest_and_shuts_down;
 mod test_echo_server;
 mod test_evented;
 mod test_interests;

@@ -118,11 +118,11 @@ impl UdpSocket {
         self.io.take_error()
     }
 
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    pub fn readv(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         self.io.readv(bufs)
     }
 
-    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    pub fn writev(&mut self, bufs: &[&IoVec]) -> io::Result<usize> {
         self.io.writev(bufs)
     }
 }

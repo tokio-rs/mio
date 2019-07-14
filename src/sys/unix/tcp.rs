@@ -109,11 +109,11 @@ impl TcpStream {
         self.inner.peek(buf)
     }
 
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    pub fn readv(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         self.inner.readv(bufs)
     }
 
-    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    pub fn writev(&mut self, bufs: &[&IoVec]) -> io::Result<usize> {
         self.inner.writev(bufs)
     }
 }

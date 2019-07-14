@@ -1,24 +1,225 @@
-use crate::event::Source;
-use crate::poll::{self, Registry};
-use crate::sys::windows::buffer_pool::BufferPool;
-use crate::sys::windows::lazycell::AtomicLazyCell;
-use crate::sys::windows::{Event, PollOpt, ReadinessQueue, Ready, Registration, SetReadiness};
-use crate::{Interests, Token};
-use log::trace;
-use miow;
-use miow::iocp::{CompletionPort, CompletionStatus};
-use std::cell::UnsafeCell;
-use std::os::windows::prelude::*;
-#[cfg(debug_assertions)]
+use std::collections::{HashMap, VecDeque};
+use std::fmt;
+use std::io;
+use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use std::{fmt, io};
-use winapi::shared::winerror::WAIT_TIMEOUT;
-use winapi::um::minwinbase::OVERLAPPED;
-use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 
-const WAKE: Token = Token(std::usize::MAX);
+use std::os::windows::io::{AsRawSocket, RawSocket};
+
+use ntapi::ntioapi::IO_STATUS_BLOCK;
+use winapi::shared::ntdef::HANDLE;
+use winapi::shared::ntdef::NT_SUCCESS;
+use winapi::shared::ntstatus::STATUS_CANCELLED;
+use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING};
+use winapi::um::winsock2::INVALID_SOCKET;
+
+use miow::iocp::{CompletionPort, CompletionStatus};
+
+use crate::sys::Events;
+use crate::{Interests, Token};
+
+use super::afd::{eventflags_to_afd_events, Afd, AfdPollInfo};
+use super::Event;
+
+const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
+
+#[derive(PartialEq, Debug)]
+enum SockPollStatus {
+    Idle,
+    Pending,
+    Cancelled,
+}
+
+struct IoStatusBlock(pub IO_STATUS_BLOCK);
+
+impl IoStatusBlock {
+    fn zeroed() -> IoStatusBlock {
+        IoStatusBlock(unsafe { mem::zeroed::<IO_STATUS_BLOCK>() })
+    }
+}
+
+impl fmt::Debug for IoStatusBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "IO_STATUS_BLOCK")
+    }
+}
+
+unsafe impl Send for IoStatusBlock {}
+unsafe impl Sync for IoStatusBlock {}
+
+#[derive(Debug)]
+struct Sock {
+    iosb: IoStatusBlock,
+    poll_info: AfdPollInfo,
+    afd: Arc<Afd>,
+    raw_socket: RawSocket,
+    base_socket: RawSocket,
+    user_evts: u32,
+    pending_evts: u32,
+    user_data: u64,
+    poll_status: SockPollStatus,
+    delete_pending: bool,
+}
+
+impl Sock {
+    pub fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<Sock> {
+        unsafe {
+            Ok(Sock {
+                iosb: IoStatusBlock::zeroed(),
+                poll_info: mem::zeroed::<AfdPollInfo>(),
+                afd,
+                raw_socket,
+                base_socket: get_base_socket(raw_socket)?,
+                user_evts: 0,
+                pending_evts: 0,
+                user_data: 0,
+                poll_status: SockPollStatus::Idle,
+                delete_pending: false,
+            })
+        }
+    }
+
+    /// True if need to be added on update queue, false otherwise.
+    pub fn set_event(&mut self, ev: Event) -> bool {
+        /* EPOLLERR and EPOLLHUP are always reported, even when not requested by the
+         * caller. However they are disabled after a event has been reported for a
+         * socket for which the EPOLLONESHOT flag as set. */
+        let events = ev.flags | EPOLLERR | EPOLLHUP;
+
+        self.user_evts = events;
+        self.user_data = ev.data;
+
+        (events & KNOWN_EPOLL_EVENTS & !self.pending_evts) != 0
+    }
+
+    pub fn update(&mut self, self_ptr: *const Mutex<Sock>) -> io::Result<()> {
+        assert!(!self.delete_pending);
+
+        if self.poll_status == SockPollStatus::Pending
+            && (self.user_evts & KNOWN_EPOLL_EVENTS & !self.pending_evts) == 0
+        {
+            /* All the events the user is interested in are already being monitored by
+             * the pending poll operation. It might spuriously complete because of an
+             * event that we're no longer interested in; when that happens we'll submit
+             * a new poll operation with the updated event mask. */
+        } else if self.poll_status == SockPollStatus::Pending {
+            /* A poll operation is already pending, but it's not monitoring for all the
+             * events that the user is interested in. Therefore, cancel the pending
+             * poll operation; when we receive it's completion package, a new poll
+             * operation will be submitted with the correct event mask. */
+            self.cancel()?;
+        } else if self.poll_status == SockPollStatus::Cancelled {
+            /* The poll operation has already been cancelled, we're still waiting for
+             * it to return. For now, there's nothing that needs to be done. */
+        } else if self.poll_status == SockPollStatus::Idle {
+            /* No poll operation is pending; start one. */
+            self.poll_info.exclusive = 0;
+            self.poll_info.number_of_handles = 1;
+            unsafe {
+                *self.poll_info.timeout.QuadPart_mut() = std::i64::MAX;
+            }
+            self.poll_info.handles[0].handle = self.base_socket as HANDLE;
+            self.poll_info.handles[0].status = 0;
+            self.poll_info.handles[0].events = eventflags_to_afd_events(self.user_evts);
+
+            let apccontext = unsafe { mem::transmute(self_ptr) };
+            let result = self
+                .afd
+                .poll(&mut self.poll_info, &mut self.iosb.0, apccontext);
+            if let Err(e) = result {
+                if let Some(code) = e.raw_os_error() {
+                    if code == ERROR_IO_PENDING as i32 {
+                        /* Overlapped poll operation in progress; this is expected. */
+                    } else if code == ERROR_INVALID_HANDLE as i32 {
+                        /* Socket closed; it'll be dropped from the epoll set. */
+                        self.delete_pending = true;
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+
+            self.poll_status = SockPollStatus::Pending;
+            self.pending_evts = self.user_evts;
+        } else {
+            unreachable!();
+        }
+        Ok(())
+    }
+
+    pub fn cancel(&mut self) -> io::Result<()> {
+        assert!(self.poll_status == SockPollStatus::Pending);
+        self.afd.cancel(&mut self.iosb.0)?;
+        self.poll_status = SockPollStatus::Cancelled;
+        self.pending_evts = 0;
+        Ok(())
+    }
+
+    /// True if the deletion needs to be delayed, false otherwise.
+    pub fn delete(&mut self) -> bool {
+        if !self.delete_pending {
+            if self.poll_status == SockPollStatus::Pending {
+                drop(self.cancel());
+            }
+
+            self.delete_pending = true;
+        }
+        /* If the poll request still needs to complete, the sock_state object can't
+         * be free()d yet. `sock_feed_event()` or `port_close()` will take care
+         * of this later. */
+        self.poll_status != SockPollStatus::Idle
+    }
+
+    pub fn feed_event(&mut self) -> Option<Event> {
+        let mut epoll_events = 0;
+        self.poll_status = SockPollStatus::Idle;
+        self.pending_evts = 0;
+
+        unsafe {
+            if self.delete_pending {
+                return None;
+            } else if self.iosb.0.u.Status == STATUS_CANCELLED {
+                /* The poll request was cancelled by CancelIoEx. */
+            } else if !NT_SUCCESS(self.iosb.0.u.Status) {
+                /* The overlapped request itself failed in an unexpected way. */
+                epoll_events &= EPOLLERR;
+            } else if self.poll_info.number_of_handles < 1 {
+                /* This poll operation succeeded but didn't report any socket events. */
+            } else if self.poll_info.handles[0].events & super::afd::AFD_POLL_LOCAL_CLOSE != 0 {
+                self.delete_pending = true;
+                return None;
+            } else {
+                epoll_events =
+                    super::afd::afd_events_to_eventflags(self.poll_info.handles[0].events);
+            }
+        }
+
+        epoll_events &= self.user_evts;
+
+        if epoll_events == 0 {
+            return None;
+        }
+
+        if (self.user_evts & EPOLLONESHOT) != 0 {
+            self.user_evts = 0;
+        }
+
+        Some(Event {
+            data: self.user_data,
+            flags: epoll_events,
+        })
+    }
+
+    pub fn is_pending_deletion(&self) -> bool {
+        self.delete_pending
+    }
+
+    pub fn raw_socket(&self) -> RawSocket {
+        self.raw_socket
+    }
+}
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
 /// gets tracked by `TcpStream`, `TcpListener`, etc... when they are first
@@ -28,569 +229,361 @@ const WAKE: Token = Token(std::usize::MAX);
 #[cfg(debug_assertions)]
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
-/// The guts of the Windows event loop, this is the struct which actually owns
-/// a completion port.
-///
-/// Internally this is just an `Arc`, and this allows handing out references to
-/// the internals to I/O handles registered on this selector. This is
-/// required to schedule I/O operations independently of being inside the event
-/// loop (e.g. when a call to `write` is seen we're not "in the event loop").
 #[derive(Debug)]
 pub struct Selector {
-    inner: Arc<SelectorInner>,
-
-    // Custom readiness queue
-    pub(super) readiness_queue: ReadinessQueue,
-}
-
-// Public to allow `Waker` access
-#[derive(Debug)]
-pub(super) struct SelectorInner {
-    /// Unique identifier of the `Selector`
     #[cfg(debug_assertions)]
     id: usize,
 
-    /// The actual completion port that's used to manage all I/O
-    port: CompletionPort,
-
-    /// A pool of buffers usable by this selector.
-    ///
-    /// Primitives will take buffers from this pool to perform I/O operations,
-    /// and once complete they'll be put back in.
-    buffers: Mutex<BufferPool>,
+    inner: Arc<SelectorInner>,
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        // offset by 1 to avoid choosing 0 as the id of a selector
-        #[cfg(debug_assertions)]
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
-        let cp = CompletionPort::new(1)?;
-
-        let inner = Arc::new(SelectorInner {
+        SelectorInner::new().map(|inner| {
             #[cfg(debug_assertions)]
-            id: id,
-            port: cp,
-            buffers: Mutex::new(BufferPool::new(256)),
-        });
-
-        let readiness_queue = ReadinessQueue::new(inner.clone())?;
-
-        Ok(Selector {
-            inner,
-            readiness_queue,
+            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
+            Selector {
+                id,
+                inner: Arc::new(inner),
+            }
         })
     }
-
-    pub fn select(&self, events: &mut Events, mut timeout: Option<Duration>) -> io::Result<()> {
-        // Compute the timeout value passed to the system selector. If the
-        // readiness queue has pending nodes, we still want to poll the system
-        // selector for new events, but we don't want to block the thread to
-        // wait for new events.
-        if timeout == Some(Duration::from_millis(0)) {
-            // If blocking is not requested, then there is no need to prepare
-            // the queue for sleep
-            //
-            // The sleep_marker should be removed by readiness_queue.poll().
-        } else if self.readiness_queue.prepare_for_sleep() {
-            // The readiness queue is empty. The call to `prepare_for_sleep`
-            // inserts `sleep_marker` into the queue. This signals to any
-            // threads setting readiness that the `Poll::poll` is going to
-            // sleep, so the waker should be used.
-        } else {
-            // The readiness queue is not empty, so do not block the thread.
-            timeout = Some(Duration::from_millis(0));
-        }
-
-        let ret = self.select2(events, timeout)?;
-
-        // Poll custom event queue
-        self.readiness_queue.poll(events);
-
-        // Return number of polled events
-        Ok(ret)
+    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+        self.inner.select(events, timeout)
     }
 
-    pub fn select2(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
-        trace!("select; timeout={:?}", timeout);
-
-        // Clear out the previous list of I/O events and get some more!
-        events.clear();
-
-        trace!("polling IOCP");
-        let n = match self.inner.port.get_many(&mut events.statuses, timeout) {
-            Ok(statuses) => statuses.len(),
-            Err(ref e) if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) => 0,
-            Err(e) => return Err(e),
-        };
-
-        for status in events.statuses[..n].iter() {
-            // This should only ever happen from the waker.
-            if status.overlapped() as usize == 0 {
-                let token = Token(status.token());
-                if token == WAKE {
-                    continue;
-                }
-                events.events.push(Event::new(Ready::READABLE, token));
-                continue;
-            }
-
-            let callback = unsafe { (*(status.overlapped() as *mut Overlapped)).callback };
-
-            trace!("select; -> got overlapped");
-            callback(status.entry());
-        }
-
-        trace!("returning");
-        Ok(())
+    pub fn register<T: AsRawSocket>(
+        &self,
+        socket: &T,
+        token: Token,
+        interests: Interests,
+    ) -> io::Result<()> {
+        self.inner.register(socket, token, interests)
     }
 
-    /// Gets a new reference to this selector, although all underlying data
-    /// structures will refer to the same completion port.
+    pub fn reregister<T: AsRawSocket>(
+        &self,
+        socket: &T,
+        token: Token,
+        interests: Interests,
+    ) -> io::Result<()> {
+        self.inner.reregister(socket, token, interests)
+    }
+
+    pub fn deregister<T: AsRawSocket>(&self, socket: &T) -> io::Result<()> {
+        self.inner.deregister(socket)
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
     pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
         self.inner.clone()
     }
-
-    /// Return the `Selector`'s identifier
-    #[cfg(debug_assertions)]
-    pub fn id(&self) -> usize {
-        self.inner.id
-    }
-}
-
-impl SelectorInner {
-    fn identical(&self, other: &SelectorInner) -> bool {
-        (self as *const SelectorInner) == (other as *const SelectorInner)
-    }
-
-    pub fn port(&self) -> &CompletionPort {
-        &self.port
-    }
-}
-
-// A registration is stored in each I/O object which keeps track of how it is
-// associated with a `Selector` above.
-//
-// Once associated with a `Selector`, a registration can never be un-associated
-// (due to IOCP requirements). This is actually implemented through the
-// `poll::Registration` and `poll::SetReadiness` APIs to keep track of all the
-// level/edge/filtering business.
-/// A `Binding` is embedded in all I/O objects associated with a `Poll`
-/// object.
-///
-/// Each registration keeps track of which selector the I/O object is
-/// associated with, ensuring that implementations of `Evented` can be
-/// conformant for the various methods on Windows.
-///
-/// If you're working with custom IOCP-enabled objects then you'll want to
-/// ensure that one of these instances is stored in your object and used in the
-/// implementation of `Evented`.
-///
-/// For more information about how to use this see the `windows` module
-/// documentation in this crate.
-pub struct Binding {
-    selector: AtomicLazyCell<Arc<SelectorInner>>,
-}
-
-impl Binding {
-    /// Creates a new blank binding ready to be inserted into an I/O
-    /// object.
-    ///
-    /// Won't actually do anything until associated with a `Poll` loop.
-    pub fn new() -> Binding {
-        Binding {
-            selector: AtomicLazyCell::new(),
-        }
-    }
-
-    /// Registers a new handle with the `Poll` specified, also assigning the
-    /// `token` specified.
-    ///
-    /// This function is intended to be used as part of `Evented::register` for
-    /// custom IOCP objects. It will add the specified handle to the internal
-    /// IOCP object with the provided `token`. All future events generated by
-    /// the handled provided will be received by the `Poll`'s internal IOCP
-    /// object.
-    ///
-    /// # Unsafety
-    ///
-    /// This function is unsafe as the `Poll` instance has assumptions about
-    /// what the `OVERLAPPED` pointer used for each I/O operation looks like.
-    /// Specifically they must all be instances of the `Overlapped` type in
-    /// this crate. More information about this can be found on the
-    /// `windows` module in this crate.
-    pub unsafe fn register_handle(
-        &self,
-        handle: &dyn AsRawHandle,
-        token: Token,
-        registry: &Registry,
-    ) -> io::Result<()> {
-        let selector = poll::selector(registry);
-
-        // Ignore errors, we'll see them on the next line.
-        drop(self.selector.fill(selector.inner.clone()));
-        self.check_same_selector(registry)?;
-
-        selector.inner.port.add_handle(usize::from(token), handle)
-    }
-
-    /// Same as `register_handle` but for sockets.
-    pub unsafe fn register_socket(
-        &self,
-        handle: &dyn AsRawSocket,
-        token: Token,
-        registry: &Registry,
-    ) -> io::Result<()> {
-        let selector = poll::selector(registry);
-        drop(self.selector.fill(selector.inner.clone()));
-        self.check_same_selector(registry)?;
-        selector.inner.port.add_socket(usize::from(token), handle)
-    }
-
-    /// Reregisters the handle provided from the `Poll` provided.
-    ///
-    /// This is intended to be used as part of `Evented::reregister` but note
-    /// that this function does not currently reregister the provided handle
-    /// with the `poll` specified. IOCP has a special binding for changing the
-    /// token which has not yet been implemented. Instead this function should
-    /// be used to assert that the call to `reregister` happened on the same
-    /// `Poll` that was passed into to `register`.
-    ///
-    /// Eventually, though, the provided `handle` will be re-assigned to have
-    /// the token `token` on the given `poll` assuming that it's been
-    /// previously registered with it.
-    ///
-    /// # Unsafety
-    ///
-    /// This function is unsafe for similar reasons to `register`. That is,
-    /// there may be pending I/O events and such which aren't handled correctly.
-    pub unsafe fn reregister_handle(
-        &self,
-        _handle: &dyn AsRawHandle,
-        _token: Token,
-        registry: &Registry,
-    ) -> io::Result<()> {
-        self.check_same_selector(registry)
-    }
-
-    /// Same as `reregister_handle`, but for sockets.
-    pub unsafe fn reregister_socket(
-        &self,
-        _socket: &dyn AsRawSocket,
-        _token: Token,
-        registry: &Registry,
-    ) -> io::Result<()> {
-        self.check_same_selector(registry)
-    }
-
-    /// Deregisters the handle provided from the `Poll` provided.
-    ///
-    /// This is intended to be used as part of `Evented::deregister` but note
-    /// that this function does not currently deregister the provided handle
-    /// from the `poll` specified. IOCP has a special binding for that which has
-    /// not yet been implemented. Instead this function should be used to assert
-    /// that the call to `deregister` happened on the same `Poll` that was
-    /// passed into to `register`.
-    ///
-    /// # Unsafety
-    ///
-    /// This function is unsafe for similar reasons to `register`. That is,
-    /// there may be pending I/O events and such which aren't handled correctly.
-    pub unsafe fn deregister_handle(
-        &self,
-        _handle: &dyn AsRawHandle,
-        registry: &Registry,
-    ) -> io::Result<()> {
-        self.check_same_selector(registry)
-    }
-
-    /// Same as `deregister_handle`, but for sockets.
-    pub unsafe fn deregister_socket(
-        &self,
-        _socket: &dyn AsRawSocket,
-        registry: &Registry,
-    ) -> io::Result<()> {
-        self.check_same_selector(registry)
-    }
-
-    fn check_same_selector(&self, registry: &Registry) -> io::Result<()> {
-        let selector = poll::selector(registry);
-        match self.selector.borrow() {
-            Some(prev) if prev.identical(&selector.inner) => Ok(()),
-            Some(_) | None => Err(other("socket already registered")),
-        }
-    }
-}
-
-impl fmt::Debug for Binding {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Binding").finish()
-    }
-}
-
-/// Helper struct used for TCP and UDP which bundles a `binding` with a
-/// `SetReadiness` handle.
-pub struct ReadyBinding {
-    binding: Binding,
-    readiness: Option<SetReadiness>,
-}
-
-impl ReadyBinding {
-    /// Creates a new blank binding ready to be inserted into an I/O object.
-    ///
-    /// Won't actually do anything until associated with an `Selector` loop.
-    pub fn new() -> ReadyBinding {
-        ReadyBinding {
-            binding: Binding::new(),
-            readiness: None,
-        }
-    }
-
-    /// Returns whether this binding has been associated with a selector
-    /// yet.
-    pub fn registered(&self) -> bool {
-        self.readiness.is_some()
-    }
-
-    /// Acquires a buffer with at least `size` capacity.
-    ///
-    /// If associated with a selector, this will attempt to pull a buffer from
-    /// that buffer pool. If not associated with a selector, this will allocate
-    /// a fresh buffer.
-    pub fn get_buffer(&self, size: usize) -> Vec<u8> {
-        match self.binding.selector.borrow() {
-            Some(i) => i.buffers.lock().unwrap().get(size),
-            None => Vec::with_capacity(size),
-        }
-    }
-
-    /// Returns a buffer to this binding.
-    ///
-    /// If associated with a selector, this will push the buffer back into the
-    /// selector's pool of buffers. Otherwise this will just drop the buffer.
-    pub fn put_buffer(&self, buf: Vec<u8>) {
-        if let Some(i) = self.binding.selector.borrow() {
-            i.buffers.lock().unwrap().put(buf);
-        }
-    }
-
-    /// Sets the readiness of this I/O object to a particular `set`.
-    ///
-    /// This is later used to fill out and respond to requests to `poll`. Note
-    /// that this is all implemented through the `SetReadiness` structure in the
-    /// `poll` module.
-    pub fn set_readiness(&self, set: Ready) {
-        if let Some(ref i) = self.readiness {
-            trace!("set readiness to {:?}", set);
-            i.set_readiness(set).expect("event loop disappeared?");
-        }
-    }
-
-    /// Queries what the current readiness of this I/O object is.
-    ///
-    /// This is what's being used to generate events returned by `poll`.
-    pub fn readiness(&self) -> Ready {
-        match self.readiness {
-            Some(ref i) => i.readiness(),
-            None => Ready::EMPTY,
-        }
-    }
-
-    /// Implementation of the `Evented::register` function essentially.
-    ///
-    /// Returns an error if we're already registered with another event loop,
-    /// and otherwise just reassociates ourselves with the event loop to
-    /// possible change tokens.
-    pub(crate) fn register_socket(
-        &mut self,
-        socket: &dyn AsRawSocket,
-        registry: &Registry,
-        token: Token,
-        events: Interests,
-        registration: &Mutex<Option<Registration>>,
-    ) -> io::Result<()> {
-        trace!("register {:?} {:?}", token, events);
-        unsafe {
-            self.binding.register_socket(socket, token, registry)?;
-        }
-
-        let (r, s) = Registration::new(
-            &poll::selector(registry).readiness_queue,
-            token,
-            events,
-            PollOpt::edge(),
-        );
-        self.readiness = Some(s);
-        *registration.lock().unwrap() = Some(r);
-        Ok(())
-    }
-
-    /// Implementation of `Evented::reregister` function.
-    pub(crate) fn reregister_socket(
-        &mut self,
-        socket: &dyn AsRawSocket,
-        registry: &Registry,
-        token: Token,
-        events: Interests,
-        registration: &Mutex<Option<Registration>>,
-    ) -> io::Result<()> {
-        trace!("reregister {:?} {:?}", token, events);
-        unsafe {
-            self.binding.reregister_socket(socket, token, registry)?;
-        }
-
-        registration
-            .lock()
-            .unwrap()
-            .as_mut()
-            .unwrap()
-            .reregister(registry, token, events)
-    }
-
-    /// Implementation of the `Evented::deregister` function.
-    ///
-    /// Doesn't allow registration with another event loop, just shuts down
-    /// readiness notifications and such.
-    pub(crate) fn deregister(
-        &mut self,
-        socket: &dyn AsRawSocket,
-        registry: &Registry,
-        registration: &Mutex<Option<Registration>>,
-    ) -> io::Result<()> {
-        trace!("deregistering");
-        unsafe {
-            self.binding.deregister_socket(socket, registry)?;
-        }
-
-        registration
-            .lock()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .deregister(registry)
-    }
-}
-
-fn other(s: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, s)
 }
 
 #[derive(Debug)]
-pub struct Events {
-    /// Raw I/O event completions are filled in here by the call to `get_many`
-    /// on the completion port above. These are then processed to run callbacks
-    /// which figure out what to do after the event is done.
-    statuses: Box<[CompletionStatus]>,
-
-    /// Literal events returned by `get` to the upwards `EventLoop`. This file
-    /// doesn't really modify this (except for the waker), instead almost all
-    /// events are filled in by the `ReadinessQueue` from the `poll` module.
-    events: Vec<Event>,
+pub struct SelectorInner {
+    cp: Arc<CompletionPort>,
+    active_poll_count: AtomicUsize,
+    update_queue: Mutex<VecDeque<RawSocket>>,
+    afd_group: Mutex<Vec<Arc<Afd>>>,
+    socket_map: Mutex<HashMap<RawSocket, Arc<Mutex<Sock>>>>,
 }
 
-impl Events {
-    pub fn with_capacity(cap: usize) -> Events {
-        // Note that it's possible for the output `events` to grow beyond the
-        // capacity as it can also include deferred events, but that's certainly
-        // not the end of the world!
-        Events {
-            statuses: vec![CompletionStatus::zero(); cap].into_boxed_slice(),
-            events: Vec::with_capacity(cap),
+impl SelectorInner {
+    pub fn new() -> io::Result<SelectorInner> {
+        CompletionPort::new(0).map(|cp| SelectorInner {
+            cp: Arc::new(cp),
+            active_poll_count: AtomicUsize::new(0),
+            update_queue: Mutex::new(VecDeque::new()),
+            afd_group: Mutex::new(Vec::new()),
+            socket_map: Mutex::new(HashMap::new()),
+        })
+    }
+
+    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+        events.clear();
+
+        self.update_sockets_events()?;
+
+        self.active_poll_count.fetch_add(1, Ordering::SeqCst);
+
+        let mut iocp_events = vec![CompletionStatus::zero(); events.capacity()];
+        let result = self.cp.get_many(&mut iocp_events, timeout);
+
+        self.active_poll_count.fetch_sub(1, Ordering::SeqCst);
+
+        if let Err(e) = result {
+            use winapi::shared::winerror::WAIT_TIMEOUT;
+            if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
+                return Ok(());
+            }
+            return Err(e);
+        }
+
+        self.feed_events(events, result.unwrap());
+        Ok(())
+    }
+
+    pub fn register<T: AsRawSocket>(
+        &self,
+        socket: &T,
+        token: Token,
+        interests: Interests,
+    ) -> io::Result<()> {
+        let flags = interests_to_epoll(interests);
+
+        let raw_socket = socket.as_raw_socket();
+        self._alloc_sock_for_rawsocket_only_if_not_existed(raw_socket)?;
+
+        let event = Event {
+            flags,
+            data: token.0 as u64,
+        };
+        self._set_socket_event(raw_socket, event);
+        self.update_sockets_events_if_polling()?;
+
+        Ok(())
+    }
+
+    pub fn reregister<T: AsRawSocket>(
+        &self,
+        socket: &T,
+        token: Token,
+        interests: Interests,
+    ) -> io::Result<()> {
+        let flags = interests_to_epoll(interests);
+
+        let raw_socket = socket.as_raw_socket();
+        {
+            let socket_map = self.socket_map.lock().unwrap();
+            match socket_map.get(&raw_socket) {
+                Some(_) => {}
+                None => return Err(io::Error::from(io::ErrorKind::NotFound)),
+            }
+        }
+
+        let event = Event {
+            flags,
+            data: token.0 as u64,
+        };
+        self._set_socket_event(raw_socket, event);
+        self.update_sockets_events_if_polling()?;
+
+        Ok(())
+    }
+
+    pub fn deregister<T: AsRawSocket>(&self, socket: &T) -> io::Result<()> {
+        let raw_socket = socket.as_raw_socket();
+        {
+            let mut socket_map = self.socket_map.lock().unwrap();
+            match socket_map.get_mut(&raw_socket) {
+                Some(sock) => {
+                    if sock.lock().unwrap().delete() {
+                        return Ok(());
+                    }
+                }
+                None => return Err(io::Error::from(io::ErrorKind::NotFound)),
+            }
+
+            socket_map.remove(&raw_socket).unwrap();
+        }
+        self._release_unused_afd();
+        Ok(())
+    }
+
+    pub fn port(&self) -> Arc<CompletionPort> {
+        self.cp.clone()
+    }
+
+    fn update_sockets_events(&self) -> io::Result<()> {
+        let mut update_queue = self.update_queue.lock().unwrap();
+        let mut socket_map = self.socket_map.lock().unwrap();
+        loop {
+            let rawsock = match update_queue.pop_front() {
+                Some(rawsock) => rawsock,
+                None => break,
+            };
+            match socket_map.get_mut(&rawsock) {
+                Some(sock) => {
+                    let ptr = Arc::into_raw(sock.clone());
+                    sock.lock().unwrap().update(ptr)?;
+                }
+                None => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn update_sockets_events_if_polling(&self) -> io::Result<()> {
+        if self.active_poll_count.load(Ordering::SeqCst) > 0 {
+            return self.update_sockets_events();
+        }
+        Ok(())
+    }
+
+    fn feed_events(&self, events: &mut Events, iocp_events: &[CompletionStatus]) {
+        {
+            let mut update_queue = self.update_queue.lock().unwrap();
+            for iocp_event in iocp_events.iter() {
+                if iocp_event.overlapped() as usize == 0 {
+                    events.push(Event {
+                        flags: EPOLLIN,
+                        data: iocp_event.token() as u64,
+                    });
+                    continue;
+                }
+                let sock: Arc<Mutex<Sock>> =
+                    unsafe { Arc::from_raw(mem::transmute(iocp_event.overlapped())) };
+                let mut sock_guard = sock.lock().unwrap();
+                match sock_guard.feed_event() {
+                    Some(e) => events.push(e),
+                    None => {}
+                }
+                if !sock_guard.is_pending_deletion() {
+                    update_queue.push_back(sock_guard.raw_socket());
+                }
+            }
+        }
+        self._release_deleted_sock();
+    }
+
+    fn _acquire_afd(&self) -> io::Result<Arc<Afd>> {
+        let mut need_alloc = false;
+        {
+            let afd_group = self.afd_group.lock().unwrap();
+            if afd_group.len() == 0 {
+                need_alloc = true;
+            } else {
+                // + 1 reference in Vec
+                if Arc::strong_count(afd_group.last().unwrap()) >= POLL_GROUP__MAX_GROUP_SIZE + 1 {
+                    need_alloc = true;
+                }
+            }
+        }
+        if need_alloc {
+            self._alloc_afd_group()?;
+        }
+        match self.afd_group.lock().unwrap().last() {
+            Some(rc) => Ok(rc.clone()),
+            None => unreachable!(),
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.events.is_empty()
+    fn _release_unused_afd(&self) {
+        let mut afd_group = self.afd_group.lock().unwrap();
+        afd_group.retain(|g| Arc::strong_count(&g) > 1);
     }
 
-    pub fn len(&self) -> usize {
-        self.events.len()
+    fn _alloc_afd_group(&self) -> io::Result<()> {
+        let mut afd_group = self.afd_group.lock().unwrap();
+        let afd = Afd::new(&self.cp)?;
+        let rc = Arc::new(afd);
+        afd_group.push(rc);
+        Ok(())
     }
 
-    pub fn capacity(&self) -> usize {
-        self.events.capacity()
+    fn _alloc_sock_for_rawsocket_only_if_not_existed(
+        &self,
+        raw_socket: RawSocket,
+    ) -> io::Result<()> {
+        let mut socket_map = self.socket_map.lock().unwrap();
+        match socket_map.get(&raw_socket) {
+            Some(_) => return Err(io::Error::from(io::ErrorKind::AlreadyExists)),
+            None => {}
+        };
+        let sock = Arc::new(Mutex::new(Sock::new(raw_socket, self._acquire_afd()?)?));
+        socket_map.insert(raw_socket, sock);
+        Ok(())
     }
 
-    pub fn get(&self, idx: usize) -> Option<&Event> {
-        self.events.get(idx)
-    }
+    fn _set_socket_event(&self, raw_socket: RawSocket, event: Event) {
+        let mut socket_map = self.socket_map.lock().unwrap();
 
-    pub fn push_event(&mut self, event: Event) {
-        self.events.push(event);
-    }
-
-    pub fn clear(&mut self) {
-        self.events.truncate(0);
-    }
-}
-
-macro_rules! overlapped2arc {
-    ($e:expr, $t:ty, $($field:ident).+) => ({
-        let offset = offset_of!($t, $($field).+);
-        debug_assert!(offset < mem::size_of::<$t>());
-        FromRawArc::from_raw(($e as usize - offset) as *mut $t)
-    })
-}
-
-macro_rules! offset_of {
-    ($t:ty, $($field:ident).+) => (
-        &(*(0 as *const $t)).$($field).+ as *const _ as usize
-    )
-}
-
-// See sys::windows module docs for why this exists.
-//
-// The gist of it is that `Selector` assumes that all `OVERLAPPED` pointers are
-// actually inside one of these structures so it can use the `Callback` stored
-// right after it.
-//
-// We use repr(C) here to ensure that we can assume the overlapped pointer is
-// at the start of the structure so we can just do a cast.
-/// A wrapper around an internal instance over `miow::Overlapped` which is in
-/// turn a wrapper around the Windows type `OVERLAPPED`.
-///
-/// This type is required to be used for all IOCP operations on handles that are
-/// registered with an event loop. The event loop will receive notifications
-/// over `OVERLAPPED` pointers that have completed, and it will cast that
-/// pointer to a pointer to this structure and invoke the associated callback.
-#[repr(C)]
-pub struct Overlapped {
-    inner: UnsafeCell<miow::Overlapped>,
-    callback: fn(&OVERLAPPED_ENTRY),
-}
-
-impl Overlapped {
-    /// Creates a new `Overlapped` which will invoke the provided `cb` callback
-    /// whenever it's triggered.
-    ///
-    /// The returned `Overlapped` must be used as the `OVERLAPPED` passed to all
-    /// I/O operations that are registered with mio's event loop. When the I/O
-    /// operation associated with an `OVERLAPPED` pointer completes the event
-    /// loop will invoke the function pointer provided by `cb`.
-    pub fn new(cb: fn(&OVERLAPPED_ENTRY)) -> Overlapped {
-        Overlapped {
-            inner: UnsafeCell::new(miow::Overlapped::zero()),
-            callback: cb,
+        if socket_map
+            .get_mut(&raw_socket)
+            .unwrap()
+            .lock()
+            .unwrap()
+            .set_event(event)
+        {
+            let mut update_queue = self.update_queue.lock().unwrap();
+            update_queue.push_back(raw_socket);
         }
     }
 
-    /// Get the underlying `Overlapped` instance as a raw pointer.
-    ///
-    /// This can be useful when only a shared borrow is held and the overlapped
-    /// pointer needs to be passed down to winapi.
-    pub fn as_mut_ptr(&self) -> *mut OVERLAPPED {
-        unsafe { (*self.inner.get()).raw() }
+    fn _release_deleted_sock(&self) {
+        let mut socket_map = self.socket_map.lock().unwrap();
+
+        socket_map.retain(|_, sock| !sock.lock().unwrap().is_pending_deletion());
     }
 }
 
-impl fmt::Debug for Overlapped {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Overlapped").finish()
+pub const EPOLLIN: u32 = (1 << 0);
+pub const EPOLLPRI: u32 = (1 << 1);
+pub const EPOLLOUT: u32 = (1 << 2);
+pub const EPOLLERR: u32 = (1 << 3);
+pub const EPOLLHUP: u32 = (1 << 4);
+pub const EPOLLRDNORM: u32 = (1 << 6);
+pub const EPOLLRDBAND: u32 = (1 << 7);
+pub const EPOLLWRNORM: u32 = (1 << 8);
+pub const EPOLLWRBAND: u32 = (1 << 9);
+pub const EPOLLMSG: u32 = (1 << 10); /* Never reported. */
+pub const EPOLLRDHUP: u32 = (1 << 13);
+pub const EPOLLONESHOT: u32 = (1 << 31);
+
+pub const KNOWN_EPOLL_EVENTS: u32 = EPOLLIN
+    | EPOLLPRI
+    | EPOLLOUT
+    | EPOLLERR
+    | EPOLLHUP
+    | EPOLLRDNORM
+    | EPOLLRDBAND
+    | EPOLLWRNORM
+    | EPOLLWRBAND
+    | EPOLLMSG
+    | EPOLLRDHUP;
+
+fn interests_to_epoll(interests: Interests) -> u32 {
+    let mut kind = 0;
+
+    if interests.is_readable() {
+        kind |= EPOLLIN;
     }
+
+    if interests.is_writable() {
+        kind |= EPOLLOUT;
+    }
+
+    kind
 }
 
-// Overlapped's APIs are marked as unsafe Overlapped's APIs are marked as
-// unsafe as they must be used with caution to ensure thread safety. The
-// structure itself is safe to send across threads.
-unsafe impl Send for Overlapped {}
-unsafe impl Sync for Overlapped {}
+fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
+    let mut base_socket: RawSocket = 0;
+    let mut bytes: u32 = 0;
+    const SIO_BASE_HANDLE: u32 = 0x48000022;
+
+    use std::mem::{size_of, transmute};
+    use std::ptr::null_mut;
+    use winapi::um::winsock2::{WSAIoctl, SOCKET_ERROR};
+
+    unsafe {
+        if WSAIoctl(
+            raw_socket as usize,
+            SIO_BASE_HANDLE,
+            null_mut(),
+            0,
+            transmute(&mut base_socket),
+            size_of::<RawSocket>() as u32,
+            &mut bytes,
+            null_mut(),
+            None,
+        ) == SOCKET_ERROR
+        {
+            return Err(io::Error::from_raw_os_error(INVALID_SOCKET as i32));
+        }
+    }
+    Ok(base_socket)
+}
