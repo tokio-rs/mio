@@ -1,5 +1,4 @@
 use crate::poll;
-use crate::sys::Selector;
 use crate::{event, Interests, Registry, Token};
 
 #[allow(unused_imports)] // only here for Rust 1.8
@@ -9,16 +8,30 @@ use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
+
+use super::selector::{Selector, SockState};
 
 struct RegistryInternalStruct {
-    selector: Option<Arc<Selector>>,
-    token: Option<Token>,
-    interests: Option<Interests>,
+    selector: Arc<Selector>,
+    token: Token,
+    interests: Interests,
+    sock_state: Option<Arc<Mutex<SockState>>>,
+}
+
+impl RegistryInternalStruct {
+    fn new(selector: Arc<Selector>, token: Token, interests: Interests) -> RegistryInternalStruct {
+        RegistryInternalStruct {
+            selector,
+            token,
+            interests,
+            sock_state: None,
+        }
+    }
 }
 
 pub struct UdpSocket {
-    internal: Arc<RwLock<RegistryInternalStruct>>,
+    internal: Arc<RwLock<Option<RegistryInternalStruct>>>,
     io: std::net::UdpSocket,
 }
 
@@ -28,11 +41,11 @@ macro_rules! wouldblock {
         if let Err(ref e) = result {
             if e.kind() == io::ErrorKind::WouldBlock {
                 let internal = $self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
+                if let Some(internal) = &*internal {
+                    internal.selector.reregister(
                         $self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
+                        internal.token,
+                        internal.interests,
                     )?;
                 }
             }
@@ -45,11 +58,7 @@ impl UdpSocket {
     pub fn new(socket: std::net::UdpSocket) -> io::Result<UdpSocket> {
         socket.set_nonblocking(true)?;
         Ok(UdpSocket {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             io: socket,
         })
     }
@@ -60,11 +69,7 @@ impl UdpSocket {
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
         self.io.try_clone().map(|io| UdpSocket {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             io,
         })
     }
@@ -158,17 +163,47 @@ impl UdpSocket {
     }
 }
 
+impl super::GenericSocket for UdpSocket {
+    fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
+        let internal = self.internal.read().unwrap();
+        match &*internal {
+            Some(internal) => match &internal.sock_state {
+                Some(arc) => Some(arc.clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+    fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
+        let mut internal = self.internal.write().unwrap();
+        match &mut *internal {
+            Some(internal) => {
+                internal.sock_state = sock_state;
+            }
+            None => {}
+        };
+    }
+}
+
 impl event::Source for UdpSocket {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        let result = poll::selector_arc(registry).register(self, token, interests);
-        match result {
-            Ok(_) => {
-                let mut internal = self.internal.write().unwrap();
-                internal.selector = Some(poll::selector_arc(registry));
-                internal.token = Some(token);
-                internal.interests = Some(interests);
+        {
+            let mut internal = self.internal.write().unwrap();
+            if internal.is_none() {
+                *internal = Some(RegistryInternalStruct::new(
+                    poll::selector_arc(registry),
+                    token,
+                    interests,
+                ));
             }
-            Err(_) => {}
+        }
+        let result = poll::selector(registry).register(self, token, interests);
+        match result {
+            Ok(_) => {}
+            Err(_) => {
+                let mut internal = self.internal.write().unwrap();
+                *internal = None;
+            }
         }
         result
     }
@@ -179,27 +214,28 @@ impl event::Source for UdpSocket {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        let result = poll::selector_arc(registry).reregister(self, token, interests);
+        let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {
                 let mut internal = self.internal.write().unwrap();
-                internal.selector = Some(poll::selector_arc(registry));
-                internal.token = Some(token);
-                internal.interests = Some(interests);
+                internal.as_mut().unwrap().token = token;
+                internal.as_mut().unwrap().interests = interests;
             }
             Err(_) => {}
-        }
+        };
         result
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        {
-            let mut internal = self.internal.write().unwrap();
-            internal.selector = None;
-            internal.token = None;
-            internal.interests = None;
-        }
-        poll::selector_arc(registry).deregister(self)
+        let result = poll::selector(registry).deregister(self);
+        match result {
+            Ok(_) => {
+                let mut internal = self.internal.write().unwrap();
+                *internal = None;
+            }
+            Err(_) => {}
+        };
+        result
     }
 }
 
@@ -212,11 +248,7 @@ impl fmt::Debug for UdpSocket {
 impl FromRawSocket for UdpSocket {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> UdpSocket {
         UdpSocket {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             io: net::UdpSocket::from_raw_socket(rawsocket),
         }
     }

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::fmt;
 use std::io;
 use std::mem;
@@ -27,6 +27,7 @@ use super::afd::{
     KNOWN_AFD_EVENTS,
 };
 use super::Event;
+use super::GenericSocket;
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
 
@@ -55,7 +56,7 @@ unsafe impl Send for IoStatusBlock {}
 unsafe impl Sync for IoStatusBlock {}
 
 #[derive(Debug)]
-struct Sock {
+pub struct SockState {
     iosb: IoStatusBlock,
     poll_info: AfdPollInfo,
     afd: Arc<Afd>,
@@ -68,10 +69,10 @@ struct Sock {
     delete_pending: bool,
 }
 
-impl Sock {
-    fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<Sock> {
+impl SockState {
+    fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
         unsafe {
-            Ok(Sock {
+            Ok(SockState {
                 iosb: IoStatusBlock::zeroed(),
                 poll_info: mem::zeroed::<AfdPollInfo>(),
                 afd,
@@ -97,7 +98,7 @@ impl Sock {
         (events & !self.pending_evts) != 0
     }
 
-    fn update(&mut self, self_ptr: *const Mutex<Sock>) -> io::Result<()> {
+    fn update(&mut self, self_ptr: *const Mutex<SockState>) -> io::Result<()> {
         assert!(!self.delete_pending);
 
         if self.poll_status == SockPollStatus::Pending
@@ -219,14 +220,6 @@ impl Sock {
     fn is_pending_deletion(&self) -> bool {
         self.delete_pending
     }
-
-    fn raw_socket(&self) -> RawSocket {
-        self.raw_socket
-    }
-
-    fn poll_status(&self) -> SockPollStatus {
-        self.poll_status
-    }
 }
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
@@ -260,28 +253,26 @@ impl Selector {
         self.inner.select(events, timeout)
     }
 
-    pub fn register<T: AsRawSocket>(
+    pub fn register<S: GenericSocket + AsRawSocket>(
         &self,
-        socket: &T,
+        socket: &S,
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        self.inner
-            .register(socket.as_raw_socket(), token, interests)
+        self.inner.register(socket, token, interests)
     }
 
-    pub fn reregister<T: AsRawSocket>(
+    pub fn reregister<S: GenericSocket>(
         &self,
-        socket: &T,
+        socket: &S,
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        self.inner
-            .reregister(socket.as_raw_socket(), token, interests)
+        self.inner.reregister(socket, token, interests)
     }
 
-    pub fn deregister<T: AsRawSocket>(&self, socket: &T) -> io::Result<()> {
-        self.inner.deregister(socket.as_raw_socket())
+    pub fn deregister<S: GenericSocket>(&self, socket: &S) -> io::Result<()> {
+        self.inner.deregister(socket)
     }
 
     pub fn id(&self) -> usize {
@@ -297,10 +288,8 @@ impl Selector {
 pub struct SelectorInner {
     cp: CompletionPort,
     active_poll_count: AtomicUsize,
-    update_queue: Mutex<VecDeque<RawSocket>>,
-    deleted_queue: Mutex<VecDeque<Arc<Mutex<Sock>>>>,
+    update_queue: Mutex<VecDeque<Arc<Mutex<SockState>>>>,
     afd_group: Mutex<Vec<Arc<Afd>>>,
-    socket_map: Mutex<HashMap<RawSocket, Arc<Mutex<Sock>>>>,
 }
 
 impl SelectorInner {
@@ -309,9 +298,7 @@ impl SelectorInner {
             cp: cp,
             active_poll_count: AtomicUsize::new(0),
             update_queue: Mutex::new(VecDeque::new()),
-            deleted_queue: Mutex::new(VecDeque::new()),
             afd_group: Mutex::new(Vec::new()),
-            socket_map: Mutex::new(HashMap::new()),
         })
     }
 
@@ -339,64 +326,65 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn register(
+    pub fn register<S: GenericSocket + AsRawSocket>(
         &self,
-        raw_socket: RawSocket,
+        socket: &S,
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
+        if socket.get_sock_state().is_some() {
+            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
+        }
+
         let flags = interests_to_afd_flags(interests);
 
-        self._alloc_sock_for_rawsocket_only_if_not_existed(raw_socket)?;
-
+        let sock = self._alloc_sock_for_rawsocket(socket.as_raw_socket())?;
         let event = Event {
             flags,
             data: token.0 as u64,
         };
-        self._set_socket_event(raw_socket, event);
+
+        {
+            sock.lock().unwrap().set_event(event);
+        }
+        socket.set_sock_state(Some(sock));
+        self.add_socket_to_update_queue(socket);
         self.update_sockets_events_if_polling()?;
 
         Ok(())
     }
 
-    pub fn reregister(
+    pub fn reregister<S: GenericSocket>(
         &self,
-        raw_socket: RawSocket,
+        socket: &S,
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
         let flags = interests_to_afd_flags(interests);
 
-        {
-            let socket_map = self.socket_map.lock().unwrap();
-            match socket_map.get(&raw_socket) {
-                Some(_) => {}
-                None => return Err(io::Error::from(io::ErrorKind::NotFound)),
-            }
-        }
-
+        let sock = match socket.get_sock_state() {
+            Some(sock) => sock,
+            None => return Err(io::Error::from(io::ErrorKind::NotFound)),
+        };
         let event = Event {
             flags,
             data: token.0 as u64,
         };
-        self._set_socket_event(raw_socket, event);
+
+        {
+            sock.lock().unwrap().set_event(event);
+        }
+        self.add_socket_to_update_queue(socket);
         self.update_sockets_events_if_polling()?;
 
         Ok(())
     }
 
-    pub fn deregister(&self, raw_socket: RawSocket) -> io::Result<()> {
-        {
-            let mut socket_map = self.socket_map.lock().unwrap();
-            match socket_map.get_mut(&raw_socket) {
-                Some(sock) => {
-                    let mut sock_internal = sock.lock().unwrap();
-                    sock_internal.mark_delete();
-                }
-                None => return Err(io::Error::from(io::ErrorKind::NotFound)),
-            }
+    pub fn deregister<S: GenericSocket>(&self, socket: &S) -> io::Result<()> {
+        if socket.get_sock_state().is_none() {
+            return Err(io::Error::from(io::ErrorKind::NotFound));
         }
-        self._cleanup_deleted_sock();
+        socket.set_sock_state(None);
         self._release_unused_afd();
         Ok(())
     }
@@ -408,25 +396,18 @@ impl SelectorInner {
     fn update_sockets_events(&self) -> io::Result<()> {
         {
             let mut update_queue = self.update_queue.lock().unwrap();
-            let mut socket_map = self.socket_map.lock().unwrap();
             loop {
-                let rawsock = match update_queue.pop_front() {
-                    Some(rawsock) => rawsock,
+                let sock = match update_queue.pop_front() {
+                    Some(sock) => sock,
                     None => break,
                 };
-                match socket_map.get_mut(&rawsock) {
-                    Some(sock) => {
-                        let ptr = Arc::into_raw(sock.clone());
-                        let mut sock_internal = sock.lock().unwrap();
-                        if !sock_internal.is_pending_deletion() {
-                            sock_internal.update(ptr).unwrap();
-                        }
-                    }
-                    None => {}
+                let ptr = Arc::into_raw(sock.clone());
+                let mut sock_internal = sock.lock().unwrap();
+                if !sock_internal.is_pending_deletion() {
+                    sock_internal.update(ptr).unwrap();
                 }
             }
         }
-        self._cleanup_deleted_sock();
         self._release_unused_afd();
         Ok(())
     }
@@ -449,7 +430,7 @@ impl SelectorInner {
                     });
                     continue;
                 }
-                let sock: Arc<Mutex<Sock>> =
+                let sock: Arc<Mutex<SockState>> =
                     unsafe { Arc::from_raw(mem::transmute(iocp_event.overlapped())) };
                 let mut sock_guard = sock.lock().unwrap();
                 match sock_guard.feed_event() {
@@ -459,11 +440,10 @@ impl SelectorInner {
                     None => {}
                 }
                 if !sock_guard.is_pending_deletion() {
-                    update_queue.push_back(sock_guard.raw_socket());
+                    update_queue.push_back(sock.clone());
                 }
             }
         }
-        self._cleanup_deleted_sock();
         self._release_unused_afd();
     }
 
@@ -502,49 +482,20 @@ impl SelectorInner {
         Ok(())
     }
 
-    fn _alloc_sock_for_rawsocket_only_if_not_existed(
+    fn _alloc_sock_for_rawsocket(
         &self,
         raw_socket: RawSocket,
-    ) -> io::Result<()> {
-        let mut socket_map = self.socket_map.lock().unwrap();
-        match socket_map.get(&raw_socket) {
-            Some(_) => return Err(io::Error::from(io::ErrorKind::AlreadyExists)),
-            None => {}
-        };
-        let sock = Arc::new(Mutex::new(Sock::new(raw_socket, self._acquire_afd()?)?));
-        socket_map.insert(raw_socket, sock);
-        Ok(())
+    ) -> io::Result<Arc<Mutex<SockState>>> {
+        Ok(Arc::new(Mutex::new(SockState::new(
+            raw_socket,
+            self._acquire_afd()?,
+        )?)))
     }
 
-    fn _set_socket_event(&self, raw_socket: RawSocket, event: Event) {
-        let mut socket_map = self.socket_map.lock().unwrap();
-
-        if socket_map
-            .get_mut(&raw_socket)
-            .unwrap()
-            .lock()
-            .unwrap()
-            .set_event(event)
-        {
-            let mut update_queue = self.update_queue.lock().unwrap();
-            update_queue.push_back(raw_socket);
-        }
-    }
-
-    fn _cleanup_deleted_sock(&self) {
-        let mut socket_map = self.socket_map.lock().unwrap();
-
-        socket_map.iter().for_each(|(_, sock)| {
-            let sock_internal = sock.lock().unwrap();
-            if !sock_internal.is_pending_deletion() {
-                return;
-            }
-            if sock_internal.poll_status() != SockPollStatus::Idle {
-                let mut deleted_queue = self.deleted_queue.lock().unwrap();
-                deleted_queue.push_back(sock.clone());
-            }
-        });
-        socket_map.retain(|_, sock| !sock.lock().unwrap().is_pending_deletion());
+    fn add_socket_to_update_queue<S: GenericSocket>(&self, socket: &S) {
+        let sock_state = socket.get_sock_state().unwrap();
+        let mut update_queue = self.update_queue.lock().unwrap();
+        update_queue.push_back(sock_state.clone());
     }
 }
 

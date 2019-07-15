@@ -1,5 +1,4 @@
 use crate::poll;
-use crate::sys::Selector;
 use crate::{event, Interests, Registry, Token};
 
 use iovec::IoVec;
@@ -9,22 +8,36 @@ use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
+use super::selector::{Selector, SockState};
+
 struct RegistryInternalStruct {
-    selector: Option<Arc<Selector>>,
-    token: Option<Token>,
-    interests: Option<Interests>,
+    selector: Arc<Selector>,
+    token: Token,
+    interests: Interests,
+    sock_state: Option<Arc<Mutex<SockState>>>,
+}
+
+impl RegistryInternalStruct {
+    fn new(selector: Arc<Selector>, token: Token, interests: Interests) -> RegistryInternalStruct {
+        RegistryInternalStruct {
+            selector,
+            token,
+            interests,
+            sock_state: None,
+        }
+    }
 }
 
 pub struct TcpStream {
-    internal: Arc<RwLock<RegistryInternalStruct>>,
+    internal: Arc<RwLock<Option<RegistryInternalStruct>>>,
     inner: net::TcpStream,
 }
 
 pub struct TcpListener {
-    internal: Arc<RwLock<RegistryInternalStruct>>,
+    internal: Arc<RwLock<Option<RegistryInternalStruct>>>,
     inner: net::TcpListener,
 }
 
@@ -34,11 +47,11 @@ macro_rules! wouldblock {
         if let Err(ref e) = result {
             if e.kind() == io::ErrorKind::WouldBlock {
                 let internal = $self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
+                if let Some(internal) = &*internal {
+                    internal.selector.reregister(
                         $self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
+                        internal.token,
+                        internal.interests,
                     )?;
                 }
             }
@@ -50,11 +63,11 @@ macro_rules! wouldblock {
         if let Err(ref e) = result {
             if e.kind() == io::ErrorKind::WouldBlock {
                 let internal = $self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
+                if let Some(internal) = &*internal {
+                    internal.selector.reregister(
                         $self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
+                        internal.token,
+                        internal.interests,
                     )?;
                 }
             }
@@ -74,22 +87,14 @@ impl TcpStream {
         }
 
         Ok(TcpStream {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             inner: stream,
         })
     }
 
     pub fn from_stream(stream: net::TcpStream) -> TcpStream {
         TcpStream {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             inner: stream,
         }
     }
@@ -104,11 +109,7 @@ impl TcpStream {
 
     pub fn try_clone(&self) -> io::Result<TcpStream> {
         self.inner.try_clone().map(|s| TcpStream {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             inner: s,
         })
     }
@@ -206,6 +207,28 @@ impl TcpStream {
     }
 }
 
+impl super::GenericSocket for TcpStream {
+    fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
+        let internal = self.internal.read().unwrap();
+        match &*internal {
+            Some(internal) => match &internal.sock_state {
+                Some(arc) => Some(arc.clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+    fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
+        let mut internal = self.internal.write().unwrap();
+        match &mut *internal {
+            Some(internal) => {
+                internal.sock_state = sock_state;
+            }
+            None => {}
+        };
+    }
+}
+
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         wouldblock!(self, read, buf)
@@ -224,15 +247,23 @@ impl Write for TcpStream {
 
 impl event::Source for TcpStream {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        let result = poll::selector_arc(registry).register(self, token, interests);
-        match result {
-            Ok(_) => {
-                let mut internal = self.internal.write().unwrap();
-                internal.selector = Some(poll::selector_arc(registry));
-                internal.token = Some(token);
-                internal.interests = Some(interests);
+        {
+            let mut internal = self.internal.write().unwrap();
+            if internal.is_none() {
+                *internal = Some(RegistryInternalStruct::new(
+                    poll::selector_arc(registry),
+                    token,
+                    interests,
+                ));
             }
-            Err(_) => {}
+        }
+        let result = poll::selector(registry).register(self, token, interests);
+        match result {
+            Ok(_) => {}
+            Err(_) => {
+                let mut internal = self.internal.write().unwrap();
+                *internal = None;
+            }
         }
         result
     }
@@ -243,27 +274,28 @@ impl event::Source for TcpStream {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        let result = poll::selector_arc(registry).reregister(self, token, interests);
+        let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {
                 let mut internal = self.internal.write().unwrap();
-                internal.selector = Some(poll::selector_arc(registry));
-                internal.token = Some(token);
-                internal.interests = Some(interests);
+                internal.as_mut().unwrap().token = token;
+                internal.as_mut().unwrap().interests = interests;
             }
             Err(_) => {}
-        }
+        };
         result
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        {
-            let mut internal = self.internal.write().unwrap();
-            internal.selector = None;
-            internal.token = None;
-            internal.interests = None;
-        }
-        poll::selector_arc(registry).deregister(self)
+        let result = poll::selector(registry).deregister(self);
+        match result {
+            Ok(_) => {
+                let mut internal = self.internal.write().unwrap();
+                *internal = None;
+            }
+            Err(_) => {}
+        };
+        result
     }
 }
 
@@ -276,11 +308,7 @@ impl fmt::Debug for TcpStream {
 impl FromRawSocket for TcpStream {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> TcpStream {
         TcpStream {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             inner: net::TcpStream::from_raw_socket(rawsocket),
         }
     }
@@ -302,11 +330,7 @@ impl TcpListener {
     pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
         inner.set_nonblocking(true)?;
         Ok(TcpListener {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             inner,
         })
     }
@@ -317,11 +341,7 @@ impl TcpListener {
 
     pub fn try_clone(&self) -> io::Result<TcpListener> {
         self.inner.try_clone().map(|s| TcpListener {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             inner: s,
         })
     }
@@ -343,17 +363,47 @@ impl TcpListener {
     }
 }
 
+impl super::GenericSocket for TcpListener {
+    fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
+        let internal = self.internal.read().unwrap();
+        match &*internal {
+            Some(internal) => match &internal.sock_state {
+                Some(arc) => Some(arc.clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+    fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
+        let mut internal = self.internal.write().unwrap();
+        match &mut *internal {
+            Some(internal) => {
+                internal.sock_state = sock_state;
+            }
+            None => {}
+        };
+    }
+}
+
 impl event::Source for TcpListener {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        let result = poll::selector_arc(registry).register(self, token, interests);
-        match result {
-            Ok(_) => {
-                let mut internal = self.internal.write().unwrap();
-                internal.selector = Some(poll::selector_arc(registry));
-                internal.token = Some(token);
-                internal.interests = Some(interests);
+        {
+            let mut internal = self.internal.write().unwrap();
+            if internal.is_none() {
+                *internal = Some(RegistryInternalStruct::new(
+                    poll::selector_arc(registry),
+                    token,
+                    interests,
+                ));
             }
-            Err(_) => {}
+        }
+        let result = poll::selector(registry).register(self, token, interests);
+        match result {
+            Ok(_) => {}
+            Err(_) => {
+                let mut internal = self.internal.write().unwrap();
+                *internal = None;
+            }
         }
         result
     }
@@ -364,27 +414,28 @@ impl event::Source for TcpListener {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        let result = poll::selector_arc(registry).reregister(self, token, interests);
+        let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {
                 let mut internal = self.internal.write().unwrap();
-                internal.selector = Some(poll::selector_arc(registry));
-                internal.token = Some(token);
-                internal.interests = Some(interests);
+                internal.as_mut().unwrap().token = token;
+                internal.as_mut().unwrap().interests = interests;
             }
             Err(_) => {}
-        }
+        };
         result
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        {
-            let mut internal = self.internal.write().unwrap();
-            internal.selector = None;
-            internal.token = None;
-            internal.interests = None;
-        }
-        poll::selector_arc(registry).deregister(self)
+        let result = poll::selector(registry).deregister(self);
+        match result {
+            Ok(_) => {
+                let mut internal = self.internal.write().unwrap();
+                *internal = None;
+            }
+            Err(_) => {}
+        };
+        result
     }
 }
 
@@ -397,11 +448,7 @@ impl fmt::Debug for TcpListener {
 impl FromRawSocket for TcpListener {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> TcpListener {
         TcpListener {
-            internal: Arc::new(RwLock::new(RegistryInternalStruct {
-                selector: None,
-                token: None,
-                interests: None,
-            })),
+            internal: Arc::new(RwLock::new(None)),
             inner: net::TcpListener::from_raw_socket(rawsocket),
         }
     }

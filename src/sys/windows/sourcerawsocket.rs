@@ -2,6 +2,9 @@ use crate::{event, poll, Interests, Registry, Token};
 
 use std::io;
 use std::os::windows::io::{AsRawSocket, RawSocket};
+use std::sync::{Arc, Mutex};
+
+use super::selector::SockState;
 
 /// Adapter for [`RawSocket`] providing an [`event::Source`] implementation.
 ///
@@ -38,7 +41,7 @@ use std::os::windows::io::{AsRawSocket, RawSocket};
 ///
 /// // Register the listener
 /// registry.register(
-///     &SourceRawSocket(&listener.as_raw_socket()),
+///     &SourceRawSocket::new(&listener.as_raw_socket()),
 ///     Token(0),
 ///     Interests::READABLE)?;
 /// #     Ok(())
@@ -63,22 +66,29 @@ use std::os::windows::io::{AsRawSocket, RawSocket};
 ///     fn register(&self, registry: &Registry, token: Token, interests: Interests)
 ///         -> io::Result<()>
 ///     {
-///         SourceRawSocket(&self.raw_socket).register(registry, token, interests)
+///         SourceRawSocket::new(&self.raw_socket).register(registry, token, interests)
 ///     }
 ///
 ///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests)
 ///         -> io::Result<()>
 ///     {
-///         SourceRawSocket(&self.raw_socket).reregister(registry, token, interests)
+///         SourceRawSocket::new(&self.raw_socket).reregister(registry, token, interests)
 ///     }
 ///
 ///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-///         SourceRawSocket(&self.raw_socket).deregister(registry)
+///         SourceRawSocket::new(&self.raw_socket).deregister(registry)
 ///     }
 /// }
 /// ```
 #[derive(Debug)]
-pub struct SourceRawSocket<'a>(pub &'a RawSocket);
+pub struct SourceRawSocket<'a>(&'a RawSocket, Arc<Mutex<Option<Arc<Mutex<SockState>>>>>);
+
+impl SourceRawSocket<'_> {
+    /// Create new SourceRawSocket
+    pub fn new<'a>(raw_socket: &'a RawSocket) -> SourceRawSocket<'a> {
+        SourceRawSocket(raw_socket, Arc::new(Mutex::new(None)))
+    }
+}
 
 impl<'a> event::Source for SourceRawSocket<'a> {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
@@ -102,5 +112,17 @@ impl<'a> event::Source for SourceRawSocket<'a> {
 impl<'a> AsRawSocket for SourceRawSocket<'a> {
     fn as_raw_socket(&self) -> RawSocket {
         *self.0
+    }
+}
+
+impl<'a> super::GenericSocket for SourceRawSocket<'a> {
+    fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
+        match &*self.1.lock().unwrap() {
+            Some(arc) => Some(arc.clone()),
+            None => None,
+        }
+    }
+    fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
+        *self.1.lock().unwrap() = sock_state
     }
 }
