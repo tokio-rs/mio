@@ -6,8 +6,6 @@ use std::mem::{size_of, transmute};
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use std::task::Poll;
-
 use miow::iocp::CompletionPort;
 
 use std::os::windows::ffi::OsStrExt;
@@ -130,7 +128,7 @@ impl Afd {
         info: &mut AfdPollInfo,
         iosb: &mut IO_STATUS_BLOCK,
         apccontext: PVOID,
-    ) -> io::Result<Poll<()>> {
+    ) -> io::Result<bool> {
         unsafe {
             let info_ptr: PVOID = transmute(info);
             iosb.u.Status = STATUS_PENDING;
@@ -147,8 +145,8 @@ impl Afd {
                 size_of::<AfdPollInfo>() as u32,
             );
             match status {
-                STATUS_SUCCESS => Ok(Poll::Ready(())),
-                STATUS_PENDING => Ok(Poll::Pending),
+                STATUS_SUCCESS => Ok(true),
+                STATUS_PENDING => Ok(false),
                 _ => Err(io::Error::from_raw_os_error(
                     RtlNtStatusToDosError(status) as i32
                 )),
