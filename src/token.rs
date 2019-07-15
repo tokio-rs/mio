@@ -61,6 +61,7 @@
 ///     for _ in 0..(MAX_SOCKETS+1) {
 ///         // Connect then drop the socket
 ///         let _ = TcpStream::connect(addr).unwrap();
+///         //std::thread::sleep(std::time::Duration::from_millis(10));
 ///     }
 /// });
 ///

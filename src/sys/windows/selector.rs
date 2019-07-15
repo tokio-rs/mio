@@ -347,8 +347,6 @@ impl SelectorInner {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        //println!("register {:?} {:?}", raw_socket, token);
-        //println!("current entries: {:?}", self.socket_map.lock().unwrap().len());
         let flags = interests_to_epoll(interests);
 
         self._alloc_sock_for_rawsocket_only_if_not_existed(raw_socket)?;
@@ -421,7 +419,10 @@ impl SelectorInner {
                 match socket_map.get_mut(&rawsock) {
                     Some(sock) => {
                         let ptr = Arc::into_raw(sock.clone());
-                        sock.lock().unwrap().update(ptr)?;
+                        let mut sock_internal = sock.lock().unwrap();
+                        if !sock_internal.is_pending_deletion() {
+                            sock_internal.update(ptr).unwrap();
+                        }
                     }
                     None => {}
                 }
