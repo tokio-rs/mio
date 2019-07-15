@@ -38,8 +38,6 @@ libc = "0.2.58"
 miow        = "0.3.3"
 winapi      = { version = "0.3", features = ["winsock2"] }
 ntapi       = "0.3"
-bitflags    = "1.0"
-lazy_static = "1.3"
 
 [dev-dependencies]
 bytes      = "0.4.12"

@@ -20,7 +20,12 @@ use miow::iocp::{CompletionPort, CompletionStatus};
 use crate::sys::Events;
 use crate::{Interests, Token};
 
-use super::afd::{eventflags_to_afd_events, Afd, AfdPollInfo};
+use super::afd::{Afd, AfdPollInfo};
+use super::afd::{
+    AFD_POLL_ABORT, AFD_POLL_ACCEPT, AFD_POLL_CONNECT_FAIL, AFD_POLL_DISCONNECT,
+    AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_RECEIVE_EXPEDITED, AFD_POLL_SEND,
+    KNOWN_AFD_EVENTS,
+};
 use super::Event;
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
@@ -42,7 +47,7 @@ impl IoStatusBlock {
 
 impl fmt::Debug for IoStatusBlock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "IO_STATUS_BLOCK")
+        write!(f, "IoStatusBlock")
     }
 }
 
@@ -83,22 +88,20 @@ impl Sock {
 
     /// True if need to be added on update queue, false otherwise.
     fn set_event(&mut self, ev: Event) -> bool {
-        /* EPOLLERR and EPOLLHUP are always reported, even when not requested by the
-         * caller. However they are disabled after a event has been reported for a
-         * socket for which the EPOLLONESHOT flag as set. */
-        let events = ev.flags | EPOLLERR | EPOLLHUP;
+        /* AFD_POLL_CONNECT_FAIL and AFD_POLL_ABORT are always reported, even when not requested by the caller. */
+        let events = ev.flags | AFD_POLL_CONNECT_FAIL | AFD_POLL_ABORT;
 
         self.user_evts = events;
         self.user_data = ev.data;
 
-        (events & KNOWN_EPOLL_EVENTS & !self.pending_evts) != 0
+        (events & !self.pending_evts) != 0
     }
 
     fn update(&mut self, self_ptr: *const Mutex<Sock>) -> io::Result<()> {
         assert!(!self.delete_pending);
 
         if self.poll_status == SockPollStatus::Pending
-            && (self.user_evts & KNOWN_EPOLL_EVENTS & !self.pending_evts) == 0
+            && (self.user_evts & KNOWN_AFD_EVENTS & !self.pending_evts) == 0
         {
             /* All the events the user is interested in are already being monitored by
              * the pending poll operation. It might spuriously complete because of an
@@ -124,7 +127,7 @@ impl Sock {
             }
             self.poll_info.handles[0].handle = self.base_socket as HANDLE;
             self.poll_info.handles[0].status = 0;
-            self.poll_info.handles[0].events = eventflags_to_afd_events(self.user_evts);
+            self.poll_info.handles[0].events = self.user_evts;
 
             let apccontext = unsafe { mem::transmute(self_ptr) };
             let result = self
@@ -135,7 +138,7 @@ impl Sock {
                     if code == ERROR_IO_PENDING as i32 {
                         /* Overlapped poll operation in progress; this is expected. */
                     } else if code == ERROR_INVALID_HANDLE as i32 {
-                        /* Socket closed; it'll be dropped from the epoll set. */
+                        /* Socket closed; it'll be dropped. */
                         self.mark_delete();
                         return Ok(());
                     } else {
@@ -171,7 +174,7 @@ impl Sock {
     }
 
     fn feed_event(&mut self) -> Option<Event> {
-        let mut epoll_events = 0;
+        let mut afd_events = 0;
         self.poll_status = SockPollStatus::Idle;
         self.pending_evts = 0;
 
@@ -182,39 +185,34 @@ impl Sock {
                 /* The poll request was cancelled by CancelIoEx. */
             } else if !NT_SUCCESS(self.iosb.0.u.Status) {
                 /* The overlapped request itself failed in an unexpected way. */
-                epoll_events &= EPOLLERR;
+                afd_events = AFD_POLL_CONNECT_FAIL;
             } else if self.poll_info.number_of_handles < 1 {
                 /* This poll operation succeeded but didn't report any socket events. */
-            } else if self.poll_info.handles[0].events & super::afd::AFD_POLL_LOCAL_CLOSE != 0 {
+            } else if self.poll_info.handles[0].events & AFD_POLL_LOCAL_CLOSE != 0 {
                 self.mark_delete();
                 return None;
             } else {
-                epoll_events =
-                    super::afd::afd_events_to_eventflags(self.poll_info.handles[0].events);
+                afd_events = self.poll_info.handles[0].events;
             }
         }
 
-        epoll_events &= self.user_evts;
+        afd_events &= self.user_evts;
 
-        if epoll_events == 0 {
+        if afd_events == 0 {
             return None;
         }
 
-        if (self.user_evts & EPOLLONESHOT) != 0 {
-            self.user_evts = 0;
-        }
-
         // Codes to emulate ET in mio
-        if (epoll_events & EPOLLIN) != 0 {
-            self.user_evts &= !EPOLLIN;
+        if (afd_events & (KNOWN_AFD_EVENTS & !AFD_POLL_SEND)) != 0 {
+            self.user_evts &= !(afd_events & (KNOWN_AFD_EVENTS & !AFD_POLL_SEND));
         }
-        if (epoll_events & EPOLLOUT) != 0 {
-            self.user_evts &= !EPOLLOUT;
+        if (afd_events & AFD_POLL_SEND) != 0 {
+            self.user_evts &= !AFD_POLL_SEND;
         }
 
         Some(Event {
             data: self.user_data,
-            flags: epoll_events,
+            flags: afd_events,
         })
     }
 
@@ -297,7 +295,7 @@ impl Selector {
 
 #[derive(Debug)]
 pub struct SelectorInner {
-    cp: Arc<CompletionPort>,
+    cp: CompletionPort,
     active_poll_count: AtomicUsize,
     update_queue: Mutex<VecDeque<RawSocket>>,
     deleted_queue: Mutex<VecDeque<Arc<Mutex<Sock>>>>,
@@ -308,7 +306,7 @@ pub struct SelectorInner {
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
         CompletionPort::new(0).map(|cp| SelectorInner {
-            cp: Arc::new(cp),
+            cp: cp,
             active_poll_count: AtomicUsize::new(0),
             update_queue: Mutex::new(VecDeque::new()),
             deleted_queue: Mutex::new(VecDeque::new()),
@@ -347,7 +345,7 @@ impl SelectorInner {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        let flags = interests_to_epoll(interests);
+        let flags = interests_to_afd_flags(interests);
 
         self._alloc_sock_for_rawsocket_only_if_not_existed(raw_socket)?;
 
@@ -367,7 +365,7 @@ impl SelectorInner {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        let flags = interests_to_epoll(interests);
+        let flags = interests_to_afd_flags(interests);
 
         {
             let socket_map = self.socket_map.lock().unwrap();
@@ -403,8 +401,8 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn port(&self) -> Arc<CompletionPort> {
-        self.cp.clone()
+    pub fn port(&self) -> &CompletionPort {
+        &self.cp
     }
 
     fn update_sockets_events(&self) -> io::Result<()> {
@@ -446,7 +444,7 @@ impl SelectorInner {
             for iocp_event in iocp_events.iter() {
                 if iocp_event.overlapped() as usize == 0 {
                     events.push(Event {
-                        flags: EPOLLIN,
+                        flags: AFD_POLL_RECEIVE,
                         data: iocp_event.token() as u64,
                     });
                     continue;
@@ -550,58 +548,20 @@ impl SelectorInner {
     }
 }
 
-pub const EPOLLIN: u32 = (1 << 0);
-pub const EPOLLPRI: u32 = (1 << 1);
-pub const EPOLLOUT: u32 = (1 << 2);
-pub const EPOLLERR: u32 = (1 << 3);
-pub const EPOLLHUP: u32 = (1 << 4);
-pub const EPOLLRDNORM: u32 = (1 << 6);
-pub const EPOLLRDBAND: u32 = (1 << 7);
-pub const EPOLLWRNORM: u32 = (1 << 8);
-pub const EPOLLWRBAND: u32 = (1 << 9);
-pub const EPOLLMSG: u32 = (1 << 10); /* Never reported. */
-pub const EPOLLRDHUP: u32 = (1 << 13);
-pub const EPOLLONESHOT: u32 = (1 << 31);
-
-pub const KNOWN_EPOLL_EVENTS: u32 = EPOLLIN
-    | EPOLLPRI
-    | EPOLLOUT
-    | EPOLLERR
-    | EPOLLHUP
-    | EPOLLRDNORM
-    | EPOLLRDBAND
-    | EPOLLWRNORM
-    | EPOLLWRBAND
-    | EPOLLMSG
-    | EPOLLRDHUP;
-
-fn interests_to_epoll(interests: Interests) -> u32 {
-    let mut kind = 0;
+fn interests_to_afd_flags(interests: Interests) -> u32 {
+    let mut flags = 0;
 
     if interests.is_readable() {
-        kind |= EPOLLIN;
+        flags |=
+            AFD_POLL_RECEIVE | AFD_POLL_RECEIVE_EXPEDITED | AFD_POLL_ACCEPT | AFD_POLL_DISCONNECT;
     }
 
     if interests.is_writable() {
-        kind |= EPOLLOUT;
+        flags |= AFD_POLL_SEND;
     }
 
-    kind
+    flags
 }
-
-/*
-fn epoll_to_interests(epoll_flags: u32) -> Option<Interests> {
-    if epoll_flags | EPOLLIN != 0 && epoll_flags | EPOLLOUT != 0 {
-        Some(Interests::READABLE | Interests::WRITABLE)
-    } else if epoll_flags | EPOLLIN != 0 {
-        Some(Interests::READABLE)
-    } else if epoll_flags | EPOLLOUT != 0 {
-        Some(Interests::WRITABLE)
-    } else {
-        None
-    }
-}
-*/
 
 fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
     let mut base_socket: RawSocket = 0;

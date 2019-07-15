@@ -130,3 +130,10 @@ pub mod unix {
 
     pub use crate::sys::SourceFd;
 }
+
+#[cfg(windows)]
+pub mod windows {
+    //! Windows only extensions.
+
+    pub use crate::sys::SourceRawSocket;
+}

@@ -180,11 +180,11 @@ impl UdpSocket {
 
 impl event::Source for UdpSocket {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        let result = poll::selector(registry).register(self, token, interests);
+        let result = poll::selector_arc(registry).register(self, token, interests);
         match result {
             Ok(_) => {
                 let mut internal = self.internal.write().unwrap();
-                internal.selector = Some(poll::selector(registry));
+                internal.selector = Some(poll::selector_arc(registry));
                 internal.token = Some(token);
                 internal.interests = Some(interests);
             }
@@ -199,11 +199,11 @@ impl event::Source for UdpSocket {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        let result = poll::selector(registry).reregister(self, token, interests);
+        let result = poll::selector_arc(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {
                 let mut internal = self.internal.write().unwrap();
-                internal.selector = Some(poll::selector(registry));
+                internal.selector = Some(poll::selector_arc(registry));
                 internal.token = Some(token);
                 internal.interests = Some(interests);
             }
@@ -219,7 +219,7 @@ impl event::Source for UdpSocket {
             internal.token = None;
             internal.interests = None;
         }
-        poll::selector(registry).deregister(self)
+        poll::selector_arc(registry).deregister(self)
     }
 }
 

@@ -14,7 +14,9 @@ pub use self::unix::{
 pub mod unix;
 
 #[cfg(windows)]
-pub use self::windows::{event, Event, Events, Selector, TcpListener, TcpStream, UdpSocket, Waker};
+pub use self::windows::{
+    event, Event, Events, Selector, SourceRawSocket, TcpListener, TcpStream, UdpSocket, Waker,
+};
 
 #[cfg(windows)]
-mod windows;
+pub mod windows;

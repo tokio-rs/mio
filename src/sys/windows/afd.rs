@@ -25,11 +25,6 @@ use ntapi::ntioapi::IO_STATUS_BLOCK;
 use ntapi::ntioapi::{NtCancelIoFileEx, NtCreateFile, NtDeviceIoControlFile};
 use ntapi::ntrtl::RtlNtStatusToDosError;
 
-use super::selector::{
-    EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT, EPOLLPRI, EPOLLRDBAND, EPOLLRDHUP, EPOLLRDNORM,
-    EPOLLWRBAND, EPOLLWRNORM,
-};
-
 const IOCTL_AFD_POLL: ULONG = 0x00012024;
 const AFD_HELPER_NAME: &'static str = "\\Device\\Afd\\Mio";
 
@@ -180,58 +175,11 @@ pub const AFD_POLL_ABORT: u32 = 0x0010;
 pub const AFD_POLL_LOCAL_CLOSE: u32 = 0x0020;
 pub const AFD_POLL_ACCEPT: u32 = 0x0080;
 pub const AFD_POLL_CONNECT_FAIL: u32 = 0x0100;
-
-pub fn eventflags_to_afd_events(epoll_events: u32) -> u32 {
-    /* Always monitor for AFD_POLL_LOCAL_CLOSE, which is triggered when the
-     * socket is closed with closesocket() or CloseHandle(). */
-    let mut afd_events = AFD_POLL_LOCAL_CLOSE;
-
-    if (epoll_events & (EPOLLIN | EPOLLRDNORM)) != 0 {
-        afd_events |= AFD_POLL_RECEIVE | AFD_POLL_ACCEPT;
-    }
-    if (epoll_events & (EPOLLPRI | EPOLLRDBAND)) != 0 {
-        afd_events |= AFD_POLL_RECEIVE_EXPEDITED;
-    }
-    if (epoll_events & (EPOLLOUT | EPOLLWRNORM | EPOLLWRBAND)) != 0 {
-        afd_events |= AFD_POLL_SEND;
-    }
-    if (epoll_events & (EPOLLIN | EPOLLRDNORM | EPOLLRDHUP)) != 0 {
-        afd_events |= AFD_POLL_DISCONNECT;
-    }
-    if (epoll_events & EPOLLHUP) != 0 {
-        afd_events |= AFD_POLL_ABORT;
-    }
-    if (epoll_events & EPOLLERR) != 0 {
-        afd_events |= AFD_POLL_CONNECT_FAIL;
-    }
-
-    return afd_events;
-}
-
-pub fn afd_events_to_eventflags(afd_events: u32) -> u32 {
-    let mut epoll_events = 0;
-
-    if afd_events & (AFD_POLL_RECEIVE | AFD_POLL_ACCEPT) != 0 {
-        epoll_events |= EPOLLIN | EPOLLRDNORM;
-    }
-    if afd_events & AFD_POLL_RECEIVE_EXPEDITED != 0 {
-        epoll_events |= EPOLLPRI | EPOLLRDBAND;
-    }
-    if afd_events & AFD_POLL_SEND != 0 {
-        epoll_events |= EPOLLOUT | EPOLLWRNORM | EPOLLWRBAND;
-    }
-    if afd_events & AFD_POLL_DISCONNECT != 0 {
-        epoll_events |= EPOLLIN | EPOLLRDNORM | EPOLLRDHUP;
-    }
-    if afd_events & AFD_POLL_ABORT != 0 {
-        //epoll_events |= EPOLLHUP;
-        // Mio needs EPOLLIN to pass the test
-        epoll_events |= EPOLLIN | EPOLLHUP;
-    }
-    if afd_events & AFD_POLL_CONNECT_FAIL != 0 {
-        /* Linux reports all these events after connect() has failed. */
-        epoll_events |= EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLRDNORM | EPOLLWRNORM | EPOLLRDHUP;
-    }
-
-    return epoll_events;
-}
+pub const KNOWN_AFD_EVENTS: u32 = AFD_POLL_RECEIVE
+    | AFD_POLL_RECEIVE_EXPEDITED
+    | AFD_POLL_SEND
+    | AFD_POLL_DISCONNECT
+    | AFD_POLL_ABORT
+    | AFD_POLL_LOCAL_CLOSE
+    | AFD_POLL_ACCEPT
+    | AFD_POLL_CONNECT_FAIL;

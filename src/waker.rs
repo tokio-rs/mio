@@ -81,7 +81,7 @@ pub struct Waker {
 impl Waker {
     /// Create a new `Waker`.
     pub fn new(registry: &Registry, token: Token) -> io::Result<Waker> {
-        sys::Waker::new(&poll::selector(&registry), token).map(|inner| Waker { inner })
+        sys::Waker::new(poll::selector(&registry), token).map(|inner| Waker { inner })
     }
 
     /// Wake up the [`Poll`] associated with this `Waker`.

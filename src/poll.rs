@@ -678,7 +678,11 @@ impl Registry {
 
 // ===== Accessors for internal usage =====
 
-pub fn selector(registry: &Registry) -> Arc<sys::Selector> {
+pub fn selector(registry: &Registry) -> &sys::Selector {
+    &registry.selector
+}
+
+pub fn selector_arc(registry: &Registry) -> Arc<sys::Selector> {
     registry.selector.clone()
 }
 
