@@ -25,7 +25,7 @@ use super::Event;
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 enum SockPollStatus {
     Idle,
     Pending,
@@ -64,7 +64,7 @@ struct Sock {
 }
 
 impl Sock {
-    pub fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<Sock> {
+    fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<Sock> {
         unsafe {
             Ok(Sock {
                 iosb: IoStatusBlock::zeroed(),
@@ -82,7 +82,7 @@ impl Sock {
     }
 
     /// True if need to be added on update queue, false otherwise.
-    pub fn set_event(&mut self, ev: Event) -> bool {
+    fn set_event(&mut self, ev: Event) -> bool {
         /* EPOLLERR and EPOLLHUP are always reported, even when not requested by the
          * caller. However they are disabled after a event has been reported for a
          * socket for which the EPOLLONESHOT flag as set. */
@@ -94,7 +94,7 @@ impl Sock {
         (events & KNOWN_EPOLL_EVENTS & !self.pending_evts) != 0
     }
 
-    pub fn update(&mut self, self_ptr: *const Mutex<Sock>) -> io::Result<()> {
+    fn update(&mut self, self_ptr: *const Mutex<Sock>) -> io::Result<()> {
         assert!(!self.delete_pending);
 
         if self.poll_status == SockPollStatus::Pending
@@ -110,9 +110,11 @@ impl Sock {
              * poll operation; when we receive it's completion package, a new poll
              * operation will be submitted with the correct event mask. */
             self.cancel()?;
+            return Ok(());
         } else if self.poll_status == SockPollStatus::Cancelled {
             /* The poll operation has already been cancelled, we're still waiting for
              * it to return. For now, there's nothing that needs to be done. */
+            return Ok(());
         } else if self.poll_status == SockPollStatus::Idle {
             /* No poll operation is pending; start one. */
             self.poll_info.exclusive = 0;
@@ -134,7 +136,8 @@ impl Sock {
                         /* Overlapped poll operation in progress; this is expected. */
                     } else if code == ERROR_INVALID_HANDLE as i32 {
                         /* Socket closed; it'll be dropped from the epoll set. */
-                        self.delete_pending = true;
+                        self.mark_delete();
+                        return Ok(());
                     } else {
                         return Err(e);
                     }
@@ -149,7 +152,7 @@ impl Sock {
         Ok(())
     }
 
-    pub fn cancel(&mut self) -> io::Result<()> {
+    fn cancel(&mut self) -> io::Result<()> {
         assert!(self.poll_status == SockPollStatus::Pending);
         self.afd.cancel(&mut self.iosb.0)?;
         self.poll_status = SockPollStatus::Cancelled;
@@ -157,8 +160,7 @@ impl Sock {
         Ok(())
     }
 
-    /// True if the deletion needs to be delayed, false otherwise.
-    pub fn delete(&mut self) -> bool {
+    fn mark_delete(&mut self) {
         if !self.delete_pending {
             if self.poll_status == SockPollStatus::Pending {
                 drop(self.cancel());
@@ -166,13 +168,9 @@ impl Sock {
 
             self.delete_pending = true;
         }
-        /* If the poll request still needs to complete, the sock_state object can't
-         * be free()d yet. `sock_feed_event()` or `port_close()` will take care
-         * of this later. */
-        self.poll_status != SockPollStatus::Idle
     }
 
-    pub fn feed_event(&mut self) -> Option<Event> {
+    fn feed_event(&mut self) -> Option<Event> {
         let mut epoll_events = 0;
         self.poll_status = SockPollStatus::Idle;
         self.pending_evts = 0;
@@ -188,7 +186,7 @@ impl Sock {
             } else if self.poll_info.number_of_handles < 1 {
                 /* This poll operation succeeded but didn't report any socket events. */
             } else if self.poll_info.handles[0].events & super::afd::AFD_POLL_LOCAL_CLOSE != 0 {
-                self.delete_pending = true;
+                self.mark_delete();
                 return None;
             } else {
                 epoll_events =
@@ -212,12 +210,16 @@ impl Sock {
         })
     }
 
-    pub fn is_pending_deletion(&self) -> bool {
+    fn is_pending_deletion(&self) -> bool {
         self.delete_pending
     }
 
-    pub fn raw_socket(&self) -> RawSocket {
+    fn raw_socket(&self) -> RawSocket {
         self.raw_socket
+    }
+
+    fn poll_status(&self) -> SockPollStatus {
+        self.poll_status
     }
 }
 
@@ -290,6 +292,7 @@ pub struct SelectorInner {
     cp: Arc<CompletionPort>,
     active_poll_count: AtomicUsize,
     update_queue: Mutex<VecDeque<RawSocket>>,
+    deleted_queue: Mutex<VecDeque<Arc<Mutex<Sock>>>>,
     afd_group: Mutex<Vec<Arc<Afd>>>,
     socket_map: Mutex<HashMap<RawSocket, Arc<Mutex<Sock>>>>,
 }
@@ -300,6 +303,7 @@ impl SelectorInner {
             cp: Arc::new(cp),
             active_poll_count: AtomicUsize::new(0),
             update_queue: Mutex::new(VecDeque::new()),
+            deleted_queue: Mutex::new(VecDeque::new()),
             afd_group: Mutex::new(Vec::new()),
             socket_map: Mutex::new(HashMap::new()),
         })
@@ -380,15 +384,13 @@ impl SelectorInner {
             let mut socket_map = self.socket_map.lock().unwrap();
             match socket_map.get_mut(&raw_socket) {
                 Some(sock) => {
-                    if sock.lock().unwrap().delete() {
-                        return Ok(());
-                    }
+                    let mut sock_internal = sock.lock().unwrap();
+                    sock_internal.mark_delete();
                 }
                 None => return Err(io::Error::from(io::ErrorKind::NotFound)),
             }
-
-            socket_map.remove(&raw_socket).unwrap();
         }
+        self._release_deleted_sock();
         self._release_unused_afd();
         Ok(())
     }
@@ -398,21 +400,25 @@ impl SelectorInner {
     }
 
     fn update_sockets_events(&self) -> io::Result<()> {
-        let mut update_queue = self.update_queue.lock().unwrap();
-        let mut socket_map = self.socket_map.lock().unwrap();
-        loop {
-            let rawsock = match update_queue.pop_front() {
-                Some(rawsock) => rawsock,
-                None => break,
-            };
-            match socket_map.get_mut(&rawsock) {
-                Some(sock) => {
-                    let ptr = Arc::into_raw(sock.clone());
-                    sock.lock().unwrap().update(ptr)?;
+        {
+            let mut update_queue = self.update_queue.lock().unwrap();
+            let mut socket_map = self.socket_map.lock().unwrap();
+            loop {
+                let rawsock = match update_queue.pop_front() {
+                    Some(rawsock) => rawsock,
+                    None => break,
+                };
+                match socket_map.get_mut(&rawsock) {
+                    Some(sock) => {
+                        let ptr = Arc::into_raw(sock.clone());
+                        sock.lock().unwrap().update(ptr)?;
+                    }
+                    None => {}
                 }
-                None => {}
             }
         }
+        self._release_deleted_sock();
+        self._release_unused_afd();
         Ok(())
     }
 
@@ -449,6 +455,7 @@ impl SelectorInner {
             }
         }
         self._release_deleted_sock();
+        self._release_unused_afd();
     }
 
     fn _acquire_afd(&self) -> io::Result<Arc<Afd>> {
@@ -518,6 +525,16 @@ impl SelectorInner {
     fn _release_deleted_sock(&self) {
         let mut socket_map = self.socket_map.lock().unwrap();
 
+        socket_map.iter().for_each(|(_, sock)| {
+            let sock_internal = sock.lock().unwrap();
+            if !sock_internal.is_pending_deletion() {
+                return;
+            }
+            if sock_internal.poll_status() != SockPollStatus::Idle {
+                let mut deleted_queue = self.deleted_queue.lock().unwrap();
+                deleted_queue.push_back(sock.clone());
+            }
+        });
         socket_map.retain(|_, sock| !sock.lock().unwrap().is_pending_deletion());
     }
 }
