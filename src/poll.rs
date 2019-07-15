@@ -682,6 +682,7 @@ pub fn selector(registry: &Registry) -> &sys::Selector {
     &registry.selector
 }
 
+#[cfg(windows)]
 pub fn selector_arc(registry: &Registry) -> Arc<sys::Selector> {
     registry.selector.clone()
 }
