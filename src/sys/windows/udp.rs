@@ -1,4 +1,5 @@
 use crate::poll;
+use crate::sys::Selector;
 use crate::{event, Interests, Registry, Token};
 
 #[allow(unused_imports)] // only here for Rust 1.8
@@ -8,15 +9,30 @@ use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::sync::{Arc, RwLock};
+
+struct RegistryInternalStruct {
+    selector: Option<Arc<Selector>>,
+    token: Option<Token>,
+    interests: Option<Interests>,
+}
 
 pub struct UdpSocket {
+    internal: Arc<RwLock<RegistryInternalStruct>>,
     io: std::net::UdpSocket,
 }
 
 impl UdpSocket {
     pub fn new(socket: std::net::UdpSocket) -> io::Result<UdpSocket> {
         socket.set_nonblocking(true)?;
-        Ok(UdpSocket { io: socket })
+        Ok(UdpSocket {
+            internal: Arc::new(RwLock::new(RegistryInternalStruct {
+                selector: None,
+                token: None,
+                interests: None,
+            })),
+            io: socket,
+        })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -24,7 +40,14 @@ impl UdpSocket {
     }
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        self.io.try_clone().map(|io| UdpSocket { io })
+        self.io.try_clone().map(|io| UdpSocket {
+            internal: Arc::new(RwLock::new(RegistryInternalStruct {
+                selector: None,
+                token: None,
+                interests: None,
+            })),
+            io,
+        })
     }
 
     pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
@@ -36,15 +59,54 @@ impl UdpSocket {
     }
 
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.io.send(buf)
+        let result = self.io.send(buf);
+        if let Err(ref e) = result {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                let internal = self.internal.read().unwrap();
+                if let Some(selector) = &internal.selector {
+                    selector.reregister(
+                        self,
+                        internal.token.unwrap(),
+                        internal.interests.unwrap(),
+                    )?;
+                }
+            }
+        }
+        result
     }
 
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.io.recv(buf)
+        let result = self.io.recv(buf);
+        if let Err(ref e) = result {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                let internal = self.internal.read().unwrap();
+                if let Some(selector) = &internal.selector {
+                    selector.reregister(
+                        self,
+                        internal.token.unwrap(),
+                        internal.interests.unwrap(),
+                    )?;
+                }
+            }
+        }
+        result
     }
 
     pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
-        self.io.connect(addr)
+        let result = self.io.connect(addr);
+        if let Err(ref e) = result {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                let internal = self.internal.read().unwrap();
+                if let Some(selector) = &internal.selector {
+                    selector.reregister(
+                        self,
+                        internal.token.unwrap(),
+                        internal.interests.unwrap(),
+                    )?;
+                }
+            }
+        }
+        result
     }
 
     pub fn broadcast(&self) -> io::Result<bool> {
@@ -118,7 +180,17 @@ impl UdpSocket {
 
 impl event::Source for UdpSocket {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        poll::selector(registry).register(self, token, interests)
+        let result = poll::selector(registry).register(self, token, interests);
+        match result {
+            Ok(_) => {
+                let mut internal = self.internal.write().unwrap();
+                internal.selector = Some(poll::selector(registry));
+                internal.token = Some(token);
+                internal.interests = Some(interests);
+            }
+            Err(_) => {}
+        }
+        result
     }
 
     fn reregister(
@@ -127,10 +199,26 @@ impl event::Source for UdpSocket {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        poll::selector(registry).reregister(self, token, interests)
+        let result = poll::selector(registry).reregister(self, token, interests);
+        match result {
+            Ok(_) => {
+                let mut internal = self.internal.write().unwrap();
+                internal.selector = Some(poll::selector(registry));
+                internal.token = Some(token);
+                internal.interests = Some(interests);
+            }
+            Err(_) => {}
+        }
+        result
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
+        {
+            let mut internal = self.internal.write().unwrap();
+            internal.selector = None;
+            internal.token = None;
+            internal.interests = None;
+        }
         poll::selector(registry).deregister(self)
     }
 }
@@ -144,6 +232,11 @@ impl fmt::Debug for UdpSocket {
 impl FromRawSocket for UdpSocket {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> UdpSocket {
         UdpSocket {
+            internal: Arc::new(RwLock::new(RegistryInternalStruct {
+                selector: None,
+                token: None,
+                interests: None,
+            })),
             io: net::UdpSocket::from_raw_socket(rawsocket),
         }
     }

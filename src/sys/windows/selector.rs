@@ -204,6 +204,14 @@ impl Sock {
             self.user_evts = 0;
         }
 
+        // Codes to emulate ET in mio
+        if (epoll_events & EPOLLIN) != 0 {
+            self.user_evts &= !EPOLLIN;
+        }
+        if (epoll_events & EPOLLOUT) != 0 {
+            self.user_evts &= !EPOLLOUT;
+        }
+
         Some(Event {
             data: self.user_data,
             flags: epoll_events,
@@ -339,6 +347,8 @@ impl SelectorInner {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
+        //println!("register {:?} {:?}", raw_socket, token);
+        //println!("current entries: {:?}", self.socket_map.lock().unwrap().len());
         let flags = interests_to_epoll(interests);
 
         self._alloc_sock_for_rawsocket_only_if_not_existed(raw_socket)?;
@@ -390,7 +400,7 @@ impl SelectorInner {
                 None => return Err(io::Error::from(io::ErrorKind::NotFound)),
             }
         }
-        self._release_deleted_sock();
+        self._cleanup_deleted_sock();
         self._release_unused_afd();
         Ok(())
     }
@@ -417,7 +427,7 @@ impl SelectorInner {
                 }
             }
         }
-        self._release_deleted_sock();
+        self._cleanup_deleted_sock();
         self._release_unused_afd();
         Ok(())
     }
@@ -454,7 +464,7 @@ impl SelectorInner {
                 }
             }
         }
-        self._release_deleted_sock();
+        self._cleanup_deleted_sock();
         self._release_unused_afd();
     }
 
@@ -522,7 +532,7 @@ impl SelectorInner {
         }
     }
 
-    fn _release_deleted_sock(&self) {
+    fn _cleanup_deleted_sock(&self) {
         let mut socket_map = self.socket_map.lock().unwrap();
 
         socket_map.iter().for_each(|(_, sock)| {

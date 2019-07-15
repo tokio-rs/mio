@@ -678,8 +678,8 @@ impl Registry {
 
 // ===== Accessors for internal usage =====
 
-pub fn selector(registry: &Registry) -> &sys::Selector {
-    &registry.selector
+pub fn selector(registry: &Registry) -> Arc<sys::Selector> {
+    registry.selector.clone()
 }
 
 fn is_send<T: Send>() {}
