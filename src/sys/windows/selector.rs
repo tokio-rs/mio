@@ -258,7 +258,8 @@ impl Selector {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        self.inner.register(socket, token, interests)
+        self.inner
+            .register(socket.as_raw_socket(), token, interests)
     }
 
     pub fn reregister<T: AsRawSocket>(
@@ -267,11 +268,12 @@ impl Selector {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        self.inner.reregister(socket, token, interests)
+        self.inner
+            .reregister(socket.as_raw_socket(), token, interests)
     }
 
     pub fn deregister<T: AsRawSocket>(&self, socket: &T) -> io::Result<()> {
-        self.inner.deregister(socket)
+        self.inner.deregister(socket.as_raw_socket())
     }
 
     pub fn id(&self) -> usize {
@@ -327,15 +329,14 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn register<T: AsRawSocket>(
+    pub fn register(
         &self,
-        socket: &T,
+        raw_socket: RawSocket,
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
         let flags = interests_to_epoll(interests);
 
-        let raw_socket = socket.as_raw_socket();
         self._alloc_sock_for_rawsocket_only_if_not_existed(raw_socket)?;
 
         let event = Event {
@@ -348,15 +349,14 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn reregister<T: AsRawSocket>(
+    pub fn reregister(
         &self,
-        socket: &T,
+        raw_socket: RawSocket,
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
         let flags = interests_to_epoll(interests);
 
-        let raw_socket = socket.as_raw_socket();
         {
             let socket_map = self.socket_map.lock().unwrap();
             match socket_map.get(&raw_socket) {
@@ -375,8 +375,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn deregister<T: AsRawSocket>(&self, socket: &T) -> io::Result<()> {
-        let raw_socket = socket.as_raw_socket();
+    pub fn deregister(&self, raw_socket: RawSocket) -> io::Result<()> {
         {
             let mut socket_map = self.socket_map.lock().unwrap();
             match socket_map.get_mut(&raw_socket) {
@@ -439,7 +438,9 @@ impl SelectorInner {
                     unsafe { Arc::from_raw(mem::transmute(iocp_event.overlapped())) };
                 let mut sock_guard = sock.lock().unwrap();
                 match sock_guard.feed_event() {
-                    Some(e) => events.push(e),
+                    Some(e) => {
+                        events.push(e);
+                    }
                     None => {}
                 }
                 if !sock_guard.is_pending_deletion() {
@@ -559,6 +560,20 @@ fn interests_to_epoll(interests: Interests) -> u32 {
 
     kind
 }
+
+/*
+fn epoll_to_interests(epoll_flags: u32) -> Option<Interests> {
+    if epoll_flags | EPOLLIN != 0 && epoll_flags | EPOLLOUT != 0 {
+        Some(Interests::READABLE | Interests::WRITABLE)
+    } else if epoll_flags | EPOLLIN != 0 {
+        Some(Interests::READABLE)
+    } else if epoll_flags | EPOLLOUT != 0 {
+        Some(Interests::WRITABLE)
+    } else {
+        None
+    }
+}
+*/
 
 fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
     let mut base_socket: RawSocket = 0;
