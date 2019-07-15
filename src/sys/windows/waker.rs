@@ -20,8 +20,8 @@ impl Waker {
     }
 
     pub fn wake(&self) -> io::Result<()> {
+        // Keep NULL as Overlapped value to notify waking.
         let status = CompletionStatus::new(0, self.token.0, 0 as *mut _);
-        self.selector.port().post(status)?;
-        Ok(())
+        self.selector.port().post(status)
     }
 }
