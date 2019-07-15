@@ -28,6 +28,41 @@ pub struct TcpListener {
     inner: net::TcpListener,
 }
 
+macro_rules! wouldblock {
+    ($self:ident, $method:ident)  => {{
+        let result = $self.inner.$method();
+        if let Err(ref e) = result {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                let internal = $self.internal.read().unwrap();
+                if let Some(selector) = &internal.selector {
+                    selector.reregister(
+                        $self,
+                        internal.token.unwrap(),
+                        internal.interests.unwrap(),
+                    )?;
+                }
+            }
+        }
+        result
+    }};
+    ($self:ident, $method:ident, $($args:expr),* )  => {{
+        let result = $self.inner.$method($($args),*);
+        if let Err(ref e) = result {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                let internal = $self.internal.read().unwrap();
+                if let Some(selector) = &internal.selector {
+                    selector.reregister(
+                        $self,
+                        internal.token.unwrap(),
+                        internal.interests.unwrap(),
+                    )?;
+                }
+            }
+        }
+        result
+    }};
+}
+
 impl TcpStream {
     pub fn connect(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
         stream.set_nonblocking(true)?;
@@ -173,56 +208,17 @@ impl TcpStream {
 
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let result = self.inner.read(buf);
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
-                        self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
-                    )?;
-                }
-            }
-        }
-        result
+        wouldblock!(self, read, buf)
     }
 }
 
 impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let result = self.inner.write(buf);
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
-                        self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
-                    )?;
-                }
-            }
-        }
-        result
+        wouldblock!(self, write, buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        let result = self.inner.flush();
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
-                        self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
-                    )?;
-                }
-            }
-        }
-        result
+        wouldblock!(self, flush)
     }
 }
 
@@ -331,20 +327,7 @@ impl TcpListener {
     }
 
     pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
-        let result = self.inner.accept();
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
-                        self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
-                    )?;
-                }
-            }
-        }
-        result
+        wouldblock!(self, accept)
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {

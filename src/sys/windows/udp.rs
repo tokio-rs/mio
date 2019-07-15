@@ -22,6 +22,25 @@ pub struct UdpSocket {
     io: std::net::UdpSocket,
 }
 
+macro_rules! wouldblock {
+    ($self:ident, $method:ident, $($args:expr),* )  => {{
+        let result = $self.io.$method($($args),*);
+        if let Err(ref e) = result {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                let internal = $self.internal.read().unwrap();
+                if let Some(selector) = &internal.selector {
+                    selector.reregister(
+                        $self,
+                        internal.token.unwrap(),
+                        internal.interests.unwrap(),
+                    )?;
+                }
+            }
+        }
+        result
+    }};
+}
+
 impl UdpSocket {
     pub fn new(socket: std::net::UdpSocket) -> io::Result<UdpSocket> {
         socket.set_nonblocking(true)?;
@@ -59,54 +78,15 @@ impl UdpSocket {
     }
 
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        let result = self.io.send(buf);
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
-                        self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
-                    )?;
-                }
-            }
-        }
-        result
+        wouldblock!(self, send, buf)
     }
 
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        let result = self.io.recv(buf);
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
-                        self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
-                    )?;
-                }
-            }
-        }
-        result
+        wouldblock!(self, recv, buf)
     }
 
     pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
-        let result = self.io.connect(addr);
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = self.internal.read().unwrap();
-                if let Some(selector) = &internal.selector {
-                    selector.reregister(
-                        self,
-                        internal.token.unwrap(),
-                        internal.interests.unwrap(),
-                    )?;
-                }
-            }
-        }
-        result
+        wouldblock!(self, connect, addr)
     }
 
     pub fn broadcast(&self) -> io::Result<bool> {
