@@ -189,7 +189,7 @@ pub fn test_udp_socket_discard() {
 pub fn test_udp_socket_send_recv_bufs() {
     use iovec::IoVec;
 
-    let (tx, rx) = connected_sockets();
+    let (mut tx, mut rx) = connected_sockets();
 
     let mut poll = Poll::new().unwrap();
 

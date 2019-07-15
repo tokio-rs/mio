@@ -519,7 +519,7 @@ impl UdpSocket {
     ///
     /// [link]: https://doc.rust-lang.org/nightly/std/io/enum.ErrorKind.html#variant.WouldBlock
     #[cfg(unix)]
-    pub fn recv_bufs(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    pub fn recv_bufs(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         self.sys.readv(bufs)
     }
 
@@ -540,7 +540,7 @@ impl UdpSocket {
     ///
     /// [link]: https://doc.rust-lang.org/nightly/std/io/enum.ErrorKind.html#variant.WouldBlock
     #[cfg(unix)]
-    pub fn send_bufs(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    pub fn send_bufs(&mut self, bufs: &[&IoVec]) -> io::Result<usize> {
         self.sys.writev(bufs)
     }
 }
