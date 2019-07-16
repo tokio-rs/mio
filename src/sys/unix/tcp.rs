@@ -1,7 +1,9 @@
 use crate::sys::unix::io::set_nonblock;
+use crate::sys::unix::uio::VecIo;
 use crate::sys::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
 
+use iovec::IoVec;
 use libc;
 use net2::TcpStreamExt;
 use std::fmt;
@@ -106,21 +108,29 @@ impl TcpStream {
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.peek(buf)
     }
-}
 
-impl Read for TcpStream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buf)
+    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+        self.inner.readv(bufs)
+    }
+
+    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+        self.inner.writev(bufs)
     }
 }
 
-impl Write for TcpStream {
+impl<'a> Read for &'a TcpStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (&self.inner).read(buf)
+    }
+}
+
+impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.write(buf)
+        (&self.inner).write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
+        (&self.inner).flush()
     }
 }
 

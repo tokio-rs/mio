@@ -43,3 +43,7 @@ ntapi  = "0.3"
 bytes      = "0.4.12"
 env_logger = { version = "0.6.1", default-features = false }
 tempdir    = "0.3.7"
+
+[[test]]
+name = "test"
+path = "test/mod.rs"

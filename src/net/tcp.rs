@@ -11,6 +11,7 @@
 use crate::poll::SelectorId;
 use crate::{event, sys, Interests, Registry, Token};
 
+use iovec::IoVec;
 use net2::TcpBuilder;
 use std::fmt;
 use std::io::{self, Read, Write};
@@ -299,6 +300,42 @@ impl TcpStream {
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.peek(buf)
     }
+
+    /// Read in a list of buffers all at once.
+    ///
+    /// This operation will attempt to read bytes from this socket and place
+    /// them into the list of buffers provided. Note that each buffer is an
+    /// `IoVec` which can be created from a byte slice.
+    ///
+    /// The buffers provided will be filled in sequentially. A buffer will be
+    /// entirely filled up before the next is written to.
+    ///
+    /// The number of bytes read is returned, if successful, or an error is
+    /// returned otherwise. If no bytes are available to be read yet then
+    /// a "would block" error is returned. This operation does not block.
+    ///
+    /// On Unix this corresponds to the `readv` syscall.
+    pub fn read_bufs(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+        self.sys.readv(bufs)
+    }
+
+    /// Write a list of buffers all at once.
+    ///
+    /// This operation will attempt to write a list of byte buffers to this
+    /// socket. Note that each buffer is an `IoVec` which can be created from a
+    /// byte slice.
+    ///
+    /// The buffers provided will be written sequentially. A buffer will be
+    /// entirely written before the next is written.
+    ///
+    /// The number of bytes written is returned, if successful, or an error is
+    /// returned otherwise. If the socket is not currently writable then a
+    /// "would block" error is returned. This operation does not block.
+    ///
+    /// On Unix this corresponds to the `writev` syscall.
+    pub fn write_bufs(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+        self.sys.writev(bufs)
+    }
 }
 
 fn inaddr_any(other: SocketAddr) -> SocketAddr {
@@ -318,17 +355,33 @@ fn inaddr_any(other: SocketAddr) -> SocketAddr {
 
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.sys.read(buf)
+        (&self.sys).read(buf)
+    }
+}
+
+impl<'a> Read for &'a TcpStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (&self.sys).read(buf)
     }
 }
 
 impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.sys.write(buf)
+        (&self.sys).write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.sys.flush()
+        (&self.sys).flush()
+    }
+}
+
+impl<'a> Write for &'a TcpStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        (&self.sys).write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        (&self.sys).flush()
     }
 }
 

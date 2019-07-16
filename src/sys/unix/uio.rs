@@ -5,13 +5,13 @@ use std::io;
 use std::os::unix::io::AsRawFd;
 
 pub trait VecIo {
-    fn readv(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize>;
+    fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize>;
 
-    fn writev(&mut self, bufs: &[&IoVec]) -> io::Result<usize>;
+    fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize>;
 }
 
 impl<T: AsRawFd> VecIo for T {
-    fn readv(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+    fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
         unsafe {
             let slice = iovec::unix::as_os_slice_mut(bufs);
             let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());
@@ -24,7 +24,7 @@ impl<T: AsRawFd> VecIo for T {
         }
     }
 
-    fn writev(&mut self, bufs: &[&IoVec]) -> io::Result<usize> {
+    fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
         unsafe {
             let slice = iovec::unix::as_os_slice(bufs);
             let len = cmp::min(<libc::c_int>::max_value() as usize, slice.len());
