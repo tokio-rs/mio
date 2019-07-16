@@ -57,7 +57,7 @@ pub struct AfdPollInfo {
 
 impl fmt::Debug for AfdPollInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AfdPollInfo")
+        f.debug_struct("AfdPollInfo").finish()
     }
 }
 
