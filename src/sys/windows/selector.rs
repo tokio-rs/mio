@@ -98,7 +98,7 @@ impl SockState {
         (events & !self.pending_evts) != 0
     }
 
-    fn update(&mut self, self_ptr: *const Mutex<SockState>) -> io::Result<()> {
+    fn update(&mut self, self_arc: &Arc<Mutex<SockState>>) -> io::Result<()> {
         assert!(!self.delete_pending);
 
         if self.poll_status == SockPollStatus::Pending
@@ -130,7 +130,7 @@ impl SockState {
             self.poll_info.handles[0].status = 0;
             self.poll_info.handles[0].events = self.user_evts;
 
-            let apccontext = self_ptr as *const _ as PVOID;
+            let apccontext = Arc::into_raw(self_arc.clone()) as *const _ as PVOID;
             let result = self
                 .afd
                 .poll(&mut self.poll_info, &mut self.iosb.0, apccontext);
@@ -410,10 +410,9 @@ impl SelectorInner {
                     Some(sock) => sock,
                     None => break,
                 };
-                let ptr = Arc::into_raw(sock.clone());
                 let mut sock_internal = sock.lock().unwrap();
                 if !sock_internal.is_pending_deletion() {
-                    sock_internal.update(ptr).unwrap();
+                    sock_internal.update(&sock).unwrap();
                 }
             }
         }
