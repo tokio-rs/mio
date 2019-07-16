@@ -2,7 +2,6 @@
 mod eventfd {
     use std::fs::File;
     use std::io::{self, Read, Write};
-    use std::mem;
     use std::os::unix::io::FromRawFd;
 
     use crate::sys::Selector;
@@ -21,16 +20,18 @@ mod eventfd {
 
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
-            let fd = syscall!(eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK))?;
-
-            selector.register(fd, token, Interests::READABLE)?;
-            Ok(Waker {
-                fd: unsafe { File::from_raw_fd(fd) },
+            syscall!(eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK)).and_then(|fd| {
+                // Turn the file descriptor into a file first so we're ensured
+                // it's closed when dropped, e.g. when register below fails.
+                let file = unsafe { File::from_raw_fd(fd) };
+                selector
+                    .register(fd, token, Interests::READABLE)
+                    .map(|()| Waker { fd: file })
             })
         }
 
         pub fn wake(&self) -> io::Result<()> {
-            let buf: [u8; 8] = unsafe { mem::transmute(1u64) };
+            let buf: [u8; 8] = 1u64.to_ne_bytes();
             match (&self.fd).write(&buf) {
                 Ok(_) => Ok(()),
                 Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
@@ -45,7 +46,7 @@ mod eventfd {
 
         /// Reset the eventfd object, only need to call this if `wake` fails.
         fn reset(&self) -> io::Result<()> {
-            let mut buf: [u8; 8] = [0; 8];
+            let mut buf: [u8; 8] = 0u64.to_ne_bytes();
             match (&self.fd).read(&mut buf) {
                 Ok(_) => Ok(()),
                 // If the `Waker` hasn't been awoken yet this will return a
@@ -126,12 +127,13 @@ mod pipe {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             let mut fds = [-1; 2];
             syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
-            selector.register(fds[0], token, Interests::READABLE)?;
-
-            Ok(Waker {
-                sender: unsafe { File::from_raw_fd(fds[1]) },
-                receiver: unsafe { File::from_raw_fd(fds[0]) },
-            })
+            // Turn the file descriptors into files first so we're ensured
+            // they're closed when dropped, e.g. when register below fails.
+            let sender = unsafe { File::from_raw_fd(fds[1]) };
+            let receiver = unsafe { File::from_raw_fd(fds[0]) };
+            selector
+                .register(fds[0], token, Interests::READABLE)
+                .map(|()| Waker { sender, receiver })
         }
 
         pub fn wake(&self) -> io::Result<()> {

@@ -29,7 +29,6 @@ publish = false
 iovec = "0.1.2"
 log   = "0.4.6"
 net2  = "0.2.33"
-slab  = "0.4.2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.58"
@@ -42,8 +41,5 @@ ntapi  = "0.3"
 [dev-dependencies]
 bytes      = "0.4.12"
 env_logger = { version = "0.6.1", default-features = false }
+slab       = "0.4.2"
 tempdir    = "0.3.7"
-
-[[test]]
-name = "test"
-path = "test/mod.rs"
