@@ -35,9 +35,9 @@ slab  = "0.4.2"
 libc = "0.2.58"
 
 [target.'cfg(windows)'.dependencies]
-miow        = "0.3.3"
-winapi      = { version = "0.3", features = ["winsock2"] }
-ntapi       = "0.3"
+miow   = "0.3.3"
+winapi = { version = "0.3", features = ["winsock2"] }
+ntapi  = "0.3"
 
 [dev-dependencies]
 bytes      = "0.4.12"
