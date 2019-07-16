@@ -48,7 +48,7 @@ use super::selector::SockState;
 /// # }
 /// ```
 ///
-/// Implementing [`event::Source`] for a custom type backed by a [`RawFd`].
+/// Implementing [`event::Source`] for a custom type backed by a [`RawSocket`].
 ///
 /// ```
 /// use mio::{event, Interests, Registry, Token};
