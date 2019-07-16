@@ -27,7 +27,7 @@ use crate::{poll, sys, Registry, Token};
 /// filter, see [implementation notes of `Poll`] to see what platforms support
 /// kqueue. On Linux it uses [eventfd].
 ///
-/// [implementation notes of `Poll`]: ../index.html#implementation-notes
+/// [implementation notes of `Poll`]: struct.Poll.html#implementation-notes
 /// [eventfd]: http://man7.org/linux/man-pages/man2/eventfd.2.html
 ///
 /// # Examples
