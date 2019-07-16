@@ -46,6 +46,17 @@ impl Event {
     ///
     /// Method is available on all platforms, but not all platforms (can) use
     /// this indicator.
+    ///
+    /// The table below shows what flags are checked on what OS.
+    ///
+    /// | [OS selector] | Flag(s) checked |
+    /// |---------------|-----------------|
+    /// | [epoll]       | `EPOLLERR`      |
+    /// | [kqueue]      | `EV_ERROR` and `EV_EOF` with `fflags` set to `0`. |
+    ///
+    /// [OS selector]: ../struct.Poll.html#implementation-notes
+    /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
+    /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
     #[inline]
     pub fn is_error(&self) -> bool {
         sys::event::is_error(&self.inner)
@@ -71,6 +82,17 @@ impl Event {
     /// Because of the above be cautions when using this in cross-platform
     /// applications, Mio makes no attempt at normalising this indicator and
     /// only provides a convenience method to read it.
+    ///
+    /// The table below shows what flags are checked on what OS.
+    ///
+    /// | [OS selector] | Flag(s) checked |
+    /// |---------------|-----------------|
+    /// | [epoll]       | `EPOLLHUP` and `EPOLLRDHUP` |
+    /// | [kqueue]      | `EV_EOF`        |
+    ///
+    /// [OS selector]: ../struct.Poll.html#implementation-notes
+    /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
+    /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
     #[inline]
     pub fn is_hup(&self) -> bool {
         sys::event::is_hup(&self.inner)
@@ -82,6 +104,17 @@ impl Event {
     ///
     /// Method is available on all platforms, but not all platforms (can) use
     /// this indicator.
+    ///
+    /// The table below shows what flags are checked on what OS.
+    ///
+    /// | [OS selector] | Flag(s) checked |
+    /// |---------------|-----------------|
+    /// | [epoll]       | `EPOLLPRI`      |
+    /// | [kqueue]      | *Not supported* |
+    ///
+    /// [OS selector]: ../struct.Poll.html#implementation-notes
+    /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
+    /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
     #[inline]
     pub fn is_priority(&self) -> bool {
         sys::event::is_priority(&self.inner)
@@ -93,6 +126,19 @@ impl Event {
     ///
     /// Method is available on all platforms, but not all platforms (can) use
     /// this indicator.
+    ///
+    /// The table below shows what flags are checked on what OS.
+    ///
+    /// | [OS selector] | Flag(s) checked |
+    /// |---------------|-----------------|
+    /// | [epoll]       | *Not supported* |
+    /// | [kqueue]<sup>1</sup> | `EVFILT_AIO` |
+    ///
+    /// 1: Only supported on DragonFly BSD, FreeBSD, iOS and macOS.
+    ///
+    /// [OS selector]: ../struct.Poll.html#implementation-notes
+    /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
+    /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
     #[inline]
     pub fn is_aio(&self) -> bool {
         sys::event::is_aio(&self.inner)
@@ -104,6 +150,9 @@ impl Event {
     ///
     /// Method is available on all platforms, but not all platforms (can) use
     /// this indicator.
+    ///
+    /// This is currently only supported on FreeBSD and checks the `EVFILT_LIO`
+    /// flag.
     #[inline]
     pub fn is_lio(&self) -> bool {
         sys::event::is_lio(&self.inner)
