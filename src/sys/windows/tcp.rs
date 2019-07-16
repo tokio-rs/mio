@@ -1,7 +1,6 @@
 use crate::poll;
 use crate::{event, Interests, Registry, Token};
 
-use iovec::IoVec;
 use net2::TcpStreamExt;
 
 use std::fmt;
@@ -172,38 +171,6 @@ impl TcpStream {
 
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.peek(buf)
-    }
-
-    pub fn readv(&mut self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
-        let mut amt = 0;
-        for buf in bufs {
-            match self.read(buf) {
-                // If we did a partial read, then return what we've read so far
-                Ok(n) if n < buf.len() => return Ok(amt + n),
-
-                // Otherwise filled this buffer entirely, so try to fill the
-                // next one as well.
-                Ok(n) => amt += n,
-
-                Err(e) => {
-                    if amt > 0 {
-                        return Ok(amt);
-                    } else {
-                        return Err(e);
-                    }
-                }
-            }
-        }
-        Ok(amt)
-    }
-
-    pub fn writev(&mut self, bufs: &[&IoVec]) -> io::Result<usize> {
-        let len = bufs.iter().map(|b| b.len()).fold(0, |a, b| a + b);
-        let mut writebuf = Vec::with_capacity(len);
-        for buf in bufs {
-            writebuf.extend_from_slice(buf);
-        }
-        self.write(&writebuf)
     }
 }
 
