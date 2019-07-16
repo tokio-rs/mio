@@ -9,8 +9,8 @@ use std::time::Duration;
 use std::os::windows::io::{AsRawSocket, RawSocket};
 
 use ntapi::ntioapi::IO_STATUS_BLOCK;
-use winapi::shared::ntdef::HANDLE;
 use winapi::shared::ntdef::NT_SUCCESS;
+use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
 use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING};
 use winapi::um::winsock2::INVALID_SOCKET;
@@ -130,7 +130,7 @@ impl SockState {
             self.poll_info.handles[0].status = 0;
             self.poll_info.handles[0].events = self.user_evts;
 
-            let apccontext = unsafe { mem::transmute(self_ptr) };
+            let apccontext = self_ptr as *const _ as PVOID;
             let result = self
                 .afd
                 .poll(&mut self.poll_info, &mut self.iosb.0, apccontext);
@@ -528,7 +528,7 @@ fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
     let mut bytes: u32 = 0;
     const SIO_BASE_HANDLE: u32 = 0x48000022;
 
-    use std::mem::{size_of, transmute};
+    use std::mem::size_of;
     use std::ptr::null_mut;
     use winapi::um::winsock2::{WSAIoctl, SOCKET_ERROR};
 
@@ -538,7 +538,7 @@ fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
             SIO_BASE_HANDLE,
             null_mut(),
             0,
-            transmute(&mut base_socket),
+            &mut base_socket as *mut _ as PVOID,
             size_of::<RawSocket>() as u32,
             &mut bytes,
             null_mut(),

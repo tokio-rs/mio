@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::fs::File;
 use std::io;
-use std::mem::{size_of, transmute};
+use std::mem::size_of;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -124,7 +124,7 @@ impl Afd {
         apccontext: PVOID,
     ) -> io::Result<bool> {
         unsafe {
-            let info_ptr: PVOID = transmute(info);
+            let info_ptr: PVOID = info as *mut _ as PVOID;
             iosb.u.Status = STATUS_PENDING;
             let status = NtDeviceIoControlFile(
                 self.fd.as_raw_handle(),
