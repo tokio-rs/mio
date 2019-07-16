@@ -1,31 +1,13 @@
-#[macro_use]
-extern crate log;
+// Not all functions are used by all tests.
+#![allow(dead_code)]
 
-pub use ports::localhost;
-
-mod test_close_on_drop;
-mod test_double_register;
-mod test_drop_cancels_interest_and_shuts_down;
-mod test_echo_server;
-mod test_evented;
-mod test_interests;
-mod test_local_addr_ready;
-mod test_multicast;
-mod test_poll;
-mod test_register_deregister;
-mod test_register_multiple_event_loops;
-mod test_reregister_without_poll;
-mod test_smoke;
-mod test_tcp;
-mod test_tcp_shutdown;
-mod test_udp_socket;
-mod test_waker;
-mod test_write_then_drop;
+use std::io::{self, Read, Write};
+use std::time::Duration;
 
 use bytes::{Buf, BufMut};
 use mio::{Events, Poll};
-use std::io::{self, Read, Write};
-use std::time::Duration;
+
+pub use ports::localhost;
 
 pub trait TryRead {
     fn try_read_buf<B: BufMut>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
@@ -137,17 +119,8 @@ mod ports {
     }
 }
 
-pub fn sleep_ms(ms: u64) {
-    use std::thread;
-    thread::sleep(Duration::from_millis(ms));
-}
-
 pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))
         .expect("unable to poll");
-    assert_eq!(
-        events.iter().count(),
-        0,
-        "received events, but didn't expect any"
-    );
+    assert!(events.is_empty(), "received events, but didn't expect any");
 }

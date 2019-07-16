@@ -43,7 +43,7 @@ pub struct TcpListener {
 
 macro_rules! wouldblock {
     ($self:ident, $method:ident)  => {{
-        let result = $self.inner.$method();
+        let result = (&$self.inner).$method();
         if let Err(ref e) = result {
             if e.kind() == io::ErrorKind::WouldBlock {
                 let internal = $self.internal.read().unwrap();
@@ -59,7 +59,7 @@ macro_rules! wouldblock {
         result
     }};
     ($self:ident, $method:ident, $($args:expr),* )  => {{
-        let result = $self.inner.$method($($args),*);
+        let result = (&$self.inner).$method($($args),*);
         if let Err(ref e) = result {
             if e.kind() == io::ErrorKind::WouldBlock {
                 let internal = $self.internal.read().unwrap();
@@ -229,13 +229,51 @@ impl super::GenericSocket for TcpStream {
     }
 }
 
+impl<'a> super::GenericSocket for &'a TcpStream {
+    fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
+        let internal = self.internal.read().unwrap();
+        match &*internal {
+            Some(internal) => match &internal.sock_state {
+                Some(arc) => Some(arc.clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+    fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
+        let mut internal = self.internal.write().unwrap();
+        match &mut *internal {
+            Some(internal) => {
+                internal.sock_state = sock_state;
+            }
+            None => {}
+        };
+    }
+}
+
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         wouldblock!(self, read, buf)
     }
 }
 
+impl<'a> Read for &'a TcpStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        wouldblock!(self, read, buf)
+    }
+}
+
 impl Write for TcpStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        wouldblock!(self, write, buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        wouldblock!(self, flush)
+    }
+}
+
+impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         wouldblock!(self, write, buf)
     }

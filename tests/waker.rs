@@ -4,7 +4,9 @@ use std::time::Duration;
 
 use mio::{Events, Poll, Token, Waker};
 
-use super::expect_no_events;
+mod util;
+
+use util::expect_no_events;
 
 #[test]
 fn waker() {
