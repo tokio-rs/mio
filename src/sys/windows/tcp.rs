@@ -251,6 +251,20 @@ impl<'a> super::MioSocketState for &'a TcpStream {
     }
 }
 
+impl Drop for TcpStream {
+    fn drop(&mut self) {
+        let internal = self.internal.read().unwrap();
+        if let Some(internal) = internal.as_ref() {
+            if let Some(sock_state) = internal.sock_state.as_ref() {
+                internal
+                    .selector
+                    .inner()
+                    .mark_delete_socket(sock_state.clone());
+            }
+        }
+    }
+}
+
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         wouldblock!(self, read, buf)
@@ -354,7 +368,7 @@ impl FromRawSocket for TcpStream {
 
 impl IntoRawSocket for TcpStream {
     fn into_raw_socket(self) -> RawSocket {
-        self.inner.into_raw_socket()
+        self.inner.as_raw_socket()
     }
 }
 
@@ -398,6 +412,20 @@ impl TcpListener {
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.inner.take_error()
+    }
+}
+
+impl Drop for TcpListener {
+    fn drop(&mut self) {
+        let internal = self.internal.read().unwrap();
+        if let Some(internal) = internal.as_ref() {
+            if let Some(sock_state) = internal.sock_state.as_ref() {
+                internal
+                    .selector
+                    .inner()
+                    .mark_delete_socket(sock_state.clone());
+            }
+        }
     }
 }
 
@@ -494,7 +522,7 @@ impl FromRawSocket for TcpListener {
 
 impl IntoRawSocket for TcpListener {
     fn into_raw_socket(self) -> RawSocket {
-        self.inner.into_raw_socket()
+        self.inner.as_raw_socket()
     }
 }
 

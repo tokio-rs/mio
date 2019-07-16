@@ -281,6 +281,10 @@ impl Selector {
         self.id
     }
 
+    pub(super) fn inner(&self) -> &SelectorInner {
+        &self.inner
+    }
+
     pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
         self.inner.clone()
     }
@@ -392,6 +396,10 @@ impl SelectorInner {
 
     pub fn port(&self) -> &CompletionPort {
         &self.cp
+    }
+
+    pub fn mark_delete_socket(&self, sock_state: Arc<Mutex<SockState>>) {
+        sock_state.lock().unwrap().mark_delete();
     }
 
     fn update_sockets_events(&self) -> io::Result<()> {

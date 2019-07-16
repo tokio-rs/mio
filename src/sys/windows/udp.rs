@@ -239,6 +239,20 @@ impl event::Source for UdpSocket {
     }
 }
 
+impl Drop for UdpSocket {
+    fn drop(&mut self) {
+        let internal = self.internal.read().unwrap();
+        if let Some(internal) = internal.as_ref() {
+            if let Some(sock_state) = internal.sock_state.as_ref() {
+                internal
+                    .selector
+                    .inner()
+                    .mark_delete_socket(sock_state.clone());
+            }
+        }
+    }
+}
+
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.io, f)
@@ -256,7 +270,7 @@ impl FromRawSocket for UdpSocket {
 
 impl IntoRawSocket for UdpSocket {
     fn into_raw_socket(self) -> RawSocket {
-        self.io.into_raw_socket()
+        self.io.as_raw_socket()
     }
 }
 
