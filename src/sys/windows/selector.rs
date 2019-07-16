@@ -244,6 +244,7 @@ impl Selector {
             #[cfg(debug_assertions)]
             let id = NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1;
             Selector {
+                #[cfg(debug_assertions)]
                 id,
                 inner: Arc::new(inner),
             }
@@ -275,6 +276,7 @@ impl Selector {
         self.inner.deregister(socket)
     }
 
+    #[cfg(debug_assertions)]
     pub fn id(&self) -> usize {
         self.id
     }

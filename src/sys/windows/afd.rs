@@ -28,7 +28,6 @@ use ntapi::ntrtl::RtlNtStatusToDosError;
 const IOCTL_AFD_POLL: ULONG = 0x00012024;
 const AFD_HELPER_NAME: &'static str = "\\Device\\Afd\\Mio";
 
-#[cfg(debug_assertions)]
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug)]
