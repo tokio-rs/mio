@@ -311,8 +311,7 @@ impl SelectorInner {
 
         self.active_poll_count.fetch_add(1, Ordering::SeqCst);
 
-        let mut iocp_events = vec![CompletionStatus::zero(); events.capacity()];
-        let result = self.cp.get_many(&mut iocp_events, timeout);
+        let result = self.cp.get_many(&mut events.statuses, timeout);
 
         self.active_poll_count.fetch_sub(1, Ordering::SeqCst);
 
@@ -324,7 +323,7 @@ impl SelectorInner {
             return Err(e);
         }
 
-        self.feed_events(events, result.unwrap());
+        self.feed_events(&mut events.events, result.unwrap());
         Ok(())
     }
 
@@ -421,7 +420,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    fn feed_events(&self, events: &mut Events, iocp_events: &[CompletionStatus]) {
+    fn feed_events(&self, events: &mut Vec<Event>, iocp_events: &[CompletionStatus]) {
         {
             let mut update_queue = self.update_queue.lock().unwrap();
             for iocp_event in iocp_events.iter() {
