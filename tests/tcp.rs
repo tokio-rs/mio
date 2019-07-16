@@ -428,13 +428,10 @@ fn write_bufs() {
             match s.write_bufs(&b) {
                 Ok(n) => so_far += n,
                 Err(e) => {
-                    #[cfg(all(windows, not(debug_assertions)))]
+                    if e.kind() == io::ErrorKind::ConnectionAborted
+                        || e.kind() == io::ErrorKind::ConnectionReset
                     {
-                        if e.kind() == io::ErrorKind::ConnectionAborted
-                            || e.kind() == io::ErrorKind::ConnectionReset
-                        {
-                            break;
-                        }
+                        break;
                     }
                     assert_eq!(e.kind(), io::ErrorKind::WouldBlock);
                     break;
