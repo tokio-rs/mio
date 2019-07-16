@@ -12,16 +12,16 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use super::selector::{Selector, SockState};
 
-struct RegistryInternalStruct {
+struct InternalState {
     selector: Arc<Selector>,
     token: Token,
     interests: Interests,
     sock_state: Option<Arc<Mutex<SockState>>>,
 }
 
-impl RegistryInternalStruct {
-    fn new(selector: Arc<Selector>, token: Token, interests: Interests) -> RegistryInternalStruct {
-        RegistryInternalStruct {
+impl InternalState {
+    fn new(selector: Arc<Selector>, token: Token, interests: Interests) -> InternalState {
+        InternalState {
             selector,
             token,
             interests,
@@ -31,7 +31,7 @@ impl RegistryInternalStruct {
 }
 
 pub struct UdpSocket {
-    internal: Arc<RwLock<Option<RegistryInternalStruct>>>,
+    internal: Arc<RwLock<Option<InternalState>>>,
     io: std::net::UdpSocket,
 }
 
@@ -190,7 +190,7 @@ impl event::Source for UdpSocket {
         {
             let mut internal = self.internal.write().unwrap();
             if internal.is_none() {
-                *internal = Some(RegistryInternalStruct::new(
+                *internal = Some(InternalState::new(
                     poll::selector_arc(registry),
                     token,
                     interests,

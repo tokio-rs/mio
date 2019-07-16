@@ -40,3 +40,5 @@ pub fn is_lio(_: &Event) -> bool {
     // Not supported.
     false
 }
+
+pub type Events = Vec<Event>;

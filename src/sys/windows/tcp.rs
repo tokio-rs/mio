@@ -13,16 +13,16 @@ use std::time::Duration;
 
 use super::selector::{Selector, SockState};
 
-struct RegistryInternalStruct {
+struct InternalState {
     selector: Arc<Selector>,
     token: Token,
     interests: Interests,
     sock_state: Option<Arc<Mutex<SockState>>>,
 }
 
-impl RegistryInternalStruct {
-    fn new(selector: Arc<Selector>, token: Token, interests: Interests) -> RegistryInternalStruct {
-        RegistryInternalStruct {
+impl InternalState {
+    fn new(selector: Arc<Selector>, token: Token, interests: Interests) -> InternalState {
+        InternalState {
             selector,
             token,
             interests,
@@ -32,12 +32,12 @@ impl RegistryInternalStruct {
 }
 
 pub struct TcpStream {
-    internal: Arc<RwLock<Option<RegistryInternalStruct>>>,
+    internal: Arc<RwLock<Option<InternalState>>>,
     inner: net::TcpStream,
 }
 
 pub struct TcpListener {
-    internal: Arc<RwLock<Option<RegistryInternalStruct>>>,
+    internal: Arc<RwLock<Option<InternalState>>>,
     inner: net::TcpListener,
 }
 
@@ -250,7 +250,7 @@ impl event::Source for TcpStream {
         {
             let mut internal = self.internal.write().unwrap();
             if internal.is_none() {
-                *internal = Some(RegistryInternalStruct::new(
+                *internal = Some(InternalState::new(
                     poll::selector_arc(registry),
                     token,
                     interests,
@@ -390,7 +390,7 @@ impl event::Source for TcpListener {
         {
             let mut internal = self.internal.write().unwrap();
             if internal.is_none() {
-                *internal = Some(RegistryInternalStruct::new(
+                *internal = Some(InternalState::new(
                     poll::selector_arc(registry),
                     token,
                     interests,
