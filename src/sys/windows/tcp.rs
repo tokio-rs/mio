@@ -2,13 +2,12 @@ use crate::sys::windows::from_raw_arc::FromRawArc;
 use crate::sys::windows::selector::{Overlapped, ReadyBinding};
 use crate::sys::windows::{Family, Ready, Registration};
 use crate::{event, Interests, Registry, Token};
-use iovec::IoVec;
 use log::trace;
 use miow::iocp::CompletionStatus;
 use miow::net::*;
 use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
 use std::fmt;
-use std::io::{self, ErrorKind, Read};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::mem;
 use std::net::{self, Shutdown, SocketAddr};
 use std::os::windows::prelude::*;
@@ -268,13 +267,6 @@ impl TcpStream {
         }
     }
 
-    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        match IoVec::from_bytes_mut(buf) {
-            Some(vec) => self.readv(&mut [vec]),
-            None => Ok(0),
-        }
-    }
-
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         let mut me = self.before_read()?;
 
@@ -287,8 +279,14 @@ impl TcpStream {
             }
         }
     }
+}
 
-    pub fn readv(&self, bufs: &mut [&mut IoVec]) -> io::Result<usize> {
+impl<'a> Read for &'a TcpStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.read_vectored(&mut [IoSliceMut::new(buf)])
+    }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let mut me = self.before_read()?;
 
         // TODO: Does WSARecv work on a nonblocking sockets? We ideally want to
@@ -338,15 +336,14 @@ impl TcpStream {
 
         Ok(amt)
     }
+}
 
-    pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        match IoVec::from_bytes(buf) {
-            Some(vec) => self.writev(&[vec]),
-            None => Ok(0),
-        }
+impl<'a> Write for &'a TcpStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.write_vectored(&mut [IoSlice::new(buf)])
     }
 
-    pub fn writev(&self, bufs: &[&IoVec]) -> io::Result<usize> {
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         let mut me = self.inner();
         let me = &mut *me;
 
@@ -376,7 +373,7 @@ impl TcpStream {
         Ok(len)
     }
 
-    pub fn flush(&self) -> io::Result<()> {
+    fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
 }
@@ -792,8 +789,9 @@ fn accept_done(status: &OVERLAPPED_ENTRY) {
         .accept_complete(&socket)
         .and_then(|()| me.accept_buf.parse(&me2.inner.socket))
         .and_then(|buf| {
-            buf.remote()
-                .ok_or_else(|| io::Error::new(ErrorKind::Other, "could not obtain remote address"))
+            buf.remote().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::Other, "could not obtain remote address")
+            })
         });
     me.accept = match result {
         Ok(remote_addr) => State::Ready((socket, remote_addr)),
