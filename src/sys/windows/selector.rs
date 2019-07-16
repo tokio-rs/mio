@@ -27,7 +27,7 @@ use super::afd::{
     KNOWN_AFD_EVENTS,
 };
 use super::Event;
-use super::GenericSocket;
+use super::MioSocketState;
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
 
@@ -254,7 +254,7 @@ impl Selector {
         self.inner.select(events, timeout)
     }
 
-    pub fn register<S: GenericSocket + AsRawSocket>(
+    pub fn register<S: MioSocketState + AsRawSocket>(
         &self,
         socket: &S,
         token: Token,
@@ -263,7 +263,7 @@ impl Selector {
         self.inner.register(socket, token, interests)
     }
 
-    pub fn reregister<S: GenericSocket>(
+    pub fn reregister<S: MioSocketState>(
         &self,
         socket: &S,
         token: Token,
@@ -272,7 +272,7 @@ impl Selector {
         self.inner.reregister(socket, token, interests)
     }
 
-    pub fn deregister<S: GenericSocket>(&self, socket: &S) -> io::Result<()> {
+    pub fn deregister<S: MioSocketState>(&self, socket: &S) -> io::Result<()> {
         self.inner.deregister(socket)
     }
 
@@ -328,7 +328,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn register<S: GenericSocket + AsRawSocket>(
+    pub fn register<S: MioSocketState + AsRawSocket>(
         &self,
         socket: &S,
         token: Token,
@@ -356,7 +356,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn reregister<S: GenericSocket>(
+    pub fn reregister<S: MioSocketState>(
         &self,
         socket: &S,
         token: Token,
@@ -382,7 +382,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn deregister<S: GenericSocket>(&self, socket: &S) -> io::Result<()> {
+    pub fn deregister<S: MioSocketState>(&self, socket: &S) -> io::Result<()> {
         if socket.get_sock_state().is_none() {
             return Err(io::Error::from(io::ErrorKind::NotFound));
         }
@@ -494,7 +494,7 @@ impl SelectorInner {
         )?)))
     }
 
-    fn add_socket_to_update_queue<S: GenericSocket>(&self, socket: &S) {
+    fn add_socket_to_update_queue<S: MioSocketState>(&self, socket: &S) {
         let sock_state = socket.get_sock_state().unwrap();
         let mut update_queue = self.update_queue.lock().unwrap();
         update_queue.push_back(sock_state.clone());

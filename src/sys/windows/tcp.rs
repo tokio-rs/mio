@@ -207,7 +207,7 @@ impl TcpStream {
     }
 }
 
-impl super::GenericSocket for TcpStream {
+impl super::MioSocketState for TcpStream {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
         let internal = self.internal.read().unwrap();
         match &*internal {
@@ -229,7 +229,7 @@ impl super::GenericSocket for TcpStream {
     }
 }
 
-impl<'a> super::GenericSocket for &'a TcpStream {
+impl<'a> super::MioSocketState for &'a TcpStream {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
         let internal = self.internal.read().unwrap();
         match &*internal {
@@ -401,7 +401,7 @@ impl TcpListener {
     }
 }
 
-impl super::GenericSocket for TcpListener {
+impl super::MioSocketState for TcpListener {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
         let internal = self.internal.read().unwrap();
         match &*internal {

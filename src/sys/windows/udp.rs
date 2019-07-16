@@ -163,7 +163,7 @@ impl UdpSocket {
     }
 }
 
-impl super::GenericSocket for UdpSocket {
+impl super::MioSocketState for UdpSocket {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
         let internal = self.internal.read().unwrap();
         match &*internal {
