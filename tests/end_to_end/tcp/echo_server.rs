@@ -7,9 +7,7 @@ use slab::Slab;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, Registry, Token};
 
-mod util;
-
-use util::{localhost, TryRead, TryWrite};
+use crate::util::{localhost, TryRead, TryWrite};
 
 const STREAM: Token = Token(1);
 const SERVER: Token = Token(2);
@@ -279,8 +277,7 @@ impl Echo {
 }
 
 #[test]
-pub fn test_echo_server() {
-    debug!("Starting TEST_ECHO_SERVER");
+fn test_echo_server() {
     let mut poll = Poll::new().unwrap();
 
     let addr = localhost();
