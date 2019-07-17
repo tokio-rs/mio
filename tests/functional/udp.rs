@@ -9,12 +9,16 @@ use log::{debug, info};
 use mio::net::UdpSocket;
 use mio::{Events, Interests, Poll, Registry, Token};
 
-mod util;
+use crate::util::{assert_send, assert_sync, localhost};
 
-use util::localhost;
-
-const LISTENER: Token = Token(0);
+const RECEIVER: Token = Token(0);
 const SENDER: Token = Token(1);
+
+#[test]
+fn is_send_and_sync() {
+    assert_send::<UdpSocket>();
+    assert_sync::<UdpSocket>();
+}
 
 pub struct UdpHandlerSendRecv {
     tx: UdpSocket,
@@ -40,17 +44,9 @@ impl UdpHandlerSendRecv {
     }
 }
 
-fn assert_send<T: Send>() {}
-
-fn assert_sync<T: Sync>() {}
-
-#[cfg(test)]
 fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     debug!("Starting TEST_UDP_SOCKETS");
     let mut poll = Poll::new().unwrap();
-
-    assert_send::<UdpSocket>();
-    assert_sync::<UdpSocket>();
 
     // ensure that the sockets are non-blocking
     let mut buf = [0; 128];
@@ -64,9 +60,9 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
         .register(&tx, SENDER, Interests::WRITABLE)
         .unwrap();
 
-    info!("Registering LISTENER");
+    info!("Registering RECEIVER");
     poll.registry()
-        .register(&rx, LISTENER, Interests::READABLE)
+        .register(&rx, RECEIVER, Interests::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -79,7 +75,7 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
         for event in &events {
             if event.is_readable() {
-                if let LISTENER = event.token() {
+                if let RECEIVER = event.token() {
                     debug!("We are receiving a datagram now...");
                     let cnt = unsafe {
                         if !handler.connected {
@@ -115,11 +111,8 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
 /// Returns the sender and the receiver
 fn connected_sockets() -> (UdpSocket, UdpSocket) {
-    let addr = localhost();
-    let any = localhost();
-
-    let tx = UdpSocket::bind(any).unwrap();
-    let rx = UdpSocket::bind(addr).unwrap();
+    let tx = UdpSocket::bind(localhost()).unwrap();
+    let rx = UdpSocket::bind(localhost()).unwrap();
 
     let tx_addr = tx.local_addr().unwrap();
     let rx_addr = rx.local_addr().unwrap();
@@ -131,32 +124,25 @@ fn connected_sockets() -> (UdpSocket, UdpSocket) {
 }
 
 #[test]
-pub fn test_udp_socket() {
-    let addr = localhost();
-    let any = localhost();
-
-    let tx = UdpSocket::bind(any).unwrap();
-    let rx = UdpSocket::bind(addr).unwrap();
+fn udp_socket() {
+    let tx = UdpSocket::bind(localhost()).unwrap();
+    let rx = UdpSocket::bind(localhost()).unwrap();
 
     test_send_recv_udp(tx, rx, false);
 }
 
 #[test]
-pub fn test_udp_socket_send_recv() {
+fn udp_connected_socket() {
     let (tx, rx) = connected_sockets();
 
     test_send_recv_udp(tx, rx, true);
 }
 
 #[test]
-pub fn test_udp_socket_discard() {
-    let addr = localhost();
-    let any = localhost();
-    let outside = localhost();
-
-    let tx = UdpSocket::bind(any).unwrap();
-    let rx = UdpSocket::bind(addr).unwrap();
-    let udp_outside = UdpSocket::bind(outside).unwrap();
+fn udp_socket_discard() {
+    let tx = UdpSocket::bind(localhost()).unwrap();
+    let rx = UdpSocket::bind(localhost()).unwrap();
+    let udp_outside = UdpSocket::bind(localhost()).unwrap();
 
     let tx_addr = tx.local_addr().unwrap();
     let rx_addr = rx.local_addr().unwrap();
@@ -171,7 +157,7 @@ pub fn test_udp_socket_discard() {
     assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
     poll.registry()
-        .register(&rx, LISTENER, Interests::READABLE)
+        .register(&rx, RECEIVER, Interests::READABLE)
         .unwrap();
     poll.registry()
         .register(&tx, SENDER, Interests::WRITABLE)
@@ -184,7 +170,7 @@ pub fn test_udp_socket_discard() {
 
     for event in &events {
         if event.is_readable() {
-            if let LISTENER = event.token() {
+            if let RECEIVER = event.token() {
                 panic!("Expected to no receive a packet but got something")
             }
         }
@@ -203,7 +189,7 @@ pub struct UdpHandler {
 
 impl UdpHandler {
     fn new(tx: UdpSocket, rx: UdpSocket, msg: &'static str) -> UdpHandler {
-        let sock = UdpSocket::bind("127.0.0.1:12345".parse().unwrap()).unwrap();
+        let sock = UdpSocket::bind(localhost()).unwrap();
         UdpHandler {
             tx,
             rx,
@@ -216,7 +202,7 @@ impl UdpHandler {
     }
 
     fn handle_read(&mut self, _: &Registry, token: Token) {
-        if let LISTENER = token {
+        if let RECEIVER = token {
             debug!("We are receiving a datagram now...");
             match unsafe { self.rx.recv_from(self.rx_buf.bytes_mut()) } {
                 Ok((cnt, addr)) => {
@@ -248,7 +234,7 @@ impl UdpHandler {
     ignore = "Multicast doesn't work on Android 64bit"
 )]
 #[test]
-pub fn test_multicast() {
+fn test_multicast() {
     drop(env_logger::try_init());
     debug!("Starting TEST_UDP_CONNECTIONLESS");
     let mut poll = Poll::new().unwrap();
@@ -273,9 +259,9 @@ pub fn test_multicast() {
         .register(&tx, SENDER, Interests::WRITABLE)
         .unwrap();
 
-    info!("Registering LISTENER");
+    info!("Registering RECEIVER");
     poll.registry()
-        .register(&rx, LISTENER, Interests::READABLE)
+        .register(&rx, RECEIVER, Interests::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
