@@ -2,7 +2,8 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::fs::File;
 use std::io;
-use std::mem::size_of;
+use std::mem::{size_of, zeroed};
+use std::pin::Pin;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -26,9 +27,41 @@ use ntapi::ntioapi::{NtCancelIoFileEx, NtCreateFile, NtDeviceIoControlFile};
 use ntapi::ntrtl::RtlNtStatusToDosError;
 
 const IOCTL_AFD_POLL: ULONG = 0x00012024;
-const AFD_HELPER_NAME: &'static str = "\\Device\\Afd\\Mio";
 
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(0);
+
+lazy_static! {
+    static ref AFD_HELPER_NAME: Vec<u16> = {
+        OsStr::new("\\Device\\Afd\\Mio")
+            .encode_wide()
+            .collect::<Vec<_>>()
+    };
+}
+
+struct UnicodeString(UNICODE_STRING);
+unsafe impl Send for UnicodeString {}
+unsafe impl Sync for UnicodeString {}
+
+struct ObjectAttributes(OBJECT_ATTRIBUTES);
+unsafe impl Send for ObjectAttributes {}
+unsafe impl Sync for ObjectAttributes {}
+
+lazy_static! {
+    static ref AFD_OBJ_NAME: UnicodeString = UnicodeString(UNICODE_STRING {
+        // Lengths are calced in bytes
+        Length: (AFD_HELPER_NAME.len() * 2) as u16,
+        MaximumLength: (AFD_HELPER_NAME.len() * 2) as u16,
+        Buffer: AFD_HELPER_NAME.as_ptr() as *mut _,
+    });
+    static ref AFD_HELPER_ATTRIBUTES: ObjectAttributes = ObjectAttributes(OBJECT_ATTRIBUTES {
+        Length: size_of::<OBJECT_ATTRIBUTES>() as ULONG,
+        RootDirectory: null_mut() as HANDLE,
+        ObjectName: &AFD_OBJ_NAME.0 as *const _ as *mut _,
+        Attributes: 0 as ULONG,
+        SecurityDescriptor: null_mut() as PVOID,
+        SecurityQualityOfService: null_mut() as PVOID,
+    });
+}
 
 #[derive(Debug)]
 pub struct Afd {
@@ -44,7 +77,6 @@ pub struct AfdPollHandleInfo {
 }
 
 unsafe impl Send for AfdPollHandleInfo {}
-unsafe impl Sync for AfdPollHandleInfo {}
 
 #[repr(C)]
 pub struct AfdPollInfo {
@@ -55,6 +87,12 @@ pub struct AfdPollInfo {
     pub handles: [AfdPollHandleInfo; 1],
 }
 
+impl AfdPollInfo {
+    pub fn zeroed() -> AfdPollInfo {
+        unsafe { zeroed::<AfdPollInfo>() }
+    }
+}
+
 impl fmt::Debug for AfdPollInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AfdPollInfo").finish()
@@ -63,32 +101,14 @@ impl fmt::Debug for AfdPollInfo {
 
 impl Afd {
     pub fn new(cp: &CompletionPort) -> io::Result<Afd> {
-        let mut afd_helper_name = OsStr::new(AFD_HELPER_NAME)
-            .encode_wide()
-            .collect::<Vec<_>>();
-
         let mut afd_helper_handle: HANDLE = INVALID_HANDLE_VALUE;
         let mut iosb: IO_STATUS_BLOCK = unsafe { std::mem::zeroed() };
 
         unsafe {
-            let mut objname = UNICODE_STRING {
-                // Lengths are calced in bytes
-                Length: (afd_helper_name.len() * 2) as u16,
-                MaximumLength: (afd_helper_name.len() * 2) as u16,
-                Buffer: afd_helper_name.as_mut_ptr(),
-            };
-            let mut afd_helper_attributes = OBJECT_ATTRIBUTES {
-                Length: size_of::<OBJECT_ATTRIBUTES>() as ULONG,
-                RootDirectory: null_mut() as HANDLE,
-                ObjectName: &mut objname,
-                Attributes: 0 as ULONG,
-                SecurityDescriptor: null_mut() as PVOID,
-                SecurityQualityOfService: null_mut() as PVOID,
-            };
             let status = NtCreateFile(
-                &mut afd_helper_handle,
+                &mut afd_helper_handle as *mut _,
                 SYNCHRONIZE,
-                &mut afd_helper_attributes,
+                &AFD_HELPER_ATTRIBUTES.0 as *const _ as *mut _,
                 &mut iosb,
                 null_mut(),
                 0 as ULONG,
@@ -120,18 +140,19 @@ impl Afd {
     pub fn poll(
         &self,
         info: &mut AfdPollInfo,
-        iosb: &mut IO_STATUS_BLOCK,
+        iosb: Pin<&mut IO_STATUS_BLOCK>,
         apccontext: PVOID,
     ) -> io::Result<bool> {
+        let info_ptr: PVOID = info as *mut _ as PVOID;
+        let iosb_ptr = iosb.get_mut();
         unsafe {
-            let info_ptr: PVOID = info as *mut _ as PVOID;
-            iosb.u.Status = STATUS_PENDING;
+            (*iosb_ptr).u.Status = STATUS_PENDING;
             let status = NtDeviceIoControlFile(
                 self.fd.as_raw_handle(),
                 null_mut(),
                 None,
                 apccontext,
-                iosb,
+                iosb_ptr,
                 IOCTL_AFD_POLL,
                 info_ptr,
                 size_of::<AfdPollInfo>() as u32,
@@ -148,14 +169,15 @@ impl Afd {
         }
     }
 
-    pub fn cancel(&self, iosb: &mut IO_STATUS_BLOCK) -> io::Result<()> {
+    pub fn cancel(&self, iosb: Pin<&mut IO_STATUS_BLOCK>) -> io::Result<()> {
         unsafe {
             if iosb.u.Status != STATUS_PENDING {
                 return Ok(());
             }
 
             let mut cancel_iosb: IO_STATUS_BLOCK = std::mem::zeroed();
-            let status = NtCancelIoFileEx(self.fd.as_raw_handle(), iosb, &mut cancel_iosb);
+            let status =
+                NtCancelIoFileEx(self.fd.as_raw_handle(), iosb.get_mut(), &mut cancel_iosb);
             if status == STATUS_SUCCESS || status == STATUS_NOT_FOUND {
                 return Ok(());
             }

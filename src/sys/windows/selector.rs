@@ -1,14 +1,12 @@
 use std::collections::VecDeque;
-use std::fmt;
 use std::io;
-use std::mem;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use std::os::windows::io::{AsRawSocket, RawSocket};
 
-use ntapi::ntioapi::IO_STATUS_BLOCK;
 use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
@@ -26,6 +24,7 @@ use super::afd::{
     AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_RECEIVE_EXPEDITED, AFD_POLL_SEND,
     KNOWN_AFD_EVENTS,
 };
+use super::io_status_block::IoStatusBlock;
 use super::Event;
 use super::MioSocketState;
 
@@ -38,26 +37,9 @@ enum SockPollStatus {
     Cancelled,
 }
 
-struct IoStatusBlock(pub IO_STATUS_BLOCK);
-
-impl IoStatusBlock {
-    fn zeroed() -> IoStatusBlock {
-        IoStatusBlock(unsafe { mem::zeroed::<IO_STATUS_BLOCK>() })
-    }
-}
-
-impl fmt::Debug for IoStatusBlock {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("IoStatusBlock").finish()
-    }
-}
-
-unsafe impl Send for IoStatusBlock {}
-unsafe impl Sync for IoStatusBlock {}
-
 #[derive(Debug)]
 pub struct SockState {
-    iosb: IoStatusBlock,
+    iosb: Pin<IoStatusBlock>,
     poll_info: AfdPollInfo,
     afd: Arc<Afd>,
     raw_socket: RawSocket,
@@ -71,20 +53,18 @@ pub struct SockState {
 
 impl SockState {
     fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
-        unsafe {
-            Ok(SockState {
-                iosb: IoStatusBlock::zeroed(),
-                poll_info: mem::zeroed::<AfdPollInfo>(),
-                afd,
-                raw_socket,
-                base_socket: get_base_socket(raw_socket)?,
-                user_evts: 0,
-                pending_evts: 0,
-                user_data: 0,
-                poll_status: SockPollStatus::Idle,
-                delete_pending: false,
-            })
-        }
+        Ok(SockState {
+            iosb: Pin::new(IoStatusBlock::zeroed()),
+            poll_info: AfdPollInfo::zeroed(),
+            afd,
+            raw_socket,
+            base_socket: get_base_socket(raw_socket)?,
+            user_evts: 0,
+            pending_evts: 0,
+            user_data: 0,
+            poll_status: SockPollStatus::Idle,
+            delete_pending: false,
+        })
     }
 
     /// True if need to be added on update queue, false otherwise.
@@ -133,7 +113,7 @@ impl SockState {
             let apccontext = Arc::into_raw(self_arc.clone()) as *const _ as PVOID;
             let result = self
                 .afd
-                .poll(&mut self.poll_info, &mut self.iosb.0, apccontext);
+                .poll(&mut self.poll_info, self.iosb.as_mut(), apccontext);
             if let Err(e) = result {
                 if let Some(code) = e.raw_os_error() {
                     if code == ERROR_IO_PENDING as i32 {
@@ -158,7 +138,7 @@ impl SockState {
 
     fn cancel(&mut self) -> io::Result<()> {
         assert!(self.poll_status == SockPollStatus::Pending);
-        self.afd.cancel(&mut self.iosb.0)?;
+        self.afd.cancel(self.iosb.as_mut())?;
         self.poll_status = SockPollStatus::Cancelled;
         self.pending_evts = 0;
         Ok(())
@@ -182,9 +162,9 @@ impl SockState {
         unsafe {
             if self.delete_pending {
                 return None;
-            } else if self.iosb.0.u.Status == STATUS_CANCELLED {
+            } else if self.iosb.u.Status == STATUS_CANCELLED {
                 /* The poll request was cancelled by CancelIoEx. */
-            } else if !NT_SUCCESS(self.iosb.0.u.Status) {
+            } else if !NT_SUCCESS(self.iosb.u.Status) {
                 /* The overlapped request itself failed in an unexpected way. */
                 afd_events = AFD_POLL_CONNECT_FAIL;
             } else if self.poll_info.number_of_handles < 1 {
