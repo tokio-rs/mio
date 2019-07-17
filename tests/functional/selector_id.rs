@@ -1,15 +1,15 @@
+// SelectorId is only used debug assertions are enabled.
+#![cfg(debug_assertions)]
+
 use std::io;
 
 use mio::net::{TcpListener, TcpStream, UdpSocket};
 use mio::{Interests, Poll, Token};
 
-mod util;
-
-use util::localhost;
+use crate::util::localhost;
 
 #[test]
-#[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.
-fn test_tcp_register_multiple_event_loops() {
+fn tcp() {
     let addr = localhost();
     let listener = TcpListener::bind(addr).unwrap();
 
@@ -71,8 +71,7 @@ fn test_tcp_register_multiple_event_loops() {
 }
 
 #[test]
-#[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.
-fn test_udp_register_multiple_event_loops() {
+fn udp() {
     let addr = localhost();
     let socket = UdpSocket::bind(addr).unwrap();
 
