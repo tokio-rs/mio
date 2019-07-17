@@ -4,12 +4,10 @@ use std::time::Duration;
 
 use mio::{Events, Poll, Token, Waker};
 
-mod util;
-
-use util::expect_no_events;
+use crate::util::expect_no_events;
 
 #[test]
-fn waker() {
+fn waking() {
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
@@ -21,7 +19,7 @@ fn waker() {
 }
 
 #[test]
-fn waker_multiple_wakeups_same_thread() {
+fn multiple_wakeups_same_thread() {
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
@@ -35,7 +33,7 @@ fn waker_multiple_wakeups_same_thread() {
 }
 
 #[test]
-fn waker_wakeup_different_thread() {
+fn wakeup_different_thread() {
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
@@ -56,7 +54,7 @@ fn waker_wakeup_different_thread() {
 }
 
 #[test]
-fn waker_multiple_wakeups_different_thread() {
+fn multiple_wakeups_different_thread() {
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
