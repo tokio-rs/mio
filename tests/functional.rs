@@ -1,3 +1,5 @@
+mod util;
+
 // This macro is required to get around rustfmt bugs #3572 and/or #1208, also
 // see Mio pr #1030.
 macro_rules! test_mod {
@@ -15,4 +17,4 @@ macro_rules! test_mod {
     };
 }
 
-test_mod!(poll, interests);
+test_mod!(poll, interests, tcp);
