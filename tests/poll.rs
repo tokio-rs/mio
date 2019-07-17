@@ -17,7 +17,6 @@ fn test_poll_closes_fd() {
 #[test]
 fn test_drop_cancels_interest_and_shuts_down() {
     use mio::net::TcpStream;
-    use mio::*;
     use std::io;
     use std::io::Read;
     use std::net::TcpListener;
