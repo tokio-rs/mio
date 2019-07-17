@@ -17,4 +17,4 @@ macro_rules! test_mod {
     };
 }
 
-test_mod!(poll, interests, tcp);
+test_mod!(event_source, interests, poll, tcp);
