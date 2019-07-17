@@ -398,8 +398,8 @@ impl SelectorInner {
         &self.cp
     }
 
-    pub fn mark_delete_socket(&self, sock_state: &Mutex<SockState>) {
-        sock_state.lock().unwrap().mark_delete();
+    pub fn mark_delete_socket(&self, sock_state: &mut SockState) {
+        sock_state.mark_delete();
     }
 
     fn update_sockets_events(&self) -> io::Result<()> {

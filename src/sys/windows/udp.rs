@@ -244,7 +244,10 @@ impl Drop for UdpSocket {
         let internal = self.internal.read().unwrap();
         if let Some(internal) = internal.as_ref() {
             if let Some(sock_state) = internal.sock_state.as_ref() {
-                internal.selector.inner().mark_delete_socket(&sock_state);
+                internal
+                    .selector
+                    .inner()
+                    .mark_delete_socket(&mut sock_state.lock().unwrap());
             }
         }
     }
