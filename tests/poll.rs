@@ -21,7 +21,6 @@ fn test_drop_cancels_interest_and_shuts_down() {
     use std::io::Read;
     use std::net::TcpListener;
     use std::thread;
-    use std::time::Duration;
 
     let l = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = l.local_addr().unwrap();
