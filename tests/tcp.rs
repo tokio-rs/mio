@@ -625,7 +625,7 @@ macro_rules! wait {
                 ))]
                 {
                     if $expect_hup {
-                        assert!(event.is_hup());
+                        assert!(event.is_read_hup());
                     }
                 }
 

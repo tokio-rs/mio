@@ -133,7 +133,10 @@ pub mod event {
 
     pub fn is_hup(event: &Event) -> bool {
         (event.events as libc::c_int & libc::EPOLLHUP) != 0
-            || (event.events as libc::c_int & libc::EPOLLRDHUP) != 0
+    }
+
+    pub fn is_read_hup(event: &Event) -> bool {
+        (event.events as libc::c_int & libc::EPOLLRDHUP) != 0
     }
 
     pub fn is_priority(event: &Event) -> bool {

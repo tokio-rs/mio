@@ -87,8 +87,8 @@ impl Event {
     ///
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
-    /// | [epoll]       | `EPOLLHUP` and `EPOLLRDHUP` |
-    /// | [kqueue]      | `EV_EOF`        |
+    /// | [epoll]       | `EPOLLHUP`      |
+    /// | [kqueue]      | Not supported   |
     ///
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
@@ -96,6 +96,34 @@ impl Event {
     #[inline]
     pub fn is_hup(&self) -> bool {
         sys::event::is_hup(&self.inner)
+    }
+
+    /// Returns true if the event contains read HUP readiness.
+    ///
+    /// # Notes
+    ///
+    /// Method is available on all platforms, but not all platforms (can) use
+    /// this indicator.
+    ///
+    /// Because of the above be cautions when using this in cross-platform
+    /// applications, Mio makes no attempt at normalising this indicator and
+    /// only provides a convenience method to read it. We advice looking at the
+    /// documentation provided for the selectors (see below) when using this
+    /// indicator.
+    ///
+    /// The table below shows what flags are checked on what OS.
+    ///
+    /// | [OS selector] | Flag(s) checked |
+    /// |---------------|-----------------|
+    /// | [epoll]       | `EPOLLRDHUP`    |
+    /// | [kqueue]      | `EV_EOF`        |
+    ///
+    /// [OS selector]: ../struct.Poll.html#implementation-notes
+    /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
+    /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
+    #[inline]
+    pub fn is_read_hup(&self) -> bool {
+        sys::event::is_read_hup(&self.inner)
     }
 
     /// Returns true if the event contains priority readiness.
@@ -176,6 +204,7 @@ impl fmt::Debug for Event {
             .field("writable", &self.is_writable())
             .field("error", &self.is_error())
             .field("hup", &self.is_hup())
+            .field("read_hup", &self.is_read_hup())
             .field("priority", &self.is_priority())
             .field("aio", &self.is_aio())
             .field("lio", &self.is_lio())
