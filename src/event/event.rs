@@ -69,19 +69,11 @@ impl Event {
     /// Method is available on all platforms, but not all platforms (can) use
     /// this indicator.
     ///
-    /// When HUP events are received is different per platform. For example on
-    /// epoll platforms HUP will be received when a TCP socket reached EOF,
-    /// however on kqueue platforms a HUP event will be received when `shutdown`
-    /// is called on the connection (both when shutting down the reading
-    /// **and/or** writing side). Meaning that even though this function might
-    /// return true on one platform in a given situation, it might return false
-    /// on a different platform in the same situation. Furthermore even if true
-    /// was returned on both platforms it could simply mean something different
-    /// on the two platforms.
-    ///
     /// Because of the above be cautions when using this in cross-platform
     /// applications, Mio makes no attempt at normalising this indicator and
-    /// only provides a convenience method to read it.
+    /// only provides a convenience method to read it. We advice looking at the
+    /// documentation provided for the selectors (see below) when using this
+    /// indicator.
     ///
     /// The table below shows what flags are checked on what OS.
     ///
