@@ -438,8 +438,8 @@ impl SelectorInner {
                     });
                     continue;
                 }
-                let sock: Arc<Mutex<SockState>> =
-                    unsafe { Arc::from_raw(mem::transmute(iocp_event.overlapped())) };
+                let sock =
+                    unsafe { Arc::from_raw(iocp_event.overlapped() as *mut Mutex<SockState>) };
                 let mut sock_guard = sock.lock().unwrap();
                 match sock_guard.feed_event() {
                     Some(e) => {
