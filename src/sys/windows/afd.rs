@@ -46,6 +46,8 @@ struct ObjectAttributes(OBJECT_ATTRIBUTES);
 unsafe impl Send for ObjectAttributes {}
 unsafe impl Sync for ObjectAttributes {}
 
+use lazy_static::lazy_static;
+
 lazy_static! {
     static ref AFD_OBJ_NAME: UnicodeString = UnicodeString(UNICODE_STRING {
         // Lengths are calced in bytes
