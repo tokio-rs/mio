@@ -247,7 +247,7 @@ impl Drop for UdpSocket {
                 internal
                     .selector
                     .inner()
-                    .mark_delete_socket(sock_state.clone());
+                    .mark_delete_socket(&sock_state);
             }
         }
     }

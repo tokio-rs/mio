@@ -226,7 +226,7 @@ impl Drop for TcpStream {
                 internal
                     .selector
                     .inner()
-                    .mark_delete_socket(sock_state.clone());
+                    .mark_delete_socket(&sock_state);
             }
         }
     }
@@ -390,7 +390,7 @@ impl Drop for TcpListener {
                 internal
                     .selector
                     .inner()
-                    .mark_delete_socket(sock_state.clone());
+                    .mark_delete_socket(&sock_state);
             }
         }
     }

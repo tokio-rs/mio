@@ -398,7 +398,7 @@ impl SelectorInner {
         &self.cp
     }
 
-    pub fn mark_delete_socket(&self, sock_state: Arc<Mutex<SockState>>) {
+    pub fn mark_delete_socket(&self, sock_state: &Mutex<SockState>) {
         sock_state.lock().unwrap().mark_delete();
     }
 
@@ -503,7 +503,7 @@ impl SelectorInner {
     fn add_socket_to_update_queue<S: MioSocketState>(&self, socket: &S) {
         let sock_state = socket.get_sock_state().unwrap();
         let mut update_queue = self.update_queue.lock().unwrap();
-        update_queue.push_back(sock_state.clone());
+        update_queue.push_back(sock_state);
     }
 }
 
