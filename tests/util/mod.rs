@@ -9,6 +9,10 @@ use mio::{Events, Poll};
 
 pub use ports::localhost;
 
+pub fn assert_send<T: Send>() {}
+
+pub fn assert_sync<T: Sync>() {}
+
 pub trait TryRead {
     fn try_read_buf<B: BufMut>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
     where

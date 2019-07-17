@@ -22,50 +22,6 @@ const CLIENT: Token = Token(1);
 const SERVER: Token = Token(2);
 
 #[test]
-fn accept() {
-    struct H {
-        hit: bool,
-        listener: TcpListener,
-        shutdown: bool,
-    }
-
-    let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
-    let addr = l.local_addr().unwrap();
-
-    let t = thread::spawn(move || {
-        net::TcpStream::connect(addr).unwrap();
-    });
-
-    let mut poll = Poll::new().unwrap();
-
-    poll.registry()
-        .register(&l, Token(1), Interests::READABLE)
-        .unwrap();
-
-    let mut events = Events::with_capacity(128);
-
-    let mut h = H {
-        hit: false,
-        listener: l,
-        shutdown: false,
-    };
-    while !h.shutdown {
-        poll.poll(&mut events, None).unwrap();
-
-        for event in &events {
-            h.hit = true;
-            assert_eq!(event.token(), Token(1));
-            assert!(event.is_readable());
-            assert!(h.listener.accept().is_ok());
-            h.shutdown = true;
-        }
-    }
-    assert!(h.hit);
-    assert!(h.listener.accept().unwrap_err().kind() == io::ErrorKind::WouldBlock);
-    t.join().unwrap();
-}
-
-#[test]
 fn connect() {
     struct H {
         hit: u32,
@@ -488,47 +444,6 @@ fn connect_then_close() {
             }
         }
     }
-}
-
-#[test]
-fn listen_then_close() {
-    let mut poll = Poll::new().unwrap();
-    let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
-
-    poll.registry()
-        .register(&l, Token(1), Interests::READABLE)
-        .unwrap();
-    drop(l);
-
-    let mut events = Events::with_capacity(128);
-
-    poll.poll(&mut events, Some(Duration::from_millis(100)))
-        .unwrap();
-
-    for event in &events {
-        if event.token() == Token(1) {
-            panic!("recieved ready() on a closed TcpListener")
-        }
-    }
-}
-
-fn assert_send<T: Send>() {}
-
-fn assert_sync<T: Sync>() {}
-
-#[test]
-fn test_tcp_sockets_are_send() {
-    assert_send::<TcpListener>();
-    assert_send::<TcpStream>();
-    assert_sync::<TcpListener>();
-    assert_sync::<TcpStream>();
-}
-
-#[test]
-fn bind_twice_bad() {
-    let l1 = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
-    let addr = l1.local_addr().unwrap();
-    assert!(TcpListener::bind(addr).is_err());
 }
 
 #[test]
