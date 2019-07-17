@@ -122,18 +122,16 @@ fn register_deregister() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(1024);
 
-    let addr = localhost();
-
-    let server = TcpListener::bind(addr).unwrap();
+    let server = TcpListener::bind(localhost()).unwrap();
 
     info!("register server socket");
     poll.registry()
         .register(&server, SERVER, Interests::READABLE)
         .unwrap();
 
-    let client = TcpStream::connect(addr).unwrap();
+    let client = TcpStream::connect(server.local_addr().unwrap()).unwrap();
 
-    // Register client socket only as writable
+    // Register client socket only as readable.
     poll.registry()
         .register(&client, CLIENT, Interests::READABLE)
         .unwrap();
