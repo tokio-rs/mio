@@ -65,6 +65,9 @@ lazy_static! {
     });
 }
 
+/// Winsock2 AFD driver instance.
+///
+/// All operations are unsafe due to IO_STATUS_BLOCK parameter are being used by Afd driver during STATUS_PENDING before I/O Completion Port returns its result.
 #[derive(Debug)]
 pub struct Afd {
     fd: File,
@@ -102,6 +105,7 @@ impl fmt::Debug for AfdPollInfo {
 }
 
 impl Afd {
+    /// Create new Afd instance.
     pub fn new(cp: &CompletionPort) -> io::Result<Afd> {
         let mut afd_helper_handle: HANDLE = INVALID_HANDLE_VALUE;
         let mut iosb: IO_STATUS_BLOCK = unsafe { std::mem::zeroed() };
@@ -139,54 +143,64 @@ impl Afd {
         }
     }
 
-    pub fn poll(
+    /// Poll `Afd` instance with `AfdPollInfo`.
+    ///
+    /// # Unsafety
+    ///
+    /// This function is unsafe due to memory of `IO_STATUS_BLOCK` still being used by `Afd` instance while `Ok(false)` (`STATUS_PENDING`).
+    /// `iosb` needs to be untouched after the call while operation is in effective at ALL TIME except for `cancel` method.
+    /// So be careful not to `poll` twice while polling.
+    pub unsafe fn poll(
         &self,
         info: &mut AfdPollInfo,
         iosb: Pin<&mut IO_STATUS_BLOCK>,
-        apccontext: PVOID,
+        overlapped: PVOID,
     ) -> io::Result<bool> {
         let info_ptr: PVOID = info as *mut _ as PVOID;
         let iosb_ptr = iosb.get_mut();
-        unsafe {
-            (*iosb_ptr).u.Status = STATUS_PENDING;
-            let status = NtDeviceIoControlFile(
-                self.fd.as_raw_handle(),
-                null_mut(),
-                None,
-                apccontext,
-                iosb_ptr,
-                IOCTL_AFD_POLL,
-                info_ptr,
-                size_of::<AfdPollInfo>() as u32,
-                info_ptr,
-                size_of::<AfdPollInfo>() as u32,
-            );
-            match status {
-                STATUS_SUCCESS => Ok(true),
-                STATUS_PENDING => Ok(false),
-                _ => Err(io::Error::from_raw_os_error(
-                    RtlNtStatusToDosError(status) as i32
-                )),
-            }
+        (*iosb_ptr).u.Status = STATUS_PENDING;
+        let status = NtDeviceIoControlFile(
+            self.fd.as_raw_handle(),
+            null_mut(),
+            None,
+            overlapped,
+            iosb_ptr,
+            IOCTL_AFD_POLL,
+            info_ptr,
+            size_of::<AfdPollInfo>() as u32,
+            info_ptr,
+            size_of::<AfdPollInfo>() as u32,
+        );
+        match status {
+            STATUS_SUCCESS => Ok(true),
+            STATUS_PENDING => Ok(false),
+            _ => Err(io::Error::from_raw_os_error(
+                RtlNtStatusToDosError(status) as i32
+            )),
         }
     }
 
-    pub fn cancel(&self, iosb: Pin<&mut IO_STATUS_BLOCK>) -> io::Result<()> {
-        unsafe {
-            if iosb.u.Status != STATUS_PENDING {
-                return Ok(());
-            }
-
-            let mut cancel_iosb: IO_STATUS_BLOCK = std::mem::zeroed();
-            let status =
-                NtCancelIoFileEx(self.fd.as_raw_handle(), iosb.get_mut(), &mut cancel_iosb);
-            if status == STATUS_SUCCESS || status == STATUS_NOT_FOUND {
-                return Ok(());
-            }
-            Err(io::Error::from_raw_os_error(
-                RtlNtStatusToDosError(status) as i32
-            ))
+    /// Cancel previous polled request of `Afd`.
+    ///
+    /// iosb needs to be used by `poll` first for valid `cancel`.
+    ///
+    /// # Unsafety
+    ///
+    /// This function is unsafe due to memory of `IO_STATUS_BLOCK` still being used by `Afd` instance while `Ok(false)` (`STATUS_PENDING`).
+    /// Use it only with request is still being polled so that you have valid `IO_STATUS_BLOCK` to use.
+    pub unsafe fn cancel(&self, iosb: Pin<&mut IO_STATUS_BLOCK>) -> io::Result<()> {
+        if iosb.u.Status != STATUS_PENDING {
+            return Ok(());
         }
+
+        let mut cancel_iosb: IO_STATUS_BLOCK = std::mem::zeroed();
+        let status = NtCancelIoFileEx(self.fd.as_raw_handle(), iosb.get_mut(), &mut cancel_iosb);
+        if status == STATUS_SUCCESS || status == STATUS_NOT_FOUND {
+            return Ok(());
+        }
+        Err(io::Error::from_raw_os_error(
+            RtlNtStatusToDosError(status) as i32
+        ))
     }
 }
 

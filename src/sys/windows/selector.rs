@@ -110,10 +110,11 @@ impl SockState {
             self.poll_info.handles[0].status = 0;
             self.poll_info.handles[0].events = self.user_evts;
 
-            let apccontext = Arc::into_raw(self_arc.clone()) as *const _ as PVOID;
-            let result = self
-                .afd
-                .poll(&mut self.poll_info, self.iosb.as_mut(), apccontext);
+            let overlapped = Arc::into_raw(self_arc.clone()) as *const _ as PVOID;
+            let result = unsafe {
+                self.afd
+                    .poll(&mut self.poll_info, self.iosb.as_mut(), overlapped)
+            };
             if let Err(e) = result {
                 if let Some(code) = e.raw_os_error() {
                     if code == ERROR_IO_PENDING as i32 {
@@ -138,7 +139,9 @@ impl SockState {
 
     fn cancel(&mut self) -> io::Result<()> {
         assert!(self.poll_status == SockPollStatus::Pending);
-        self.afd.cancel(self.iosb.as_mut())?;
+        unsafe {
+            self.afd.cancel(self.iosb.as_mut())?;
+        }
         self.poll_status = SockPollStatus::Cancelled;
         self.pending_evts = 0;
         Ok(())
@@ -183,10 +186,11 @@ impl SockState {
             return None;
         }
 
-        // Codes to emulate ET in mio
+        // Reset readable event
         if (afd_events & (KNOWN_AFD_EVENTS & !AFD_POLL_SEND)) != 0 {
             self.user_evts &= !(afd_events & (KNOWN_AFD_EVENTS & !AFD_POLL_SEND));
         }
+        // Reset writable event
         if (afd_events & AFD_POLL_SEND) != 0 {
             self.user_evts &= !AFD_POLL_SEND;
         }
@@ -210,6 +214,12 @@ impl SockState {
 #[cfg(debug_assertions)]
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
+/// Windows implementaion of `sys::Selector`
+///
+/// Edge-triggered event notification is simulated by resetting internal event flag of each socket state `SockState`
+/// and setting all events back by intercepting all requests that could cause `io::ErrorKind::WouldBlock` happening.
+///
+/// This selector is currently only support socket due to `Afd` driver is winsock2 specific.
 #[derive(Debug)]
 pub struct Selector {
     #[cfg(debug_assertions)]
