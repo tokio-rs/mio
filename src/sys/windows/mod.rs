@@ -14,7 +14,7 @@ pub use tcp::{TcpListener, TcpStream};
 pub use udp::UdpSocket;
 pub use waker::Waker;
 
-pub trait MioSocketState {
+pub trait WindowsSocketState {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>>;
     fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>);
 }

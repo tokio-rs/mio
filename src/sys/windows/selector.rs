@@ -26,7 +26,7 @@ use super::afd::{
 };
 use super::io_status_block::IoStatusBlock;
 use super::Event;
-use super::MioSocketState;
+use super::WindowsSocketState;
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
 
@@ -244,7 +244,7 @@ impl Selector {
         self.inner.select(events, timeout)
     }
 
-    pub fn register<S: MioSocketState + AsRawSocket>(
+    pub fn register<S: WindowsSocketState + AsRawSocket>(
         &self,
         socket: &S,
         token: Token,
@@ -253,7 +253,7 @@ impl Selector {
         self.inner.register(socket, token, interests)
     }
 
-    pub fn reregister<S: MioSocketState>(
+    pub fn reregister<S: WindowsSocketState>(
         &self,
         socket: &S,
         token: Token,
@@ -262,7 +262,7 @@ impl Selector {
         self.inner.reregister(socket, token, interests)
     }
 
-    pub fn deregister<S: MioSocketState>(&self, socket: &S) -> io::Result<()> {
+    pub fn deregister<S: WindowsSocketState>(&self, socket: &S) -> io::Result<()> {
         self.inner.deregister(socket)
     }
 
@@ -321,7 +321,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn register<S: MioSocketState + AsRawSocket>(
+    pub fn register<S: WindowsSocketState + AsRawSocket>(
         &self,
         socket: &S,
         token: Token,
@@ -349,7 +349,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn reregister<S: MioSocketState>(
+    pub fn reregister<S: WindowsSocketState>(
         &self,
         socket: &S,
         token: Token,
@@ -375,7 +375,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn deregister<S: MioSocketState>(&self, socket: &S) -> io::Result<()> {
+    pub fn deregister<S: WindowsSocketState>(&self, socket: &S) -> io::Result<()> {
         if socket.get_sock_state().is_none() {
             return Err(io::Error::from(io::ErrorKind::NotFound));
         }
@@ -490,7 +490,7 @@ impl SelectorInner {
         )?)))
     }
 
-    fn add_socket_to_update_queue<S: MioSocketState>(&self, socket: &S) {
+    fn add_socket_to_update_queue<S: WindowsSocketState>(&self, socket: &S) {
         let sock_state = socket.get_sock_state().unwrap();
         let mut update_queue = self.update_queue.lock().unwrap();
         update_queue.push_back(sock_state);
