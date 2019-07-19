@@ -14,11 +14,17 @@ pub fn token(event: &Event) -> Token {
 }
 
 pub fn is_readable(event: &Event) -> bool {
+    if is_hup(event) {
+        return true;
+    }
     (event.flags & (afd::KNOWN_AFD_EVENTS & !afd::AFD_POLL_SEND)) != 0
 }
 
 pub fn is_writable(event: &Event) -> bool {
-    (event.flags & (afd::AFD_POLL_SEND | afd::AFD_POLL_CONNECT_FAIL)) != 0
+    if is_hup(event) {
+        return true;
+    }
+    (event.flags & (afd::AFD_POLL_SEND)) != 0
 }
 
 pub fn is_error(event: &Event) -> bool {
