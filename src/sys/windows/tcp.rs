@@ -174,7 +174,7 @@ impl TcpStream {
     }
 }
 
-impl super::WindowsSocketState for TcpStream {
+impl super::SocketState for TcpStream {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
         let internal = self.internal.read().unwrap();
         match &*internal {
@@ -196,7 +196,7 @@ impl super::WindowsSocketState for TcpStream {
     }
 }
 
-impl<'a> super::WindowsSocketState for &'a TcpStream {
+impl<'a> super::SocketState for &'a TcpStream {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
         let internal = self.internal.read().unwrap();
         match &*internal {
@@ -412,7 +412,7 @@ impl Drop for TcpListener {
     }
 }
 
-impl super::WindowsSocketState for TcpListener {
+impl super::SocketState for TcpListener {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
         let internal = self.internal.read().unwrap();
         match &*internal {

@@ -1,9 +1,6 @@
 use crate::poll;
 use crate::{event, Interests, Registry, Token};
 
-#[allow(unused_imports)] // only here for Rust 1.8
-use net2::UdpSocketExt;
-
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -150,20 +147,12 @@ impl UdpSocket {
         self.io.leave_multicast_v6(multiaddr, interface)
     }
 
-    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.io.set_only_v6(only_v6)
-    }
-
-    pub fn only_v6(&self) -> io::Result<bool> {
-        self.io.only_v6()
-    }
-
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.io.take_error()
     }
 }
 
-impl super::WindowsSocketState for UdpSocket {
+impl super::SocketState for UdpSocket {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
         let internal = self.internal.read().unwrap();
         match &*internal {

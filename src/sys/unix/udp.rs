@@ -7,9 +7,6 @@ use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
-#[allow(unused_imports)] // only here for Rust 1.8
-use net2::UdpSocketExt;
-
 pub struct UdpSocket {
     io: std::net::UdpSocket,
 }

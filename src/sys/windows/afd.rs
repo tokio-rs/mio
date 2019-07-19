@@ -3,7 +3,6 @@ use std::fmt;
 use std::fs::File;
 use std::io;
 use std::mem::{size_of, zeroed};
-use std::pin::Pin;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -22,7 +21,7 @@ use winapi::um::winnt::SYNCHRONIZE;
 use winapi::um::winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE};
 
 use ntapi::ntioapi::FILE_OPEN;
-use ntapi::ntioapi::IO_STATUS_BLOCK;
+use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
 use ntapi::ntioapi::{NtCancelIoFileEx, NtCreateFile, NtDeviceIoControlFile};
 use ntapi::ntrtl::RtlNtStatusToDosError;
 
@@ -94,7 +93,7 @@ pub struct AfdPollInfo {
 
 impl AfdPollInfo {
     pub fn zeroed() -> AfdPollInfo {
-        unsafe { zeroed::<AfdPollInfo>() }
+        unsafe { zeroed() }
     }
 }
 
@@ -108,7 +107,10 @@ impl Afd {
     /// Create new Afd instance.
     pub fn new(cp: &CompletionPort) -> io::Result<Afd> {
         let mut afd_helper_handle: HANDLE = INVALID_HANDLE_VALUE;
-        let mut iosb: IO_STATUS_BLOCK = unsafe { std::mem::zeroed() };
+        let mut iosb = IO_STATUS_BLOCK {
+            u: IO_STATUS_BLOCK_u { Status: 0 },
+            Information: 0,
+        };
 
         unsafe {
             let status = NtCreateFile(
@@ -153,18 +155,17 @@ impl Afd {
     pub unsafe fn poll(
         &self,
         info: &mut AfdPollInfo,
-        iosb: Pin<&mut IO_STATUS_BLOCK>,
+        iosb: *mut IO_STATUS_BLOCK,
         overlapped: PVOID,
     ) -> io::Result<bool> {
         let info_ptr: PVOID = info as *mut _ as PVOID;
-        let iosb_ptr = iosb.get_mut();
-        (*iosb_ptr).u.Status = STATUS_PENDING;
+        (*iosb).u.Status = STATUS_PENDING;
         let status = NtDeviceIoControlFile(
             self.fd.as_raw_handle(),
             null_mut(),
             None,
             overlapped,
-            iosb_ptr,
+            iosb,
             IOCTL_AFD_POLL,
             info_ptr,
             size_of::<AfdPollInfo>() as u32,
@@ -188,13 +189,16 @@ impl Afd {
     ///
     /// This function is unsafe due to memory of `IO_STATUS_BLOCK` still being used by `Afd` instance while `Ok(false)` (`STATUS_PENDING`).
     /// Use it only with request is still being polled so that you have valid `IO_STATUS_BLOCK` to use.
-    pub unsafe fn cancel(&self, iosb: Pin<&mut IO_STATUS_BLOCK>) -> io::Result<()> {
-        if iosb.u.Status != STATUS_PENDING {
+    pub unsafe fn cancel(&self, iosb: *mut IO_STATUS_BLOCK) -> io::Result<()> {
+        if (*iosb).u.Status != STATUS_PENDING {
             return Ok(());
         }
 
-        let mut cancel_iosb: IO_STATUS_BLOCK = std::mem::zeroed();
-        let status = NtCancelIoFileEx(self.fd.as_raw_handle(), iosb.get_mut(), &mut cancel_iosb);
+        let mut cancel_iosb = IO_STATUS_BLOCK {
+            u: IO_STATUS_BLOCK_u { Status: 0 },
+            Information: 0,
+        };
+        let status = NtCancelIoFileEx(self.fd.as_raw_handle(), iosb, &mut cancel_iosb);
         if status == STATUS_SUCCESS || status == STATUS_NOT_FOUND {
             return Ok(());
         }

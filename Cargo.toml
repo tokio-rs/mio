@@ -34,7 +34,7 @@ libc = "0.2.58"
 
 [target.'cfg(windows)'.dependencies]
 miow   = "0.3.3"
-winapi = { version = "0.3", features = ["winsock2"] }
+winapi = { version = "0.3", features = ["winsock2", "mswsock"] }
 ntapi  = "0.3"
 lazy_static = "1.3.0"
 

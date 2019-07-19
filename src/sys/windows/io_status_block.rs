@@ -1,17 +1,19 @@
 use std::cell::UnsafeCell;
 use std::fmt;
-use std::mem;
-use std::ops::{Deref, DerefMut};
 
-use ntapi::ntioapi::IO_STATUS_BLOCK;
+use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
 
 pub struct IoStatusBlock(UnsafeCell<IO_STATUS_BLOCK>);
 
+// There is a pointer field in `IO_STATUS_BLOCK_u`, which we don't use that. Thus it is safe to implement Send here.
 unsafe impl Send for IoStatusBlock {}
 
 impl IoStatusBlock {
     pub fn zeroed() -> IoStatusBlock {
-        let iosb = unsafe { mem::zeroed::<IO_STATUS_BLOCK>() };
+        let iosb = IO_STATUS_BLOCK {
+            u: IO_STATUS_BLOCK_u { Status: 0 },
+            Information: 0,
+        };
         IoStatusBlock(UnsafeCell::new(iosb))
     }
 
@@ -21,19 +23,6 @@ impl IoStatusBlock {
 
     pub fn as_mut_ptr(&self) -> *mut IO_STATUS_BLOCK {
         self.0.get()
-    }
-}
-
-impl Deref for IoStatusBlock {
-    type Target = IO_STATUS_BLOCK;
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*self.as_ptr() }
-    }
-}
-
-impl DerefMut for IoStatusBlock {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *self.as_mut_ptr() }
     }
 }
 

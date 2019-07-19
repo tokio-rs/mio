@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 use std::io;
+use std::mem::size_of;
 use std::pin::Pin;
+use std::ptr::null_mut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -11,7 +13,8 @@ use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
 use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING};
-use winapi::um::winsock2::INVALID_SOCKET;
+use winapi::um::mswsock::SIO_BASE_HANDLE;
+use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 
@@ -26,7 +29,7 @@ use super::afd::{
 };
 use super::io_status_block::IoStatusBlock;
 use super::Event;
-use super::WindowsSocketState;
+use super::SocketState;
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
 
@@ -39,7 +42,7 @@ enum SockPollStatus {
 
 #[derive(Debug)]
 pub struct SockState {
-    iosb: Pin<IoStatusBlock>,
+    iosb: Pin<Box<IoStatusBlock>>,
     poll_info: AfdPollInfo,
     afd: Arc<Afd>,
     raw_socket: RawSocket,
@@ -54,7 +57,7 @@ pub struct SockState {
 impl SockState {
     fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
         Ok(SockState {
-            iosb: Pin::new(IoStatusBlock::zeroed()),
+            iosb: Pin::new(Box::new(IoStatusBlock::zeroed())),
             poll_info: AfdPollInfo::zeroed(),
             afd,
             raw_socket,
@@ -113,7 +116,7 @@ impl SockState {
             let overlapped = Arc::into_raw(self_arc.clone()) as *const _ as PVOID;
             let result = unsafe {
                 self.afd
-                    .poll(&mut self.poll_info, self.iosb.as_mut(), overlapped)
+                    .poll(&mut self.poll_info, (*self.iosb).as_mut_ptr(), overlapped)
             };
             if let Err(e) = result {
                 if let Some(code) = e.raw_os_error() {
@@ -140,7 +143,7 @@ impl SockState {
     fn cancel(&mut self) -> io::Result<()> {
         assert!(self.poll_status == SockPollStatus::Pending);
         unsafe {
-            self.afd.cancel(self.iosb.as_mut())?;
+            self.afd.cancel((*self.iosb).as_mut_ptr())?;
         }
         self.poll_status = SockPollStatus::Cancelled;
         self.pending_evts = 0;
@@ -162,12 +165,14 @@ impl SockState {
         self.poll_status = SockPollStatus::Idle;
         self.pending_evts = 0;
 
+        // We use the status info in IO_STATUS_BLOCK to determine the socket poll status. It is unsafe to use a pointer of IO_STATUS_BLOCK.
         unsafe {
+            let iosb = &*(*self.iosb).as_ptr();
             if self.delete_pending {
                 return None;
-            } else if self.iosb.u.Status == STATUS_CANCELLED {
+            } else if iosb.u.Status == STATUS_CANCELLED {
                 /* The poll request was cancelled by CancelIoEx. */
-            } else if !NT_SUCCESS(self.iosb.u.Status) {
+            } else if !NT_SUCCESS(iosb.u.Status) {
                 /* The overlapped request itself failed in an unexpected way. */
                 afd_events = AFD_POLL_CONNECT_FAIL;
             } else if self.poll_info.number_of_handles < 1 {
@@ -244,7 +249,7 @@ impl Selector {
         self.inner.select(events, timeout)
     }
 
-    pub fn register<S: WindowsSocketState + AsRawSocket>(
+    pub fn register<S: SocketState + AsRawSocket>(
         &self,
         socket: &S,
         token: Token,
@@ -253,7 +258,7 @@ impl Selector {
         self.inner.register(socket, token, interests)
     }
 
-    pub fn reregister<S: WindowsSocketState>(
+    pub fn reregister<S: SocketState>(
         &self,
         socket: &S,
         token: Token,
@@ -262,7 +267,7 @@ impl Selector {
         self.inner.reregister(socket, token, interests)
     }
 
-    pub fn deregister<S: WindowsSocketState>(&self, socket: &S) -> io::Result<()> {
+    pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
         self.inner.deregister(socket)
     }
 
@@ -321,7 +326,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn register<S: WindowsSocketState + AsRawSocket>(
+    pub fn register<S: SocketState + AsRawSocket>(
         &self,
         socket: &S,
         token: Token,
@@ -349,7 +354,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn reregister<S: WindowsSocketState>(
+    pub fn reregister<S: SocketState>(
         &self,
         socket: &S,
         token: Token,
@@ -375,7 +380,7 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn deregister<S: WindowsSocketState>(&self, socket: &S) -> io::Result<()> {
+    pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
         if socket.get_sock_state().is_none() {
             return Err(io::Error::from(io::ErrorKind::NotFound));
         }
@@ -490,7 +495,7 @@ impl SelectorInner {
         )?)))
     }
 
-    fn add_socket_to_update_queue<S: WindowsSocketState>(&self, socket: &S) {
+    fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
         let sock_state = socket.get_sock_state().unwrap();
         let mut update_queue = self.update_queue.lock().unwrap();
         update_queue.push_back(sock_state);
@@ -515,11 +520,6 @@ fn interests_to_afd_flags(interests: Interests) -> u32 {
 fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
     let mut base_socket: RawSocket = 0;
     let mut bytes: u32 = 0;
-    const SIO_BASE_HANDLE: u32 = 0x48000022;
-
-    use std::mem::size_of;
-    use std::ptr::null_mut;
-    use winapi::um::winsock2::{WSAIoctl, SOCKET_ERROR};
 
     unsafe {
         if WSAIoctl(
