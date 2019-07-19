@@ -1,9 +1,8 @@
-use std::io::{self, Cursor, IoSlice, IoSliceMut, Read, Write};
+use std::io::{self, Cursor, Read, Write};
 use std::net::Shutdown;
-use std::ops::DerefMut;
 use std::sync::mpsc::channel;
 use std::time::Duration;
-use std::{cmp, net, thread};
+use std::{net, thread};
 
 use bytes::{Buf, Bytes, BytesMut};
 use log::{debug, info};
@@ -254,84 +253,6 @@ fn peek() {
 }
 
 #[test]
-fn read_vectored() {
-    const N: usize = 16 * 1024 * 1024;
-
-    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = l.local_addr().unwrap();
-
-    let t = thread::spawn(move || {
-        let mut s = l.accept().unwrap().0;
-        let b = [1; 1024];
-        let mut amt = 0;
-        while amt < N {
-            amt += s.write(&b).unwrap();
-        }
-    });
-
-    let mut poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(128);
-
-    let s = TcpStream::connect(addr).unwrap();
-
-    poll.registry()
-        .register(&s, Token(1), Interests::READABLE)
-        .unwrap();
-
-    let b1 = &mut [0; 10][..];
-    let b2 = &mut [0; 383][..];
-    let b3 = &mut [0; 28][..];
-    let b4 = &mut [0; 8][..];
-    let b5 = &mut [0; 128][..];
-    let mut b: [IoSliceMut; 5] = [
-        IoSliceMut::new(b1),
-        IoSliceMut::new(b2),
-        IoSliceMut::new(b3),
-        IoSliceMut::new(b4),
-        IoSliceMut::new(b5),
-    ];
-
-    let mut so_far = 0;
-    'event_loop: loop {
-        for buf in b.iter_mut() {
-            for byte in buf.deref_mut().iter_mut() {
-                *byte = 0;
-            }
-        }
-
-        poll.poll(&mut events, None).unwrap();
-
-        'read_loop: loop {
-            match (&s).read_vectored(&mut b) {
-                Ok(0) => {
-                    assert_eq!(so_far, N);
-                    break 'event_loop;
-                }
-                Ok(mut n) => {
-                    so_far += n;
-                    for buf in b.iter() {
-                        for byte in (&buf[..cmp::min(n, buf.len())]).iter() {
-                            assert_eq!(*byte, 1);
-                        }
-                        n = n.saturating_sub(buf.len());
-                        if n == 0 {
-                            continue 'read_loop;
-                        }
-                    }
-                    assert_eq!(n, 0);
-                }
-                Err(e) => {
-                    assert_eq!(e.kind(), io::ErrorKind::WouldBlock);
-                    break 'read_loop;
-                }
-            }
-        }
-    }
-
-    t.join().unwrap();
-}
-
-#[test]
 fn write() {
     const N: usize = 16 * 1024 * 1024;
     struct H {
@@ -385,67 +306,6 @@ fn write() {
             }
         }
     }
-    t.join().unwrap();
-}
-
-#[test]
-fn write_vectored() {
-    const N: usize = 16 * 1024 * 1024;
-
-    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = l.local_addr().unwrap();
-
-    let t = thread::spawn(move || {
-        let mut s = l.accept().unwrap().0;
-        let mut b = [0; 1024];
-        let mut amt = 0;
-        while amt < N {
-            for byte in b.iter_mut() {
-                *byte = 0;
-            }
-            let n = s.read(&mut b).unwrap();
-            amt += n;
-            for byte in b[..n].iter() {
-                assert_eq!(*byte, 1);
-            }
-        }
-    });
-
-    let mut poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(128);
-    let s = TcpStream::connect(addr).unwrap();
-    poll.registry()
-        .register(&s, Token(1), Interests::WRITABLE)
-        .unwrap();
-
-    let b1 = &mut [1; 10][..];
-    let b2 = &mut [1; 383][..];
-    let b3 = &mut [1; 28][..];
-    let b4 = &mut [1; 8][..];
-    let b5 = &mut [1; 128][..];
-    let b: [IoSlice; 5] = [
-        IoSlice::new(b1),
-        IoSlice::new(b2),
-        IoSlice::new(b3),
-        IoSlice::new(b4),
-        IoSlice::new(b5),
-    ];
-
-    let mut so_far = 0;
-    while so_far < N {
-        poll.poll(&mut events, None).unwrap();
-
-        loop {
-            match (&s).write_vectored(&b) {
-                Ok(n) => so_far += n,
-                Err(e) => {
-                    assert_eq!(e.kind(), io::ErrorKind::WouldBlock);
-                    break;
-                }
-            }
-        }
-    }
-
     t.join().unwrap();
 }
 

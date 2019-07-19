@@ -4,7 +4,9 @@ use std::time::Duration;
 
 use log::{debug, info, trace};
 
-use mio::net::{TcpListener, TcpStream, UdpSocket};
+#[cfg(debug_assertions)]
+use mio::net::UdpSocket;
+use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
