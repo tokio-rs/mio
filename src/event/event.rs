@@ -71,9 +71,8 @@ impl Event {
     ///
     /// Because of the above be cautions when using this in cross-platform
     /// applications, Mio makes no attempt at normalising this indicator and
-    /// only provides a convenience method to read it. We advice looking at the
-    /// documentation provided for the selectors (see below) when using this
-    /// indicator.
+    /// only provides a convenience method to read it. Refer to the selector
+    /// documentation (below) when using this indicator.
     ///
     /// The table below shows what flags are checked on what OS.
     ///
