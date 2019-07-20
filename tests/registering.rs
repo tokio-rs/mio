@@ -238,7 +238,7 @@ fn test_udp_register_multiple_event_loops() {
 }
 
 #[test]
-fn test_reregistering_after_deregistering() {
+fn test_registering_after_deregistering() {
     drop(env_logger::try_init());
 
     let mut poll = Poll::new().unwrap();
@@ -256,7 +256,7 @@ fn test_reregistering_after_deregistering() {
     registry.deregister(&server).unwrap();
 
     registry
-        .reregister(&server, SERVER, Interests::READABLE)
+        .register(&server, SERVER, Interests::READABLE)
         .unwrap();
 
     poll.poll(&mut events, Some(Duration::from_millis(100)))
