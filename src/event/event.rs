@@ -44,8 +44,8 @@ impl Event {
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms (can) use
-    /// this indicator.
+    /// Method is available on all platforms, but not all platforms trigger the
+    /// error event.
     ///
     /// The table below shows what flags are checked on what OS.
     ///
@@ -66,8 +66,8 @@ impl Event {
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms (can) use
-    /// this indicator.
+    /// Method is available on all platforms, but not all platforms trigger the
+    /// HUP event.
     ///
     /// Because of the above be cautions when using this in cross-platform
     /// applications, Mio makes no attempt at normalising this indicator and
@@ -94,8 +94,8 @@ impl Event {
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms (can) use
-    /// this indicator.
+    /// Method is available on all platforms, but not all platforms trigger the
+    /// read HUP event.
     ///
     /// Because of the above be cautions when using this in cross-platform
     /// applications, Mio makes no attempt at normalising this indicator and
@@ -122,8 +122,8 @@ impl Event {
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms (can) use
-    /// this indicator.
+    /// Method is available on all platforms, but not all platforms trigger the
+    /// priority event.
     ///
     /// The table below shows what flags are checked on what OS.
     ///
@@ -144,8 +144,7 @@ impl Event {
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms (can) use
-    /// this indicator.
+    /// Method is available on all platforms, but not all platforms support AIO.
     ///
     /// The table below shows what flags are checked on what OS.
     ///
@@ -168,11 +167,8 @@ impl Event {
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms (can) use
-    /// this indicator.
-    ///
-    /// This is currently only supported on FreeBSD and checks the `EVFILT_LIO`
-    /// flag.
+    /// Method is available on all platforms, but only FreeBSD supports LIO. On
+    /// FreeBSD this method checks the `EVFILT_LIO` flag.
     #[inline]
     pub fn is_lio(&self) -> bool {
         sys::event::is_lio(&self.inner)
