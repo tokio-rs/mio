@@ -152,7 +152,7 @@ impl Afd {
     /// This function is unsafe due to memory of `IO_STATUS_BLOCK` still being used by `Afd` instance while `Ok(false)` (`STATUS_PENDING`).
     /// `iosb` needs to be untouched after the call while operation is in effective at ALL TIME except for `cancel` method.
     /// So be careful not to `poll` twice while polling.
-    /// User should deallocate there overlapped value when error or calling `cancel` to prevent memory leak.
+    /// User should deallocate there overlapped value when error to prevent memory leak.
     pub unsafe fn poll(
         &self,
         info: &mut AfdPollInfo,
@@ -190,7 +190,7 @@ impl Afd {
     ///
     /// This function is unsafe due to memory of `IO_STATUS_BLOCK` still being used by `Afd` instance while `Ok(false)` (`STATUS_PENDING`).
     /// Use it only with request is still being polled so that you have valid `IO_STATUS_BLOCK` to use.
-    /// User should deallocate there overlapped value after the `cancel` to prevent memory leak.
+    /// User should NOT deallocate there overlapped value after the `cancel` to prevent double free.
     pub unsafe fn cancel(&self, iosb: *mut IO_STATUS_BLOCK) -> io::Result<()> {
         if (*iosb).u.Status != STATUS_PENDING {
             return Ok(());
