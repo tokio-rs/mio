@@ -236,3 +236,30 @@ fn test_udp_register_multiple_event_loops() {
     assert!(res.is_err());
     assert_eq!(res.unwrap_err().kind(), io::ErrorKind::Other);
 }
+
+#[test]
+fn test_reregistering_after_deregistering() {
+    drop(env_logger::try_init());
+
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+
+    let addr = localhost();
+    let server = TcpListener::bind(addr).unwrap();
+
+    let registry = poll.registry();
+
+    registry
+        .register(&server, SERVER, Interests::READABLE)
+        .unwrap();
+
+    registry.deregister(&server).unwrap();
+
+    registry
+        .reregister(&server, SERVER, Interests::READABLE)
+        .unwrap();
+
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+    assert!(events.is_empty());
+}
