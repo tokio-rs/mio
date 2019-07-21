@@ -120,24 +120,6 @@ impl UdpSocket {
         UdpSocket::from_socket(socket)
     }
 
-    /// Creates a new mio-wrapped socket from an underlying and bound std
-    /// socket.
-    ///
-    /// This function requires that `socket` has previously been bound to an
-    /// address to work correctly, and returns an I/O object which can be used
-    /// with mio to send/receive UDP messages.
-    ///
-    /// This can be used in conjunction with net2's `UdpBuilder` interface to
-    /// configure a socket before it's handed off to mio, such as setting
-    /// options like `reuse_address` or binding to multiple addresses.
-    pub fn from_socket(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        Ok(UdpSocket {
-            sys: sys::UdpSocket::new(socket)?,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        })
-    }
-
     /// Returns the socket address that this socket was created from.
     ///
     /// # Examples
