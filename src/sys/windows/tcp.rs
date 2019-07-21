@@ -13,7 +13,7 @@ use winapi::ctypes::c_int;
 use winapi::shared::ws2def::SOCKADDR;
 use winapi::um::winsock2::{
     bind, connect, ioctlsocket, socket, FIONBIO, INVALID_SOCKET, PF_INET, PF_INET6, SOCKET_ERROR,
-    SOCK_STREAM, WSAEINPROGRESS,
+    SOCK_STREAM,
 };
 
 use crate::poll;
@@ -98,7 +98,6 @@ impl TcpStream {
         )
         .and_then(|socket| {
             syscall!(ioctlsocket(socket, FIONBIO, &mut 1), PartialEq::ne, 0)
-                .or_else(ignore_in_progress)
                 .and_then(|_| {
                     // Required for a future `connect_overlapped` operation to be
                     // executed successfully.
@@ -109,7 +108,6 @@ impl TcpStream {
                         PartialEq::eq,
                         SOCKET_ERROR
                     )
-                    .or_else(ignore_in_progress)
                     .and_then(|_| {
                         let (raw_address, raw_address_length) = socket_address(&address);
                         syscall!(
@@ -117,7 +115,10 @@ impl TcpStream {
                             PartialEq::eq,
                             SOCKET_ERROR
                         )
-                        .or_else(ignore_in_progress)
+                        .or_else(|err| match err {
+                            ref err if err.kind() == io::ErrorKind::WouldBlock => Ok(0),
+                            err => Err(err),
+                        })
                     })
                 })
                 .map(|_| socket)
@@ -251,13 +252,6 @@ fn socket_address(address: &SocketAddr) -> (*const SOCKADDR, c_int) {
             address as *const _ as *const SOCKADDR,
             size_of_val(address) as c_int,
         ),
-    }
-}
-
-fn ignore_in_progress(err: io::Error) -> io::Result<c_int> {
-    match err {
-        ref err if err.raw_os_error() == Some(WSAEINPROGRESS) => Ok(0),
-        err => Err(err),
     }
 }
 
