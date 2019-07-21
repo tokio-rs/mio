@@ -1,16 +1,11 @@
 use std::io::{self, Cursor, Read, Write};
 use std::net::Shutdown;
-#[cfg(unix)]
-use std::os::unix::io::{FromRawFd, IntoRawFd};
-#[cfg(windows)]
-use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 use std::{net, thread};
 
 use bytes::{Buf, Bytes, BytesMut};
 use log::{debug, info};
-use net2::{self, TcpStreamExt};
 use slab::Slab;
 
 use mio::net::{TcpListener, TcpStream};
@@ -441,6 +436,7 @@ fn multiple_writes_immediate_success() {
     t.join().unwrap();
 }
 
+/* FIXME: requires net2 to use linger.
 #[test]
 fn connection_reset_by_peer() {
     let mut poll = Poll::new().unwrap();
@@ -458,16 +454,7 @@ fn connection_reset_by_peer() {
     client.connect(&addr).unwrap();
 
     // Convert to Mio stream
-    let client = unsafe {
-        #[cfg(windows)]
-        {
-            TcpStream::from_raw_socket(client.into_raw_socket())
-        }
-        #[cfg(unix)]
-        {
-            TcpStream::from_raw_fd(client.into_raw_fd())
-        }
-    };
+    let client = TcpStream::from_stream(client).unwrap();
 
     // Register server
     poll.registry()
@@ -526,6 +513,7 @@ fn connection_reset_by_peer() {
         }
     }
 }
+*/
 
 #[test]
 fn connect_error() {
