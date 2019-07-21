@@ -7,15 +7,14 @@
 //!
 //! [portability guidelines]: ../struct.Poll.html#portability
 
-#[cfg(debug_assertions)]
-use crate::poll::SelectorId;
-use crate::{event, sys, Interests, Registry, Token};
-
-use net2::TcpBuilder;
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, SocketAddr};
 use std::time::Duration;
+
+#[cfg(debug_assertions)]
+use crate::poll::SelectorId;
+use crate::{event, sys, Interests, Registry, Token};
 
 /*
  *
@@ -425,24 +424,8 @@ impl TcpListener {
     /// combination with the `TcpListener::from_listener` method to transfer
     /// ownership into mio.
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
-        // Create the socket
-        let sock = match addr {
-            SocketAddr::V4(..) => TcpBuilder::new_v4(),
-            SocketAddr::V6(..) => TcpBuilder::new_v6(),
-        }?;
-
-        // Set SO_REUSEADDR, but only on Unix (mirrors what libstd does)
-        if cfg!(unix) {
-            sock.reuse_address(true)?;
-        }
-
-        // Bind the socket
-        sock.bind(addr)?;
-
-        // listen
-        let listener = sock.listen(1024)?;
-        Ok(TcpListener {
-            sys: sys::TcpListener::new(listener)?,
+        sys::TcpListener::bind(addr).map(|sys| TcpListener {
+            sys,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })

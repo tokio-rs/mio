@@ -4,7 +4,7 @@ use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::mem::size_of_val;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-use std::os::windows::raw::SOCKET;
+use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
@@ -12,8 +12,8 @@ use net2::TcpStreamExt;
 use winapi::ctypes::c_int;
 use winapi::shared::ws2def::SOCKADDR;
 use winapi::um::winsock2::{
-    bind, connect, ioctlsocket, socket, FIONBIO, INVALID_SOCKET, PF_INET, PF_INET6, SOCKET_ERROR,
-    SOCK_STREAM,
+    bind, connect, ioctlsocket, listen, socket, FIONBIO, INVALID_SOCKET, PF_INET, PF_INET6, SOCKET,
+    SOCKET_ERROR, SOCK_STREAM,
 };
 
 use crate::poll;
@@ -85,48 +85,36 @@ macro_rules! wouldblock {
 }
 
 impl TcpStream {
-    pub fn connect(address: SocketAddr) -> io::Result<TcpStream> {
-        let domain = match address {
-            SocketAddr::V4(..) => PF_INET,
-            SocketAddr::V6(..) => PF_INET6,
-        };
-
-        syscall!(
-            socket(domain, SOCK_STREAM, 0),
-            PartialEq::eq,
-            INVALID_SOCKET
-        )
-        .and_then(|socket| {
-            syscall!(ioctlsocket(socket, FIONBIO, &mut 1), PartialEq::ne, 0)
+    pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
+        new_socket(addr)
+            .and_then(|socket| {
+                // Required for a future `connect_overlapped` operation to be
+                // executed successfully.
+                let any_addr = inaddr_any(addr);
+                let (raw_addr, raw_addr_length) = socket_addr(&any_addr);
+                syscall!(
+                    bind(socket, raw_addr, raw_addr_length),
+                    PartialEq::eq,
+                    SOCKET_ERROR
+                )
                 .and_then(|_| {
-                    // Required for a future `connect_overlapped` operation to be
-                    // executed successfully.
-                    let any_address = inaddr_any(address);
-                    let (raw_address, raw_address_length) = socket_address(&any_address);
+                    let (raw_addr, raw_addr_length) = socket_addr(&addr);
                     syscall!(
-                        bind(socket, raw_address, raw_address_length),
+                        connect(socket, raw_addr, raw_addr_length),
                         PartialEq::eq,
                         SOCKET_ERROR
                     )
-                    .and_then(|_| {
-                        let (raw_address, raw_address_length) = socket_address(&address);
-                        syscall!(
-                            connect(socket, raw_address, raw_address_length),
-                            PartialEq::eq,
-                            SOCKET_ERROR
-                        )
-                        .or_else(|err| match err {
-                            ref err if err.kind() == io::ErrorKind::WouldBlock => Ok(0),
-                            err => Err(err),
-                        })
+                    .or_else(|err| match err {
+                        ref err if err.kind() == io::ErrorKind::WouldBlock => Ok(0),
+                        err => Err(err),
                     })
                 })
                 .map(|_| socket)
-        })
-        .map(|socket| TcpStream {
-            internal: Arc::new(RwLock::new(None)),
-            inner: unsafe { net::TcpStream::from_raw_socket(socket as SOCKET) },
-        })
+            })
+            .map(|socket| TcpStream {
+                internal: Arc::new(RwLock::new(None)),
+                inner: unsafe { net::TcpStream::from_raw_socket(socket as StdSocket) },
+            })
     }
 
     pub fn connect_stream(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
@@ -239,19 +227,6 @@ fn inaddr_any(other: SocketAddr) -> SocketAddr {
             let addr = SocketAddrV6::new(any, 0, 0, 0);
             SocketAddr::V6(addr)
         }
-    }
-}
-
-fn socket_address(address: &SocketAddr) -> (*const SOCKADDR, c_int) {
-    match address {
-        SocketAddr::V4(ref address) => (
-            address as *const _ as *const SOCKADDR,
-            size_of_val(address) as c_int,
-        ),
-        SocketAddr::V6(ref address) => (
-            address as *const _ as *const SOCKADDR,
-            size_of_val(address) as c_int,
-        ),
     }
 }
 
@@ -443,6 +418,22 @@ impl AsRawSocket for TcpStream {
 }
 
 impl TcpListener {
+    pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
+        new_socket(addr).and_then(|socket| {
+            let (raw_addr, raw_addr_length) = socket_addr(&addr);
+            syscall!(
+                bind(socket, raw_addr, raw_addr_length,),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )
+            .and_then(|_| syscall!(listen(socket, 1024), PartialEq::eq, SOCKET_ERROR))
+            .map(|_| TcpListener {
+                internal: Arc::new(RwLock::new(None)),
+                inner: unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) },
+            })
+        })
+    }
+
     pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
         inner.set_nonblocking(true)?;
         Ok(TcpListener {
@@ -593,5 +584,35 @@ impl IntoRawSocket for TcpListener {
 impl AsRawSocket for TcpListener {
     fn as_raw_socket(&self) -> RawSocket {
         self.inner.as_raw_socket()
+    }
+}
+
+/// Create a new non-blocking socket.
+fn new_socket(addr: SocketAddr) -> io::Result<SOCKET> {
+    let domain = match addr {
+        SocketAddr::V4(..) => PF_INET,
+        SocketAddr::V6(..) => PF_INET6,
+    };
+
+    syscall!(
+        socket(domain, SOCK_STREAM, 0),
+        PartialEq::eq,
+        INVALID_SOCKET
+    )
+    .and_then(|socket| {
+        syscall!(ioctlsocket(socket, FIONBIO, &mut 1), PartialEq::ne, 0).map(|_| socket as SOCKET)
+    })
+}
+
+fn socket_addr(addr: &SocketAddr) -> (*const SOCKADDR, c_int) {
+    match addr {
+        SocketAddr::V4(ref addr) => (
+            addr as *const _ as *const SOCKADDR,
+            size_of_val(addr) as c_int,
+        ),
+        SocketAddr::V6(ref addr) => (
+            addr as *const _ as *const SOCKADDR,
+            size_of_val(addr) as c_int,
+        ),
     }
 }
