@@ -461,7 +461,7 @@ fn connection_reset_by_peer() {
     let client = unsafe {
         #[cfg(windows)]
         {
-            TcpStream::from_raw_fd(client.into_raw_fd())
+            TcpStream::from_raw_socket(client.into_raw_socket())
         }
         #[cfg(unix)]
         {
