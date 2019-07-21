@@ -14,7 +14,7 @@ use crate::{event, sys, Interests, Registry, Token};
 use net2::TcpBuilder;
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::net::{self, SocketAddr};
 use std::time::Duration;
 
 /*
@@ -77,16 +77,11 @@ impl TcpStream {
     /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
     /// the connect operation.
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
-        let sock = match addr {
-            SocketAddr::V4(..) => TcpBuilder::new_v4(),
-            SocketAddr::V6(..) => TcpBuilder::new_v6(),
-        }?;
-        // Required on Windows for a future `connect_overlapped` operation to be
-        // executed successfully.
-        if cfg!(windows) {
-            sock.bind(inaddr_any(addr))?;
-        }
-        TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
+        sys::TcpStream::connect(addr).map(|sys| TcpStream {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        })
     }
 
     /// Creates a new `TcpStream` from the pending socket inside the given
@@ -109,7 +104,7 @@ impl TcpStream {
     ///   (perhaps to `INADDR_ANY`) before this method is called.
     pub fn connect_stream(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
         Ok(TcpStream {
-            sys: sys::TcpStream::connect(stream, addr)?,
+            sys: sys::TcpStream::connect_stream(stream, addr)?,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })
@@ -298,21 +293,6 @@ impl TcpStream {
     /// `MSG_PEEK` as a flag to the underlying recv system call.
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.peek(buf)
-    }
-}
-
-fn inaddr_any(other: SocketAddr) -> SocketAddr {
-    match other {
-        SocketAddr::V4(..) => {
-            let any = Ipv4Addr::new(0, 0, 0, 0);
-            let addr = SocketAddrV4::new(any, 0);
-            SocketAddr::V4(addr)
-        }
-        SocketAddr::V6(..) => {
-            let any = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0);
-            let addr = SocketAddrV6::new(any, 0, 0, 0);
-            SocketAddr::V6(addr)
-        }
     }
 }
 

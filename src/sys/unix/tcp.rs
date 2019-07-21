@@ -1,14 +1,16 @@
-use crate::sys::unix::io::set_nonblock;
-use crate::sys::unix::SourceFd;
-use crate::{event, Interests, Registry, Token};
-
-use libc;
-use net2::TcpStreamExt;
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
+use std::mem::size_of_val;
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::time::Duration;
+
+use libc;
+use net2::TcpStreamExt;
+
+use crate::sys::unix::io::set_nonblock;
+use crate::sys::unix::SourceFd;
+use crate::{event, Interests, Registry, Token};
 
 pub struct TcpStream {
     inner: net::TcpStream,
@@ -19,7 +21,59 @@ pub struct TcpListener {
 }
 
 impl TcpStream {
-    pub fn connect(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
+    pub fn connect(address: SocketAddr) -> io::Result<TcpStream> {
+        let domain = match address {
+            SocketAddr::V4(..) => libc::AF_INET,
+            SocketAddr::V6(..) => libc::AF_INET6,
+        };
+        #[cfg(any(
+            target_os = "ios", // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
+            target_os = "macos",
+            target_os = "solaris" // Not sure about Solaris, couldn't find anything online.
+        ))]
+        let socket_type = libc::SOCK_STREAM;
+        #[cfg(any(
+            target_os = "android",
+            target_os = "bitrig",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "linux",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        let socket_type = libc::SOCK_STREAM | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+
+        let socket = syscall!(socket(domain, socket_type, 0));
+
+        #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
+        let socket = socket.and_then(|socket| {
+            // For platforms that don't support flags in socket, we need to
+            // set the flags ourselves.
+            syscall!(fcntl(
+                socket,
+                libc::F_SETFL,
+                libc::O_NONBLOCK | libc::O_CLOEXEC
+            ))
+            .map(|_| socket)
+        });
+
+        socket
+            .and_then(|socket| {
+                let (raw_address, raw_address_length) = socket_address(&address);
+                syscall!(connect(socket, raw_address, raw_address_length))
+                    .or_else(|err| match err {
+                        // Connect hasn't finished, but that is fine.
+                        ref err if err.raw_os_error() == Some(libc::EINPROGRESS) => Ok(0),
+                        err => Err(err),
+                    })
+                    .map(|_| socket)
+            })
+            .map(|socket| TcpStream {
+                inner: unsafe { net::TcpStream::from_raw_fd(socket) },
+            })
+    }
+
+    pub fn connect_stream(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
         set_nonblock(stream.as_raw_fd())?;
 
         match stream.connect(addr) {
@@ -105,6 +159,19 @@ impl TcpStream {
 
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.peek(buf)
+    }
+}
+
+fn socket_address(address: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t) {
+    match address {
+        SocketAddr::V4(ref address) => (
+            address as *const _ as *const libc::sockaddr,
+            size_of_val(address) as libc::socklen_t,
+        ),
+        SocketAddr::V6(ref address) => (
+            address as *const _ as *const libc::sockaddr,
+            size_of_val(address) as libc::socklen_t,
+        ),
     }
 }
 

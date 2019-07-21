@@ -1,5 +1,19 @@
 use std::sync::{Arc, Mutex};
 
+/// Helper macro to execute a system call that returns an `io::Result`.
+//
+// Macro must be defined before any modules that uses them.
+macro_rules! syscall {
+    ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
+        let res = unsafe { $fn($($arg, )*) };
+        if $err_test(&res, &$err_value) {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(res)
+        }
+    }};
+}
+
 mod afd;
 pub mod event;
 mod io_status_block;
