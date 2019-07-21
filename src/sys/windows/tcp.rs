@@ -97,32 +97,29 @@ impl TcpStream {
             INVALID_SOCKET
         )
         .and_then(|socket| {
-            syscall!(ioctlsocket(socket, FIONBIO, &mut 1), PartialEq::ne, 0).map(|_| socket)
-        })
-        .and_then(|socket| {
-            // Required for a future `connect_overlapped` operation to be
-            // executed successfully.
-            let any_address = inaddr_any(address);
-            let (raw_address, raw_address_length) = socket_address(&any_address);
-            syscall!(
-                bind(socket, raw_address, raw_address_length),
-                PartialEq::eq,
-                SOCKET_ERROR
-            )
-            .and_then(|_| {
-                let (raw_address, raw_address_length) = socket_address(&address);
-                syscall!(
-                    connect(socket, raw_address, raw_address_length),
-                    PartialEq::eq,
-                    SOCKET_ERROR
-                )
-                .or_else(|err| match err {
-                    // Connect hasn't finished, but that is fine.
-                    ref err if err.raw_os_error() == Some(WSAEINPROGRESS) => Ok(0),
-                    err => Err(err),
+            syscall!(ioctlsocket(socket, FIONBIO, &mut 1), PartialEq::ne, 0)
+                .and_then(|_| {
+                    // Required for a future `connect_overlapped` operation to be
+                    // executed successfully.
+                    let any_address = inaddr_any(address);
+                    let (raw_address, raw_address_length) = socket_address(&any_address);
+                    syscall!(
+                        bind(socket, raw_address, raw_address_length),
+                        PartialEq::eq,
+                        SOCKET_ERROR
+                    )
+                    .or_else(ignore_in_progress)
+                    .and_then(|_| {
+                        let (raw_address, raw_address_length) = socket_address(&address);
+                        syscall!(
+                            connect(socket, raw_address, raw_address_length),
+                            PartialEq::eq,
+                            SOCKET_ERROR
+                        )
+                        .or_else(ignore_in_progress)
+                    })
                 })
                 .map(|_| socket)
-            })
         })
         .map(|socket| TcpStream {
             internal: Arc::new(RwLock::new(None)),
@@ -253,6 +250,13 @@ fn socket_address(address: &SocketAddr) -> (*const SOCKADDR, c_int) {
             address as *const _ as *const SOCKADDR,
             size_of_val(address) as c_int,
         ),
+    }
+}
+
+fn ignore_in_progress(err: io::Error) -> io::Result<c_int> {
+    match err {
+        ref err if err.raw_os_error() == Some(WSAEINPROGRESS) => Ok(0),
+        err => Err(err),
     }
 }
 
