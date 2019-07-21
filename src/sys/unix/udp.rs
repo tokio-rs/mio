@@ -1,20 +1,18 @@
 use crate::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
 
-use std;
-use std::fmt;
-use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::{fmt, io, net};
 
 pub struct UdpSocket {
-    io: std::net::UdpSocket,
+    io: net::UdpSocket,
 }
 
 impl UdpSocket {
-    pub fn new(socket: std::net::UdpSocket) -> io::Result<UdpSocket> {
-        socket.set_nonblocking(true)?;
-        Ok(UdpSocket { io: socket })
+    pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
+        net::UdpSocket::bind(addr)
+            .and_then(|io| io.set_nonblocking(true).map(|()| UdpSocket { io }))
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {

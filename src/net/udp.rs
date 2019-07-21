@@ -13,7 +13,7 @@ use crate::{event, sys, Interests, Registry, Token};
 
 use std::fmt;
 use std::io;
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 
 /// A User Datagram Protocol socket.
 ///
@@ -116,8 +116,11 @@ impl UdpSocket {
     /// # }
     /// ```
     pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
-        let socket = net::UdpSocket::bind(addr)?;
-        UdpSocket::from_socket(socket)
+        sys::UdpSocket::bind(addr).map(|sys| UdpSocket {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        })
     }
 
     /// Returns the socket address that this socket was created from.
