@@ -349,7 +349,7 @@ pub mod event {
     }
 
     pub fn is_read_hup(event: &Event) -> bool {
-        (event.flags & libc::EV_EOF) != 0
+        event.filter == libc::EVFILT_READ && (event.flags & libc::EV_EOF) != 0
     }
 
     pub fn is_priority(_: &Event) -> bool {
