@@ -26,8 +26,7 @@ publish = false
 [features]
 
 [dependencies]
-log   = "0.4.6"
-net2  = "0.2.33"
+log = "0.4.6"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.58"
