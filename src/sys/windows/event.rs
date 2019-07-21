@@ -35,6 +35,11 @@ pub fn is_hup(event: &Event) -> bool {
     (event.flags & (afd::AFD_POLL_ABORT | afd::AFD_POLL_CONNECT_FAIL)) != 0
 }
 
+pub fn is_read_hup(_: &Event) -> bool {
+    // Not supported.
+    false
+}
+
 pub fn is_priority(event: &Event) -> bool {
     (event.flags & afd::AFD_POLL_RECEIVE_EXPEDITED) != 0
 }
