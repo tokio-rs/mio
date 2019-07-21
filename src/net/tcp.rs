@@ -63,13 +63,6 @@ use std::net::Shutdown;
 impl TcpStream {
     /// Create a new TCP stream and issue a non-blocking connect to the
     /// specified address.
-    ///
-    /// This convenience method is available and uses the system's default
-    /// options when creating a socket which is then connected. If fine-grained
-    /// control over the creation of the socket is desired, you can use
-    /// `net2::TcpBuilder` to configure a socket and then pass its socket to
-    /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
-    /// the connect operation.
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         sys::TcpStream::connect(addr).map(|sys| TcpStream {
             sys,
@@ -288,14 +281,9 @@ impl TcpListener {
     /// This function will take the following steps:
     ///
     /// 1. Create a new TCP socket.
-    /// 2. Set the `SO_REUSEADDR` option on the socket.
+    /// 2. Set the `SO_REUSEADDR` option on the socket on Unix.
     /// 3. Bind the socket to the specified address.
-    /// 4. Call `listen` on the socket to prepare it to receive new connections.
-    ///
-    /// If fine-grained control over the binding and listening process for a
-    /// socket is desired then the `net2::TcpBuilder` methods can be used in
-    /// combination with the `TcpListener::from_listener` method to transfer
-    /// ownership into mio.
+    /// 4. Calls `listen` on the socket to prepare it to receive new connections.
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
         sys::TcpListener::bind(addr).map(|sys| TcpListener {
             sys,
