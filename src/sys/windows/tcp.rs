@@ -98,6 +98,7 @@ impl TcpStream {
         )
         .and_then(|socket| {
             syscall!(ioctlsocket(socket, FIONBIO, &mut 1), PartialEq::ne, 0)
+                .or_else(ignore_in_progress)
                 .and_then(|_| {
                     // Required for a future `connect_overlapped` operation to be
                     // executed successfully.
