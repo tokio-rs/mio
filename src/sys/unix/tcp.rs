@@ -3,12 +3,9 @@ use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::mem::{size_of, size_of_val};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::time::Duration;
 
 use libc;
-use net2::TcpStreamExt;
 
-use crate::sys::unix::io::set_nonblock;
 use crate::sys::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
 
@@ -44,22 +41,6 @@ impl TcpStream {
             })
     }
 
-    pub fn connect_stream(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
-        set_nonblock(stream.as_raw_fd())?;
-
-        match stream.connect(addr) {
-            Ok(..) => {}
-            Err(ref e) if e.raw_os_error() == Some(libc::EINPROGRESS) => {}
-            Err(e) => return Err(e),
-        }
-
-        Ok(TcpStream { inner: stream })
-    }
-
-    pub fn from_stream(stream: net::TcpStream) -> TcpStream {
-        TcpStream { inner: stream }
-    }
-
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
     }
@@ -84,44 +65,12 @@ impl TcpStream {
         self.inner.nodelay()
     }
 
-    pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.inner.set_recv_buffer_size(size)
-    }
-
-    pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        self.inner.recv_buffer_size()
-    }
-
-    pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.inner.set_send_buffer_size(size)
-    }
-
-    pub fn send_buffer_size(&self) -> io::Result<usize> {
-        self.inner.send_buffer_size()
-    }
-
-    pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
-        self.inner.set_keepalive(keepalive)
-    }
-
-    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        self.inner.keepalive()
-    }
-
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.set_ttl(ttl)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
         self.inner.ttl()
-    }
-
-    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.inner.set_linger(dur)
-    }
-
-    pub fn linger(&self) -> io::Result<Option<Duration>> {
-        self.inner.linger()
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
@@ -230,11 +179,6 @@ impl TcpListener {
         })
     }
 
-    pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
-        set_nonblock(inner.as_raw_fd())?;
-        Ok(TcpListener { inner })
-    }
-
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.inner.local_addr()
     }
@@ -243,8 +187,10 @@ impl TcpListener {
         self.inner.try_clone().map(|s| TcpListener { inner: s })
     }
 
-    pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
-        self.inner.accept()
+    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+        self.inner
+            .accept()
+            .map(|(inner, addr)| (TcpStream { inner }, addr))
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {

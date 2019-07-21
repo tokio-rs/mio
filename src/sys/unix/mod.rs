@@ -40,7 +40,6 @@ mod kqueue;
 ))]
 pub use self::kqueue::{event, Event, Selector};
 
-mod io;
 mod sourcefd;
 mod tcp;
 mod udp;

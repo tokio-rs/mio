@@ -6,9 +6,7 @@ use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6}
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
 
-use net2::TcpStreamExt;
 use winapi::ctypes::c_int;
 use winapi::shared::ws2def::SOCKADDR;
 use winapi::um::winsock2::{
@@ -123,28 +121,6 @@ impl TcpStream {
             })
     }
 
-    pub fn connect_stream(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
-        stream.set_nonblocking(true)?;
-
-        match stream.connect(addr) {
-            Ok(..) => {}
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
-            Err(e) => return Err(e),
-        }
-
-        Ok(TcpStream {
-            internal: Arc::new(RwLock::new(None)),
-            inner: stream,
-        })
-    }
-
-    pub fn from_stream(stream: net::TcpStream) -> TcpStream {
-        TcpStream {
-            internal: Arc::new(RwLock::new(None)),
-            inner: stream,
-        }
-    }
-
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
     }
@@ -172,44 +148,12 @@ impl TcpStream {
         self.inner.nodelay()
     }
 
-    pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.inner.set_recv_buffer_size(size)
-    }
-
-    pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        self.inner.recv_buffer_size()
-    }
-
-    pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.inner.set_send_buffer_size(size)
-    }
-
-    pub fn send_buffer_size(&self) -> io::Result<usize> {
-        self.inner.send_buffer_size()
-    }
-
-    pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
-        self.inner.set_keepalive(keepalive)
-    }
-
-    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        self.inner.keepalive()
-    }
-
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.set_ttl(ttl)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
         self.inner.ttl()
-    }
-
-    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.inner.set_linger(dur)
-    }
-
-    pub fn linger(&self) -> io::Result<Option<Duration>> {
-        self.inner.linger()
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
@@ -446,14 +390,6 @@ impl TcpListener {
         })
     }
 
-    pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
-        inner.set_nonblocking(true)?;
-        Ok(TcpListener {
-            internal: Arc::new(RwLock::new(None)),
-            inner,
-        })
-    }
-
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.inner.local_addr()
     }
@@ -465,8 +401,16 @@ impl TcpListener {
         })
     }
 
-    pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
-        wouldblock!(self, accept)
+    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+        wouldblock!(self, accept).map(|(inner, addr)| {
+            (
+                TcpStream {
+                    internal: Arc::new(RwLock::new(None)),
+                    inner,
+                },
+                addr,
+            )
+        })
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
