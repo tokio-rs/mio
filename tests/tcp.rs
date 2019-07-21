@@ -1,5 +1,9 @@
 use std::io::{self, Cursor, Read, Write};
 use std::net::Shutdown;
+#[cfg(unix)]
+use std::os::unix::io::{FromRawFd, IntoRawFd};
+#[cfg(windows)]
+use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 use std::{net, thread};
@@ -454,7 +458,16 @@ fn connection_reset_by_peer() {
     client.connect(&addr).unwrap();
 
     // Convert to Mio stream
-    let client = TcpStream::from_stream(client).unwrap();
+    let client = unsafe {
+        #[cfg(windows)]
+        {
+            TcpStream::from_raw_fd(client.into_raw_fd())
+        }
+        #[cfg(unix)]
+        {
+            TcpStream::from_raw_fd(client.into_raw_fd())
+        }
+    };
 
     // Register server
     poll.registry()
