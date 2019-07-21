@@ -316,6 +316,8 @@ fn new_socket(addr: SocketAddr) -> io::Result<libc::c_int> {
     ))]
     let socket_type = libc::SOCK_STREAM | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
+    // Gives a warning for platforms without SOCK_NONBLOCK.
+    #[allow(clippy::let_and_return)]
     let socket = syscall!(socket(domain, socket_type, 0));
 
     #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
