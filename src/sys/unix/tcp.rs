@@ -32,6 +32,12 @@ impl TcpStream {
                         err => Err(err),
                     })
                     .map(|_| socket)
+                    .map_err(|err| {
+                        // Close the socket if we hit an error, ignoring the error
+                        // from closing since we can't pass back two errors.
+                        let _ = unsafe { libc::close(socket) };
+                        err
+                    })
             })
             .map(|socket| TcpStream {
                 inner: unsafe { net::TcpStream::from_raw_fd(socket) },
@@ -212,6 +218,12 @@ impl TcpListener {
                 syscall!(bind(socket, raw_addr, raw_addr_length))
             })
             .and_then(|_| syscall!(listen(socket, 1024)))
+            .map_err(|err| {
+                // Close the socket if we hit an error, ignoring the error
+                // from closing since we can't pass back two errors.
+                let _ = unsafe { libc::close(socket) };
+                err
+            })
             .map(|_| TcpListener {
                 inner: unsafe { net::TcpListener::from_raw_fd(socket) },
             })

@@ -12,8 +12,8 @@ use net2::TcpStreamExt;
 use winapi::ctypes::c_int;
 use winapi::shared::ws2def::SOCKADDR;
 use winapi::um::winsock2::{
-    bind, connect, ioctlsocket, listen, socket, FIONBIO, INVALID_SOCKET, PF_INET, PF_INET6, SOCKET,
-    SOCKET_ERROR, SOCK_STREAM,
+    bind, closesocket, connect, ioctlsocket, listen, socket, FIONBIO, INVALID_SOCKET, PF_INET,
+    PF_INET6, SOCKET, SOCKET_ERROR, SOCK_STREAM,
 };
 
 use crate::poll;
@@ -110,6 +110,12 @@ impl TcpStream {
                     })
                 })
                 .map(|_| socket)
+                .map_err(|err| {
+                    // Close the socket if we hit an error, ignoring the error
+                    // from closing since we can't pass back two errors.
+                    let _ = unsafe { closesocket(socket) };
+                    err
+                })
             })
             .map(|socket| TcpStream {
                 internal: Arc::new(RwLock::new(None)),
@@ -427,6 +433,12 @@ impl TcpListener {
                 SOCKET_ERROR
             )
             .and_then(|_| syscall!(listen(socket, 1024), PartialEq::eq, SOCKET_ERROR))
+            .map_err(|err| {
+                // Close the socket if we hit an error, ignoring the error
+                // from closing since we can't pass back two errors.
+                let _ = unsafe { closesocket(socket) };
+                err
+            })
             .map(|_| TcpListener {
                 internal: Arc::new(RwLock::new(None)),
                 inner: unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) },
