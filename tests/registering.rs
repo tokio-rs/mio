@@ -114,6 +114,8 @@ pub fn test_register_deregister() {
 
 #[test]
 pub fn test_reregister_different_without_poll() {
+    init();
+
     let mut events = Events::with_capacity(1024);
     let mut poll = Poll::new().unwrap();
 
