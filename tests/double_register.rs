@@ -6,6 +6,10 @@ pub fn test_double_register() {
     use mio::net::TcpListener;
     use mio::*;
 
+    // FIXME: see issue #1046.
+    // Let stdandard library call WSAStartup for us.
+    drop(std::net::TcpListener::bind("255.255.255.255:0"));
+
     let poll = Poll::new().unwrap();
 
     // Create the listener
