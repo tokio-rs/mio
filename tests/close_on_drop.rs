@@ -87,6 +87,10 @@ impl TestHandler {
 
 #[test]
 pub fn test_close_on_drop() {
+    // FIXME: see issue #1046.
+    // Let stdandard library call WSAStartup for us.
+    drop(std::net::TcpListener::bind("255.255.255.255:0"));
+
     drop(env_logger::try_init());
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut poll = Poll::new().unwrap();
