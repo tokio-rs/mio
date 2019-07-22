@@ -17,7 +17,7 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::{localhost, TryRead, TryWrite};
+use util::{init, localhost, TryRead, TryWrite};
 
 const LISTEN: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -25,6 +25,8 @@ const SERVER: Token = Token(2);
 
 #[test]
 fn accept() {
+    init();
+
     struct H {
         hit: bool,
         listener: TcpListener,
@@ -69,6 +71,8 @@ fn accept() {
 
 #[test]
 fn connect() {
+    init();
+
     struct H {
         hit: u32,
         shutdown: bool,
@@ -137,6 +141,8 @@ fn connect() {
 
 #[test]
 fn read() {
+    init();
+
     const N: usize = 16 * 1024 * 1024;
     struct H {
         amt: usize,
@@ -194,6 +200,8 @@ fn read() {
 
 #[test]
 fn peek() {
+    init();
+
     const N: usize = 16 * 1024 * 1024;
     struct H {
         amt: usize,
@@ -257,6 +265,8 @@ fn peek() {
 
 #[test]
 fn write() {
+    init();
+
     const N: usize = 16 * 1024 * 1024;
     struct H {
         amt: usize,
@@ -314,6 +324,8 @@ fn write() {
 
 #[test]
 fn connect_then_close() {
+    init();
+
     struct H {
         listener: TcpListener,
         shutdown: bool,
@@ -355,6 +367,8 @@ fn connect_then_close() {
 
 #[test]
 fn listen_then_close() {
+    init();
+
     let mut poll = Poll::new().unwrap();
     let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
 
@@ -381,6 +395,8 @@ fn assert_sync<T: Sync>() {}
 
 #[test]
 fn test_tcp_sockets_are_send() {
+    init();
+
     assert_send::<TcpListener>();
     assert_send::<TcpStream>();
     assert_sync::<TcpListener>();
@@ -389,6 +405,8 @@ fn test_tcp_sockets_are_send() {
 
 #[test]
 fn bind_twice_bad() {
+    init();
+
     let l1 = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = l1.local_addr().unwrap();
     assert!(TcpListener::bind(addr).is_err());
@@ -396,6 +414,8 @@ fn bind_twice_bad() {
 
 #[test]
 fn multiple_writes_immediate_success() {
+    init();
+
     const N: usize = 16;
     let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = l.local_addr().unwrap();
@@ -443,6 +463,8 @@ fn multiple_writes_immediate_success() {
 #[test]
 #[cfg(unix)]
 fn connection_reset_by_peer() {
+    init();
+
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(16);
     let mut buf = [0u8; 16];
@@ -521,6 +543,8 @@ fn connection_reset_by_peer() {
 
 #[test]
 fn connect_error() {
+    init();
+
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(16);
 
@@ -555,6 +579,8 @@ fn connect_error() {
 
 #[test]
 fn write_error() {
+    init();
+
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(16);
     let (tx, rx) = channel();
@@ -649,6 +675,8 @@ macro_rules! wait {
 
 #[test]
 fn test_write_shutdown() {
+    init();
+
     let mut poll = Poll::new().unwrap();
 
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -690,6 +718,8 @@ struct MyHandler {
 
 #[test]
 fn local_addr_ready() {
+    init();
+
     let addr = "127.0.0.1:0".parse().unwrap();
     let server = TcpListener::bind(addr).unwrap();
     let addr = server.local_addr().unwrap();
@@ -1013,6 +1043,8 @@ impl Echo {
 
 #[test]
 pub fn test_echo_server() {
+    init();
+
     debug!("Starting TEST_ECHO_SERVER");
     let mut poll = Poll::new().unwrap();
 
@@ -1063,7 +1095,7 @@ pub fn test_echo_server() {
 
 #[test]
 fn write_then_drop() {
-    drop(env_logger::try_init());
+    init();
 
     let a = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = a.local_addr().unwrap();
@@ -1121,7 +1153,7 @@ fn write_then_drop() {
 
 #[test]
 fn write_then_deregister() {
-    drop(env_logger::try_init());
+    init();
 
     let a = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
     let addr = a.local_addr().unwrap();

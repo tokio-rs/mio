@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use std::io::{self, Read, Write};
+use std::sync::Once;
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
@@ -123,4 +124,16 @@ pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))
         .expect("unable to poll");
     assert!(events.is_empty(), "received events, but didn't expect any");
+}
+
+pub fn init() {
+    static INIT: Once = Once::new();
+
+    INIT.call_once(|| {
+        drop(env_logger::try_init());
+
+        // FIXME: see issue #1046.
+        // Let stdandard library call WSAStartup for us.
+        drop(std::net::TcpListener::bind("255.255.255.255:0"));
+    })
 }

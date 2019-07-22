@@ -11,7 +11,7 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::localhost;
+use util::{init, localhost};
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
@@ -132,6 +132,8 @@ fn connected_sockets() -> (UdpSocket, UdpSocket) {
 
 #[test]
 pub fn test_udp_socket() {
+    init();
+
     let addr = localhost();
     let any = localhost();
 
@@ -143,6 +145,8 @@ pub fn test_udp_socket() {
 
 #[test]
 pub fn test_udp_socket_send_recv() {
+    init();
+
     let (tx, rx) = connected_sockets();
 
     test_send_recv_udp(tx, rx, true);
@@ -150,6 +154,8 @@ pub fn test_udp_socket_send_recv() {
 
 #[test]
 pub fn test_udp_socket_discard() {
+    init();
+
     let addr = localhost();
     let any = localhost();
     let outside = localhost();
@@ -249,7 +255,8 @@ impl UdpHandler {
 )]
 #[test]
 pub fn test_multicast() {
-    drop(env_logger::try_init());
+    init();
+
     debug!("Starting TEST_UDP_CONNECTIONLESS");
     let mut poll = Poll::new().unwrap();
 

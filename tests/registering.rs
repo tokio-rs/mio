@@ -11,7 +11,7 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::localhost;
+use util::{init, localhost};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -68,7 +68,7 @@ impl TestHandler {
 
 #[test]
 pub fn test_register_deregister() {
-    drop(env_logger::try_init());
+    init();
 
     debug!("Starting TEST_REGISTER_DEREGISTER");
     let mut poll = Poll::new().unwrap();
@@ -144,6 +144,8 @@ pub fn test_reregister_different_without_poll() {
 #[test]
 #[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.
 fn test_tcp_register_multiple_event_loops() {
+    init();
+
     let addr = localhost();
     let listener = TcpListener::bind(addr).unwrap();
 
@@ -207,6 +209,8 @@ fn test_tcp_register_multiple_event_loops() {
 #[test]
 #[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.
 fn test_udp_register_multiple_event_loops() {
+    init();
+
     let addr = localhost();
     let socket = UdpSocket::bind(addr).unwrap();
 

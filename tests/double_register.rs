@@ -1,14 +1,17 @@
 //! A smoke test for windows compatibility
 
-#[test]
-#[cfg(any(target_os = "linux", target_os = "windows"))]
-pub fn test_double_register() {
-    use mio::net::TcpListener;
-    use mio::*;
+#![cfg(any(target_os = "linux", target_os = "windows"))]
 
-    // FIXME: see issue #1046.
-    // Let stdandard library call WSAStartup for us.
-    drop(std::net::TcpListener::bind("255.255.255.255:0"));
+use mio::net::TcpListener;
+use mio::*;
+
+mod util;
+
+use util::init;
+
+#[test]
+pub fn test_double_register() {
+    init();
 
     let poll = Poll::new().unwrap();
 
