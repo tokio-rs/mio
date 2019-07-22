@@ -1,11 +1,10 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::mem::{size_of, size_of_val};
+use std::mem::size_of;
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
-use libc;
-
+use crate::sys::unix::net::{new_socket, socket_addr};
 use crate::sys::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
 
@@ -19,7 +18,7 @@ pub struct TcpListener {
 
 impl TcpStream {
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
-        new_socket(addr)
+        new_socket(addr, libc::SOCK_STREAM)
             .and_then(|socket| {
                 let (raw_addr, raw_addr_length) = socket_addr(&addr);
                 syscall!(connect(socket, raw_addr, raw_addr_length))
@@ -153,7 +152,7 @@ impl AsRawFd for TcpStream {
 
 impl TcpListener {
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
-        new_socket(addr).and_then(|socket| {
+        new_socket(addr, libc::SOCK_STREAM).and_then(|socket| {
             // Set SO_REUSEADDR (mirrors what libstd does).
             syscall!(setsockopt(
                 socket,
@@ -248,60 +247,5 @@ impl IntoRawFd for TcpListener {
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
-    }
-}
-
-/// Create a new non-blocking socket.
-fn new_socket(addr: SocketAddr) -> io::Result<libc::c_int> {
-    let domain = match addr {
-        SocketAddr::V4(..) => libc::AF_INET,
-        SocketAddr::V6(..) => libc::AF_INET6,
-    };
-    #[cfg(any(
-            target_os = "ios", // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
-            target_os = "macos",
-            target_os = "solaris" // Not sure about Solaris, couldn't find anything online.
-        ))]
-    let socket_type = libc::SOCK_STREAM;
-    #[cfg(any(
-        target_os = "android",
-        target_os = "bitrig",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "linux",
-        target_os = "netbsd",
-        target_os = "openbsd"
-    ))]
-    let socket_type = libc::SOCK_STREAM | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-
-    // Gives a warning for platforms without SOCK_NONBLOCK.
-    #[allow(clippy::let_and_return)]
-    let socket = syscall!(socket(domain, socket_type, 0));
-
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
-    let socket = socket.and_then(|socket| {
-        // For platforms that don't support flags in socket, we need to
-        // set the flags ourselves.
-        syscall!(fcntl(
-            socket,
-            libc::F_SETFL,
-            libc::O_NONBLOCK | libc::O_CLOEXEC
-        ))
-        .map(|_| socket)
-    });
-
-    socket
-}
-
-fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t) {
-    match addr {
-        SocketAddr::V4(ref addr) => (
-            addr as *const _ as *const libc::sockaddr,
-            size_of_val(addr) as libc::socklen_t,
-        ),
-        SocketAddr::V6(ref addr) => (
-            addr as *const _ as *const libc::sockaddr,
-            size_of_val(addr) as libc::socklen_t,
-        ),
     }
 }
