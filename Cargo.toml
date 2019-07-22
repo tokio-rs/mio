@@ -42,3 +42,4 @@ bytes      = "0.4.12"
 env_logger = { version = "0.6.1", default-features = false }
 slab       = "0.4.2"
 tempdir    = "0.3.7"
+net2       = "0.2.33"
