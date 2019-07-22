@@ -8,6 +8,7 @@ use std::{net, thread};
 
 use bytes::{Buf, Bytes, BytesMut};
 use log::{debug, info};
+#[cfg(unix)]
 use net2::TcpStreamExt;
 use slab::Slab;
 
