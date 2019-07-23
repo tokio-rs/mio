@@ -1,3 +1,4 @@
+#[path = "./util/mod.rs"]
 mod util;
 
 // This macro is required to get around rustfmt bugs #3572 and/or #1208, also
