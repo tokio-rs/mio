@@ -60,14 +60,10 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     );
 
     info!("Registering SENDER");
-    poll.registry()
-        .register(&tx, SENDER, Interests::WRITABLE)
-        .unwrap();
+    poll.register(&tx, SENDER, Interests::WRITABLE).unwrap();
 
     info!("Registering LISTENER");
-    poll.registry()
-        .register(&rx, LISTENER, Interests::READABLE)
-        .unwrap();
+    poll.register(&rx, LISTENER, Interests::READABLE).unwrap();
 
     let mut events = Events::with_capacity(1024);
 
@@ -176,12 +172,8 @@ pub fn test_udp_socket_discard() {
     let r = udp_outside.send(b"hello world");
     assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
 
-    poll.registry()
-        .register(&rx, LISTENER, Interests::READABLE)
-        .unwrap();
-    poll.registry()
-        .register(&tx, SENDER, Interests::WRITABLE)
-        .unwrap();
+    poll.register(&rx, LISTENER, Interests::READABLE).unwrap();
+    poll.register(&tx, SENDER, Interests::WRITABLE).unwrap();
 
     let mut events = Events::with_capacity(1024);
 
@@ -276,14 +268,10 @@ pub fn test_multicast() {
         .unwrap();
 
     info!("Registering SENDER");
-    poll.registry()
-        .register(&tx, SENDER, Interests::WRITABLE)
-        .unwrap();
+    poll.register(&tx, SENDER, Interests::WRITABLE).unwrap();
 
     info!("Registering LISTENER");
-    poll.registry()
-        .register(&rx, LISTENER, Interests::READABLE)
-        .unwrap();
+    poll.register(&rx, LISTENER, Interests::READABLE).unwrap();
 
     let mut events = Events::with_capacity(1024);
 
@@ -296,11 +284,11 @@ pub fn test_multicast() {
 
         for event in &events {
             if event.is_readable() {
-                handler.handle_read(poll.registry(), event.token());
+                handler.handle_read(&poll, event.token());
             }
 
             if event.is_writable() {
-                handler.handle_write(poll.registry(), event.token());
+                handler.handle_write(&poll, event.token());
             }
         }
     }

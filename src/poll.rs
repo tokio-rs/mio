@@ -1,14 +1,14 @@
-use crate::{event, sys, Events, Interests, Token};
-use log::trace;
+use std::ops::Deref;
 #[cfg(unix)]
-use std::os::unix::io::AsRawFd;
-#[cfg(unix)]
-use std::os::unix::io::RawFd;
+use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{fmt, io, usize};
+
+use log::trace;
+
+use crate::{event, sys, Events, Interests, Token};
 
 /// Polls for readiness events on all registered values.
 ///
@@ -49,14 +49,13 @@ use std::{fmt, io, usize};
 ///
 /// // Construct a new `Poll` handle as well as the `Events` we'll store into
 /// let mut poll = Poll::new()?;
-/// let registry = poll.registry().clone();
 /// let mut events = Events::with_capacity(1024);
 ///
 /// // Connect the stream
 /// let stream = TcpStream::connect(server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// registry.register(&stream, Token(0), Interests::READABLE | Interests::WRITABLE)?;
+/// poll.register(&stream, Token(0), Interests::READABLE | Interests::WRITABLE)?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -147,11 +146,10 @@ use std::{fmt, io, usize};
 /// thread::sleep(Duration::from_secs(1));
 ///
 /// let poll = Poll::new()?;
-/// let registry = poll.registry().clone();
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// registry.register(&sock, Token(0), Interests::READABLE | Interests::WRITABLE)?;
+/// poll.register(&sock, Token(0), Interests::READABLE | Interests::WRITABLE)?;
 /// #     Ok(())
 /// # }
 /// ```
@@ -199,14 +197,18 @@ use std::{fmt, io, usize};
 /// [`SourceFd`]: unix/struct.SourceFd.html
 /// [`SetReadiness`]: struct.SetReadiness.html
 /// [`Poll::poll`]: struct.Poll.html#method.poll
+#[repr(transparent)]
 pub struct Poll {
-    registry: Registry,
+    // `Poll` must have the same memory layout as `Registry`, see
+    // the `Deref` implementation.
+    selector: sys::Selector,
 }
 
 /// Registers I/O resources.
-#[derive(Clone)]
+#[repr(transparent)]
 pub struct Registry {
-    selector: Arc<sys::Selector>,
+    // `Registry` must have the same memory layout as `Poll`, see `Poll`.
+    selector: sys::Selector,
 }
 
 /// Used to associate an IO type with a Selector
@@ -257,19 +259,15 @@ impl Poll {
     /// # }
     /// ```
     pub fn new() -> io::Result<Poll> {
-        is_send::<Poll>();
-        is_sync::<Poll>();
-
-        let selector = Arc::new(sys::Selector::new()?);
-
-        let registry = Registry { selector };
-
-        Ok(Poll { registry })
+        sys::Selector::new().map(|selector| Poll { selector })
     }
 
-    /// Return a reference to the associated `Registry`.
-    pub fn registry(&self) -> &Registry {
-        &self.registry
+    /// Create a separate `Registry` which can be used to register
+    /// `event::Source`s.
+    pub fn registry(&self) -> io::Result<Registry> {
+        self.selector
+            .registry()
+            .map(|selector| Registry { selector })
     }
 
     /// Wait for readiness events
@@ -337,14 +335,13 @@ impl Poll {
     ///
     /// // Construct a new `Poll` handle as well as the `Events` we'll store into
     /// let mut poll = Poll::new()?;
-    /// let registry = poll.registry().clone();
     /// let mut events = Events::with_capacity(1024);
     ///
     /// // Connect the stream
     /// let stream = TcpStream::connect(addr)?;
     ///
     /// // Register the stream with `Poll`
-    /// registry.register(
+    /// poll.register(
     ///     &stream,
     ///     Token(0),
     ///     Interests::READABLE | Interests::WRITABLE)?;
@@ -389,12 +386,10 @@ impl Poll {
         mut timeout: Option<Duration>,
         interruptible: bool,
     ) -> io::Result<usize> {
-        let selector = &*self.registry.selector;
-
         loop {
             let now = Instant::now();
             // First get selector events
-            let res = selector.select(events.sys(), timeout);
+            let res = self.selector.select(events.sys(), timeout);
 
             match res {
                 Ok(()) => break,
@@ -418,6 +413,19 @@ impl Poll {
     }
 }
 
+impl Deref for Poll {
+    type Target = Registry;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe {
+            // This is safe because the memory layout of `Poll` is the same as
+            // `Registry` and `sys::Selector` due to the `repr(transparent)`
+            // attribute.
+            &*(&self.selector as *const sys::Selector as *const Registry)
+        }
+    }
+}
+
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Poll").finish()
@@ -433,7 +441,7 @@ impl fmt::Debug for Registry {
 #[cfg(unix)]
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
-        self.registry.selector.as_raw_fd()
+        self.selector.as_raw_fd()
     }
 }
 
@@ -502,14 +510,13 @@ impl Registry {
     /// use std::time::{Duration, Instant};
     ///
     /// let mut poll = Poll::new()?;
-    /// let registry = poll.registry().clone();
     ///
     /// let address = "127.0.0.1:9002".parse()?;
     /// # let _listener = net::TcpListener::bind(address)?;
     /// let socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`
-    /// registry.register(
+    /// poll.register(
     ///     &socket,
     ///     Token(0),
     ///     Interests::READABLE | Interests::WRITABLE)?;
@@ -579,21 +586,20 @@ impl Registry {
     /// use mio::net::TcpStream;
     ///
     /// let poll = Poll::new()?;
-    /// let registry = poll.registry().clone();
     ///
     /// let address = "127.0.0.1:9003".parse()?;
     /// # let _listener = net::TcpListener::bind(address)?;
     /// let socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`, requesting readable
-    /// registry.register(
+    /// poll.register(
     ///     &socket,
     ///     Token(0),
     ///     Interests::READABLE)?;
     ///
     /// // Reregister the socket specifying write interest instead. Even though
     /// // the token is the same it must be specified.
-    /// registry.reregister(
+    /// poll.reregister(
     ///     &socket,
     ///     Token(2),
     ///     Interests::WRITABLE)?;
@@ -644,19 +650,18 @@ impl Registry {
     /// use std::time::Duration;
     ///
     /// let mut poll = Poll::new()?;
-    /// let registry = poll.registry().clone();
     ///
     /// let address = "127.0.0.1:9004".parse()?;
     /// # let _listener = net::TcpListener::bind(address)?;
     /// let socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`
-    /// registry.register(
+    /// poll.register(
     ///     &socket,
     ///     Token(0),
     ///     Interests::READABLE)?;
     ///
-    /// registry.deregister(&socket)?;
+    /// poll.deregister(&socket)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     ///
@@ -681,14 +686,6 @@ impl Registry {
 pub fn selector(registry: &Registry) -> &sys::Selector {
     &registry.selector
 }
-
-#[cfg(windows)]
-pub fn selector_arc(registry: &Registry) -> Arc<sys::Selector> {
-    registry.selector.clone()
-}
-
-fn is_send<T: Send>() {}
-fn is_sync<T: Sync>() {}
 
 #[cfg(debug_assertions)]
 impl SelectorId {

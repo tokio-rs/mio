@@ -51,8 +51,7 @@ fn test_drop_cancels_interest_and_shuts_down() {
     let mut poll = Poll::new().unwrap();
     let mut s = TcpStream::connect(addr).unwrap();
 
-    poll.registry()
-        .register(&s, Token(1), Interests::READABLE | Interests::WRITABLE)
+    poll.register(&s, Token(1), Interests::READABLE | Interests::WRITABLE)
         .unwrap();
     let mut events = Events::with_capacity(16);
     'outer: loop {
