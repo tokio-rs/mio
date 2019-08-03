@@ -7,7 +7,6 @@ fn is_tests() {
     assert!(!Interests::WRITABLE.is_readable());
     assert!(Interests::WRITABLE.is_writable());
     assert!(!Interests::WRITABLE.is_aio());
-    assert!(!Interests::WRITABLE.is_lio());
 }
 
 #[test]
@@ -33,9 +32,5 @@ fn fmt_debug() {
     ))]
     {
         assert_eq!(format!("{:?}", Interests::AIO), "AIO");
-    }
-    #[cfg(any(target_os = "freebsd"))]
-    {
-        assert_eq!(format!("{:?}", Interests::LIO), "LIO");
     }
 }

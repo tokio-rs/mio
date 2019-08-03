@@ -378,18 +378,6 @@ pub mod event {
             false
         }
     }
-
-    #[allow(unused_variables)] // `event` is only used on FreeBSD.
-    pub fn is_lio(event: &Event) -> bool {
-        #[cfg(target_os = "freebsd")]
-        {
-            event.filter == libc::EVFILT_LIO
-        }
-        #[cfg(not(target_os = "freebsd"))]
-        {
-            false
-        }
-    }
 }
 
 #[test]

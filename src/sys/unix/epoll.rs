@@ -147,11 +147,6 @@ pub mod event {
         // Not supported in the kernel, only in libc.
         false
     }
-
-    pub fn is_lio(_: &Event) -> bool {
-        // Not supported.
-        false
-    }
 }
 
 #[test]

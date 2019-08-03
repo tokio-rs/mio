@@ -40,8 +40,6 @@ const WRITABLE: u8 = 0b0_010;
     allow(dead_code)
 )]
 const AIO: u8 = 0b0_100;
-#[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
-const LIO: u8 = 0b1_000;
 
 impl Interests {
     /// Returns a `Interests` set representing readable interests.
@@ -59,10 +57,6 @@ impl Interests {
     ))]
     pub const AIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(AIO) });
 
-    /// Returns a `Interests` set representing LIO completion interests.
-    #[cfg(target_os = "freebsd")]
-    pub const LIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(LIO) });
-
     /// Returns true if the value includes readable readiness.
     pub fn is_readable(self) -> bool {
         (self.0.get() & READABLE) != 0
@@ -76,11 +70,6 @@ impl Interests {
     /// Returns true if `Interests` contains AIO readiness
     pub fn is_aio(self) -> bool {
         (self.0.get() & AIO) != 0
-    }
-
-    /// Returns true if `Interests` contains LIO readiness
-    pub fn is_lio(self) -> bool {
-        (self.0.get() & LIO) != 0
     }
 }
 
@@ -129,16 +118,6 @@ impl fmt::Debug for Interests {
                     write!(fmt, " | ")?
                 }
                 write!(fmt, "AIO")?;
-                one = true
-            }
-        }
-        #[cfg(any(target_os = "freebsd"))]
-        {
-            if self.is_lio() {
-                if one {
-                    write!(fmt, " | ")?
-                }
-                write!(fmt, "LIO")?;
                 one = true
             }
         }

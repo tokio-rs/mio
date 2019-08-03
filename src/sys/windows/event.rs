@@ -49,11 +49,6 @@ pub fn is_aio(_: &Event) -> bool {
     false
 }
 
-pub fn is_lio(_: &Event) -> bool {
-    // Not supported.
-    false
-}
-
 pub struct Events {
     /// Raw I/O event completions are filled in here by the call to `get_many`
     /// on the completion port above. These are then processed to run callbacks

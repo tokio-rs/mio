@@ -162,17 +162,6 @@ impl Event {
         sys::event::is_aio(&self.inner)
     }
 
-    /// Returns true if the event contains LIO readiness.
-    ///
-    /// # Notes
-    ///
-    /// Method is available on all platforms, but only FreeBSD supports LIO. On
-    /// FreeBSD this method checks the `EVFILT_LIO` flag.
-    #[inline]
-    pub fn is_lio(&self) -> bool {
-        sys::event::is_lio(&self.inner)
-    }
-
     /// Create a reference to an `Event` from a platform specific event.
     pub(crate) fn from_sys_event_ref(sys_event: &sys::Event) -> &Event {
         unsafe {
@@ -194,7 +183,6 @@ impl fmt::Debug for Event {
             .field("read_hup", &self.is_read_hup())
             .field("priority", &self.is_priority())
             .field("aio", &self.is_aio())
-            .field("lio", &self.is_lio())
             .finish()
     }
 }
