@@ -15,6 +15,7 @@ use winapi::um::winsock2::{
 };
 
 use crate::poll;
+use crate::sys::windows::init;
 use crate::{event, Interests, Registry, Token};
 
 use super::selector::{Selector, SockState};
@@ -84,6 +85,7 @@ macro_rules! wouldblock {
 
 impl TcpStream {
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
+        init();
         new_socket(addr)
             .and_then(|socket| {
                 // Required for a future `connect_overlapped` operation to be
@@ -369,6 +371,7 @@ impl AsRawSocket for TcpStream {
 
 impl TcpListener {
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
+        init();
         new_socket(addr).and_then(|socket| {
             let (raw_addr, raw_addr_length) = socket_addr(&addr);
             syscall!(

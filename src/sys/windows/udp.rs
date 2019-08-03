@@ -6,7 +6,8 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 use std::sync::{Arc, Mutex, RwLock};
 use std::{fmt, io};
 
-use super::selector::{Selector, SockState};
+use crate::sys::windows::init;
+use crate::sys::windows::selector::{Selector, SockState};
 
 struct InternalState {
     selector: Arc<Selector>,
@@ -52,6 +53,7 @@ macro_rules! wouldblock {
 
 impl UdpSocket {
     pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
+        init();
         net::UdpSocket::bind(addr).and_then(|io| {
             io.set_nonblocking(true).map(|()| UdpSocket {
                 internal: Arc::new(RwLock::new(None)),
