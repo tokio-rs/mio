@@ -1,9 +1,12 @@
+use mio::net::{TcpListener, TcpStream};
 use mio::*;
+use std::sync::{Arc, Barrier};
+use std::thread;
 use std::time::Duration;
 
 mod util;
 
-use util::init;
+use util::{init, localhost};
 
 #[test]
 fn test_poll_closes_fd() {
@@ -73,4 +76,58 @@ fn test_drop_cancels_interest_and_shuts_down() {
 
     drop(s);
     t.join().unwrap();
+}
+
+#[test]
+fn test_registry_behind_arc() {
+    // `Registry` should work behind an `Arc`, being `Sync` and `Send`.
+    init();
+
+    let mut poll = Poll::new().unwrap();
+    let registry = Arc::new(poll.registry().unwrap());
+    let mut events = Events::with_capacity(128);
+
+    let addr = localhost();
+    let barrier = Arc::new(Barrier::new(3));
+
+    let registry2 = Arc::clone(&registry);
+    let registry3 = Arc::clone(&registry);
+    let barrier2 = Arc::clone(&barrier);
+    let barrier3 = Arc::clone(&barrier);
+
+    let handle1 = thread::spawn(move || {
+        let mut listener = TcpListener::bind(addr).unwrap();
+        registry2
+            .register(&mut listener, Token(0), Interests::READABLE)
+            .unwrap();
+        barrier2.wait();
+    });
+    let handle2 = thread::spawn(move || {
+        let mut stream = TcpStream::connect(addr).unwrap();
+        registry3
+            .register(&mut stream, Token(1), Interests::READABLE)
+            .unwrap();
+        barrier3.wait();
+    });
+
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+    assert!(events.iter().count() >= 1);
+
+    // Let the threads return.
+    barrier.wait();
+
+    handle1.join().unwrap();
+    handle2.join().unwrap();
+}
+
+#[test]
+fn assertions() {
+    fn assert_sync<T: Sync>() {}
+    fn assert_send<T: Send>() {}
+
+    assert_sync::<Poll>();
+    assert_send::<Poll>();
+    assert_sync::<Registry>();
+    assert_send::<Registry>();
 }
