@@ -40,11 +40,10 @@ use crate::{event, sys, Interests, Registry, Token};
 /// let stream = TcpStream::connect("127.0.0.1:34254".parse()?)?;
 ///
 /// let mut poll = Poll::new()?;
-/// let registry = poll.registry().clone();
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// registry.register(&stream, Token(0), Interests::WRITABLE)?;
+/// poll.register(&stream, Token(0), Interests::WRITABLE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -256,11 +255,10 @@ impl fmt::Debug for TcpStream {
 /// let listener = TcpListener::bind("127.0.0.1:34255".parse()?)?;
 ///
 /// let mut poll = Poll::new()?;
-/// let registry = poll.registry().clone();
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// registry.register(&listener, Token(0), Interests::READABLE)?;
+/// poll.register(&listener, Token(0), Interests::READABLE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///

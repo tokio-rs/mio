@@ -81,6 +81,15 @@ impl Selector {
         self.id
     }
 
+    pub fn registry(&self) -> io::Result<Selector> {
+        syscall!(dup(self.kq)).map(|kq| Selector {
+            // It's the same selector, so we use the same id.
+            #[cfg(debug_assertions)]
+            id: self.id,
+            kq,
+        })
+    }
+
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         let timeout = timeout.map(|to| libc::timespec {
             tv_sec: cmp::min(to.as_secs(), libc::time_t::max_value() as u64) as libc::time_t,
@@ -403,7 +412,6 @@ fn does_not_register_rw() {
 
     // Registering kqueue fd will fail if write is requested (On anything but
     // some versions of macOS).
-    poll.registry()
-        .register(&kqf, Token(1234), Interests::READABLE)
+    poll.register(&kqf, Token(1234), Interests::READABLE)
         .unwrap();
 }

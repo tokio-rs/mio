@@ -50,11 +50,10 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 /// // We need a Poll to check if SENDER is ready to be written into, and if ECHOER is ready to be
 /// // read from.
 /// let mut poll = Poll::new()?;
-/// let registry = poll.registry().clone();
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// registry.register(&sender_socket, SENDER, Interests::WRITABLE)?;
-/// registry.register(&echoer_socket, ECHOER, Interests::READABLE)?;
+/// poll.register(&sender_socket, SENDER, Interests::WRITABLE)?;
+/// poll.register(&echoer_socket, ECHOER, Interests::READABLE)?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];

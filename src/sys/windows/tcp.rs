@@ -18,17 +18,17 @@ use crate::poll;
 use crate::sys::windows::init;
 use crate::{event, Interests, Registry, Token};
 
-use super::selector::{Selector, SockState};
+use super::selector::{SelectorInner, SockState};
 
 struct InternalState {
-    selector: Arc<Selector>,
+    selector: Arc<SelectorInner>,
     token: Token,
     interests: Interests,
     sock_state: Option<Arc<Mutex<SockState>>>,
 }
 
 impl InternalState {
-    fn new(selector: Arc<Selector>, token: Token, interests: Interests) -> InternalState {
+    fn new(selector: Arc<SelectorInner>, token: Token, interests: Interests) -> InternalState {
         InternalState {
             selector,
             token,
@@ -233,7 +233,6 @@ impl Drop for TcpStream {
             if let Some(sock_state) = internal.sock_state.as_ref() {
                 internal
                     .selector
-                    .inner()
                     .mark_delete_socket(&mut sock_state.lock().unwrap());
             }
         }
@@ -294,7 +293,7 @@ impl event::Source for TcpStream {
             let mut internal = self.internal.write().unwrap();
             if internal.is_none() {
                 *internal = Some(InternalState::new(
-                    poll::selector_arc(registry),
+                    poll::selector(registry).clone_inner(),
                     token,
                     interests,
                 ));
@@ -436,7 +435,6 @@ impl Drop for TcpListener {
             if let Some(sock_state) = internal.sock_state.as_ref() {
                 internal
                     .selector
-                    .inner()
                     .mark_delete_socket(&mut sock_state.lock().unwrap());
             }
         }
@@ -471,7 +469,7 @@ impl event::Source for TcpListener {
             let mut internal = self.internal.write().unwrap();
             if internal.is_none() {
                 *internal = Some(InternalState::new(
-                    poll::selector_arc(registry),
+                    poll::selector(registry).clone_inner(),
                     token,
                     interests,
                 ));

@@ -14,7 +14,7 @@ fn waker() {
     let mut events = Events::with_capacity(10);
 
     let token = Token(10);
-    let waker = Waker::new(poll.registry(), token).expect("unable to create waker");
+    let waker = Waker::new(&poll, token).expect("unable to create waker");
 
     waker.wake().expect("unable to wake");
     expect_waker_event(&mut poll, &mut events, token);
@@ -26,7 +26,7 @@ fn waker_multiple_wakeups_same_thread() {
     let mut events = Events::with_capacity(10);
 
     let token = Token(10);
-    let waker = Waker::new(poll.registry(), token).expect("unable to create waker");
+    let waker = Waker::new(&poll, token).expect("unable to create waker");
 
     for _ in 0..3 {
         waker.wake().expect("unable to wake");
@@ -40,7 +40,7 @@ fn waker_wakeup_different_thread() {
     let mut events = Events::with_capacity(10);
 
     let token = Token(10);
-    let waker = Waker::new(poll.registry(), token).expect("unable to create waker");
+    let waker = Waker::new(&poll, token).expect("unable to create waker");
 
     let waker = Arc::new(waker);
     let waker1 = Arc::clone(&waker);
@@ -61,7 +61,7 @@ fn waker_multiple_wakeups_different_thread() {
     let mut events = Events::with_capacity(10);
 
     let token = Token(10);
-    let waker = Waker::new(poll.registry(), token).expect("unable to create waker");
+    let waker = Waker::new(&poll, token).expect("unable to create waker");
     let waker = Arc::new(waker);
     let waker1 = Arc::clone(&waker);
     let waker2 = Arc::clone(&waker1);

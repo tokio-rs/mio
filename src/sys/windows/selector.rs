@@ -304,6 +304,15 @@ impl Selector {
             }
         })
     }
+
+    pub fn registry(&self) -> io::Result<Selector> {
+        Ok(Selector {
+            #[cfg(debug_assertions)]
+            id: self.id,
+            inner: Arc::clone(&self.inner),
+        })
+    }
+
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         self.inner.select(events, timeout)
     }
@@ -333,10 +342,6 @@ impl Selector {
     #[cfg(debug_assertions)]
     pub fn id(&self) -> usize {
         self.id
-    }
-
-    pub(super) fn inner(&self) -> &SelectorInner {
-        &self.inner
     }
 
     pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {

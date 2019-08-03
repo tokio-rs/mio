@@ -38,6 +38,15 @@ impl Selector {
         self.id
     }
 
+    pub fn registry(&self) -> io::Result<Selector> {
+        syscall!(dup(self.ep)).map(|ep| Selector {
+            // It's the same selector, so we use the same id.
+            #[cfg(debug_assertions)]
+            id: self.id,
+            ep,
+        })
+    }
+
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         let timeout = timeout
             .map(|to| cmp::min(to.as_millis(), libc::c_int::max_value() as u128) as libc::c_int)

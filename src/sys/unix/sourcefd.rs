@@ -38,10 +38,9 @@ use std::os::unix::io::RawFd;
 /// let listener = TcpListener::bind("127.0.0.1:0")?;
 ///
 /// let poll = Poll::new()?;
-/// let registry = poll.registry().clone();
 ///
 /// // Register the listener
-/// registry.register(
+/// poll.register(
 ///     &SourceFd(&listener.as_raw_fd()),
 ///     Token(0),
 ///     Interests::READABLE)?;
