@@ -131,9 +131,5 @@ pub fn init() {
 
     INIT.call_once(|| {
         drop(env_logger::try_init());
-
-        // FIXME: see issue #1046.
-        // Let stdandard library call WSAStartup for us.
-        drop(std::net::TcpListener::bind("255.255.255.255:0"));
     })
 }
