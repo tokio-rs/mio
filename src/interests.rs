@@ -63,6 +63,22 @@ impl Interests {
     #[cfg(target_os = "freebsd")]
     pub const LIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(LIO) });
 
+    /// Add together two `Interests`.
+    ///
+    /// This does the same thing as the `BitOr` implementation, but is a
+    /// constant function.
+    ///
+    /// ```
+    /// use mio::Interests;
+    ///
+    /// const INTERESTS: Interests = Interests::READABLE.and(Interests::WRITABLE);
+    /// # fn silent_dead_code_warning(_: Interests) { }
+    /// # silent_dead_code_warning(INTERESTS)
+    /// ```
+    pub const fn and(self, other: Interests) -> Interests {
+        Interests(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
+    }
+
     /// Returns true if the value includes readable readiness.
     pub fn is_readable(self) -> bool {
         (self.0.get() & READABLE) != 0
