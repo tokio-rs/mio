@@ -96,16 +96,16 @@ fn test_registry_behind_arc() {
     let barrier3 = Arc::clone(&barrier);
 
     let handle1 = thread::spawn(move || {
-        let mut listener = TcpListener::bind(addr).unwrap();
+        let listener = TcpListener::bind(addr).unwrap();
         registry2
-            .register(&mut listener, Token(0), Interests::READABLE)
+            .register(&listener, Token(0), Interests::READABLE)
             .unwrap();
         barrier2.wait();
     });
     let handle2 = thread::spawn(move || {
-        let mut stream = TcpStream::connect(addr).unwrap();
+        let stream = TcpStream::connect(addr).unwrap();
         registry3
-            .register(&mut stream, Token(1), Interests::READABLE)
+            .register(&stream, Token(1), Interests::READABLE)
             .unwrap();
         barrier3.wait();
     });
