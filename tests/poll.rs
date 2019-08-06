@@ -105,7 +105,7 @@ fn test_registry_behind_arc() {
     let handle2 = thread::spawn(move || {
         let stream = TcpStream::connect(addr).unwrap();
         registry3
-            .register(&stream, Token(1), Interests::READABLE)
+            .register(&stream, Token(1), Interests::READABLE | Interests::WRITABLE)
             .unwrap();
         barrier3.wait();
     });
