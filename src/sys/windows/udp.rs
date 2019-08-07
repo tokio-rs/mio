@@ -79,12 +79,20 @@ impl UdpSocket {
         self.io.recv_from(buf)
     }
 
+    pub fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.io.peek_from(buf)
+    }
+
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         wouldblock!(self, send, buf)
     }
 
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         wouldblock!(self, recv, buf)
+    }
+
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        wouldblock!(self, peek, buf)
     }
 
     pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
