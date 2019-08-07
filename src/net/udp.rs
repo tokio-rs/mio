@@ -248,6 +248,36 @@ impl UdpSocket {
         self.sys.recv_from(buf)
     }
 
+    /// Receives data from the socket, without removing it from the input queue.
+    /// On success, returns the number of bytes read and the address from whence
+    /// the data came.
+    /// Receives data from the socket. On success, returns the number of bytes
+    /// read and the address from whence the data came.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use std::error::Error;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// use mio::net::UdpSocket;
+    ///
+    /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
+    ///
+    /// // We must check if the socket is readable before calling recv_from,
+    /// // or we could run into a WouldBlock error.
+    ///
+    /// let mut buf = [0; 9];
+    /// let (num_recv, from_addr) = socket.peek_from(&mut buf)?;
+    /// println!("Received {:?} -> {:?} bytes from {:?}", buf, num_recv, from_addr);
+    /// #
+    /// #    Ok(())
+    /// # }
+    /// ```
+    pub fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.sys.peek_from(buf)
+    }
+
     /// Sends data on the socket to the address previously bound via connect(). On success,
     /// returns the number of bytes written.
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
@@ -258,6 +288,12 @@ impl UdpSocket {
     /// the number of bytes read.
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.recv(buf)
+    }
+
+    /// Receives data from the socket, without removing it from the input queue.
+    /// On success, returns the number of bytes read.
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.sys.peek(buf)
     }
 
     /// Connects the UDP socket setting the default destination for `send()`
