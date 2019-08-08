@@ -47,7 +47,7 @@ use crate::{poll, sys, Registry, Token};
 /// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(2);
 ///
-/// let waker = Arc::new(Waker::new(&poll, WAKE_TOKEN)?);
+/// let waker = Arc::new(Waker::new(poll.registry(), WAKE_TOKEN)?);
 ///
 /// // We need to keep the Waker alive, so we'll create a clone for the
 /// // thread we create below.

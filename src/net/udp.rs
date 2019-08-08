@@ -52,8 +52,8 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 /// let mut poll = Poll::new()?;
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// poll.register(&sender_socket, SENDER, Interests::WRITABLE)?;
-/// poll.register(&echoer_socket, ECHOER, Interests::READABLE)?;
+/// poll.registry().register(&sender_socket, SENDER, Interests::WRITABLE)?;
+/// poll.registry().register(&echoer_socket, ECHOER, Interests::READABLE)?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];

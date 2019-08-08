@@ -54,7 +54,8 @@ fn test_drop_cancels_interest_and_shuts_down() {
     let mut poll = Poll::new().unwrap();
     let mut s = TcpStream::connect(addr).unwrap();
 
-    poll.register(&s, Token(1), Interests::READABLE | Interests::WRITABLE)
+    poll.registry()
+        .register(&s, Token(1), Interests::READABLE | Interests::WRITABLE)
         .unwrap();
     let mut events = Events::with_capacity(16);
     'outer: loop {
@@ -84,7 +85,7 @@ fn test_registry_behind_arc() {
     init();
 
     let mut poll = Poll::new().unwrap();
-    let registry = Arc::new(poll.registry().unwrap());
+    let registry = Arc::new(poll.registry().try_clone().unwrap());
     let mut events = Events::with_capacity(128);
 
     let addr = localhost();

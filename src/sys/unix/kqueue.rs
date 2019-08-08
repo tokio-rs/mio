@@ -81,7 +81,7 @@ impl Selector {
         self.id
     }
 
-    pub fn registry(&self) -> io::Result<Selector> {
+    pub fn try_clone(&self) -> io::Result<Selector> {
         syscall!(dup(self.kq)).map(|kq| Selector {
             // It's the same selector, so we use the same id.
             #[cfg(debug_assertions)]
@@ -412,6 +412,7 @@ fn does_not_register_rw() {
 
     // Registering kqueue fd will fail if write is requested (On anything but
     // some versions of macOS).
-    poll.register(&kqf, Token(1234), Interests::READABLE)
+    poll.registry()
+        .register(&kqf, Token(1234), Interests::READABLE)
         .unwrap();
 }

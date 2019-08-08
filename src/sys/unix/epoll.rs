@@ -38,7 +38,7 @@ impl Selector {
         self.id
     }
 
-    pub fn registry(&self) -> io::Result<Selector> {
+    pub fn try_clone(&self) -> io::Result<Selector> {
         syscall!(dup(self.ep)).map(|ep| Selector {
             // It's the same selector, so we use the same id.
             #[cfg(debug_assertions)]

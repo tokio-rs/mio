@@ -43,7 +43,7 @@ use crate::{event, sys, Interests, Registry, Token};
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.register(&stream, Token(0), Interests::WRITABLE)?;
+/// poll.registry().register(&stream, Token(0), Interests::WRITABLE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -258,7 +258,7 @@ impl fmt::Debug for TcpStream {
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.register(&listener, Token(0), Interests::READABLE)?;
+/// poll.registry().register(&listener, Token(0), Interests::READABLE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///

@@ -1,4 +1,3 @@
-use std::ops::Deref;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
@@ -55,7 +54,7 @@ use crate::{event, sys, Events, Interests, Token};
 /// let stream = TcpStream::connect(server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// poll.register(&stream, Token(0), Interests::READABLE | Interests::WRITABLE)?;
+/// poll.registry().register(&stream, Token(0), Interests::READABLE | Interests::WRITABLE)?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -149,7 +148,7 @@ use crate::{event, sys, Events, Interests, Token};
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// poll.register(&sock, Token(0), Interests::READABLE | Interests::WRITABLE)?;
+/// poll.registry().register(&sock, Token(0), Interests::READABLE | Interests::WRITABLE)?;
 /// #     Ok(())
 /// # }
 /// ```
@@ -199,15 +198,12 @@ use crate::{event, sys, Events, Interests, Token};
 /// [`Poll::poll`]: struct.Poll.html#method.poll
 #[repr(transparent)]
 pub struct Poll {
-    // `Poll` must have the same memory layout as `Registry`, see
-    // the `Deref` implementation.
-    selector: sys::Selector,
+    registry: Registry,
 }
 
 /// Registers I/O resources.
 #[repr(transparent)]
 pub struct Registry {
-    // `Registry` must have the same memory layout as `Poll`, see `Poll`.
     selector: sys::Selector,
 }
 
@@ -259,15 +255,15 @@ impl Poll {
     /// # }
     /// ```
     pub fn new() -> io::Result<Poll> {
-        sys::Selector::new().map(|selector| Poll { selector })
+        sys::Selector::new().map(|selector| Poll {
+            registry: Registry { selector },
+        })
     }
 
     /// Create a separate `Registry` which can be used to register
     /// `event::Source`s.
-    pub fn registry(&self) -> io::Result<Registry> {
-        self.selector
-            .registry()
-            .map(|selector| Registry { selector })
+    pub fn registry(&self) -> &Registry {
+        &self.registry
     }
 
     /// Wait for readiness events
@@ -341,7 +337,7 @@ impl Poll {
     /// let stream = TcpStream::connect(addr)?;
     ///
     /// // Register the stream with `Poll`
-    /// poll.register(
+    /// poll.registry().register(
     ///     &stream,
     ///     Token(0),
     ///     Interests::READABLE | Interests::WRITABLE)?;
@@ -389,7 +385,7 @@ impl Poll {
         loop {
             let now = Instant::now();
             // First get selector events
-            let res = self.selector.select(events.sys(), timeout);
+            let res = self.registry.selector.select(events.sys(), timeout);
 
             match res {
                 Ok(()) => break,
@@ -413,19 +409,6 @@ impl Poll {
     }
 }
 
-impl Deref for Poll {
-    type Target = Registry;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe {
-            // This is safe because the memory layout of `Poll` is the same as
-            // `Registry` and `sys::Selector` due to the `repr(transparent)`
-            // attribute.
-            &*(&self.selector as *const sys::Selector as *const Registry)
-        }
-    }
-}
-
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Poll").finish()
@@ -441,7 +424,7 @@ impl fmt::Debug for Registry {
 #[cfg(unix)]
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
-        self.selector.as_raw_fd()
+        self.registry.selector.as_raw_fd()
     }
 }
 
@@ -516,7 +499,7 @@ impl Registry {
     /// let socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`
-    /// poll.register(
+    /// poll.registry().register(
     ///     &socket,
     ///     Token(0),
     ///     Interests::READABLE | Interests::WRITABLE)?;
@@ -592,14 +575,14 @@ impl Registry {
     /// let socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`, requesting readable
-    /// poll.register(
+    /// poll.registry().register(
     ///     &socket,
     ///     Token(0),
     ///     Interests::READABLE)?;
     ///
     /// // Reregister the socket specifying write interest instead. Even though
     /// // the token is the same it must be specified.
-    /// poll.reregister(
+    /// poll.registry().reregister(
     ///     &socket,
     ///     Token(2),
     ///     Interests::WRITABLE)?;
@@ -656,12 +639,12 @@ impl Registry {
     /// let socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`
-    /// poll.register(
+    /// poll.registry().register(
     ///     &socket,
     ///     Token(0),
     ///     Interests::READABLE)?;
     ///
-    /// poll.deregister(&socket)?;
+    /// poll.registry().deregister(&socket)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     ///
@@ -678,6 +661,16 @@ impl Registry {
         trace!("deregistering event source from poller");
         source.deregister(self)?;
         Ok(())
+    }
+
+    /// Creates a new independently owned `Registry`.
+    ///
+    /// Event sources registered with this `Registry` will be registerd with the
+    /// original `Registry` and `Poll` instance.
+    pub fn try_clone(&self) -> io::Result<Registry> {
+        self.selector
+            .try_clone()
+            .map(|selector| Registry { selector })
     }
 }
 

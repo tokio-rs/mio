@@ -305,7 +305,7 @@ impl Selector {
         })
     }
 
-    pub fn registry(&self) -> io::Result<Selector> {
+    pub fn try_clone(&self) -> io::Result<Selector> {
         Ok(Selector {
             #[cfg(debug_assertions)]
             id: self.id,
