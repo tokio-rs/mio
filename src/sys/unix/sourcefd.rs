@@ -40,7 +40,7 @@ use std::os::unix::io::RawFd;
 /// let poll = Poll::new()?;
 ///
 /// // Register the listener
-/// poll.register(
+/// poll.registry().register(
 ///     &SourceFd(&listener.as_raw_fd()),
 ///     Token(0),
 ///     Interests::READABLE)?;

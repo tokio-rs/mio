@@ -75,13 +75,13 @@
 //! let mut poll = Poll::new().unwrap();
 //!
 //! // Start listening for incoming connections
-//! poll.register(&server, SERVER, Interests::READABLE).unwrap();
+//! poll.registry().register(&server, SERVER, Interests::READABLE).unwrap();
 //!
 //! // Setup the client socket
 //! let sock = TcpStream::connect(addr).unwrap();
 //!
 //! // Register the socket
-//! poll.register(&sock, CLIENT, Interests::READABLE).unwrap();
+//! poll.registry().register(&sock, CLIENT, Interests::READABLE).unwrap();
 //!
 //! // Create storage for events
 //! let mut events = Events::with_capacity(1024);

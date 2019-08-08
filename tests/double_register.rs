@@ -19,7 +19,12 @@ pub fn test_double_register() {
     let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
 
     // Register the listener with `Poll`
-    poll.register(&l, Token(0), Interests::READABLE).unwrap();
+    poll.registry()
+        .register(&l, Token(0), Interests::READABLE)
+        .unwrap();
 
-    assert!(poll.register(&l, Token(1), Interests::READABLE).is_err());
+    assert!(poll
+        .registry()
+        .register(&l, Token(1), Interests::READABLE)
+        .is_err());
 }
