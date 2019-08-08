@@ -196,13 +196,11 @@ use crate::{event, sys, Events, Interests, Token};
 /// [`SourceFd`]: unix/struct.SourceFd.html
 /// [`SetReadiness`]: struct.SetReadiness.html
 /// [`Poll::poll`]: struct.Poll.html#method.poll
-#[repr(transparent)]
 pub struct Poll {
     registry: Registry,
 }
 
 /// Registers I/O resources.
-#[repr(transparent)]
 pub struct Registry {
     selector: sys::Selector,
 }
