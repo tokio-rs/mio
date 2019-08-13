@@ -1,20 +1,47 @@
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::{fmt, io, net};
+
+use crate::sys::unix::net::{new_socket, socket_addr};
 use crate::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
 
-use std;
-use std::fmt;
-use std::io;
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-
 pub struct UdpSocket {
-    io: std::net::UdpSocket,
+    io: net::UdpSocket,
 }
 
 impl UdpSocket {
-    pub fn new(socket: std::net::UdpSocket) -> io::Result<UdpSocket> {
-        socket.set_nonblocking(true)?;
-        Ok(UdpSocket { io: socket })
+    pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
+        // Gives a warning for non Apple platforms.
+        #[allow(clippy::let_and_return)]
+        let socket = new_socket(addr, libc::SOCK_DGRAM);
+
+        // Set SO_NOSIGPIPE on iOS and macOS (mirrors what libstd does).
+        #[cfg(any(target_os = "ios", target_os = "macos"))]
+        let socket = socket.and_then(|socket| {
+            syscall!(setsockopt(
+                socket,
+                libc::SOL_SOCKET,
+                libc::SO_NOSIGPIPE,
+                &1 as *const libc::c_int as *const libc::c_void,
+                std::mem::size_of::<libc::c_int>() as libc::socklen_t,
+            ))
+            .map(|_| socket)
+        });
+
+        socket.and_then(|socket| {
+            let (raw_addr, raw_addr_length) = socket_addr(&addr);
+            syscall!(bind(socket, raw_addr, raw_addr_length))
+                .map_err(|err| {
+                    // Close the socket if we hit an error, ignoring the error
+                    // from closing since we can't pass back two errors.
+                    let _ = unsafe { libc::close(socket) };
+                    err
+                })
+                .map(|_| UdpSocket {
+                    io: unsafe { net::UdpSocket::from_raw_fd(socket) },
+                })
+        })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {

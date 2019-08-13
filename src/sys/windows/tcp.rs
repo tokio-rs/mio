@@ -1,14 +1,22 @@
-use crate::poll;
-use crate::{event, Interests, Registry, Token};
-
-use net2::TcpStreamExt;
-
+use std::cmp::PartialEq;
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::net::{self, SocketAddr};
+use std::mem::size_of_val;
+use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
+
+use winapi::ctypes::c_int;
+use winapi::shared::ws2def::SOCKADDR;
+use winapi::um::winsock2::{
+    bind, closesocket, connect, ioctlsocket, listen, socket, FIONBIO, INVALID_SOCKET, PF_INET,
+    PF_INET6, SOCKET, SOCKET_ERROR, SOCK_STREAM,
+};
+
+use crate::poll;
+use crate::sys::windows::init;
+use crate::{event, Interests, Registry, Token};
 
 use super::selector::{Selector, SockState};
 
@@ -76,26 +84,43 @@ macro_rules! wouldblock {
 }
 
 impl TcpStream {
-    pub fn connect(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
-        stream.set_nonblocking(true)?;
-
-        match stream.connect(addr) {
-            Ok(..) => {}
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
-            Err(e) => return Err(e),
-        }
-
-        Ok(TcpStream {
-            internal: Arc::new(RwLock::new(None)),
-            inner: stream,
-        })
-    }
-
-    pub fn from_stream(stream: net::TcpStream) -> TcpStream {
-        TcpStream {
-            internal: Arc::new(RwLock::new(None)),
-            inner: stream,
-        }
+    pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
+        init();
+        new_socket(addr)
+            .and_then(|socket| {
+                // Required for a future `connect_overlapped` operation to be
+                // executed successfully.
+                let any_addr = inaddr_any(addr);
+                let (raw_addr, raw_addr_length) = socket_addr(&any_addr);
+                syscall!(
+                    bind(socket, raw_addr, raw_addr_length),
+                    PartialEq::eq,
+                    SOCKET_ERROR
+                )
+                .and_then(|_| {
+                    let (raw_addr, raw_addr_length) = socket_addr(&addr);
+                    syscall!(
+                        connect(socket, raw_addr, raw_addr_length),
+                        PartialEq::eq,
+                        SOCKET_ERROR
+                    )
+                    .or_else(|err| match err {
+                        ref err if err.kind() == io::ErrorKind::WouldBlock => Ok(0),
+                        err => Err(err),
+                    })
+                })
+                .map(|_| socket)
+                .map_err(|err| {
+                    // Close the socket if we hit an error, ignoring the error
+                    // from closing since we can't pass back two errors.
+                    let _ = unsafe { closesocket(socket) };
+                    err
+                })
+            })
+            .map(|socket| TcpStream {
+                internal: Arc::new(RwLock::new(None)),
+                inner: unsafe { net::TcpStream::from_raw_socket(socket as StdSocket) },
+            })
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
@@ -125,30 +150,6 @@ impl TcpStream {
         self.inner.nodelay()
     }
 
-    pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.inner.set_recv_buffer_size(size)
-    }
-
-    pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        self.inner.recv_buffer_size()
-    }
-
-    pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.inner.set_send_buffer_size(size)
-    }
-
-    pub fn send_buffer_size(&self) -> io::Result<usize> {
-        self.inner.send_buffer_size()
-    }
-
-    pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
-        self.inner.set_keepalive(keepalive)
-    }
-
-    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        self.inner.keepalive()
-    }
-
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.set_ttl(ttl)
     }
@@ -157,20 +158,27 @@ impl TcpStream {
         self.inner.ttl()
     }
 
-    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.inner.set_linger(dur)
-    }
-
-    pub fn linger(&self) -> io::Result<Option<Duration>> {
-        self.inner.linger()
-    }
-
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.inner.take_error()
     }
 
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.peek(buf)
+    }
+}
+
+fn inaddr_any(other: SocketAddr) -> SocketAddr {
+    match other {
+        SocketAddr::V4(..) => {
+            let any = Ipv4Addr::new(0, 0, 0, 0);
+            let addr = SocketAddrV4::new(any, 0);
+            SocketAddr::V4(addr)
+        }
+        SocketAddr::V6(..) => {
+            let any = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0);
+            let addr = SocketAddrV6::new(any, 0, 0, 0);
+            SocketAddr::V6(addr)
+        }
     }
 }
 
@@ -362,11 +370,26 @@ impl AsRawSocket for TcpStream {
 }
 
 impl TcpListener {
-    pub fn new(inner: net::TcpListener) -> io::Result<TcpListener> {
-        inner.set_nonblocking(true)?;
-        Ok(TcpListener {
-            internal: Arc::new(RwLock::new(None)),
-            inner,
+    pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
+        init();
+        new_socket(addr).and_then(|socket| {
+            let (raw_addr, raw_addr_length) = socket_addr(&addr);
+            syscall!(
+                bind(socket, raw_addr, raw_addr_length,),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )
+            .and_then(|_| syscall!(listen(socket, 1024), PartialEq::eq, SOCKET_ERROR))
+            .map_err(|err| {
+                // Close the socket if we hit an error, ignoring the error
+                // from closing since we can't pass back two errors.
+                let _ = unsafe { closesocket(socket) };
+                err
+            })
+            .map(|_| TcpListener {
+                internal: Arc::new(RwLock::new(None)),
+                inner: unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) },
+            })
         })
     }
 
@@ -381,8 +404,16 @@ impl TcpListener {
         })
     }
 
-    pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
-        wouldblock!(self, accept)
+    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+        wouldblock!(self, accept).map(|(inner, addr)| {
+            (
+                TcpStream {
+                    internal: Arc::new(RwLock::new(None)),
+                    inner,
+                },
+                addr,
+            )
+        })
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
@@ -512,5 +543,35 @@ impl IntoRawSocket for TcpListener {
 impl AsRawSocket for TcpListener {
     fn as_raw_socket(&self) -> RawSocket {
         self.inner.as_raw_socket()
+    }
+}
+
+/// Create a new non-blocking socket.
+fn new_socket(addr: SocketAddr) -> io::Result<SOCKET> {
+    let domain = match addr {
+        SocketAddr::V4(..) => PF_INET,
+        SocketAddr::V6(..) => PF_INET6,
+    };
+
+    syscall!(
+        socket(domain, SOCK_STREAM, 0),
+        PartialEq::eq,
+        INVALID_SOCKET
+    )
+    .and_then(|socket| {
+        syscall!(ioctlsocket(socket, FIONBIO, &mut 1), PartialEq::ne, 0).map(|_| socket as SOCKET)
+    })
+}
+
+fn socket_addr(addr: &SocketAddr) -> (*const SOCKADDR, c_int) {
+    match addr {
+        SocketAddr::V4(ref addr) => (
+            addr as *const _ as *const SOCKADDR,
+            size_of_val(addr) as c_int,
+        ),
+        SocketAddr::V6(ref addr) => (
+            addr as *const _ as *const SOCKADDR,
+            size_of_val(addr) as c_int,
+        ),
     }
 }

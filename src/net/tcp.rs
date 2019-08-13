@@ -7,15 +7,13 @@
 //!
 //! [portability guidelines]: ../struct.Poll.html#portability
 
+use std::fmt;
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
+use std::net::SocketAddr;
+
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
 use crate::{event, sys, Interests, Registry, Token};
-
-use net2::TcpBuilder;
-use std::fmt;
-use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
-use std::time::Duration;
 
 /*
  *
@@ -62,74 +60,12 @@ pub struct TcpStream {
 
 use std::net::Shutdown;
 
-fn set_nonblocking(stream: &net::TcpStream) -> io::Result<()> {
-    stream.set_nonblocking(true)
-}
-
 impl TcpStream {
     /// Create a new TCP stream and issue a non-blocking connect to the
     /// specified address.
-    ///
-    /// This convenience method is available and uses the system's default
-    /// options when creating a socket which is then connected. If fine-grained
-    /// control over the creation of the socket is desired, you can use
-    /// `net2::TcpBuilder` to configure a socket and then pass its socket to
-    /// `TcpStream::connect_stream` to transfer ownership into mio and schedule
-    /// the connect operation.
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
-        let sock = match addr {
-            SocketAddr::V4(..) => TcpBuilder::new_v4(),
-            SocketAddr::V6(..) => TcpBuilder::new_v6(),
-        }?;
-        // Required on Windows for a future `connect_overlapped` operation to be
-        // executed successfully.
-        if cfg!(windows) {
-            sock.bind(inaddr_any(addr))?;
-        }
-        TcpStream::connect_stream(sock.to_tcp_stream()?, addr)
-    }
-
-    /// Creates a new `TcpStream` from the pending socket inside the given
-    /// `std::net::TcpBuilder`, connecting it to the address specified.
-    ///
-    /// This constructor allows configuring the socket before it's actually
-    /// connected, and this function will transfer ownership to the returned
-    /// `TcpStream` if successful. An unconnected `TcpStream` can be created
-    /// with the `net2::TcpBuilder` type (and also configured via that route).
-    ///
-    /// The platform specific behavior of this function looks like:
-    ///
-    /// * On Unix, the socket is placed into nonblocking mode and then a
-    ///   `connect` call is issued.
-    ///
-    /// * On Windows, the address is stored internally and the connect operation
-    ///   is issued when the returned `TcpStream` is registered with an event
-    ///   loop. Note that on Windows you must `bind` a socket before it can be
-    ///   connected, so if a custom `TcpBuilder` is used it should be bound
-    ///   (perhaps to `INADDR_ANY`) before this method is called.
-    pub fn connect_stream(stream: net::TcpStream, addr: SocketAddr) -> io::Result<TcpStream> {
-        Ok(TcpStream {
-            sys: sys::TcpStream::connect(stream, addr)?,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        })
-    }
-
-    /// Creates a new `TcpStream` from a standard `net::TcpStream`.
-    ///
-    /// This function is intended to be used to wrap a TCP stream from the
-    /// standard library in the mio equivalent. The conversion here will
-    /// automatically set `stream` to nonblocking and the returned object should
-    /// be ready to get associated with an event loop.
-    ///
-    /// Note that the TCP stream here will not have `connect` called on it, so
-    /// it should already be connected via some other means (be it manually, the
-    /// net2 crate, or the standard library).
-    pub fn from_stream(stream: net::TcpStream) -> io::Result<TcpStream> {
-        set_nonblocking(&stream)?;
-
-        Ok(TcpStream {
-            sys: sys::TcpStream::from_stream(stream),
+        sys::TcpStream::connect(addr).map(|sys| TcpStream {
+            sys,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })
@@ -188,68 +124,6 @@ impl TcpStream {
         self.sys.nodelay()
     }
 
-    /// Sets the value of the `SO_RCVBUF` option on this socket.
-    ///
-    /// Changes the size of the operating system's receive buffer associated
-    /// with the socket.
-    pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.sys.set_recv_buffer_size(size)
-    }
-
-    /// Gets the value of the `SO_RCVBUF` option on this socket.
-    ///
-    /// For more information about this option, see
-    /// [`set_recv_buffer_size`][link].
-    ///
-    /// [link]: #method.set_recv_buffer_size
-    pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        self.sys.recv_buffer_size()
-    }
-
-    /// Sets the value of the `SO_SNDBUF` option on this socket.
-    ///
-    /// Changes the size of the operating system's send buffer associated with
-    /// the socket.
-    pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.sys.set_send_buffer_size(size)
-    }
-
-    /// Gets the value of the `SO_SNDBUF` option on this socket.
-    ///
-    /// For more information about this option, see
-    /// [`set_send_buffer_size`][link].
-    ///
-    /// [link]: #method.set_send_buffer_size
-    pub fn send_buffer_size(&self) -> io::Result<usize> {
-        self.sys.send_buffer_size()
-    }
-
-    /// Sets whether keepalive messages are enabled to be sent on this socket.
-    ///
-    /// On Unix, this option will set the `SO_KEEPALIVE` as well as the
-    /// `TCP_KEEPALIVE` or `TCP_KEEPIDLE` option (depending on your platform).
-    /// On Windows, this will set the `SIO_KEEPALIVE_VALS` option.
-    ///
-    /// If `None` is specified then keepalive messages are disabled, otherwise
-    /// the duration specified will be the time to remain idle before sending a
-    /// TCP keepalive probe.
-    ///
-    /// Some platforms specify this value in seconds, so sub-second
-    /// specifications may be omitted.
-    pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
-        self.sys.set_keepalive(keepalive)
-    }
-
-    /// Returns whether keepalive messages are enabled on this socket, and if so
-    /// the duration of time between them.
-    ///
-    /// For more information about this option, see [`set_keepalive`][link].
-    ///
-    /// [link]: #method.set_keepalive
-    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        self.sys.keepalive()
-    }
-
     /// Sets the value for the `IP_TTL` option on this socket.
     ///
     /// This value sets the time-to-live field that is used in every packet sent
@@ -265,20 +139,6 @@ impl TcpStream {
     /// [link]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
         self.sys.ttl()
-    }
-
-    /// Sets the value for the `SO_LINGER` option on this socket.
-    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.sys.set_linger(dur)
-    }
-
-    /// Gets the value of the `SO_LINGER` option on this socket.
-    ///
-    /// For more information about this option, see [`set_linger`][link].
-    ///
-    /// [link]: #method.set_linger
-    pub fn linger(&self) -> io::Result<Option<Duration>> {
-        self.sys.linger()
     }
 
     /// Get the value of the `SO_ERROR` option on this socket.
@@ -298,21 +158,6 @@ impl TcpStream {
     /// `MSG_PEEK` as a flag to the underlying recv system call.
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.peek(buf)
-    }
-}
-
-fn inaddr_any(other: SocketAddr) -> SocketAddr {
-    match other {
-        SocketAddr::V4(..) => {
-            let any = Ipv4Addr::new(0, 0, 0, 0);
-            let addr = SocketAddrV4::new(any, 0);
-            SocketAddr::V4(addr)
-        }
-        SocketAddr::V6(..) => {
-            let any = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0);
-            let addr = SocketAddrV6::new(any, 0, 0, 0);
-            SocketAddr::V6(addr)
-        }
     }
 }
 
@@ -436,50 +281,12 @@ impl TcpListener {
     /// This function will take the following steps:
     ///
     /// 1. Create a new TCP socket.
-    /// 2. Set the `SO_REUSEADDR` option on the socket.
+    /// 2. Set the `SO_REUSEADDR` option on the socket on Unix.
     /// 3. Bind the socket to the specified address.
-    /// 4. Call `listen` on the socket to prepare it to receive new connections.
-    ///
-    /// If fine-grained control over the binding and listening process for a
-    /// socket is desired then the `net2::TcpBuilder` methods can be used in
-    /// combination with the `TcpListener::from_listener` method to transfer
-    /// ownership into mio.
+    /// 4. Calls `listen` on the socket to prepare it to receive new connections.
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
-        // Create the socket
-        let sock = match addr {
-            SocketAddr::V4(..) => TcpBuilder::new_v4(),
-            SocketAddr::V6(..) => TcpBuilder::new_v6(),
-        }?;
-
-        // Set SO_REUSEADDR, but only on Unix (mirrors what libstd does)
-        if cfg!(unix) {
-            sock.reuse_address(true)?;
-        }
-
-        // Bind the socket
-        sock.bind(addr)?;
-
-        // listen
-        let listener = sock.listen(1024)?;
-        Ok(TcpListener {
-            sys: sys::TcpListener::new(listener)?,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        })
-    }
-
-    /// Creates a new `TcpListener` from an instance of a
-    /// `std::net::TcpListener` type.
-    ///
-    /// This function will set the `listener` provided into nonblocking mode on
-    /// Unix, and otherwise the stream will just be wrapped up in an mio stream
-    /// ready to accept new connections and become associated with an event
-    /// loop.
-    ///
-    /// The address provided must be the address that the listener is bound to.
-    pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
-        sys::TcpListener::new(listener).map(|s| TcpListener {
-            sys: s,
+        sys::TcpListener::bind(addr).map(|sys| TcpListener {
+            sys,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })
@@ -494,17 +301,16 @@ impl TcpListener {
     /// If an accepted stream is returned, the remote address of the peer is
     /// returned along with it.
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        let (s, a) = self.accept_std()?;
-        Ok((TcpStream::from_stream(s)?, a))
-    }
-
-    /// Accepts a new `std::net::TcpStream`.
-    ///
-    /// This method is the same as `accept`, except that it returns a TCP socket
-    /// *in blocking mode* which isn't bound to `mio`. This can be later then
-    /// converted to a `mio` type, if necessary.
-    pub fn accept_std(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
-        self.sys.accept()
+        self.sys.accept().map(|(sys, addr)| {
+            (
+                TcpStream {
+                    sys,
+                    #[cfg(debug_assertions)]
+                    selector_id: SelectorId::new(),
+                },
+                addr,
+            )
+        })
     }
 
     /// Returns the local socket address of this listener.

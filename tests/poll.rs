@@ -1,8 +1,14 @@
 use mio::*;
 use std::time::Duration;
 
+mod util;
+
+use util::init;
+
 #[test]
 fn test_poll_closes_fd() {
+    init();
+
     for _ in 0..2000 {
         let mut poll = Poll::new().unwrap();
         let mut events = Events::with_capacity(4);
@@ -16,6 +22,8 @@ fn test_poll_closes_fd() {
 
 #[test]
 fn test_drop_cancels_interest_and_shuts_down() {
+    init();
+
     use mio::net::TcpStream;
     use std::io;
     use std::io::Read;

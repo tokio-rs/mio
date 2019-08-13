@@ -1,13 +1,13 @@
 use crate::poll;
 use crate::{event, Interests, Registry, Token};
 
-use std::fmt;
-use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::sync::{Arc, Mutex, RwLock};
+use std::{fmt, io};
 
-use super::selector::{Selector, SockState};
+use crate::sys::windows::init;
+use crate::sys::windows::selector::{Selector, SockState};
 
 struct InternalState {
     selector: Arc<Selector>,
@@ -29,7 +29,7 @@ impl InternalState {
 
 pub struct UdpSocket {
     internal: Arc<RwLock<Option<InternalState>>>,
-    io: std::net::UdpSocket,
+    io: net::UdpSocket,
 }
 
 macro_rules! wouldblock {
@@ -52,11 +52,13 @@ macro_rules! wouldblock {
 }
 
 impl UdpSocket {
-    pub fn new(socket: std::net::UdpSocket) -> io::Result<UdpSocket> {
-        socket.set_nonblocking(true)?;
-        Ok(UdpSocket {
-            internal: Arc::new(RwLock::new(None)),
-            io: socket,
+    pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
+        init();
+        net::UdpSocket::bind(addr).and_then(|io| {
+            io.set_nonblocking(true).map(|()| UdpSocket {
+                internal: Arc::new(RwLock::new(None)),
+                io,
+            })
         })
     }
 

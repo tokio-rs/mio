@@ -13,7 +13,7 @@ use crate::{event, sys, Interests, Registry, Token};
 
 use std::fmt;
 use std::io;
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 
 /// A User Datagram Protocol socket.
 ///
@@ -116,23 +116,8 @@ impl UdpSocket {
     /// # }
     /// ```
     pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
-        let socket = net::UdpSocket::bind(addr)?;
-        UdpSocket::from_socket(socket)
-    }
-
-    /// Creates a new mio-wrapped socket from an underlying and bound std
-    /// socket.
-    ///
-    /// This function requires that `socket` has previously been bound to an
-    /// address to work correctly, and returns an I/O object which can be used
-    /// with mio to send/receive UDP messages.
-    ///
-    /// This can be used in conjunction with net2's `UdpBuilder` interface to
-    /// configure a socket before it's handed off to mio, such as setting
-    /// options like `reuse_address` or binding to multiple addresses.
-    pub fn from_socket(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        Ok(UdpSocket {
-            sys: sys::UdpSocket::new(socket)?,
+        sys::UdpSocket::bind(addr).map(|sys| UdpSocket {
+            sys,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })

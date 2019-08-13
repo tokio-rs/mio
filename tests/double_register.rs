@@ -1,10 +1,17 @@
 //! A smoke test for windows compatibility
 
+#![cfg(any(target_os = "linux", target_os = "windows"))]
+
+use mio::net::TcpListener;
+use mio::*;
+
+mod util;
+
+use util::init;
+
 #[test]
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 pub fn test_double_register() {
-    use mio::net::TcpListener;
-    use mio::*;
+    init();
 
     let poll = Poll::new().unwrap();
 

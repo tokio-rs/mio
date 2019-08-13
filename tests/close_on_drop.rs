@@ -6,7 +6,7 @@ use mio::{Events, Interests, Poll, Token};
 
 mod util;
 
-use util::{localhost, TryRead};
+use util::{init, localhost, TryRead};
 
 use self::TestState::{AfterRead, Initial};
 
@@ -87,7 +87,7 @@ impl TestHandler {
 
 #[test]
 pub fn test_close_on_drop() {
-    drop(env_logger::try_init());
+    init();
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut poll = Poll::new().unwrap();
 
