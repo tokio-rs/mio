@@ -111,7 +111,7 @@ fn test_registry_behind_arc() {
         barrier3.wait();
     });
 
-    poll.poll(&mut events, Some(Duration::from_millis(100)))
+    poll.poll(&mut events, Some(Duration::from_millis(500)))
         .unwrap();
     assert!(events.iter().count() >= 1);
 
