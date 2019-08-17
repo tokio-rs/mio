@@ -549,22 +549,16 @@ impl SelectorInner {
     }
 
     fn _acquire_afd(&self) -> io::Result<Arc<Afd>> {
-        let mut need_alloc = false;
-        {
-            let afd_group = self.afd_group.lock().unwrap();
-            if afd_group.len() == 0 {
-                need_alloc = true;
-            } else {
-                // + 1 reference in Vec
-                if Arc::strong_count(afd_group.last().unwrap()) >= POLL_GROUP__MAX_GROUP_SIZE + 1 {
-                    need_alloc = true;
-                }
+        let mut afd_group = self.afd_group.lock().unwrap();
+        if afd_group.len() == 0 {
+            self._alloc_afd_group(&mut afd_group)?;
+        } else {
+            // + 1 reference in Vec
+            if Arc::strong_count(afd_group.last().unwrap()) >= POLL_GROUP__MAX_GROUP_SIZE + 1 {
+                self._alloc_afd_group(&mut afd_group)?;
             }
         }
-        if need_alloc {
-            self._alloc_afd_group()?;
-        }
-        match self.afd_group.lock().unwrap().last() {
+        match afd_group.last() {
             Some(rc) => Ok(rc.clone()),
             None => unreachable!(),
         }
@@ -575,8 +569,7 @@ impl SelectorInner {
         afd_group.retain(|g| Arc::strong_count(&g) > 1);
     }
 
-    fn _alloc_afd_group(&self) -> io::Result<()> {
-        let mut afd_group = self.afd_group.lock().unwrap();
+    fn _alloc_afd_group(&self, afd_group: &mut Vec<Arc<Afd>>) -> io::Result<()> {
         let afd = Afd::new(&self.cp)?;
         let rc = Arc::new(afd);
         afd_group.push(rc);
