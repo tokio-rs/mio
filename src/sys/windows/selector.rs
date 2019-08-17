@@ -1,11 +1,14 @@
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::io;
 use std::mem::size_of;
 use std::pin::Pin;
 use std::ptr::null_mut;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+#[cfg(debug_assertions)]
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use std::os::windows::io::{AsRawSocket, RawSocket};
 
@@ -351,18 +354,23 @@ impl Selector {
 
 #[derive(Debug)]
 pub struct SelectorInner {
+    lock: Mutex<()>,
     cp: CompletionPort,
-    active_poll_count: AtomicUsize,
-    update_queue: Mutex<VecDeque<Arc<Mutex<SockState>>>>,
+    active_poll_count: RefCell<usize>,
+    update_queue: RefCell<VecDeque<Arc<Mutex<SockState>>>>,
     afd_group: Mutex<Vec<Arc<Afd>>>,
 }
+
+// We have ensured thread safety by introducing lock manually.
+unsafe impl Sync for SelectorInner {}
 
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
         CompletionPort::new(0).map(|cp| SelectorInner {
+            lock: Mutex::new(()),
             cp: cp,
-            active_poll_count: AtomicUsize::new(0),
-            update_queue: Mutex::new(VecDeque::new()),
+            active_poll_count: RefCell::new(0),
+            update_queue: RefCell::new(VecDeque::new()),
             afd_group: Mutex::new(Vec::new()),
         })
     }
@@ -370,22 +378,31 @@ impl SelectorInner {
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
 
-        self.active_poll_count.fetch_add(1, Ordering::SeqCst);
+        {
+            let _guard = self.lock.lock().unwrap();
 
-        self.update_sockets_events()?;
-        let result = self.cp.get_many(&mut events.statuses, timeout);
+            self.update_sockets_events()?;
 
-        self.active_poll_count.fetch_sub(1, Ordering::SeqCst);
-
-        if let Err(e) = result {
-            use winapi::shared::winerror::WAIT_TIMEOUT;
-            if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
-                return Ok(());
-            }
-            return Err(e);
+            *self.active_poll_count.borrow_mut() += 1;
         }
 
-        self.feed_events(&mut events.events, result.unwrap());
+        let result = self.cp.get_many(&mut events.statuses, timeout);
+
+        {
+            let _guard = self.lock.lock().unwrap();
+
+            *self.active_poll_count.borrow_mut() -= 1;
+
+            if let Err(e) = result {
+                use winapi::shared::winerror::WAIT_TIMEOUT;
+                if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
+                    return Ok(());
+                }
+                return Err(e);
+            }
+            self.feed_events(&mut events.events, result.unwrap());
+        }
+
         Ok(())
     }
 
@@ -411,8 +428,11 @@ impl SelectorInner {
             sock.lock().unwrap().set_event(event);
         }
         socket.set_sock_state(Some(sock));
-        self.add_socket_to_update_queue(socket);
-        self.update_sockets_events_if_polling()?;
+        {
+            let _guard = self.lock.lock().unwrap();
+            self.add_socket_to_update_queue(socket);
+            self.update_sockets_events_if_polling()?;
+        }
 
         Ok(())
     }
@@ -437,8 +457,11 @@ impl SelectorInner {
         {
             sock.lock().unwrap().set_event(event);
         }
-        self.add_socket_to_update_queue(socket);
-        self.update_sockets_events_if_polling()?;
+        {
+            let _guard = self.lock.lock().unwrap();
+            self.add_socket_to_update_queue(socket);
+            self.update_sockets_events_if_polling()?;
+        }
 
         Ok(())
     }
@@ -461,17 +484,15 @@ impl SelectorInner {
     }
 
     fn update_sockets_events(&self) -> io::Result<()> {
-        {
-            let mut update_queue = self.update_queue.lock().unwrap();
-            loop {
-                let sock = match update_queue.pop_front() {
-                    Some(sock) => sock,
-                    None => break,
-                };
-                let mut sock_internal = sock.lock().unwrap();
-                if !sock_internal.is_pending_deletion() {
-                    sock_internal.update(&sock).unwrap();
-                }
+        let mut update_queue = self.update_queue.borrow_mut();
+        loop {
+            let sock = match update_queue.pop_front() {
+                Some(sock) => sock,
+                None => break,
+            };
+            let mut sock_internal = sock.lock().unwrap();
+            if !sock_internal.is_pending_deletion() {
+                sock_internal.update(&sock).unwrap();
             }
         }
         self._release_unused_afd();
@@ -479,35 +500,39 @@ impl SelectorInner {
     }
 
     fn update_sockets_events_if_polling(&self) -> io::Result<()> {
-        if self.active_poll_count.load(Ordering::SeqCst) > 0 {
+        if *self.active_poll_count.borrow() > 0 {
             return self.update_sockets_events();
         }
         Ok(())
     }
 
+    fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
+        let sock_state = socket.get_sock_state().unwrap();
+        let mut update_queue = self.update_queue.borrow_mut();
+        update_queue.push_back(sock_state);
+    }
+
     fn feed_events(&self, events: &mut Vec<Event>, iocp_events: &[CompletionStatus]) {
-        {
-            let mut update_queue = self.update_queue.lock().unwrap();
-            for iocp_event in iocp_events.iter() {
-                if iocp_event.overlapped() as usize == 0 {
-                    events.push(Event {
-                        flags: AFD_POLL_RECEIVE,
-                        data: iocp_event.token() as u64,
-                    });
-                    continue;
+        let mut update_queue = self.update_queue.borrow_mut();
+        for iocp_event in iocp_events.iter() {
+            if iocp_event.overlapped() as usize == 0 {
+                events.push(Event {
+                    flags: AFD_POLL_RECEIVE,
+                    data: iocp_event.token() as u64,
+                });
+                continue;
+            }
+            let sock_arc =
+                unsafe { Arc::from_raw(iocp_event.overlapped() as *const Mutex<SockState>) };
+            let mut sock_guard = sock_arc.lock().unwrap();
+            match sock_guard.feed_event() {
+                Some(e) => {
+                    events.push(e);
                 }
-                let sock_arc =
-                    unsafe { Arc::from_raw(iocp_event.overlapped() as *const Mutex<SockState>) };
-                let mut sock_guard = sock_arc.lock().unwrap();
-                match sock_guard.feed_event() {
-                    Some(e) => {
-                        events.push(e);
-                    }
-                    None => {}
-                }
-                if !sock_guard.is_pending_deletion() {
-                    update_queue.push_back(sock_arc.clone());
-                }
+                None => {}
+            }
+            if !sock_guard.is_pending_deletion() {
+                update_queue.push_back(sock_arc.clone());
             }
         }
         self._release_unused_afd();
@@ -556,12 +581,6 @@ impl SelectorInner {
             raw_socket,
             self._acquire_afd()?,
         )?)))
-    }
-
-    fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
-        let sock_state = socket.get_sock_state().unwrap();
-        let mut update_queue = self.update_queue.lock().unwrap();
-        update_queue.push_back(sock_state);
     }
 }
 
