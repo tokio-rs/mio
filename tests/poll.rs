@@ -114,7 +114,6 @@ fn test_drop_cancels_interest_and_shuts_down() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "can't concurrently poll and register on Windows")]
 fn test_registry_behind_arc() {
     // `Registry` should work behind an `Arc`, being `Sync` and `Send`.
     init();
