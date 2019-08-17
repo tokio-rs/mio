@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::UnsafeCell;
 use std::collections::VecDeque;
 use std::io;
 use std::mem::size_of;
@@ -356,8 +356,8 @@ impl Selector {
 pub struct SelectorInner {
     lock: Mutex<()>,
     cp: CompletionPort,
-    active_poll_count: RefCell<usize>,
-    update_queue: RefCell<VecDeque<Arc<Mutex<SockState>>>>,
+    active_poll_count: UnsafeCell<usize>,
+    update_queue: UnsafeCell<VecDeque<Arc<Mutex<SockState>>>>,
     afd_group: Mutex<Vec<Arc<Afd>>>,
 }
 
@@ -369,8 +369,8 @@ impl SelectorInner {
         CompletionPort::new(0).map(|cp| SelectorInner {
             lock: Mutex::new(()),
             cp: cp,
-            active_poll_count: RefCell::new(0),
-            update_queue: RefCell::new(VecDeque::new()),
+            active_poll_count: UnsafeCell::new(0),
+            update_queue: UnsafeCell::new(VecDeque::new()),
             afd_group: Mutex::new(Vec::new()),
         })
     }
@@ -381,9 +381,11 @@ impl SelectorInner {
         {
             let _guard = self.lock.lock().unwrap();
 
-            self.update_sockets_events()?;
+            unsafe {
+                self.update_sockets_events()?;
 
-            *self.active_poll_count.borrow_mut() += 1;
+                *self.active_poll_count.get() += 1;
+            }
         }
 
         let result = self.cp.get_many(&mut events.statuses, timeout);
@@ -391,7 +393,9 @@ impl SelectorInner {
         {
             let _guard = self.lock.lock().unwrap();
 
-            *self.active_poll_count.borrow_mut() -= 1;
+            unsafe {
+                *self.active_poll_count.get() -= 1;
+            }
 
             if let Err(e) = result {
                 use winapi::shared::winerror::WAIT_TIMEOUT;
@@ -400,7 +404,9 @@ impl SelectorInner {
                 }
                 return Err(e);
             }
-            self.feed_events(&mut events.events, result.unwrap());
+            unsafe {
+                self.feed_events(&mut events.events, result.unwrap());
+            }
         }
 
         Ok(())
@@ -430,8 +436,10 @@ impl SelectorInner {
         socket.set_sock_state(Some(sock));
         {
             let _guard = self.lock.lock().unwrap();
-            self.add_socket_to_update_queue(socket);
-            self.update_sockets_events_if_polling()?;
+            unsafe {
+                self.add_socket_to_update_queue(socket);
+                self.update_sockets_events_if_polling()?;
+            }
         }
 
         Ok(())
@@ -459,8 +467,10 @@ impl SelectorInner {
         }
         {
             let _guard = self.lock.lock().unwrap();
-            self.add_socket_to_update_queue(socket);
-            self.update_sockets_events_if_polling()?;
+            unsafe {
+                self.add_socket_to_update_queue(socket);
+                self.update_sockets_events_if_polling()?;
+            }
         }
 
         Ok(())
@@ -483,8 +493,8 @@ impl SelectorInner {
         sock_state.mark_delete();
     }
 
-    fn update_sockets_events(&self) -> io::Result<()> {
-        let mut update_queue = self.update_queue.borrow_mut();
+    unsafe fn update_sockets_events(&self) -> io::Result<()> {
+        let update_queue = &mut *self.update_queue.get();
         loop {
             let sock = match update_queue.pop_front() {
                 Some(sock) => sock,
@@ -499,21 +509,22 @@ impl SelectorInner {
         Ok(())
     }
 
-    fn update_sockets_events_if_polling(&self) -> io::Result<()> {
-        if *self.active_poll_count.borrow() > 0 {
+    unsafe fn update_sockets_events_if_polling(&self) -> io::Result<()> {
+        let active_poll_count = *self.active_poll_count.get();
+        if active_poll_count > 0 {
             return self.update_sockets_events();
         }
         Ok(())
     }
 
-    fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
+    unsafe fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
         let sock_state = socket.get_sock_state().unwrap();
-        let mut update_queue = self.update_queue.borrow_mut();
+        let update_queue = &mut *self.update_queue.get();
         update_queue.push_back(sock_state);
     }
 
-    fn feed_events(&self, events: &mut Vec<Event>, iocp_events: &[CompletionStatus]) {
-        let mut update_queue = self.update_queue.borrow_mut();
+    unsafe fn feed_events(&self, events: &mut Vec<Event>, iocp_events: &[CompletionStatus]) {
+        let update_queue = &mut *self.update_queue.get();
         for iocp_event in iocp_events.iter() {
             if iocp_event.overlapped() as usize == 0 {
                 events.push(Event {
@@ -522,8 +533,7 @@ impl SelectorInner {
                 });
                 continue;
             }
-            let sock_arc =
-                unsafe { Arc::from_raw(iocp_event.overlapped() as *const Mutex<SockState>) };
+            let sock_arc = Arc::from_raw(iocp_event.overlapped() as *const Mutex<SockState>);
             let mut sock_guard = sock_arc.lock().unwrap();
             match sock_guard.feed_event() {
                 Some(e) => {
