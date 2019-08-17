@@ -145,8 +145,7 @@ fn test_registry_behind_arc() {
         barrier3.wait();
     });
 
-    poll.poll(&mut events, None)
-        .unwrap();
+    poll.poll(&mut events, None).unwrap();
     assert!(events.iter().count() >= 1);
 
     // Let the threads return.
