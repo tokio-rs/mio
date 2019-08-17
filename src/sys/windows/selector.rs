@@ -370,10 +370,9 @@ impl SelectorInner {
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
 
-        self.update_sockets_events()?;
-
         self.active_poll_count.fetch_add(1, Ordering::SeqCst);
 
+        self.update_sockets_events()?;
         let result = self.cp.get_many(&mut events.statuses, timeout);
 
         self.active_poll_count.fetch_sub(1, Ordering::SeqCst);
