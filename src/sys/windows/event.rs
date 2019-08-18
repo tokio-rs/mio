@@ -14,25 +14,25 @@ pub fn token(event: &Event) -> Token {
 }
 
 pub fn is_readable(event: &Event) -> bool {
-    if is_hup(event) {
+    if is_error(event) {
         return true;
     }
-    (event.flags & (afd::KNOWN_AFD_EVENTS & !afd::AFD_POLL_SEND)) != 0
+    event.flags & (afd::AFD_POLL_RECEIVE | afd::AFD_POLL_ACCEPT | afd::AFD_POLL_DISCONNECT) != 0
 }
 
 pub fn is_writable(event: &Event) -> bool {
-    if is_hup(event) {
+    if is_error(event) {
         return true;
     }
-    (event.flags & (afd::AFD_POLL_SEND)) != 0
+    event.flags & afd::AFD_POLL_SEND != 0
 }
 
 pub fn is_error(event: &Event) -> bool {
-    event.flags == afd::AFD_POLL_CONNECT_FAIL
+    event.flags & afd::AFD_POLL_CONNECT_FAIL != 0
 }
 
 pub fn is_hup(event: &Event) -> bool {
-    (event.flags & (afd::AFD_POLL_ABORT | afd::AFD_POLL_CONNECT_FAIL)) != 0
+    event.flags & afd::AFD_POLL_ABORT != 0
 }
 
 pub fn is_read_hup(_: &Event) -> bool {
@@ -41,7 +41,7 @@ pub fn is_read_hup(_: &Event) -> bool {
 }
 
 pub fn is_priority(event: &Event) -> bool {
-    (event.flags & afd::AFD_POLL_RECEIVE_EXPEDITED) != 0
+    event.flags & afd::AFD_POLL_RECEIVE_EXPEDITED != 0
 }
 
 pub fn is_aio(_: &Event) -> bool {

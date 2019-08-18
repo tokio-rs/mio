@@ -26,8 +26,8 @@ use crate::{Interests, Token};
 
 use super::afd::{Afd, AfdPollInfo};
 use super::afd::{
-    AFD_POLL_ABORT, AFD_POLL_CONNECT_FAIL, AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_SEND,
-    KNOWN_AFD_EVENTS,
+    AFD_POLL_ABORT, AFD_POLL_ACCEPT, AFD_POLL_CONNECT_FAIL, AFD_POLL_DISCONNECT,
+    AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_SEND, KNOWN_AFD_EVENTS,
 };
 use super::io_status_block::IoStatusBlock;
 use super::Event;
@@ -202,24 +202,23 @@ impl SockState {
                     .poll(&mut self.poll_info, (*self.iosb).as_mut_ptr(), overlapped)
             };
             if let Err(e) = result {
-                if let Some(code) = e.raw_os_error() {
-                    if code == ERROR_IO_PENDING as i32 {
-                        /* Overlapped poll operation in progress; this is expected. */
-                    } else if code == ERROR_INVALID_HANDLE as i32 {
-                        /* Socket closed; it'll be dropped. */
-                        self.mark_delete();
-                        return Ok(());
-                    } else {
-                        return Err(e);
-                    }
+                let code = e.raw_os_error().unwrap();
+                if code == ERROR_IO_PENDING as i32 {
+                    /* Overlapped poll operation in progress; this is expected. */
+                } else if code == ERROR_INVALID_HANDLE as i32 {
+                    /* Socket closed; it'll be dropped. */
+                    self.mark_delete();
+                    return Ok(());
+                } else {
+                    return Err(e);
                 }
             }
 
-            self.poll_status = SockPollStatus::Pending;
             if self.self_wrapped.is_some() {
                 // This shouldn't be happening. We cannot deallocate already pending overlapped before feed_event so we need to stand out here to declare unreachable.
                 unreachable!();
             }
+            self.poll_status = SockPollStatus::Pending;
             self.self_wrapped = Some(wrapped_overlapped);
             self.pending_evts = self.user_evts;
         } else {
@@ -285,12 +284,12 @@ impl SockState {
         // then reregister the socket to reset the interests.
 
         // Reset readable event
-        if (afd_events & (KNOWN_AFD_EVENTS & !AFD_POLL_SEND)) != 0 {
-            self.user_evts &= !(KNOWN_AFD_EVENTS & !AFD_POLL_SEND);
+        if (afd_events & interests_to_afd_flags(Interests::READABLE)) != 0 {
+            self.user_evts &= !(interests_to_afd_flags(Interests::READABLE));
         }
         // Reset writable event
-        if (afd_events & AFD_POLL_SEND) != 0 {
-            self.user_evts &= !AFD_POLL_SEND;
+        if (afd_events & interests_to_afd_flags(Interests::WRITABLE)) != 0 {
+            self.user_evts &= !interests_to_afd_flags(Interests::WRITABLE);
         }
 
         Some(Event {
@@ -471,8 +470,6 @@ impl SelectorInner {
         events: &mut Vec<Event>,
         timeout: Option<Duration>,
     ) -> io::Result<usize> {
-        events.clear();
-
         {
             let _guard = self.lock.lock().unwrap();
 
@@ -610,6 +607,7 @@ impl SelectorInner {
         update_queue.push_back(sock_state);
     }
 
+    // The ret value here means processed iocp_events not events itself.
     unsafe fn feed_events(
         &self,
         events: &mut Vec<Event>,
@@ -631,10 +629,10 @@ impl SelectorInner {
             match sock_guard.feed_event() {
                 Some(e) => {
                     events.push(e);
-                    n += 1;
                 }
                 None => {}
             }
+            n += 1;
             if !sock_guard.is_pending_deletion() {
                 update_queue.push_back(sock_arc.clone());
             }
@@ -656,7 +654,7 @@ fn interests_to_afd_flags(interests: Interests) -> u32 {
     let mut flags = 0;
 
     if interests.is_readable() {
-        flags |= KNOWN_AFD_EVENTS & !AFD_POLL_SEND;
+        flags |= AFD_POLL_RECEIVE | AFD_POLL_ACCEPT | AFD_POLL_DISCONNECT;
     }
 
     if interests.is_writable() {
