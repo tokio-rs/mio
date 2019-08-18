@@ -5,7 +5,7 @@ use std::mem::size_of;
 use std::pin::Pin;
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -26,8 +26,7 @@ use crate::{Interests, Token};
 
 use super::afd::{Afd, AfdPollInfo};
 use super::afd::{
-    AFD_POLL_ABORT, AFD_POLL_ACCEPT, AFD_POLL_CONNECT_FAIL, AFD_POLL_DISCONNECT,
-    AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_RECEIVE_EXPEDITED, AFD_POLL_SEND,
+    AFD_POLL_ABORT, AFD_POLL_CONNECT_FAIL, AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_SEND,
     KNOWN_AFD_EVENTS,
 };
 use super::io_status_block::IoStatusBlock;
@@ -35,6 +34,49 @@ use super::Event;
 use super::SocketState;
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
+
+#[derive(Debug)]
+struct AfdGroup {
+    cp: Arc<CompletionPort>,
+    afd_group: Mutex<Vec<Arc<Afd>>>,
+}
+
+impl AfdGroup {
+    pub fn new(cp: Arc<CompletionPort>) -> AfdGroup {
+        AfdGroup {
+            afd_group: Mutex::new(Vec::new()),
+            cp,
+        }
+    }
+
+    pub fn acquire(&self) -> io::Result<Arc<Afd>> {
+        let mut afd_group = self.afd_group.lock().unwrap();
+        if afd_group.len() == 0 {
+            self._alloc_afd_group(&mut afd_group)?;
+        } else {
+            // + 1 reference in Vec
+            if Arc::strong_count(afd_group.last().unwrap()) >= POLL_GROUP__MAX_GROUP_SIZE + 1 {
+                self._alloc_afd_group(&mut afd_group)?;
+            }
+        }
+        match afd_group.last() {
+            Some(arc) => Ok(arc.clone()),
+            None => unreachable!(),
+        }
+    }
+
+    pub fn release_unused_afd(&self) {
+        let mut afd_group = self.afd_group.lock().unwrap();
+        afd_group.retain(|g| Arc::strong_count(&g) > 1);
+    }
+
+    fn _alloc_afd_group(&self, afd_group: &mut Vec<Arc<Afd>>) -> io::Result<()> {
+        let afd = Afd::new(&self.cp)?;
+        let arc = Arc::new(afd);
+        afd_group.push(arc);
+        Ok(())
+    }
+}
 
 /// This is the deallocation wrapper for overlapped pointer.
 /// In case of error or status changing before the overlapped pointer is actually used(or not even being used),
@@ -138,12 +180,10 @@ impl SockState {
                  * poll operation; when we receive it's completion package, a new poll
                  * operation will be submitted with the correct event mask. */
                 self.cancel()?;
-                return Ok(());
             }
         } else if let SockPollStatus::Cancelled = self.poll_status {
             /* The poll operation has already been cancelled, we're still waiting for
              * it to return. For now, there's nothing that needs to be done. */
-            return Ok(());
         } else if let SockPollStatus::Idle = self.poll_status {
             /* No poll operation is pending; start one. */
             self.poll_info.exclusive = 0;
@@ -153,7 +193,7 @@ impl SockState {
             }
             self.poll_info.handles[0].handle = self.base_socket as HANDLE;
             self.poll_info.handles[0].status = 0;
-            self.poll_info.handles[0].events = self.user_evts;
+            self.poll_info.handles[0].events = self.user_evts | AFD_POLL_LOCAL_CLOSE;
 
             let wrapped_overlapped = OverlappedArcWrapper::new(self_arc);
             let overlapped = wrapped_overlapped.get_ptr() as *const _ as PVOID;
@@ -201,16 +241,6 @@ impl SockState {
         Ok(())
     }
 
-    fn mark_delete(&mut self) {
-        if !self.delete_pending {
-            if let SockPollStatus::Pending = self.poll_status {
-                drop(self.cancel());
-            }
-
-            self.delete_pending = true;
-        }
-    }
-
     // This is the function called from the overlapped using as Arc<Mutex<SockState>>. Watch out for reference counting.
     fn feed_event(&mut self) -> Option<Event> {
         if self.self_wrapped.is_some() {
@@ -236,6 +266,7 @@ impl SockState {
             } else if self.poll_info.number_of_handles < 1 {
                 /* This poll operation succeeded but didn't report any socket events. */
             } else if self.poll_info.handles[0].events & AFD_POLL_LOCAL_CLOSE != 0 {
+                /* The poll operation reported that the socket was closed. */
                 self.mark_delete();
                 return None;
             } else {
@@ -255,7 +286,7 @@ impl SockState {
 
         // Reset readable event
         if (afd_events & (KNOWN_AFD_EVENTS & !AFD_POLL_SEND)) != 0 {
-            self.user_evts &= !(afd_events & (KNOWN_AFD_EVENTS & !AFD_POLL_SEND));
+            self.user_evts &= !(KNOWN_AFD_EVENTS & !AFD_POLL_SEND);
         }
         // Reset writable event
         if (afd_events & AFD_POLL_SEND) != 0 {
@@ -268,8 +299,24 @@ impl SockState {
         })
     }
 
-    fn is_pending_deletion(&self) -> bool {
+    pub fn is_pending_deletion(&self) -> bool {
         self.delete_pending
+    }
+
+    pub fn mark_delete(&mut self) {
+        if !self.delete_pending {
+            if let SockPollStatus::Pending = self.poll_status {
+                drop(self.cancel());
+            }
+
+            self.delete_pending = true;
+        }
+    }
+}
+
+impl Drop for SockState {
+    fn drop(&mut self) {
+        self.mark_delete();
     }
 }
 
@@ -355,10 +402,10 @@ impl Selector {
 #[derive(Debug)]
 pub struct SelectorInner {
     lock: Mutex<()>,
-    cp: CompletionPort,
+    cp: Arc<CompletionPort>,
     active_poll_count: UnsafeCell<usize>,
     update_queue: UnsafeCell<VecDeque<Arc<Mutex<SockState>>>>,
-    afd_group: Mutex<Vec<Arc<Afd>>>,
+    afd_group: AfdGroup,
 }
 
 // We have ensured thread safety by introducing lock manually.
@@ -366,16 +413,64 @@ unsafe impl Sync for SelectorInner {}
 
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
-        CompletionPort::new(0).map(|cp| SelectorInner {
-            lock: Mutex::new(()),
-            cp: cp,
-            active_poll_count: UnsafeCell::new(0),
-            update_queue: UnsafeCell::new(VecDeque::new()),
-            afd_group: Mutex::new(Vec::new()),
+        CompletionPort::new(0).map(|cp| {
+            let cp = Arc::new(cp);
+            let cp_afd = Arc::clone(&cp);
+
+            SelectorInner {
+                lock: Mutex::new(()),
+                cp: cp,
+                active_poll_count: UnsafeCell::new(0),
+                update_queue: UnsafeCell::new(VecDeque::new()),
+                afd_group: AfdGroup::new(cp_afd),
+            }
         })
     }
 
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+        events.clear();
+
+        let deadline = match timeout {
+            Some(timeout) => Some(Instant::now() + timeout),
+            None => None,
+        };
+        let mut n = 0;
+
+        loop {
+            if timeout.is_none() {
+                let len = self.select2(&mut events.statuses, &mut events.events, None)?;
+                if len == 0 {
+                    continue;
+                }
+                return Ok(());
+            } else {
+                if n >= events.statuses.len() {
+                    return Ok(());
+                }
+                let deadline = deadline.unwrap();
+                let now = Instant::now();
+                if now >= deadline {
+                    return Ok(());
+                }
+                let len = self.select2(
+                    &mut events.statuses[n..],
+                    &mut events.events,
+                    Some(deadline - now),
+                )?;
+                if len == 0 {
+                    return Ok(());
+                }
+                n += len;
+            }
+        }
+    }
+
+    pub fn select2(
+        &self,
+        statuses: &mut [CompletionStatus],
+        events: &mut Vec<Event>,
+        timeout: Option<Duration>,
+    ) -> io::Result<usize> {
         events.clear();
 
         {
@@ -388,7 +483,7 @@ impl SelectorInner {
             }
         }
 
-        let result = self.cp.get_many(&mut events.statuses, timeout);
+        let result = self.cp.get_many(statuses, timeout);
 
         {
             let _guard = self.lock.lock().unwrap();
@@ -400,16 +495,12 @@ impl SelectorInner {
             if let Err(e) = result {
                 use winapi::shared::winerror::WAIT_TIMEOUT;
                 if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
-                    return Ok(());
+                    return Ok(0);
                 }
                 return Err(e);
             }
-            unsafe {
-                self.feed_events(&mut events.events, result.unwrap());
-            }
+            unsafe { Ok(self.feed_events(events, result.unwrap())) }
         }
-
-        Ok(())
     }
 
     pub fn register<S: SocketState + AsRawSocket>(
@@ -481,16 +572,12 @@ impl SelectorInner {
             return Err(io::Error::from(io::ErrorKind::NotFound));
         }
         socket.set_sock_state(None);
-        self._release_unused_afd();
+        self.afd_group.release_unused_afd();
         Ok(())
     }
 
     pub fn port(&self) -> &CompletionPort {
         &self.cp
-    }
-
-    pub fn mark_delete_socket(&self, sock_state: &mut SockState) {
-        sock_state.mark_delete();
     }
 
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
@@ -505,7 +592,7 @@ impl SelectorInner {
                 sock_internal.update(&sock).unwrap();
             }
         }
-        self._release_unused_afd();
+        self.afd_group.release_unused_afd();
         Ok(())
     }
 
@@ -523,7 +610,12 @@ impl SelectorInner {
         update_queue.push_back(sock_state);
     }
 
-    unsafe fn feed_events(&self, events: &mut Vec<Event>, iocp_events: &[CompletionStatus]) {
+    unsafe fn feed_events(
+        &self,
+        events: &mut Vec<Event>,
+        iocp_events: &[CompletionStatus],
+    ) -> usize {
+        let mut n = 0;
         let update_queue = &mut *self.update_queue.get();
         for iocp_event in iocp_events.iter() {
             if iocp_event.overlapped() as usize == 0 {
@@ -531,6 +623,7 @@ impl SelectorInner {
                     flags: AFD_POLL_RECEIVE,
                     data: iocp_event.token() as u64,
                 });
+                n += 1;
                 continue;
             }
             let sock_arc = Arc::from_raw(iocp_event.overlapped() as *const Mutex<SockState>);
@@ -538,6 +631,7 @@ impl SelectorInner {
             match sock_guard.feed_event() {
                 Some(e) => {
                     events.push(e);
+                    n += 1;
                 }
                 None => {}
             }
@@ -545,45 +639,16 @@ impl SelectorInner {
                 update_queue.push_back(sock_arc.clone());
             }
         }
-        self._release_unused_afd();
-    }
-
-    fn _acquire_afd(&self) -> io::Result<Arc<Afd>> {
-        let mut afd_group = self.afd_group.lock().unwrap();
-        if afd_group.len() == 0 {
-            self._alloc_afd_group(&mut afd_group)?;
-        } else {
-            // + 1 reference in Vec
-            if Arc::strong_count(afd_group.last().unwrap()) >= POLL_GROUP__MAX_GROUP_SIZE + 1 {
-                self._alloc_afd_group(&mut afd_group)?;
-            }
-        }
-        match afd_group.last() {
-            Some(rc) => Ok(rc.clone()),
-            None => unreachable!(),
-        }
-    }
-
-    fn _release_unused_afd(&self) {
-        let mut afd_group = self.afd_group.lock().unwrap();
-        afd_group.retain(|g| Arc::strong_count(&g) > 1);
-    }
-
-    fn _alloc_afd_group(&self, afd_group: &mut Vec<Arc<Afd>>) -> io::Result<()> {
-        let afd = Afd::new(&self.cp)?;
-        let rc = Arc::new(afd);
-        afd_group.push(rc);
-        Ok(())
+        self.afd_group.release_unused_afd();
+        n
     }
 
     fn _alloc_sock_for_rawsocket(
         &self,
         raw_socket: RawSocket,
     ) -> io::Result<Arc<Mutex<SockState>>> {
-        Ok(Arc::new(Mutex::new(SockState::new(
-            raw_socket,
-            self._acquire_afd()?,
-        )?)))
+        let afd = self.afd_group.acquire()?;
+        Ok(Arc::new(Mutex::new(SockState::new(raw_socket, afd)?)))
     }
 }
 
@@ -591,8 +656,7 @@ fn interests_to_afd_flags(interests: Interests) -> u32 {
     let mut flags = 0;
 
     if interests.is_readable() {
-        flags |=
-            AFD_POLL_RECEIVE | AFD_POLL_RECEIVE_EXPEDITED | AFD_POLL_ACCEPT | AFD_POLL_DISCONNECT;
+        flags |= KNOWN_AFD_EVENTS & !AFD_POLL_SEND;
     }
 
     if interests.is_writable() {
