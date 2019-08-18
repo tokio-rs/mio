@@ -25,6 +25,8 @@ use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
 use ntapi::ntioapi::{NtCancelIoFileEx, NtCreateFile, NtDeviceIoControlFile};
 use ntapi::ntrtl::RtlNtStatusToDosError;
 
+use lazy_static::lazy_static;
+
 const IOCTL_AFD_POLL: ULONG = 0x00012024;
 
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(0);
@@ -44,8 +46,6 @@ unsafe impl Sync for UnicodeString {}
 struct ObjectAttributes(OBJECT_ATTRIBUTES);
 unsafe impl Send for ObjectAttributes {}
 unsafe impl Sync for ObjectAttributes {}
-
-use lazy_static::lazy_static;
 
 lazy_static! {
     static ref AFD_OBJ_NAME: UnicodeString = UnicodeString(UNICODE_STRING {
@@ -132,8 +132,8 @@ impl Afd {
                 ));
             }
             let fd = File::from_raw_handle(afd_helper_handle as RawHandle);
-            let afd = Afd { fd };
             let token = NEXT_TOKEN.fetch_add(1, Ordering::Relaxed) + 1;
+            let afd = Afd { fd };
             cp.add_handle(token, &afd.fd)?;
             match SetFileCompletionNotificationModes(
                 afd_helper_handle,
@@ -223,6 +223,5 @@ pub const KNOWN_AFD_EVENTS: u32 = AFD_POLL_RECEIVE
     | AFD_POLL_SEND
     | AFD_POLL_DISCONNECT
     | AFD_POLL_ABORT
-    | AFD_POLL_LOCAL_CLOSE
     | AFD_POLL_ACCEPT
     | AFD_POLL_CONNECT_FAIL;

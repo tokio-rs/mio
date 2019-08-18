@@ -3,32 +3,16 @@ use crate::{event, Interests, Registry, Token};
 
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 use std::{fmt, io};
 
 use crate::sys::windows::init;
-use crate::sys::windows::selector::{SelectorInner, SockState};
 
-struct InternalState {
-    selector: Arc<SelectorInner>,
-    token: Token,
-    interests: Interests,
-    sock_state: Option<Arc<Mutex<SockState>>>,
-}
-
-impl InternalState {
-    fn new(selector: Arc<SelectorInner>, token: Token, interests: Interests) -> InternalState {
-        InternalState {
-            selector,
-            token,
-            interests,
-            sock_state: None,
-        }
-    }
-}
+use super::selector::SockState;
+use super::InternalState;
 
 pub struct UdpSocket {
-    internal: Arc<RwLock<Option<InternalState>>>,
+    internal: Arc<Mutex<Option<InternalState>>>,
     io: net::UdpSocket,
 }
 
@@ -37,12 +21,16 @@ macro_rules! wouldblock {
         let result = $self.io.$method($($args),*);
         if let Err(ref e) = result {
             if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = $self.internal.read().unwrap();
-                if let Some(internal) = &*internal {
-                    internal.selector.reregister(
+                let internal = $self.internal.lock().unwrap();
+                if internal.is_some() {
+                    let selector = internal.as_ref().unwrap().selector.clone();
+                    let token = internal.as_ref().unwrap().token;
+                    let interests = internal.as_ref().unwrap().interests;
+                    drop(internal);
+                    selector.reregister(
                         $self,
-                        internal.token,
-                        internal.interests,
+                        token,
+                        interests,
                     )?;
                 }
             }
@@ -56,7 +44,7 @@ impl UdpSocket {
         init();
         net::UdpSocket::bind(addr).and_then(|io| {
             io.set_nonblocking(true).map(|()| UdpSocket {
-                internal: Arc::new(RwLock::new(None)),
+                internal: Arc::new(Mutex::new(None)),
                 io,
             })
         })
@@ -68,7 +56,7 @@ impl UdpSocket {
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
         self.io.try_clone().map(|io| UdpSocket {
-            internal: Arc::new(RwLock::new(None)),
+            internal: Arc::new(Mutex::new(None)),
             io,
         })
     }
@@ -164,7 +152,7 @@ impl UdpSocket {
 
 impl super::SocketState for UdpSocket {
     fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
-        let internal = self.internal.read().unwrap();
+        let internal = self.internal.lock().unwrap();
         match &*internal {
             Some(internal) => match &internal.sock_state {
                 Some(arc) => Some(arc.clone()),
@@ -174,7 +162,7 @@ impl super::SocketState for UdpSocket {
         }
     }
     fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
-        let mut internal = self.internal.write().unwrap();
+        let mut internal = self.internal.lock().unwrap();
         match &mut *internal {
             Some(internal) => {
                 internal.sock_state = sock_state;
@@ -187,7 +175,7 @@ impl super::SocketState for UdpSocket {
 impl event::Source for UdpSocket {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         {
-            let mut internal = self.internal.write().unwrap();
+            let mut internal = self.internal.lock().unwrap();
             if internal.is_none() {
                 *internal = Some(InternalState::new(
                     poll::selector(registry).clone_inner(),
@@ -200,7 +188,7 @@ impl event::Source for UdpSocket {
         match result {
             Ok(_) => {}
             Err(_) => {
-                let mut internal = self.internal.write().unwrap();
+                let mut internal = self.internal.lock().unwrap();
                 *internal = None;
             }
         }
@@ -216,7 +204,7 @@ impl event::Source for UdpSocket {
         let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {
-                let mut internal = self.internal.write().unwrap();
+                let mut internal = self.internal.lock().unwrap();
                 internal.as_mut().unwrap().token = token;
                 internal.as_mut().unwrap().interests = interests;
             }
@@ -229,25 +217,12 @@ impl event::Source for UdpSocket {
         let result = poll::selector(registry).deregister(self);
         match result {
             Ok(_) => {
-                let mut internal = self.internal.write().unwrap();
+                let mut internal = self.internal.lock().unwrap();
                 *internal = None;
             }
             Err(_) => {}
         };
         result
-    }
-}
-
-impl Drop for UdpSocket {
-    fn drop(&mut self) {
-        let internal = self.internal.read().unwrap();
-        if let Some(internal) = internal.as_ref() {
-            if let Some(sock_state) = internal.sock_state.as_ref() {
-                internal
-                    .selector
-                    .mark_delete_socket(&mut sock_state.lock().unwrap());
-            }
-        }
     }
 }
 
@@ -260,7 +235,7 @@ impl fmt::Debug for UdpSocket {
 impl FromRawSocket for UdpSocket {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> UdpSocket {
         UdpSocket {
-            internal: Arc::new(RwLock::new(None)),
+            internal: Arc::new(Mutex::new(None)),
             io: net::UdpSocket::from_raw_socket(rawsocket),
         }
     }
