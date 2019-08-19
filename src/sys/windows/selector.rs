@@ -15,7 +15,7 @@ use std::os::windows::io::{AsRawSocket, RawSocket};
 use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
-use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING};
+use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, WAIT_TIMEOUT};
 use winapi::um::mswsock::SIO_BASE_HANDLE;
 use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
 
@@ -429,11 +429,8 @@ impl SelectorInner {
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
 
-        let deadline = match timeout {
-            Some(timeout) => Some(Instant::now() + timeout),
-            None => None,
-        };
         let mut n = 0;
+        let start = Instant::now();
 
         loop {
             if timeout.is_none() {
@@ -446,20 +443,26 @@ impl SelectorInner {
                 if n >= events.statuses.len() {
                     return Ok(());
                 }
-                let deadline = deadline.unwrap();
+                let timeout = timeout.unwrap();
+                let deadline = start + timeout;
                 let now = Instant::now();
-                if now >= deadline {
+                if timeout.as_nanos() != 0 {
+                    if now >= deadline {
+                        return Ok(());
+                    }
+                    let len = self.select2(
+                        &mut events.statuses[n..],
+                        &mut events.events,
+                        Some(deadline - now),
+                    )?;
+                    if len == 0 {
+                        return Ok(());
+                    }
+                    n += len;
+                } else {
+                    self.select2(&mut events.statuses[n..], &mut events.events, Some(timeout))?;
                     return Ok(());
                 }
-                let len = self.select2(
-                    &mut events.statuses[n..],
-                    &mut events.events,
-                    Some(deadline - now),
-                )?;
-                if len == 0 {
-                    return Ok(());
-                }
-                n += len;
             }
         }
     }
@@ -490,7 +493,6 @@ impl SelectorInner {
             }
 
             if let Err(e) = result {
-                use winapi::shared::winerror::WAIT_TIMEOUT;
                 if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
                     return Ok(0);
                 }
@@ -607,7 +609,7 @@ impl SelectorInner {
         update_queue.push_back(sock_state);
     }
 
-    // The ret value here means processed iocp_events not events itself.
+    // It returns processed count of iocp_events rather than the events itself.
     unsafe fn feed_events(
         &self,
         events: &mut Vec<Event>,
