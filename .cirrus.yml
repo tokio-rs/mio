@@ -21,6 +21,7 @@ task:
     - cargo test
   i386_test_script:
     - . $HOME/.cargo/env
+    - rustup target add i686-unknown-freebsd
     - cargo test --target i686-unknown-freebsd
   before_cache_script:
     - rm -rf $HOME/.cargo/registry/index
