@@ -10,6 +10,8 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::SocketAddr;
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
@@ -388,9 +390,6 @@ impl fmt::Debug for TcpListener {
  * ===== UNIX ext =====
  *
  */
-
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
 #[cfg(unix)]
 impl IntoRawFd for TcpStream {

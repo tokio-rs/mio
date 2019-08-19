@@ -1,6 +1,7 @@
-use crate::{Interests, Registry, Token};
 use std::io;
 use std::ops::Deref;
+
+use crate::{Interests, Registry, Token};
 
 /// An event source that may be registered with [`Registry`].
 ///

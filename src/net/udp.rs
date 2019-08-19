@@ -7,13 +7,15 @@
 //!
 //! [portability guidelines]: ../struct.Poll.html#portability
 
-#[cfg(debug_assertions)]
-use crate::poll::SelectorId;
-use crate::{event, sys, Interests, Registry, Token};
-
 use std::fmt;
 use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+
+#[cfg(debug_assertions)]
+use crate::poll::SelectorId;
+use crate::{event, sys, Interests, Registry, Token};
 
 /// A User Datagram Protocol socket.
 ///
@@ -531,9 +533,6 @@ impl fmt::Debug for UdpSocket {
  * ===== UNIX ext =====
  *
  */
-
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
 #[cfg(unix)]
 impl IntoRawFd for UdpSocket {
