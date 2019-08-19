@@ -1,4 +1,4 @@
-use std::io::{self, Cursor, Read, Write};
+use std::io::{self, Read, Write};
 use std::net::Shutdown;
 #[cfg(unix)]
 use std::os::unix::io::{FromRawFd, IntoRawFd};
@@ -779,7 +779,7 @@ fn local_addr_ready() {
 
 struct EchoConn {
     sock: TcpStream,
-    buf: Option<Cursor<Bytes>>,
+    buf: Option<Bytes>,
     mut_buf: Option<BytesMut>,
     token: Option<Token>,
     interests: Option<Interests>,
@@ -812,7 +812,7 @@ impl EchoConn {
             Ok(Some(r)) => {
                 debug!("CONN : we wrote {} bytes!", r);
 
-                self.mut_buf = Some(buf.into_inner().try_mut().unwrap());
+                self.mut_buf = Some(buf.try_mut().unwrap());
 
                 self.interests = Some(Interests::READABLE);
             }
@@ -840,7 +840,7 @@ impl EchoConn {
                 debug!("CONN : we read {} bytes!", r);
 
                 // prepare to provide this to writable
-                self.buf = Some(Cursor::new(buf.freeze()));
+                self.buf = Some(buf.freeze());
 
                 self.interests = Some(Interests::WRITABLE);
             }
@@ -903,8 +903,8 @@ impl EchoServer {
 struct EchoClient {
     sock: TcpStream,
     msgs: Vec<&'static str>,
-    tx: Cursor<Bytes>,
-    rx: Cursor<Bytes>,
+    tx: Bytes,
+    rx: Bytes,
     mut_buf: Option<BytesMut>,
     token: Token,
     interests: Option<Interests>,
@@ -919,8 +919,8 @@ impl EchoClient {
         EchoClient {
             sock,
             msgs,
-            tx: Cursor::new(Bytes::from_static(curr.as_bytes())),
-            rx: Cursor::new(Bytes::from_static(curr.as_bytes())),
+            tx: Bytes::from_static(curr.as_bytes()),
+            rx: Bytes::from_static(curr.as_bytes()),
             mut_buf: Some(BytesMut::with_capacity(2048)),
             token,
             interests: None,
@@ -943,7 +943,7 @@ impl EchoClient {
                 debug!("CLIENT : We read {} bytes!", r);
 
                 // prepare for reading
-                let mut buf = Cursor::new(buf.freeze());
+                let mut buf = buf.freeze();
 
                 while buf.has_remaining() {
                     let actual = buf.get_u8();
@@ -952,7 +952,7 @@ impl EchoClient {
                     assert!(actual == expect, "actual={}; expect={}", actual, expect);
                 }
 
-                self.mut_buf = Some(buf.into_inner().try_mut().unwrap());
+                self.mut_buf = Some(buf.try_mut().unwrap());
 
                 if self.interests == Some(Interests::READABLE) {
                     self.interests = None;
@@ -1013,8 +1013,8 @@ impl EchoClient {
         let curr = self.msgs.remove(0);
 
         debug!("client prepping next message");
-        self.tx = Cursor::new(Bytes::from_static(curr.as_bytes()));
-        self.rx = Cursor::new(Bytes::from_static(curr.as_bytes()));
+        self.tx = Bytes::from_static(curr.as_bytes());
+        self.rx = Bytes::from_static(curr.as_bytes());
 
         self.interests = match self.interests {
             None => Some(Interests::WRITABLE),

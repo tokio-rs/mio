@@ -3,7 +3,7 @@ use std::net::IpAddr;
 use std::str;
 use std::time;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use log::{debug, info};
 
 use mio::net::UdpSocket;
