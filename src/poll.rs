@@ -3,7 +3,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
-use std::{fmt, io, usize};
+use std::{fmt, io};
 
 use log::trace;
 
@@ -247,8 +247,8 @@ impl Poll {
     ///
     /// // Wait for events, but none will be received because no
     /// // `event::Source`s have been registered with this `Poll` instance.
-    /// let n = poll.poll(&mut events, Some(Duration::from_millis(500)))?;
-    /// assert_eq!(n, 0);
+    /// poll.poll(&mut events, Some(Duration::from_millis(500)))?;
+    /// assert!(events.is_empty());
     /// #     Ok(())
     /// # }
     /// ```
@@ -357,7 +357,7 @@ impl Poll {
     /// ```
     ///
     /// [struct]: #
-    pub fn poll(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
+    pub fn poll(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         self.poll2(events, timeout, false)
     }
 
@@ -369,7 +369,7 @@ impl Poll {
         &mut self,
         events: &mut Events,
         timeout: Option<Duration>,
-    ) -> io::Result<usize> {
+    ) -> io::Result<()> {
         self.poll2(events, timeout, true)
     }
 
@@ -379,20 +379,21 @@ impl Poll {
         events: &mut Events,
         mut timeout: Option<Duration>,
         interruptible: bool,
-    ) -> io::Result<usize> {
+    ) -> io::Result<()> {
         loop {
             let now = Instant::now();
             // First get selector events
             let res = self.registry.selector.select(events.sys(), timeout);
 
             match res {
-                Ok(()) => break,
+                Ok(()) => return Ok(()),
                 Err(ref e) if e.kind() == io::ErrorKind::Interrupted && !interruptible => {
                     // Interrupted by a signal; update timeout if necessary and retry
                     if let Some(to) = timeout {
                         let elapsed = now.elapsed();
                         if elapsed >= to {
-                            break;
+                            // Timeout passed.
+                            return Ok(());
                         } else {
                             timeout = Some(to - elapsed);
                         }
@@ -401,9 +402,6 @@ impl Poll {
                 Err(e) => return Err(e),
             }
         }
-
-        // Return number of polled events
-        Ok(events.sys().len())
     }
 }
 
@@ -647,8 +645,8 @@ impl Registry {
     /// let mut events = Events::with_capacity(1024);
     ///
     /// // Set a timeout because this poll should never receive any events.
-    /// let n = poll.poll(&mut events, Some(Duration::from_secs(1)))?;
-    /// assert_eq!(0, n);
+    /// poll.poll(&mut events, Some(Duration::from_secs(1)))?;
+    /// assert!(events.is_empty());
     /// #     Ok(())
     /// # }
     /// ```

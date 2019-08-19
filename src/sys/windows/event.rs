@@ -81,10 +81,6 @@ impl Events {
         self.events.is_empty()
     }
 
-    pub fn len(&self) -> usize {
-        self.events.len()
-    }
-
     pub fn capacity(&self) -> usize {
         self.events.capacity()
     }
