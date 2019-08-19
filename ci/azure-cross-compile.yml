@@ -22,9 +22,13 @@ jobs:
         vmImage: ubuntu-16.04
         target: arm-linux-androideabi
 
-      Android_64:
+      Android_ARM64:
         vmImage: ubuntu-16.04
         target: aarch64-linux-android
+
+      Android_32:
+        vmImage: ubuntu-16.04
+        target: i686-unknown-linux-gnu
 
       NetBSD:
         vmImage: ubuntu-16.04
@@ -33,14 +37,6 @@ jobs:
       Solaris:
         vmImage: ubuntu-16.04
         target: x86_64-sun-solaris
-
-      Linux_ARM:
-        vmImage: ubuntu-16.04
-        target: arm-linux-androideabi
-
-      Linux_32:
-        vmImage: ubuntu-16.04
-        target: i686-unknown-linux-gnu
 
   pool:
     vmImage: $(vmImage)
