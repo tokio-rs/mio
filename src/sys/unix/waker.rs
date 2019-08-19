@@ -82,7 +82,7 @@ mod kqueue {
 
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
-            selector.try_clone_waker().and_then(|selector| {
+            selector.try_clone().and_then(|selector| {
                 selector
                     .setup_waker(token)
                     .map(|()| Waker { selector, token })

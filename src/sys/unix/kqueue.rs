@@ -229,16 +229,6 @@ impl Selector {
 
     // Used by `Waker`.
     #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
-    pub fn try_clone_waker(&self) -> io::Result<Selector> {
-        syscall!(dup(self.kq)).map(|new_kq| Selector {
-            #[cfg(debug_assertions)]
-            id: self.id,
-            kq: new_kq,
-        })
-    }
-
-    // Used by `Waker`.
-    #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
     pub fn wake(&self, token: Token) -> io::Result<()> {
         let mut kevent = kevent!(
             0,
