@@ -496,8 +496,7 @@ impl Registry {
             token,
             interests
         );
-        source.register(self, token, interests)?;
-        Ok(())
+        source.register(self, token, interests)
     }
 
     /// Re-register an [`event::Source`] with the `Poll` instance.
@@ -563,8 +562,7 @@ impl Registry {
             token,
             interests
         );
-        source.reregister(self, token, interests)?;
-        Ok(())
+        source.reregister(self, token, interests)
     }
 
     /// Deregister an [`event::Source`] with the `Poll` instance.
@@ -618,14 +616,13 @@ impl Registry {
         S: event::Source + ?Sized,
     {
         trace!("deregistering event source from poller");
-        source.deregister(self)?;
-        Ok(())
+        source.deregister(self)
     }
 
     /// Creates a new independently owned `Registry`.
     ///
-    /// Event sources registered with this `Registry` will be registerd with the
-    /// original `Registry` and `Poll` instance.
+    /// Event sources registered with this `Registry` will be registered with
+    /// the original `Registry` and `Poll` instance.
     pub fn try_clone(&self) -> io::Result<Registry> {
         self.selector
             .try_clone()
