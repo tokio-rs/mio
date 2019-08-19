@@ -3,12 +3,17 @@ use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 
 use std::net::{self, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
 use std::sync::{Arc, Mutex};
+
+use winapi::um::winsock2::{bind, closesocket, connect, listen, SOCKET_ERROR, SOCK_STREAM};
 
 use crate::poll;
 use crate::sys::windows::init;
 use crate::{event, Interests, Registry, Token};
+
+use super::{inaddr_any, new_socket, socket_addr};
 
 use super::selector::SockState;
 use super::InternalState;
@@ -69,12 +74,41 @@ macro_rules! wouldblock {
 impl TcpStream {
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         init();
-        net::TcpStream::connect(addr).and_then(|s| {
-            s.set_nonblocking(true).map(|()| TcpStream {
-                internal: Arc::new(Mutex::new(None)),
-                inner: s,
+        new_socket(addr, SOCK_STREAM)
+            .and_then(|socket| {
+                // Required for a future `connect_overlapped` operation to be
+                // executed successfully.
+                let any_addr = inaddr_any(addr);
+                let (raw_addr, raw_addr_length) = socket_addr(&any_addr);
+                syscall!(
+                    bind(socket, raw_addr, raw_addr_length),
+                    PartialEq::eq,
+                    SOCKET_ERROR
+                )
+                .and_then(|_| {
+                    let (raw_addr, raw_addr_length) = socket_addr(&addr);
+                    syscall!(
+                        connect(socket, raw_addr, raw_addr_length),
+                        PartialEq::eq,
+                        SOCKET_ERROR
+                    )
+                    .or_else(|err| match err {
+                        ref err if err.kind() == io::ErrorKind::WouldBlock => Ok(0),
+                        err => Err(err),
+                    })
+                })
+                .map(|_| socket)
+                .map_err(|err| {
+                    // Close the socket if we hit an error, ignoring the error
+                    // from closing since we can't pass back two errors.
+                    let _ = unsafe { closesocket(socket) };
+                    err
+                })
             })
-        })
+            .map(|socket| TcpStream {
+                internal: Arc::new(Mutex::new(None)),
+                inner: unsafe { net::TcpStream::from_raw_socket(socket as StdSocket) },
+            })
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
@@ -297,10 +331,23 @@ impl AsRawSocket for TcpStream {
 impl TcpListener {
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
         init();
-        net::TcpListener::bind(addr).and_then(|l| {
-            l.set_nonblocking(true).map(|()| TcpListener {
+        new_socket(addr, SOCK_STREAM).and_then(|socket| {
+            let (raw_addr, raw_addr_length) = socket_addr(&addr);
+            syscall!(
+                bind(socket, raw_addr, raw_addr_length,),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )
+            .and_then(|_| syscall!(listen(socket, 1024), PartialEq::eq, SOCKET_ERROR))
+            .map_err(|err| {
+                // Close the socket if we hit an error, ignoring the error
+                // from closing since we can't pass back two errors.
+                let _ = unsafe { closesocket(socket) };
+                err
+            })
+            .map(|_| TcpListener {
                 internal: Arc::new(Mutex::new(None)),
-                inner: l,
+                inner: unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) },
             })
         })
     }

@@ -1,12 +1,18 @@
 use crate::poll;
 use crate::{event, Interests, Registry, Token};
 
-use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::sync::{Arc, Mutex};
 use std::{fmt, io};
 
+use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
+
+use winapi::um::winsock2::{bind, closesocket, SOCKET_ERROR, SOCK_DGRAM};
+
 use crate::sys::windows::init;
+
+use super::{new_socket, socket_addr};
 
 use super::selector::SockState;
 use super::InternalState;
@@ -42,10 +48,22 @@ macro_rules! wouldblock {
 impl UdpSocket {
     pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
         init();
-        net::UdpSocket::bind(addr).and_then(|io| {
-            io.set_nonblocking(true).map(|()| UdpSocket {
+        new_socket(addr, SOCK_DGRAM).and_then(|socket| {
+            let (raw_addr, raw_addr_length) = socket_addr(&addr);
+            syscall!(
+                bind(socket, raw_addr, raw_addr_length,),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )
+            .map_err(|err| {
+                // Close the socket if we hit an error, ignoring the error
+                // from closing since we can't pass back two errors.
+                let _ = unsafe { closesocket(socket) };
+                err
+            })
+            .map(|_| UdpSocket {
                 internal: Arc::new(Mutex::new(None)),
-                io,
+                io: unsafe { net::UdpSocket::from_raw_socket(socket as StdSocket) },
             })
         })
     }
