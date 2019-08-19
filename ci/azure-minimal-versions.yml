@@ -1,0 +1,37 @@
+parameters:
+  rust_version: nightly
+
+jobs:
+- job: ${{ parameters.name }}
+  displayName: Minimal versions
+  strategy:
+    matrix:
+      Linux:
+        vmImage: ubuntu-16.04
+      Windows:
+        vmImage: vs2017-win2016
+  pool:
+    vmImage: $(vmImage)
+
+  variables:
+    RUST_BACKTRACE: full
+
+  steps:
+  - template: azure-install-rust.yml
+    parameters:
+      rust_version: ${{ parameters.rust_version }}
+
+  - script: cargo update -Zminimal-versions
+    displayName: cargo update -Zminimal-versions
+    env:
+      CI: 'True'
+
+  - script: cargo test
+    displayName: cargo test
+    env:
+      CI: 'True'
+
+  - script: cargo test --no-default-features
+    displayName: cargo test --no-default-features
+    env:
+      CI: 'True'

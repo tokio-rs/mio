@@ -36,6 +36,10 @@ jobs:
     cmd: check
     cross: true
 
+- template: ci/azure-minimal-versions.yml
+  parameters:
+    name: minimal_versions
+
 - template: ci/azure-clippy.yml
   parameters:
     name: clippy
