@@ -2,8 +2,8 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
-use std::{fmt, io, usize};
+use std::time::Duration;
+use std::{fmt, io};
 
 use log::trace;
 
@@ -247,8 +247,8 @@ impl Poll {
     ///
     /// // Wait for events, but none will be received because no
     /// // `event::Source`s have been registered with this `Poll` instance.
-    /// let n = poll.poll(&mut events, Some(Duration::from_millis(500)))?;
-    /// assert_eq!(n, 0);
+    /// poll.poll(&mut events, Some(Duration::from_millis(500)))?;
+    /// assert!(events.is_empty());
     /// #     Ok(())
     /// # }
     /// ```
@@ -304,6 +304,12 @@ impl Poll {
     /// [struct]: #
     /// [`iter`]: struct.Events.html#method.iter
     ///
+    /// # Notes
+    ///
+    /// This returns any errors without attempting to retry, previous versions
+    /// of Mio would automatically retry the poll call if it was interrupted
+    /// (if `EINTR` was returned).
+    ///
     /// # Examples
     ///
     /// A basic example -- establishing a `TcpStream` connection.
@@ -357,53 +363,8 @@ impl Poll {
     /// ```
     ///
     /// [struct]: #
-    pub fn poll(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
-        self.poll2(events, timeout, false)
-    }
-
-    /// Like `poll`, but may be interrupted by a signal
-    ///
-    /// If `poll` is inturrupted while blocking, it will transparently retry the syscall.  If you
-    /// want to handle signals yourself, however, use `poll_interruptible`.
-    pub fn poll_interruptible(
-        &mut self,
-        events: &mut Events,
-        timeout: Option<Duration>,
-    ) -> io::Result<usize> {
-        self.poll2(events, timeout, true)
-    }
-
-    #[allow(clippy::if_same_then_else)]
-    fn poll2(
-        &mut self,
-        events: &mut Events,
-        mut timeout: Option<Duration>,
-        interruptible: bool,
-    ) -> io::Result<usize> {
-        loop {
-            let now = Instant::now();
-            // First get selector events
-            let res = self.registry.selector.select(events.sys(), timeout);
-
-            match res {
-                Ok(()) => break,
-                Err(ref e) if e.kind() == io::ErrorKind::Interrupted && !interruptible => {
-                    // Interrupted by a signal; update timeout if necessary and retry
-                    if let Some(to) = timeout {
-                        let elapsed = now.elapsed();
-                        if elapsed >= to {
-                            break;
-                        } else {
-                            timeout = Some(to - elapsed);
-                        }
-                    }
-                }
-                Err(e) => return Err(e),
-            }
-        }
-
-        // Return number of polled events
-        Ok(events.sys().len())
+    pub fn poll(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+        self.registry.selector.select(events.sys(), timeout)
     }
 }
 
@@ -647,8 +608,8 @@ impl Registry {
     /// let mut events = Events::with_capacity(1024);
     ///
     /// // Set a timeout because this poll should never receive any events.
-    /// let n = poll.poll(&mut events, Some(Duration::from_secs(1)))?;
-    /// assert_eq!(0, n);
+    /// poll.poll(&mut events, Some(Duration::from_secs(1)))?;
+    /// assert!(events.is_empty());
     /// #     Ok(())
     /// # }
     /// ```
