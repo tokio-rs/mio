@@ -9,6 +9,14 @@ use std::time::Duration;
 use bytes::{Buf, BufMut};
 use mio::{Events, Poll};
 
+pub fn init() {
+    static INIT: Once = Once::new();
+
+    INIT.call_once(|| {
+        env_logger::try_init().expect("unable to initialise logger");
+    })
+}
+
 pub fn assert_sync<T: Sync>() {}
 pub fn assert_send<T: Send>() {}
 
@@ -99,14 +107,6 @@ pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))
         .expect("unable to poll");
     assert!(events.is_empty(), "received events, but didn't expect any");
-}
-
-pub fn init() {
-    static INIT: Once = Once::new();
-
-    INIT.call_once(|| {
-        drop(env_logger::try_init());
-    })
 }
 
 /// Bind to any port on localhost.

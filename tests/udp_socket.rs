@@ -48,6 +48,8 @@ impl UdpHandlerSendRecv {
 
 #[cfg(test)]
 fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
+    init();
+
     debug!("Starting TEST_UDP_SOCKETS");
     let mut poll = Poll::new().unwrap();
 

@@ -6,7 +6,7 @@ use mio::{Events, Poll, Token, Waker};
 
 mod util;
 
-use util::{assert_send, assert_sync, expect_no_events};
+use util::{assert_send, assert_sync, expect_no_events, init};
 
 #[test]
 fn is_send_and_sync() {
@@ -16,6 +16,8 @@ fn is_send_and_sync() {
 
 #[test]
 fn waker() {
+    init();
+
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
@@ -28,6 +30,8 @@ fn waker() {
 
 #[test]
 fn waker_multiple_wakeups_same_thread() {
+    init();
+
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
@@ -42,6 +46,8 @@ fn waker_multiple_wakeups_same_thread() {
 
 #[test]
 fn waker_wakeup_different_thread() {
+    init();
+
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 
@@ -63,6 +69,8 @@ fn waker_wakeup_different_thread() {
 
 #[test]
 fn waker_multiple_wakeups_different_thread() {
+    init();
+
     let mut poll = Poll::new().expect("unable to create new Poll instance");
     let mut events = Events::with_capacity(10);
 

@@ -243,7 +243,7 @@ fn test_udp_register_multiple_event_loops() {
 
 #[test]
 fn test_registering_after_deregistering() {
-    drop(env_logger::try_init());
+    init();
 
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(8);
