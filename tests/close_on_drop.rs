@@ -6,7 +6,7 @@ use mio::{Events, Interests, Poll, Token};
 
 mod util;
 
-use util::{init, localhost, TryRead};
+use util::{any_local_address, init, TryRead};
 
 use self::TestState::{AfterRead, Initial};
 
@@ -91,11 +91,9 @@ pub fn test_close_on_drop() {
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut poll = Poll::new().unwrap();
 
-    // The address to connect to - localhost + a unique port
-    let addr = localhost();
-
     // == Create & setup server socket
-    let srv = TcpListener::bind(addr).unwrap();
+    let srv = TcpListener::bind(any_local_address()).unwrap();
+    let addr = srv.local_addr().unwrap();
 
     poll.registry()
         .register(&srv, SERVER, Interests::READABLE)

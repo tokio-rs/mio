@@ -17,11 +17,20 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::{init, localhost, TryRead, TryWrite};
+use util::{any_local_address, assert_send, assert_sync, init, TryRead, TryWrite};
 
 const LISTEN: Token = Token(0);
 const CLIENT: Token = Token(1);
 const SERVER: Token = Token(2);
+
+#[test]
+fn is_send_and_sync() {
+    assert_send::<TcpListener>();
+    assert_sync::<TcpListener>();
+
+    assert_send::<TcpStream>();
+    assert_sync::<TcpStream>();
+}
 
 #[test]
 fn accept() {
@@ -387,20 +396,6 @@ fn listen_then_close() {
             panic!("recieved ready() on a closed TcpListener")
         }
     }
-}
-
-fn assert_send<T: Send>() {}
-
-fn assert_sync<T: Sync>() {}
-
-#[test]
-fn test_tcp_sockets_are_send() {
-    init();
-
-    assert_send::<TcpListener>();
-    assert_send::<TcpStream>();
-    assert_sync::<TcpListener>();
-    assert_sync::<TcpStream>();
 }
 
 #[test]
@@ -1048,8 +1043,8 @@ pub fn test_echo_server() {
     debug!("Starting TEST_ECHO_SERVER");
     let mut poll = Poll::new().unwrap();
 
-    let addr = localhost();
-    let srv = TcpListener::bind(addr).unwrap();
+    let srv = TcpListener::bind(any_local_address()).unwrap();
+    let addr = srv.local_addr().unwrap();
 
     info!("listen for connections");
     poll.registry()

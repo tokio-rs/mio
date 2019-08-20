@@ -6,7 +6,41 @@ use std::time::Duration;
 
 mod util;
 
-use util::{init, localhost};
+use util::{any_local_address, assert_send, assert_sync, init};
+
+#[test]
+fn is_send_and_sync() {
+    assert_sync::<Poll>();
+    assert_send::<Poll>();
+
+    assert_sync::<Registry>();
+    assert_send::<Registry>();
+}
+
+#[test]
+fn run_once_with_nothing() {
+    init();
+
+    let mut events = Events::with_capacity(16);
+    let mut poll = Poll::new().unwrap();
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+}
+
+#[test]
+fn add_then_drop() {
+    init();
+
+    let mut events = Events::with_capacity(16);
+    let l = TcpListener::bind(any_local_address()).unwrap();
+    let mut poll = Poll::new().unwrap();
+    poll.registry()
+        .register(&l, Token(1), Interests::READABLE | Interests::WRITABLE)
+        .unwrap();
+    drop(l);
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+}
 
 #[test]
 fn test_poll_closes_fd() {
@@ -89,7 +123,8 @@ fn test_registry_behind_arc() {
     let registry = Arc::new(poll.registry().try_clone().unwrap());
     let mut events = Events::with_capacity(128);
 
-    let addr = localhost();
+    let listener = TcpListener::bind(any_local_address()).unwrap();
+    let addr = listener.local_addr().unwrap();
     let barrier = Arc::new(Barrier::new(3));
 
     let registry2 = Arc::clone(&registry);
@@ -98,7 +133,6 @@ fn test_registry_behind_arc() {
     let barrier3 = Arc::clone(&barrier);
 
     let handle1 = thread::spawn(move || {
-        let listener = TcpListener::bind(addr).unwrap();
         registry2
             .register(&listener, Token(0), Interests::READABLE)
             .unwrap();
@@ -123,13 +157,21 @@ fn test_registry_behind_arc() {
     handle2.join().unwrap();
 }
 
+// On kqueue platforms registering twice (not *re*registering) works.
 #[test]
-fn assertions() {
-    fn assert_sync<T: Sync>() {}
-    fn assert_send<T: Send>() {}
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+pub fn test_double_register() {
+    init();
+    let poll = Poll::new().unwrap();
 
-    assert_sync::<Poll>();
-    assert_send::<Poll>();
-    assert_sync::<Registry>();
-    assert_send::<Registry>();
+    let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+
+    poll.registry()
+        .register(&l, Token(0), Interests::READABLE)
+        .unwrap();
+
+    assert!(poll
+        .registry()
+        .register(&l, Token(1), Interests::READABLE)
+        .is_err());
 }
