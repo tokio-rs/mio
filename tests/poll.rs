@@ -133,3 +133,22 @@ fn assertions() {
     assert_sync::<Registry>();
     assert_send::<Registry>();
 }
+
+// On kqueue platforms registering twice (not *re*registering) works.
+#[test]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+pub fn test_double_register() {
+    init();
+    let poll = Poll::new().unwrap();
+
+    let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+
+    poll.registry()
+        .register(&l, Token(0), Interests::READABLE)
+        .unwrap();
+
+    assert!(poll
+        .registry()
+        .register(&l, Token(1), Interests::READABLE)
+        .is_err());
+}
