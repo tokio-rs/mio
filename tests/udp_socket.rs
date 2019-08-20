@@ -11,7 +11,7 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::{init, localhost};
+use util::{any_local_address, init};
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
@@ -115,11 +115,8 @@ fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
 /// Returns the sender and the receiver
 fn connected_sockets() -> (UdpSocket, UdpSocket) {
-    let addr = localhost();
-    let any = localhost();
-
-    let tx = UdpSocket::bind(any).unwrap();
-    let rx = UdpSocket::bind(addr).unwrap();
+    let tx = UdpSocket::bind(any_local_address()).unwrap();
+    let rx = UdpSocket::bind(any_local_address()).unwrap();
 
     let tx_addr = tx.local_addr().unwrap();
     let rx_addr = rx.local_addr().unwrap();
@@ -134,11 +131,8 @@ fn connected_sockets() -> (UdpSocket, UdpSocket) {
 pub fn test_udp_socket() {
     init();
 
-    let addr = localhost();
-    let any = localhost();
-
-    let tx = UdpSocket::bind(any).unwrap();
-    let rx = UdpSocket::bind(addr).unwrap();
+    let tx = UdpSocket::bind(any_local_address()).unwrap();
+    let rx = UdpSocket::bind(any_local_address()).unwrap();
 
     test_send_recv_udp(tx, rx, false);
 }
@@ -156,13 +150,9 @@ pub fn test_udp_socket_send_recv() {
 pub fn test_udp_socket_discard() {
     init();
 
-    let addr = localhost();
-    let any = localhost();
-    let outside = localhost();
-
-    let tx = UdpSocket::bind(any).unwrap();
-    let rx = UdpSocket::bind(addr).unwrap();
-    let udp_outside = UdpSocket::bind(outside).unwrap();
+    let tx = UdpSocket::bind(any_local_address()).unwrap();
+    let rx = UdpSocket::bind(any_local_address()).unwrap();
+    let udp_outside = UdpSocket::bind(any_local_address()).unwrap();
 
     let tx_addr = tx.local_addr().unwrap();
     let rx_addr = rx.local_addr().unwrap();
@@ -260,11 +250,8 @@ pub fn test_multicast() {
     debug!("Starting TEST_UDP_CONNECTIONLESS");
     let mut poll = Poll::new().unwrap();
 
-    let addr = localhost();
-    let any = "0.0.0.0:0".parse().unwrap();
-
-    let tx = UdpSocket::bind(any).unwrap();
-    let rx = UdpSocket::bind(addr).unwrap();
+    let tx = UdpSocket::bind(any_local_address()).unwrap();
+    let rx = UdpSocket::bind(any_local_address()).unwrap();
 
     info!("Joining group 227.1.1.100");
     let any = "0.0.0.0".parse().unwrap();

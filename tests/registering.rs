@@ -11,7 +11,7 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::{init, localhost};
+use util::{any_local_address, init};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -74,9 +74,8 @@ pub fn test_register_deregister() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(1024);
 
-    let addr = localhost();
-
-    let server = TcpListener::bind(addr).unwrap();
+    let server = TcpListener::bind(any_local_address()).unwrap();
+    let addr = server.local_addr().unwrap();
 
     info!("register server socket");
     poll.registry()
@@ -148,8 +147,8 @@ pub fn test_reregister_different_without_poll() {
 fn test_tcp_register_multiple_event_loops() {
     init();
 
-    let addr = localhost();
-    let listener = TcpListener::bind(addr).unwrap();
+    let listener = TcpListener::bind(any_local_address()).unwrap();
+    let addr = listener.local_addr().unwrap();
 
     let poll1 = Poll::new().unwrap();
     poll1
@@ -213,8 +212,7 @@ fn test_tcp_register_multiple_event_loops() {
 fn test_udp_register_multiple_event_loops() {
     init();
 
-    let addr = localhost();
-    let socket = UdpSocket::bind(addr).unwrap();
+    let socket = UdpSocket::bind(any_local_address()).unwrap();
 
     let poll1 = Poll::new().unwrap();
     poll1
@@ -250,8 +248,7 @@ fn test_registering_after_deregistering() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(8);
 
-    let addr = localhost();
-    let server = TcpListener::bind(addr).unwrap();
+    let server = TcpListener::bind(any_local_address()).unwrap();
 
     poll.registry()
         .register(&server, SERVER, Interests::READABLE)

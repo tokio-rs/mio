@@ -6,7 +6,7 @@ use std::time::Duration;
 
 mod util;
 
-use util::{init, localhost};
+use util::{any_local_address, init};
 
 #[test]
 fn test_poll_closes_fd() {
@@ -89,7 +89,8 @@ fn test_registry_behind_arc() {
     let registry = Arc::new(poll.registry().try_clone().unwrap());
     let mut events = Events::with_capacity(128);
 
-    let addr = localhost();
+    let listener = TcpListener::bind(any_local_address()).unwrap();
+    let addr = listener.local_addr().unwrap();
     let barrier = Arc::new(Barrier::new(3));
 
     let registry2 = Arc::clone(&registry);
@@ -98,7 +99,6 @@ fn test_registry_behind_arc() {
     let barrier3 = Arc::clone(&barrier);
 
     let handle1 = thread::spawn(move || {
-        let listener = TcpListener::bind(addr).unwrap();
         registry2
             .register(&listener, Token(0), Interests::READABLE)
             .unwrap();

@@ -2,13 +2,12 @@
 #![allow(dead_code)]
 
 use std::io::{self, Read, Write};
+use std::net::SocketAddr;
 use std::sync::Once;
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
 use mio::{Events, Poll};
-
-pub use ports::localhost;
 
 pub trait TryRead {
     fn try_read_buf<B: BufMut>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
@@ -93,33 +92,6 @@ impl<T> MapNonBlock<T> for io::Result<T> {
     }
 }
 
-mod ports {
-    use std::net::SocketAddr;
-    use std::str::FromStr;
-    use std::sync::atomic::AtomicUsize;
-    use std::sync::atomic::Ordering::SeqCst;
-
-    // Helper for getting a unique port for the task run
-    // TODO: Reuse ports to not spam the system
-    static mut NEXT_PORT: AtomicUsize = AtomicUsize::new(0);
-    const FIRST_PORT: usize = 18080;
-
-    fn next_port() -> usize {
-        unsafe {
-            // If the atomic was never used, set it to the initial port
-            NEXT_PORT.compare_and_swap(0, FIRST_PORT, SeqCst);
-
-            // Get and increment the port list
-            NEXT_PORT.fetch_add(1, SeqCst)
-        }
-    }
-
-    pub fn localhost() -> SocketAddr {
-        let s = format!("127.0.0.1:{}", next_port());
-        FromStr::from_str(&s).unwrap()
-    }
-}
-
 pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))
         .expect("unable to poll");
@@ -132,4 +104,14 @@ pub fn init() {
     INIT.call_once(|| {
         drop(env_logger::try_init());
     })
+}
+
+/// Bind to any port on localhost.
+pub fn any_local_address() -> SocketAddr {
+    "127.0.0.1:0".parse().unwrap()
+}
+
+/// Bind to any port on localhost, using a IPv6 address.
+pub fn any_local_ipv6_address() -> SocketAddr {
+    "[::1]:0".parse().unwrap()
 }

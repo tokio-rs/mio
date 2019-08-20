@@ -17,7 +17,7 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::{init, localhost, TryRead, TryWrite};
+use util::{any_local_address, init, TryRead, TryWrite};
 
 const LISTEN: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -1048,8 +1048,8 @@ pub fn test_echo_server() {
     debug!("Starting TEST_ECHO_SERVER");
     let mut poll = Poll::new().unwrap();
 
-    let addr = localhost();
-    let srv = TcpListener::bind(addr).unwrap();
+    let srv = TcpListener::bind(any_local_address()).unwrap();
+    let addr = srv.local_addr().unwrap();
 
     info!("listen for connections");
     poll.registry()
