@@ -6,7 +6,13 @@ use mio::{Events, Poll, Token, Waker};
 
 mod util;
 
-use util::expect_no_events;
+use util::{assert_send, assert_sync, expect_no_events};
+
+#[test]
+fn is_send_and_sync() {
+    assert_send::<Waker>();
+    assert_sync::<Waker>();
+}
 
 #[test]
 fn waker() {

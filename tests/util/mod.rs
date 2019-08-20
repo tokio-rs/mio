@@ -9,6 +9,9 @@ use std::time::Duration;
 use bytes::{Buf, BufMut};
 use mio::{Events, Poll};
 
+pub fn assert_sync<T: Sync>() {}
+pub fn assert_send<T: Send>() {}
+
 pub trait TryRead {
     fn try_read_buf<B: BufMut>(&mut self, buf: &mut B) -> io::Result<Option<usize>>
     where

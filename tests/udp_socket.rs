@@ -11,10 +11,16 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::{any_local_address, init};
+use util::{any_local_address, assert_send, assert_sync, init};
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
+
+#[test]
+fn is_send_and_sync() {
+    assert_send::<UdpSocket>();
+    assert_sync::<UdpSocket>();
+}
 
 pub struct UdpHandlerSendRecv {
     tx: UdpSocket,
@@ -40,17 +46,10 @@ impl UdpHandlerSendRecv {
     }
 }
 
-fn assert_send<T: Send>() {}
-
-fn assert_sync<T: Sync>() {}
-
 #[cfg(test)]
 fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     debug!("Starting TEST_UDP_SOCKETS");
     let mut poll = Poll::new().unwrap();
-
-    assert_send::<UdpSocket>();
-    assert_sync::<UdpSocket>();
 
     // ensure that the sockets are non-blocking
     let mut buf = [0; 128];

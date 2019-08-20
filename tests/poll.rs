@@ -6,7 +6,16 @@ use std::time::Duration;
 
 mod util;
 
-use util::{any_local_address, init};
+use util::{any_local_address, assert_send, assert_sync, init};
+
+#[test]
+fn is_send_and_sync() {
+    assert_sync::<Poll>();
+    assert_send::<Poll>();
+
+    assert_sync::<Registry>();
+    assert_send::<Registry>();
+}
 
 #[test]
 fn run_once_with_nothing() {
@@ -146,17 +155,6 @@ fn test_registry_behind_arc() {
 
     handle1.join().unwrap();
     handle2.join().unwrap();
-}
-
-#[test]
-fn assertions() {
-    fn assert_sync<T: Sync>() {}
-    fn assert_send<T: Send>() {}
-
-    assert_sync::<Poll>();
-    assert_send::<Poll>();
-    assert_sync::<Registry>();
-    assert_send::<Registry>();
 }
 
 // On kqueue platforms registering twice (not *re*registering) works.
