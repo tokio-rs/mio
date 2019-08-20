@@ -1,9 +1,11 @@
 use mio::net::{TcpListener, TcpStream};
-use mio::*;
+use mio::{event, Events, Interests, Poll, Registry, Token};
+
 use std::net;
-use std::sync::{Arc, Barrier};
+use std::sync::{Arc, Barrier, Mutex};
 use std::thread::{self, sleep};
 use std::time::Duration;
+use std::{fmt, io};
 
 mod util;
 
@@ -209,4 +211,144 @@ pub fn test_double_register() {
         .registry()
         .register(&l, Token(1), Interests::READABLE)
         .is_err());
+}
+
+struct TestEventSource(Mutex<TestEventSourceData>);
+
+struct TestEventSourceData {
+    registrations: Vec<(Token, Interests)>,
+    reregistrations: Vec<(Token, Interests)>,
+    deregister_count: usize,
+}
+
+impl TestEventSource {
+    fn new() -> TestEventSource {
+        TestEventSource(Mutex::new(TestEventSourceData {
+            registrations: Vec::new(),
+            reregistrations: Vec::new(),
+            deregister_count: 0,
+        }))
+    }
+}
+
+impl event::Source for TestEventSource {
+    fn register(&self, _registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+        let mut inner = self.0.lock().unwrap();
+        inner.registrations.push((token, interests));
+        Ok(())
+    }
+
+    fn reregister(
+        &self,
+        _registry: &Registry,
+        token: Token,
+        interests: Interests,
+    ) -> io::Result<()> {
+        let mut inner = self.0.lock().unwrap();
+        inner.reregistrations.push((token, interests));
+        Ok(())
+    }
+
+    fn deregister(&self, _registry: &Registry) -> io::Result<()> {
+        let mut inner = self.0.lock().unwrap();
+        inner.deregister_count += 1;
+        Ok(())
+    }
+}
+
+#[test]
+fn poll_registration() {
+    init();
+    let poll = Poll::new().unwrap();
+    let registry = poll.registry();
+
+    let source = TestEventSource::new();
+    let token = Token(0);
+    let interests = Interests::READABLE;
+    registry.register(&source, token, interests).unwrap();
+    {
+        let source = source.0.lock().unwrap();
+        assert_eq!(source.registrations.len(), 1);
+        assert_eq!(source.registrations.get(0), Some(&(token, interests)));
+        assert!(source.reregistrations.is_empty());
+        assert_eq!(source.deregister_count, 0);
+    }
+
+    let re_token = Token(0);
+    let re_interests = Interests::READABLE;
+    registry
+        .reregister(&source, re_token, re_interests)
+        .unwrap();
+    {
+        let source = source.0.lock().unwrap();
+        assert_eq!(source.registrations.len(), 1);
+        assert_eq!(source.reregistrations.len(), 1);
+        assert_eq!(
+            source.reregistrations.get(0),
+            Some(&(re_token, re_interests))
+        );
+        assert_eq!(source.deregister_count, 0);
+    }
+
+    registry.deregister(&source).unwrap();
+    {
+        let source = source.0.lock().unwrap();
+        assert_eq!(source.registrations.len(), 1);
+        assert_eq!(source.reregistrations.len(), 1);
+        assert_eq!(source.deregister_count, 1);
+    }
+}
+
+struct ErroneousTestEventSource;
+
+impl event::Source for ErroneousTestEventSource {
+    fn register(
+        &self,
+        _registry: &Registry,
+        _token: Token,
+        _interests: Interests,
+    ) -> io::Result<()> {
+        Err(io::Error::new(io::ErrorKind::Other, "register"))
+    }
+
+    fn reregister(
+        &self,
+        _registry: &Registry,
+        _token: Token,
+        _interests: Interests,
+    ) -> io::Result<()> {
+        Err(io::Error::new(io::ErrorKind::Other, "reregister"))
+    }
+
+    fn deregister(&self, _registry: &Registry) -> io::Result<()> {
+        Err(io::Error::new(io::ErrorKind::Other, "deregister"))
+    }
+}
+
+#[test]
+fn poll_erroneous_registration() {
+    init();
+    let poll = Poll::new().unwrap();
+    let registry = poll.registry();
+
+    let source = ErroneousTestEventSource;
+    let token = Token(0);
+    let interests = Interests::READABLE;
+    assert_error(registry.register(&source, token, interests), "register");
+    assert_error(registry.reregister(&source, token, interests), "reregister");
+    assert_error(registry.deregister(&source), "deregister");
+}
+
+/// Assert that `result` is an error and the formatted error (via
+/// `fmt::Display`) equals `expected_msg`.
+pub fn assert_error<T, E: fmt::Display>(result: Result<T, E>, expected_msg: &str) {
+    match result {
+        Ok(_) => panic!("unexpected OK result"),
+        Err(err) => assert!(
+            err.to_string().contains(expected_msg),
+            "wanted: {}, got: {}",
+            err,
+            expected_msg
+        ),
+    }
 }
