@@ -9,6 +9,31 @@ mod util;
 use util::{any_local_address, init};
 
 #[test]
+fn run_once_with_nothing() {
+    init();
+
+    let mut events = Events::with_capacity(16);
+    let mut poll = Poll::new().unwrap();
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+}
+
+#[test]
+fn add_then_drop() {
+    init();
+
+    let mut events = Events::with_capacity(16);
+    let l = TcpListener::bind(any_local_address()).unwrap();
+    let mut poll = Poll::new().unwrap();
+    poll.registry()
+        .register(&l, Token(1), Interests::READABLE | Interests::WRITABLE)
+        .unwrap();
+    drop(l);
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+}
+
+#[test]
 fn test_poll_closes_fd() {
     init();
 
