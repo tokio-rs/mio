@@ -71,11 +71,12 @@ impl Interests {
     /// ```
     /// use mio::Interests;
     ///
-    /// const INTERESTS: Interests = Interests::READABLE.and(Interests::WRITABLE);
+    /// const INTERESTS: Interests = Interests::READABLE.add(Interests::WRITABLE);
     /// # fn silent_dead_code_warning(_: Interests) { }
     /// # silent_dead_code_warning(INTERESTS)
     /// ```
-    pub const fn and(self, other: Interests) -> Interests {
+    #[allow(clippy::should_implement_trait)]
+    pub const fn add(self, other: Interests) -> Interests {
         Interests(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
     }
 
