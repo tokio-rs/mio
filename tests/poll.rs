@@ -1,8 +1,7 @@
 use mio::net::{TcpListener, TcpStream};
 use mio::*;
-use std::net;
 use std::sync::{Arc, Barrier};
-use std::thread::{self, sleep};
+use std::thread;
 use std::time::Duration;
 
 mod util;
@@ -41,41 +40,6 @@ fn add_then_drop() {
     drop(l);
     poll.poll(&mut events, Some(Duration::from_millis(100)))
         .unwrap();
-}
-
-#[test]
-fn zero_duration_polls_events() {
-    init();
-
-    let mut poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(16);
-
-    let listener = net::TcpListener::bind(localhost()).unwrap();
-    let addr = listener.local_addr().unwrap();
-
-    let streams: Vec<TcpStream> = (0..3)
-        .map(|n| {
-            let stream = TcpStream::connect(addr).unwrap();
-            poll.registry()
-                .register(&stream, Token(n), Interests::WRITABLE)
-                .unwrap();
-            stream
-        })
-        .collect();
-
-    // Ensure the TcpStreams have some time to connection and for the events to
-    // show up.
-    sleep(Duration::from_millis(10));
-
-    // Even when passing a zero duration timeout we still want do the system
-    // call.
-    poll.poll(&mut events, Some(Duration::from_nanos(0)))
-        .unwrap();
-    assert!(!events.is_empty());
-
-    // Both need to live until here.
-    drop(streams);
-    drop(listener);
 }
 
 #[test]
