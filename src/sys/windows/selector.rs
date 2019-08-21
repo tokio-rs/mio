@@ -656,6 +656,7 @@ fn interests_to_afd_flags(interests: Interests) -> u32 {
     let mut flags = 0;
 
     if interests.is_readable() {
+        // AFD_POLL_DISCONNECT for is_read_hup()
         flags |= AFD_POLL_RECEIVE | AFD_POLL_ACCEPT | AFD_POLL_DISCONNECT;
     }
 

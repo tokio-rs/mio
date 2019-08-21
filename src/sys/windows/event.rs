@@ -14,10 +14,10 @@ pub fn token(event: &Event) -> Token {
 }
 
 pub fn is_readable(event: &Event) -> bool {
-    if is_error(event) {
+    if is_error(event) || is_read_hup(event) {
         return true;
     }
-    event.flags & (afd::AFD_POLL_RECEIVE | afd::AFD_POLL_ACCEPT | afd::AFD_POLL_DISCONNECT) != 0
+    event.flags & (afd::AFD_POLL_RECEIVE | afd::AFD_POLL_ACCEPT) != 0
 }
 
 pub fn is_writable(event: &Event) -> bool {
@@ -35,9 +35,8 @@ pub fn is_hup(event: &Event) -> bool {
     event.flags & afd::AFD_POLL_ABORT != 0
 }
 
-pub fn is_read_hup(_: &Event) -> bool {
-    // Not supported.
-    false
+pub fn is_read_hup(event: &Event) -> bool {
+    event.flags & afd::AFD_POLL_DISCONNECT != 0
 }
 
 pub fn is_priority(event: &Event) -> bool {
