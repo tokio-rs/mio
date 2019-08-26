@@ -50,7 +50,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 ///
 /// // If we do not use connect here, SENDER and ECHOER would need to call send_to and recv_from
 /// // respectively.
-/// sender_socket.connect(echoer_socket.local_addr().unwrap())?;
+/// sender_socket.connect(echoer_socket.local_addr()?)?;
 ///
 /// // We need a Poll to check if SENDER is ready to be written into, and if ECHOER is ready to be
 /// // read from.
