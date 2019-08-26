@@ -25,15 +25,15 @@ use std::fmt;
 ///
 /// let mut events = Events::with_capacity(1024);
 /// let mut poll = Poll::new()?;
-///
-/// assert_eq!(0, events.iter().count());
+/// #
+/// # assert!(events.is_empty());
 ///
 /// // Register `event::Source`s with `poll`.
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
-/// for event in &events {
-///     println!("event={:?}", event);
+/// for event in events.iter() {
+///     println!("Got an event for {:?}", event.token());
 /// }
 /// #     Ok(())
 /// # }
@@ -60,12 +60,12 @@ pub struct Events {
 /// let mut events = Events::with_capacity(1024);
 /// let mut poll = Poll::new()?;
 ///
-/// // Register handles with `poll`
+/// // Register handles with `poll`.
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
 /// for event in events.iter() {
-///     println!("event={:?}", event);
+///     println!("Got an event for {:?}", event.token());
 /// }
 /// #     Ok(())
 /// # }
@@ -85,7 +85,6 @@ impl Events {
     /// use mio::Events;
     ///
     /// let events = Events::with_capacity(1024);
-    ///
     /// assert_eq!(1024, events.capacity());
     /// ```
     pub fn with_capacity(capacity: usize) -> Events {
@@ -100,7 +99,6 @@ impl Events {
     /// use mio::Events;
     ///
     /// let events = Events::with_capacity(1024);
-    ///
     /// assert_eq!(1024, events.capacity());
     /// ```
     pub fn capacity(&self) -> usize {
@@ -115,7 +113,6 @@ impl Events {
     /// use mio::Events;
     ///
     /// let events = Events::with_capacity(1024);
-    ///
     /// assert!(events.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
@@ -135,12 +132,12 @@ impl Events {
     /// let mut events = Events::with_capacity(1024);
     /// let mut poll = Poll::new()?;
     ///
-    /// // Register handles with `poll`
+    /// // Register handles with `poll`.
     ///
     /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
     ///
     /// for event in events.iter() {
-    ///     println!("event={:?}", event);
+    ///     println!("Got an event for {:?}", event.token());
     /// }
     /// #     Ok(())
     /// # }
@@ -154,6 +151,10 @@ impl Events {
 
     /// Clearing all `Event` values from container explicitly.
     ///
+    /// # Notes
+    ///
+    /// Events are cleared before every `poll`, it not needed to this.
+    ///
     /// # Examples
     ///
     /// ```
@@ -165,15 +166,13 @@ impl Events {
     /// let mut events = Events::with_capacity(1024);
     /// let mut poll = Poll::new()?;
     ///
-    /// // Register handles with `poll`
-    /// for _ in 0..2 {
-    ///     events.clear();
-    ///     poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+    /// // Register handles with `poll`.
     ///
-    ///     for event in events.iter() {
-    ///         println!("event={:?}", event);
-    ///     }
-    /// }
+    /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+    ///
+    /// // Clear all events.
+    /// events.clear();
+    /// assert!(events.is_empty());
     /// #     Ok(())
     /// # }
     /// ```
