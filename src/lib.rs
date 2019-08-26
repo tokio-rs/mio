@@ -57,6 +57,8 @@
 //! # Example
 //!
 //! ```
+//! # use std::error::Error;
+//! # fn main() -> Result<(), Box<dyn Error>> {
 //! use mio::*;
 //! use mio::net::{TcpListener, TcpStream};
 //!
@@ -65,28 +67,28 @@
 //! const SERVER: Token = Token(0);
 //! const CLIENT: Token = Token(1);
 //!
-//! let addr = "127.0.0.1:13265".parse().unwrap();
+//! let addr = "127.0.0.1:13265".parse()?;
 //!
 //! // Setup the server socket
-//! let server = TcpListener::bind(addr).unwrap();
+//! let server = TcpListener::bind(addr)?;
 //!
 //! // Create a poll instance
-//! let mut poll = Poll::new().unwrap();
+//! let mut poll = Poll::new()?;
 //!
 //! // Start listening for incoming connections
-//! poll.registry().register(&server, SERVER, Interests::READABLE).unwrap();
+//! poll.registry().register(&server, SERVER, Interests::READABLE)?;
 //!
 //! // Setup the client socket
-//! let sock = TcpStream::connect(addr).unwrap();
+//! let sock = TcpStream::connect(addr)?;
 //!
 //! // Register the socket
-//! poll.registry().register(&sock, CLIENT, Interests::READABLE).unwrap();
+//! poll.registry().register(&sock, CLIENT, Interests::READABLE)?;
 //!
 //! // Create storage for events
 //! let mut events = Events::with_capacity(1024);
 //!
 //! loop {
-//!     poll.poll(&mut events, None).unwrap();
+//!     poll.poll(&mut events, None)?;
 //!
 //!     for event in events.iter() {
 //!         match event.token() {
@@ -98,13 +100,13 @@
 //!             CLIENT => {
 //!                 // The server just shuts down the socket, let's just exit
 //!                 // from our event loop.
-//!                 return;
+//!                 return Ok(());
 //!             }
 //!             _ => unreachable!(),
 //!         }
 //!     }
 //! }
-//!
+//! # }
 //! ```
 
 mod interests;
