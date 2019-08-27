@@ -1,16 +1,18 @@
+use lazy_static::lazy_static;
+use miow::iocp::CompletionPort;
+use ntapi::ntioapi::FILE_OPEN;
+use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
+use ntapi::ntioapi::{NtCancelIoFileEx, NtCreateFile, NtDeviceIoControlFile};
+use ntapi::ntrtl::RtlNtStatusToDosError;
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs::File;
 use std::io;
 use std::mem::{size_of, zeroed};
-use std::ptr::null_mut;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-use miow::iocp::CompletionPort;
-
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
-
+use std::ptr::null_mut;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use winapi::shared::ntdef::{
     HANDLE, LARGE_INTEGER, NTSTATUS, OBJECT_ATTRIBUTES, PVOID, ULONG, UNICODE_STRING,
 };
@@ -19,13 +21,6 @@ use winapi::um::handleapi::INVALID_HANDLE_VALUE;
 use winapi::um::winbase::{SetFileCompletionNotificationModes, FILE_SKIP_SET_EVENT_ON_HANDLE};
 use winapi::um::winnt::SYNCHRONIZE;
 use winapi::um::winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE};
-
-use ntapi::ntioapi::FILE_OPEN;
-use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
-use ntapi::ntioapi::{NtCancelIoFileEx, NtCreateFile, NtDeviceIoControlFile};
-use ntapi::ntrtl::RtlNtStatusToDosError;
-
-use lazy_static::lazy_static;
 
 const IOCTL_AFD_POLL: ULONG = 0x00012024;
 

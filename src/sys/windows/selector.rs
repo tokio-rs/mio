@@ -1,29 +1,3 @@
-use std::cell::UnsafeCell;
-use std::collections::VecDeque;
-use std::io;
-use std::mem::size_of;
-use std::pin::Pin;
-use std::ptr::null_mut;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-
-#[cfg(debug_assertions)]
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-use std::os::windows::io::{AsRawSocket, RawSocket};
-
-use winapi::shared::ntdef::NT_SUCCESS;
-use winapi::shared::ntdef::{HANDLE, PVOID};
-use winapi::shared::ntstatus::STATUS_CANCELLED;
-use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, WAIT_TIMEOUT};
-use winapi::um::mswsock::SIO_BASE_HANDLE;
-use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
-
-use miow::iocp::{CompletionPort, CompletionStatus};
-
-use crate::sys::Events;
-use crate::{Interests, Token};
-
 use super::afd::{Afd, AfdPollInfo};
 use super::afd::{
     AFD_POLL_ABORT, AFD_POLL_ACCEPT, AFD_POLL_CONNECT_FAIL, AFD_POLL_DISCONNECT,
@@ -32,6 +6,27 @@ use super::afd::{
 use super::io_status_block::IoStatusBlock;
 use super::Event;
 use super::SocketState;
+use crate::sys::Events;
+use crate::{Interests, Token};
+
+use miow::iocp::{CompletionPort, CompletionStatus};
+use std::cell::UnsafeCell;
+use std::collections::VecDeque;
+use std::io;
+use std::mem::size_of;
+use std::os::windows::io::{AsRawSocket, RawSocket};
+use std::pin::Pin;
+use std::ptr::null_mut;
+#[cfg(debug_assertions)]
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use winapi::shared::ntdef::NT_SUCCESS;
+use winapi::shared::ntdef::{HANDLE, PVOID};
+use winapi::shared::ntstatus::STATUS_CANCELLED;
+use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, WAIT_TIMEOUT};
+use winapi::um::mswsock::SIO_BASE_HANDLE;
+use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
 
