@@ -1,14 +1,13 @@
+use crate::sys::Events;
+use crate::{Interests, Token};
+
+use log::error;
 use std::mem::MaybeUninit;
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{cmp, io, ptr, slice};
-
-use log::error;
-
-use crate::sys::Events;
-use crate::{Interests, Token};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]

@@ -1,22 +1,17 @@
-use std::fmt;
-use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-
-use std::net::{self, SocketAddr};
-use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
-
-use std::sync::{Arc, Mutex};
-
-use winapi::um::winsock2::{bind, closesocket, connect, listen, SOCKET_ERROR, SOCK_STREAM};
-
+use super::selector::SockState;
+use super::InternalState;
+use super::{inaddr_any, new_socket, socket_addr};
 use crate::poll;
 use crate::sys::windows::init;
 use crate::{event, Interests, Registry, Token};
 
-use super::{inaddr_any, new_socket, socket_addr};
-
-use super::selector::SockState;
-use super::InternalState;
+use std::fmt;
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
+use std::net::{self, SocketAddr};
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
+use std::sync::{Arc, Mutex};
+use winapi::um::winsock2::{bind, closesocket, connect, listen, SOCKET_ERROR, SOCK_STREAM};
 
 pub struct TcpStream {
     internal: Arc<Mutex<Option<InternalState>>>,

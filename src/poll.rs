@@ -1,13 +1,12 @@
+use crate::{event, sys, Events, Interests, Token};
+
+use log::trace;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{fmt, io};
-
-use log::trace;
-
-use crate::{event, sys, Events, Interests, Token};
 
 /// Polls for readiness events on all registered values.
 ///

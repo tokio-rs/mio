@@ -1,21 +1,16 @@
+use super::selector::SockState;
+use super::InternalState;
+use super::{new_socket, socket_addr};
 use crate::poll;
+use crate::sys::windows::init;
 use crate::{event, Interests, Registry, Token};
-
-use std::sync::{Arc, Mutex};
-use std::{fmt, io};
 
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
-
+use std::sync::{Arc, Mutex};
+use std::{fmt, io};
 use winapi::um::winsock2::{bind, closesocket, SOCKET_ERROR, SOCK_DGRAM};
-
-use crate::sys::windows::init;
-
-use super::{new_socket, socket_addr};
-
-use super::selector::SockState;
-use super::InternalState;
 
 pub struct UdpSocket {
     internal: Arc<Mutex<Option<InternalState>>>,

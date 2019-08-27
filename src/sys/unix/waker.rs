@@ -1,11 +1,11 @@
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod eventfd {
+    use crate::sys::Selector;
+    use crate::{Interests, Token};
+
     use std::fs::File;
     use std::io::{self, Read, Write};
     use std::os::unix::io::FromRawFd;
-
-    use crate::sys::Selector;
-    use crate::{Interests, Token};
 
     /// Waker backed by `eventfd`.
     ///
@@ -63,10 +63,10 @@ pub use self::eventfd::Waker;
 
 #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
 mod kqueue {
-    use std::io;
-
     use crate::sys::Selector;
     use crate::Token;
+
+    use std::io;
 
     /// Waker backed by kqueue user space notifications (`EVFILT_USER`).
     ///
@@ -106,12 +106,12 @@ pub use self::kqueue::Waker;
     target_os = "solaris"
 ))]
 mod pipe {
+    use crate::sys::unix::Selector;
+    use crate::{Interests, Token};
+
     use std::fs::File;
     use std::io::{self, Read, Write};
     use std::os::unix::io::FromRawFd;
-
-    use crate::sys::unix::Selector;
-    use crate::{Interests, Token};
 
     /// Waker backed by a unix pipe.
     ///

@@ -1,7 +1,6 @@
+use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
 use std::cell::UnsafeCell;
 use std::fmt;
-
-use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
 
 pub struct IoStatusBlock(UnsafeCell<IO_STATUS_BLOCK>);
 

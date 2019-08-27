@@ -1,10 +1,10 @@
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::{fmt, io, net};
-
 use crate::sys::unix::net::{new_socket, socket_addr};
 use crate::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
+
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::{fmt, io, net};
 
 pub struct UdpSocket {
     io: net::UdpSocket,
