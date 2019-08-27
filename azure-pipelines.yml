@@ -17,8 +17,8 @@ jobs:
 # Stable --release
 - template: ci/azure-test-stable.yml
   parameters:
-    name: stable --release
-    displayName: Test
+    name: stable-release
+    displayName: Test --release
     cmd: test --release
 
 # Nightly
