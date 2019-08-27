@@ -1,9 +1,8 @@
-use mio::net::*;
-
 #[test]
 #[cfg(unix)]
 #[cfg(not(debug_assertions))]
 fn assert_size() {
+    use mio::net::*;
     use std::mem::size_of;
 
     // Without debug assertions enabled `TcpListener`, `TcpStream` and `UdpSocket` should have the
