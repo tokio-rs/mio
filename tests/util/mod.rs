@@ -1,13 +1,16 @@
 // Not all functions are used by all tests.
 #![allow(dead_code)]
 
+use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::SocketAddr;
 use std::sync::Once;
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use mio::{Events, Poll};
+use log::{error, warn};
+use mio::event::Event;
+use mio::{Events, Interests, Poll, Token};
 
 pub fn init() {
     static INIT: Once = Once::new();
@@ -15,6 +18,14 @@ pub fn init() {
     INIT.call_once(|| {
         env_logger::try_init().expect("unable to initialise logger");
     })
+}
+
+pub fn init_with_poll() -> (Poll, Events) {
+    init();
+
+    let poll = Poll::new().expect("unable to create Poll instance");
+    let events = Events::with_capacity(16);
+    (poll, events)
 }
 
 pub fn assert_sync<T: Sync>() {}
@@ -103,10 +114,85 @@ impl<T> MapNonBlock<T> for io::Result<T> {
     }
 }
 
+/// An event that is expected to show up when `Poll` is polled, see
+/// `expect_events`.
+#[derive(Debug)]
+pub struct ExpectEvent {
+    token: Token,
+    // We're (ab)using `Interests` as readiness in `matches`.
+    interests: Interests,
+}
+
+impl ExpectEvent {
+    pub const fn new(token: Token, interests: Interests) -> ExpectEvent {
+        ExpectEvent { token, interests }
+    }
+
+    fn matches(&self, event: &Event) -> bool {
+        event.token() == self.token &&
+            // If we expect a readiness then also match on the event.
+            // In maths terms that is p -> q, which is the same  as !p || q.
+            (!self.interests.is_readable() || event.is_readable()) &&
+            (!self.interests.is_writable() || event.is_writable()) &&
+            (!self.interests.is_aio() || event.is_aio()) &&
+            (!self.interests.is_lio() || event.is_lio())
+    }
+}
+
+pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<ExpectEvent>) {
+    // In a lot of calls we expect more then one event, but it could be that
+    // poll returns the first event only in a single call. To be a bit more
+    // lenient we'll poll a couple of times.
+    for _ in 0..3 {
+        poll.poll(events, Some(Duration::from_millis(500)))
+            .expect("unable to poll");
+
+        for event in events.iter() {
+            let index = expected.iter().position(|expected| expected.matches(event));
+
+            if let Some(index) = index {
+                expected.swap_remove(index);
+            } else {
+                // Must accept sporadic events.
+                warn!("got unexpected event: {:?}", event);
+            }
+        }
+
+        if expected.is_empty() {
+            return;
+        }
+    }
+
+    assert!(
+        expected.is_empty(),
+        "the following expected events were not found: {:?}",
+        expected
+    );
+}
+
 pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))
         .expect("unable to poll");
-    assert!(events.is_empty(), "received events, but didn't expect any");
+    if !events.is_empty() {
+        for event in events.iter() {
+            error!("unexpected event: {:?}", event);
+        }
+        panic!("received events, but didn't expect any, see above");
+    }
+}
+
+/// Assert that `result` is an error and the formatted error (via
+/// `fmt::Display`) equals `expected_msg`.
+pub fn assert_error<T, E: fmt::Display>(result: Result<T, E>, expected_msg: &str) {
+    match result {
+        Ok(_) => panic!("unexpected OK result"),
+        Err(err) => assert!(
+            err.to_string().contains(expected_msg),
+            "wanted: {}, got: {}",
+            err,
+            expected_msg
+        ),
+    }
 }
 
 /// Bind to any port on localhost.
