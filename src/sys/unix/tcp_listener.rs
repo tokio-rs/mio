@@ -13,7 +13,10 @@ pub struct TcpListener {
 }
 
 impl TcpListener {
-    pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
+    pub fn bind_with_options<F>(addr: SocketAddr, set_opts: F) -> io::Result<TcpListener>
+    where
+        F: FnOnce(RawFd) -> io::Result<()>,
+    {
         new_socket(addr, libc::SOCK_STREAM).and_then(|socket| {
             // Set SO_REUSEADDR (mirrors what libstd does).
             syscall!(setsockopt(
@@ -23,6 +26,7 @@ impl TcpListener {
                 &1 as *const libc::c_int as *const libc::c_void,
                 size_of::<libc::c_int>() as libc::socklen_t,
             ))
+            .and_then(|_| set_opts(socket)) // Call user provided function.
             .and_then(|_| {
                 let (raw_addr, raw_addr_length) = socket_addr(&addr);
                 syscall!(bind(socket, raw_addr, raw_addr_length))

@@ -324,26 +324,33 @@ impl AsRawSocket for TcpStream {
 }
 
 impl TcpListener {
-    pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
+    pub fn bind_with_options<F>(addr: SocketAddr, set_opts: F) -> io::Result<TcpListener>
+    where
+        F: FnOnce(StdSocket) -> io::Result<()>,
+    {
         init();
         new_socket(addr, SOCK_STREAM).and_then(|socket| {
-            let (raw_addr, raw_addr_length) = socket_addr(&addr);
-            syscall!(
-                bind(socket, raw_addr, raw_addr_length,),
-                PartialEq::eq,
-                SOCKET_ERROR
-            )
-            .and_then(|_| syscall!(listen(socket, 1024), PartialEq::eq, SOCKET_ERROR))
-            .map_err(|err| {
-                // Close the socket if we hit an error, ignoring the error
-                // from closing since we can't pass back two errors.
-                let _ = unsafe { closesocket(socket) };
-                err
-            })
-            .map(|_| TcpListener {
-                internal: Arc::new(Mutex::new(None)),
-                inner: unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) },
-            })
+            // Call user provided function.
+            set_opts(socket as StdSocket)
+                .and_then(|_| {
+                    let (raw_addr, raw_addr_length) = socket_addr(&addr);
+                    syscall!(
+                        bind(socket, raw_addr, raw_addr_length,),
+                        PartialEq::eq,
+                        SOCKET_ERROR
+                    )
+                    .and_then(|_| syscall!(listen(socket, 1024), PartialEq::eq, SOCKET_ERROR))
+                })
+                .map_err(|err| {
+                    // Close the socket if we hit an error, ignoring the error
+                    // from closing since we can't pass back two errors.
+                    let _ = unsafe { closesocket(socket) };
+                    err
+                })
+                .map(|_| TcpListener {
+                    internal: Arc::new(Mutex::new(None)),
+                    inner: unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) },
+                })
         })
     }
 

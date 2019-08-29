@@ -8,6 +8,8 @@ use std::io;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::raw::SOCKET as RawFd;
 
 /// A structure representing a socket server
 ///
@@ -51,7 +53,91 @@ impl TcpListener {
     /// 3. Bind the socket to the specified address.
     /// 4. Calls `listen` on the socket to prepare it to receive new connections.
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
-        sys::TcpListener::bind(addr).map(|sys| TcpListener {
+        TcpListener::bind_with_options(addr, |_| Ok(()))
+    }
+
+    /// Bind a new TCP listener to the address, calling `set_opts` before the
+    /// call to bind allowing for user defined modifications of the socket. If
+    /// the provided `set_opts` does nothing this does the same as
+    /// `TcpListener::bind`.
+    ///
+    /// The socket provided to `set_opts` may not be closed. Any error returned
+    /// by the `set_opts` function will be seen as fatal for the creation of
+    /// `TcpListener` and will be returned.
+    ///
+    /// # Notes
+    ///
+    /// The provided `set_opts` function is different depending on the OS. On
+    /// Unix platforms it accepts a [`RawFd`], on Windows [`SOCKET`].
+    ///
+    /// [`RawFd`]: std::os::unix::io::RawFd
+    /// [`SOCKET`]: std::os::windows::raw::SOCKET
+    ///
+    /// # Examples
+    ///
+    /// Enabling `SO_REUSEPORT`.
+    ///
+    #[cfg_attr(unix, doc = " ```")]
+    #[cfg_attr(not(unix), doc = " ```no_run")]
+    /// use std::io;
+    /// use std::mem::size_of_val;
+    /// use std::os::unix::io::RawFd;
+    /// use std::time::Duration;
+    ///
+    /// use libc;
+    /// use mio::net::{TcpStream, TcpListener};
+    /// use mio::{Events, Poll, Interests, Token};
+    ///
+    /// const LISTENER1: Token = Token(0);
+    /// const LISTENER2: Token = Token(1);
+    /// const STREAM: Token = Token(2);
+    ///
+    /// /// Sets `SO_REUSEPORT` to 1 on `socket`.
+    /// fn enable_reuse_port(socket: RawFd) -> io::Result<()> {
+    ///     let enable: libc::c_int = 1;
+    ///     let ok = unsafe {
+    ///         libc::setsockopt(socket, libc::SOL_SOCKET, libc::SO_REUSEPORT,
+    ///             (&enable as *const libc::c_int) as *const libc::c_void,
+    ///             size_of_val(&enable) as libc::socklen_t)
+    ///     };
+    ///     if ok == 0 {
+    ///         Ok(())
+    ///     } else {
+    ///         Err(io::Error::last_os_error())
+    ///     }
+    /// }
+    ///
+    /// fn main() -> io::Result<()> {
+    ///     let mut poll = Poll::new()?;
+    ///     let mut events = Events::with_capacity(16);
+    ///
+    ///     // Using the `SO_REUSEPORT` we can bind two listeners to the same
+    ///     // address.
+    ///     let addr = "127.0.0.1:9191".parse().unwrap();
+    ///     let listener1 = TcpListener::bind_with_options(addr, enable_reuse_port)?;
+    ///     let listener2 = TcpListener::bind_with_options(addr, enable_reuse_port)?;
+    ///
+    ///     poll.registry().register(&listener1, LISTENER1, Interests::READABLE)?;
+    ///     poll.registry().register(&listener1, LISTENER2, Interests::READABLE)?;
+    ///
+    ///     let stream = TcpStream::connect(addr)?;
+    ///     poll.registry().register(&stream, STREAM, Interests::WRITABLE)?;
+    ///
+    ///     poll.poll(&mut events, Some(Duration::from_millis(100)))?;
+    ///     // We should have at least one event now.
+    ///     assert!(!events.is_empty());
+    ///
+    /// #   // Silence unused warnings.
+    /// #   drop((listener1, listener2, stream));
+    ///     Ok(())
+    /// }
+    /// ```
+    #[cfg(any(unix, windows))]
+    pub fn bind_with_options<F>(addr: SocketAddr, set_opts: F) -> io::Result<TcpListener>
+    where
+        F: FnOnce(RawFd) -> io::Result<()>,
+    {
+        sys::TcpListener::bind_with_options(addr, set_opts).map(|sys| TcpListener {
             sys,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
