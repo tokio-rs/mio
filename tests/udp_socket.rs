@@ -1,7 +1,11 @@
 use std::io::ErrorKind;
-use std::net::IpAddr;
+use std::net::{self, IpAddr, SocketAddr};
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::str;
-use std::time;
+use std::sync::{Arc, Barrier};
+use std::thread;
+use std::time::Duration;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use log::{debug, info};
@@ -11,15 +15,551 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::{any_local_address, assert_send, assert_sync, init};
+use util::{
+    any_local_address, any_local_ipv6_address, assert_error, assert_send, assert_sync,
+    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
+};
+
+const DATA1: &[u8] = b"Hello world!";
+const DATA2: &[u8] = b"Hello mars!";
 
 const LISTENER: Token = Token(0);
 const SENDER: Token = Token(1);
+const ID1: Token = Token(2);
+const ID2: Token = Token(3);
+const ID3: Token = Token(4);
 
 #[test]
 fn is_send_and_sync() {
     assert_send::<UdpSocket>();
     assert_sync::<UdpSocket>();
+}
+
+#[test]
+fn unconnected_udp_socket_ipv4() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    smoke_test_unconnected_udp_socket(socket1, socket2);
+}
+
+#[test]
+fn unconnected_udp_socket_ipv6() {
+    let socket1 = UdpSocket::bind(any_local_ipv6_address()).unwrap();
+    let socket2 = UdpSocket::bind(any_local_ipv6_address()).unwrap();
+    smoke_test_unconnected_udp_socket(socket1, socket2);
+}
+
+fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
+    let (mut poll, mut events) = init_with_poll();
+
+    let address1 = socket1.local_addr().unwrap();
+    let address2 = socket2.local_addr().unwrap();
+
+    poll.registry()
+        .register(&socket1, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .expect("unable to register UDP socket");
+    poll.registry()
+        .register(&socket2, ID2, Interests::READABLE.add(Interests::WRITABLE))
+        .expect("unable to register UDP socket");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interests::WRITABLE),
+            ExpectEvent::new(ID2, Interests::WRITABLE),
+        ],
+    );
+
+    socket1.send_to(DATA1, address2).unwrap();
+    socket2.send_to(DATA2, address1).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interests::READABLE),
+            ExpectEvent::new(ID2, Interests::READABLE),
+        ],
+    );
+
+    let mut buf = [0; 20];
+    let (n, got_address1) = socket1.peek_from(&mut buf).unwrap();
+    assert_eq!(n, DATA2.len());
+    assert_eq!(buf[..n], DATA2[..]);
+    assert_eq!(got_address1, address2);
+
+    let (n, got_address2) = socket2.peek_from(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+    assert_eq!(got_address2, address1);
+
+    let (n, got_address1) = socket1.recv_from(&mut buf).unwrap();
+    assert_eq!(n, DATA2.len());
+    assert_eq!(buf[..n], DATA2[..]);
+    assert_eq!(got_address1, address2);
+
+    let (n, got_address2) = socket2.recv_from(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+    assert_eq!(got_address2, address1);
+
+    assert!(socket1.take_error().unwrap().is_none());
+    assert!(socket2.take_error().unwrap().is_none());
+}
+
+#[test]
+fn connected_udp_socket_ipv4() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let address1 = socket1.local_addr().unwrap();
+
+    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let address2 = socket2.local_addr().unwrap();
+
+    socket1.connect(address2).unwrap();
+    socket2.connect(address1).unwrap();
+
+    smoke_test_connected_udp_socket(socket1, socket2);
+}
+
+#[test]
+fn connected_udp_socket_ipv6() {
+    let socket1 = UdpSocket::bind(any_local_ipv6_address()).unwrap();
+    let address1 = socket1.local_addr().unwrap();
+
+    let socket2 = UdpSocket::bind(any_local_ipv6_address()).unwrap();
+    let address2 = socket2.local_addr().unwrap();
+
+    socket1.connect(address2).unwrap();
+    socket2.connect(address1).unwrap();
+
+    smoke_test_connected_udp_socket(socket1, socket2);
+}
+
+fn smoke_test_connected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
+    let (mut poll, mut events) = init_with_poll();
+
+    poll.registry()
+        .register(&socket1, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .expect("unable to register UDP socket");
+    poll.registry()
+        .register(&socket2, ID2, Interests::READABLE.add(Interests::WRITABLE))
+        .expect("unable to register UDP socket");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interests::WRITABLE),
+            ExpectEvent::new(ID2, Interests::WRITABLE),
+        ],
+    );
+
+    socket1.send(DATA1).unwrap();
+    socket2.send(DATA2).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interests::READABLE),
+            ExpectEvent::new(ID2, Interests::READABLE),
+        ],
+    );
+
+    let mut buf = [0; 20];
+    let n = socket1.peek(&mut buf).unwrap();
+    assert_eq!(n, DATA2.len());
+    assert_eq!(buf[..n], DATA2[..]);
+
+    let n = socket2.peek(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+
+    let n = socket1.recv(&mut buf).unwrap();
+    assert_eq!(n, DATA2.len());
+    assert_eq!(buf[..n], DATA2[..]);
+
+    let n = socket2.recv(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+
+    assert!(socket1.take_error().unwrap().is_none());
+    assert!(socket2.take_error().unwrap().is_none());
+}
+
+#[test]
+fn reconnect_udp_socket_sending() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket3 = UdpSocket::bind(any_local_address()).unwrap();
+
+    let address1 = socket1.local_addr().unwrap();
+    let address2 = socket2.local_addr().unwrap();
+    let address3 = socket3.local_addr().unwrap();
+
+    socket1.connect(address2).unwrap();
+    socket2.connect(address1).unwrap();
+    socket3.connect(address1).unwrap();
+
+    poll.registry()
+        .register(&socket1, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .unwrap();
+    poll.registry()
+        .register(&socket2, ID2, Interests::READABLE)
+        .unwrap();
+    poll.registry()
+        .register(&socket3, ID3, Interests::READABLE)
+        .unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+    );
+
+    socket1.send(DATA1).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
+
+    let mut buf = [0; 20];
+    let n = socket2.recv(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+
+    socket1.connect(address3).unwrap();
+    socket1.send(DATA2).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID3, Interests::READABLE)],
+    );
+
+    let n = socket3.recv(&mut buf).unwrap();
+    assert_eq!(n, DATA2.len());
+    assert_eq!(buf[..n], DATA2[..]);
+
+    assert!(socket1.take_error().unwrap().is_none());
+    assert!(socket2.take_error().unwrap().is_none());
+    assert!(socket3.take_error().unwrap().is_none());
+}
+
+#[test]
+fn reconnect_udp_socket_receiving() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket3 = UdpSocket::bind(any_local_address()).unwrap();
+
+    let address1 = socket1.local_addr().unwrap();
+    let address2 = socket2.local_addr().unwrap();
+    let address3 = socket3.local_addr().unwrap();
+
+    socket1.connect(address2).unwrap();
+    socket2.connect(address1).unwrap();
+    socket3.connect(address1).unwrap();
+
+    poll.registry()
+        .register(&socket1, ID1, Interests::READABLE)
+        .unwrap();
+    poll.registry()
+        .register(&socket2, ID2, Interests::WRITABLE)
+        .unwrap();
+    poll.registry()
+        .register(&socket3, ID3, Interests::WRITABLE)
+        .unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID2, Interests::WRITABLE),
+            ExpectEvent::new(ID3, Interests::WRITABLE),
+        ],
+    );
+
+    socket2.send(DATA1).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+    );
+
+    let mut buf = [0; 20];
+    let n = socket1.recv(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+
+    socket1.connect(address3).unwrap();
+    socket3.send(DATA2).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+    );
+
+    // Read only a part of the data.
+    let max = 4;
+    let n = socket1.recv(&mut buf[..max]).unwrap();
+    assert_eq!(n, max);
+    assert_eq!(buf[..max], DATA2[..max]);
+
+    // Now connect back to socket 2, dropping the unread data.
+    socket1.connect(address2).unwrap();
+    socket2.send(DATA2).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+    );
+
+    let n = socket1.recv(&mut buf).unwrap();
+    assert_eq!(n, DATA2.len());
+    assert_eq!(buf[..n], DATA2[..]);
+
+    assert!(socket1.take_error().unwrap().is_none());
+    assert!(socket2.take_error().unwrap().is_none());
+    assert!(socket3.take_error().unwrap().is_none());
+}
+
+#[test]
+fn unconnected_udp_socket_connected_methods() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let address2 = socket2.local_addr().unwrap();
+
+    poll.registry()
+        .register(&socket1, ID1, Interests::WRITABLE)
+        .unwrap();
+    poll.registry()
+        .register(&socket2, ID2, Interests::READABLE)
+        .unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+    );
+
+    // Socket is unconnected, but we're using an connected method.
+    assert_error(socket1.send(DATA1), "address required");
+
+    // Now send some actual data.
+    socket1.send_to(DATA1, address2).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
+
+    // Receive methods don't require the socket to be connected, you just won't
+    // know the sender.
+    let mut buf = [0; 20];
+    let n = socket2.peek(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+
+    let n = socket2.recv(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+
+    assert!(socket1.take_error().unwrap().is_none());
+    assert!(socket2.take_error().unwrap().is_none());
+}
+
+#[test]
+fn connected_udp_socket_unconnected_methods() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket3 = UdpSocket::bind(any_local_address()).unwrap();
+
+    let address2 = socket2.local_addr().unwrap();
+    let address3 = socket3.local_addr().unwrap();
+
+    socket1.connect(address3).unwrap();
+    socket3.connect(address2).unwrap();
+
+    poll.registry()
+        .register(&socket1, ID1, Interests::WRITABLE)
+        .unwrap();
+    poll.registry()
+        .register(&socket2, ID2, Interests::WRITABLE)
+        .unwrap();
+    poll.registry()
+        .register(&socket3, ID3, Interests::READABLE)
+        .unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interests::WRITABLE),
+            ExpectEvent::new(ID2, Interests::WRITABLE),
+        ],
+    );
+
+    // Can't use `send_to`.
+    // Linux (and Android) actually allow `send_to` even if the socket is
+    // connected.
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    assert_error(socket1.send_to(DATA1, address2), "already connected");
+    // Even if the address is the same.
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    assert_error(socket1.send_to(DATA1, address3), "already connected");
+
+    socket2.send_to(DATA2, address3).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID3, Interests::READABLE)],
+    );
+
+    let mut buf = [0; 20];
+    let (n, got_address1) = socket3.peek_from(&mut buf).unwrap();
+    assert_eq!(n, DATA2.len());
+    assert_eq!(buf[..n], DATA2[..]);
+    assert_eq!(got_address1, address2);
+
+    let (n, got_address2) = socket3.recv_from(&mut buf).unwrap();
+    assert_eq!(n, DATA2.len());
+    assert_eq!(buf[..n], DATA2[..]);
+    assert_eq!(got_address2, address2);
+
+    assert!(socket1.take_error().unwrap().is_none());
+    assert!(socket2.take_error().unwrap().is_none());
+    assert!(socket3.take_error().unwrap().is_none());
+}
+
+#[test]
+#[cfg(unix)]
+fn udp_socket_raw_fd() {
+    init();
+
+    let socket = UdpSocket::bind(any_local_address()).unwrap();
+    let address = socket.local_addr().unwrap();
+
+    let raw_fd1 = socket.as_raw_fd();
+    let raw_fd2 = socket.into_raw_fd();
+    assert_eq!(raw_fd1, raw_fd2);
+
+    let socket = unsafe { UdpSocket::from_raw_fd(raw_fd2) };
+    assert_eq!(socket.as_raw_fd(), raw_fd1);
+    assert_eq!(socket.local_addr().unwrap(), address);
+}
+
+#[test]
+fn udp_socket_register() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let socket = UdpSocket::bind(any_local_address()).unwrap();
+    poll.registry()
+        .register(&socket, ID1, Interests::READABLE)
+        .expect("unable to register UDP socket");
+
+    expect_no_events(&mut poll, &mut events);
+
+    // NOTE: more tests are done in the smoke tests above.
+}
+
+#[test]
+fn udp_socket_reregister() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let socket = UdpSocket::bind(any_local_address()).unwrap();
+    let address = socket.local_addr().unwrap();
+
+    let barrier = Arc::new(Barrier::new(2));
+    let thread_handle = send_packets(address, 1, barrier.clone());
+
+    poll.registry()
+        .register(&socket, ID1, Interests::WRITABLE)
+        .unwrap();
+    // Let the first packet be send.
+    barrier.wait();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)], // Not readable!
+    );
+
+    poll.registry()
+        .reregister(&socket, ID2, Interests::READABLE)
+        .unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
+
+    let mut buf = [0; 20];
+    let (n, _) = socket.recv_from(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+
+    thread_handle.join().expect("unable to join thread");
+}
+
+#[test]
+fn udp_socket_deregister() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let socket = UdpSocket::bind(any_local_address()).unwrap();
+    let address = socket.local_addr().unwrap();
+
+    let barrier = Arc::new(Barrier::new(2));
+    let thread_handle = send_packets(address, 1, barrier.clone());
+
+    poll.registry()
+        .register(&socket, ID1, Interests::READABLE)
+        .unwrap();
+
+    // Let the packet be send.
+    barrier.wait();
+
+    poll.registry().deregister(&socket).unwrap();
+
+    expect_no_events(&mut poll, &mut events);
+
+    // But we do expect a packet to be send.
+    let mut buf = [0; 20];
+    let (n, _) = socket.recv_from(&mut buf).unwrap();
+    assert_eq!(n, DATA1.len());
+    assert_eq!(buf[..n], DATA1[..]);
+
+    thread_handle.join().expect("unable to join thread");
+}
+
+/// Sends `n_packets` packets to `address`, over UDP, after the `barrier` is
+/// waited (before each send) on in another thread.
+fn send_packets(
+    address: SocketAddr,
+    n_packets: usize,
+    barrier: Arc<Barrier>,
+) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        let socket = net::UdpSocket::bind(any_local_address()).unwrap();
+        for _ in 0..n_packets {
+            barrier.wait();
+            assert_eq!(socket.send_to(DATA1, address).unwrap(), DATA1.len());
+        }
+    })
 }
 
 pub struct UdpHandlerSendRecv {
@@ -176,7 +716,7 @@ pub fn test_udp_socket_discard() {
 
     let mut events = Events::with_capacity(1024);
 
-    poll.poll(&mut events, Some(time::Duration::from_secs(5)))
+    poll.poll(&mut events, Some(Duration::from_secs(5)))
         .unwrap();
 
     for event in &events {
