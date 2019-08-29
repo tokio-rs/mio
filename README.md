@@ -77,8 +77,10 @@ platform, submit a PR to update the list!
 
 ## Community
 
-A group of Mio users hang out in the #mio channel on the Mozilla IRC
-server (irc.mozilla.org). This can be a good place to go for questions.
+A group of Mio users hang out on [Gitter], this can be a good place to go for
+questions.
+
+[Gitter]: https://gitter.im/tokio-rs/mio
 
 ## Contributing
 
