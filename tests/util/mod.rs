@@ -195,6 +195,15 @@ pub fn assert_error<T, E: fmt::Display>(result: Result<T, E>, expected_msg: &str
     }
 }
 
+/// Assert that the provided result is an `io::Error` with kind `WouldBlock`.
+pub fn assert_would_block<T>(result: io::Result<T>) {
+    match result {
+        Ok(_) => panic!("unexpected OK result, expected a `WouldBlock` error"),
+        Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {}
+        Err(err) => panic!("unexpected error result: {}", err),
+    }
+}
+
 /// Bind to any port on localhost.
 pub fn any_local_address() -> SocketAddr {
     "127.0.0.1:0".parse().unwrap()

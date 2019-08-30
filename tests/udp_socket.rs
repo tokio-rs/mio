@@ -17,7 +17,7 @@ mod util;
 
 use util::{
     any_local_address, any_local_ipv6_address, assert_error, assert_send, assert_sync,
-    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
+    assert_would_block, expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
 };
 
 const DATA1: &[u8] = b"Hello world!";
@@ -71,6 +71,10 @@ fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
         ],
     );
 
+    let mut buf = [0; 20];
+    assert_would_block(socket1.peek_from(&mut buf));
+    assert_would_block(socket1.recv_from(&mut buf));
+
     socket1.send_to(DATA1, address2).unwrap();
     socket2.send_to(DATA2, address1).unwrap();
 
@@ -83,7 +87,6 @@ fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
         ],
     );
 
-    let mut buf = [0; 20];
     let (n, got_address1) = socket1.peek_from(&mut buf).unwrap();
     assert_eq!(n, DATA2.len());
     assert_eq!(buf[..n], DATA2[..]);
@@ -154,6 +157,10 @@ fn smoke_test_connected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
             ExpectEvent::new(ID2, Interests::WRITABLE),
         ],
     );
+
+    let mut buf = [0; 20];
+    assert_would_block(socket1.peek(&mut buf));
+    assert_would_block(socket1.recv(&mut buf));
 
     socket1.send(DATA1).unwrap();
     socket2.send(DATA2).unwrap();
