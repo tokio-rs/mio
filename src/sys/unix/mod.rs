@@ -40,6 +40,8 @@ mod kqueue;
 ))]
 pub use self::kqueue::{event, Event, Selector};
 
+pub mod uds;
+
 mod net;
 mod sourcefd;
 mod tcp_listener;

@@ -7,7 +7,7 @@
 
 #[cfg(unix)]
 pub use self::unix::{
-    event, Event, Events, Selector, SourceFd, TcpListener, TcpStream, UdpSocket, Waker,
+    uds, event, Event, Events, Selector, SourceFd, TcpListener, TcpStream, UdpSocket, Waker,
 };
 
 #[cfg(unix)]

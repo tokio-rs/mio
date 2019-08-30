@@ -15,3 +15,8 @@ pub use self::tcp_stream::TcpStream;
 
 mod udp;
 pub use self::udp::UdpSocket;
+
+#[cfg(unix)]
+mod uds;
+#[cfg(unix)]
+pub use self::uds::{UnixDatagram, UnixListener, UnixStream};
