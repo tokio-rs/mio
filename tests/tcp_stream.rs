@@ -227,9 +227,21 @@ fn shutdown_read() {
 
     stream.shutdown(Shutdown::Read).unwrap();
 
-    let mut buf = [0; 20];
-    let n = stream.read(&mut buf).unwrap();
-    assert_eq!(n, 0);
+    // Shutting down the reading side is different on each platform. For example
+    // on Linux based systems we can still read.
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ))]
+    {
+        let mut buf = [0; 20];
+        let n = stream.read(&mut buf).unwrap();
+        assert_eq!(n, 0);
+    }
 
     drop(stream);
     thread_handle.join().expect("unable to join thread");
@@ -308,9 +320,21 @@ fn shutdown_both() {
 
     stream.shutdown(Shutdown::Both).unwrap();
 
-    let mut buf = [0; 20];
-    let n = stream.read(&mut buf).unwrap();
-    assert_eq!(n, 0);
+    // Shutting down the reading side is different on each platform. For example
+    // on Linux based systems we can still read.
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ))]
+    {
+        let mut buf = [0; 20];
+        let n = stream.read(&mut buf).unwrap();
+        assert_eq!(n, 0);
+    }
 
     let err = stream.write(DATA2).unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
