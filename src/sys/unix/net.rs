@@ -2,13 +2,17 @@ use std::io;
 use std::mem::size_of_val;
 use std::net::SocketAddr;
 
-/// Create a new non-blocking socket.
-pub fn new_socket(addr: SocketAddr, socket_type: libc::c_int) -> io::Result<libc::c_int> {
+pub fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> io::Result<libc::c_int> {
     let domain = match addr {
         SocketAddr::V4(..) => libc::AF_INET,
         SocketAddr::V6(..) => libc::AF_INET6,
     };
 
+    new_socket(domain, socket_type)
+}
+
+/// Create a new non-blocking socket.
+pub fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::Result<libc::c_int> {
     #[cfg(any(
         target_os = "android",
         target_os = "bitrig",

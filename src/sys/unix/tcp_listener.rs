@@ -1,4 +1,4 @@
-use crate::sys::unix::net::{new_socket, socket_addr};
+use crate::sys::unix::net::{new_ip_socket, socket_addr};
 use crate::sys::unix::{SourceFd, TcpStream};
 use crate::{event, Interests, Registry, Token};
 
@@ -14,7 +14,7 @@ pub struct TcpListener {
 
 impl TcpListener {
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
-        new_socket(addr, libc::SOCK_STREAM).and_then(|socket| {
+        new_ip_socket(addr, libc::SOCK_STREAM).and_then(|socket| {
             // Set SO_REUSEADDR (mirrors what libstd does).
             syscall!(setsockopt(
                 socket,

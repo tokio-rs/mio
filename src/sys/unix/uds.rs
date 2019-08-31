@@ -1,32 +1,30 @@
+use crate::sys::unix::net::new_socket;
+
+use std::cmp::Ordering;
 use std::io;
-use std::os::unix::net::{UnixDatagram, UnixListener,UnixStream};
+use std::mem;
+use std::os::unix::prelude::*;
+use std::os::unix::net::{SocketAddr, UnixDatagram, UnixListener,UnixStream};
 use std::path::Path;
 
-pub fn connect_stream(_path: &Path) -> io::Result<UnixStream> {
-    unimplemented!();
-    /*
-    unsafe {
-        // On linux we first attempt to pass the SOCK_CLOEXEC flag to
-        // atomically create the socket and set it as CLOEXEC. Support for
-        // this option, however, was added in 2.6.27, and we still support
-        // 2.6.18 as a kernel, so if the returned error is EINVAL we
-        // fallthrough to the fallback.
-        if cfg!(target_os = "linux") || cfg!(target_os = "android") {
-            let flags = ty | SOCK_CLOEXEC | SOCK_NONBLOCK;
-            match cvt(libc::socket(libc::AF_UNIX, flags, 0)) {
-                Ok(fd) => return Ok(Socket { fd: fd }),
-                Err(ref e) if e.raw_os_error() == Some(libc::EINVAL) => {}
-                Err(e) => return Err(e),
-            }
-        }
+pub fn connect_stream(path: &Path) -> io::Result<UnixStream> {
+    let socket = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
+    let (raw_addr, raw_addr_length) = socket_addr(path)?;
+    let raw_addr = &raw_addr as *const _ as *const _;
 
-        let fd = Socket { fd: try!(cvt(libc::socket(libc::AF_UNIX, ty, 0))) };
-        try!(cvt(libc::ioctl(fd.fd, libc::FIOCLEX)));
-        let mut nonblocking = 1 as c_ulong;
-        try!(cvt(libc::ioctl(fd.fd, libc::FIONBIO, &mut nonblocking)));
-        Ok(fd)
+    match syscall!(connect(socket, raw_addr, raw_addr_length)) {
+        Ok(_) => {}
+        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+        Err(e) => {
+            // Close the socket if we hit an error, ignoring the error
+            // from closing since we can't pass back two errors.
+            let _ = unsafe { libc::close(socket) };
+
+            return Err(e);
+        }
     }
-    */
+
+    Ok(unsafe { UnixStream::from_raw_fd(socket) })
 }
 
 pub fn pair_stream() -> io::Result<(UnixStream, UnixStream)> {
@@ -47,4 +45,54 @@ pub fn pair_datagram() -> io::Result<(UnixDatagram, UnixDatagram)> {
 
 pub fn unbound_datagram() -> io::Result<UnixDatagram> {
     unimplemented!();
+}
+
+pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
+    unimplemented!();
+}
+
+pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
+    unsafe {
+        let mut addr: libc::sockaddr_un = mem::zeroed();
+        addr.sun_family = libc::AF_UNIX as libc::sa_family_t;
+
+        let bytes = path.as_os_str().as_bytes();
+
+        match (bytes.get(0), bytes.len().cmp(&addr.sun_path.len())) {
+            // Abstract paths don't need a null terminator
+            (Some(&0), Ordering::Greater) => {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput,
+                                          "path must be no longer than SUN_LEN"));
+            }
+            (_, Ordering::Greater) | (_, Ordering::Equal) => {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput,
+                                          "path must be shorter than SUN_LEN"));
+            }
+            _ => {}
+        }
+        for (dst, src) in addr.sun_path.iter_mut().zip(bytes.iter()) {
+            *dst = *src as libc::c_char;
+        }
+        // null byte for pathname addresses is already there because we zeroed the
+        // struct
+
+        let mut len = sun_path_offset() + bytes.len();
+
+        match bytes.get(0) {
+            Some(&0) | None => {}
+            Some(_) => len += 1,
+        }
+
+        Ok((addr, len as libc::socklen_t))
+    }
+}
+
+fn sun_path_offset() -> usize {
+    unsafe {
+        // Work with an actual instance of the type since using a null pointer is UB
+        let addr: libc::sockaddr_un = mem::uninitialized();
+        let base = &addr as *const _ as usize;
+        let path = &addr.sun_path as *const _ as usize;
+        path - base
+    }
 }

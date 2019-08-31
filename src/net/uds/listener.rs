@@ -31,7 +31,8 @@ impl UnixListener {
 
     /// Accepts a new incoming connection to this listener.
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        unimplemented!();
+        let (std, addr) = sys::uds::accept(&self.std)?;
+        Ok((UnixStream::from_std(std), addr))
         /*
         let (std, addr) = self.accept_std()?;
         // TODO: is there a way to accept w/ non-blocking
