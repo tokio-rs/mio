@@ -55,7 +55,9 @@ pub fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t
     }
 }
 
-#[cfg(debug_assertions)]
+/// Returns `true` if the socket is non-blocking.
+///
+/// Used in assertions.
 pub fn is_non_blocking(socket: RawFd) -> io::Result<bool> {
     let flags = syscall!(fcntl(socket, libc::F_GETFL, libc::O_NONBLOCK))?;
     Ok(flags & libc::O_NONBLOCK == libc::O_NONBLOCK)
