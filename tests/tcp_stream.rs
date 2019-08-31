@@ -236,6 +236,7 @@ fn shutdown_read() {
 }
 
 #[test]
+#[ignore = "This test is flaky, it doesn't always receive an event after shutting down the write side"]
 fn shutdown_write() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -261,7 +262,7 @@ fn shutdown_write() {
     let err = stream.write(DATA2).unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
 
-    // TODO: this can be flaky, fix that.
+    // FIXME: we don't always receive the following event.
     expect_events(
         &mut poll,
         &mut events,
