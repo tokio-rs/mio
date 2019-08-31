@@ -186,6 +186,7 @@ fn deregister() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "fails on Windows, see #1073")]
 fn try_clone_same_poll() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -248,6 +249,7 @@ fn try_clone_same_poll() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "fails on Windows, see #1073")]
 fn try_clone_different_poll() {
     let (mut poll1, mut events) = init_with_poll();
     let mut poll2 = Poll::new().unwrap();
