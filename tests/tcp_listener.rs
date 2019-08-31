@@ -198,7 +198,6 @@ fn try_clone_same_poll() {
 
     let barrier = Arc::new(Barrier::new(3));
     let thread_handle1 = start_connections(address, 1, barrier.clone());
-    let thread_handle2 = start_connections(address, 1, barrier.clone());
 
     poll.registry()
         .register(&listener1, ID1, Interests::READABLE)
@@ -220,6 +219,17 @@ fn try_clone_same_poll() {
     assert!(peer_address.ip().is_loopback());
     assert_eq!(stream.peer_addr().unwrap(), peer_address);
     assert_eq!(stream.local_addr().unwrap(), address);
+
+    let thread_handle2 = start_connections(address, 1, barrier.clone());
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interests::READABLE),
+            ExpectEvent::new(ID2, Interests::READABLE),
+        ],
+    );
 
     let (stream, peer_address) = listener2.accept().expect("unable to accept connection");
     assert!(peer_address.ip().is_loopback());
@@ -251,7 +261,6 @@ fn try_clone_different_poll() {
 
     let barrier = Arc::new(Barrier::new(3));
     let thread_handle1 = start_connections(address, 1, barrier.clone());
-    let thread_handle2 = start_connections(address, 1, barrier.clone());
 
     poll1
         .registry()
@@ -277,6 +286,19 @@ fn try_clone_different_poll() {
     assert!(peer_address.ip().is_loopback());
     assert_eq!(stream.peer_addr().unwrap(), peer_address);
     assert_eq!(stream.local_addr().unwrap(), address);
+
+    let thread_handle2 = start_connections(address, 1, barrier.clone());
+
+    expect_events(
+        &mut poll1,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+    );
+    expect_events(
+        &mut poll2,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
 
     let (stream, peer_address) = listener2.accept().expect("unable to accept connection");
     assert!(peer_address.ip().is_loopback());
