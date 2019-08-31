@@ -1,25 +1,26 @@
-use crate::sys::unix::net::{new_socket, socket_addr};
+use crate::sys::unix::net;
 use crate::sys::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
 
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::net::{self, SocketAddr};
+use std::net::{SocketAddr, Shutdown};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
 pub struct TcpStream {
-    inner: net::TcpStream,
+    inner: std::net::TcpStream,
 }
 
 impl TcpStream {
-    pub(crate) fn new(inner: net::TcpStream) -> TcpStream {
+    pub(crate) fn new(inner: std::net::TcpStream) -> TcpStream {
+        debug_assert!(net::is_non_blocking(inner.as_raw_fd()).unwrap());
         TcpStream { inner }
     }
 
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
-        new_socket(addr, libc::SOCK_STREAM)
+        net::new_socket(addr, libc::SOCK_STREAM)
             .and_then(|socket| {
-                let (raw_addr, raw_addr_length) = socket_addr(&addr);
+                let (raw_addr, raw_addr_length) = net::socket_addr(&addr);
                 syscall!(connect(socket, raw_addr, raw_addr_length))
                     .or_else(|err| match err {
                         // Connect hasn't finished, but that is fine.
@@ -35,7 +36,7 @@ impl TcpStream {
                     })
             })
             .map(|socket| TcpStream {
-                inner: unsafe { net::TcpStream::from_raw_fd(socket) },
+                inner: unsafe { std::net::TcpStream::from_raw_fd(socket) },
             })
     }
 
@@ -51,7 +52,7 @@ impl TcpStream {
         self.inner.try_clone().map(|s| TcpStream { inner: s })
     }
 
-    pub fn shutdown(&self, how: net::Shutdown) -> io::Result<()> {
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.inner.shutdown(how)
     }
 
@@ -132,7 +133,7 @@ impl fmt::Debug for TcpStream {
 impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream {
-            inner: net::TcpStream::from_raw_fd(fd),
+            inner: std::net::TcpStream::from_raw_fd(fd),
         }
     }
 }

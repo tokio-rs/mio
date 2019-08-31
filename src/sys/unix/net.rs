@@ -1,6 +1,7 @@
 use std::io;
 use std::mem::size_of_val;
 use std::net::SocketAddr;
+use std::os::unix::io::RawFd;
 
 /// Create a new non-blocking socket.
 pub fn new_socket(addr: SocketAddr, socket_type: libc::c_int) -> io::Result<libc::c_int> {
@@ -52,4 +53,10 @@ pub fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t
             size_of_val(addr) as libc::socklen_t,
         ),
     }
+}
+
+#[cfg(debug_assertions)]
+pub fn is_non_blocking(socket: RawFd) -> io::Result<bool> {
+    let flags = syscall!(fcntl(socket, libc::F_GETFL, libc::O_NONBLOCK))?;
+    Ok(flags & libc::O_NONBLOCK == libc::O_NONBLOCK)
 }
