@@ -452,7 +452,16 @@ fn echo_listener(addr: SocketAddr, n_connections: usize) -> (thread::JoinHandle<
             let (mut stream, _) = listener.accept().unwrap();
 
             loop {
-                let n = stream.read(&mut buf).expect("error reading");
+                let n = stream
+                    .read(&mut buf)
+                    // On Linux based system it will cause a connection reset
+                    // error when the reading side of the peer connection is
+                    // shutdown, we don't consider it an actual here.
+                    .or_else(|err| match err {
+                        ref err if err.kind() == io::ErrorKind::ConnectionReset => Ok(0),
+                        err => Err(err),
+                    })
+                    .expect("error reading");
                 if n == 0 {
                     break;
                 }
