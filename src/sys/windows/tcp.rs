@@ -359,14 +359,16 @@ impl TcpListener {
     }
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        wouldblock!(self, accept).map(|(inner, addr)| {
-            (
-                TcpStream {
-                    internal: Arc::new(Mutex::new(None)),
-                    inner,
-                },
-                addr,
-            )
+        wouldblock!(self, accept).and_then(|(inner, addr)| {
+            inner.set_nonblocking(true).map(|()| {
+                (
+                    TcpStream {
+                        internal: Arc::new(Mutex::new(None)),
+                        inner,
+                    },
+                    addr,
+                )
+            })
         })
     }
 
