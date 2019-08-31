@@ -49,9 +49,11 @@ impl TcpListener {
     }
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.inner
-            .accept()
-            .map(|(inner, addr)| (TcpStream::new(inner), addr))
+        self.inner.accept().and_then(|(inner, addr)| {
+            inner
+                .set_nonblocking(true)
+                .map(|()| (TcpStream::new(inner), addr))
+        })
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
