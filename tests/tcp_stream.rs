@@ -337,7 +337,10 @@ fn shutdown_both() {
     }
 
     let err = stream.write(DATA2).unwrap_err();
+    #[cfg(unix)]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
+    #[cfg(windows)]
+    assert_eq!(err.kind(), io::ErrorKind::ConnectionAborted);
 
     drop(stream);
     thread_handle.join().expect("unable to join thread");
