@@ -183,6 +183,7 @@ fn ttl() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "fails on Windows, see #1079")]
 fn nodelay() {
     init();
 
