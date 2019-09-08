@@ -11,8 +11,7 @@ fn main() -> io::Result<()> {
     let mut poll = Poll::new()?;
     // Register our socket with the token IN (defined above) and an interest
     // in being `READABLE`.
-    poll.registry()
-        .register(&socket, IN, Interests::READABLE)?;
+    poll.registry().register(&socket, IN, Interests::READABLE)?;
 
     // Prepare a buffer for the number of events we can handle at a time.
     // Someone might wat to echo really fast so lets give it some size.
@@ -27,7 +26,7 @@ fn main() -> io::Result<()> {
         for event in events.iter() {
             // Validate the token we registered our socket with,
             // in this example it will only ever be one but we
-            // make sure it's valid non the less.
+            // make sure it's valid none the less.
             match event.token() {
                 IN => loop {
                     // In this loop we receive from the socket as long as we
@@ -56,5 +55,5 @@ fn main() -> io::Result<()> {
                 _ => unreachable!(),
             }
         }
-    }   
+    }
 }
