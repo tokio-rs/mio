@@ -46,8 +46,8 @@ fn main() -> io::Result<()> {
                                 break;
                             } else {
                                 // If it was any other kind of error, something
-                                // went wrong and we panic.
-                                panic!("error: {:?}", e)
+                                // went wrong and we terminate with an error.
+                                return Err(e);
                             }
                         }
                     }
