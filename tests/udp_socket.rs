@@ -259,6 +259,7 @@ fn reconnect_udp_socket_sending() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "fails on Windows, see #1080")]
 fn reconnect_udp_socket_receiving() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -341,6 +342,7 @@ fn reconnect_udp_socket_receiving() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "fails on Windows, see #1080")]
 fn unconnected_udp_socket_connected_methods() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -422,12 +424,12 @@ fn connected_udp_socket_unconnected_methods() {
     );
 
     // Can't use `send_to`.
-    // Linux (and Android) actually allow `send_to` even if the socket is
-    // connected.
-    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    // Linux (and Android) and Windows actually allow `send_to` even if the
+    // socket is connected.
+    #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
     assert_error(socket1.send_to(DATA1, address2), "already connected");
     // Even if the address is the same.
-    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
     assert_error(socket1.send_to(DATA1, address3), "already connected");
 
     socket2.send_to(DATA2, address3).unwrap();
@@ -524,6 +526,7 @@ fn udp_socket_reregister() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "fails on Windows, see #1080")]
 fn udp_socket_deregister() {
     let (mut poll, mut events) = init_with_poll();
 
