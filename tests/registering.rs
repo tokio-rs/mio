@@ -67,7 +67,7 @@ impl TestHandler {
 }
 
 #[test]
-pub fn test_register_deregister() {
+pub fn register_deregister() {
     init();
 
     debug!("Starting TEST_REGISTER_DEREGISTER");
@@ -112,7 +112,7 @@ pub fn test_register_deregister() {
 }
 
 #[test]
-pub fn test_reregister_different_without_poll() {
+pub fn reregister_different_without_poll() {
     init();
 
     let mut events = Events::with_capacity(1024);
@@ -144,7 +144,7 @@ pub fn test_reregister_different_without_poll() {
 
 #[test]
 #[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.
-fn test_tcp_register_multiple_event_loops() {
+fn tcp_register_multiple_event_loops() {
     init();
 
     let listener = TcpListener::bind(any_local_address()).unwrap();
@@ -209,7 +209,7 @@ fn test_tcp_register_multiple_event_loops() {
 
 #[test]
 #[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.
-fn test_udp_register_multiple_event_loops() {
+fn udp_register_multiple_event_loops() {
     init();
 
     let socket = UdpSocket::bind(any_local_address()).unwrap();
@@ -242,7 +242,7 @@ fn test_udp_register_multiple_event_loops() {
 }
 
 #[test]
-fn test_registering_after_deregistering() {
+fn registering_after_deregistering() {
     init();
 
     let mut poll = Poll::new().unwrap();
