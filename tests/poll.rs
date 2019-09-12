@@ -79,7 +79,7 @@ fn zero_duration_polls_events() {
 }
 
 #[test]
-fn test_poll_closes_fd() {
+fn poll_closes_fd() {
     init();
 
     for _ in 0..2000 {
@@ -94,7 +94,7 @@ fn test_poll_closes_fd() {
 }
 
 #[test]
-fn test_drop_cancels_interest_and_shuts_down() {
+fn drop_cancels_interest_and_shuts_down() {
     init();
 
     use mio::net::TcpStream;
@@ -150,7 +150,7 @@ fn test_drop_cancels_interest_and_shuts_down() {
 }
 
 #[test]
-fn test_registry_behind_arc() {
+fn registry_behind_arc() {
     // `Registry` should work behind an `Arc`, being `Sync` and `Send`.
     init();
 
@@ -195,7 +195,7 @@ fn test_registry_behind_arc() {
 // On kqueue platforms registering twice (not *re*registering) works.
 #[test]
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-pub fn test_double_register() {
+pub fn double_register() {
     init();
     let poll = Poll::new().unwrap();
 

@@ -86,7 +86,7 @@ impl TestHandler {
 }
 
 #[test]
-pub fn test_close_on_drop() {
+pub fn close_on_drop() {
     init();
     debug!("Starting TEST_CLOSE_ON_DROP");
     let mut poll = Poll::new().unwrap();

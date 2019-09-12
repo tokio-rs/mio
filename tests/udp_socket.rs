@@ -47,7 +47,7 @@ impl UdpHandlerSendRecv {
 }
 
 #[cfg(test)]
-fn test_send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
+fn send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
     init();
 
     debug!("Starting TEST_UDP_SOCKETS");
@@ -129,26 +129,26 @@ fn connected_sockets() -> (UdpSocket, UdpSocket) {
 }
 
 #[test]
-pub fn test_udp_socket() {
+pub fn udp_socket() {
     init();
 
     let tx = UdpSocket::bind(any_local_address()).unwrap();
     let rx = UdpSocket::bind(any_local_address()).unwrap();
 
-    test_send_recv_udp(tx, rx, false);
+    send_recv_udp(tx, rx, false);
 }
 
 #[test]
-pub fn test_udp_socket_send_recv() {
+pub fn udp_socket_send_recv() {
     init();
 
     let (tx, rx) = connected_sockets();
 
-    test_send_recv_udp(tx, rx, true);
+    send_recv_udp(tx, rx, true);
 }
 
 #[test]
-pub fn test_udp_socket_discard() {
+pub fn udp_socket_discard() {
     init();
 
     let tx = UdpSocket::bind(any_local_address()).unwrap();
@@ -245,7 +245,7 @@ impl UdpHandler {
     ignore = "Multicast doesn't work on Android 64bit"
 )]
 #[test]
-pub fn test_multicast() {
+pub fn multicast() {
     init();
 
     debug!("Starting TEST_UDP_CONNECTIONLESS");

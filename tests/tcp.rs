@@ -669,7 +669,7 @@ macro_rules! wait {
 }
 
 #[test]
-fn test_write_shutdown() {
+fn write_shutdown() {
     init();
 
     let mut poll = Poll::new().unwrap();
@@ -1037,7 +1037,7 @@ impl Echo {
 }
 
 #[test]
-pub fn test_echo_server() {
+pub fn echo_server() {
     init();
 
     debug!("Starting TEST_ECHO_SERVER");
