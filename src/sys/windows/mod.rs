@@ -22,6 +22,28 @@ macro_rules! syscall {
     }};
 }
 
+macro_rules! wouldblock {
+    ($self:ident, $method:ident $(, $args:expr)* )  => {{
+        let result = (&$self.inner).$method($($args),*);
+        if let Err(ref e) = result {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                if let Some(ref internal) = &*$self.internal.lock().unwrap() {
+                    let selector = internal.selector.clone();
+                    let token = internal.token;
+                    let interests = internal.interests;
+                    drop(internal);
+                    selector.reregister(
+                        $self,
+                        token,
+                        interests,
+                    )?;
+                }
+            }
+        }
+        result
+    }};
+}
+
 mod afd;
 pub mod event;
 mod io_status_block;

@@ -23,49 +23,6 @@ pub struct TcpListener {
     inner: net::TcpListener,
 }
 
-macro_rules! wouldblock {
-    ($self:ident, $method:ident)  => {{
-        let result = (&$self.inner).$method();
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = $self.internal.lock().unwrap();
-                if internal.is_some() {
-                    let selector = internal.as_ref().unwrap().selector.clone();
-                    let token = internal.as_ref().unwrap().token;
-                    let interests = internal.as_ref().unwrap().interests;
-                    drop(internal);
-                    selector.reregister(
-                        $self,
-                        token,
-                        interests,
-                    )?;
-                }
-            }
-        }
-        result
-    }};
-    ($self:ident, $method:ident, $($args:expr),* )  => {{
-        let result = (&$self.inner).$method($($args),*);
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = $self.internal.lock().unwrap();
-                if internal.is_some() {
-                    let selector = internal.as_ref().unwrap().selector.clone();
-                    let token = internal.as_ref().unwrap().token;
-                    let interests = internal.as_ref().unwrap().interests;
-                    drop(internal);
-                    selector.reregister(
-                        $self,
-                        token,
-                        interests,
-                    )?;
-                }
-            }
-        }
-        result
-    }};
-}
-
 impl TcpStream {
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         init();
