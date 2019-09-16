@@ -341,9 +341,8 @@ pub mod event {
             (event.flags & libc::EV_EOF) != 0 && event.fflags != 0
     }
 
-    pub fn is_hup(_: &Event) -> bool {
-        // Not supported.
-        false
+    pub fn is_hup(event: &Event) -> bool {
+        event.filter == libc::EVFILT_WRITE && (event.flags & libc::EV_EOF) != 0
     }
 
     pub fn is_read_hup(event: &Event) -> bool {

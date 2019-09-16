@@ -79,7 +79,7 @@ impl Event {
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
     /// | [epoll]       | `EPOLLHUP`      |
-    /// | [kqueue]      | Not supported   |
+    /// | [kqueue]      | `EV_EOF`        |
     ///
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
