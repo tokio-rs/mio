@@ -391,6 +391,10 @@ impl Selector {
     pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
         self.inner.clone()
     }
+
+    pub(super) fn clone_port(&self) -> Arc<CompletionPort> {
+        self.inner.cp.clone()
+    }
 }
 
 #[derive(Debug)]
@@ -568,10 +572,6 @@ impl SelectorInner {
         socket.set_sock_state(None);
         self.afd_group.release_unused_afd();
         Ok(())
-    }
-
-    pub fn port(&self) -> &CompletionPort {
-        &self.cp
     }
 
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
