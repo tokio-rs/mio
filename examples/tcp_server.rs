@@ -113,7 +113,7 @@ fn handle_connection_event(
 
     if event.is_readable() {
         let mut connection_closed = false;
-        let mut received_data = Vec::with_capacity(4056);
+        let mut received_data = Vec::with_capacity(4096);
         // We can (maybe) read from the connection.
         loop {
             let mut buf = [0; 256];
@@ -124,16 +124,11 @@ fn handle_connection_event(
                     connection_closed = true;
                     break;
                 }
-                Ok(_n) => received_data.extend_from_slice(&buf),
+                Ok(n) => received_data.extend_from_slice(&buf[..n]),
                 // Would block "errors" are the OS's way of saying that the
                 // connection is not actually ready to perform this I/O operation.
                 Err(ref err) if would_block(err) => break,
-                // Got interrupted (how rude!), we'll try again.
-                // NOTE: that this is not the proper way to this as we'll also redo
-                // the writable side above.
-                Err(ref err) if interrupted(err) => {
-                    return handle_connection_event(poll, connection, event)
-                }
+                Err(ref err) if interrupted(err) => continue,
                 // Other errors we'll consider fatal.
                 Err(err) => return Err(err),
             }
