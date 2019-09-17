@@ -112,33 +112,36 @@ fn handle_connection_event(
     }
 
     if event.is_readable() {
+        let mut received_data = Vec::with_capacity(4056);
         // We can (maybe) read from the connection.
-        let mut buf = [0; 4096];
-        match connection.read(&mut buf) {
-            Ok(0) => {
-                // Reading 0 bytes means the other side has closed the
-                // connection or is done writing, then so are we.
-                println!("Connection closed");
-                return Ok(true);
-            }
-            Ok(n) => {
-                if let Ok(str_buf) = from_utf8(&buf[..n]) {
-                    println!("Received data: {}", str_buf.trim_end());
-                } else {
-                    println!("Received (none UTF-8) data: {:?}", &buf[..n]);
+        loop {
+            let mut buf = [0; 256];
+            match connection.read(&mut buf) {
+                Ok(0) => {
+                    // Reading 0 bytes means the other side has closed the
+                    // connection or is done writing, then so are we.
+                    println!("Connection closed");
+                    return Ok(true);
                 }
+                Ok(_n) => received_data.extend_from_slice(&buf),
+                // Would block "errors" are the OS's way of saying that the
+                // connection is not actually ready to perform this I/O operation.
+                Err(ref err) if would_block(err) => break,
+                // Got interrupted (how rude!), we'll try again.
+                // NOTE: that this is not the proper way to this as we'll also redo
+                // the writable side above.
+                Err(ref err) if interrupted(err) => {
+                    return handle_connection_event(poll, connection, event)
+                }
+                // Other errors we'll consider fatal.
+                Err(err) => return Err(err),
             }
-            // Would block "errors" are the OS's way of saying that the
-            // connection is not actually ready to perform this I/O operation.
-            Err(ref err) if would_block(err) => {}
-            // Got interrupted (how rude!), we'll try again.
-            // NOTE: that this is not the proper way to this as we'll also redo
-            // the writable side above.
-            Err(ref err) if interrupted(err) => {
-                return handle_connection_event(poll, connection, event)
-            }
-            // Other errors we'll consider fatal.
-            Err(err) => return Err(err),
+        }
+
+        if let Ok(str_buf) = from_utf8(&received_data) {
+            println!("Received data: {}", str_buf.trim_end());
+        } else {
+            println!("Received (none UTF-8) data: {:?}", &received_data);
         }
     }
 
