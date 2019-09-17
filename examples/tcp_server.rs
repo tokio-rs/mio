@@ -112,6 +112,7 @@ fn handle_connection_event(
     }
 
     if event.is_readable() {
+        let mut connection_closed = false;
         let mut received_data = Vec::with_capacity(4056);
         // We can (maybe) read from the connection.
         loop {
@@ -120,8 +121,8 @@ fn handle_connection_event(
                 Ok(0) => {
                     // Reading 0 bytes means the other side has closed the
                     // connection or is done writing, then so are we.
-                    println!("Connection closed");
-                    return Ok(true);
+                    connection_closed = true;
+                    break;
                 }
                 Ok(_n) => received_data.extend_from_slice(&buf),
                 // Would block "errors" are the OS's way of saying that the
@@ -142,6 +143,10 @@ fn handle_connection_event(
             println!("Received data: {}", str_buf.trim_end());
         } else {
             println!("Received (none UTF-8) data: {:?}", &received_data);
+        }
+
+        if connection_closed {
+            println!("Connection closed");
         }
     }
 
