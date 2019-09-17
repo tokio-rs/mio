@@ -147,6 +147,7 @@ fn handle_connection_event(
 
         if connection_closed {
             println!("Connection closed");
+            return Ok(true);
         }
     }
 
