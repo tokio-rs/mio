@@ -181,6 +181,14 @@ impl Event {
             &*(sys_event as *const sys::Event as *const Event)
         }
     }
+
+    /// Get the underlying system event.
+    ///
+    /// Only used in `list_event_details`.
+    #[cfg(test)]
+    pub fn sys(&self) -> &sys::Event {
+        &self.inner
+    }
 }
 
 impl fmt::Debug for Event {

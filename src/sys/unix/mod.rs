@@ -1,6 +1,10 @@
 /// Helper macro to execute a system call that returns an `io::Result`.
+///
+/// NOTE: this is not a part of the API, do not use!
 //
 // Macro must be defined before any modules that uses them.
+#[macro_export] // Used in `list_event_details`.
+#[doc(hidden)]
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
         let res = unsafe { libc::$fn($($arg, )*) };
