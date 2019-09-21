@@ -1,7 +1,7 @@
 use super::UnixStream;
-use crate::{Interests, Registry, Token, sys};
 use crate::event::Source;
 use crate::unix::SourceFd;
+use crate::{sys, Interests, Registry, Token};
 
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -30,23 +30,13 @@ impl UnixListener {
     }
 
     /// Accepts a new incoming connection to this listener.
+    ///
+    /// The call is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        let (std, addr) = sys::uds::accept(&self.std)?;
-        Ok((UnixStream::from_std(std), addr))
-        /*
-        let (std, addr) = self.accept_std()?;
-        // TODO: is there a way to accept w/ non-blocking
-        Ok((UnixStream::from_std(std), addr))
-        match self.accept_std()? {
-            Some((stream, addr)) => Ok(Some((UnixStream::from_stream(stream)?, addr))),
-            None => Ok(None),
-        }
-        */
-    }
-
-    /// Accepts a new incoming connection to this listener.
-    pub fn accept_std(&self) -> io::Result<(std::os::unix::net::UnixStream, SocketAddr)> {
-        self.std.accept()
+        self.std
+            .accept()
+            .map(|(stream, addr)| (UnixStream::from_std(stream), addr))
     }
 
     /// Creates a new independently owned handle to the underlying socket.
@@ -55,9 +45,7 @@ impl UnixListener {
     /// object references. Both handles can be used to accept incoming
     /// connections and options set on one listener will affect the other.
     pub fn try_clone(&self) -> io::Result<UnixListener> {
-        self.std.try_clone().map(|std| {
-            UnixListener { std }
-        })
+        self.std.try_clone().map(|std| UnixListener { std })
     }
 
     /// Returns the local socket address of this listener.
@@ -76,7 +64,12 @@ impl Source for UnixListener {
         SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn reregister(
+        &self,
+        registry: &Registry,
+        token: Token,
+        interests: Interests,
+    ) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
