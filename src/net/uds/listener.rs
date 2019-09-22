@@ -1,11 +1,12 @@
 use super::UnixStream;
 use crate::event::Source;
+use crate::unix::SocketAddr;
 use crate::unix::SourceFd;
 use crate::{sys, Interests, Registry, Token};
 
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net::SocketAddr;
+use std::os::unix::net;
 use std::path::Path;
 
 /// A non-blocking Unix domain socket server.
@@ -50,7 +51,7 @@ impl UnixListener {
     }
 
     /// Returns the local socket address of this listener.
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<net::SocketAddr> {
         self.std.local_addr()
     }
 

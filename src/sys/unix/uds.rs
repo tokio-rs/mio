@@ -3,9 +3,14 @@ use crate::sys::unix::net::new_socket;
 use std::cmp::Ordering;
 use std::io;
 use std::mem;
-use std::os::unix::net::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
+use std::os::unix::net::{UnixDatagram, UnixListener, UnixStream};
 use std::os::unix::prelude::*;
 use std::path::Path;
+
+pub struct SocketAddr {
+    addr: libc::sockaddr_un,
+    len: libc::socklen_t,
+}
 
 pub fn connect_stream(path: &Path) -> io::Result<UnixStream> {
     let socket = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
@@ -79,7 +84,7 @@ pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketA
     storage.sun_family = libc::AF_UNIX as libc::sa_family_t;
     let mut len = mem::size_of_val(&storage) as libc::socklen_t;
 
-    let raw_storage = &storage as *mut _ as *mut _;
+    let raw_storage = &mut storage as *mut _ as *mut _;
     let socket_type: libc::c_int = libc::SOCK_STREAM;
 
     #[cfg(any(
@@ -120,7 +125,7 @@ pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketA
     syscall!(fcntl(sock_addr, libc::F_SETFD, libc::FD_CLOEXEC))?;
 
     Ok(Some((
-        UnixStream::from_raw_fd(sock_addr),
+        unsafe { UnixStream::from_raw_fd(sock_addr) },
         SocketAddr { addr: storage, len },
     )))
 }

@@ -53,6 +53,7 @@ pub use self::sourcefd::SourceFd;
 pub use self::tcp_listener::TcpListener;
 pub use self::tcp_stream::TcpStream;
 pub use self::udp::UdpSocket;
+pub use self::uds::SocketAddr;
 pub use self::waker::Waker;
 
 pub type Events = Vec<Event>;
