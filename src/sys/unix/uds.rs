@@ -3,7 +3,7 @@ use crate::sys::unix::net::new_socket;
 use std::cmp::Ordering;
 use std::io;
 use std::mem;
-use std::os::unix::net::{UnixDatagram, UnixListener, UnixStream};
+use std::os::unix::net::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
 use std::os::unix::prelude::*;
 use std::path::Path;
 
@@ -74,6 +74,57 @@ pub fn bind_datagram(path: &Path) -> io::Result<UnixDatagram> {
     Ok(unsafe { UnixDatagram::from_raw_fd(socket) })
 }
 
+pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketAddr)>> {
+    let mut storage: libc::sockaddr_un = unsafe { mem::zeroed() };
+    storage.sun_family = libc::AF_UNIX as libc::sa_family_t;
+    let mut len = mem::size_of_val(&storage) as libc::socklen_t;
+
+    let raw_storage = &storage as *mut _ as *mut _;
+    let socket_type: libc::c_int = libc::SOCK_STREAM;
+
+    #[cfg(any(
+        target_os = "android",
+        target_os = "bitrig",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "linux",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "solaris"
+    ))]
+    let sock_addr = {
+        let flags = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+
+        match syscall!(accept4(
+            listener.into_raw_fd(),
+            raw_storage,
+            &mut len,
+            flags
+        )) {
+            Ok(sa) => sa,
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(None),
+            Err(e) => return Err(e),
+        }
+    };
+
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    let sock_addr = match syscall!(accept(listener.into_raw_fd(), raw_storage, &mut len,)) {
+        Ok(sa) => sa,
+        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(None),
+        Err(e) => return Err(e),
+    };
+
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    syscall!(fcntl(sock_addr, libc::F_SETFL, libc::O_NONBLOCK))?;
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    syscall!(fcntl(sock_addr, libc::F_SETFD, libc::FD_CLOEXEC))?;
+
+    Ok(Some((
+        UnixStream::from_raw_fd(sock_addr),
+        SocketAddr { addr: storage, len },
+    )))
+}
+
 // TODO(kleimkuhler): Duplicated from `pair_stream`... this can probably be
 // encapsulated by some `Stream::pair(socket_type: libc::c_int)`
 pub fn pair_datagram() -> io::Result<(UnixDatagram, UnixDatagram)> {
@@ -114,6 +165,7 @@ pub fn pair_datagram() -> io::Result<(UnixDatagram, UnixDatagram)> {
     })
 }
 
+// This can probably be better
 pub fn unbound_datagram() -> io::Result<UnixDatagram> {
     let socket = UnixDatagram::unbound()?;
     socket.set_nonblocking(true)?;

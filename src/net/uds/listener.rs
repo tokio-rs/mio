@@ -31,12 +31,13 @@ impl UnixListener {
 
     /// Accepts a new incoming connection to this listener.
     ///
-    /// The call is responsible for ensuring that the socket is in
+    /// The call is responsible for ensuring that the listening socket is in
     /// non-blocking mode.
-    pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        self.std
-            .accept()
-            .map(|(stream, addr)| (UnixStream::from_std(stream), addr))
+    pub fn accept(&self) -> io::Result<Option<(UnixStream, SocketAddr)>> {
+        match sys::uds::accept(&self.std)? {
+            Some((stream, addr)) => Ok(Some((UnixStream::from_std(stream), addr))),
+            None => Ok(None),
+        }
     }
 
     /// Creates a new independently owned handle to the underlying socket.
