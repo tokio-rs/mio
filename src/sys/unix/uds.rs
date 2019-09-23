@@ -1,7 +1,9 @@
 use crate::sys::unix::net::new_socket;
 
+use std::ascii;
 use std::cmp::Ordering;
 use std::ffi::OsStr;
+use std::fmt;
 use std::io;
 use std::mem;
 use std::os::unix::net::{UnixDatagram, UnixListener, UnixStream};
@@ -268,5 +270,26 @@ impl SocketAddr {
         } else {
             AddressKind::Pathname(OsStr::from_bytes(&path[..len - 1]).as_ref())
         }
+    }
+}
+
+impl fmt::Debug for SocketAddr {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.address() {
+            AddressKind::Unnamed => write!(fmt, "(unnamed)"),
+            AddressKind::Abstract(name) => write!(fmt, "{} (abstract)", AsciiEscaped(name)),
+            AddressKind::Pathname(path) => write!(fmt, "{:?} (pathname)", path),
+        }
+    }
+}
+struct AsciiEscaped<'a>(&'a [u8]);
+
+impl<'a> fmt::Display for AsciiEscaped<'a> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "\"")?;
+        for byte in self.0.iter().cloned().flat_map(ascii::escape_default) {
+            write!(fmt, "{}", byte as char)?;
+        }
+        write!(fmt, "\"")
     }
 }
