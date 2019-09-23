@@ -92,13 +92,11 @@ pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketA
     let mut storage: libc::sockaddr_un = unsafe { mem::zeroed() };
     storage.sun_family = libc::AF_UNIX as libc::sa_family_t;
     let mut len = mem::size_of_val(&storage) as libc::socklen_t;
-
     let raw_storage = &mut storage as *mut _ as *mut _;
-    let socket_type: libc::c_int = libc::SOCK_STREAM;
 
     #[cfg(not(any(target_os = "ios", target_os = "macos")))]
     let sock_addr = {
-        let flags = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+        let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
         match syscall!(accept4(listener.as_raw_fd(), raw_storage, &mut len, flags)) {
             Ok(sa) => sa,
