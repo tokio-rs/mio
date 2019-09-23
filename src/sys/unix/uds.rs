@@ -1,15 +1,30 @@
 use crate::sys::unix::net::new_socket;
 
 use std::cmp::Ordering;
+use std::ffi::OsStr;
 use std::io;
 use std::mem;
 use std::os::unix::net::{UnixDatagram, UnixListener, UnixStream};
 use std::os::unix::prelude::*;
 use std::path::Path;
 
+/// An address associated with a mio specific unix socket.
+///
+/// This is implemented instead of imported from [`net::SocketAddr`] because
+/// there is no way to create a [`net::SocketAddr`]. One must be returned by
+/// [`accept`], so this is returned instead.
+///
+/// [`net::SocketAddr`]: std::os::unix::net::SocketAddr
+/// [`accept`]: #method.accept
 pub struct SocketAddr {
     addr: libc::sockaddr_un,
     len: libc::socklen_t,
+}
+
+enum AddressKind<'a> {
+    Unnamed,
+    Pathname(&'a Path),
+    Abstract(&'a [u8]),
 }
 
 pub fn connect_stream(path: &Path) -> io::Result<UnixStream> {
@@ -35,19 +50,9 @@ pub fn connect_stream(path: &Path) -> io::Result<UnixStream> {
 pub fn pair_stream() -> io::Result<(UnixStream, UnixStream)> {
     let mut fds = [0, 0];
     let socket_type = libc::SOCK_STREAM;
-
-    #[cfg(any(
-        target_os = "android",
-        target_os = "bitrig",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "linux",
-        target_os = "netbsd",
-        target_os = "openbsd"
-    ))]
     let flags = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
-    // Gives a warning for platforms without SOCK_NONBLOCK.
+    // Gives a warning for platforms without SOCK_NONBLOCK or SOCK_CLOEXEC.
     syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
 
     // Darwin and Solaris don't have SOCK_NONBLOCK or SOCK_CLOEXEC.
@@ -62,6 +67,7 @@ pub fn pair_stream() -> io::Result<(UnixStream, UnixStream)> {
         syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
         syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
     }
+
     Ok(unsafe {
         (
             UnixStream::from_raw_fd(fds[0]),
@@ -87,25 +93,11 @@ pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketA
     let raw_storage = &mut storage as *mut _ as *mut _;
     let socket_type: libc::c_int = libc::SOCK_STREAM;
 
-    #[cfg(any(
-        target_os = "android",
-        target_os = "bitrig",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "linux",
-        target_os = "netbsd",
-        target_os = "openbsd",
-        target_os = "solaris"
-    ))]
+    #[cfg(not(any(target_os = "ios", target_os = "macos")))]
     let sock_addr = {
         let flags = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
-        match syscall!(accept4(
-            listener.into_raw_fd(),
-            raw_storage,
-            &mut len,
-            flags
-        )) {
+        match syscall!(accept4(listener.as_raw_fd(), raw_storage, &mut len, flags)) {
             Ok(sa) => sa,
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(None),
             Err(e) => return Err(e),
@@ -113,16 +105,17 @@ pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketA
     };
 
     #[cfg(any(target_os = "ios", target_os = "macos"))]
-    let sock_addr = match syscall!(accept(listener.into_raw_fd(), raw_storage, &mut len,)) {
+    let sock_addr = match syscall!(accept(listener.as_raw_fd(), raw_storage, &mut len,)) {
         Ok(sa) => sa,
         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(None),
         Err(e) => return Err(e),
     };
 
     #[cfg(any(target_os = "ios", target_os = "macos"))]
-    syscall!(fcntl(sock_addr, libc::F_SETFL, libc::O_NONBLOCK))?;
-    #[cfg(any(target_os = "ios", target_os = "macos"))]
-    syscall!(fcntl(sock_addr, libc::F_SETFD, libc::FD_CLOEXEC))?;
+    {
+        syscall!(fcntl(sock_addr, libc::F_SETFL, libc::O_NONBLOCK))?;
+        syscall!(fcntl(sock_addr, libc::F_SETFD, libc::FD_CLOEXEC))?;
+    }
 
     Ok(Some((
         unsafe { UnixStream::from_raw_fd(sock_addr) },
@@ -135,16 +128,6 @@ pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketA
 pub fn pair_datagram() -> io::Result<(UnixDatagram, UnixDatagram)> {
     let mut fds = [0, 0];
     let socket_type = libc::SOCK_DGRAM;
-
-    #[cfg(any(
-        target_os = "android",
-        target_os = "bitrig",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "linux",
-        target_os = "netbsd",
-        target_os = "openbsd"
-    ))]
     let flags = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
     // Gives a warning for platforms without SOCK_NONBLOCK.
@@ -162,6 +145,7 @@ pub fn pair_datagram() -> io::Result<(UnixDatagram, UnixDatagram)> {
         syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
         syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
     }
+
     Ok(unsafe {
         (
             UnixDatagram::from_raw_fd(fds[0]),
@@ -170,11 +154,9 @@ pub fn pair_datagram() -> io::Result<(UnixDatagram, UnixDatagram)> {
     })
 }
 
-// This can probably be better
 pub fn unbound_datagram() -> io::Result<UnixDatagram> {
-    let socket = UnixDatagram::unbound()?;
-    socket.set_nonblocking(true)?;
-    Ok(socket)
+    let socket = new_socket(libc::AF_UNIX, libc::SOCK_DGRAM)?;
+    Ok(unsafe { UnixDatagram::from_raw_fd(socket) })
 }
 
 pub fn bind_listener(path: &Path) -> io::Result<UnixListener> {
@@ -216,12 +198,13 @@ pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_
             }
             _ => {}
         }
+
         for (dst, src) in addr.sun_path.iter_mut().zip(bytes.iter()) {
             *dst = *src as libc::c_char;
         }
+
         // null byte for pathname addresses is already there because we zeroed the
         // struct
-
         let mut len = sun_path_offset() + bytes.len();
 
         match bytes.get(0) {
@@ -240,5 +223,50 @@ fn sun_path_offset() -> usize {
         let base = &addr as *const _ as usize;
         let path = &addr.sun_path as *const _ as usize;
         path - base
+    }
+}
+
+impl SocketAddr {
+    /// Returns `true` if the address is unnamed.
+    ///
+    /// Documentation reflected in [`SocketAddr`]
+    ///
+    /// [`SocketAddr`]: std::os::unix::net::SocketAddr
+    pub fn is_unnamed(&self) -> bool {
+        if let AddressKind::Unnamed = self.address() {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns the contents of this address if it is a `pathname` address.
+    ///
+    /// Documentation reflected in [`SocketAddr`]
+    ///
+    /// [`SocketAddr`]: std::os::unix::net::SocketAddr
+    pub fn as_pathname(&self) -> Option<&Path> {
+        if let AddressKind::Pathname(path) = self.address() {
+            Some(path)
+        } else {
+            None
+        }
+    }
+
+    fn address(&self) -> AddressKind<'_> {
+        let len = self.len as usize - sun_path_offset();
+        let path = unsafe { mem::transmute::<&[libc::c_char], &[u8]>(&self.addr.sun_path) };
+
+        // macOS seems to return a len of 16 and a zeroed sun_path for unnamed addresses
+        if len == 0
+            || (cfg!(not(any(target_os = "linux", target_os = "android")))
+                && self.addr.sun_path[0] == 0)
+        {
+            AddressKind::Unnamed
+        } else if self.addr.sun_path[0] == 0 {
+            AddressKind::Abstract(&path[1..len])
+        } else {
+            AddressKind::Pathname(OsStr::from_bytes(&path[..len - 1]).as_ref())
+        }
     }
 }
