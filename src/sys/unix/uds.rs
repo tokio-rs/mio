@@ -51,10 +51,11 @@ pub fn connect_stream(path: &Path) -> io::Result<UnixStream> {
 
 pub fn pair_stream() -> io::Result<(UnixStream, UnixStream)> {
     let mut fds = [0, 0];
-    let socket_type = libc::SOCK_STREAM;
-    let flags = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+    let flags = libc::SOCK_STREAM;
 
-    // Gives a warning for platforms without SOCK_NONBLOCK or SOCK_CLOEXEC.
+    #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
+    let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+
     syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
 
     // Darwin and Solaris don't have SOCK_NONBLOCK or SOCK_CLOEXEC.
@@ -129,10 +130,11 @@ pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketA
 // encapsulated by some `Stream::pair(socket_type: libc::c_int)`
 pub fn pair_datagram() -> io::Result<(UnixDatagram, UnixDatagram)> {
     let mut fds = [0, 0];
-    let socket_type = libc::SOCK_DGRAM;
-    let flags = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+    let flags = libc::SOCK_DGRAM;
 
-    // Gives a warning for platforms without SOCK_NONBLOCK.
+    #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
+    let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+
     syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
 
     // Darwin and Solaris don't have SOCK_NONBLOCK or SOCK_CLOEXEC.
