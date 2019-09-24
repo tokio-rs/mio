@@ -35,7 +35,7 @@ type Filter = u32;
     target_os = "macos"
 ))]
 type Data = libc::intptr_t;
-#[cfg(any(target_os = "bitrig", target_os = "netbsd", target_os = "openbsd",))]
+#[cfg(any(target_os = "netbsd", target_os = "openbsd"))]
 type Data = i64;
 
 // Type of the `udata` field in the `kevent` structure.

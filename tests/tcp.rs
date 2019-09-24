@@ -641,7 +641,6 @@ macro_rules! wait {
             for event in &events {
                 // Hup is only generated on kqueue platforms.
                 #[cfg(any(
-                    target_os = "bitrig",
                     target_os = "dragonfly",
                     target_os = "freebsd",
                     target_os = "ios",

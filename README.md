@@ -61,7 +61,6 @@ or higher-level libraries.
 Currently supported platforms:
 
 * Android
-* Bitrig
 * DragonFly BSD
 * FreeBSD
 * Linux

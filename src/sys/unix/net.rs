@@ -15,7 +15,6 @@ pub fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> io::Result<l
 pub fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::Result<libc::c_int> {
     #[cfg(any(
         target_os = "android",
-        target_os = "bitrig",
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "linux",

@@ -30,7 +30,6 @@
 //! Currently supported platforms:
 //!
 //! * Android
-//! * Bitrig
 //! * DragonFly BSD
 //! * FreeBSD
 //! * Linux
