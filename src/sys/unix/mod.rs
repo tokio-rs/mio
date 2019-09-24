@@ -19,7 +19,6 @@ mod epoll;
 pub use self::epoll::{event, Event, Selector};
 
 #[cfg(any(
-    target_os = "bitrig",
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "ios",
@@ -30,7 +29,6 @@ pub use self::epoll::{event, Event, Selector};
 mod kqueue;
 
 #[cfg(any(
-    target_os = "bitrig",
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "ios",

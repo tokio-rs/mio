@@ -159,7 +159,6 @@ use std::{fmt, io};
 /// |      OS       |  Selector |
 /// |---------------|-----------|
 /// | Android       | [epoll]   |
-/// | Bitrig        | [kqueue]  |
 /// | DragonFly BSD | [kqueue]  |
 /// | FreeBSD       | [kqueue]  |
 /// | Linux         | [epoll]   |
