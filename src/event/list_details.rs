@@ -18,6 +18,8 @@ use std::io;
 use std::os::unix::io::RawFd;
 use std::time::Duration;
 
+#[cfg(windows)]
+use crate::sys::afd;
 #[cfg(unix)]
 use crate::syscall;
 #[cfg(unix)]
@@ -32,7 +34,7 @@ const DATA: &[u8] = b"hello";
 
 #[test]
 #[cfg(not(windows))]
-#[ignore = "This is not a test, it just list event details"]
+#[ignore = "This is not a test, it just lists OS event details"]
 fn list_event_details() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(16);
@@ -140,7 +142,7 @@ fn print_event(desc: &str, events: &Events) {
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "solaris"))]
 fn event_data(result: &mut String, event: &sys::Event) {
     macro_rules! has_event {
-        ($($(#[$target: meta])* $event: ident ),+ $(,)*) => {
+        ($($(#[$target: meta])* $event: ident),+ $(,)*) => {
             $(
                 $(#[$target])*
                 {
@@ -184,7 +186,7 @@ fn event_data(result: &mut String, event: &sys::Event) {
 ))]
 fn event_data(result: &mut String, event: &sys::Event) {
     macro_rules! is_filter {
-        ($($(#[$target: meta])* $filter: ident ),+ $(,)*) => {
+        ($($(#[$target: meta])* $filter: ident),+ $(,)*) => {
             $(
                 $(#[$target])*
                 {
@@ -235,7 +237,7 @@ fn event_data(result: &mut String, event: &sys::Event) {
     );
 
     macro_rules! has_flag {
-        ($($(#[$target: meta])* $flag: ident ),+ $(,)*) => {
+        ($($(#[$target: meta])* $flag: ident),+ $(,)*) => {
             $(
                 $(#[$target])*
                 {
@@ -273,7 +275,7 @@ fn event_data(result: &mut String, event: &sys::Event) {
     );
 
     macro_rules! has_fflag {
-        ($($(#[$target: meta])* $fflag: ident ),+ $(,)*) => {
+        ($($(#[$target: meta])* $fflag: ident),+ $(,)*) => {
             $(
                 $(#[$target])*
                 #[allow(clippy::bad_bit_mask)] // Apparently some flags are zero.
@@ -422,6 +424,28 @@ fn event_data(result: &mut String, event: &sys::Event) {
 }
 
 #[cfg(windows)]
-fn event_data(_result: &mut String, _event: &sys::Event) {
-    unimplemented!()
+fn event_data(result: &mut String, event: &sys::Event) {
+    macro_rules! has_event {
+        ($($(#[$target: meta])* $event: ident),+ $(,)*) => {
+            $(
+                $(#[$target])*
+                {
+                    if event.flags & afd::$event != 0 {
+                        write!(result, "{}|", stringify!($event)).unwrap();
+                    }
+                }
+            )+
+        };
+    }
+
+    has_event!(
+        AFD_POLL_RECEIVE,
+        AFD_POLL_RECEIVE_EXPEDITED,
+        AFD_POLL_SEND,
+        AFD_POLL_DISCONNECT,
+        AFD_POLL_ABORT,
+        AFD_POLL_LOCAL_CLOSE,
+        AFD_POLL_ACCEPT,
+        AFD_POLL_CONNECT_FAIL,
+    );
 }

@@ -22,7 +22,7 @@ macro_rules! syscall {
     }};
 }
 
-mod afd;
+pub(crate) mod afd; // Used in `list_event_details`.
 pub mod event;
 mod io_status_block;
 mod selector;

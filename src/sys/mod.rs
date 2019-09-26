@@ -17,4 +17,7 @@ mod unix;
 pub use self::windows::{event, Event, Events, Selector, TcpListener, TcpStream, UdpSocket, Waker};
 
 #[cfg(windows)]
+pub(crate) use self::windows::afd; // Used in `list_event_details`.
+
+#[cfg(windows)]
 mod windows;
