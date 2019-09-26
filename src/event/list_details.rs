@@ -19,7 +19,7 @@ use std::sync::{Arc, Barrier};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use crate::net::{TcpListener, TcpStream};
+use crate::net::{TcpListener, TcpStream, UdpSocket};
 #[cfg(windows)]
 use crate::sys::afd;
 #[cfg(unix)]
@@ -43,6 +43,8 @@ fn list_event_details() {
     tcp_stream(&mut poll, &mut events).unwrap();
     println!();
     tcp_listener(&mut poll, &mut events).unwrap();
+    println!();
+    udp_socket(&mut poll, &mut events).unwrap();
     println!();
     #[cfg(unix)]
     unix_pipe(&mut poll, &mut events).unwrap();
@@ -165,6 +167,39 @@ fn tcp_listener(poll: &mut Poll, events: &mut Events) -> io::Result<()> {
         &listener,
         Interests::READABLE,
         "TcpListener incoming stream",
+        || Ok(()),
+        || Ok(()),
+    )?;
+
+    Ok(())
+}
+
+fn udp_socket(poll: &mut Poll, events: &mut Events) -> io::Result<()> {
+    let local = "127.0.0.1:7890".parse().unwrap();
+    let remote = "127.0.0.1:7891".parse().unwrap();
+
+    let socket = UdpSocket::bind(local)?;
+
+    register_and_print(
+        poll,
+        events,
+        &socket,
+        Interests::WRITABLE,
+        "UdpSocket writable",
+        || Ok(()),
+        || Ok(()),
+    )?;
+
+    let socket2 = UdpSocket::bind(remote)?;
+    wait_for_event(poll, events, &socket2, Interests::WRITABLE)?;
+    socket2.send_to(DATA, local)?;
+
+    register_and_print(
+        poll,
+        events,
+        &socket,
+        Interests::READABLE,
+        "UdpSocket readable",
         || Ok(()),
         || Ok(()),
     )?;
