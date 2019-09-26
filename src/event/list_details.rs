@@ -10,8 +10,6 @@
 // NOTE: this code is very ugly and doesn't do proper cleanup (closing of fds
 // etc.), only look at this when you want to know what **not** to do.
 
-#![cfg_attr(windows, allow(dead_code))]
-
 use std::fmt::Write as FmtWrite;
 use std::io::{self, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
@@ -21,7 +19,7 @@ use std::sync::{Arc, Barrier};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use crate::net::TcpStream;
+use crate::net::{TcpListener, TcpStream};
 #[cfg(windows)]
 use crate::sys::afd;
 #[cfg(unix)]
@@ -37,13 +35,15 @@ const TIMEOUT: Option<Duration> = Some(Duration::from_secs(1));
 const DATA: &[u8] = b"hello";
 
 #[test]
-#[cfg(not(windows))]
 #[ignore = "This is not a test, it just lists OS event details"]
 fn list_event_details() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(16);
 
     tcp_stream(&mut poll, &mut events).unwrap();
+    println!();
+    tcp_listener(&mut poll, &mut events).unwrap();
+    println!();
     #[cfg(unix)]
     unix_pipe(&mut poll, &mut events).unwrap();
 }
@@ -150,6 +150,26 @@ fn start_listener(address: SocketAddr, barrier: Arc<Barrier>) -> JoinHandle<io::
 
         Ok(())
     })
+}
+
+fn tcp_listener(poll: &mut Poll, events: &mut Events) -> io::Result<()> {
+    let address = "127.0.0.1:7890".parse().unwrap();
+    let listener = TcpListener::bind(address)?;
+
+    let stream = TcpStream::connect(address)?;
+    wait_for_event(poll, events, &stream, Interests::WRITABLE)?;
+
+    register_and_print(
+        poll,
+        events,
+        &listener,
+        Interests::READABLE,
+        "TcpListener incoming stream",
+        || Ok(()),
+        || Ok(()),
+    )?;
+
+    Ok(())
 }
 
 #[cfg(unix)]
