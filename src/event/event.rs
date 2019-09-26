@@ -186,7 +186,7 @@ impl Event {
     ///
     /// Only used in `list_event_details`.
     #[cfg(test)]
-    pub fn sys(&self) -> &sys::Event {
+    pub(crate) fn sys(&self) -> &sys::Event {
         &self.inner
     }
 }
