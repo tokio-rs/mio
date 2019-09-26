@@ -12,12 +12,16 @@
 
 #![cfg_attr(windows, allow(dead_code))]
 
-use std::fmt::Write;
-use std::io;
+use std::fmt::Write as FmtWrite;
+use std::io::{self, Read, Write};
+use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
+use std::sync::{Arc, Barrier};
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use crate::net::TcpStream;
 #[cfg(windows)]
 use crate::sys::afd;
 #[cfg(unix)]
@@ -38,8 +42,114 @@ const DATA: &[u8] = b"hello";
 fn list_event_details() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(16);
+
+    tcp_stream(&mut poll, &mut events).unwrap();
     #[cfg(unix)]
     unix_pipe(&mut poll, &mut events).unwrap();
+}
+
+fn tcp_stream(poll: &mut Poll, events: &mut Events) -> io::Result<()> {
+    let remote = "127.0.0.1:7890".parse().unwrap();
+    let barrier = Arc::new(Barrier::new(2));
+    let handle = start_listener(remote, barrier.clone());
+
+    let stream = TcpStream::connect(remote)?;
+
+    register_and_print(
+        poll,
+        events,
+        &stream,
+        Interests::WRITABLE,
+        "TcpStream connected and writable",
+        || Ok(()),
+        || (&stream).write(DATA), // Setup readable below.
+    )?;
+
+    register_and_print(
+        poll,
+        events,
+        &stream,
+        Interests::READABLE,
+        "TcpStream readable",
+        || Ok(()), // Listener will write to the connection.
+        || Ok(()),
+    )?;
+
+    register_and_print(
+        poll,
+        events,
+        &stream,
+        Interests::READABLE,
+        "TcpStream shutdown reading side",
+        || stream.shutdown(Shutdown::Read),
+        || Ok(()),
+    )?;
+
+    register_and_print(
+        poll,
+        events,
+        &stream,
+        Interests::WRITABLE,
+        "TcpStream shutdown writing side",
+        || stream.shutdown(Shutdown::Write),
+        || Ok(()),
+    )?;
+
+    // Unblock the first connection.
+    barrier.wait();
+    drop(stream);
+
+    // Open another clean connection.
+    let stream = TcpStream::connect(remote)?;
+    wait_for_event(poll, events, &stream, Interests::WRITABLE)?;
+
+    register_and_print(
+        poll,
+        events,
+        &stream,
+        Interests::READABLE | Interests::WRITABLE,
+        "TcpStream shutdown both sides",
+        || stream.shutdown(Shutdown::Both),
+        || Ok(()),
+    )?;
+
+    register_and_print(
+        poll,
+        events,
+        &stream,
+        Interests::READABLE | Interests::WRITABLE,
+        "TcpStream remote closed",
+        || Ok(barrier.wait()), // Unblock closing of the connection.
+        || Ok(()),
+    )?;
+
+    handle
+        .join()
+        .expect("failed to join the listener thread")
+        .expect("I/O error in listener thread");
+    Ok(())
+}
+
+fn start_listener(address: SocketAddr, barrier: Arc<Barrier>) -> JoinHandle<io::Result<()>> {
+    thread::spawn(move || {
+        let listener = net::TcpListener::bind(address)?;
+
+        let (mut stream, _) = listener.accept()?;
+        let mut buf = [0; 20];
+        let read = stream.read(&mut buf)?;
+        let written = stream.write(&buf[..read])?;
+        assert_eq!(read, written);
+
+        barrier.wait();
+        drop(stream);
+
+        let (stream, _) = listener.accept()?;
+
+        barrier.wait();
+        drop(stream);
+
+        Ok(())
+    })
 }
 
 #[cfg(unix)]
@@ -100,6 +210,23 @@ fn unix_pipe(poll: &mut Poll, events: &mut Events) -> io::Result<()> {
     })
 }
 
+/// Waits for a single event to be returned, used to wait for sockets to
+/// connect.
+fn wait_for_event<S>(
+    poll: &mut Poll,
+    events: &mut Events,
+    source: &S,
+    interests: Interests,
+) -> io::Result<()>
+where
+    S: event::Source,
+{
+    poll.registry().register(source, TOKEN, interests)?;
+    poll.poll(events, TIMEOUT)?;
+    assert!(!events.is_empty(), "Expected an event, but got none");
+    poll.registry().deregister(source)
+}
+
 /// Registers the `source`, calls `create_event` to create events, polls for the
 /// events and print them. Finally it deregisters the source and calls
 /// `cleanup`.
@@ -131,12 +258,14 @@ where
 
 fn print_event(desc: &str, events: &Events) {
     assert!(!events.is_empty());
+    let mut result = String::new();
+    write!(result, "{}: ", desc).unwrap();
     for event in events {
-        let mut result = String::new();
-        write!(result, "{}: ", desc).unwrap(); // alignment
+        write!(result, "\n\t").unwrap();
         event_data(&mut result, event.sys());
-        println!("{}", result);
+        result.pop(); // Remove last `|`.
     }
+    println!("{}", result);
 }
 
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "solaris"))]
