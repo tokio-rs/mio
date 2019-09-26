@@ -55,6 +55,8 @@ fn tcp_stream(poll: &mut Poll, events: &mut Events) -> io::Result<()> {
     let barrier = Arc::new(Barrier::new(2));
     let handle = start_listener(remote, barrier.clone());
 
+    // Ensure the listener is bound.
+    barrier.wait();
     let stream = TcpStream::connect(remote)?;
 
     register_and_print(
@@ -135,8 +137,11 @@ fn tcp_stream(poll: &mut Poll, events: &mut Events) -> io::Result<()> {
 fn start_listener(address: SocketAddr, barrier: Arc<Barrier>) -> JoinHandle<io::Result<()>> {
     thread::spawn(move || {
         let listener = net::TcpListener::bind(address)?;
+        // Unblock the connecting of the stream.
+        barrier.wait();
 
         let (mut stream, _) = listener.accept()?;
+
         let mut buf = [0; 20];
         let read = stream.read(&mut buf)?;
         let written = stream.write(&buf[..read])?;
