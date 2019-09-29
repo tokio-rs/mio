@@ -34,10 +34,10 @@ impl UnixListener {
     ///
     /// The call is responsible for ensuring that the listening socket is in
     /// non-blocking mode.
-    pub fn accept(&self) -> io::Result<Option<(UnixStream, SocketAddr)>> {
-        match sys::uds::accept(&self.std)? {
-            Some((stream, addr)) => Ok(Some((UnixStream::from_std(stream), addr))),
-            None => Ok(None),
+    pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
+        match sys::uds::accept(&self.std) {
+            Ok((stream, addr)) => Ok((UnixStream::from_std(stream), addr)),
+            Err(e) => Err(e),
         }
     }
 

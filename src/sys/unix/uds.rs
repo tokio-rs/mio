@@ -88,7 +88,8 @@ pub fn bind_datagram(path: &Path) -> io::Result<UnixDatagram> {
     Ok(unsafe { UnixDatagram::from_raw_fd(socket) })
 }
 
-pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketAddr)>> {
+// pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketAddr)>> {
+pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
     let mut storage: libc::sockaddr_un = unsafe { mem::zeroed() };
     storage.sun_family = libc::AF_UNIX as libc::sa_family_t;
     let mut len = mem::size_of_val(&storage) as libc::socklen_t;
@@ -100,7 +101,6 @@ pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketA
 
         match syscall!(accept4(listener.as_raw_fd(), raw_storage, &mut len, flags)) {
             Ok(sa) => sa,
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(None),
             Err(e) => return Err(e),
         }
     };
@@ -118,10 +118,10 @@ pub fn accept(listener: &UnixListener) -> io::Result<Option<(UnixStream, SocketA
         syscall!(fcntl(sock_addr, libc::F_SETFD, libc::FD_CLOEXEC))?;
     }
 
-    Ok(Some((
+    Ok((
         unsafe { UnixStream::from_raw_fd(sock_addr) },
         SocketAddr { addr: storage, len },
-    )))
+    ))
 }
 
 // TODO(kleimkuhler): Duplicated from `pair_stream`... this can probably be
