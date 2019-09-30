@@ -1,8 +1,8 @@
-use crate::{Interests, Registry, Token, sys};
 use crate::event::Source;
 use crate::unix::SourceFd;
+use crate::{sys, Interests, Registry, Token};
 
-use std::io;
+use std::io::{self, IoSlice, IoSliceMut};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::SocketAddr;
@@ -44,9 +44,7 @@ impl UnixStream {
     /// data, and options set on one stream will be propogated to the other
     /// stream.
     pub fn try_clone(&self) -> io::Result<UnixStream> {
-        self.std.try_clone().map(|std| {
-            UnixStream { std }
-        })
+        self.std.try_clone().map(|std| UnixStream { std })
     }
 
     /// Returns the socket address of the local half of this connection.
@@ -79,7 +77,12 @@ impl Source for UnixStream {
         SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn reregister(
+        &self,
+        registry: &Registry,
+        token: Token,
+        interests: Interests,
+    ) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
@@ -92,17 +95,29 @@ impl io::Read for UnixStream {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
         self.std.read(dst)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        (&self.std).read_vectored(bufs)
+    }
 }
 
 impl<'a> io::Read for &'a UnixStream {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
         (&self.std).read(dst)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        (&self.std).read_vectored(bufs)
+    }
 }
 
 impl io::Write for UnixStream {
     fn write(&mut self, src: &[u8]) -> io::Result<usize> {
         self.std.write(src)
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        (&self.std).write_vectored(bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -113,6 +128,10 @@ impl io::Write for UnixStream {
 impl<'a> io::Write for &'a UnixStream {
     fn write(&mut self, src: &[u8]) -> io::Result<usize> {
         (&self.std).write(src)
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        (&self.std).write_vectored(bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
