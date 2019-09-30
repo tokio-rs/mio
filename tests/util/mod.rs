@@ -12,6 +12,28 @@ use log::{error, warn};
 use mio::event::Event;
 use mio::{Events, Interests, Poll, Token};
 
+// TODO: replace w/ assertive
+// https://github.com/carllerche/assertive
+macro_rules! assert_ok {
+    ($e:expr) => {
+        assert_ok!($e,)
+    };
+    ($e:expr,) => {{
+        use std::result::Result::*;
+        match $e {
+            Ok(v) => v,
+            Err(e) => panic!("assertion failed: error = {:?}", e),
+        }
+    }};
+    ($e:expr, $($arg:tt)+) => {{
+        use std::result::Result::*;
+        match $e {
+            Ok(v) => v,
+            Err(e) => panic!("assertion failed: error = {:?}: {}", e, format_args!($($arg)+)),
+        }
+    }};
+}
+
 pub fn init() {
     static INIT: Once = Once::new();
 
