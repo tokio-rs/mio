@@ -261,7 +261,7 @@ impl SocketAddr {
     fn address(&self) -> AddressKind<'_> {
         let len = self.len as usize - sun_path_offset();
         let path = unsafe {
-            std::slice::from_raw_parts(&self.addr.sun_path as *const [i8; 108] as *const u8, 108)
+            std::slice::from_raw_parts(&self.addr.sun_path as *const i8 as *const u8, 108)
         };
 
         // macOS seems to return a len of 16 and a zeroed sun_path for unnamed addresses
