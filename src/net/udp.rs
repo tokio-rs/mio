@@ -237,8 +237,6 @@ impl UdpSocket {
     /// Receives data from the socket, without removing it from the input queue.
     /// On success, returns the number of bytes read and the address from whence
     /// the data came.
-    /// Receives data from the socket. On success, returns the number of bytes
-    /// read and the address from whence the data came.
     ///
     /// # Examples
     ///
