@@ -210,7 +210,7 @@ fn test_graceful_shutdown() {
 #[test]
 fn test_abrupt_shutdown() {
     use net2::TcpStreamExt;
-    use std::io::{self, Read, Write};
+    use std::io::Read;
 
     let mut poll = TestPoll::new();
     let mut buf = [0; 1024];
@@ -224,7 +224,7 @@ fn test_abrupt_shutdown() {
                   Ready::readable() | Ready::writable(),
                   PollOpt::edge());
 
-    let (mut socket, _) = assert_ok!(listener.accept());
+    let (socket, _) = assert_ok!(listener.accept());
     assert_ok!(socket.set_linger(Some(Duration::from_millis(0))));
     // assert_ok!(socket.set_linger(None));
 
