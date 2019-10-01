@@ -1,6 +1,6 @@
-use crate::{Interests, Registry, Token, sys};
 use crate::event::Source;
 use crate::unix::SourceFd;
+use crate::{sys, Interests, Registry, Token};
 
 use std::io;
 use std::net::Shutdown;
@@ -52,9 +52,7 @@ impl UnixDatagram {
     /// object references. Both handles can be used to accept incoming
     /// connections and options set on one listener will affect the other.
     pub fn try_clone(&self) -> io::Result<UnixDatagram> {
-        self.std.try_clone().map(|std| {
-            UnixDatagram { std }
-        })
+        self.std.try_clone().map(|std| UnixDatagram { std })
     }
 
     /// Returns the address of this socket.
@@ -121,7 +119,12 @@ impl Source for UnixDatagram {
         SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn reregister(
+        &self,
+        registry: &Registry,
+        token: Token,
+        interests: Interests,
+    ) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
