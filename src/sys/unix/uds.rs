@@ -106,9 +106,8 @@ pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
     };
 
     #[cfg(any(target_os = "ios", target_os = "macos"))]
-    let sock_addr = match syscall!(accept(listener.as_raw_fd(), raw_storage, &mut len,)) {
+    let sock_addr = match syscall!(accept(listener.as_raw_fd(), raw_storage, &mut len)) {
         Ok(sa) => sa,
-        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(None),
         Err(e) => return Err(e),
     };
 
