@@ -212,6 +212,7 @@ fn connect() {
 
     assert_ok!(handle.join());
 }
+
 #[test]
 fn try_clone() {
     let (mut poll, mut events) = init_with_poll();
