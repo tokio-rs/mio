@@ -79,7 +79,12 @@ pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
     let mut len = mem::size_of_val(&storage) as libc::socklen_t;
     let raw_storage = &mut storage as *mut _ as *mut _;
 
-    #[cfg(not(any(target_os = "ios", target_os = "macos")))]
+    #[cfg(not(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "solaris"
+    )))]
     let sock_addr = {
         let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
@@ -89,13 +94,23 @@ pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
         }
     };
 
-    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "solaris"
+    ))]
     let sock_addr = match syscall!(accept(listener.as_raw_fd(), raw_storage, &mut len)) {
         Ok(sa) => sa,
         Err(e) => return Err(e),
     };
 
-    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "solaris"
+    ))]
     {
         syscall!(fcntl(sock_addr, libc::F_SETFL, libc::O_NONBLOCK))?;
         syscall!(fcntl(sock_addr, libc::F_SETFD, libc::FD_CLOEXEC))?;
@@ -206,8 +221,10 @@ fn pair_descriptors(mut fds: [i32; 2], flags: i32) -> io::Result<()> {
 
 fn sun_path_offset() -> usize {
     unsafe {
-        // Work with an actual instance of the type since using a null pointer is UB
-        let addr: libc::sockaddr_un = mem::uninitialized();
+        // Work with an actual instance of the type since using a null pointer
+        // is UB. We can assume initialized data here because the only thing
+        // being calculated is a struct field offset.
+        let addr: libc::sockaddr_un = mem::MaybeUninit::uninit().assume_init();
         let base = &addr as *const _ as usize;
         let path = &addr.sun_path as *const _ as usize;
         path - base
@@ -243,7 +260,9 @@ impl SocketAddr {
 
     fn address(&self) -> AddressKind<'_> {
         let len = self.len as usize - sun_path_offset();
-        let path = unsafe { mem::transmute::<&[libc::c_char], &[u8]>(&self.addr.sun_path) };
+        let path = unsafe {
+            std::slice::from_raw_parts(&self.addr.sun_path as *const [i8; 108] as *const u8, 108)
+        };
 
         // macOS seems to return a len of 16 and a zeroed sun_path for unnamed addresses
         if len == 0

@@ -1,3 +1,4 @@
+#![cfg(target_os = "unix")]
 #[macro_use]
 mod util;
 
