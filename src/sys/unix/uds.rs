@@ -50,26 +50,10 @@ pub fn connect_stream(path: &Path) -> io::Result<UnixStream> {
 }
 
 pub fn pair_stream() -> io::Result<(UnixStream, UnixStream)> {
-    let mut fds = [0, 0];
+    let fds = [0, 0];
     let flags = libc::SOCK_STREAM;
 
-    #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
-    let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-
-    syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
-
-    // Darwin and Solaris don't have SOCK_NONBLOCK or SOCK_CLOEXEC.
-    //
-    // For platforms that don't support flags in `socket`, the flags must be
-    // set through `fcntl`. The `F_SETFL` command sets the `O_NONBLOCK` bit.
-    // The `F_SETFD` command sets the `FD_CLOEXEC` bit.
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
-    {
-        syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
-        syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
-        syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
-        syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
-    }
+    pair_descriptors(fds, flags)?;
 
     Ok(unsafe {
         (
@@ -123,29 +107,11 @@ pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
     ))
 }
 
-// TODO(kleimkuhler): Duplicated from `pair_stream`... this can probably be
-// encapsulated by some `Stream::pair(socket_type: libc::c_int)`
 pub fn pair_datagram() -> io::Result<(UnixDatagram, UnixDatagram)> {
-    let mut fds = [0, 0];
+    let fds = [0, 0];
     let flags = libc::SOCK_DGRAM;
 
-    #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
-    let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-
-    syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
-
-    // Darwin and Solaris don't have SOCK_NONBLOCK or SOCK_CLOEXEC.
-    //
-    // For platforms that don't support flags in `socket`, the flags must be
-    // set through `fcntl`. The `F_SETFL` command sets the `O_NONBLOCK` bit.
-    // The `F_SETFD` command sets the `FD_CLOEXEC` bit.
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
-    {
-        syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
-        syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
-        syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
-        syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
-    }
+    pair_descriptors(fds, flags)?;
 
     Ok(unsafe {
         (
@@ -215,6 +181,27 @@ pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_
 
         Ok((addr, len as libc::socklen_t))
     }
+}
+
+fn pair_descriptors(mut fds: [i32; 2], flags: i32) -> io::Result<()> {
+    #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
+    let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+
+    syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
+
+    // Darwin and Solaris don't have SOCK_NONBLOCK or SOCK_CLOEXEC.
+    //
+    // For platforms that don't support flags in `socket`, the flags must be
+    // set through `fcntl`. The `F_SETFL` command sets the `O_NONBLOCK` bit.
+    // The `F_SETFD` command sets the `FD_CLOEXEC` bit.
+    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
+    {
+        syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
+        syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
+        syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
+        syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
+    }
+    Ok(())
 }
 
 fn sun_path_offset() -> usize {
