@@ -8,7 +8,6 @@ use std::net::Shutdown;
 #[cfg(unix)]
 use std::os::unix::net::SocketAddr;
 use std::sync::mpsc::{channel, Receiver};
-use std::sync::{Arc, Barrier};
 use std::thread;
 use tempdir::TempDir;
 use util::{
@@ -16,15 +15,15 @@ use util::{
     ExpectEvent, TryRead, TryWrite,
 };
 
-const DATA1: &[u8] = b"Hello world!";
-const DATA2: &[u8] = b"Hello mars!";
+const DATA1: &[u8] = b"Hello same host!";
+const DATA2: &[u8] = b"Why hello mio!";
 
-const DATA1_LEN: usize = 12;
-const DATA2_LEN: usize = 11;
+const DEFAULT_BUF_SIZE: usize = 64;
+const DATA1_LEN: usize = 16;
+const DATA2_LEN: usize = 14;
 
 const LOCAL: Token = Token(0);
-const REMOTE: Token = Token(1);
-const LOCAL_CLONE: Token = Token(2);
+const LOCAL_CLONE: Token = Token(1);
 
 #[test]
 fn smoke_test() {
@@ -49,16 +48,11 @@ fn smoke_test() {
         vec![ExpectEvent::new(LOCAL, Interests::WRITABLE)],
     );
 
-    let mut buf = [0; 64];
+    let mut buf = [0; DEFAULT_BUF_SIZE];
     assert_would_block(local.read(&mut buf));
 
-    let (mut read, mut written) = (0, 0);
-    while written < DATA1_LEN {
-        if let Some(amount) = assert_ok!(local.try_write(&DATA1)) {
-            written += amount;
-        }
-    }
-    assert_eq!(written, DATA1_LEN);
+    let wrote = assert_ok!(local.write(&DATA1));
+    assert_eq!(wrote, DATA1_LEN);
     assert_ok!(local.flush());
 
     expect_events(
@@ -67,20 +61,16 @@ fn smoke_test() {
         vec![ExpectEvent::new(LOCAL, Interests::READABLE)],
     );
 
-    while read < DATA1_LEN {
-        if let Some(amount) = assert_ok!(local.try_read(&mut buf)) {
-            read += amount;
-        }
-    }
+    let read = assert_ok!(local.read(&mut buf));
     assert_eq!(read, DATA1_LEN);
     assert_eq!(&buf[..read], DATA1);
-    assert_eq!(read, written, "unequal reads and writes");
+    assert_eq!(read, wrote, "unequal reads and writes");
 
     assert!(assert_ok!(local.take_error()).is_none());
 
     let bufs = [IoSlice::new(&DATA1), IoSlice::new(&DATA2)];
-    let written = assert_ok!(local.write_vectored(&bufs));
-    assert_eq!(written, DATA1_LEN + DATA2_LEN);
+    let wrote = assert_ok!(local.write_vectored(&bufs));
+    assert_eq!(wrote, DATA1_LEN + DATA2_LEN);
 
     expect_events(
         &mut poll,
@@ -95,7 +85,9 @@ fn smoke_test() {
     assert_eq!(read, DATA1_LEN + DATA2_LEN);
     assert_eq!(&buf1, DATA1);
     assert_eq!(&buf2[..DATA2.len()], DATA2);
-    assert_eq!(buf2[DATA2.len()], 2); // Last byte should be unchanged.
+
+    // Last byte should be unchanged
+    assert_eq!(buf2[DATA2.len()], 2);
 
     // Close the connection to allow the remote to shutdown
     drop(local);
@@ -217,6 +209,7 @@ fn connect() {
         &mut events,
         vec![ExpectEvent::new(LOCAL, Interests::READABLE)],
     );
+
     assert_ok!(handle.join());
 }
 #[test]
@@ -240,16 +233,11 @@ fn try_clone() {
         vec![ExpectEvent::new(LOCAL, Interests::WRITABLE)],
     );
 
-    let mut buf = [0; 64];
-    let mut written = 0;
-    while written < DATA1_LEN {
-        if let Some(amount) = assert_ok!(local_1.try_write(&DATA1)) {
-            written += amount;
-        }
-    }
-    assert_eq!(written, DATA1_LEN);
+    let mut buf = [0; DEFAULT_BUF_SIZE];
+    let wrote = assert_ok!(local_1.write(&DATA1));
+    assert_eq!(wrote, DATA1_LEN);
 
-    let mut local_2 = local_1.try_clone().unwrap();
+    let mut local_2 = assert_ok!(local_1.try_clone());
 
     // When using `try_clone` the `TcpStream` needs to be deregistered!
     assert_ok!(poll.registry().deregister(&local_1));
@@ -265,18 +253,13 @@ fn try_clone() {
         vec![ExpectEvent::new(LOCAL_CLONE, Interests::READABLE)],
     );
 
-    let mut read = 0;
-    while read < DATA1_LEN {
-        if let Some(amount) = assert_ok!(local_2.try_read(&mut buf)) {
-            read += amount;
-        }
-    }
+    let read = assert_ok!(local_2.read(&mut buf));
     assert_eq!(read, DATA1_LEN);
     assert_eq!(&buf[..read], DATA1);
 
     // Close the connection to allow the remote to shutdown
     drop(local_2);
-    handle.join().expect("unable to join thread");
+    assert_ok!(handle.join());
 }
 
 #[test]
@@ -311,7 +294,7 @@ fn shutdown_read() {
         vec![ExpectEvent::new(LOCAL, Interests::READABLE)],
     );
 
-    local.shutdown(Shutdown::Read).unwrap();
+    assert_ok!(local.shutdown(Shutdown::Read));
 
     // Shutting down the reading side is different on each platform. For example
     // on Linux based systems we can still read.
@@ -324,7 +307,7 @@ fn shutdown_read() {
         target_os = "openbsd"
     ))]
     {
-        let mut buf = [0; 64];
+        let mut buf = [0; DEFAULT_BUF_SIZE];
         let read = assert_ok!(local.read(&mut buf));
         assert_eq!(read, 0);
     }
@@ -371,15 +354,14 @@ fn shutdown_write() {
     let err = assert_err!(local.write(DATA2));
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
 
-    // FIXME: we don't always receive the following event.
     expect_events(
         &mut poll,
         &mut events,
         vec![ExpectEvent::new(LOCAL, Interests::READABLE)],
     );
 
-    // Read should be ok.
-    let mut buf = [0; 64];
+    // Read should be ok
+    let mut buf = [0; DEFAULT_BUF_SIZE];
     let read = assert_ok!(local.read(&mut buf));
     assert_eq!(read, DATA1_LEN);
     assert_eq!(&buf[..read], DATA1);
@@ -434,7 +416,7 @@ fn shutdown_both() {
         target_os = "openbsd"
     ))]
     {
-        let mut buf = [0; 64];
+        let mut buf = [0; DEFAULT_BUF_SIZE];
         let read = assert_ok!(local.read(&mut buf));
         assert_eq!(read, 0);
     }
@@ -470,7 +452,7 @@ fn echo_remote(
             // error when the reading side of the peer connection is
             // shutdown, we don't consider it an actual here.
             let (mut read, mut written) = (0, 0);
-            let mut buf = [0; 64];
+            let mut buf = [0; DEFAULT_BUF_SIZE];
             loop {
                 let n = match local.try_read(&mut buf) {
                     Ok(Some(amount)) => {
@@ -489,31 +471,6 @@ fn echo_remote(
                 };
             }
             assert_eq!(read, written, "unequal reads and writes");
-        }
-    });
-    (handle, assert_ok!(addr_receiver.recv()))
-}
-
-fn _start_remote(
-    connections: usize,
-    sync_receiver: Receiver<()>,
-    barrier: Option<Arc<Barrier>>,
-) -> (thread::JoinHandle<()>, SocketAddr) {
-    let (addr_sender, addr_receiver) = channel();
-    let handle = thread::spawn(move || {
-        let dir = assert_ok!(TempDir::new("uds"));
-        let path = dir.path().join("foo");
-        let remote = assert_ok!(UnixListener::bind(path.clone()));
-        let local_address = assert_ok!(remote.local_addr());
-        assert_ok!(addr_sender.send(local_address));
-
-        for _ in 0..connections {
-            assert_ok!(sync_receiver.recv());
-            let (_local, _) = assert_ok!(remote.accept());
-            if let Some(ref barrier) = barrier {
-                barrier.wait();
-            }
-            drop(_local);
         }
     });
     (handle, assert_ok!(addr_receiver.recv()))
