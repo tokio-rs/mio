@@ -14,6 +14,7 @@ use mio::{Events, Interests, Poll, Token};
 
 // TODO: replace w/ assertive
 // https://github.com/carllerche/assertive
+#[macro_export]
 macro_rules! assert_ok {
     ($e:expr) => {
         assert_ok!($e,)
@@ -34,6 +35,7 @@ macro_rules! assert_ok {
     }};
 }
 
+#[macro_export]
 macro_rules! assert_err {
     ($e:expr) => {
         assert_err!($e,);
