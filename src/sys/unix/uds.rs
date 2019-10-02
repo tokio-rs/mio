@@ -71,10 +71,19 @@ pub fn bind_datagram(path: &Path) -> io::Result<UnixDatagram> {
 }
 
 pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
-    let mut sockaddr = libc::sockaddr_un {
-        sun_family: libc::AF_UNIX as libc::sa_family_t,
-        sun_path: [0; 108],
-    };
+    let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
+
+    // This is safe to assume because a `libc::sockaddr_un` filled with `0`
+    // bytes is properly initialized.
+    //
+    // `0` is a valid value for `sockaddr_un::sun_family`; it is
+    // `libc::AF_UNSPEC`.
+    //
+    // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
+    // abstract path.
+    let mut sockaddr = unsafe { sockaddr.assume_init() };
+
+    sockaddr.sun_family = libc::AF_UNIX as libc::sa_family_t;
     let mut socklen = mem::size_of_val(&sockaddr) as libc::socklen_t;
 
     #[cfg(not(any(
@@ -153,10 +162,19 @@ pub fn bind_listener(path: &Path) -> io::Result<UnixListener> {
 }
 
 pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
-    let mut sockaddr = libc::sockaddr_un {
-        sun_family: libc::AF_UNIX as libc::sa_family_t,
-        sun_path: [0; 108],
-    };
+    let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
+
+    // This is safe to assume because a `libc::sockaddr_un` filled with `0`
+    // bytes is properly initialized.
+    //
+    // `0` is a valid value for `sockaddr_un::sun_family`; it is
+    // `libc::AF_UNSPEC`.
+    //
+    // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
+    // abstract path.
+    let mut sockaddr = unsafe { sockaddr.assume_init() };
+
+    sockaddr.sun_family = libc::AF_UNIX as libc::sa_family_t;
 
     let bytes = path.as_os_str().as_bytes();
     match (bytes.get(0), bytes.len().cmp(&sockaddr.sun_path.len())) {
