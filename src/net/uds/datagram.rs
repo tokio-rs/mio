@@ -1,4 +1,6 @@
 use crate::event::Source;
+#[cfg(debug_assertions)]
+use crate::poll::SelectorId;
 use crate::unix::SourceFd;
 use crate::{sys, Interests, Registry, Token};
 
@@ -12,13 +14,19 @@ use std::path::Path;
 #[derive(Debug)]
 pub struct UnixDatagram {
     std: std::os::unix::net::UnixDatagram,
+    #[cfg(debug_assertions)]
+    selector_id: SelectorId,
 }
 
 impl UnixDatagram {
     /// Creates a Unix datagram socket bound to the given path.
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixDatagram> {
         let std = sys::uds::bind_datagram(path.as_ref())?;
-        Ok(UnixDatagram { std })
+        Ok(UnixDatagram {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        })
     }
 
     /// Converts a `std` `UnixDatagram` to a `mio` `UnixDatagram`.
@@ -26,13 +34,21 @@ impl UnixDatagram {
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     pub fn from_std(std: std::os::unix::net::UnixDatagram) -> UnixDatagram {
-        UnixDatagram { std }
+        UnixDatagram {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Creates a Unix Datagram socket which is not bound to any address.
     pub fn unbound() -> io::Result<UnixDatagram> {
         let std = sys::uds::unbound_datagram()?;
-        Ok(UnixDatagram { std })
+        Ok(UnixDatagram {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        })
     }
 
     /// Create an unnamed pair of connected sockets.
@@ -146,8 +162,16 @@ impl IntoRawFd for UnixDatagram {
 }
 
 impl FromRawFd for UnixDatagram {
+    /// Converts a `std` `RawFd` to a `mio` `UnixDatagram`.
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixDatagram {
         let std = std::os::unix::net::UnixDatagram::from_raw_fd(fd);
-        UnixDatagram { std }
+        UnixDatagram {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 }

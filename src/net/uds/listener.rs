@@ -1,5 +1,7 @@
 use super::UnixStream;
 use crate::event::Source;
+#[cfg(debug_assertions)]
+use crate::poll::SelectorId;
 use crate::unix::SocketAddr;
 use crate::unix::SourceFd;
 use crate::{sys, Interests, Registry, Token};
@@ -13,13 +15,19 @@ use std::path::Path;
 #[derive(Debug)]
 pub struct UnixListener {
     std: std::os::unix::net::UnixListener,
+    #[cfg(debug_assertions)]
+    selector_id: SelectorId,
 }
 
 impl UnixListener {
     /// Creates a new `UnixListener` bound to the specified socket.
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
         let std = sys::uds::bind_listener(path.as_ref())?;
-        Ok(UnixListener { std })
+        Ok(UnixListener {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        })
     }
 
     /// Converts a `std` `UnixListener` to a `mio` `UnixListener`.
@@ -27,7 +35,11 @@ impl UnixListener {
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     pub fn from_std(std: std::os::unix::net::UnixListener) -> UnixListener {
-        UnixListener { std }
+        UnixListener {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Accepts a new incoming connection to this listener.
@@ -45,7 +57,11 @@ impl UnixListener {
     /// object references. Both handles can be used to accept incoming
     /// connections and options set on one listener will affect the other.
     pub fn try_clone(&self) -> io::Result<UnixListener> {
-        self.std.try_clone().map(|std| UnixListener { std })
+        self.std.try_clone().map(|std| UnixListener {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        })
     }
 
     /// Returns the local socket address of this listener.
@@ -91,8 +107,16 @@ impl IntoRawFd for UnixListener {
 }
 
 impl FromRawFd for UnixListener {
+    /// Converts a `std` `RawFd` to a `mio` `UnixListener`.
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixListener {
         let std = std::os::unix::net::UnixListener::from_raw_fd(fd);
-        UnixListener { std }
+        UnixListener {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 }

@@ -1,4 +1,6 @@
 use crate::event::Source;
+#[cfg(debug_assertions)]
+use crate::poll::SelectorId;
 use crate::unix::SourceFd;
 use crate::{sys, Interests, Registry, Token};
 
@@ -12,13 +14,19 @@ use std::path::Path;
 #[derive(Debug)]
 pub struct UnixStream {
     std: std::os::unix::net::UnixStream,
+    #[cfg(debug_assertions)]
+    selector_id: SelectorId,
 }
 
 impl UnixStream {
     /// Connects to the socket named by `path`.
     pub fn connect<P: AsRef<Path>>(p: P) -> io::Result<UnixStream> {
         let std = sys::uds::connect_stream(p.as_ref())?;
-        Ok(UnixStream { std })
+        Ok(UnixStream {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        })
     }
 
     /// Converts a `std` `UnixStream` to a `mio` `UnixStream`.
@@ -26,7 +34,11 @@ impl UnixStream {
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     pub fn from_std(std: std::os::unix::net::UnixStream) -> UnixStream {
-        UnixStream { std }
+        UnixStream {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Creates an unnamed pair of connected sockets.
@@ -44,7 +56,11 @@ impl UnixStream {
     /// data, and options set on one stream will be propogated to the other
     /// stream.
     pub fn try_clone(&self) -> io::Result<UnixStream> {
-        self.std.try_clone().map(|std| UnixStream { std })
+        self.std.try_clone().map(|std| UnixStream {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        })
     }
 
     /// Returns the socket address of the local half of this connection.
@@ -152,8 +168,16 @@ impl IntoRawFd for UnixStream {
 }
 
 impl FromRawFd for UnixStream {
+    /// Converts a `std` `RawFd` to a `mio` `UnixStream`.
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixStream {
         let std = std::os::unix::net::UnixStream::from_raw_fd(fd);
-        UnixStream { std }
+        UnixStream {
+            std,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 }
