@@ -35,10 +35,8 @@ impl UnixListener {
     /// The call is responsible for ensuring that the listening socket is in
     /// non-blocking mode.
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        match sys::uds::accept(&self.std) {
-            Ok((stream, addr)) => Ok((UnixStream::from_std(stream), addr)),
-            Err(e) => Err(e),
-        }
+        let (stream, addr) = sys::uds::accept(&self.std)?;
+        Ok((UnixStream::from_std(stream), addr))
     }
 
     /// Creates a new independently owned handle to the underlying socket.

@@ -52,7 +52,7 @@ impl UnixDatagram {
     /// object references. Both handles can be used to accept incoming
     /// connections and options set on one listener will affect the other.
     pub fn try_clone(&self) -> io::Result<UnixDatagram> {
-        self.std.try_clone().map(|std| UnixDatagram { std })
+        self.std.try_clone().map(Self::from_std)
     }
 
     /// Returns the address of this socket.
