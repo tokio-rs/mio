@@ -1,14 +1,12 @@
 use crate::sys::unix::net::new_socket;
 
-use std::ascii;
 use std::cmp::Ordering;
 use std::ffi::OsStr;
-use std::fmt;
-use std::io;
-use std::mem;
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::os::unix::net::{UnixDatagram, UnixListener, UnixStream};
-use std::os::unix::prelude::*;
 use std::path::Path;
+use std::{ascii, fmt, io, mem};
 
 /// An address associated with a `mio` specific Unix socket.
 ///
@@ -19,8 +17,8 @@ use std::path::Path;
 /// [`net::SocketAddr`]: std::os::unix::net::SocketAddr
 /// [`accept`]: #method.accept
 pub struct SocketAddr {
-    addr: libc::sockaddr_un,
-    len: libc::socklen_t,
+    sockaddr: libc::sockaddr_un,
+    socklen: libc::socklen_t,
 }
 
 enum AddressKind<'a> {
@@ -50,7 +48,7 @@ pub fn connect_stream(path: &Path) -> io::Result<UnixStream> {
 }
 
 pub fn pair_stream() -> io::Result<(UnixStream, UnixStream)> {
-    let fds = [0, 0];
+    let fds = [-1; 2];
     let flags = libc::SOCK_STREAM;
 
     pair_descriptors(fds, flags)?;
@@ -73,10 +71,11 @@ pub fn bind_datagram(path: &Path) -> io::Result<UnixDatagram> {
 }
 
 pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
-    let mut storage: libc::sockaddr_un = unsafe { mem::zeroed() };
-    storage.sun_family = libc::AF_UNIX as libc::sa_family_t;
-    let mut len = mem::size_of_val(&storage) as libc::socklen_t;
-    let raw_storage = &mut storage as *mut libc::sockaddr_un as *mut libc::sockaddr;
+    let mut sockaddr = libc::sockaddr_un {
+        sun_family: libc::AF_UNIX as libc::sa_family_t,
+        sun_path: [0; 108],
+    };
+    let mut socklen = mem::size_of_val(&sockaddr) as libc::socklen_t;
 
     #[cfg(not(any(
         target_os = "ios",
@@ -84,9 +83,10 @@ pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
         target_os = "netbsd",
         target_os = "solaris"
     )))]
-    let sock_addr = {
+    let socket = {
+        let sockaddr = &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr;
         let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-        syscall!(accept4(listener.as_raw_fd(), raw_storage, &mut len, flags))?
+        syscall!(accept4(listener.as_raw_fd(), sockaddr, &mut socklen, flags))?
     };
 
     #[cfg(any(
@@ -95,7 +95,10 @@ pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
         target_os = "netbsd",
         target_os = "solaris"
     ))]
-    let sock_addr = syscall!(accept(listener.as_raw_fd(), raw_storage, &mut len))?;
+    let socket = {
+        let sockaddr = &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr;
+        syscall!(accept(listener.as_raw_fd(), sockaddr, &mut socklen))?
+    };
 
     #[cfg(any(
         target_os = "ios",
@@ -104,18 +107,18 @@ pub fn accept(listener: &UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
         target_os = "solaris"
     ))]
     {
-        syscall!(fcntl(sock_addr, libc::F_SETFL, libc::O_NONBLOCK))?;
-        syscall!(fcntl(sock_addr, libc::F_SETFD, libc::FD_CLOEXEC))?;
+        syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))?;
+        syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC))?;
     }
 
     Ok((
-        unsafe { UnixStream::from_raw_fd(sock_addr) },
-        SocketAddr { addr: storage, len },
+        unsafe { UnixStream::from_raw_fd(socket) },
+        SocketAddr { sockaddr, socklen },
     ))
 }
 
 pub fn pair_datagram() -> io::Result<(UnixDatagram, UnixDatagram)> {
-    let fds = [0, 0];
+    let fds = [-1; 2];
     let flags = libc::SOCK_DGRAM;
 
     pair_descriptors(fds, flags)?;
@@ -150,19 +153,10 @@ pub fn bind_listener(path: &Path) -> io::Result<UnixListener> {
 }
 
 pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
-    let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
-
-    // This is safe to assume because a `libc::sockaddr_un` filled with `0`
-    // bytes is properly initialized.
-    //
-    // `0` is a valid value for `sockaddr_un::sun_family`; it is
-    // `libc::AF_UNSPEC`.
-    //
-    // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
-    // abstract path.
-    let mut sockaddr = unsafe { sockaddr.assume_init() };
-
-    sockaddr.sun_family = libc::AF_UNIX as libc::sa_family_t;
+    let mut sockaddr = libc::sockaddr_un {
+        sun_family: libc::AF_UNIX as libc::sa_family_t,
+        sun_path: [0; 108],
+    };
 
     let bytes = path.as_os_str().as_bytes();
     match (bytes.get(0), bytes.len().cmp(&sockaddr.sun_path.len())) {
@@ -170,13 +164,13 @@ pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_
         (Some(&0), Ordering::Greater) => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "path must be no longer than SUN_LEN",
+                "path must be no longer than libc::sockaddr_un.sun_path",
             ));
         }
         (_, Ordering::Greater) | (_, Ordering::Equal) => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "path must be shorter than SUN_LEN",
+                "path must be shorter than libc::sockaddr_un.sun_path",
             ));
         }
         _ => {}
@@ -186,7 +180,14 @@ pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_
         *dst = *src as libc::c_char;
     }
 
-    let mut socklen = sun_path_offset() + bytes.len();
+    // View `SocketAddr::path_offset` documentation for why this is necessary.
+    let offset = {
+        let base = &sockaddr as *const _ as usize;
+        let path = &sockaddr as *const _ as usize;
+        path - base
+    };
+    let mut socklen = offset + bytes.len();
+
     match bytes.get(0) {
         // The struct has already been zeroes so the null byte for pathname
         // addresses is already there.
@@ -218,17 +219,6 @@ fn pair_descriptors(mut fds: [i32; 2], flags: i32) -> io::Result<()> {
     Ok(())
 }
 
-// On Linux, this funtion equates to the same value as
-// `size_of::<sun_path>()`, but some other implementations include other
-// fields before `sun_path`, so the expression more portably describes the
-// size of the address structure.
-fn sun_path_offset() -> usize {
-    let sockaddr = unsafe { mem::MaybeUninit::<libc::sockaddr_un>::uninit().assume_init() };
-    let base = &sockaddr as *const _ as usize;
-    let path = &sockaddr.sun_path as *const _ as usize;
-    path - base
-}
-
 impl SocketAddr {
     /// Returns `true` if the address is unnamed.
     ///
@@ -257,20 +247,30 @@ impl SocketAddr {
     }
 
     fn address(&self) -> AddressKind<'_> {
-        let len = self.len as usize - sun_path_offset();
-        let path = unsafe { &*(&self.addr.sun_path as *const [libc::c_char] as *const [u8]) };
+        let len = self.socklen as usize - self.path_offset();
+        let path = unsafe { &*(&self.sockaddr.sun_path as *const [libc::c_char] as *const [u8]) };
 
         // macOS seems to return a len of 16 and a zeroed sun_path for unnamed addresses
         if len == 0
             || (cfg!(not(any(target_os = "linux", target_os = "android")))
-                && self.addr.sun_path[0] == 0)
+                && self.sockaddr.sun_path[0] == 0)
         {
             AddressKind::Unnamed
-        } else if self.addr.sun_path[0] == 0 {
+        } else if self.sockaddr.sun_path[0] == 0 {
             AddressKind::Abstract(&path[1..len])
         } else {
             AddressKind::Pathname(OsStr::from_bytes(&path[..len - 1]).as_ref())
         }
+    }
+
+    // On Linux, this funtion equates to the same value as
+    // `size_of::<sa_family_t>()`, but some other implementations include
+    // other fields before `sun_path`, so the expression more portably
+    // describes the size of the address structure.
+    fn path_offset(&self) -> usize {
+        let base = &self.sockaddr as *const _ as usize;
+        let path = &self.sockaddr as *const _ as usize;
+        path - base
     }
 }
 
