@@ -1,9 +1,8 @@
-use super::UnixStream;
 use crate::event::Source;
+use crate::net::UnixStream;
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
 use crate::unix::SocketAddr;
-use crate::unix::SourceFd;
 use crate::{sys, Interests, Registry, Token};
 
 use std::io;
@@ -14,32 +13,24 @@ use std::path::Path;
 /// A non-blocking Unix domain socket server.
 #[derive(Debug)]
 pub struct UnixListener {
-    std: std::os::unix::net::UnixListener,
+    sys: sys::UnixListener,
     #[cfg(debug_assertions)]
     selector_id: SelectorId,
 }
 
 impl UnixListener {
-    /// Creates a new `UnixListener` bound to the specified socket.
-    pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
-        let std = sys::uds::bind_listener(path.as_ref())?;
-        Ok(UnixListener {
-            std,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        })
-    }
-
-    /// Converts a `std` `UnixListener` to a `mio` `UnixListener`.
-    ///
-    /// The caller is responsible for ensuring that the socket is in
-    /// non-blocking mode.
-    pub fn from_std(std: std::os::unix::net::UnixListener) -> UnixListener {
+    fn new(sys: sys::UnixListener) -> UnixListener {
         UnixListener {
-            std,
+            sys,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         }
+    }
+
+    /// Creates a new `UnixListener` bound to the specified socket.
+    pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
+        let sys = sys::UnixListener::bind(path.as_ref())?;
+        Ok(UnixListener::new(sys))
     }
 
     /// Accepts a new incoming connection to this listener.
@@ -47,8 +38,8 @@ impl UnixListener {
     /// The call is responsible for ensuring that the listening socket is in
     /// non-blocking mode.
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        let (stream, addr) = sys::uds::accept(&self.std)?;
-        Ok((UnixStream::from_std(stream), addr))
+        let (sys, sockaddr) = self.sys.accept()?;
+        Ok((UnixStream::new(sys), sockaddr))
     }
 
     /// Creates a new independently owned handle to the underlying socket.
@@ -57,27 +48,26 @@ impl UnixListener {
     /// object references. Both handles can be used to accept incoming
     /// connections and options set on one listener will affect the other.
     pub fn try_clone(&self) -> io::Result<UnixListener> {
-        self.std.try_clone().map(|std| UnixListener {
-            std,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        })
+        let sys = self.sys.try_clone()?;
+        Ok(UnixListener::new(sys))
     }
 
     /// Returns the local socket address of this listener.
     pub fn local_addr(&self) -> io::Result<net::SocketAddr> {
-        self.std.local_addr()
+        self.sys.local_addr()
     }
 
     /// Returns the value of the `SO_ERROR` option.
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.std.take_error()
+        self.sys.take_error()
     }
 }
 
 impl Source for UnixListener {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).register(registry, token, interests)
+        #[cfg(debug_assertions)]
+        self.selector_id.associate_selector(registry)?;
+        self.sys.reregister(registry, token, interests)
     }
 
     fn reregister(
@@ -86,37 +76,35 @@ impl Source for UnixListener {
         token: Token,
         interests: Interests,
     ) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
+        self.sys.reregister(registry, token, interests)
     }
 
     fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).deregister(registry)
+        self.sys.deregister(registry)
     }
 }
 
+#[cfg(unix)]
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
-        self.std.as_raw_fd()
+        self.sys.as_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl IntoRawFd for UnixListener {
     fn into_raw_fd(self) -> RawFd {
-        self.std.into_raw_fd()
+        self.sys.into_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl FromRawFd for UnixListener {
     /// Converts a `std` `RawFd` to a `mio` `UnixListener`.
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixListener {
-        let std = std::os::unix::net::UnixListener::from_raw_fd(fd);
-        UnixListener {
-            std,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        }
+        UnixListener::new(FromRawFd::from_raw_fd(fd))
     }
 }
