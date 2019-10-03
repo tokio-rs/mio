@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::net::Shutdown;
+use std::net::{self, Shutdown};
 use std::time::{Duration, Instant};
 
 use mio::{Token, Ready, PollOpt, Poll, Events};
@@ -142,7 +142,7 @@ fn test_write_shutdown() {
     let mut poll = TestPoll::new();
     let mut buf = [0; 1024];
 
-    let listener = assert_ok!(std::net::TcpListener::bind("127.0.0.1:0"));
+    let listener = assert_ok!(net::TcpListener::bind("127.0.0.1:0"));
     let addr = assert_ok!(listener.local_addr());
 
     let mut client = assert_ok!(TcpStream::connect(&addr));
@@ -176,7 +176,7 @@ fn test_graceful_shutdown() {
     let mut poll = TestPoll::new();
     let mut buf = [0; 1024];
 
-    let listener = assert_ok!(std::net::TcpListener::bind("127.0.0.1:0"));
+    let listener = assert_ok!(net::TcpListener::bind("127.0.0.1:0"));
     let addr = assert_ok!(listener.local_addr());
 
     let mut client = assert_ok!(TcpStream::connect(&addr));
@@ -210,12 +210,12 @@ fn test_graceful_shutdown() {
 #[test]
 fn test_abrupt_shutdown() {
     use net2::TcpStreamExt;
-    use std::io::{self, Read, Write};
+    use std::io::Read;
 
     let mut poll = TestPoll::new();
     let mut buf = [0; 1024];
 
-    let listener = assert_ok!(std::net::TcpListener::bind("127.0.0.1:0"));
+    let listener = assert_ok!(net::TcpListener::bind("127.0.0.1:0"));
     let addr = assert_ok!(listener.local_addr());
 
     let mut client = assert_ok!(TcpStream::connect(&addr));
@@ -224,7 +224,7 @@ fn test_abrupt_shutdown() {
                   Ready::readable() | Ready::writable(),
                   PollOpt::edge());
 
-    let (mut socket, _) = assert_ok!(listener.accept());
+    let (socket, _) = assert_ok!(listener.accept());
     assert_ok!(socket.set_linger(Some(Duration::from_millis(0))));
     // assert_ok!(socket.set_linger(None));
 
