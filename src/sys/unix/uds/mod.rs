@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::io::RawFd;
 use std::path::Path;
 use std::{io, mem};
 
@@ -67,7 +68,7 @@ pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_
     Ok((sockaddr, socklen as libc::socklen_t))
 }
 
-fn pair_descriptors(mut fds: [i32; 2], flags: i32) -> io::Result<()> {
+fn pair_descriptors(mut fds: [RawFd; 2], flags: i32) -> io::Result<()> {
     #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
     let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 

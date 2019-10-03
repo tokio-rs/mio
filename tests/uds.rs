@@ -1,12 +1,11 @@
-#![cfg(target_os = "unix")]
+#![cfg(unix)]
 #[macro_use]
 mod util;
 
-use mio::net::{UnixListener, UnixStream};
+use mio::net::{UnixDatagram, UnixListener, UnixStream};
 use mio::{Interests, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
-#[cfg(unix)]
 use std::os::unix::net::SocketAddr;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
@@ -102,6 +101,9 @@ fn is_send_and_sync() {
 
     assert_send::<UnixStream>();
     assert_sync::<UnixStream>();
+
+    assert_send::<UnixDatagram>();
+    assert_sync::<UnixDatagram>();
 }
 
 #[test]
