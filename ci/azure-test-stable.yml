@@ -18,9 +18,6 @@ jobs:
   pool:
     vmImage: $(vmImage)
 
-  variables:
-    RUST_BACKTRACE: full
-
   steps:
   - template: azure-install-rust.yml
     parameters:
