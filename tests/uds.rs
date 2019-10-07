@@ -1,12 +1,12 @@
-#![cfg(target_os = "unix")]
+#![cfg(unix)]
 #[macro_use]
 mod util;
 
-use mio::net::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
+use mio::net::{UnixDatagram, UnixListener, UnixStream};
+use mio::unix::SocketAddr;
 use mio::{Interests, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
-use std::os::unix::net;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use tempdir::TempDir;
