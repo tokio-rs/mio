@@ -1,4 +1,4 @@
-use super::{pair_descriptors, socket_addr};
+use super::{pair_descriptors, socket_addr, SocketAddr};
 use crate::event::Source;
 use crate::sys::unix::net::new_socket;
 use crate::sys::unix::SourceFd;
@@ -7,7 +7,7 @@ use crate::{Interests, Registry, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net::{self, SocketAddr};
+use std::os::unix::net;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -60,11 +60,15 @@ impl UnixStream {
     }
 
     pub(crate) fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.inner.local_addr()
+        SocketAddr::new(|sockaddr, socklen| {
+            syscall!(getsockname(self.inner.as_raw_fd(), sockaddr, socklen))
+        })
     }
 
     pub(crate) fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.inner.peer_addr()
+        SocketAddr::new(|sockaddr, socklen| {
+            syscall!(getpeername(self.inner.as_raw_fd(), sockaddr, socklen))
+        })
     }
 
     pub(crate) fn take_error(&self) -> io::Result<Option<io::Error>> {

@@ -6,7 +6,6 @@ use crate::{sys, Interests, Registry, Token};
 use std::io::{self, IoSlice, IoSliceMut};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net::SocketAddr;
 use std::path::Path;
 
 /// A non-blocking Unix stream socket.
@@ -54,12 +53,12 @@ impl UnixStream {
     }
 
     /// Returns the socket address of the local half of this connection.
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
         self.sys.local_addr()
     }
 
     /// Returns the socket address of the remote half of this connection.
-    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<sys::SocketAddr> {
         self.sys.peer_addr()
     }
 

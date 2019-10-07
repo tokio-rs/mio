@@ -6,7 +6,6 @@ use crate::{sys, Interests, Registry, Token};
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net::SocketAddr;
 use std::path::Path;
 
 /// A Unix datagram socket.
@@ -62,14 +61,14 @@ impl UnixDatagram {
     }
 
     /// Returns the address of this socket.
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
         self.sys.local_addr()
     }
 
     /// Returns the address of this socket's peer.
     ///
     /// The `connect` method will connect the socket to a peer.
-    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<sys::SocketAddr> {
         self.sys.peer_addr()
     }
 
@@ -77,7 +76,7 @@ impl UnixDatagram {
     ///
     /// On success, returns the number of bytes read and the address from
     /// whence the data came.
-    pub fn recv_from(&self, dst: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub fn recv_from(&self, dst: &mut [u8]) -> io::Result<(usize, sys::SocketAddr)> {
         self.sys.recv_from(dst)
     }
 

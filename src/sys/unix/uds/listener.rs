@@ -98,7 +98,7 @@ impl UnixListener {
 
         Ok((
             unsafe { UnixStream::from_raw_fd(socket) },
-            SocketAddr::new(sockaddr, socklen),
+            SocketAddr::from_parts(sockaddr, socklen),
         ))
     }
 
@@ -123,8 +123,10 @@ impl UnixListener {
         Ok(UnixListener::new(inner))
     }
 
-    pub(crate) fn local_addr(&self) -> io::Result<net::SocketAddr> {
-        self.inner.local_addr()
+    pub(crate) fn local_addr(&self) -> io::Result<SocketAddr> {
+        SocketAddr::new(|sockaddr, socklen| {
+            syscall!(getsockname(self.inner.as_raw_fd(), sockaddr, socklen))
+        })
     }
 
     /// Returns the value of the `SO_ERROR` option.
@@ -171,7 +173,23 @@ impl FromRawFd for UnixListener {
 }
 
 impl SocketAddr {
-    fn new(sockaddr: libc::sockaddr_un, socklen: libc::socklen_t) -> SocketAddr {
+    pub(crate) fn new<F>(f: F) -> io::Result<SocketAddr>
+    where
+        F: FnOnce(*mut libc::sockaddr, &mut libc::socklen_t) -> io::Result<libc::c_int>,
+    {
+        let mut sockaddr = {
+            let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
+            unsafe { sockaddr.assume_init() }
+        };
+
+        let raw_sockaddr = &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr;
+        let mut socklen = mem::size_of_val(&sockaddr) as libc::socklen_t;
+
+        f(raw_sockaddr, &mut socklen)?;
+        Ok(SocketAddr::from_parts(sockaddr, socklen))
+    }
+
+    pub(crate) fn from_parts(sockaddr: libc::sockaddr_un, socklen: libc::socklen_t) -> SocketAddr {
         SocketAddr { sockaddr, socklen }
     }
 

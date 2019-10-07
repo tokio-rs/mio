@@ -7,7 +7,6 @@ use crate::{sys, Interests, Registry, Token};
 
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net;
 use std::path::Path;
 
 /// A non-blocking Unix domain socket server.
@@ -53,7 +52,7 @@ impl UnixListener {
     }
 
     /// Returns the local socket address of this listener.
-    pub fn local_addr(&self) -> io::Result<net::SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
         self.sys.local_addr()
     }
 
