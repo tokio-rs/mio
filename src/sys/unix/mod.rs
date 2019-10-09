@@ -45,12 +45,14 @@ mod sourcefd;
 mod tcp_listener;
 mod tcp_stream;
 mod udp;
+mod uds;
 mod waker;
 
 pub use self::sourcefd::SourceFd;
 pub use self::tcp_listener::TcpListener;
 pub use self::tcp_stream::TcpStream;
 pub use self::udp::UdpSocket;
+pub use self::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
 pub use self::waker::Waker;
 
 pub type Events = Vec<Event>;

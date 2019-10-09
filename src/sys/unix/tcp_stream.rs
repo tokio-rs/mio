@@ -1,4 +1,4 @@
-use crate::sys::unix::net::{new_socket, socket_addr};
+use crate::sys::unix::net::{new_ip_socket, socket_addr};
 use crate::sys::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
 
@@ -17,7 +17,7 @@ impl TcpStream {
     }
 
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
-        new_socket(addr, libc::SOCK_STREAM)
+        new_ip_socket(addr, libc::SOCK_STREAM)
             .and_then(|socket| {
                 let (raw_addr, raw_addr_length) = socket_addr(&addr);
                 syscall!(connect(socket, raw_addr, raw_addr_length))

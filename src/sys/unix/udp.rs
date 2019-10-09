@@ -1,4 +1,4 @@
-use crate::sys::unix::net::{new_socket, socket_addr};
+use crate::sys::unix::net::{new_ip_socket, socket_addr};
 use crate::unix::SourceFd;
 use crate::{event, Interests, Registry, Token};
 
@@ -14,7 +14,7 @@ impl UdpSocket {
     pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
         // Gives a warning for non Apple platforms.
         #[allow(clippy::let_and_return)]
-        let socket = new_socket(addr, libc::SOCK_DGRAM);
+        let socket = new_ip_socket(addr, libc::SOCK_DGRAM);
 
         // Set SO_NOSIGPIPE on iOS and macOS (mirrors what libstd does).
         #[cfg(any(target_os = "ios", target_os = "macos"))]
