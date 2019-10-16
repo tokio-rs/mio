@@ -53,7 +53,7 @@ pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_
     // View `SocketAddr::path_offset` documentation for why this is necessary.
     let offset = {
         let base = &sockaddr as *const _ as usize;
-        let path = &sockaddr as *const _ as usize;
+        let path = &sockaddr.sun_path as *const _ as usize;
         path - base
     };
     let mut socklen = offset + bytes.len();
