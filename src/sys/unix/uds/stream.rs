@@ -44,14 +44,31 @@ impl UnixStream {
         let fds = [-1; 2];
         let flags = libc::SOCK_STREAM;
 
-        pair_descriptors(fds, flags)?;
+        #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
+        {
+            pair_descriptors(fds, flags)?;
+            Ok(unsafe {
+                (
+                    UnixStream::from_raw_fd(fds[0]),
+                    UnixStream::from_raw_fd(fds[1]),
+                )
+            })
+        }
 
-        Ok(unsafe {
-            (
-                UnixStream::from_raw_fd(fds[0]),
-                UnixStream::from_raw_fd(fds[1]),
-            )
-        })
+        // Darwin and Solaris do not have SOCK_NONBLOCK or SOCK_CLOEXEC.
+        //
+        // In order to set those flags, additional `fcntl` sys calls must be
+        // made in `pair_descriptors` that are fallible. If a `fnctl` fails
+        // after the sockets have been created, the file descriptors will
+        // leak. Creating `s1` and `s2` below ensure that if there is an
+        // error, the file descriptors are closed.
+        #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
+        {
+            let s1 = unsafe { UnixStream::from_raw_fd(fds[0]) };
+            let s2 = unsafe { UnixStream::from_raw_fd(fds[1]) };
+            pair_descriptors(fds, flags)?;
+            Ok((s1, s2))
+        }
     }
 
     pub(crate) fn try_clone(&self) -> io::Result<UnixStream> {

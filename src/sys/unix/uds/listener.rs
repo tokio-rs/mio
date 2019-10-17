@@ -63,27 +63,19 @@ impl UnixListener {
             target_os = "netbsd",
             target_os = "solaris"
         )))]
-        let socket = {
-            let sockaddr = &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr;
+        {
             let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-            syscall!(accept4(
+            let socket = syscall!(accept4(
                 self.inner.as_raw_fd(),
-                sockaddr,
+                &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr,
                 &mut socklen,
                 flags
-            ))?
-        };
-
-        #[cfg(any(
-            target_os = "ios",
-            target_os = "macos",
-            target_os = "netbsd",
-            target_os = "solaris"
-        ))]
-        let socket = {
-            let sockaddr = &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr;
-            syscall!(accept(self.inner.as_raw_fd(), sockaddr, &mut socklen))?
-        };
+            ))?;
+            Ok((
+                unsafe { UnixStream::from_raw_fd(socket) },
+                SocketAddr::from_parts(sockaddr, socklen),
+            ))
+        }
 
         #[cfg(any(
             target_os = "ios",
@@ -92,14 +84,18 @@ impl UnixListener {
             target_os = "solaris"
         ))]
         {
+            let socket = syscall!(accept(
+                self.inner.as_raw_fd(),
+                &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr,
+                &mut socklen
+            ))?;
+            // Ensure the socket is closed if either of the `fcntl` calls
+            // error below.
+            let s = unsafe { UnixStream::from_raw_fd(socket) };
             syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))?;
             syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC))?;
+            Ok((s, SocketAddr::from_parts(sockaddr, socklen)))
         }
-
-        Ok((
-            unsafe { UnixStream::from_raw_fd(socket) },
-            SocketAddr::from_parts(sockaddr, socklen),
-        ))
     }
 
     pub(crate) fn bind(path: &Path) -> io::Result<UnixListener> {
