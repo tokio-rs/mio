@@ -242,7 +242,7 @@ impl SocketAddr {
     // describes the size of the address structure.
     fn path_offset(&self) -> usize {
         let base = &self.sockaddr as *const _ as usize;
-        let path = &self.sockaddr as *const _ as usize;
+        let path = &self.sockaddr.sun_path as *const _ as usize;
         path - base
     }
 }
