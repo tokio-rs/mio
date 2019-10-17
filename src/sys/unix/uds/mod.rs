@@ -102,10 +102,6 @@ mod tests {
     use std::path::Path;
     use std::str;
 
-    // Assert `socklen` equals 16 (on Linux):
-    //   - 13 bytes for path length
-    //   - `path_offset` bytes for the `sun_path` offset (2 on Linux)
-    //   - 1 for the null terminator
     #[test]
     fn pathname_address() {
         const PATH: &str = "./foo/bar.txt";
