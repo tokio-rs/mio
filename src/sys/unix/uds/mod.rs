@@ -81,6 +81,8 @@ fn pair_descriptors(mut fds: [RawFd; 2], flags: i32) -> io::Result<()> {
 
     syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
 
+    // Darwin and Solaris don't have SOCK_NONBLOCK or SOCK_CLOEXEC.
+    //
     // For platforms that don't support flags in `socket`, the flags must be
     // set through `fcntl`. The `F_SETFL` command sets the `O_NONBLOCK` bit.
     // The `F_SETFD` command sets the `FD_CLOEXEC` bit.
@@ -91,7 +93,6 @@ fn pair_descriptors(mut fds: [RawFd; 2], flags: i32) -> io::Result<()> {
         syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
         syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
     }
-
     Ok(())
 }
 
