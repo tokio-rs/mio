@@ -1,4 +1,4 @@
-use super::socket_addr;
+use super::{path_offset, socket_addr};
 use crate::event::Source;
 use crate::sys::unix::net::new_socket;
 use crate::sys::unix::UnixStream;
@@ -216,7 +216,8 @@ impl SocketAddr {
     }
 
     fn address(&self) -> AddressKind<'_> {
-        let len = self.socklen as usize - self.path_offset();
+        let offset = path_offset(&self.sockaddr);
+        let len = self.socklen as usize - offset;
         let path = unsafe { &*(&self.sockaddr.sun_path as *const [libc::c_char] as *const [u8]) };
 
         // macOS seems to return a len of 16 and a zeroed sun_path for unnamed addresses
@@ -230,16 +231,6 @@ impl SocketAddr {
         } else {
             AddressKind::Pathname(OsStr::from_bytes(&path[..len - 1]).as_ref())
         }
-    }
-
-    // On Linux, this funtion equates to the same value as
-    // `size_of::<sa_family_t>()`, but some other implementations include
-    // other fields before `sun_path`, so the expression more portably
-    // describes the size of the address structure.
-    fn path_offset(&self) -> usize {
-        let base = &self.sockaddr as *const _ as usize;
-        let path = &self.sockaddr.sun_path as *const _ as usize;
-        path - base
     }
 }
 
