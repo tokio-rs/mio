@@ -13,26 +13,38 @@ pub fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> io::Result<l
 
 /// Create a new non-blocking socket.
 pub fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::Result<libc::c_int> {
-    #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
-    {
-        let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-        syscall!(socket(domain, socket_type, 0))
-    }
+    #[cfg(any(
+        target_os = "android",
+        target_os = "bitrig",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "linux",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ))]
+    let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
+    // Gives a warning for platforms without SOCK_NONBLOCK.
+    #[allow(clippy::let_and_return)]
+    let socket = syscall!(socket(domain, socket_type, 0));
+
+    // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC. Not sure about
+    // Solaris, couldn't find anything online.
     #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
-    {
-        let socket = syscall!(socket(domain, socket_type, 0))?;
-        if let Err(e) = (|| {
-            syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))?;
-            syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC))
-        })() {
-            // If either of the `fcntl` calls failed, ensure the socket is
-            // closed and return the error.
-            syscall!(close(socket))?;
-            return Err(e);
-        }
-        Ok(socket)
-    }
+    let socket = socket.and_then(|socket| {
+        // For platforms that don't support flags in socket, we need to
+        // set the flags ourselves.
+        syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK,))
+            .and_then(|_| syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC,)).map(|_| socket))
+            .map_err(|e| {
+                // If either of the `fcntl` calls failed, ensure the socket is
+                // closed and return the error.
+                let _ = syscall!(close(socket));
+                e
+            })
+    });
+
+    socket
 }
 
 pub fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t) {

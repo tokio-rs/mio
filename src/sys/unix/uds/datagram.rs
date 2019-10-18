@@ -38,15 +38,15 @@ impl UnixDatagram {
         let flags = libc::SOCK_DGRAM;
 
         #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
-        {
+        let pair = {
             pair_descriptors(fds, flags)?;
-            Ok(unsafe {
+            unsafe {
                 (
                     UnixDatagram::from_raw_fd(fds[0]),
                     UnixDatagram::from_raw_fd(fds[1]),
                 )
-            })
-        }
+            }
+        };
 
         // Darwin and Solaris do not have SOCK_NONBLOCK or SOCK_CLOEXEC.
         //
@@ -56,12 +56,14 @@ impl UnixDatagram {
         // leak. Creating `s1` and `s2` below ensure that if there is an
         // error, the file descriptors are closed.
         #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
-        {
+        let pair = {
             let s1 = unsafe { UnixDatagram::from_raw_fd(fds[0]) };
             let s2 = unsafe { UnixDatagram::from_raw_fd(fds[1]) };
             pair_descriptors(fds, flags)?;
-            Ok((s1, s2))
-        }
+            (s1, s2)
+        };
+
+        Ok(pair)
     }
 
     pub(crate) fn unbound() -> io::Result<UnixDatagram> {

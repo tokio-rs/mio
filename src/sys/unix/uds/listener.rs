@@ -63,19 +63,16 @@ impl UnixListener {
             target_os = "netbsd",
             target_os = "solaris"
         )))]
-        {
+        let socket = {
             let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-            let socket = syscall!(accept4(
+            syscall!(accept4(
                 self.inner.as_raw_fd(),
                 &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr,
                 &mut socklen,
                 flags
-            ))?;
-            Ok((
-                unsafe { UnixStream::from_raw_fd(socket) },
-                SocketAddr::from_parts(sockaddr, socklen),
             ))
-        }
+            .map(|socket| unsafe { UnixStream::from_raw_fd(socket) })
+        };
 
         #[cfg(any(
             target_os = "ios",
@@ -83,19 +80,20 @@ impl UnixListener {
             target_os = "netbsd",
             target_os = "solaris"
         ))]
-        {
-            let socket = syscall!(accept(
-                self.inner.as_raw_fd(),
-                &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr,
-                &mut socklen
-            ))?;
+        let socket = syscall!(accept(
+            self.inner.as_raw_fd(),
+            &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr,
+            &mut socklen,
+        ))
+        .and_then(|socket| {
             // Ensure the socket is closed if either of the `fcntl` calls
             // error below.
             let s = unsafe { UnixStream::from_raw_fd(socket) };
-            syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))?;
-            syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC))?;
-            Ok((s, SocketAddr::from_parts(sockaddr, socklen)))
-        }
+            syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))
+                .and_then(|_| syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| s))
+        });
+
+        socket.and_then(|s| Ok((s, SocketAddr::from_parts(sockaddr, socklen))))
     }
 
     pub(crate) fn bind(path: &Path) -> io::Result<UnixListener> {
