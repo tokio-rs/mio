@@ -183,14 +183,23 @@ fn ttl() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1079")]
 fn nodelay() {
-    init();
+    let (mut poll, mut events) = init_with_poll();
 
     let barrier = Arc::new(Barrier::new(2));
     let (thread_handle, address) = start_listener(1, Some(barrier.clone()));
 
     let stream = TcpStream::connect(address).unwrap();
+
+    poll.registry()
+        .register(&stream, ID1, Interests::WRITABLE)
+        .expect("unable to register TCP stream");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+    );
 
     const NO_DELAY: bool = true;
     stream.set_nodelay(NO_DELAY).unwrap();
