@@ -32,13 +32,11 @@ fn is_send_and_sync() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_ipv4() {
     smoke_test_tcp_stream(any_local_address());
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_ipv6() {
     smoke_test_tcp_stream(any_local_ipv6_address());
 }
@@ -88,6 +86,10 @@ fn smoke_test_tcp_stream(addr: SocketAddr) {
     assert_eq!(&buf[..n], DATA1);
 
     assert!(stream.take_error().unwrap().is_none());
+
+    let mut buf = [0; 32];
+    assert_would_block(stream.peek(&mut buf));
+    assert_would_block(stream.read(&mut buf));
 
     let bufs = [IoSlice::new(&DATA1), IoSlice::new(&DATA2)];
     let n = stream
