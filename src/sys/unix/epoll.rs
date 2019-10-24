@@ -1,7 +1,7 @@
 use crate::sys::Events;
 use crate::{Interests, Token};
 
-use libc::{EPOLLET, EPOLLIN, EPOLLOUT};
+use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLRDHUP};
 use log::error;
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
@@ -91,6 +91,9 @@ impl Selector {
 fn interests_to_epoll(interests: Interests) -> u32 {
     let mut kind = EPOLLET;
 
+    // Interest in EPOLLRDHUP must be explicitly registered
+    kind |= EPOLLRDHUP;
+
     if interests.is_readable() {
         kind |= EPOLLIN;
     }
@@ -139,12 +142,20 @@ pub mod event {
         (event.events as libc::c_int & libc::EPOLLERR) != 0
     }
 
-    pub fn is_hup(event: &Event) -> bool {
-        (event.events as libc::c_int & libc::EPOLLHUP) != 0
+    pub fn is_read_close(event: &Event) -> bool {
+        // Both halves of the socket have closed
+        event.events as libc::c_int & libc::EPOLLHUP != 0
+            // Socket has received FIN or called shutdown(SHUT_RD)
+            || (event.events as libc::c_int & libc::EPOLLIN != 0
+                && event.events as libc::c_int & libc::EPOLLRDHUP != 0)
     }
 
-    pub fn is_read_hup(event: &Event) -> bool {
-        (event.events as libc::c_int & libc::EPOLLRDHUP) != 0
+    pub fn is_write_close(event: &Event) -> bool {
+        // Both halves of the socket have closed
+        event.events as libc::c_int & libc::EPOLLHUP != 0
+            // Unix pipe write end has closed
+            || (event.events as libc::c_int & libc::EPOLLOUT != 0
+                && event.events as libc::c_int & libc::EPOLLERR != 0)
     }
 
     pub fn is_priority(event: &Event) -> bool {

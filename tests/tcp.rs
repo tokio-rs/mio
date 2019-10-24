@@ -622,7 +622,7 @@ fn write_error() {
 }
 
 macro_rules! wait {
-    ($poll:ident, $ready:ident, $expect_hup: expr) => {{
+    ($poll:ident, $ready:ident, $expect_read_close: expr) => {{
         use std::time::Instant;
 
         let now = Instant::now();
@@ -639,23 +639,10 @@ macro_rules! wait {
                 .unwrap();
 
             for event in &events {
-                // Hup is only generated on kqueue platforms.
-                #[cfg(any(
-                    target_os = "dragonfly",
-                    target_os = "freebsd",
-                    target_os = "ios",
-                    target_os = "macos",
-                    target_os = "netbsd",
-                    target_os = "openbsd"
-                ))]
-                {
-                    if $expect_hup {
-                        assert!(event.is_read_hup());
-                    }
-                }
-
-                if !$expect_hup {
-                    assert!(!event.is_hup());
+                if $expect_read_close {
+                    assert!(event.is_read_close());
+                } else {
+                    assert!(!event.is_read_close() && !event.is_write_close());
                 }
 
                 if event.token() == Token(0) && event.$ready() {

@@ -62,59 +62,51 @@ impl Event {
         sys::event::is_error(&self.inner)
     }
 
-    /// Returns true if the event contains HUP readiness.
+    /// Returns true if the event contains read close readiness.
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms trigger the
-    /// HUP event.
-    ///
-    /// Because of the above be cautions when using this in cross-platform
-    /// applications, Mio makes no attempt at normalising this indicator and
-    /// only provides a convenience method to read it. Refer to the selector
-    /// documentation (below) when using this indicator.
+    /// Method is a best effort implementation. While some platforms may not
+    /// return readiness when read half is closed, it is guaranteed that
+    /// false-positives will not occur.
     ///
     /// The table below shows what flags are checked on what OS.
     ///
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
-    /// | [epoll]       | `EPOLLHUP`      |
+    /// | [epoll]       | `EPOLLHUP`
+    /// |               | `EPOLLIN` and `EPOLLRDHUP` |
     /// | [kqueue]      | `EV_EOF`        |
     ///
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
     /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
     #[inline]
-    pub fn is_hup(&self) -> bool {
-        sys::event::is_hup(&self.inner)
+    pub fn is_read_close(&self) -> bool {
+        sys::event::is_read_close(&self.inner)
     }
 
-    /// Returns true if the event contains read HUP readiness.
+    /// Returns true if the event contains write close readiness.
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms trigger the
-    /// read HUP event.
-    ///
-    /// Because of the above be cautions when using this in cross-platform
-    /// applications, Mio makes no attempt at normalising this indicator and
-    /// only provides a convenience method to read it. We advice looking at the
-    /// documentation provided for the selectors (see below) when using this
-    /// indicator.
+    /// Method is a best effort implementation. While some platforms may not
+    /// return readiness when write half is closed, it is guaranteed that
+    /// false-positives will not occur.
     ///
     /// The table below shows what flags are checked on what OS.
     ///
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
-    /// | [epoll]       | `EPOLLRDHUP`    |
+    /// | [epoll]       | `EPOLLHUP`
+    /// |               | `EPOLLOUT` and `EPOLLERR` |
     /// | [kqueue]      | `EV_EOF`        |
     ///
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
     /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
-    #[inline]
-    pub fn is_read_hup(&self) -> bool {
-        sys::event::is_read_hup(&self.inner)
+    pub fn is_write_close(&self) -> bool {
+        sys::event::is_write_close(&self.inner)
     }
 
     /// Returns true if the event contains priority readiness.
@@ -190,8 +182,8 @@ impl fmt::Debug for Event {
             .field("readable", &self.is_readable())
             .field("writable", &self.is_writable())
             .field("error", &self.is_error())
-            .field("hup", &self.is_hup())
-            .field("read_hup", &self.is_read_hup())
+            .field("read_close", &self.is_read_close())
+            .field("write_close", &self.is_write_close())
             .field("priority", &self.is_priority())
             .field("aio", &self.is_aio())
             .field("lio", &self.is_lio())
