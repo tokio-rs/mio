@@ -21,7 +21,7 @@ pub fn is_readable(event: &Event) -> bool {
 }
 
 pub fn is_writable(event: &Event) -> bool {
-    if is_error(event) || is_write_close(event) {
+    if is_error(event) {
         return true;
     }
     event.flags & afd::AFD_POLL_SEND != 0

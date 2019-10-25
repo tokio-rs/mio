@@ -8,6 +8,7 @@ use std::io::{Read, Result, Write};
 use std::net::{Shutdown, SocketAddr};
 use std::sync::{mpsc, Arc, Barrier};
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 use util::{any_local_address, any_local_ipv6_address, expect_events, init_with_poll, ExpectEvent};
 
 const DATA: &[u8] = b"hello";
@@ -161,11 +162,9 @@ fn start_echo_server(address: SocketAddr, barrier: Arc<Barrier>) -> (JoinHandle<
         send.send(local_address)
             .expect("failed to send local address");
 
-        // Unblock the first peer and accept connection
+        // Unblock the peer and accept connection
         barrier.wait();
-        let (mut stream, _) = listener
-            .accept()
-            .expect("failed to accept first connection");
+        let (mut stream, _) = try_accept(&listener);
 
         // Wait for data on the stream
         barrier.wait();
@@ -178,7 +177,7 @@ fn start_echo_server(address: SocketAddr, barrier: Arc<Barrier>) -> (JoinHandle<
             .expect("failed to write to stream");
         assert_eq!(read, written);
 
-        // Wait for the first peer to close connection and drop the stream
+        // Wait for the peer to close connection and drop the stream
         barrier.wait();
         drop(stream);
     });
@@ -196,11 +195,9 @@ fn start_noop_server(address: SocketAddr, barrier: Arc<Barrier>) -> (JoinHandle<
         send.send(local_address)
             .expect("failed to send local address");
 
-        // Unblock the first peer and accept connection
+        // Unblock the peer and accept connection
         barrier.wait();
-        let (stream, _) = listener
-            .accept()
-            .expect("failed to accept first connection");
+        let (stream, _) = try_accept(&listener);
 
         // Wait for peer to close connection and drop stream
         barrier.wait();
@@ -223,16 +220,14 @@ fn start_write_shutdown_server(
         send.send(local_address)
             .expect("failed to send local address");
 
-        // Unblock the first peer and accept connection
+        // Unblock the peer and accept connection
         barrier.wait();
-        let (stream, _) = listener
-            .accept()
-            .expect("failed to accept first connection");
+        let (stream, _) = try_accept(&listener);
 
         // Immediately shutdown the write half of the socket--sending a FIN to the peer
         assert_ok!(stream.shutdown(Shutdown::Write));
 
-        // Wait for the third peer to close connection and drop the stream
+        // Wait for peer to close connection and drop the stream
         barrier.wait();
         drop(stream);
     });
@@ -260,4 +255,14 @@ where
     expect_events(poll, events, vec![ExpectEvent::new(TOK, interests)]);
     poll.registry().deregister(source)?;
     cleanup()
+}
+
+fn try_accept(listener: &TcpListener) -> (TcpStream, SocketAddr) {
+    for _ in 0..3 {
+        if let Ok((stream, addr)) = listener.accept() {
+            return (stream, addr);
+        }
+        thread::sleep(Duration::from_millis(500))
+    }
+    panic!("failed to accept connection")
 }

@@ -91,15 +91,16 @@ impl Selector {
 fn interests_to_epoll(interests: Interests) -> u32 {
     let mut kind = EPOLLET;
 
-    // Interest in EPOLLRDHUP must be explicitly registered
-    kind |= EPOLLRDHUP;
-
     if interests.is_readable() {
         kind |= EPOLLIN;
     }
 
     if interests.is_writable() {
         kind |= EPOLLOUT;
+    }
+
+    if interests.is_read_close() {
+        kind |= EPOLLRDHUP;
     }
 
     kind as u32
