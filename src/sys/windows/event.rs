@@ -14,14 +14,14 @@ pub fn token(event: &Event) -> Token {
 }
 
 pub fn is_readable(event: &Event) -> bool {
-    if is_error(event) || is_read_hup(event) {
+    if is_error(event) || is_read_close(event) {
         return true;
     }
     event.flags & (afd::AFD_POLL_RECEIVE | afd::AFD_POLL_ACCEPT) != 0
 }
 
 pub fn is_writable(event: &Event) -> bool {
-    if is_error(event) {
+    if is_error(event) || is_write_close(event) {
         return true;
     }
     event.flags & afd::AFD_POLL_SEND != 0
@@ -31,12 +31,12 @@ pub fn is_error(event: &Event) -> bool {
     event.flags & afd::AFD_POLL_CONNECT_FAIL != 0
 }
 
-pub fn is_hup(event: &Event) -> bool {
-    event.flags & afd::AFD_POLL_ABORT != 0
+pub fn is_read_close(event: &Event) -> bool {
+    event.flags & afd::AFD_POLL_DISCONNECT != 0
 }
 
-pub fn is_read_hup(event: &Event) -> bool {
-    event.flags & afd::AFD_POLL_DISCONNECT != 0
+pub fn is_write_close(event: &Event) -> bool {
+    event.flags & afd::AFD_POLL_ABORT != 0
 }
 
 pub fn is_priority(event: &Event) -> bool {
