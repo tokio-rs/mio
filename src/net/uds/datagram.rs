@@ -26,6 +26,11 @@ impl UnixDatagram {
     }
 
     /// Creates a Unix datagram socket bound to the given path.
+    ///
+    /// On success, this creates a socket file at the bound path as a side effect.
+    /// The [`unlink`] method can be used to prevent leaking this file.
+    ///
+    /// [`unlink`]: #method.unlink
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixDatagram> {
         let sys = sys::UnixDatagram::bind(path.as_ref())?;
         Ok(UnixDatagram::new(sys))
@@ -116,6 +121,14 @@ impl UnixDatagram {
     /// (see the documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.sys.shutdown(how)
+    }
+
+    /// Consumes the socket, unlinking the bound socket file, if there is one.
+    ///
+    /// Note that a socket file is only removed once all references to it are
+    /// closed.
+    pub fn unlink(self) {
+        self.sys.unlink()
     }
 }
 

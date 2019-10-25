@@ -107,6 +107,30 @@ fn is_send_and_sync() {
 }
 
 #[test]
+fn datagram_unlink() {
+    let path = "bar";
+
+    let datagram = assert_ok!(UnixDatagram::bind(path));
+    assert_err!(UnixDatagram::bind(path));
+    datagram.unlink();
+
+    let datagram = assert_ok!(UnixDatagram::bind(path));
+    datagram.unlink();
+}
+
+#[test]
+fn listener_unlink() {
+    let path = "baz";
+
+    let listener = assert_ok!(UnixListener::bind(path));
+    assert_err!(UnixListener::bind(path));
+    listener.unlink();
+
+    let listener = assert_ok!(UnixListener::bind(path));
+    listener.unlink();
+}
+
+#[test]
 fn register() {
     let (mut poll, mut events) = init_with_poll();
 

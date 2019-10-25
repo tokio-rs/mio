@@ -4,11 +4,11 @@ use crate::sys::unix::net::new_socket;
 use crate::unix::SourceFd;
 use crate::{Interests, Registry, Token};
 
-use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
+use std::{io, mem};
 
 #[derive(Debug)]
 pub struct UnixDatagram {
@@ -128,6 +128,29 @@ impl UnixDatagram {
 
     pub(crate) fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.inner.shutdown(how)
+    }
+
+    pub(crate) fn unlink(mut self) {
+        // Retrieve the local bound and drop the socket.
+        let maybe_path = {
+            let socket = mem::replace(&mut self.inner, unsafe {
+                net::UnixDatagram::from_raw_fd(-1)
+            });
+            match socket.local_addr() {
+                Ok(addr) => match addr.as_pathname() {
+                    Some(path) => Some(path.to_owned()),
+                    None => None,
+                },
+                Err(_) => None,
+            }
+        };
+
+        // If the socket was bound to a named path, unlink it.
+        if let Some(path) = maybe_path {
+            let _ = std::fs::remove_file(path);
+        }
+
+        mem::forget(self);
     }
 }
 

@@ -27,6 +27,11 @@ impl UnixListener {
     }
 
     /// Creates a new `UnixListener` bound to the specified socket.
+    ///
+    /// On success, this creates a socket file at the bound path as a side effect.
+    /// The [`unlink`] method can be used to prevent leaking this file.
+    ///
+    /// [`unlink`]: #method.unlink
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
         let sys = sys::UnixListener::bind(path.as_ref())?;
         Ok(UnixListener::new(sys))
@@ -59,6 +64,14 @@ impl UnixListener {
     /// Returns the value of the `SO_ERROR` option.
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.sys.take_error()
+    }
+
+    /// Consumes the socket, unlinking the bound socket file, if there is one.
+    ///
+    /// Note that a socket file is only removed once all references to it are
+    /// closed.
+    pub fn unlink(self) {
+        self.sys.unlink()
     }
 }
 

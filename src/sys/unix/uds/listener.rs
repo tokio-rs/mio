@@ -127,6 +127,29 @@ impl UnixListener {
     pub(crate) fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.inner.take_error()
     }
+
+    pub(crate) fn unlink(mut self) {
+        // Retrieve the local bound and drop the socket.
+        let maybe_path = {
+            let socket = mem::replace(&mut self.inner, unsafe {
+                net::UnixListener::from_raw_fd(-1)
+            });
+            match socket.local_addr() {
+                Ok(addr) => match addr.as_pathname() {
+                    Some(path) => Some(path.as_os_str().to_owned()),
+                    None => None,
+                },
+                Err(_) => None,
+            }
+        };
+
+        // If the socket was bound to a named path, unlink it.
+        if let Some(path) = maybe_path {
+            let _ = std::fs::remove_file(path);
+        }
+
+        mem::forget(self);
+    }
 }
 
 impl Source for UnixListener {
