@@ -1,4 +1,4 @@
-use std::num::NonZeroU8;
+use std::num::NonZeroU16;
 use std::{fmt, ops};
 
 /// Interests used in registering.
@@ -24,11 +24,11 @@ use std::{fmt, ops};
 /// [`poll`]: crate::Poll::poll
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct Interests(NonZeroU8);
+pub struct Interests(NonZeroU16);
 
 // These must be unique.
-const READABLE: u8 = 0b0_001;
-const WRITABLE: u8 = 0b0_010;
+const READABLE: u16 = 0b0_001;
+const WRITABLE: u16 = 0b0_010;
 // The following are not available on all platforms.
 #[cfg_attr(
     not(any(
@@ -39,16 +39,19 @@ const WRITABLE: u8 = 0b0_010;
     )),
     allow(dead_code)
 )]
-const AIO: u8 = 0b0_100;
+const AIO: u16 = 0b0_100;
 #[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
-const LIO: u8 = 0b1_000;
+const LIO: u16 = 0b1_000;
+
+const READ_CLOSE: u16 = 0b001_0000;
+const WRITE_CLOSE: u16 = 0b010_0000;
 
 impl Interests {
     /// Returns a `Interests` set representing readable interests.
-    pub const READABLE: Interests = Interests(unsafe { NonZeroU8::new_unchecked(READABLE) });
+    pub const READABLE: Interests = Interests(unsafe { NonZeroU16::new_unchecked(READABLE) });
 
     /// Returns a `Interests` set representing writable interests.
-    pub const WRITABLE: Interests = Interests(unsafe { NonZeroU8::new_unchecked(WRITABLE) });
+    pub const WRITABLE: Interests = Interests(unsafe { NonZeroU16::new_unchecked(WRITABLE) });
 
     /// Returns a `Interests` set representing AIO completion interests.
     #[cfg(any(
@@ -57,11 +60,17 @@ impl Interests {
         target_os = "ios",
         target_os = "macos"
     ))]
-    pub const AIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(AIO) });
+    pub const AIO: Interests = Interests(unsafe { NonZeroU16::new_unchecked(AIO) });
 
     /// Returns a `Interests` set representing LIO completion interests.
     #[cfg(target_os = "freebsd")]
-    pub const LIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(LIO) });
+    pub const LIO: Interests = Interests(unsafe { NonZeroU16::new_unchecked(LIO) });
+
+    /// TODO
+    pub const READ_CLOSE: Interests = Interests(unsafe { NonZeroU16::new_unchecked(READ_CLOSE) });
+
+    /// TODO
+    pub const WRITE_CLOSE: Interests = Interests(unsafe { NonZeroU16::new_unchecked(WRITE_CLOSE) });
 
     /// Add together two `Interests`.
     ///
@@ -77,7 +86,7 @@ impl Interests {
     /// ```
     #[allow(clippy::should_implement_trait)]
     pub const fn add(self, other: Interests) -> Interests {
-        Interests(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
+        Interests(unsafe { NonZeroU16::new_unchecked(self.0.get() | other.0.get()) })
     }
 
     /// Returns true if the value includes readable readiness.
@@ -88,6 +97,16 @@ impl Interests {
     /// Returns true if the value includes writable readiness.
     pub const fn is_writable(self) -> bool {
         (self.0.get() & WRITABLE) != 0
+    }
+
+    /// Returns true if the value includes read close readiness.
+    pub const fn is_read_close(self) -> bool {
+        (self.0.get() & READ_CLOSE) != 0
+    }
+
+    /// Returns true if the value includes write close readiness.
+    pub const fn is_write_close(self) -> bool {
+        (self.0.get() & WRITE_CLOSE) != 0
     }
 
     /// Returns true if `Interests` contains AIO readiness
@@ -106,7 +125,7 @@ impl ops::BitOr for Interests {
 
     #[inline]
     fn bitor(self, other: Self) -> Self {
-        Interests(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
+        Interests(unsafe { NonZeroU16::new_unchecked(self.0.get() | other.0.get()) })
     }
 }
 
