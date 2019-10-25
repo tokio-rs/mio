@@ -43,8 +43,8 @@ const AIO: u16 = 0b0_100;
 #[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
 const LIO: u16 = 0b1_000;
 
-const READ_CLOSE: u16 = 0b001_0000;
-const WRITE_CLOSE: u16 = 0b010_0000;
+const READ_CLOSE: u16 = 0b001_0001;
+const WRITE_CLOSE: u16 = 0b010_0010;
 
 impl Interests {
     /// Returns a `Interests` set representing readable interests.
@@ -151,6 +151,20 @@ impl fmt::Debug for Interests {
                 write!(fmt, " | ")?
             }
             write!(fmt, "WRITABLE")?;
+            one = true
+        }
+        if self.is_read_close() {
+            if one {
+                write!(fmt, " | ")?
+            }
+            write!(fmt, "READ_CLOSE")?;
+            one = true
+        }
+        if self.is_write_close() {
+            if one {
+                write!(fmt, " | ")?
+            }
+            write!(fmt, "WRITE_CLOSE")?;
             one = true
         }
         #[cfg(any(
