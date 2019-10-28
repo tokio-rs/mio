@@ -10,9 +10,9 @@ use crate::sys::Events;
 use crate::{Interests, Token};
 
 use miow::iocp::{CompletionPort, CompletionStatus};
+use miow::Overlapped;
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;
-use std::io;
 use std::mem::size_of;
 use std::os::windows::io::{AsRawSocket, RawSocket};
 use std::pin::Pin;
@@ -21,6 +21,7 @@ use std::ptr::null_mut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use std::{io, ptr};
 use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
@@ -29,6 +30,11 @@ use winapi::um::mswsock::SIO_BASE_HANDLE;
 use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
+
+/// Overlapped value to indicate a `Waker` event.
+//
+// Note: this must be null, `SelectorInner::feed_events` depends on it.
+pub const WAKER_OVERLAPPED: *mut Overlapped = ptr::null_mut();
 
 #[derive(Debug)]
 struct AfdGroup {
@@ -391,6 +397,10 @@ impl Selector {
     pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
         self.inner.clone()
     }
+
+    pub(super) fn clone_port(&self) -> Arc<CompletionPort> {
+        self.inner.cp.clone()
+    }
 }
 
 #[derive(Debug)]
@@ -570,10 +580,6 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn port(&self) -> &CompletionPort {
-        &self.cp
-    }
-
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
         let update_queue = &mut *self.update_queue.get();
         loop {
@@ -613,7 +619,8 @@ impl SelectorInner {
         let mut n = 0;
         let update_queue = &mut *self.update_queue.get();
         for iocp_event in iocp_events.iter() {
-            if iocp_event.overlapped() as usize == 0 {
+            if iocp_event.overlapped().is_null() {
+                // `Waker` event, we'll add a readable event to match the other platforms.
                 events.push(Event {
                     flags: AFD_POLL_RECEIVE,
                     data: iocp_event.token() as u64,
