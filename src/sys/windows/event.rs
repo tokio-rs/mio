@@ -89,9 +89,9 @@ impl Events {
     }
 
     pub fn clear(&mut self) {
-        self.events.truncate(0);
-        for c in 0..self.statuses.len() {
-            self.statuses[c] = CompletionStatus::zero();
+        self.events.clear();
+        for status in self.statuses.iter_mut() {
+            *status = CompletionStatus::zero();
         }
     }
 }
