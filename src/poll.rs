@@ -106,20 +106,20 @@ use std::{fmt, io};
 /// interest and either an error or close is received, a readiness event will
 /// be generated for the socket, but it **may** only include `readable`
 /// readiness. Also note that, given the potential for spurious events,
-/// receiving a readiness event with `read_close`, `write_close`, or `error`
+/// receiving a readiness event with `read_closed`, `write_closed`, or `error`
 /// doesn't actually mean that a `read` on the socket will return a result
 /// matching the readiness event.
 ///
-/// In other words, portable programs that explicitly check for [`read_close`],
-/// [`write_close`], or [`error`] readiness should be doing so as an
+/// In other words, portable programs that explicitly check for [`read_closed`],
+/// [`write_closed`], or [`error`] readiness should be doing so as an
 /// **optimization** and always be able to handle an error or close situation
 /// when performing the actual read operation.
 ///
 /// [`readable`]: crate::event::Event::is_readable
 /// [`writable`]: crate::event::Event::is_writable
 /// [`error`]: crate::event::Event::is_error
-/// [`read_close`]: crate::event::Event::is_read_close
-/// [`write_close`]: crate::event::Event::is_write_close
+/// [`read_closed`]: crate::event::Event::is_read_closed
+/// [`write_closed`]: crate::event::Event::is_write_closed
 ///
 /// ### Registering handles
 ///

@@ -82,8 +82,8 @@ impl Event {
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
     /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
     #[inline]
-    pub fn is_read_close(&self) -> bool {
-        sys::event::is_read_close(&self.inner)
+    pub fn is_read_closed(&self) -> bool {
+        sys::event::is_read_closed(&self.inner)
     }
 
     /// Returns true if the event contains write close readiness.
@@ -105,8 +105,8 @@ impl Event {
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
     /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
-    pub fn is_write_close(&self) -> bool {
-        sys::event::is_write_close(&self.inner)
+    pub fn is_write_closed(&self) -> bool {
+        sys::event::is_write_closed(&self.inner)
     }
 
     /// Returns true if the event contains priority readiness.
@@ -182,8 +182,8 @@ impl fmt::Debug for Event {
             .field("readable", &self.is_readable())
             .field("writable", &self.is_writable())
             .field("error", &self.is_error())
-            .field("read_close", &self.is_read_close())
-            .field("write_close", &self.is_write_close())
+            .field("read_closed", &self.is_read_closed())
+            .field("write_closed", &self.is_write_closed())
             .field("priority", &self.is_priority())
             .field("aio", &self.is_aio())
             .field("lio", &self.is_lio())

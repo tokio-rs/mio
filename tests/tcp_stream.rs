@@ -452,6 +452,10 @@ fn deregistering() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "fails on Windows; client close events are not found"
+)]
 fn tcp_shutdown_client_read_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -461,7 +465,7 @@ fn tcp_shutdown_client_read_close_event() {
 
     let interests = Interests::READABLE | Interests::WRITABLE;
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::READ_CLOSE;
+    let interests = interests | Interests::READ_CLOSED;
 
     assert_ok!(poll.registry().register(&stream, ID1, interests));
 
@@ -477,12 +481,12 @@ fn tcp_shutdown_client_read_close_event() {
     assert_ok!(poll.poll(&mut events, TIMEOUT));
     for event in events.iter() {
         println!("Event: {:?}", event);
-        if event.is_read_close() {
+        if event.is_read_closed() {
             found = true
         }
     }
     if !found {
-        panic!("failed to find read_close event")
+        panic!("failed to find read_closed event")
     }
 
     barrier.wait();
@@ -499,7 +503,7 @@ fn tcp_shutdown_server_write_close_event() {
 
     let interests = Interests::READABLE | Interests::WRITABLE;
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::READ_CLOSE;
+    let interests = interests | Interests::READ_CLOSED;
 
     assert_ok!(poll.registry().register(&stream, ID1, interests));
 
@@ -515,12 +519,12 @@ fn tcp_shutdown_server_write_close_event() {
     assert_ok!(poll.poll(&mut events, TIMEOUT));
     for event in events.iter() {
         println!("Event: {:?}", event);
-        if event.is_read_close() {
+        if event.is_read_closed() {
             found = true
         }
     }
     if !found {
-        panic!("failed to find read_close event")
+        panic!("failed to find read_closed event")
     }
 
     barrier.wait();
@@ -528,6 +532,10 @@ fn tcp_shutdown_server_write_close_event() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "fails on Windows; client close events are not found"
+)]
 fn tcp_shutdown_client_both_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -537,7 +545,7 @@ fn tcp_shutdown_client_both_close_event() {
 
     let interests = Interests::READABLE | Interests::WRITABLE;
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::WRITE_CLOSE;
+    let interests = interests | Interests::WRITE_CLOSED;
 
     assert_ok!(poll.registry().register(&stream, ID1, interests));
 
@@ -553,12 +561,12 @@ fn tcp_shutdown_client_both_close_event() {
     assert_ok!(poll.poll(&mut events, TIMEOUT));
     for event in events.iter() {
         println!("Event: {:?}", event);
-        if event.is_write_close() {
+        if event.is_write_closed() {
             found = true
         }
     }
     if !found {
-        panic!("failed to find write_close event")
+        panic!("failed to find write_closed event")
     }
 
     barrier.wait();

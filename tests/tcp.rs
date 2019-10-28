@@ -622,7 +622,7 @@ fn write_error() {
 }
 
 macro_rules! wait {
-    ($poll:ident, $ready:ident, $expect_read_close: expr) => {{
+    ($poll:ident, $ready:ident, $expect_read_closed: expr) => {{
         use std::time::Instant;
 
         let now = Instant::now();
@@ -639,10 +639,10 @@ macro_rules! wait {
                 .unwrap();
 
             for event in &events {
-                if $expect_read_close {
-                    assert!(event.is_read_close());
+                if $expect_read_closed {
+                    assert!(event.is_read_closed());
                 } else {
-                    assert!(!event.is_read_close() && !event.is_write_close());
+                    assert!(!event.is_read_closed() && !event.is_write_closed());
                 }
 
                 if event.token() == Token(0) && event.$ready() {
@@ -665,7 +665,7 @@ fn write_shutdown() {
 
     let interests = Interests::READABLE | Interests::WRITABLE;
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::READ_CLOSE;
+    let interests = interests | Interests::READ_CLOSED;
 
     let client = TcpStream::connect(addr).unwrap();
     poll.registry()

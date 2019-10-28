@@ -99,11 +99,11 @@ fn interests_to_epoll(interests: Interests) -> u32 {
         kind |= EPOLLOUT;
     }
 
-    if interests.is_read_close() {
+    if interests.is_read_closed() {
         kind |= EPOLLRDHUP;
     }
 
-    if interests.is_write_close() {
+    if interests.is_write_closed() {
         kind |= EPOLLOUT;
     }
 
@@ -147,14 +147,14 @@ pub mod event {
         (event.events as libc::c_int & libc::EPOLLERR) != 0
     }
 
-    pub fn is_read_close(event: &Event) -> bool {
+    pub fn is_read_closed(event: &Event) -> bool {
         // Both halves of the socket have closed
         event.events as libc::c_int & libc::EPOLLHUP != 0
             // Socket has received FIN or called shutdown(SHUT_RD)
             || event.events as libc::c_int & libc::EPOLLRDHUP != 0
     }
 
-    pub fn is_write_close(event: &Event) -> bool {
+    pub fn is_write_closed(event: &Event) -> bool {
         // Both halves of the socket have closed
         event.events as libc::c_int & libc::EPOLLHUP != 0
             // Unix pipe write end has closed

@@ -341,11 +341,11 @@ pub mod event {
             (event.flags & libc::EV_EOF) != 0 && event.fflags != 0
     }
 
-    pub fn is_read_close(event: &Event) -> bool {
+    pub fn is_read_closed(event: &Event) -> bool {
         event.filter == libc::EVFILT_READ && event.flags & libc::EV_EOF != 0
     }
 
-    pub fn is_write_close(event: &Event) -> bool {
+    pub fn is_write_closed(event: &Event) -> bool {
         event.filter == libc::EVFILT_WRITE && event.flags & libc::EV_EOF != 0
     }
 

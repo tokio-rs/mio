@@ -43,16 +43,10 @@ const AIO: u16 = 0b0_100;
 #[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
 const LIO: u16 = 0b1_000;
 
-#[cfg_attr(
-    not(any(target_os = "linux", target_os = "android", target_os = "solaris")),
-    allow(dead_code)
-)]
-const READ_CLOSE: u16 = 0b001_0000;
-#[cfg_attr(
-    not(any(target_os = "linux", target_os = "android", target_os = "solaris")),
-    allow(dead_code)
-)]
-const WRITE_CLOSE: u16 = 0b010_0000;
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+const READ_CLOSED: u16 = 0b001_0000;
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+const WRITE_CLOSED: u16 = 0b010_0000;
 
 impl Interests {
     /// Returns a `Interests` set representing readable interests.
@@ -76,11 +70,12 @@ impl Interests {
 
     /// TODO
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    pub const READ_CLOSE: Interests = Interests(unsafe { NonZeroU16::new_unchecked(READ_CLOSE) });
+    pub const READ_CLOSED: Interests = Interests(unsafe { NonZeroU16::new_unchecked(READ_CLOSED) });
 
     /// TODO
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    pub const WRITE_CLOSE: Interests = Interests(unsafe { NonZeroU16::new_unchecked(WRITE_CLOSE) });
+    pub const WRITE_CLOSED: Interests =
+        Interests(unsafe { NonZeroU16::new_unchecked(WRITE_CLOSED) });
 
     /// Add together two `Interests`.
     ///
@@ -120,13 +115,15 @@ impl Interests {
     }
 
     /// Returns true if the value includes read close readiness.
-    pub const fn is_read_close(self) -> bool {
-        (self.0.get() & READ_CLOSE) != 0
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    pub const fn is_read_closed(self) -> bool {
+        (self.0.get() & READ_CLOSED) != 0
     }
 
     /// Returns true if the value includes write close readiness.
-    pub const fn is_write_close(self) -> bool {
-        (self.0.get() & WRITE_CLOSE) != 0
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    pub const fn is_write_closed(self) -> bool {
+        (self.0.get() & WRITE_CLOSED) != 0
     }
 }
 
@@ -190,21 +187,21 @@ impl fmt::Debug for Interests {
         }
         #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
         {
-            if self.is_read_close() {
+            if self.is_read_closed() {
                 if one {
                     write!(fmt, " | ")?
                 }
-                write!(fmt, "READ_CLOSE")?;
+                write!(fmt, "READ_CLOSED")?;
                 one = true
             }
         }
         #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
         {
-            if self.is_write_close() {
+            if self.is_write_closed() {
                 if one {
                     write!(fmt, " | ")?
                 }
-                write!(fmt, "WRITE_CLOSE")?;
+                write!(fmt, "WRITE_CLOSED")?;
                 one = true
             }
         }
