@@ -1,9 +1,7 @@
 use super::selector::SockState;
-use super::InternalState;
-use super::{new_socket, socket_addr};
-use crate::poll;
+use super::{new_socket, socket_addr, InternalState};
 use crate::sys::windows::init;
-use crate::{event, Interests, Registry, Token};
+use crate::{event, poll, Interests, Registry, Token};
 
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};

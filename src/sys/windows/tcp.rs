@@ -1,9 +1,7 @@
 use super::selector::SockState;
-use super::InternalState;
-use super::{inaddr_any, new_socket, socket_addr};
-use crate::poll;
+use super::{inaddr_any, new_socket, socket_addr, InternalState};
 use crate::sys::windows::init;
-use crate::{event, Interests, Registry, Token};
+use crate::{event, poll, Interests, Registry, Token};
 
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
