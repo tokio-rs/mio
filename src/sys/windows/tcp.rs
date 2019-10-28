@@ -23,49 +23,6 @@ pub struct TcpListener {
     inner: net::TcpListener,
 }
 
-macro_rules! wouldblock {
-    ($self:ident, $method:ident)  => {{
-        let result = (&$self.inner).$method();
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = $self.internal.lock().unwrap();
-                if internal.is_some() {
-                    let selector = internal.as_ref().unwrap().selector.clone();
-                    let token = internal.as_ref().unwrap().token;
-                    let interests = internal.as_ref().unwrap().interests;
-                    drop(internal);
-                    selector.reregister(
-                        $self,
-                        token,
-                        interests,
-                    )?;
-                }
-            }
-        }
-        result
-    }};
-    ($self:ident, $method:ident, $($args:expr),* )  => {{
-        let result = (&$self.inner).$method($($args),*);
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = $self.internal.lock().unwrap();
-                if internal.is_some() {
-                    let selector = internal.as_ref().unwrap().selector.clone();
-                    let token = internal.as_ref().unwrap().token;
-                    let interests = internal.as_ref().unwrap().interests;
-                    drop(internal);
-                    selector.reregister(
-                        $self,
-                        token,
-                        interests,
-                    )?;
-                }
-            }
-        }
-        result
-    }};
-}
-
 impl TcpStream {
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         init();
@@ -196,49 +153,49 @@ impl<'a> super::SocketState for &'a TcpStream {
 
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        wouldblock!(self, read, buf)
+        try_io!(self, read, buf)
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        wouldblock!(self, read_vectored, bufs)
+        try_io!(self, read_vectored, bufs)
     }
 }
 
 impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        wouldblock!(self, read, buf)
+        try_io!(self, read, buf)
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        wouldblock!(self, read_vectored, bufs)
+        try_io!(self, read_vectored, bufs)
     }
 }
 
 impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        wouldblock!(self, write, buf)
+        try_io!(self, write, buf)
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        wouldblock!(self, write_vectored, bufs)
+        try_io!(self, write_vectored, bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        wouldblock!(self, flush)
+        try_io!(self, flush)
     }
 }
 
 impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        wouldblock!(self, write, buf)
+        try_io!(self, write, buf)
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        wouldblock!(self, write_vectored, bufs)
+        try_io!(self, write_vectored, bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        wouldblock!(self, flush)
+        try_io!(self, flush)
     }
 }
 
@@ -359,7 +316,7 @@ impl TcpListener {
     }
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        wouldblock!(self, accept).and_then(|(inner, addr)| {
+        try_io!(self, accept).and_then(|(inner, addr)| {
             inner.set_nonblocking(true).map(|()| {
                 (
                     TcpStream {
