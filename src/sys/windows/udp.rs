@@ -138,6 +138,20 @@ impl UdpSocket {
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.inner.take_error()
     }
+
+    // Used by `try_io` to register after an I/O operation blocked.
+    fn io_blocked_reregister(&self) -> io::Result<()> {
+        let internal = self.internal.lock().unwrap();
+        if internal.is_some() {
+            let selector = internal.as_ref().unwrap().selector.clone();
+            let token = internal.as_ref().unwrap().token;
+            let interests = internal.as_ref().unwrap().interests;
+            drop(internal);
+            selector.reregister(self, token, interests)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl super::SocketState for UdpSocket {

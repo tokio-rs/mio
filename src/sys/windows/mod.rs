@@ -29,18 +29,7 @@ macro_rules! try_io {
         let result = (&$self.inner).$method($($args),*);
         if let Err(ref e) = result {
             if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = $self.internal.lock().unwrap();
-                if internal.is_some() {
-                    let selector = internal.as_ref().unwrap().selector.clone();
-                    let token = internal.as_ref().unwrap().token;
-                    let interests = internal.as_ref().unwrap().interests;
-                    drop(internal);
-                    selector.reregister(
-                        $self,
-                        token,
-                        interests,
-                    )?;
-                }
+                $self.io_blocked_reregister()?;
             }
         }
         result
