@@ -43,8 +43,16 @@ const AIO: u16 = 0b0_100;
 #[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
 const LIO: u16 = 0b1_000;
 
-const READ_CLOSE: u16 = 0b001_0001;
-const WRITE_CLOSE: u16 = 0b010_0010;
+#[cfg_attr(
+    not(any(target_os = "linux", target_os = "android", target_os = "solaris")),
+    allow(dead_code)
+)]
+const READ_CLOSE: u16 = 0b001_0000;
+#[cfg_attr(
+    not(any(target_os = "linux", target_os = "android", target_os = "solaris")),
+    allow(dead_code)
+)]
+const WRITE_CLOSE: u16 = 0b010_0000;
 
 impl Interests {
     /// Returns a `Interests` set representing readable interests.
@@ -67,9 +75,11 @@ impl Interests {
     pub const LIO: Interests = Interests(unsafe { NonZeroU16::new_unchecked(LIO) });
 
     /// TODO
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
     pub const READ_CLOSE: Interests = Interests(unsafe { NonZeroU16::new_unchecked(READ_CLOSE) });
 
     /// TODO
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
     pub const WRITE_CLOSE: Interests = Interests(unsafe { NonZeroU16::new_unchecked(WRITE_CLOSE) });
 
     /// Add together two `Interests`.
@@ -99,16 +109,6 @@ impl Interests {
         (self.0.get() & WRITABLE) != 0
     }
 
-    /// Returns true if the value includes read close readiness.
-    pub const fn is_read_close(self) -> bool {
-        (self.0.get() & READ_CLOSE) != 0
-    }
-
-    /// Returns true if the value includes write close readiness.
-    pub const fn is_write_close(self) -> bool {
-        (self.0.get() & WRITE_CLOSE) != 0
-    }
-
     /// Returns true if `Interests` contains AIO readiness
     pub const fn is_aio(self) -> bool {
         (self.0.get() & AIO) != 0
@@ -117,6 +117,16 @@ impl Interests {
     /// Returns true if `Interests` contains LIO readiness
     pub const fn is_lio(self) -> bool {
         (self.0.get() & LIO) != 0
+    }
+
+    /// Returns true if the value includes read close readiness.
+    pub const fn is_read_close(self) -> bool {
+        (self.0.get() & READ_CLOSE) != 0
+    }
+
+    /// Returns true if the value includes write close readiness.
+    pub const fn is_write_close(self) -> bool {
+        (self.0.get() & WRITE_CLOSE) != 0
     }
 }
 
@@ -153,20 +163,6 @@ impl fmt::Debug for Interests {
             write!(fmt, "WRITABLE")?;
             one = true
         }
-        if self.is_read_close() {
-            if one {
-                write!(fmt, " | ")?
-            }
-            write!(fmt, "READ_CLOSE")?;
-            one = true
-        }
-        if self.is_write_close() {
-            if one {
-                write!(fmt, " | ")?
-            }
-            write!(fmt, "WRITE_CLOSE")?;
-            one = true
-        }
         #[cfg(any(
             target_os = "dragonfly",
             target_os = "freebsd",
@@ -189,6 +185,26 @@ impl fmt::Debug for Interests {
                     write!(fmt, " | ")?
                 }
                 write!(fmt, "LIO")?;
+                one = true
+            }
+        }
+        #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+        {
+            if self.is_read_close() {
+                if one {
+                    write!(fmt, " | ")?
+                }
+                write!(fmt, "READ_CLOSE")?;
+                one = true
+            }
+        }
+        #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+        {
+            if self.is_write_close() {
+                if one {
+                    write!(fmt, " | ")?
+                }
+                write!(fmt, "WRITE_CLOSE")?;
                 one = true
             }
         }

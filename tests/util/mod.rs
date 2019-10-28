@@ -12,6 +12,18 @@ use log::{error, warn};
 use mio::event::Event;
 use mio::{Events, Interests, Poll, Token};
 
+pub const DATA1: &[u8] = b"Hello world!";
+pub const DATA2: &[u8] = b"Hello mars!";
+
+// TODO: replace with `DATA1.len()` once `const_slice_len` is stable.
+pub const DATA1_LEN: usize = 12;
+pub const DATA2_LEN: usize = 11;
+
+pub const ID1: Token = Token(0);
+pub const ID2: Token = Token(1);
+
+pub const TIMEOUT: Option<Duration> = Some(Duration::from_millis(500));
+
 // TODO: replace w/ assertive
 // https://github.com/carllerche/assertive
 #[macro_export]
@@ -188,8 +200,7 @@ pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<Exp
     // poll returns the first event only in a single call. To be a bit more
     // lenient we'll poll a couple of times.
     for _ in 0..3 {
-        poll.poll(events, Some(Duration::from_millis(500)))
-            .expect("unable to poll");
+        poll.poll(events, TIMEOUT).expect("unable to poll");
 
         for event in events.iter() {
             let index = expected.iter().position(|expected| expected.matches(event));
@@ -215,8 +226,7 @@ pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<Exp
 }
 
 pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
-    poll.poll(events, Some(Duration::from_millis(50)))
-        .expect("unable to poll");
+    poll.poll(events, TIMEOUT).expect("unable to poll");
     if !events.is_empty() {
         for event in events.iter() {
             error!("unexpected event: {:?}", event);

@@ -19,17 +19,11 @@ fn bit_or() {
 
 #[test]
 fn fmt_debug() {
-    assert_eq!(
-        format!("{:?}", Interests::READABLE),
-        "READABLE | READ_CLOSE"
-    );
-    assert_eq!(
-        format!("{:?}", Interests::WRITABLE),
-        "WRITABLE | WRITE_CLOSE"
-    );
+    assert_eq!(format!("{:?}", Interests::READABLE), "READABLE");
+    assert_eq!(format!("{:?}", Interests::WRITABLE), "WRITABLE");
     assert_eq!(
         format!("{:?}", Interests::READABLE | Interests::WRITABLE),
-        "READABLE | WRITABLE | READ_CLOSE | WRITE_CLOSE"
+        "READABLE | WRITABLE"
     );
     #[cfg(any(
         target_os = "dragonfly",
@@ -44,4 +38,8 @@ fn fmt_debug() {
     {
         assert_eq!(format!("{:?}", Interests::LIO), "LIO");
     }
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    assert_eq!(format!("{:?}", Interests::READ_CLOSE), "READ_CLOSE");
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    assert_eq!(format!("{:?}", Interests::WRITE_CLOSE), "WRITE_CLOSE");
 }

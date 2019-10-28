@@ -1,3 +1,8 @@
+#[macro_use]
+mod util;
+
+use mio::net::TcpStream;
+use mio::{Interests, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
@@ -5,15 +10,9 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Barrier};
 use std::thread;
-
-use mio::net::TcpStream;
-use mio::{Interests, Token};
-
-mod util;
-
 use util::{
     any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
-    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
+    expect_events, expect_no_events, init, init_with_poll, ExpectEvent, TIMEOUT,
 };
 
 const DATA1: &[u8] = b"Hello world!";
@@ -169,7 +168,7 @@ fn ttl() {
     init();
 
     let barrier = Arc::new(Barrier::new(2));
-    let (thread_handle, address) = start_listener(1, Some(barrier.clone()));
+    let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
 
     let stream = TcpStream::connect(address).unwrap();
 
@@ -187,7 +186,7 @@ fn nodelay() {
     let (mut poll, mut events) = init_with_poll();
 
     let barrier = Arc::new(Barrier::new(2));
-    let (thread_handle, address) = start_listener(1, Some(barrier.clone()));
+    let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
 
     let stream = TcpStream::connect(address).unwrap();
 
@@ -363,7 +362,7 @@ fn shutdown_both() {
 fn raw_fd() {
     init();
 
-    let (thread_handle, address) = start_listener(1, None);
+    let (thread_handle, address) = start_listener(1, None, false);
 
     let stream = TcpStream::connect(address).unwrap();
     let address = stream.local_addr().unwrap();
@@ -452,6 +451,120 @@ fn deregistering() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[test]
+fn tcp_shutdown_client_read_close_event() {
+    let (mut poll, mut events) = init_with_poll();
+    let barrier = Arc::new(Barrier::new(2));
+
+    let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
+    let stream = assert_ok!(TcpStream::connect(sockaddr));
+
+    let interests = Interests::READABLE | Interests::WRITABLE;
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    let interests = interests | Interests::READ_CLOSE;
+
+    assert_ok!(poll.registry().register(&stream, ID1, interests));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+    );
+
+    assert_ok!(stream.shutdown(Shutdown::Read));
+
+    let mut found = false;
+    assert_ok!(poll.poll(&mut events, TIMEOUT));
+    for event in events.iter() {
+        println!("Event: {:?}", event);
+        if event.is_read_close() {
+            found = true
+        }
+    }
+    if !found {
+        panic!("failed to find read_close event")
+    }
+
+    barrier.wait();
+    handle.join().expect("failed to join thread");
+}
+
+#[test]
+fn tcp_shutdown_server_write_close_event() {
+    let (mut poll, mut events) = init_with_poll();
+    let barrier = Arc::new(Barrier::new(2));
+
+    let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), true);
+    let stream = assert_ok!(TcpStream::connect(sockaddr));
+
+    let interests = Interests::READABLE | Interests::WRITABLE;
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    let interests = interests | Interests::READ_CLOSE;
+
+    assert_ok!(poll.registry().register(&stream, ID1, interests));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+    );
+
+    barrier.wait();
+
+    let mut found = false;
+    assert_ok!(poll.poll(&mut events, TIMEOUT));
+    for event in events.iter() {
+        println!("Event: {:?}", event);
+        if event.is_read_close() {
+            found = true
+        }
+    }
+    if !found {
+        panic!("failed to find read_close event")
+    }
+
+    barrier.wait();
+    handle.join().expect("failed to join thread");
+}
+
+#[test]
+fn tcp_shutdown_client_both_close_event() {
+    let (mut poll, mut events) = init_with_poll();
+    let barrier = Arc::new(Barrier::new(2));
+
+    let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
+    let stream = assert_ok!(TcpStream::connect(sockaddr));
+
+    let interests = Interests::READABLE | Interests::WRITABLE;
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    let interests = interests | Interests::WRITE_CLOSE;
+
+    assert_ok!(poll.registry().register(&stream, ID1, interests));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+    );
+
+    assert_ok!(stream.shutdown(Shutdown::Both));
+
+    let mut found = false;
+    assert_ok!(poll.poll(&mut events, TIMEOUT));
+    for event in events.iter() {
+        println!("Event: {:?}", event);
+        if event.is_write_close() {
+            found = true
+        }
+    }
+    if !found {
+        panic!("failed to find write_close event")
+    }
+
+    barrier.wait();
+    handle.join().expect("failed to join thread");
+}
+
 /// Start a listener that accepts `n_connections` connections on the returned
 /// address. It echos back any data it reads from the connection before
 /// accepting another one.
@@ -494,6 +607,7 @@ fn echo_listener(addr: SocketAddr, n_connections: usize) -> (thread::JoinHandle<
 fn start_listener(
     n_connections: usize,
     barrier: Option<Arc<Barrier>>,
+    drop_write: bool,
 ) -> (thread::JoinHandle<()>, SocketAddr) {
     let (sender, receiver) = channel();
     let thread_handle = thread::spawn(move || {
@@ -505,6 +619,11 @@ fn start_listener(
             let (stream, _) = listener.accept().unwrap();
             if let Some(ref barrier) = barrier {
                 barrier.wait();
+
+                if drop_write {
+                    assert_ok!(stream.shutdown(Shutdown::Write));
+                    barrier.wait();
+                }
             }
             drop(stream);
         }
