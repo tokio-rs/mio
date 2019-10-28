@@ -11,7 +11,6 @@ use crate::{Interests, Token};
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::Overlapped;
-use std::cell::UnsafeCell;
 use std::collections::VecDeque;
 use std::mem::size_of;
 use std::os::windows::io::{AsRawSocket, RawSocket};
@@ -405,10 +404,8 @@ impl Selector {
 
 #[derive(Debug)]
 pub struct SelectorInner {
-    lock: Mutex<()>,
     cp: Arc<CompletionPort>,
-    active_poll_count: UnsafeCell<usize>,
-    update_queue: UnsafeCell<VecDeque<Arc<Mutex<SockState>>>>,
+    update_queue: Mutex<VecDeque<Arc<Mutex<SockState>>>>,
     afd_group: AfdGroup,
 }
 
@@ -422,10 +419,8 @@ impl SelectorInner {
             let cp_afd = Arc::clone(&cp);
 
             SelectorInner {
-                lock: Mutex::new(()),
-                cp: cp,
-                active_poll_count: UnsafeCell::new(0),
-                update_queue: UnsafeCell::new(VecDeque::new()),
+                cp,
+                update_queue: Mutex::new(VecDeque::new()),
                 afd_group: AfdGroup::new(cp_afd),
             }
         })
@@ -478,33 +473,19 @@ impl SelectorInner {
         events: &mut Vec<Event>,
         timeout: Option<Duration>,
     ) -> io::Result<usize> {
-        {
-            let _guard = self.lock.lock().unwrap();
-
-            unsafe {
-                self.update_sockets_events()?;
-
-                *self.active_poll_count.get() += 1;
-            }
+        unsafe {
+            self.update_sockets_events()?;
         }
 
         let result = self.cp.get_many(statuses, timeout);
 
-        {
-            let _guard = self.lock.lock().unwrap();
-
-            unsafe {
-                *self.active_poll_count.get() -= 1;
+        if let Err(e) = result {
+            if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
+                return Ok(0);
             }
-
-            if let Err(e) = result {
-                if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
-                    return Ok(0);
-                }
-                return Err(e);
-            }
-            unsafe { Ok(self.feed_events(events, result.unwrap())) }
+            return Err(e);
         }
+        unsafe { Ok(self.feed_events(events, result.unwrap())) }
     }
 
     pub fn register<S: SocketState + AsRawSocket>(
@@ -529,12 +510,9 @@ impl SelectorInner {
             sock.lock().unwrap().set_event(event);
         }
         socket.set_sock_state(Some(sock));
-        {
-            let _guard = self.lock.lock().unwrap();
-            unsafe {
-                self.add_socket_to_update_queue(socket);
-                self.update_sockets_events_if_polling()?;
-            }
+        unsafe {
+            self.add_socket_to_update_queue(socket);
+            self.update_sockets_events_if_polling()?;
         }
 
         Ok(())
@@ -560,12 +538,9 @@ impl SelectorInner {
         {
             sock.lock().unwrap().set_event(event);
         }
-        {
-            let _guard = self.lock.lock().unwrap();
-            unsafe {
-                self.add_socket_to_update_queue(socket);
-                self.update_sockets_events_if_polling()?;
-            }
+        unsafe {
+            self.add_socket_to_update_queue(socket);
+            self.update_sockets_events_if_polling()?;
         }
 
         Ok(())
@@ -581,7 +556,7 @@ impl SelectorInner {
     }
 
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
-        let update_queue = &mut *self.update_queue.get();
+        let mut update_queue = self.update_queue.lock().unwrap();
         loop {
             let sock = match update_queue.pop_front() {
                 Some(sock) => sock,
@@ -597,7 +572,8 @@ impl SelectorInner {
     }
 
     unsafe fn update_sockets_events_if_polling(&self) -> io::Result<()> {
-        let active_poll_count = *self.active_poll_count.get();
+        // FIXME: only do this while polling.
+        let active_poll_count = 1; //*self.active_poll_count.lock();
         if active_poll_count > 0 {
             return self.update_sockets_events();
         }
@@ -606,7 +582,7 @@ impl SelectorInner {
 
     unsafe fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
         let sock_state = socket.get_sock_state().unwrap();
-        let update_queue = &mut *self.update_queue.get();
+        let mut update_queue = self.update_queue.lock().unwrap();
         update_queue.push_back(sock_state);
     }
 
@@ -617,7 +593,7 @@ impl SelectorInner {
         iocp_events: &[CompletionStatus],
     ) -> usize {
         let mut n = 0;
-        let update_queue = &mut *self.update_queue.get();
+        let mut update_queue = self.update_queue.lock().unwrap();
         for iocp_event in iocp_events.iter() {
             if iocp_event.overlapped().is_null() {
                 // `Waker` event, we'll add a readable event to match the other platforms.
