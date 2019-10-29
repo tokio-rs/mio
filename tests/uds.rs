@@ -281,11 +281,11 @@ fn shutdown_read() {
     let mut local = assert_ok!(UnixStream::connect(path));
     assert_ok!(sync_sender.send(()));
 
-    let interests = Interests::READABLE | Interests::WRITABLE;
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::READ_CLOSED;
-
-    assert_ok!(poll.registry().register(&local, LOCAL, interests));
+    assert_ok!(poll.registry().register(
+        &local,
+        LOCAL,
+        Interests::READABLE.add(Interests::WRITABLE)
+    ));
 
     expect_events(
         &mut poll,
@@ -462,11 +462,11 @@ fn uds_shutdown_listener_write() {
     let path = remote_addr.as_pathname().expect("not a pathname");
     let stream = assert_ok!(UnixStream::connect(path));
 
-    let interests = Interests::READABLE | Interests::WRITABLE;
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::READ_CLOSED;
-
-    assert_ok!(poll.registry().register(&stream, LOCAL, interests,));
+    assert_ok!(poll.registry().register(
+        &stream,
+        LOCAL,
+        Interests::READABLE.add(Interests::WRITABLE)
+    ));
 
     expect_events(
         &mut poll,

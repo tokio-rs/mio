@@ -467,8 +467,6 @@ fn tcp_shutdown_client_read_close_event() {
     let stream = assert_ok!(TcpStream::connect(sockaddr));
 
     let interests = Interests::READABLE | Interests::WRITABLE;
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::READ_CLOSED;
 
     assert_ok!(poll.registry().register(&stream, ID1, interests));
 
@@ -523,11 +521,11 @@ fn tcp_shutdown_server_write_close_event() {
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), true);
     let stream = assert_ok!(TcpStream::connect(sockaddr));
 
-    let interests = Interests::READABLE | Interests::WRITABLE;
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::READ_CLOSED;
-
-    assert_ok!(poll.registry().register(&stream, ID1, interests));
+    assert_ok!(poll.registry().register(
+        &stream,
+        ID1,
+        Interests::READABLE.add(Interests::WRITABLE)
+    ));
 
     expect_events(
         &mut poll,
@@ -555,11 +553,11 @@ fn tcp_shutdown_client_both_close_event() {
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
     let stream = assert_ok!(TcpStream::connect(sockaddr));
 
-    let interests = Interests::READABLE | Interests::WRITABLE;
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::WRITE_CLOSED;
-
-    assert_ok!(poll.registry().register(&stream, ID1, interests));
+    assert_ok!(poll.registry().register(
+        &stream,
+        ID1,
+        Interests::READABLE.add(Interests::WRITABLE)
+    ));
 
     expect_events(
         &mut poll,

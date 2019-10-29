@@ -92,18 +92,10 @@ fn interests_to_epoll(interests: Interests) -> u32 {
     let mut kind = EPOLLET;
 
     if interests.is_readable() {
-        kind |= EPOLLIN;
+        kind = kind | EPOLLIN | EPOLLRDHUP;
     }
 
     if interests.is_writable() {
-        kind |= EPOLLOUT;
-    }
-
-    if interests.is_read_closed() {
-        kind |= EPOLLRDHUP;
-    }
-
-    if interests.is_write_closed() {
         kind |= EPOLLOUT;
     }
 
@@ -151,7 +143,8 @@ pub mod event {
         // Both halves of the socket have closed
         event.events as libc::c_int & libc::EPOLLHUP != 0
             // Socket has received FIN or called shutdown(SHUT_RD)
-            || event.events as libc::c_int & libc::EPOLLRDHUP != 0
+            || (event.events as libc::c_int & libc::EPOLLIN != 0
+                && event.events as libc::c_int & libc::EPOLLRDHUP != 0)
     }
 
     pub fn is_write_closed(event: &Event) -> bool {

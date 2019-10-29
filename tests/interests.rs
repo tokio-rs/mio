@@ -38,8 +38,4 @@ fn fmt_debug() {
     {
         assert_eq!(format!("{:?}", Interests::LIO), "LIO");
     }
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    assert_eq!(format!("{:?}", Interests::READ_CLOSED), "READ_CLOSED");
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    assert_eq!(format!("{:?}", Interests::WRITE_CLOSED), "WRITE_CLOSED");
 }

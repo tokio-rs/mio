@@ -663,13 +663,13 @@ fn write_shutdown() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
 
-    let interests = Interests::READABLE | Interests::WRITABLE;
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
-    let interests = interests | Interests::READ_CLOSED;
-
     let client = TcpStream::connect(addr).unwrap();
     poll.registry()
-        .register(&client, Token(0), interests)
+        .register(
+            &client,
+            Token(0),
+            Interests::READABLE.add(Interests::WRITABLE),
+        )
         .unwrap();
 
     let (socket, _) = listener.accept().unwrap();
