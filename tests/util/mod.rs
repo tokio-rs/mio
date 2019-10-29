@@ -12,8 +12,6 @@ use log::{error, warn};
 use mio::event::Event;
 use mio::{Events, Interests, Poll, Token};
 
-pub const TIMEOUT: Option<Duration> = Some(Duration::from_millis(500));
-
 // TODO: replace w/ assertive
 // https://github.com/carllerche/assertive
 #[macro_export]
@@ -67,7 +65,7 @@ macro_rules! expect_flaky_event {
         // Poll a couple of times in case the event does not immediately
         // happen
         'outer: for _ in 0..3 {
-            assert_ok!($poll.poll(&mut $events, TIMEOUT));
+            assert_ok!($poll.poll(&mut $events, Some(Duration::from_millis(500))));
             for event in $events.iter() {
                 if event.$secondary() {
                     found = true;
@@ -216,7 +214,8 @@ pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<Exp
     // poll returns the first event only in a single call. To be a bit more
     // lenient we'll poll a couple of times.
     for _ in 0..3 {
-        poll.poll(events, TIMEOUT).expect("unable to poll");
+        poll.poll(events, Some(Duration::from_millis(500)))
+            .expect("unable to poll");
 
         for event in events.iter() {
             let index = expected.iter().position(|expected| expected.matches(event));
@@ -242,7 +241,8 @@ pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<Exp
 }
 
 pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
-    poll.poll(events, TIMEOUT).expect("unable to poll");
+    poll.poll(events, Some(Duration::from_millis(50)))
+        .expect("unable to poll");
     if !events.is_empty() {
         for event in events.iter() {
             error!("unexpected event: {:?}", event);
