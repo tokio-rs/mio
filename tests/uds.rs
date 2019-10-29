@@ -2,17 +2,22 @@
 #[macro_use]
 mod util;
 
-use mio::net::{UnixDatagram, UnixListener, UnixStream};
-use mio::unix::SocketAddr;
-use mio::{Interests, Token};
-use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::net::Shutdown;
-use std::sync::mpsc::{channel, Receiver};
-use std::thread;
+use log::warn;
+use mio::{
+    net::{UnixDatagram, UnixListener, UnixStream},
+    unix::SocketAddr,
+    Interests, Token,
+};
+use std::{
+    io::{self, IoSlice, IoSliceMut, Read, Write},
+    net::Shutdown,
+    sync::mpsc::{self, Receiver},
+    thread,
+};
 use tempdir::TempDir;
 use util::{
     assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
-    ExpectEvent, TryRead, TryWrite,
+    ExpectEvent, TryRead, TryWrite, TIMEOUT,
 };
 
 const DATA1: &[u8] = b"Hello same host!";
@@ -29,7 +34,7 @@ const LOCAL_CLONE: Token = Token(1);
 fn smoke_test() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (sync_sender, sync_receiver) = channel();
+    let (sync_sender, sync_receiver) = mpsc::channel();
     let (handle, remote_addr) = echo_remote(1, sync_receiver);
 
     let path = remote_addr.as_pathname().expect("not a pathname");
@@ -110,7 +115,7 @@ fn is_send_and_sync() {
 fn register() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (sync_sender, sync_receiver) = channel();
+    let (sync_sender, sync_receiver) = mpsc::channel();
     let (handle, remote_addr) = echo_remote(1, sync_receiver);
 
     let path = remote_addr.as_pathname().expect("not a pathname");
@@ -130,7 +135,7 @@ fn register() {
 fn reregister() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (sync_sender, sync_receiver) = channel();
+    let (sync_sender, sync_receiver) = mpsc::channel();
     let (handle, remote_addr) = echo_remote(1, sync_receiver);
 
     let path = remote_addr.as_pathname().expect("not a pathname");
@@ -157,7 +162,7 @@ fn reregister() {
 fn deregister() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (sync_sender, sync_receiver) = channel();
+    let (sync_sender, sync_receiver) = mpsc::channel();
     let (handle, remote_addr) = echo_remote(1, sync_receiver);
 
     let path = remote_addr.as_pathname().expect("not a pathname");
@@ -184,8 +189,8 @@ fn connect() {
     let remote = assert_ok!(UnixListener::bind(path.clone()));
     let local = assert_ok!(UnixStream::connect(path));
 
-    let (sender_1, receiver_1) = channel();
-    let (sender_2, receiver_2) = channel();
+    let (sender_1, receiver_1) = mpsc::channel();
+    let (sender_2, receiver_2) = mpsc::channel();
 
     let handle = thread::spawn(move || {
         let (stream, _) = assert_ok!(remote.accept());
@@ -220,7 +225,7 @@ fn connect() {
 fn try_clone() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (sync_sender, sync_receiver) = channel();
+    let (sync_sender, sync_receiver) = mpsc::channel();
     let (handle, remote_addr) = echo_remote(1, sync_receiver);
 
     let path = remote_addr.as_pathname().expect("not a pathname");
@@ -270,18 +275,18 @@ fn try_clone() {
 fn shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (sync_sender, sync_receiver) = channel();
+    let (sync_sender, sync_receiver) = mpsc::channel();
     let (handle, remote_addr) = echo_remote(1, sync_receiver);
 
     let path = remote_addr.as_pathname().expect("not a pathname");
     let mut local = assert_ok!(UnixStream::connect(path));
     assert_ok!(sync_sender.send(()));
 
-    assert_ok!(poll.registry().register(
-        &local,
-        LOCAL,
-        Interests::WRITABLE.add(Interests::READABLE)
-    ));
+    let interests = Interests::READABLE | Interests::WRITABLE;
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    let interests = interests | Interests::READ_CLOSED;
+
+    assert_ok!(poll.registry().register(&local, LOCAL, interests));
 
     expect_events(
         &mut poll,
@@ -299,6 +304,7 @@ fn shutdown_read() {
     );
 
     assert_ok!(local.shutdown(Shutdown::Read));
+    expect_secondary_event!(poll, events, is_read_closed);
 
     // Shutting down the reading side is different on each platform. For example
     // on Linux based systems we can still read.
@@ -325,7 +331,7 @@ fn shutdown_read() {
 fn shutdown_write() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (sync_sender, sync_receiver) = channel();
+    let (sync_sender, sync_receiver) = mpsc::channel();
     let (handle, remote_addr) = echo_remote(1, sync_receiver);
 
     let path = remote_addr.as_pathname().expect("not a pathname");
@@ -379,7 +385,7 @@ fn shutdown_write() {
 fn shutdown_both() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (sync_sender, sync_receiver) = channel();
+    let (sync_sender, sync_receiver) = mpsc::channel();
     let (handle, remote_addr) = echo_remote(1, sync_receiver);
 
     let path = remote_addr.as_pathname().expect("not a pathname");
@@ -408,6 +414,7 @@ fn shutdown_both() {
     );
 
     assert_ok!(local.shutdown(Shutdown::Both));
+    expect_secondary_event!(poll, events, is_write_closed);
 
     // Shutting down the reading side is different on each platform. For example
     // on Linux based systems we can still read.
@@ -436,11 +443,42 @@ fn shutdown_both() {
     assert_ok!(handle.join());
 }
 
+#[test]
+fn uds_shutdown_listener_write() {
+    let (sync_sender, sync_receiver) = mpsc::channel();
+    let (mut poll, mut events) = init_with_poll();
+
+    let (handle, remote_addr) = noop_listener(1, sync_receiver);
+
+    let path = remote_addr.as_pathname().expect("not a pathname");
+    let stream = assert_ok!(UnixStream::connect(path));
+    assert_ok!(sync_sender.send(()));
+
+    let interests = Interests::READABLE | Interests::WRITABLE;
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
+    let interests = interests | Interests::READ_CLOSED;
+
+    assert_ok!(poll.registry().register(&stream, LOCAL, interests,));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(LOCAL, Interests::WRITABLE)],
+    );
+
+    assert_ok!(sync_sender.send(()));
+
+    expect_secondary_event!(poll, events, is_read_closed);
+
+    assert_ok!(sync_sender.send(()));
+    handle.join().expect("failed to join thread");
+}
+
 fn echo_remote(
     connections: usize,
     sync_receiver: Receiver<()>,
 ) -> (thread::JoinHandle<()>, SocketAddr) {
-    let (addr_sender, addr_receiver) = channel();
+    let (addr_sender, addr_receiver) = mpsc::channel();
     let handle = thread::spawn(move || {
         let dir = assert_ok!(TempDir::new("uds"));
         let path = dir.path().join("foo");
@@ -478,4 +516,28 @@ fn echo_remote(
         }
     });
     (handle, assert_ok!(addr_receiver.recv()))
+}
+
+fn noop_listener(
+    connections: usize,
+    sync_receiver: Receiver<()>,
+) -> (thread::JoinHandle<()>, SocketAddr) {
+    let (sender, receiver) = mpsc::channel();
+    let handle = thread::spawn(move || {
+        let dir = assert_ok!(TempDir::new("uds"));
+        let path = dir.path().join("foo");
+        let listener = assert_ok!(UnixListener::bind(path.clone()));
+        let local_address = assert_ok!(listener.local_addr());
+        assert_ok!(sender.send(local_address));
+
+        for _ in 0..connections {
+            assert_ok!(sync_receiver.recv());
+            let (stream, _) = listener.accept().unwrap();
+            assert_ok!(sync_receiver.recv());
+            assert_ok!(stream.shutdown(Shutdown::Write));
+            assert_ok!(sync_receiver.recv());
+            drop(stream);
+        }
+    });
+    (handle, assert_ok!(receiver.recv()))
 }

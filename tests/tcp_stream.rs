@@ -1,13 +1,14 @@
 #[macro_use]
 mod util;
 
+use log::warn;
 use mio::net::TcpStream;
 use mio::{Interests, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
-use std::sync::mpsc::channel;
+use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
 use std::thread;
 use util::{
@@ -476,18 +477,7 @@ fn tcp_shutdown_client_read_close_event() {
     );
 
     assert_ok!(stream.shutdown(Shutdown::Read));
-
-    let mut found = false;
-    assert_ok!(poll.poll(&mut events, TIMEOUT));
-    for event in events.iter() {
-        println!("Event: {:?}", event);
-        if event.is_read_closed() {
-            found = true
-        }
-    }
-    if !found {
-        panic!("failed to find read_closed event")
-    }
+    expect_secondary_event!(poll, events, is_read_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -515,17 +505,7 @@ fn tcp_shutdown_server_write_close_event() {
 
     barrier.wait();
 
-    let mut found = false;
-    assert_ok!(poll.poll(&mut events, TIMEOUT));
-    for event in events.iter() {
-        println!("Event: {:?}", event);
-        if event.is_read_closed() {
-            found = true
-        }
-    }
-    if !found {
-        panic!("failed to find read_closed event")
-    }
+    expect_secondary_event!(poll, events, is_read_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -556,18 +536,7 @@ fn tcp_shutdown_client_both_close_event() {
     );
 
     assert_ok!(stream.shutdown(Shutdown::Both));
-
-    let mut found = false;
-    assert_ok!(poll.poll(&mut events, TIMEOUT));
-    for event in events.iter() {
-        println!("Event: {:?}", event);
-        if event.is_write_closed() {
-            found = true
-        }
-    }
-    if !found {
-        panic!("failed to find write_closed event")
-    }
+    expect_secondary_event!(poll, events, is_write_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -577,7 +546,7 @@ fn tcp_shutdown_client_both_close_event() {
 /// address. It echos back any data it reads from the connection before
 /// accepting another one.
 fn echo_listener(addr: SocketAddr, n_connections: usize) -> (thread::JoinHandle<()>, SocketAddr) {
-    let (sender, receiver) = channel();
+    let (sender, receiver) = mpsc::channel();
     let thread_handle = thread::spawn(move || {
         let listener = net::TcpListener::bind(addr).unwrap();
         let local_address = listener.local_addr().unwrap();
@@ -612,12 +581,12 @@ fn echo_listener(addr: SocketAddr, n_connections: usize) -> (thread::JoinHandle<
 /// Start a listener that accepts `n_connections` connections on the returned
 /// address. If a barrier is provided it will wait on it before closing the
 /// connection.
-fn start_listener(
+pub fn start_listener(
     n_connections: usize,
     barrier: Option<Arc<Barrier>>,
     drop_write: bool,
 ) -> (thread::JoinHandle<()>, SocketAddr) {
-    let (sender, receiver) = channel();
+    let (sender, receiver) = mpsc::channel();
     let thread_handle = thread::spawn(move || {
         let listener = net::TcpListener::bind(any_local_address()).unwrap();
         let local_address = listener.local_addr().unwrap();

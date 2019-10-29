@@ -74,8 +74,8 @@ impl Event {
     ///
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
-    /// | [epoll]       | `EPOLLHUP`
-    /// |               | `EPOLLIN` and `EPOLLRDHUP` |
+    /// | [epoll]       | `EPOLLHUP`, or  |
+    /// |               | `EPOLLRDHUP`    |
     /// | [kqueue]      | `EV_EOF`        |
     ///
     /// [OS selector]: ../struct.Poll.html#implementation-notes
@@ -98,7 +98,7 @@ impl Event {
     ///
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
-    /// | [epoll]       | `EPOLLHUP`
+    /// | [epoll]       | `EPOLLHUP`, or  |
     /// |               | `EPOLLOUT` and `EPOLLERR` |
     /// | [kqueue]      | `EV_EOF`        |
     ///

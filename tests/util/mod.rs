@@ -68,6 +68,30 @@ macro_rules! assert_err {
     }};
 }
 
+#[macro_export]
+macro_rules! expect_secondary_event {
+    ($poll:ident, $events:ident, $secondary:ident) => {
+        let mut found = false;
+        // Poll a couple of times in case the event does not immediately
+        // happen
+        'outer: for _ in 0..3 {
+            assert_ok!($poll.poll(&mut $events, TIMEOUT));
+            for event in $events.iter() {
+                if event.$secondary() {
+                    found = true;
+                    break 'outer;
+                } else {
+                    // Accept sporadic events.
+                    warn!("got unexpected event: {:?}", event);
+                }
+            }
+        }
+        if !found {
+            panic!("failed to find ")
+        }
+    };
+}
+
 pub fn init() {
     static INIT: Once = Once::new();
 
