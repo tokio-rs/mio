@@ -2,7 +2,7 @@ steps:
   # Linux and macOS.
   - script: |
       set -e
-      curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+      curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none --profile minimal
       export PATH=$PATH:$HOME/.cargo/bin
       rustup toolchain install $RUSTUP_TOOLCHAIN
       rustup default $RUSTUP_TOOLCHAIN
