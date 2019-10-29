@@ -4,7 +4,6 @@ use crate::sys::unix::net::new_socket;
 use crate::unix::SourceFd;
 use crate::{Interests, Registry, Token};
 
-use std::cmp::Ordering;
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -91,20 +90,19 @@ impl UnixDatagram {
 
     pub(crate) fn recv_from(&self, dst: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         let mut count = 0;
-        let socketaddr = SocketAddr::new(|sockaddr, socklen| unsafe {
-            count = libc::recvfrom(
+        let socketaddr = SocketAddr::new(|sockaddr, socklen| {
+            syscall!(recvfrom(
                 self.inner.as_raw_fd(),
                 dst.as_mut_ptr() as *mut _,
                 dst.len(),
                 0,
                 sockaddr,
                 socklen,
-            );
-            match count.cmp(&0) {
-                Ordering::Greater => Ok(1),
-                Ordering::Equal => Ok(0),
-                Ordering::Less => Err(io::Error::last_os_error()),
-            }
+            ))
+            .map(|c| {
+                count = c;
+                c as libc::c_int
+            })
         })?;
         Ok((count as usize, socketaddr))
     }
