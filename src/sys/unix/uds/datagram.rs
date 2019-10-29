@@ -4,6 +4,7 @@ use crate::sys::unix::net::new_socket;
 use crate::unix::SourceFd;
 use crate::{Interests, Registry, Token};
 
+use std::cmp::Ordering;
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -99,12 +100,10 @@ impl UnixDatagram {
                 sockaddr,
                 socklen,
             );
-            if count > 0 {
-                Ok(1)
-            } else if count == 0 {
-                Ok(0)
-            } else {
-                Err(io::Error::last_os_error())
+            match count.cmp(&0) {
+                Ordering::Greater => Ok(1),
+                Ordering::Equal => Ok(0),
+                Ordering::Less => Err(io::Error::last_os_error()),
             }
         })?;
         Ok((count as usize, socketaddr))
