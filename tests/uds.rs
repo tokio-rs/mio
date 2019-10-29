@@ -373,12 +373,6 @@ fn shutdown_write() {
     let err = assert_err!(local.write(DATA2));
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
 
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(LOCAL, Interests::READABLE)],
-    );
-
     // Read should be ok
     let mut buf = [0; DEFAULT_BUF_SIZE];
     let read = assert_ok!(local.read(&mut buf));
@@ -513,6 +507,9 @@ fn echo_remote(
                     Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
                     Err(err) => panic!("{}", err),
                 };
+                if n == 0 {
+                    break;
+                }
                 match local.try_write(&buf[..n]) {
                     Ok(Some(amount)) => written += amount,
                     Ok(None) => continue,
