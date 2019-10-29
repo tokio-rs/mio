@@ -12,16 +12,6 @@ use log::{error, warn};
 use mio::event::Event;
 use mio::{Events, Interests, Poll, Token};
 
-pub const DATA1: &[u8] = b"Hello world!";
-pub const DATA2: &[u8] = b"Hello mars!";
-
-// TODO: replace with `DATA1.len()` once `const_slice_len` is stable.
-pub const DATA1_LEN: usize = 12;
-pub const DATA2_LEN: usize = 11;
-
-pub const ID1: Token = Token(0);
-pub const ID2: Token = Token(1);
-
 pub const TIMEOUT: Option<Duration> = Some(Duration::from_millis(500));
 
 // TODO: replace w/ assertive
@@ -68,8 +58,10 @@ macro_rules! assert_err {
     }};
 }
 
+/// Expect an event that may not be represented by an Interest, such as
+/// `is_read_closed` and `is_write_closed` on some platforms.
 #[macro_export]
-macro_rules! expect_secondary_event {
+macro_rules! expect_flaky_event {
     ($poll:ident, $events:ident, $secondary:ident) => {
         let mut found = false;
         // Poll a couple of times in case the event does not immediately

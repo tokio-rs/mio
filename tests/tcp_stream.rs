@@ -2,15 +2,15 @@
 mod util;
 
 use log::warn;
-use mio::net::TcpStream;
-use mio::{Interests, Token};
-use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::net::{self, Shutdown, SocketAddr};
+use mio::{net::TcpStream, Interests, Token};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
-use std::sync::mpsc;
-use std::sync::{Arc, Barrier};
-use std::thread;
+use std::{
+    io::{self, IoSlice, IoSliceMut, Read, Write},
+    net::{self, Shutdown, SocketAddr},
+    sync::{mpsc, Arc, Barrier},
+    thread,
+};
 use util::{
     any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
     expect_events, expect_no_events, init, init_with_poll, ExpectEvent, TIMEOUT,
@@ -477,7 +477,7 @@ fn tcp_shutdown_client_read_close_event() {
     );
 
     assert_ok!(stream.shutdown(Shutdown::Read));
-    expect_secondary_event!(poll, events, is_read_closed);
+    expect_flaky_event!(poll, events, is_read_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -507,7 +507,7 @@ fn tcp_shutdown_client_write_close_event() {
     );
 
     assert_ok!(stream.shutdown(Shutdown::Write));
-    expect_secondary_event!(poll, events, is_write_closed);
+    expect_flaky_event!(poll, events, is_write_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -535,7 +535,7 @@ fn tcp_shutdown_server_write_close_event() {
 
     barrier.wait();
 
-    expect_secondary_event!(poll, events, is_read_closed);
+    expect_flaky_event!(poll, events, is_read_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -566,7 +566,7 @@ fn tcp_shutdown_client_both_close_event() {
     );
 
     assert_ok!(stream.shutdown(Shutdown::Both));
-    expect_secondary_event!(poll, events, is_write_closed);
+    expect_flaky_event!(poll, events, is_write_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -611,7 +611,7 @@ fn echo_listener(addr: SocketAddr, n_connections: usize) -> (thread::JoinHandle<
 /// Start a listener that accepts `n_connections` connections on the returned
 /// address. If a barrier is provided it will wait on it before closing the
 /// connection.
-pub fn start_listener(
+fn start_listener(
     n_connections: usize,
     barrier: Option<Arc<Barrier>>,
     drop_write: bool,
