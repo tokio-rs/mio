@@ -455,7 +455,7 @@ fn deregistering() {
 #[test]
 #[cfg_attr(
     windows,
-    ignore = "fails on Windows; client close events are not found"
+    ignore = "fails on Windows; client read closed events are not triggered"
 )]
 fn tcp_shutdown_client_read_close_event() {
     let (mut poll, mut events) = init_with_poll();
@@ -478,6 +478,36 @@ fn tcp_shutdown_client_read_close_event() {
 
     assert_ok!(stream.shutdown(Shutdown::Read));
     expect_secondary_event!(poll, events, is_read_closed);
+
+    barrier.wait();
+    handle.join().expect("failed to join thread");
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "fails; client write_closed events are not found")]
+#[cfg_attr(
+    any(target_os = "linux", target_os = "android", target_os = "solaris"),
+    ignore = "fails; client write_closed events are not found"
+)]
+fn tcp_shutdown_client_write_close_event() {
+    let (mut poll, mut events) = init_with_poll();
+    let barrier = Arc::new(Barrier::new(2));
+
+    let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
+    let stream = assert_ok!(TcpStream::connect(sockaddr));
+
+    let interests = Interests::READABLE | Interests::WRITABLE;
+
+    assert_ok!(poll.registry().register(&stream, ID1, interests));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+    );
+
+    assert_ok!(stream.shutdown(Shutdown::Write));
+    expect_secondary_event!(poll, events, is_write_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");

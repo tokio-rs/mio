@@ -68,11 +68,11 @@ impl Interests {
     #[cfg(target_os = "freebsd")]
     pub const LIO: Interests = Interests(unsafe { NonZeroU16::new_unchecked(LIO) });
 
-    /// TODO
+    /// Returns a `Interests` set representing read_closed interests.    
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
     pub const READ_CLOSED: Interests = Interests(unsafe { NonZeroU16::new_unchecked(READ_CLOSED) });
 
-    /// TODO
+    /// Returns a `Interests` set representing write_closed interests.    
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "solaris"))]
     pub const WRITE_CLOSED: Interests =
         Interests(unsafe { NonZeroU16::new_unchecked(WRITE_CLOSED) });

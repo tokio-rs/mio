@@ -62,9 +62,17 @@ impl Event {
         sys::event::is_error(&self.inner)
     }
 
-    /// Returns true if the event contains read close readiness.
+    /// Returns true if the event contains read closed readiness.
     ///
     /// # Notes
+    ///
+    /// Read closed readiness can be expected after any of the following have
+    /// occurred:
+    /// * The local stream has shutdown the read half of its socket
+    /// * The local stream has shtudown both the read half and the write half
+    ///   of its socket
+    /// * The peer stream has shtudown the write half its socket; this sends a
+    ///   `FIN` packet that has been received by the local stream
     ///
     /// Method is a best effort implementation. While some platforms may not
     /// return readiness when read half is closed, it is guaranteed that
@@ -86,9 +94,15 @@ impl Event {
         sys::event::is_read_closed(&self.inner)
     }
 
-    /// Returns true if the event contains write close readiness.
+    /// Returns true if the event contains write closed readiness.
     ///
     /// # Notes
+    ///
+    /// On [epoll] this is essentially a check for `EPOLLHUP` flag as the
+    /// local stream shutting down its write half does not trigger this event.
+    ///
+    /// On [kqueue] the local stream shutting down the write half of its
+    /// socket will trigger this event.
     ///
     /// Method is a best effort implementation. While some platforms may not
     /// return readiness when write half is closed, it is guaranteed that
