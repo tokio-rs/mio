@@ -438,7 +438,7 @@ fn echo_remote(
     let handle = thread::spawn(move || {
         let dir = assert_ok!(TempDir::new("uds"));
         let path = dir.path().join("foo");
-        let remote = assert_ok!(UnixListener::bind(path.clone()));
+        let remote = assert_ok!(UnixListener::bind(path));
         let local_address = assert_ok!(remote.local_addr());
         assert_ok!(addr_sender.send(local_address));
 
