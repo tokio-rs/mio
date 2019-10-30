@@ -56,18 +56,17 @@ macro_rules! assert_err {
     }};
 }
 
-/// Expect an event that may not be represented by an Interest, such as
-/// `is_read_closed` and `is_write_closed` on some platforms.
+/// Expect specific readiness on an event.
 #[macro_export]
-macro_rules! expect_flaky_event {
-    ($poll:ident, $events:ident, $secondary:ident) => {
+macro_rules! expect_readiness {
+    ($poll:ident, $events:ident, $readiness:ident) => {
         let mut found = false;
         // Poll a couple of times in case the event does not immediately
         // happen
         'outer: for _ in 0..3 {
             assert_ok!($poll.poll(&mut $events, Some(Duration::from_millis(500))));
             for event in $events.iter() {
-                if event.$secondary() {
+                if event.$readiness() {
                     found = true;
                     break 'outer;
                 } else {
@@ -77,7 +76,7 @@ macro_rules! expect_flaky_event {
             }
         }
         if !found {
-            panic!("failed to find ")
+            panic!("failed to find event readiness")
         }
     };
 }

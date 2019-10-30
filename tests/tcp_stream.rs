@@ -477,7 +477,7 @@ fn tcp_shutdown_client_read_close_event() {
     );
 
     assert_ok!(stream.shutdown(Shutdown::Read));
-    expect_flaky_event!(poll, events, is_read_closed);
+    expect_readiness!(poll, events, is_read_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -507,7 +507,7 @@ fn tcp_shutdown_client_write_close_event() {
     );
 
     assert_ok!(stream.shutdown(Shutdown::Write));
-    expect_flaky_event!(poll, events, is_write_closed);
+    expect_readiness!(poll, events, is_write_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -535,7 +535,7 @@ fn tcp_shutdown_server_write_close_event() {
 
     barrier.wait();
 
-    expect_flaky_event!(poll, events, is_read_closed);
+    expect_readiness!(poll, events, is_read_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -566,7 +566,7 @@ fn tcp_shutdown_client_both_close_event() {
     );
 
     assert_ok!(stream.shutdown(Shutdown::Both));
-    expect_flaky_event!(poll, events, is_write_closed);
+    expect_readiness!(poll, events, is_write_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");

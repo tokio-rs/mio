@@ -303,7 +303,7 @@ fn shutdown_read() {
     );
 
     assert_ok!(local.shutdown(Shutdown::Read));
-    expect_flaky_event!(poll, events, is_read_closed);
+    expect_readiness!(poll, events, is_read_closed);
 
     // Shutting down the reading side is different on each platform. For example
     // on Linux based systems we can still read.
@@ -368,7 +368,7 @@ fn shutdown_write() {
         target_os = "netbsd",
         target_os = "openbsd"
     ))]
-    expect_flaky_event!(poll, events, is_write_closed);
+    expect_readiness!(poll, events, is_write_closed);
 
     let err = assert_err!(local.write(DATA2));
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
@@ -417,7 +417,7 @@ fn shutdown_both() {
     );
 
     assert_ok!(local.shutdown(Shutdown::Both));
-    expect_flaky_event!(poll, events, is_write_closed);
+    expect_readiness!(poll, events, is_write_closed);
 
     // Shutting down the reading side is different on each platform. For example
     // on Linux based systems we can still read.
@@ -470,7 +470,7 @@ fn uds_shutdown_listener_write() {
 
     barrier.wait();
 
-    expect_flaky_event!(poll, events, is_read_closed);
+    expect_readiness!(poll, events, is_read_closed);
 
     barrier.wait();
     handle.join().expect("failed to join thread");
