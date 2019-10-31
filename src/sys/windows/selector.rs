@@ -1,8 +1,4 @@
-use super::afd::{Afd, AfdPollInfo};
-use super::afd::{
-    AFD_POLL_ABORT, AFD_POLL_ACCEPT, AFD_POLL_CONNECT_FAIL, AFD_POLL_DISCONNECT,
-    AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_SEND, KNOWN_AFD_EVENTS,
-};
+use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
 use super::SocketState;
@@ -156,8 +152,8 @@ impl SockState {
 
     /// True if need to be added on update queue, false otherwise.
     fn set_event(&mut self, ev: Event) -> bool {
-        /* AFD_POLL_CONNECT_FAIL and AFD_POLL_ABORT are always reported, even when not requested by the caller. */
-        let events = ev.flags | AFD_POLL_CONNECT_FAIL | AFD_POLL_ABORT;
+        /* afd::POLL_CONNECT_FAIL and afd::POLL_ABORT are always reported, even when not requested by the caller. */
+        let events = ev.flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
 
         self.user_evts = events;
         self.user_data = ev.data;
@@ -169,7 +165,7 @@ impl SockState {
         assert!(!self.delete_pending);
 
         if let SockPollStatus::Pending = self.poll_status {
-            if (self.user_evts & KNOWN_AFD_EVENTS & !self.pending_evts) == 0 {
+            if (self.user_evts & afd::KNOWN_EVENTS & !self.pending_evts) == 0 {
                 /* All the events the user is interested in are already being monitored by
                  * the pending poll operation. It might spuriously complete because of an
                  * event that we're no longer interested in; when that happens we'll submit
@@ -193,7 +189,7 @@ impl SockState {
             }
             self.poll_info.handles[0].handle = self.base_socket as HANDLE;
             self.poll_info.handles[0].status = 0;
-            self.poll_info.handles[0].events = self.user_evts | AFD_POLL_LOCAL_CLOSE;
+            self.poll_info.handles[0].events = self.user_evts | afd::POLL_LOCAL_CLOSE;
 
             let wrapped_overlapped = OverlappedArcWrapper::new(self_arc);
             let overlapped = wrapped_overlapped.get_ptr() as *const _ as PVOID;
@@ -261,10 +257,10 @@ impl SockState {
                 /* The poll request was cancelled by CancelIoEx. */
             } else if !NT_SUCCESS(iosb.u.Status) {
                 /* The overlapped request itself failed in an unexpected way. */
-                afd_events = AFD_POLL_CONNECT_FAIL;
+                afd_events = afd::POLL_CONNECT_FAIL;
             } else if self.poll_info.number_of_handles < 1 {
                 /* This poll operation succeeded but didn't report any socket events. */
-            } else if self.poll_info.handles[0].events & AFD_POLL_LOCAL_CLOSE != 0 {
+            } else if self.poll_info.handles[0].events & afd::POLL_LOCAL_CLOSE != 0 {
                 /* The poll operation reported that the socket was closed. */
                 self.mark_delete();
                 return None;
@@ -598,7 +594,7 @@ impl SelectorInner {
             if iocp_event.overlapped().is_null() {
                 // `Waker` event, we'll add a readable event to match the other platforms.
                 events.push(Event {
-                    flags: AFD_POLL_RECEIVE,
+                    flags: afd::POLL_RECEIVE,
                     data: iocp_event.token() as u64,
                 });
                 n += 1;
@@ -634,12 +630,12 @@ fn interests_to_afd_flags(interests: Interests) -> u32 {
     let mut flags = 0;
 
     if interests.is_readable() {
-        // AFD_POLL_DISCONNECT for is_read_hup()
-        flags |= AFD_POLL_RECEIVE | AFD_POLL_ACCEPT | AFD_POLL_DISCONNECT;
+        // afd::POLL_DISCONNECT for is_read_hup()
+        flags |= afd::POLL_RECEIVE | afd::POLL_ACCEPT | afd::POLL_DISCONNECT;
     }
 
     if interests.is_writable() {
-        flags |= AFD_POLL_SEND;
+        flags |= afd::POLL_SEND;
     }
 
     flags
