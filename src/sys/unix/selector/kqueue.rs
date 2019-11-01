@@ -1,4 +1,3 @@
-use crate::sys::Events;
 use crate::{Interests, Token};
 
 use log::error;
@@ -305,6 +304,7 @@ impl Drop for Selector {
 }
 
 pub type Event = libc::kevent;
+pub type Events = Vec<Event>;
 
 pub mod event {
     use crate::sys::Event;
