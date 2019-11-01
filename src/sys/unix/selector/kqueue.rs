@@ -1,4 +1,3 @@
-use crate::sys::Events;
 use crate::{Interests, Token};
 
 use log::error;
