@@ -117,6 +117,7 @@ impl Drop for Selector {
 }
 
 pub type Event = libc::epoll_event;
+pub type Events = Vec<Event>;
 
 pub mod event {
     use crate::sys::Event;
