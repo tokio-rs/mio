@@ -23,3 +23,5 @@ mod kqueue;
     target_os = "openbsd"
 ))]
 pub use self::kqueue::{event, Event, Selector};
+
+pub type Events = Vec<Event>;

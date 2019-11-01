@@ -15,7 +15,7 @@ macro_rules! syscall {
 mod net;
 
 mod selector;
-pub use self::selector::{event, Event, Selector};
+pub use self::selector::{event, Event, Events, Selector};
 
 mod sourcefd;
 pub use self::sourcefd::SourceFd;
@@ -31,5 +31,3 @@ pub use self::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
 
 mod waker;
 pub use self::waker::Waker;
-
-pub type Events = Vec<Event>;
