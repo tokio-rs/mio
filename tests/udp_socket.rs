@@ -112,6 +112,26 @@ fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
 }
 
 #[test]
+fn set_get_ttl() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+
+    // set TTL, get TTL, make sure it has the expected value
+    const TTL: u32 = 10;
+    socket1.set_ttl(TTL).unwrap();
+    assert_eq!(socket1.ttl().unwrap(), TTL);
+    assert!(socket1.take_error().unwrap().is_none());
+}
+
+#[test]
+fn get_ttl_without_previous_set() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+
+    // expect a get TTL to work w/o any previous set_ttl
+    socket1.ttl().expect("unable to get TTL for UDP socket");
+}
+
+
+#[test]
 fn connected_udp_socket_ipv4() {
     let socket1 = UdpSocket::bind(any_local_address()).unwrap();
     let address1 = socket1.local_addr().unwrap();
