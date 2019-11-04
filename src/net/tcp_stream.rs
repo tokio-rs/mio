@@ -105,6 +105,9 @@ impl TcpStream {
     /// small amount of data. When not set, data is buffered until there is a
     /// sufficient amount to send out, thereby avoiding the frequent sending of
     /// small packets.
+    ///
+    /// Note On Windows: Make sure the stream is connected before calling this method.
+    /// Trying to set the nodelay on a not connected stream is undefined behavior.
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
         self.sys.set_nodelay(nodelay)
     }
@@ -114,6 +117,9 @@ impl TcpStream {
     /// For more information about this option, see [`set_nodelay`][link].
     ///
     /// [link]: #method.set_nodelay
+    ///
+    /// Note On Windows: Make sure the stream is connected before calling this method.
+    /// Trying to get the nodelay on a not connected stream is undefined behavior.
     pub fn nodelay(&self) -> io::Result<bool> {
         self.sys.nodelay()
     }

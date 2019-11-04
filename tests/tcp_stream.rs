@@ -227,7 +227,7 @@ fn get_ttl_without_previous_set() {
 }
 
 #[test]
-fn nodelay() {
+fn set_get_nodelay() {
     let (mut poll, mut events) = init_with_poll();
 
     let barrier = Arc::new(Barrier::new(2));
@@ -235,6 +235,9 @@ fn nodelay() {
 
     let stream = TcpStream::connect(address).unwrap();
 
+    // on Windows: the stream must be connected before setting the nodelay, otherwise
+    // it is undefined behavior, register and expect a WRITABLE here to make sure
+    // the stream is connected
     poll.registry()
         .register(&stream, ID1, Interests::WRITABLE)
         .expect("unable to register TCP stream");
@@ -245,9 +248,40 @@ fn nodelay() {
         vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
     );
 
+    // set nodelay, get nodelay, make sure it has the expected value
     const NO_DELAY: bool = true;
     stream.set_nodelay(NO_DELAY).unwrap();
     assert_eq!(stream.nodelay().unwrap(), NO_DELAY);
+    assert!(stream.take_error().unwrap().is_none());
+
+    barrier.wait();
+    thread_handle.join().expect("unable to join thread");
+}
+
+#[test]
+fn get_nodelay_without_previous_set() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let barrier = Arc::new(Barrier::new(2));
+    let (thread_handle, address) = start_listener(1, Some(barrier.clone()));
+
+    let stream = TcpStream::connect(address).unwrap();
+
+    // on Windows: the stream must be connected before setting the nodelay, otherwise
+    // it is undefined behavior, register and expect a WRITABLE here to make sure
+    // the stream is connected
+    poll.registry()
+        .register(&stream, ID1, Interests::WRITABLE)
+        .expect("unable to register TCP stream");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+    );
+
+    // expect a get nodelay to work w/o any previous set nodelay
+    stream.nodelay().expect("Unable to get nodelay for TCP stream");
     assert!(stream.take_error().unwrap().is_none());
 
     barrier.wait();
