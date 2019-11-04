@@ -166,12 +166,22 @@ fn try_clone() {
 
 #[test]
 fn ttl() {
-    init();
+    let (mut poll, mut events) = init_with_poll();
 
     let barrier = Arc::new(Barrier::new(2));
     let (thread_handle, address) = start_listener(1, Some(barrier.clone()));
 
     let stream = TcpStream::connect(address).unwrap();
+
+    poll.registry()
+        .register(&stream, ID1, Interests::WRITABLE)
+        .expect("unable to register TCP stream");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+    );
 
     const TTL: u32 = 10;
     stream.set_ttl(TTL).unwrap();
