@@ -122,6 +122,9 @@ impl TcpStream {
     ///
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
+    ///
+    /// Note On Windows: Make sure the stream is connected before calling this method.
+    /// Trying to set the TTL on a not connected stream is undefined behavior.
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.sys.set_ttl(ttl)
     }
@@ -129,6 +132,9 @@ impl TcpStream {
     /// Gets the value of the `IP_TTL` option for this socket.
     ///
     /// For more information about this option, see [`set_ttl`][link].
+    ///
+    /// Note On Windows: Make sure the stream is connected before calling this method.
+    /// Trying to get the TTL on a not connected stream is undefined behavior.
     ///
     /// [link]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
