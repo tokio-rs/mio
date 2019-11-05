@@ -116,6 +116,7 @@ mod waker;
 pub mod event;
 pub mod net;
 
+#[doc(no_inline)]
 pub use event::Events;
 pub use interests::Interests;
 pub use poll::{Poll, Registry};
