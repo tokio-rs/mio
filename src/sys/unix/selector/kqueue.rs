@@ -84,6 +84,7 @@ impl Selector {
     }
 
     #[cfg(debug_assertions)]
+    #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
     pub fn id(&self) -> usize {
         self.id
     }

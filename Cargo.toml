@@ -24,7 +24,11 @@ exclude       = [
 publish = false
 
 [features]
-default = []
+os-poll = []
+os-ext = []
+tcp = []
+udp = []
+uds = []
 
 # Adds additional documentation in the form of a user guide.
 guide = []

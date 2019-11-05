@@ -1,7 +1,7 @@
 use crate::{event, sys, Events, Interest, Token};
 
 use log::trace;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "os-ext"))]
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -373,7 +373,7 @@ impl fmt::Debug for Registry {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "os-ext"))]
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
         self.registry.selector.as_raw_fd()
@@ -627,12 +627,14 @@ pub fn selector(registry: &Registry) -> &sys::Selector {
 
 #[cfg(debug_assertions)]
 impl SelectorId {
+    #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
     pub fn new() -> SelectorId {
         SelectorId {
             id: AtomicUsize::new(0),
         }
     }
 
+    #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
     pub fn associate_selector(&self, registry: &Registry) -> io::Result<()> {
         let selector_id = self.id.load(Ordering::SeqCst);
 

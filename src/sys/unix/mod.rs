@@ -5,7 +5,7 @@ macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
         let res = unsafe { libc::$fn($($arg, )*) };
         if res == -1 {
-            Err(io::Error::last_os_error())
+            Err(std::io::Error::last_os_error())
         } else {
             Ok(res)
         }
@@ -20,13 +20,19 @@ pub use self::selector::{event, Event, Events, Selector};
 mod sourcefd;
 pub use self::sourcefd::SourceFd;
 
+#[cfg(feature = "tcp")]
 mod tcp;
+#[cfg(feature = "tcp")]
 pub use self::tcp::{TcpListener, TcpStream};
 
+#[cfg(feature = "udp")]
 mod udp;
+#[cfg(feature = "udp")]
 pub use self::udp::UdpSocket;
 
+#[cfg(feature = "uds")]
 mod uds;
+#[cfg(feature = "uds")]
 pub use self::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
 
 mod waker;
