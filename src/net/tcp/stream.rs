@@ -106,6 +106,8 @@ impl TcpStream {
     /// sufficient amount to send out, thereby avoiding the frequent sending of
     /// small packets.
     ///
+    /// # Notes
+    ///
     /// On Windows make sure the stream is connected before calling this method,
     /// by receiving an (writable) event. Trying to set `nodelay` on an
     /// unconnected `TcpStream` is undefined behavior.
@@ -119,6 +121,8 @@ impl TcpStream {
     ///
     /// [link]: #method.set_nodelay
     ///
+    /// # Notes
+    ///
     /// On Windows make sure the stream is connected before calling this method,
     /// by receiving an (writable) event. Trying to get `nodelay` on an
     /// unconnected `TcpStream` is undefined behavior.
@@ -131,6 +135,8 @@ impl TcpStream {
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
     ///
+    /// # Notes
+    ///
     /// On Windows make sure the stream is connected before calling this method,
     /// by receiving an (writable) event. Trying to set `ttl` on an
     /// unconnected `TcpStream` is undefined behavior.
@@ -141,6 +147,8 @@ impl TcpStream {
     /// Gets the value of the `IP_TTL` option for this socket.
     ///
     /// For more information about this option, see [`set_ttl`][link].
+    ///
+    /// # Notes
     ///
     /// On Windows make sure the stream is connected before calling this method,
     /// by receiving an (writable) event. Trying to get `ttl` on an
