@@ -15,7 +15,7 @@ mod util;
 
 use util::{
     any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
-    expect_events, expect_no_events, init_with_poll, ExpectEvent,
+    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
 };
 
 const DATA1: &[u8] = b"Hello world!";
