@@ -358,7 +358,11 @@ impl Selector {
         })
     }
 
-    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+    /// # Safety
+    ///
+    /// This requires a mutable reference to self because only a single thread
+    /// can poll IOCP at a time.
+    pub fn select(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         self.inner.select(events, timeout)
     }
 
@@ -422,6 +426,9 @@ impl SelectorInner {
         })
     }
 
+    /// # Safety
+    ///
+    /// May only be calling via `Selector::select`.
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
 
