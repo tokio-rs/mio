@@ -7,13 +7,17 @@
 //!
 //! [portability guidelines]: ../struct.Poll.html#portability
 
+#[cfg(feature = "tcp")]
 mod tcp;
+#[cfg(feature = "tcp")]
 pub use self::tcp::{TcpListener, TcpStream};
 
+#[cfg(feature = "udp")]
 mod udp;
+#[cfg(feature = "udp")]
 pub use self::udp::UdpSocket;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "uds"))]
 mod uds;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "uds"))]
 pub use self::uds::{UnixDatagram, UnixListener, UnixStream};

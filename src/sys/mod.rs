@@ -5,17 +5,19 @@
 //! `event`: a module with various helper functions for `Event`, see
 //!          `crate::event::Event` for the required functions.
 
-#[cfg(unix)]
-pub use self::unix::{
-    event, Event, Events, Selector, SocketAddr, SourceFd, TcpListener, TcpStream, UdpSocket,
-    UnixDatagram, UnixListener, UnixStream, Waker,
-};
+#[cfg(all(unix, feature = "os-poll"))]
+pub use self::unix::*;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "os-poll"))]
 mod unix;
 
-#[cfg(windows)]
-pub use self::windows::{event, Event, Events, Selector, TcpListener, TcpStream, UdpSocket, Waker};
+#[cfg(all(windows, feature = "os-poll"))]
+pub use self::windows::*;
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "os-poll"))]
 mod windows;
+
+#[cfg(not(feature = "os-poll"))]
+mod shell;
+#[cfg(not(feature = "os-poll"))]
+pub(crate) use self::shell::*;

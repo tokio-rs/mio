@@ -24,6 +24,11 @@ exclude       = [
 publish = false
 
 [features]
+os-poll = []
+os-ext = []
+tcp = []
+udp = []
+uds = []
 
 [dependencies]
 log = "0.4.8"
