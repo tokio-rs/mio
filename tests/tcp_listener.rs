@@ -73,14 +73,26 @@ fn smoke_test_tcp_listener(addr: SocketAddr) {
 }
 
 #[test]
-fn ttl() {
+fn set_get_ttl() {
     init();
 
     let listener = TcpListener::bind(any_local_address()).unwrap();
 
+    // set TTL, get TTL, make sure it has the expected value
     const TTL: u32 = 10;
     listener.set_ttl(TTL).unwrap();
     assert_eq!(listener.ttl().unwrap(), TTL);
+    assert!(listener.take_error().unwrap().is_none());
+}
+
+#[test]
+fn get_ttl_without_previous_set() {
+    init();
+
+    let listener = TcpListener::bind(any_local_address()).unwrap();
+
+    // expect a get TTL to work w/o any previous set_ttl
+    listener.ttl().expect("unable to get TTL for TCP listener");
     assert!(listener.take_error().unwrap().is_none());
 }
 
