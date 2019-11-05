@@ -106,8 +106,9 @@ impl TcpStream {
     /// sufficient amount to send out, thereby avoiding the frequent sending of
     /// small packets.
     ///
-    /// Note On Windows: Make sure the stream is connected before calling this method.
-    /// Trying to set the nodelay on a not connected stream is undefined behavior.
+    /// On Windows make sure the stream is connected before calling this method,
+    /// by receiving an (writable) event. Trying to set `nodelay` on an
+    /// unconnected `TcpStream` is undefined behavior.
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
         self.sys.set_nodelay(nodelay)
     }
@@ -118,8 +119,9 @@ impl TcpStream {
     ///
     /// [link]: #method.set_nodelay
     ///
-    /// Note On Windows: Make sure the stream is connected before calling this method.
-    /// Trying to get the nodelay on a not connected stream is undefined behavior.
+    /// On Windows make sure the stream is connected before calling this method,
+    /// by receiving an (writable) event. Trying to get `nodelay` on an
+    /// unconnected `TcpStream` is undefined behavior.
     pub fn nodelay(&self) -> io::Result<bool> {
         self.sys.nodelay()
     }
@@ -129,8 +131,9 @@ impl TcpStream {
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
     ///
-    /// Note On Windows: Make sure the stream is connected before calling this method.
-    /// Trying to set the TTL on a not connected stream is undefined behavior.
+    /// On Windows make sure the stream is connected before calling this method,
+    /// by receiving an (writable) event. Trying to set `ttl` on an
+    /// unconnected `TcpStream` is undefined behavior.
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.sys.set_ttl(ttl)
     }
@@ -139,8 +142,9 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_ttl`][link].
     ///
-    /// Note On Windows: Make sure the stream is connected before calling this method.
-    /// Trying to get the TTL on a not connected stream is undefined behavior.
+    /// On Windows make sure the stream is connected before calling this method,
+    /// by receiving an (writable) event. Trying to get `ttl` on an
+    /// unconnected `TcpStream` is undefined behavior.
     ///
     /// [link]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
