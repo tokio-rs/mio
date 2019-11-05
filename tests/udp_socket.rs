@@ -130,7 +130,6 @@ fn get_ttl_without_previous_set() {
     socket1.ttl().expect("unable to get TTL for UDP socket");
 }
 
-
 #[test]
 fn connected_udp_socket_ipv4() {
     let socket1 = UdpSocket::bind(any_local_address()).unwrap();

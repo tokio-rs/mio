@@ -15,7 +15,7 @@ mod util;
 
 use util::{
     any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
-    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
+    expect_events, expect_no_events, init_with_poll, ExpectEvent,
 };
 
 const DATA1: &[u8] = b"Hello world!";
@@ -283,7 +283,9 @@ fn get_nodelay_without_previous_set() {
     );
 
     // expect a get nodelay to work w/o any previous set nodelay
-    stream.nodelay().expect("Unable to get nodelay for TCP stream");
+    stream
+        .nodelay()
+        .expect("Unable to get nodelay for TCP stream");
     assert!(stream.take_error().unwrap().is_none());
 
     barrier.wait();
