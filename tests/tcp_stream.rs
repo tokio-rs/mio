@@ -233,7 +233,7 @@ fn set_get_nodelay() {
     let (mut poll, mut events) = init_with_poll();
 
     let barrier = Arc::new(Barrier::new(2));
-    let (thread_handle, address) = start_listener(1, Some(barrier.clone()));
+    let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
 
     let stream = TcpStream::connect(address).unwrap();
 
@@ -265,7 +265,7 @@ fn get_nodelay_without_previous_set() {
     let (mut poll, mut events) = init_with_poll();
 
     let barrier = Arc::new(Barrier::new(2));
-    let (thread_handle, address) = start_listener(1, Some(barrier.clone()));
+    let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
 
     let stream = TcpStream::connect(address).unwrap();
 
