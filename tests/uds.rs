@@ -531,7 +531,7 @@ fn noop_listener(
     let handle = thread::spawn(move || {
         let dir = assert_ok!(TempDir::new("uds"));
         let path = dir.path().join("foo");
-        let listener = assert_ok!(net::UnixListener::bind(path.clone()));
+        let listener = assert_ok!(net::UnixListener::bind(path));
         let local_address = assert_ok!(listener.local_addr());
         assert_ok!(sender.send(local_address));
 
