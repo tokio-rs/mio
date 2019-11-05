@@ -102,23 +102,24 @@ use std::{fmt, io};
 /// The only readiness operations that are guaranteed to be present on all
 /// supported platforms are [`readable`] and [`writable`]. All other readiness
 /// operations may have false negatives and as such should be considered
-/// **hints**. This means that if a socket is registered with [`readable`],
-/// [`error`], and [`hup`] interest, and either an error or hup is received, a
-/// readiness event will be generated for the socket, but it **may** only
-/// include `readable` readiness. Also note that, given the potential for
-/// spurious events, receiving a readiness event with `hup` or `error` doesn't
-/// actually mean that a `read` on the socket will return a result matching the
-/// readiness event.
+/// **hints**. This means that if a socket is registered with [`readable`]
+/// interest and either an error or close is received, a readiness event will
+/// be generated for the socket, but it **may** only include `readable`
+/// readiness. Also note that, given the potential for spurious events,
+/// receiving a readiness event with `read_closed`, `write_closed`, or `error`
+/// doesn't actually mean that a `read` on the socket will return a result
+/// matching the readiness event.
 ///
-/// In other words, portable programs that explicitly check for [`hup`] or
-/// [`error`] readiness should be doing so as an **optimization** and always be
-/// able to handle an error or HUP situation when performing the actual read
-/// operation.
+/// In other words, portable programs that explicitly check for [`read_closed`],
+/// [`write_closed`], or [`error`] readiness should be doing so as an
+/// **optimization** and always be able to handle an error or close situation
+/// when performing the actual read operation.
 ///
 /// [`readable`]: crate::event::Event::is_readable
 /// [`writable`]: crate::event::Event::is_writable
 /// [`error`]: crate::event::Event::is_error
-/// [`hup`]: crate::event::Event::is_hup
+/// [`read_closed`]: crate::event::Event::is_read_closed
+/// [`write_closed`]: crate::event::Event::is_write_closed
 ///
 /// ### Registering handles
 ///

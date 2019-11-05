@@ -62,59 +62,65 @@ impl Event {
         sys::event::is_error(&self.inner)
     }
 
-    /// Returns true if the event contains HUP readiness.
+    /// Returns true if the event contains read closed readiness.
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms trigger the
-    /// HUP event.
+    /// Read closed readiness can be expected after any of the following have
+    /// occurred:
+    /// * The local stream has shutdown the read half of its socket
+    /// * The local stream has shtudown both the read half and the write half
+    ///   of its socket
+    /// * The peer stream has shtudown the write half its socket; this sends a
+    ///   `FIN` packet that has been received by the local stream
     ///
-    /// Because of the above be cautions when using this in cross-platform
-    /// applications, Mio makes no attempt at normalising this indicator and
-    /// only provides a convenience method to read it. Refer to the selector
-    /// documentation (below) when using this indicator.
+    /// Method is a best effort implementation. While some platforms may not
+    /// return readiness when read half is closed, it is guaranteed that
+    /// false-positives will not occur.
     ///
     /// The table below shows what flags are checked on what OS.
     ///
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
-    /// | [epoll]       | `EPOLLHUP`      |
+    /// | [epoll]       | `EPOLLHUP`, or  |
+    /// |               | `EPOLLIN` and EPOLLRDHUP` |
     /// | [kqueue]      | `EV_EOF`        |
     ///
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
     /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
     #[inline]
-    pub fn is_hup(&self) -> bool {
-        sys::event::is_hup(&self.inner)
+    pub fn is_read_closed(&self) -> bool {
+        sys::event::is_read_closed(&self.inner)
     }
 
-    /// Returns true if the event contains read HUP readiness.
+    /// Returns true if the event contains write closed readiness.
     ///
     /// # Notes
     ///
-    /// Method is available on all platforms, but not all platforms trigger the
-    /// read HUP event.
+    /// On [epoll] this is essentially a check for `EPOLLHUP` flag as the
+    /// local stream shutting down its write half does not trigger this event.
     ///
-    /// Because of the above be cautions when using this in cross-platform
-    /// applications, Mio makes no attempt at normalising this indicator and
-    /// only provides a convenience method to read it. We advice looking at the
-    /// documentation provided for the selectors (see below) when using this
-    /// indicator.
+    /// On [kqueue] the local stream shutting down the write half of its
+    /// socket will trigger this event.
+    ///
+    /// Method is a best effort implementation. While some platforms may not
+    /// return readiness when write half is closed, it is guaranteed that
+    /// false-positives will not occur.
     ///
     /// The table below shows what flags are checked on what OS.
     ///
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
-    /// | [epoll]       | `EPOLLRDHUP`    |
+    /// | [epoll]       | `EPOLLHUP`, or  |
+    /// |               | `EPOLLOUT` and `EPOLLERR` |
     /// | [kqueue]      | `EV_EOF`        |
     ///
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
     /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
-    #[inline]
-    pub fn is_read_hup(&self) -> bool {
-        sys::event::is_read_hup(&self.inner)
+    pub fn is_write_closed(&self) -> bool {
+        sys::event::is_write_closed(&self.inner)
     }
 
     /// Returns true if the event contains priority readiness.
@@ -190,8 +196,8 @@ impl fmt::Debug for Event {
             .field("readable", &self.is_readable())
             .field("writable", &self.is_writable())
             .field("error", &self.is_error())
-            .field("hup", &self.is_hup())
-            .field("read_hup", &self.is_read_hup())
+            .field("read_closed", &self.is_read_closed())
+            .field("write_closed", &self.is_write_closed())
             .field("priority", &self.is_priority())
             .field("aio", &self.is_aio())
             .field("lio", &self.is_lio())

@@ -90,22 +90,19 @@ impl UnixDatagram {
 
     pub(crate) fn recv_from(&self, dst: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         let mut count = 0;
-        let socketaddr = SocketAddr::new(|sockaddr, socklen| unsafe {
-            count = libc::recvfrom(
+        let socketaddr = SocketAddr::new(|sockaddr, socklen| {
+            syscall!(recvfrom(
                 self.inner.as_raw_fd(),
                 dst.as_mut_ptr() as *mut _,
                 dst.len(),
                 0,
                 sockaddr,
                 socklen,
-            );
-            if count > 0 {
-                Ok(1)
-            } else if count == 0 {
-                Ok(0)
-            } else {
-                Err(io::Error::last_os_error())
-            }
+            ))
+            .map(|c| {
+                count = c;
+                c as libc::c_int
+            })
         })?;
         Ok((count as usize, socketaddr))
     }

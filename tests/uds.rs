@@ -2,13 +2,17 @@
 #[macro_use]
 mod util;
 
+use log::warn;
 use mio::net::{UnixDatagram, UnixListener, UnixStream};
 use mio::unix::SocketAddr;
 use mio::{Interests, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
+use std::os::unix::net;
 use std::sync::mpsc::{channel, Receiver};
+use std::sync::{Arc, Barrier};
 use std::thread;
+use std::time::Duration;
 use tempdir::TempDir;
 use util::{
     assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
@@ -280,7 +284,7 @@ fn shutdown_read() {
     assert_ok!(poll.registry().register(
         &local,
         LOCAL,
-        Interests::WRITABLE.add(Interests::READABLE)
+        Interests::READABLE.add(Interests::WRITABLE)
     ));
 
     expect_events(
@@ -299,6 +303,7 @@ fn shutdown_read() {
     );
 
     assert_ok!(local.shutdown(Shutdown::Read));
+    expect_readiness!(poll, events, is_read_closed);
 
     // Shutting down the reading side is different on each platform. For example
     // on Linux based systems we can still read.
@@ -355,14 +360,18 @@ fn shutdown_write() {
 
     assert_ok!(local.shutdown(Shutdown::Write));
 
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ))]
+    expect_readiness!(poll, events, is_write_closed);
+
     let err = assert_err!(local.write(DATA2));
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
-
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(LOCAL, Interests::READABLE)],
-    );
 
     // Read should be ok
     let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -408,6 +417,7 @@ fn shutdown_both() {
     );
 
     assert_ok!(local.shutdown(Shutdown::Both));
+    expect_readiness!(poll, events, is_write_closed);
 
     // Shutting down the reading side is different on each platform. For example
     // on Linux based systems we can still read.
@@ -436,6 +446,36 @@ fn shutdown_both() {
     assert_ok!(handle.join());
 }
 
+#[test]
+fn uds_shutdown_listener_write() {
+    let barrier = Arc::new(Barrier::new(2));
+    let (mut poll, mut events) = init_with_poll();
+
+    let (handle, remote_addr) = noop_listener(1, barrier.clone());
+
+    let path = remote_addr.as_pathname().expect("not a pathname");
+    let stream = assert_ok!(UnixStream::connect(path));
+
+    assert_ok!(poll.registry().register(
+        &stream,
+        LOCAL,
+        Interests::READABLE.add(Interests::WRITABLE)
+    ));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(LOCAL, Interests::WRITABLE)],
+    );
+
+    barrier.wait();
+
+    expect_readiness!(poll, events, is_read_closed);
+
+    barrier.wait();
+    handle.join().expect("failed to join thread");
+}
+
 fn echo_remote(
     connections: usize,
     sync_receiver: Receiver<()>,
@@ -444,7 +484,7 @@ fn echo_remote(
     let handle = thread::spawn(move || {
         let dir = assert_ok!(TempDir::new("uds"));
         let path = dir.path().join("foo");
-        let remote = assert_ok!(UnixListener::bind(path.clone()));
+        let remote = assert_ok!(UnixListener::bind(path));
         let local_address = assert_ok!(remote.local_addr());
         assert_ok!(addr_sender.send(local_address));
 
@@ -467,6 +507,9 @@ fn echo_remote(
                     Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
                     Err(err) => panic!("{}", err),
                 };
+                if n == 0 {
+                    break;
+                }
                 match local.try_write(&buf[..n]) {
                     Ok(Some(amount)) => written += amount,
                     Ok(None) => continue,
@@ -478,4 +521,27 @@ fn echo_remote(
         }
     });
     (handle, assert_ok!(addr_receiver.recv()))
+}
+
+fn noop_listener(
+    connections: usize,
+    barrier: Arc<Barrier>,
+) -> (thread::JoinHandle<()>, net::SocketAddr) {
+    let (sender, receiver) = channel();
+    let handle = thread::spawn(move || {
+        let dir = assert_ok!(TempDir::new("uds"));
+        let path = dir.path().join("foo");
+        let listener = assert_ok!(net::UnixListener::bind(path.clone()));
+        let local_address = assert_ok!(listener.local_addr());
+        assert_ok!(sender.send(local_address));
+
+        for _ in 0..connections {
+            let (stream, _) = listener.accept().unwrap();
+            barrier.wait();
+            assert_ok!(stream.shutdown(Shutdown::Write));
+            barrier.wait();
+            drop(stream);
+        }
+    });
+    (handle, assert_ok!(receiver.recv()))
 }
