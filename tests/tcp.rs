@@ -622,7 +622,7 @@ fn write_error() {
 }
 
 macro_rules! wait {
-    ($poll:ident, $ready:ident, $expect_hup: expr) => {{
+    ($poll:ident, $ready:ident, $expect_read_closed: expr) => {{
         use std::time::Instant;
 
         let now = Instant::now();
@@ -639,23 +639,10 @@ macro_rules! wait {
                 .unwrap();
 
             for event in &events {
-                // Hup is only generated on kqueue platforms.
-                #[cfg(any(
-                    target_os = "dragonfly",
-                    target_os = "freebsd",
-                    target_os = "ios",
-                    target_os = "macos",
-                    target_os = "netbsd",
-                    target_os = "openbsd"
-                ))]
-                {
-                    if $expect_hup {
-                        assert!(event.is_read_hup());
-                    }
-                }
-
-                if !$expect_hup {
-                    assert!(!event.is_hup());
+                if $expect_read_closed {
+                    assert!(event.is_read_closed());
+                } else {
+                    assert!(!event.is_read_closed() && !event.is_write_closed());
                 }
 
                 if event.token() == Token(0) && event.$ready() {
@@ -676,11 +663,13 @@ fn write_shutdown() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
 
-    let interests = Interests::READABLE | Interests::WRITABLE;
-
     let client = TcpStream::connect(addr).unwrap();
     poll.registry()
-        .register(&client, Token(0), interests)
+        .register(
+            &client,
+            Token(0),
+            Interests::READABLE.add(Interests::WRITABLE),
+        )
         .unwrap();
 
     let (socket, _) = listener.accept().unwrap();

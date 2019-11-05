@@ -56,6 +56,31 @@ macro_rules! assert_err {
     }};
 }
 
+/// Expect specific readiness on an event.
+#[macro_export]
+macro_rules! expect_readiness {
+    ($poll:ident, $events:ident, $readiness:ident) => {
+        let mut found = false;
+        // Poll a couple of times in case the event does not immediately
+        // happen
+        'outer: for _ in 0..3 {
+            assert_ok!($poll.poll(&mut $events, Some(Duration::from_millis(500))));
+            for event in $events.iter() {
+                if event.$readiness() {
+                    found = true;
+                    break 'outer;
+                } else {
+                    // Accept sporadic events.
+                    warn!("got unexpected event: {:?}", event);
+                }
+            }
+        }
+        if !found {
+            panic!("failed to find event readiness")
+        }
+    };
+}
+
 pub fn init() {
     static INIT: Once = Once::new();
 
