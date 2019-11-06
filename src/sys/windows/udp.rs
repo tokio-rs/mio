@@ -11,7 +11,7 @@ use std::{fmt, io};
 use winapi::um::winsock2::{bind, closesocket, SOCKET_ERROR, SOCK_DGRAM};
 
 pub struct UdpSocket {
-    internal: Mutex<Option<InternalState>>,
+    internal: Box<Mutex<Option<InternalState>>>,
     inner: net::UdpSocket,
 }
 
@@ -32,7 +32,7 @@ impl UdpSocket {
                 err
             })
             .map(|_| UdpSocket {
-                internal: Mutex::new(None),
+                internal: Box::new(Mutex::new(None)),
                 inner: unsafe { net::UdpSocket::from_raw_socket(socket as StdSocket) },
             })
         })
@@ -44,7 +44,7 @@ impl UdpSocket {
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
         self.inner.try_clone().map(|inner| UdpSocket {
-            internal: Mutex::new(None),
+            internal: Box::new(Mutex::new(None)),
             inner,
         })
     }
@@ -237,7 +237,7 @@ impl fmt::Debug for UdpSocket {
 impl FromRawSocket for UdpSocket {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> UdpSocket {
         UdpSocket {
-            internal: Mutex::new(None),
+            internal: Box::new(Mutex::new(None)),
             inner: net::UdpSocket::from_raw_socket(rawsocket),
         }
     }

@@ -12,12 +12,12 @@ use std::sync::{Arc, Mutex};
 use winapi::um::winsock2::{bind, closesocket, connect, listen, SOCKET_ERROR, SOCK_STREAM};
 
 pub struct TcpStream {
-    internal: Mutex<Option<InternalState>>,
+    internal: Box<Mutex<Option<InternalState>>>,
     inner: net::TcpStream,
 }
 
 pub struct TcpListener {
-    internal: Mutex<Option<InternalState>>,
+    internal: Box<Mutex<Option<InternalState>>>,
     inner: net::TcpListener,
 }
 
@@ -56,7 +56,7 @@ impl TcpStream {
                 })
             })
             .map(|socket| TcpStream {
-                internal: Mutex::new(None),
+                internal: Box::new(Mutex::new(None)),
                 inner: unsafe { net::TcpStream::from_raw_socket(socket as StdSocket) },
             })
     }
@@ -71,7 +71,7 @@ impl TcpStream {
 
     pub fn try_clone(&self) -> io::Result<TcpStream> {
         self.inner.try_clone().map(|s| TcpStream {
-            internal: Mutex::new(None),
+            internal: Box::new(Mutex::new(None)),
             inner: s,
         })
     }
@@ -274,7 +274,7 @@ impl fmt::Debug for TcpStream {
 impl FromRawSocket for TcpStream {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> TcpStream {
         TcpStream {
-            internal: Mutex::new(None),
+            internal: Box::new(Mutex::new(None)),
             inner: net::TcpStream::from_raw_socket(rawsocket),
         }
     }
@@ -310,7 +310,7 @@ impl TcpListener {
                 err
             })
             .map(|_| TcpListener {
-                internal: Mutex::new(None),
+                internal: Box::new(Mutex::new(None)),
                 inner: unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) },
             })
         })
@@ -322,7 +322,7 @@ impl TcpListener {
 
     pub fn try_clone(&self) -> io::Result<TcpListener> {
         self.inner.try_clone().map(|s| TcpListener {
-            internal: Mutex::new(None),
+            internal: Box::new(Mutex::new(None)),
             inner: s,
         })
     }
@@ -332,7 +332,7 @@ impl TcpListener {
             inner.set_nonblocking(true).map(|()| {
                 (
                     TcpStream {
-                        internal: Mutex::new(None),
+                        internal: Box::new(Mutex::new(None)),
                         inner,
                     },
                     addr,
@@ -453,7 +453,7 @@ impl fmt::Debug for TcpListener {
 impl FromRawSocket for TcpListener {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> TcpListener {
         TcpListener {
-            internal: Mutex::new(None),
+            internal: Box::new(Mutex::new(None)),
             inner: net::TcpListener::from_raw_socket(rawsocket),
         }
     }
