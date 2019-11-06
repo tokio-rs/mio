@@ -213,6 +213,7 @@ impl fmt::Debug for Events {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Events")
             .field("capacity", &self.capacity())
+            .field("raw_events", &self.inner)
             .finish()
     }
 }

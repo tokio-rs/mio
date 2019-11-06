@@ -201,6 +201,7 @@ impl fmt::Debug for Event {
             .field("priority", &self.is_priority())
             .field("aio", &self.is_aio())
             .field("lio", &self.is_lio())
+            .field("raw_flags", &self.inner)
             .finish()
     }
 }

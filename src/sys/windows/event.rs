@@ -1,4 +1,3 @@
-#[derive(Debug)]
 pub struct Event {
     pub flags: u32,
     pub data: u64,
@@ -8,6 +7,12 @@ use miow::iocp::CompletionStatus;
 
 use super::afd;
 use crate::Token;
+use std::fmt;
+
+use super::afd::{
+    AFD_POLL_ABORT, AFD_POLL_ACCEPT, AFD_POLL_CONNECT_FAIL, AFD_POLL_DISCONNECT,
+    AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_SEND, AFD_POLL_RECEIVE_EXPEDITED,
+};
 
 pub fn token(event: &Event) -> Token {
     Token(event.data as usize)
@@ -53,6 +58,38 @@ pub fn is_lio(_: &Event) -> bool {
     false
 }
 
+impl fmt::Debug for Event {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "(")?;
+        if self.flags & AFD_POLL_RECEIVE != 0 {
+            write!(fmt, "AFD_POLL_RECEIVE ")?;
+        }
+        if self.flags & AFD_POLL_RECEIVE_EXPEDITED != 0 {
+            write!(fmt, "AFD_POLL_RECEIVE_EXPEDITED ")?;
+        }
+        if self.flags & AFD_POLL_SEND != 0 {
+            write!(fmt, "AFD_POLL_SEND ")?;
+        }
+        if self.flags & AFD_POLL_DISCONNECT != 0 {
+            write!(fmt, "AFD_POLL_DISCONNECT ")?;
+        }
+        if self.flags & AFD_POLL_ABORT != 0 {
+            write!(fmt, "AFD_POLL_ABORT ")?;
+        }
+        if self.flags & AFD_POLL_LOCAL_CLOSE != 0 {
+            write!(fmt, "AFD_POLL_LOCAL_CLOSE ")?;
+        }
+        if self.flags & AFD_POLL_ACCEPT != 0 {
+            write!(fmt, "AFD_POLL_ACCEPT ")?;
+        }
+        if self.flags & AFD_POLL_CONNECT_FAIL != 0 {
+            write!(fmt, "AFD_POLL_CONNECT_FAIL ")?;
+        }
+        write!(fmt, ")")?;
+        Ok(())
+    }
+}
+
 pub struct Events {
     /// Raw I/O event completions are filled in here by the call to `get_many`
     /// on the completion port above. These are then processed to run callbacks
@@ -93,5 +130,16 @@ impl Events {
         for c in 0..self.statuses.len() {
             self.statuses[c] = CompletionStatus::zero();
         }
+    }
+}
+
+impl fmt::Debug for Events {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "(")?;
+        for event in &self.events {
+            write!(fmt, "{:?}, ", event)?;
+        }
+        write!(fmt, ")")?;
+        Ok(())
     }
 }
