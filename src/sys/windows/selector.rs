@@ -515,7 +515,7 @@ impl SelectorInner {
         socket.set_sock_state(Some(sock));
         unsafe {
             self.add_socket_to_update_queue(socket);
-            self.update_sockets_events_if_polling()?;
+            self.update_sockets_events()?;
         }
 
         Ok(())
@@ -543,7 +543,7 @@ impl SelectorInner {
         }
         unsafe {
             self.add_socket_to_update_queue(socket);
-            self.update_sockets_events_if_polling()?;
+            self.update_sockets_events()?;
         }
 
         Ok(())
@@ -571,15 +571,6 @@ impl SelectorInner {
             }
         }
         self.afd_group.release_unused_afd();
-        Ok(())
-    }
-
-    unsafe fn update_sockets_events_if_polling(&self) -> io::Result<()> {
-        // FIXME: only do this while polling.
-        let active_poll_count = 1; //*self.active_poll_count.lock();
-        if active_poll_count > 0 {
-            return self.update_sockets_events();
-        }
         Ok(())
     }
 
