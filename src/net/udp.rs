@@ -13,6 +13,7 @@ use crate::{event, sys, Interests, Registry, Token};
 
 use std::fmt;
 use std::io;
+use std::net;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -92,6 +93,20 @@ pub struct UdpSocket {
 }
 
 impl UdpSocket {
+    /// Creates a new `UdpSocket` from a standard `net::UdpSocket`.
+    ///
+    /// This function is intended to be used to wrap a UDP socket from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying socket.
+    pub fn from_std(socket: net::UdpSocket) -> Self {
+        let sys = sys::UdpSocket::from_std(socket);
+        Self {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+
     /// Creates a UDP socket from the given address.
     ///
     /// # Examples

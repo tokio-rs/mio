@@ -7,6 +7,7 @@ use crate::{sys, Interests, Registry, Token};
 
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::net;
 use std::path::Path;
 
 /// A non-blocking Unix domain socket server.
@@ -20,6 +21,20 @@ pub struct UnixListener {
 impl UnixListener {
     fn new(sys: sys::UnixListener) -> UnixListener {
         UnixListener {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+
+    /// Creates a new `UnixListener` from a standard `net::UnixListener`.
+    ///
+    /// This function is intended to be used to wrap a Unix listener from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying listener.
+    pub fn from_std(listener: net::UnixListener) -> Self {
+        let sys = sys::UnixListener::from_std(listener);
+        Self {
             sys,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),

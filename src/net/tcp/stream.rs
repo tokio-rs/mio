@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
+use std::net;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -49,6 +50,24 @@ use std::net::Shutdown;
 impl TcpStream {
     pub(crate) fn new(sys: sys::TcpStream) -> TcpStream {
         TcpStream {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+
+    /// Creates a new `TcpStream` from a standard `net::TcpStream`.
+    ///
+    /// This function is intended to be used to wrap a TCP stream from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying stream.
+    ///
+    /// Note: The TCP stream here will not have `connect` called on it, so it
+    /// should already be connected via some other means (be it manually, or
+    /// the standard library).
+    pub fn from_std(stream: net::TcpStream) -> Self {
+        let sys = sys::TcpStream::from_std(stream);
+        Self {
             sys,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),

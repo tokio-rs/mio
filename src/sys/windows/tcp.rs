@@ -67,6 +67,15 @@ macro_rules! wouldblock {
 }
 
 impl TcpStream {
+    pub(crate) fn from_std(inner: net::TcpStream) -> Self {
+        let raw_socket = inner.into_raw_socket();
+        let inner = unsafe { FromRawSocket::from_raw_socket(raw_socket) };
+        Self {
+            internal: Arc::new(Mutex::new(None)),
+            inner,
+        }
+    }
+
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         init();
         new_socket(addr, SOCK_STREAM)
@@ -324,6 +333,15 @@ impl AsRawSocket for TcpStream {
 }
 
 impl TcpListener {
+    pub(crate) fn from_std(inner: net::TcpListener) -> Self {
+        let raw_socket = inner.into_raw_socket();
+        let inner = unsafe { FromRawSocket::from_raw_socket(raw_socket) };
+        Self {
+            internal: Arc::new(Mutex::new(None)),
+            inner,
+        }
+    }
+
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
         init();
         new_socket(addr, SOCK_STREAM).and_then(|socket| {

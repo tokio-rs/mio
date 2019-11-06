@@ -5,6 +5,7 @@ use crate::{event, sys, Interests, Registry, Token};
 
 use std::fmt;
 use std::io;
+use std::net;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -41,6 +42,20 @@ pub struct TcpListener {
 }
 
 impl TcpListener {
+    /// Creates a new `TcpListener` from a standard `net::TcpListener`.
+    ///
+    /// This function is intended to be used to wrap a TCP listener from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying listener.
+    pub fn from_std(listener: net::TcpListener) -> Self {
+        let sys = sys::TcpListener::from_std(listener);
+        Self {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+
     /// Convenience method to bind a new TCP listener to the specified address
     /// to receive new connections.
     ///

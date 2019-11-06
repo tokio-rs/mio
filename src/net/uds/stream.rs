@@ -6,6 +6,7 @@ use crate::{sys, Interests, Registry, Token};
 use std::io::{self, IoSlice, IoSliceMut};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::net;
 use std::path::Path;
 
 /// A non-blocking Unix stream socket.
@@ -19,6 +20,24 @@ pub struct UnixStream {
 impl UnixStream {
     pub(crate) fn new(sys: sys::UnixStream) -> UnixStream {
         UnixStream {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+
+    /// Creates a new `UnixStream` from a standard `net::UnixStream`.
+    ///
+    /// This function is intended to be used to wrap a Unix stream from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying stream.
+    ///
+    /// Note: The Unix stream here will not have `connect` called on it, so it
+    /// should already be connected via some other means (be it manually, or
+    /// the standard library).
+    pub fn from_std(stream: net::UnixStream) -> Self {
+        let sys = sys::UnixStream::from_std(stream);
+        Self {
             sys,
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
