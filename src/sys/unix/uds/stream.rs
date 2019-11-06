@@ -20,6 +20,12 @@ impl UnixStream {
         UnixStream { inner }
     }
 
+    pub(crate) fn from_std(inner: net::UnixStream) -> Self {
+        let raw_fd = inner.into_raw_fd();
+        let inner = unsafe { FromRawFd::from_raw_fd(raw_fd) };
+        Self { inner }
+    }
+
     pub(crate) fn connect(path: &Path) -> io::Result<UnixStream> {
         let socket = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
         let (sockaddr, socklen) = socket_addr(path)?;

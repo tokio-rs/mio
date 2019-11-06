@@ -11,6 +11,12 @@ pub struct UdpSocket {
 }
 
 impl UdpSocket {
+    pub(crate) fn from_std(io: net::UdpSocket) -> Self {
+        let raw_fd = io.into_raw_fd();
+        let io = unsafe { FromRawFd::from_raw_fd(raw_fd) };
+        Self { io }
+    }
+
     pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
         // Gives a warning for non Apple platforms.
         #[allow(clippy::let_and_return)]

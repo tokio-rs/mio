@@ -20,6 +20,12 @@ impl UnixDatagram {
         UnixDatagram { inner }
     }
 
+    pub(crate) fn from_std(inner: net::UnixDatagram) -> Self {
+        let raw_fd = inner.into_raw_fd();
+        let inner = unsafe { FromRawFd::from_raw_fd(raw_fd) };
+        UnixDatagram { inner }
+    }
+
     pub(crate) fn bind(path: &Path) -> io::Result<UnixDatagram> {
         let socket = new_socket(libc::AF_UNIX, libc::SOCK_DGRAM)?;
         let (sockaddr, socklen) = socket_addr(path)?;
