@@ -9,6 +9,8 @@ use std::net;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 /// A structure representing a socket server
 ///
@@ -181,5 +183,30 @@ impl FromRawFd for TcpListener {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         }
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for TcpListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.sys.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for TcpListener {
+    unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
+        TcpListener {
+            sys: FromRawSocket::from_raw_socket(socket),
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for TcpListener {
+    fn into_raw_socket(self) -> RawSocket {
+        self.sys.into_raw_socket()
     }
 }
