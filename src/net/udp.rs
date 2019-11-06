@@ -17,6 +17,8 @@ use std::net;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 /// A User Datagram Protocol socket.
 ///
@@ -569,5 +571,30 @@ impl FromRawFd for UdpSocket {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         }
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for UdpSocket {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.sys.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for UdpSocket {
+    unsafe fn from_raw_socket(socket: RawSocket) -> UdpSocket {
+        UdpSocket {
+            sys: FromRawSocket::from_raw_socket(socket),
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for UdpSocket {
+    fn into_raw_socket(self) -> RawSocket {
+        self.sys.into_raw_socket()
     }
 }

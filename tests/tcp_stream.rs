@@ -120,6 +120,14 @@ fn smoke_test_tcp_stream(addr: SocketAddr) {
     thread_handle.join().expect("unable to join thread");
 }
 
+// #[test]
+// fn tcp_stream_from_std() {
+//     let (handle, sockaddr) = echo_listener(any_local_address(), 1);
+//     let stream = assert_ok!(std::net::TcpStream::connect(sockaddr));
+//     assert_ok!(TcpStream::from_std(stream));
+//     assert_ok!(handle.join())
+// }
+
 #[test]
 fn try_clone() {
     let (mut poll, mut events) = init_with_poll();

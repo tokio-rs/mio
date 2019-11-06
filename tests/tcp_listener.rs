@@ -72,6 +72,12 @@ fn smoke_test_tcp_listener(addr: SocketAddr) {
     thread_handle.join().expect("unable to join thread");
 }
 
+// #[test]
+// fn tcp_listener_from_std() {
+//     let listener = assert_ok!(std::net::TcpListener::bind(any_local_address()));
+//     assert_ok!(TcpListener::from_std(listener));
+// }
+
 #[test]
 fn set_get_ttl() {
     init();
