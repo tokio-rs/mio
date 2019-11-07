@@ -165,7 +165,6 @@ fn reregister() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "deregister doesn't work, see #1073")]
 fn deregister() {
     let (mut poll, mut events) = init_with_poll();
 
