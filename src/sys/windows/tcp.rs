@@ -63,7 +63,7 @@ impl TcpStream {
 
     pub fn from_std(inner: net::TcpStream) -> TcpStream {
         TcpStream {
-            internal: Arc::new(Mutex::new(None)),
+            internal: Box::new(Mutex::new(None)),
             inner,
         }
     }
@@ -325,7 +325,7 @@ impl TcpListener {
 
     pub fn from_std(inner: net::TcpListener) -> TcpListener {
         TcpListener {
-            internal: Arc::new(Mutex::new(None)),
+            internal: Box::new(Mutex::new(None)),
             inner,
         }
     }
