@@ -211,9 +211,12 @@ impl<'a> Iterator for Iter<'a> {
 
 impl fmt::Debug for Events {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Events")
-            .field("capacity", &self.capacity())
-            .field("raw_events", &self.inner)
-            .finish()
+        let mut d = f.debug_struct("Events");
+        d.field("capacity", &self.capacity());
+
+        #[cfg(target_os = "windows")]
+        d.field("raw_events", &self.inner);
+
+        d.finish()
     }
 }

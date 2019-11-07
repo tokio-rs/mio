@@ -191,8 +191,8 @@ impl Event {
 
 impl fmt::Debug for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Event")
-            .field("token", &self.token())
+        let mut d = f.debug_struct("Event");
+        d.field("token", &self.token())
             .field("readable", &self.is_readable())
             .field("writable", &self.is_writable())
             .field("error", &self.is_error())
@@ -200,8 +200,11 @@ impl fmt::Debug for Event {
             .field("write_closed", &self.is_write_closed())
             .field("priority", &self.is_priority())
             .field("aio", &self.is_aio())
-            .field("lio", &self.is_lio())
-            .field("raw_flags", &self.inner)
-            .finish()
+            .field("lio", &self.is_lio());
+
+        #[cfg(target_os = "windows")]
+        d.field("raw_flags", &self.inner);
+
+        d.finish()
     }
 }
