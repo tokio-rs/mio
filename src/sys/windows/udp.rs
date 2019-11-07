@@ -38,10 +38,10 @@ impl UdpSocket {
         })
     }
 
-    pub fn from_std(io: net::UdpSocket) -> UdpSocket {
+    pub fn from_std(inner: net::UdpSocket) -> UdpSocket {
         UdpSocket {
-            internal: Arc::new(Mutex::new(None)),
-            io,
+            internal: Box::new(Mutex::new(None)),
+            inner,
         }
     }
 

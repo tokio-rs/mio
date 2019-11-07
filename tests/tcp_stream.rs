@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 
 use mio::net::TcpStream;
-use mio::{Events, Interests, Poll, Token};
+use mio::{Interests, Token};
 
 #[macro_use]
 mod util;
@@ -36,47 +36,36 @@ fn is_send_and_sync() {
 #[test]
 #[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_ipv4() {
-    let (poll, events) = init_with_poll();
-    let (handle, addr) = echo_listener(any_local_address(), 1);
-    let stream = TcpStream::connect(addr).unwrap();
-
-    smoke_test_tcp_stream(stream, poll, events, addr);
-    handle.join().expect("unable to join thread");
+    smoke_test_tcp_stream(any_local_address(), |addr| TcpStream::connect(addr));
 }
 
 #[test]
 #[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_ipv6() {
-    let (poll, events) = init_with_poll();
-    let (handle, addr) = echo_listener(any_local_ipv6_address(), 1);
-    let stream = TcpStream::connect(addr).unwrap();
-
-    smoke_test_tcp_stream(stream, poll, events, addr);
-    handle.join().expect("unable to join thread");
+    smoke_test_tcp_stream(any_local_ipv6_address(), |addr| TcpStream::connect(addr));
 }
 
 #[test]
 #[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_std() {
-    let (poll, events) = init_with_poll();
-    let (handle, addr) = echo_listener(any_local_address(), 1);
-    let stream = net::TcpStream::connect(addr).unwrap();
-
-    // `std::net::TcpStream`s are blocking by default, so make sure it is in
-    // non-blocking mode before wrapping in a Mio equivalent.
-    assert_ok!(stream.set_nonblocking(true));
-    let stream = TcpStream::from_std(stream);
-
-    smoke_test_tcp_stream(stream, poll, events, addr);
-    handle.join().expect("unable to join thread");
+    smoke_test_tcp_stream(any_local_address(), |addr| {
+        let stream = net::TcpStream::connect(addr).unwrap();
+        // `std::net::TcpStream`s are blocking by default, so make sure it is
+        // in non-blocking mode before wrapping in a Mio equivalent.
+        assert_ok!(stream.set_nonblocking(true));
+        Ok(TcpStream::from_std(stream))
+    });
 }
 
-fn smoke_test_tcp_stream(
-    mut stream: TcpStream,
-    mut poll: Poll,
-    mut events: Events,
-    addr: SocketAddr,
-) {
+fn smoke_test_tcp_stream<F>(addr: SocketAddr, make_stream: F)
+where
+    F: FnOnce(SocketAddr) -> io::Result<TcpStream>,
+{
+    let (mut poll, mut events) = init_with_poll();
+
+    let (handle, addr) = echo_listener(addr, 1);
+    let mut stream = make_stream(addr).unwrap();
+
     poll.registry()
         .register(&stream, ID1, Interests::WRITABLE.add(Interests::READABLE))
         .expect("unable to register TCP stream");
@@ -142,6 +131,7 @@ fn smoke_test_tcp_stream(
 
     // Close the connection to allow the listener to shutdown.
     drop(stream);
+    handle.join().expect("unable to join thread");
 }
 
 #[test]

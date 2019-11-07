@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{self, Read};
 use std::net::{self, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
@@ -26,30 +26,32 @@ fn is_send_and_sync() {
 
 #[test]
 fn tcp_listener() {
-    let listener = TcpListener::bind(any_local_address()).unwrap();
-    smoke_test_tcp_listener(listener);
+    smoke_test_tcp_listener(any_local_address(), |addr| TcpListener::bind(addr));
 }
 
 #[test]
 fn tcp_listener_ipv6() {
-    let listener = TcpListener::bind(any_local_ipv6_address()).unwrap();
-    smoke_test_tcp_listener(listener);
+    smoke_test_tcp_listener(any_local_ipv6_address(), |addr| TcpListener::bind(addr));
 }
 
 #[test]
 fn tcp_listener_std() {
-    let listener = net::TcpListener::bind(any_local_address()).unwrap();
-
-    // `std::net::TcpListener`s are blocking by default, so make sure it is in
-    // non-blocking mode before wrapping in a Mio equivalent.
-    assert_ok!(listener.set_nonblocking(true));
-    let listener = TcpListener::from_std(listener);
-
-    smoke_test_tcp_listener(listener);
+    smoke_test_tcp_listener(any_local_address(), |addr| {
+        let listener = net::TcpListener::bind(addr).unwrap();
+        // `std::net::TcpListener`s are blocking by default, so make sure it is in
+        // non-blocking mode before wrapping in a Mio equivalent.
+        assert_ok!(listener.set_nonblocking(true));
+        Ok(TcpListener::from_std(listener))
+    });
 }
 
-fn smoke_test_tcp_listener(listener: TcpListener) {
+fn smoke_test_tcp_listener<F>(addr: SocketAddr, make_listener: F)
+where
+    F: FnOnce(SocketAddr) -> io::Result<TcpListener>,
+{
     let (mut poll, mut events) = init_with_poll();
+
+    let listener = make_listener(addr).unwrap();
     let address = listener.local_addr().unwrap();
 
     poll.registry()

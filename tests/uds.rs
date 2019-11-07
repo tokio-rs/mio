@@ -5,11 +5,12 @@ mod util;
 use log::warn;
 use mio::net::{UnixDatagram, UnixListener, UnixStream};
 use mio::unix::SocketAddr;
-use mio::{Events, Interests, Poll, Token};
+use mio::{Interests, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::net;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::path::Path;
+use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
@@ -31,38 +32,31 @@ const LOCAL_CLONE: Token = Token(1);
 
 #[test]
 fn uds_stream() {
-    let (poll, events) = init_with_poll();
-
-    let (sync_sender, sync_receiver) = channel();
-    let (handle, remote_addr) = echo_remote(1, sync_receiver);
-
-    let path = remote_addr.as_pathname().expect("not a pathname");
-    let local = assert_ok!(UnixStream::connect(path));
-
-    smoke_test(local, poll, events, sync_sender);
-    assert_ok!(handle.join());
+    smoke_test(|path| UnixStream::connect(path));
 }
 
 #[test]
 fn uds_stream_std() {
-    let (poll, events) = init_with_poll();
+    smoke_test(|path| {
+        let local = assert_ok!(net::UnixStream::connect(path));
+        // `std::os::unix::net::UnixStream`s are blocking by default, so make sure
+        // it is in non-blocking mode before wrapping in a Mio equivalent.
+        assert_ok!(local.set_nonblocking(true));
+        Ok(UnixStream::from_std(local))
+    })
+}
+
+fn smoke_test<F>(make_stream: F)
+where
+    F: FnOnce(&Path) -> io::Result<UnixStream>,
+{
+    let (mut poll, mut events) = init_with_poll();
 
     let (sync_sender, sync_receiver) = channel();
     let (handle, remote_addr) = echo_remote(1, sync_receiver);
 
     let path = remote_addr.as_pathname().expect("not a pathname");
-    let local = assert_ok!(net::UnixStream::connect(path));
-
-    // `std::os::unix::net::UnixStream`s are blocking by default, so make sure
-    // it is in non-blocking mode before wrapping in a Mio equivalent.
-    assert_ok!(local.set_nonblocking(true));
-    let local = UnixStream::from_std(local);
-
-    smoke_test(local, poll, events, sync_sender);
-    assert_ok!(handle.join());
-}
-
-fn smoke_test(mut local: UnixStream, mut poll: Poll, mut events: Events, sync_sender: Sender<()>) {
+    let mut local = assert_ok!(make_stream(path));
     assert_ok!(sync_sender.send(()));
 
     assert_ok!(poll.registry().register(
@@ -120,6 +114,7 @@ fn smoke_test(mut local: UnixStream, mut poll: Poll, mut events: Events, sync_se
 
     // Close the connection to allow the remote to shutdown
     drop(local);
+    assert_ok!(handle.join());
 }
 
 #[test]
