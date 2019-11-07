@@ -26,12 +26,12 @@ fn is_send_and_sync() {
 
 #[test]
 fn tcp_listener() {
-    smoke_test_tcp_listener(any_local_address(), |addr| TcpListener::bind(addr));
+    smoke_test_tcp_listener(any_local_address(), TcpListener::bind);
 }
 
 #[test]
 fn tcp_listener_ipv6() {
-    smoke_test_tcp_listener(any_local_ipv6_address(), |addr| TcpListener::bind(addr));
+    smoke_test_tcp_listener(any_local_ipv6_address(), TcpListener::bind);
 }
 
 #[test]
