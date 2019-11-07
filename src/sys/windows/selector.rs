@@ -1,8 +1,4 @@
-use super::afd::{Afd, AfdPollInfo};
-use super::afd::{
-    AFD_POLL_ABORT, AFD_POLL_ACCEPT, AFD_POLL_CONNECT_FAIL, AFD_POLL_DISCONNECT,
-    AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_SEND, KNOWN_AFD_EVENTS,
-};
+use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
 use super::SocketState;
@@ -10,9 +6,8 @@ use crate::sys::Events;
 use crate::{Interests, Token};
 
 use miow::iocp::{CompletionPort, CompletionStatus};
-use std::cell::UnsafeCell;
+use miow::Overlapped;
 use std::collections::VecDeque;
-use std::io;
 use std::mem::size_of;
 use std::os::windows::io::{AsRawSocket, RawSocket};
 use std::pin::Pin;
@@ -21,6 +16,7 @@ use std::ptr::null_mut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use std::{io, ptr};
 use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
@@ -29,6 +25,11 @@ use winapi::um::mswsock::SIO_BASE_HANDLE;
 use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
+
+/// Overlapped value to indicate a `Waker` event.
+//
+// Note: this must be null, `SelectorInner::feed_events` depends on it.
+pub const WAKER_OVERLAPPED: *mut Overlapped = ptr::null_mut();
 
 #[derive(Debug)]
 struct AfdGroup {
@@ -151,8 +152,8 @@ impl SockState {
 
     /// True if need to be added on update queue, false otherwise.
     fn set_event(&mut self, ev: Event) -> bool {
-        /* AFD_POLL_CONNECT_FAIL and AFD_POLL_ABORT are always reported, even when not requested by the caller. */
-        let events = ev.flags | AFD_POLL_CONNECT_FAIL | AFD_POLL_ABORT;
+        /* afd::POLL_CONNECT_FAIL and afd::POLL_ABORT are always reported, even when not requested by the caller. */
+        let events = ev.flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
 
         self.user_evts = events;
         self.user_data = ev.data;
@@ -164,7 +165,7 @@ impl SockState {
         assert!(!self.delete_pending);
 
         if let SockPollStatus::Pending = self.poll_status {
-            if (self.user_evts & KNOWN_AFD_EVENTS & !self.pending_evts) == 0 {
+            if (self.user_evts & afd::KNOWN_EVENTS & !self.pending_evts) == 0 {
                 /* All the events the user is interested in are already being monitored by
                  * the pending poll operation. It might spuriously complete because of an
                  * event that we're no longer interested in; when that happens we'll submit
@@ -188,7 +189,7 @@ impl SockState {
             }
             self.poll_info.handles[0].handle = self.base_socket as HANDLE;
             self.poll_info.handles[0].status = 0;
-            self.poll_info.handles[0].events = self.user_evts | AFD_POLL_LOCAL_CLOSE;
+            self.poll_info.handles[0].events = self.user_evts | afd::POLL_LOCAL_CLOSE;
 
             let wrapped_overlapped = OverlappedArcWrapper::new(self_arc);
             let overlapped = wrapped_overlapped.get_ptr() as *const _ as PVOID;
@@ -256,10 +257,10 @@ impl SockState {
                 /* The poll request was cancelled by CancelIoEx. */
             } else if !NT_SUCCESS(iosb.u.Status) {
                 /* The overlapped request itself failed in an unexpected way. */
-                afd_events = AFD_POLL_CONNECT_FAIL;
+                afd_events = afd::POLL_CONNECT_FAIL;
             } else if self.poll_info.number_of_handles < 1 {
                 /* This poll operation succeeded but didn't report any socket events. */
-            } else if self.poll_info.handles[0].events & AFD_POLL_LOCAL_CLOSE != 0 {
+            } else if self.poll_info.handles[0].events & afd::POLL_LOCAL_CLOSE != 0 {
                 /* The poll operation reported that the socket was closed. */
                 self.mark_delete();
                 return None;
@@ -357,7 +358,11 @@ impl Selector {
         })
     }
 
-    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+    /// # Safety
+    ///
+    /// This requires a mutable reference to self because only a single thread
+    /// can poll IOCP at a time.
+    pub fn select(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         self.inner.select(events, timeout)
     }
 
@@ -391,14 +396,16 @@ impl Selector {
     pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
         self.inner.clone()
     }
+
+    pub(super) fn clone_port(&self) -> Arc<CompletionPort> {
+        self.inner.cp.clone()
+    }
 }
 
 #[derive(Debug)]
 pub struct SelectorInner {
-    lock: Mutex<()>,
     cp: Arc<CompletionPort>,
-    active_poll_count: UnsafeCell<usize>,
-    update_queue: UnsafeCell<VecDeque<Arc<Mutex<SockState>>>>,
+    update_queue: Mutex<VecDeque<Arc<Mutex<SockState>>>>,
     afd_group: AfdGroup,
 }
 
@@ -412,15 +419,16 @@ impl SelectorInner {
             let cp_afd = Arc::clone(&cp);
 
             SelectorInner {
-                lock: Mutex::new(()),
-                cp: cp,
-                active_poll_count: UnsafeCell::new(0),
-                update_queue: UnsafeCell::new(VecDeque::new()),
+                cp,
+                update_queue: Mutex::new(VecDeque::new()),
                 afd_group: AfdGroup::new(cp_afd),
             }
         })
     }
 
+    /// # Safety
+    ///
+    /// May only be calling via `Selector::select`.
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
 
@@ -468,33 +476,19 @@ impl SelectorInner {
         events: &mut Vec<Event>,
         timeout: Option<Duration>,
     ) -> io::Result<usize> {
-        {
-            let _guard = self.lock.lock().unwrap();
-
-            unsafe {
-                self.update_sockets_events()?;
-
-                *self.active_poll_count.get() += 1;
-            }
+        unsafe {
+            self.update_sockets_events()?;
         }
 
         let result = self.cp.get_many(statuses, timeout);
 
-        {
-            let _guard = self.lock.lock().unwrap();
-
-            unsafe {
-                *self.active_poll_count.get() -= 1;
+        if let Err(e) = result {
+            if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
+                return Ok(0);
             }
-
-            if let Err(e) = result {
-                if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
-                    return Ok(0);
-                }
-                return Err(e);
-            }
-            unsafe { Ok(self.feed_events(events, result.unwrap())) }
+            return Err(e);
         }
+        unsafe { Ok(self.feed_events(events, result.unwrap())) }
     }
 
     pub fn register<S: SocketState + AsRawSocket>(
@@ -519,12 +513,9 @@ impl SelectorInner {
             sock.lock().unwrap().set_event(event);
         }
         socket.set_sock_state(Some(sock));
-        {
-            let _guard = self.lock.lock().unwrap();
-            unsafe {
-                self.add_socket_to_update_queue(socket);
-                self.update_sockets_events_if_polling()?;
-            }
+        unsafe {
+            self.add_socket_to_update_queue(socket);
+            self.update_sockets_events()?;
         }
 
         Ok(())
@@ -550,12 +541,9 @@ impl SelectorInner {
         {
             sock.lock().unwrap().set_event(event);
         }
-        {
-            let _guard = self.lock.lock().unwrap();
-            unsafe {
-                self.add_socket_to_update_queue(socket);
-                self.update_sockets_events_if_polling()?;
-            }
+        unsafe {
+            self.add_socket_to_update_queue(socket);
+            self.update_sockets_events()?;
         }
 
         Ok(())
@@ -570,12 +558,8 @@ impl SelectorInner {
         Ok(())
     }
 
-    pub fn port(&self) -> &CompletionPort {
-        &self.cp
-    }
-
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
-        let update_queue = &mut *self.update_queue.get();
+        let mut update_queue = self.update_queue.lock().unwrap();
         loop {
             let sock = match update_queue.pop_front() {
                 Some(sock) => sock,
@@ -590,17 +574,9 @@ impl SelectorInner {
         Ok(())
     }
 
-    unsafe fn update_sockets_events_if_polling(&self) -> io::Result<()> {
-        let active_poll_count = *self.active_poll_count.get();
-        if active_poll_count > 0 {
-            return self.update_sockets_events();
-        }
-        Ok(())
-    }
-
     unsafe fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
         let sock_state = socket.get_sock_state().unwrap();
-        let update_queue = &mut *self.update_queue.get();
+        let mut update_queue = self.update_queue.lock().unwrap();
         update_queue.push_back(sock_state);
     }
 
@@ -611,11 +587,12 @@ impl SelectorInner {
         iocp_events: &[CompletionStatus],
     ) -> usize {
         let mut n = 0;
-        let update_queue = &mut *self.update_queue.get();
+        let mut update_queue = self.update_queue.lock().unwrap();
         for iocp_event in iocp_events.iter() {
-            if iocp_event.overlapped() as usize == 0 {
+            if iocp_event.overlapped().is_null() {
+                // `Waker` event, we'll add a readable event to match the other platforms.
                 events.push(Event {
-                    flags: AFD_POLL_RECEIVE,
+                    flags: afd::POLL_RECEIVE,
                     data: iocp_event.token() as u64,
                 });
                 n += 1;
@@ -651,12 +628,12 @@ fn interests_to_afd_flags(interests: Interests) -> u32 {
     let mut flags = 0;
 
     if interests.is_readable() {
-        // AFD_POLL_DISCONNECT for is_read_hup()
-        flags |= AFD_POLL_RECEIVE | AFD_POLL_ACCEPT | AFD_POLL_DISCONNECT;
+        // afd::POLL_DISCONNECT for is_read_hup()
+        flags |= afd::POLL_RECEIVE | afd::POLL_ACCEPT | afd::POLL_DISCONNECT;
     }
 
     if interests.is_writable() {
-        flags |= AFD_POLL_SEND;
+        flags |= afd::POLL_SEND;
     }
 
     flags

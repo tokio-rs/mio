@@ -22,6 +22,20 @@ macro_rules! syscall {
     }};
 }
 
+/// Helper macro to execute an I/O operation and register interests if the
+/// operation would block.
+macro_rules! try_io {
+    ($self: ident, $method: ident $(, $args: expr)*)  => {{
+        let result = (&$self.inner).$method($($args),*);
+        if let Err(ref e) = result {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                $self.io_blocked_reregister()?;
+            }
+        }
+        result
+    }};
+}
+
 mod afd;
 pub mod event;
 mod io_status_block;
