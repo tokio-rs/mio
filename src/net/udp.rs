@@ -95,20 +95,6 @@ pub struct UdpSocket {
 }
 
 impl UdpSocket {
-    /// Creates a new `UdpSocket` from a standard `net::UdpSocket`.
-    ///
-    /// This function is intended to be used to wrap a UDP socket from the
-    /// standard library in the Mio equivalent. The conversion assumes nothing
-    /// about the underlying socket.
-    pub fn from_std(socket: net::UdpSocket) -> Self {
-        let sys = sys::UdpSocket::from_std(socket);
-        Self {
-            sys,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        }
-    }
-
     /// Creates a UDP socket from the given address.
     ///
     /// # Examples
@@ -139,6 +125,21 @@ impl UdpSocket {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })
+    }
+
+    /// Creates a new `UdpSocket` from a standard `net::UdpSocket`.
+    ///
+    /// This function is intended to be used to wrap a UDP socket from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying socket; it is left up to the user to set it in
+    /// non-blocking mode.
+    pub fn from_std(socket: net::UdpSocket) -> UdpSocket {
+        let sys = sys::UdpSocket::from_std(socket);
+        UdpSocket {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Returns the socket address that this socket was created from.

@@ -13,12 +13,6 @@ pub struct TcpListener {
 }
 
 impl TcpListener {
-    pub(crate) fn from_std(inner: net::TcpListener) -> Self {
-        let raw_fd = inner.into_raw_fd();
-        let inner = unsafe { FromRawFd::from_raw_fd(raw_fd) };
-        Self { inner }
-    }
-
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
         new_ip_socket(addr, libc::SOCK_STREAM).and_then(|socket| {
             // Set SO_REUSEADDR (mirrors what libstd does).
@@ -44,6 +38,10 @@ impl TcpListener {
                 inner: unsafe { net::TcpListener::from_raw_fd(socket) },
             })
         })
+    }
+
+    pub fn from_std(inner: net::TcpListener) -> TcpListener {
+        TcpListener { inner }
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
