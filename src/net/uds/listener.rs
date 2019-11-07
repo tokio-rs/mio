@@ -27,24 +27,25 @@ impl UnixListener {
         }
     }
 
-    /// Creates a new `UnixListener` from a standard `net::UnixListener`.
-    ///
-    /// This function is intended to be used to wrap a Unix listener from the
-    /// standard library in the Mio equivalent. The conversion assumes nothing
-    /// about the underlying listener.
-    pub fn from_std(listener: net::UnixListener) -> Self {
-        let sys = sys::UnixListener::from_std(listener);
-        Self {
-            sys,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        }
-    }
-
     /// Creates a new `UnixListener` bound to the specified socket.
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
         let sys = sys::UnixListener::bind(path.as_ref())?;
         Ok(UnixListener::new(sys))
+    }
+
+    /// Creates a new `UnixListener` from a standard `net::UnixListener`.
+    ///
+    /// This function is intended to be used to wrap a Unix listener from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying listener; it is left up to the user to set it in
+    /// non-blocking mode.
+    pub fn from_std(listener: net::UnixListener) -> UnixListener {
+        let sys = sys::UnixListener::from_std(listener);
+        UnixListener {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Accepts a new incoming connection to this listener.

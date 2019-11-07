@@ -26,28 +26,31 @@ impl UnixStream {
         }
     }
 
-    /// Creates a new `UnixStream` from a standard `net::UnixStream`.
-    ///
-    /// This function is intended to be used to wrap a Unix stream from the
-    /// standard library in the Mio equivalent. The conversion assumes nothing
-    /// about the underlying stream.
-    ///
-    /// Note: The Unix stream here will not have `connect` called on it, so it
-    /// should already be connected via some other means (be it manually, or
-    /// the standard library).
-    pub fn from_std(stream: net::UnixStream) -> Self {
-        let sys = sys::UnixStream::from_std(stream);
-        Self {
-            sys,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        }
-    }
-
     /// Connects to the socket named by `path`.
     pub fn connect<P: AsRef<Path>>(p: P) -> io::Result<UnixStream> {
         let sys = sys::UnixStream::connect(p.as_ref())?;
         Ok(UnixStream::new(sys))
+    }
+
+    /// Creates a new `UnixStream` from a standard `net::UnixStream`.
+    ///
+    /// This function is intended to be used to wrap a Unix stream from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying stream; it is left up to the user to set it in
+    /// non-blocking mode.
+    ///
+    /// # Note
+    ///
+    /// The Unix stream here will not have `connect` called on it, so it
+    /// should already be connected via some other means (be it manually, or
+    /// the standard library).
+    pub fn from_std(stream: net::UnixStream) -> UnixStream {
+        let sys = sys::UnixStream::from_std(stream);
+        UnixStream {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Creates an unnamed pair of connected sockets.

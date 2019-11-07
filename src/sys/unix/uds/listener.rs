@@ -41,12 +41,6 @@ impl UnixListener {
         UnixListener { inner }
     }
 
-    pub(crate) fn from_std(inner: net::UnixListener) -> Self {
-        let raw_fd = inner.into_raw_fd();
-        let inner = unsafe { FromRawFd::from_raw_fd(raw_fd) };
-        Self { inner }
-    }
-
     pub(crate) fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
         let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
 
@@ -116,6 +110,10 @@ impl UnixListener {
                 err
             })
             .map(|_| unsafe { UnixListener::from_raw_fd(socket) })
+    }
+
+    pub fn from_std(inner: net::UnixListener) -> UnixListener {
+        UnixListener { inner }
     }
 
     pub(crate) fn try_clone(&self) -> io::Result<UnixListener> {

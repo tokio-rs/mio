@@ -41,15 +41,6 @@ macro_rules! wouldblock {
 }
 
 impl UdpSocket {
-    pub(crate) fn from_std(io: net::UdpSocket) -> Self {
-        let raw_socket = io.into_raw_socket();
-        let io = unsafe { FromRawSocket::from_raw_socket(raw_socket) };
-        Self {
-            internal: Arc::new(Mutex::new(None)),
-            io,
-        }
-    }
-
     pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
         init();
         new_socket(addr, SOCK_DGRAM).and_then(|socket| {
@@ -70,6 +61,13 @@ impl UdpSocket {
                 io: unsafe { net::UdpSocket::from_raw_socket(socket as StdSocket) },
             })
         })
+    }
+
+    pub fn from_std(io: net::UdpSocket) -> UdpSocket {
+        UdpSocket {
+            internal: Arc::new(Mutex::new(None)),
+            io,
+        }
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {

@@ -58,24 +58,6 @@ impl TcpStream {
         }
     }
 
-    /// Creates a new `TcpStream` from a standard `net::TcpStream`.
-    ///
-    /// This function is intended to be used to wrap a TCP stream from the
-    /// standard library in the Mio equivalent. The conversion assumes nothing
-    /// about the underlying stream.
-    ///
-    /// Note: The TCP stream here will not have `connect` called on it, so it
-    /// should already be connected via some other means (be it manually, or
-    /// the standard library).
-    pub fn from_std(stream: net::TcpStream) -> Self {
-        let sys = sys::TcpStream::from_std(stream);
-        Self {
-            sys,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        }
-    }
-
     /// Create a new TCP stream and issue a non-blocking connect to the
     /// specified address.
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
@@ -84,6 +66,27 @@ impl TcpStream {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })
+    }
+
+    /// Creates a new `TcpStream` from a standard `net::TcpStream`.
+    ///
+    /// This function is intended to be used to wrap a TCP stream from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying stream; it is left up to the user to set it in
+    /// non-blocking mode.
+    ///
+    /// # Note
+    ///
+    /// The TCP stream here will not have `connect` called on it, so it
+    /// should already be connected via some other means (be it manually, or
+    /// the standard library).
+    pub fn from_std(stream: net::TcpStream) -> TcpStream {
+        let sys = sys::TcpStream::from_std(stream);
+        TcpStream {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Returns the socket address of the remote peer of this TCP connection.

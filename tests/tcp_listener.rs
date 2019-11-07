@@ -26,18 +26,30 @@ fn is_send_and_sync() {
 
 #[test]
 fn tcp_listener() {
-    smoke_test_tcp_listener(any_local_address());
+    let listener = TcpListener::bind(any_local_address()).unwrap();
+    smoke_test_tcp_listener(listener);
 }
 
 #[test]
 fn tcp_listener_ipv6() {
-    smoke_test_tcp_listener(any_local_ipv6_address());
+    let listener = TcpListener::bind(any_local_ipv6_address()).unwrap();
+    smoke_test_tcp_listener(listener);
 }
 
-fn smoke_test_tcp_listener(addr: SocketAddr) {
-    let (mut poll, mut events) = init_with_poll();
+#[test]
+fn tcp_listener_std() {
+    let listener = net::TcpListener::bind(any_local_address()).unwrap();
 
-    let listener = TcpListener::bind(addr).unwrap();
+    // `std::net::TcpListener`s are blocking by default, so make sure it is in
+    // non-blocking mode before wrapping in a Mio equivalent.
+    assert_ok!(listener.set_nonblocking(true));
+    let listener = TcpListener::from_std(listener);
+
+    smoke_test_tcp_listener(listener);
+}
+
+fn smoke_test_tcp_listener(listener: TcpListener) {
+    let (mut poll, mut events) = init_with_poll();
     let address = listener.local_addr().unwrap();
 
     poll.registry()
@@ -71,12 +83,6 @@ fn smoke_test_tcp_listener(addr: SocketAddr) {
     barrier.wait();
     thread_handle.join().expect("unable to join thread");
 }
-
-// #[test]
-// fn tcp_listener_from_std() {
-//     let listener = assert_ok!(std::net::TcpListener::bind(any_local_address()));
-//     assert_ok!(TcpListener::from_std(listener));
-// }
 
 #[test]
 fn set_get_ttl() {

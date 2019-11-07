@@ -16,12 +16,6 @@ impl TcpStream {
         TcpStream { inner }
     }
 
-    pub(crate) fn from_std(inner: net::TcpStream) -> Self {
-        let raw_fd = inner.into_raw_fd();
-        let inner = unsafe { FromRawFd::from_raw_fd(raw_fd) };
-        Self { inner }
-    }
-
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         new_ip_socket(addr, libc::SOCK_STREAM)
             .and_then(|socket| {
@@ -43,6 +37,10 @@ impl TcpStream {
             .map(|socket| TcpStream {
                 inner: unsafe { net::TcpStream::from_raw_fd(socket) },
             })
+    }
+
+    pub fn from_std(inner: net::TcpStream) -> TcpStream {
+        TcpStream { inner }
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
