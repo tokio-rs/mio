@@ -32,6 +32,7 @@ const LOCAL_CLONE: Token = Token(1);
 
 #[test]
 fn uds_stream() {
+    #[allow(clippy::redundant_closure)]
     smoke_test(|path| UnixStream::connect(path));
 }
 
