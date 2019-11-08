@@ -539,7 +539,6 @@ fn no_events_after_deregister() {
         .deregister(&stream)
         .expect("unable to deregister TCP stream");
 
-    // note: without deregistering at this point poll would retrieve Interests::WRITABLE
     expect_no_events(&mut poll, &mut events);
 
     // We do expect to be connected.
@@ -554,7 +553,6 @@ fn no_events_after_deregister() {
     assert_eq!(n, DATA1.len());
     stream.flush().unwrap();
 
-    // note: without deregistering at this point poll would retrieve Interests::READABLE
     expect_no_events(&mut poll, &mut events);
 
     drop(stream);

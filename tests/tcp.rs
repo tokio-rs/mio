@@ -1207,8 +1207,11 @@ fn tcp_no_events_after_deregister() {
         .register(&stream, Token(3), Interests::READABLE)
         .unwrap();
 
-    // Wait a moment for stream to connect before trying accept
-    thread::sleep(Duration::from_millis(100));
+    while events.is_empty() {
+        poll.poll(&mut events, None).unwrap();
+    }
+    assert_eq!(events.iter().count(), 1);
+    assert_eq!(events.iter().next().unwrap().token(), Token(1));
 
     let mut stream2 = listener.accept().unwrap().0;
     poll.registry()
@@ -1221,8 +1224,6 @@ fn tcp_no_events_after_deregister() {
     poll.registry().deregister(&stream).unwrap();
     poll.registry().deregister(&stream2).unwrap();
 
-    // note: without deregister, poll would have retrieved 3 events:
-    // listener-READABLE, stream2-WRITABLE, stream-READABLE
     expect_no_events(&mut poll, &mut events);
 
     let mut buf = [0; 10];
