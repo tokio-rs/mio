@@ -38,6 +38,13 @@ impl UdpSocket {
         })
     }
 
+    pub fn from_std(inner: net::UdpSocket) -> UdpSocket {
+        UdpSocket {
+            internal: Box::new(Mutex::new(None)),
+            inner,
+        }
+    }
+
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.inner.local_addr()
     }

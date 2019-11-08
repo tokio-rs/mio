@@ -40,6 +40,10 @@ impl UnixStream {
         Ok(unsafe { UnixStream::from_raw_fd(socket) })
     }
 
+    pub fn from_std(inner: net::UnixStream) -> UnixStream {
+        UnixStream { inner }
+    }
+
     pub(crate) fn pair() -> io::Result<(UnixStream, UnixStream)> {
         let fds = [-1; 2];
         let flags = libc::SOCK_STREAM;

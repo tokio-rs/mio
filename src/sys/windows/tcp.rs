@@ -61,6 +61,13 @@ impl TcpStream {
             })
     }
 
+    pub fn from_std(inner: net::TcpStream) -> TcpStream {
+        TcpStream {
+            internal: Box::new(Mutex::new(None)),
+            inner,
+        }
+    }
+
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
     }
@@ -336,6 +343,13 @@ impl TcpListener {
                 inner: unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) },
             })
         })
+    }
+
+    pub fn from_std(inner: net::TcpListener) -> TcpListener {
+        TcpListener {
+            internal: Box::new(Mutex::new(None)),
+            inner,
+        }
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {

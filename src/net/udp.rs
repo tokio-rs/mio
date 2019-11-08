@@ -13,9 +13,12 @@ use crate::{event, sys, Interests, Registry, Token};
 
 use std::fmt;
 use std::io;
+use std::net;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 /// A User Datagram Protocol socket.
 ///
@@ -122,6 +125,21 @@ impl UdpSocket {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })
+    }
+
+    /// Creates a new `UdpSocket` from a standard `net::UdpSocket`.
+    ///
+    /// This function is intended to be used to wrap a UDP socket from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying socket; it is left up to the user to set it in
+    /// non-blocking mode.
+    pub fn from_std(socket: net::UdpSocket) -> UdpSocket {
+        let sys = sys::UdpSocket::from_std(socket);
+        UdpSocket {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Returns the socket address that this socket was created from.
@@ -554,5 +572,30 @@ impl FromRawFd for UdpSocket {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         }
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for UdpSocket {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.sys.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for UdpSocket {
+    unsafe fn from_raw_socket(socket: RawSocket) -> UdpSocket {
+        UdpSocket {
+            sys: FromRawSocket::from_raw_socket(socket),
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for UdpSocket {
+    fn into_raw_socket(self) -> RawSocket {
+        self.sys.into_raw_socket()
     }
 }

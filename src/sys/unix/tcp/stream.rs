@@ -39,6 +39,10 @@ impl TcpStream {
             })
     }
 
+    pub fn from_std(inner: net::TcpStream) -> TcpStream {
+        TcpStream { inner }
+    }
+
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
     }

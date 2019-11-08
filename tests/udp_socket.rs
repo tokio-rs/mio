@@ -49,6 +49,21 @@ fn unconnected_udp_socket_ipv6() {
     smoke_test_unconnected_udp_socket(socket1, socket2);
 }
 
+#[test]
+fn unconnected_udp_socket_std() {
+    let socket1 = net::UdpSocket::bind(any_local_address()).unwrap();
+    let socket2 = net::UdpSocket::bind(any_local_address()).unwrap();
+
+    // `std::net::UdpSocket`s are blocking by default, so make sure they are
+    // in non-blocking mode before wrapping in a Mio equivalent.
+    assert_ok!(socket1.set_nonblocking(true));
+    assert_ok!(socket2.set_nonblocking(true));
+
+    let socket1 = UdpSocket::from_std(socket1);
+    let socket2 = UdpSocket::from_std(socket2);
+    smoke_test_unconnected_udp_socket(socket1, socket2);
+}
+
 fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
     let (mut poll, mut events) = init_with_poll();
 
@@ -154,6 +169,28 @@ fn connected_udp_socket_ipv6() {
 
     socket1.connect(address2).unwrap();
     socket2.connect(address1).unwrap();
+
+    smoke_test_connected_udp_socket(socket1, socket2);
+}
+
+#[test]
+fn connected_udp_socket_std() {
+    let socket1 = net::UdpSocket::bind(any_local_address()).unwrap();
+    let address1 = socket1.local_addr().unwrap();
+
+    let socket2 = net::UdpSocket::bind(any_local_address()).unwrap();
+    let address2 = socket2.local_addr().unwrap();
+
+    socket1.connect(address2).unwrap();
+    socket2.connect(address1).unwrap();
+
+    // `std::net::UdpSocket`s are blocking by default, so make sure they are
+    // in non-blocking mode before wrapping in a Mio equivalent.
+    assert_ok!(socket1.set_nonblocking(true));
+    assert_ok!(socket2.set_nonblocking(true));
+
+    let socket1 = UdpSocket::from_std(socket1);
+    let socket2 = UdpSocket::from_std(socket2);
 
     smoke_test_connected_udp_socket(socket1, socket2);
 }

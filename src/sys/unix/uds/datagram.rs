@@ -29,6 +29,10 @@ impl UnixDatagram {
         Ok(unsafe { UnixDatagram::from_raw_fd(socket) })
     }
 
+    pub fn from_std(inner: net::UnixDatagram) -> UnixDatagram {
+        UnixDatagram { inner }
+    }
+
     pub(crate) fn connect<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
         self.inner.connect(path)
     }

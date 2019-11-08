@@ -112,6 +112,10 @@ impl UnixListener {
             .map(|_| unsafe { UnixListener::from_raw_fd(socket) })
     }
 
+    pub fn from_std(inner: net::UnixListener) -> UnixListener {
+        UnixListener { inner }
+    }
+
     pub(crate) fn try_clone(&self) -> io::Result<UnixListener> {
         let inner = self.inner.try_clone()?;
         Ok(UnixListener::new(inner))

@@ -40,6 +40,10 @@ impl TcpListener {
         })
     }
 
+    pub fn from_std(inner: net::TcpListener) -> TcpListener {
+        TcpListener { inner }
+    }
+
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.inner.local_addr()
     }
