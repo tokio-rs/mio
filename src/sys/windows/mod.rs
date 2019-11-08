@@ -34,6 +34,19 @@ macro_rules! try_io {
         }
         result
     }};
+    ($self: ident.$method: ident ( $($arg: expr),* $(,)* ), $reregister_check: expr)  => {{
+        let result = (&$self.inner).$method($($arg),*);
+        let should_reregister = match &result {
+            // See if we need reregister interest to emulate edge-triggers.
+            Ok(ok) => $reregister_check(ok),
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => true,
+            Err(_) => false,
+        };
+        if should_reregister {
+            $self.io_blocked_reregister()?;
+        }
+        result
+    }};
 }
 
 mod afd;

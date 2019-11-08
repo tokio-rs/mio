@@ -34,19 +34,16 @@ fn is_send_and_sync() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_ipv4() {
     smoke_test_tcp_stream(any_local_address(), TcpStream::connect);
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_ipv6() {
     smoke_test_tcp_stream(any_local_ipv6_address(), TcpStream::connect);
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_std() {
     smoke_test_tcp_stream(any_local_address(), |addr| {
         let stream = net::TcpStream::connect(addr).unwrap();
