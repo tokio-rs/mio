@@ -2,6 +2,7 @@ use crate::{Interests, Token};
 
 use log::error;
 use std::mem::MaybeUninit;
+use std::ops::{Deref, DerefMut};
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -304,7 +305,30 @@ impl Drop for Selector {
 }
 
 pub type Event = libc::kevent;
-pub type Events = Vec<Event>;
+pub struct Events(Vec<libc::kevent>);
+
+impl Events {
+    pub fn with_capacity(capacity: usize) -> Events {
+        Events(Vec::with_capacity(capacity))
+    }
+}
+
+impl Deref for Events {
+    type Target = Vec<libc::kevent>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Events {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+unsafe impl Send for Events {}
+unsafe impl Sync for Events {}
 
 pub mod event {
     use crate::sys::Event;
