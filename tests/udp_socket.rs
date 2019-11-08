@@ -545,8 +545,7 @@ fn udp_socket_reregister() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1080")]
-fn udp_socket_deregister() {
+fn udp_socket_no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
 
     let socket = UdpSocket::bind(any_local_address()).unwrap();
