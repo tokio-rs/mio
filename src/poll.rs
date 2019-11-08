@@ -406,9 +406,6 @@ impl Registry {
     /// associated with the `event::Source` can be changed at any time by
     /// calling [`reregister`].
     ///
-    /// `token` cannot be `Token(usize::MAX)` as it is reserved for internal
-    /// usage.
-    ///
     /// See documentation on [`Token`] for an example showing how to pick
     /// [`Token`] values.
     ///
