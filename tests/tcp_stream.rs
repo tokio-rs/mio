@@ -510,25 +510,38 @@ fn reregistering() {
 }
 
 #[test]
-fn deregistering() {
+fn no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
 
     let (thread_handle, address) = echo_listener(any_local_address(), 1);
 
-    let stream = TcpStream::connect(address).unwrap();
+    let mut stream = TcpStream::connect(address).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interests::READABLE)
+        .register(&stream, ID1, Interests::WRITABLE.add(Interests::READABLE))
         .expect("unable to register TCP stream");
 
     poll.registry()
         .deregister(&stream)
         .expect("unable to deregister TCP stream");
 
+    // note: without deregistering at this point poll would retrieve Interests::WRITABLE
     expect_no_events(&mut poll, &mut events);
 
     // We do expect to be connected.
     assert_eq!(stream.peer_addr().unwrap(), address);
+
+    // Also, write should work
+    let mut buf = [0; 16];
+    assert_would_block(stream.peek(&mut buf));
+    assert_would_block(stream.read(&mut buf));
+
+    let n = stream.write(&DATA1).expect("unable to write to stream");
+    assert_eq!(n, DATA1.len());
+    stream.flush().unwrap();
+
+    // note: without deregistering at this point poll would retrieve Interests::READABLE
+    expect_no_events(&mut poll, &mut events);
 
     drop(stream);
     thread_handle.join().expect("unable to join thread");

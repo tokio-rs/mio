@@ -134,6 +134,17 @@ impl super::SocketState for TcpStream {
         let mut internal = self.internal.lock().unwrap();
         match &mut *internal {
             Some(internal) => {
+                // action of setting a None state it's a sign of deregistering a socket, so
+                // existing socket must be marked for deletion so it won't be used by selector
+                // for subsequent updates (atm it will be removed during first selector poll update)
+                if sock_state.is_none() {
+                    if internal.sock_state.is_some() {
+                        let sock_state = internal.sock_state.as_ref();
+                        let mut sock_internal = sock_state.unwrap().lock().unwrap();
+                        sock_internal.mark_delete();
+                    }
+                }
+
                 internal.sock_state = sock_state;
             }
             None => {}
@@ -156,6 +167,17 @@ impl<'a> super::SocketState for &'a TcpStream {
         let mut internal = self.internal.lock().unwrap();
         match &mut *internal {
             Some(internal) => {
+                // action of setting a None state it's a sign of deregistering a socket, so
+                // existing socket must be marked for deletion so it won't be used by selector
+                // for subsequent updates (atm it will be removed during first selector poll update)
+                if sock_state.is_none() {
+                    if internal.sock_state.is_some() {
+                        let sock_state = internal.sock_state.as_ref();
+                        let mut sock_internal = sock_state.unwrap().lock().unwrap();
+                        sock_internal.mark_delete();
+                    }
+                }
+
                 internal.sock_state = sock_state;
             }
             None => {}
