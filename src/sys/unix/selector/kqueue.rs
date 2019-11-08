@@ -327,8 +327,10 @@ impl DerefMut for Events {
     }
 }
 
+// `Events` cannot derive `Send` because of the `udata: *mut ::c_void` field
+// in `libc::kevent`. However, `Events`'s public API treats the `udata` field as
+// a `uintptr_t` which is `Send`.
 unsafe impl Send for Events {}
-unsafe impl Sync for Events {}
 
 pub mod event {
     use crate::sys::Event;
