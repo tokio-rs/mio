@@ -13,7 +13,6 @@ use util::{any_local_address, assert_send, assert_sync, init};
 
 #[test]
 fn is_send_and_sync() {
-    assert_sync::<Events>();
     assert_send::<Events>();
 
     assert_sync::<Poll>();
