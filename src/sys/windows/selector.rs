@@ -515,7 +515,6 @@ impl SelectorInner {
         socket.set_sock_state(Some(sock));
         unsafe {
             self.add_socket_to_update_queue(socket);
-            self.update_sockets_events()?;
         }
 
         Ok(())
@@ -543,7 +542,6 @@ impl SelectorInner {
         }
         unsafe {
             self.add_socket_to_update_queue(socket);
-            self.update_sockets_events()?;
         }
 
         Ok(())
