@@ -165,7 +165,7 @@ fn reregister() {
 }
 
 #[test]
-fn deregister() {
+fn no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
 
     let listener = TcpListener::bind(any_local_address()).unwrap();
