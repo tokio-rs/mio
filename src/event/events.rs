@@ -153,7 +153,7 @@ impl Events {
     ///
     /// # Notes
     ///
-    /// Events are cleared before every `poll`, it not needed to this.
+    /// Events are cleared before every `poll`, so this is not required.
     ///
     /// # Examples
     ///
