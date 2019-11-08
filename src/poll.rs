@@ -393,7 +393,7 @@ impl Registry {
     /// readiness state changes. When it notices a state change, it will return
     /// a readiness event for the handle the next time [`poll`] is called.
     ///
-    /// See the [`struct`] docs for a high level overview.
+    /// See [`Poll`] docs for a high level overview.
     ///
     /// # Arguments
     ///
@@ -402,7 +402,7 @@ impl Registry {
     ///
     /// `token: Token`: The caller picks a token to associate with the socket.
     /// When [`poll`] returns an event for the handle, this token is included.
-    /// This allows the caller to map the event to its handle. The token
+    /// This allows the caller to map the event to its source. The token
     /// associated with the `event::Source` can be changed at any time by
     /// calling [`reregister`].
     ///
@@ -431,11 +431,10 @@ impl Registry {
     /// multiple threads.
     ///
     /// [`event::Source`]: crate::event::Source
-    /// [`struct`]: #
-    /// [`reregister`]: #method.reregister
-    /// [`deregister`]: #method.deregister
-    /// [`poll`]: #method.poll
-    /// [`Token`]: struct.Token.html
+    /// [`poll`]: Poll::poll
+    /// [`reregister`]: Registry::reregister
+    /// [`deregister`]: Registry::deregister
+    /// [`Token`]: Token
     ///
     /// # Examples
     ///
