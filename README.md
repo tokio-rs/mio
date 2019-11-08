@@ -1,6 +1,7 @@
 # Mio – Metal IO
 
-Mio is a lightweight I/O library for Rust with a focus on adding as little
+Mio is a fast, low-level I/O library for Rust focusing on non-blocking APIs and
+event notification for building high performance I/O apps with as little
 overhead as possible over the OS abstractions.
 
 [![Crates.io][crates-badge]][crates-url]
@@ -34,10 +35,76 @@ To use `mio`, first add this to your `Cargo.toml`:
 mio = "0.6"
 ```
 
-Then, add this to your crate root:
+Next we can start using Mio. The following is quick introduction using
+`TcpListener` and `TcpStream`.
 
 ```rust
-extern crate mio;
+use std::error::Error;
+
+use mio::net::{TcpListener, TcpStream};
+use mio::{Events, Interests, Poll, Token};
+
+// Some tokens to allow us to identify which event is for which socket.
+const SERVER: Token = Token(0);
+const CLIENT: Token = Token(1);
+
+fn main() -> Result<(), Box<dyn Error>> {
+    // Create a poll instance.
+    let mut poll = Poll::new()?;
+    // Create storage for events.
+    let mut events = Events::with_capacity(128);
+
+    // Setup the server socket.
+    let addr = "127.0.0.1:13265".parse()?;
+    let server = TcpListener::bind(addr)?;
+    // Start listening for incoming connections.
+    poll.registry()
+        .register(&server, SERVER, Interests::READABLE)?;
+
+    // Setup the client socket.
+    let client = TcpStream::connect(addr)?;
+    // Register the socket.
+    poll.registry()
+        .register(&client, CLIENT, Interests::READABLE | Interests::WRITABLE)?;
+
+    // Start an event loop.
+    loop {
+        // Poll Mio for events, blocking until we get an event.
+        poll.poll(&mut events, None)?;
+
+        // Process each event.
+        for event in events.iter() {
+            // We can use the token we previously provided to `register` to
+            // determine for which socket the event is.
+            match event.token() {
+                SERVER => {
+                    // If we can an event for the server it means a connection
+                    // is ready to be accepted.
+                    //
+                    // Accept the connection and drop it immediately, this will
+                    // close the socket and notify the client of the EOF.
+                    let connection = server.accept();
+                    drop(connection);
+                }
+                CLIENT => {
+                    if event.is_writable() {
+                        // We can (likely) write to the socket without blocking.
+                    }
+
+                    if event.is_readable() {
+                        // We can (likely) read from the socket without blocking.
+                    }
+
+                    // Since the server just shuts down the connection, let's
+                    // just exit from our event loop.
+                    return Ok(());
+                }
+                // We don't expect any events with tokens other then we provided.
+                _ => unreachable!(),
+            }
+        }
+    }
+}
 ```
 
 ## Features
@@ -70,6 +137,10 @@ Currently supported platforms:
 * Windows
 * iOS
 * macOS
+
+Mio can handle interfacing with each of the event systems of the aforementioned
+platforms. The details of their implementation are further discussed in the
+`Poll` type of the API documentation (see above).
 
 There are potentially others. If you find that Mio works on another
 platform, submit a PR to update the list!
