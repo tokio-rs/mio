@@ -192,47 +192,29 @@ impl<'a> super::SocketState for &'a TcpStream {
     }
 }
 
-impl Read for TcpStream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        try_io!(self, read, buf)
-    }
-
-    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        try_io!(self, read_vectored, bufs)
-    }
-}
-
 impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        try_io!(self, read, buf)
+        try_io!(self.read(buf), |bytes_read: &usize| *bytes_read
+            <= buf.len())
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        try_io!(self, read_vectored, bufs)
-    }
-}
-
-impl Write for TcpStream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        try_io!(self, write, buf)
-    }
-
-    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        try_io!(self, write_vectored, bufs)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        try_io!(self, flush)
+        try_io!(self.read_vectored(bufs), |bytes_read: &usize| *bytes_read
+            <= bufs.iter().map(|b| b.len()).sum())
     }
 }
 
 impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        try_io!(self, write, buf)
+        try_io!(self.write(buf), |bytes_written: &usize| *bytes_written
+            <= buf.len())
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        try_io!(self, write_vectored, bufs)
+        try_io!(
+            self.write_vectored(bufs),
+            |bytes_written: &usize| *bytes_written <= bufs.iter().map(|b| b.len()).sum()
+        )
     }
 
     fn flush(&mut self) -> io::Result<()> {
