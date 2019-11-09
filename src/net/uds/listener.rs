@@ -82,7 +82,7 @@ impl Source for UnixListener {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
-        self.sys.reregister(registry, token, interests)
+        self.sys.register(registry, token, interests)
     }
 
     fn reregister(
