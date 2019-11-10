@@ -13,7 +13,8 @@ use std::os::windows::io::{AsRawSocket, RawSocket};
 use std::pin::Pin;
 use std::ptr::null_mut;
 #[cfg(debug_assertions)]
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::{io, ptr};
@@ -407,6 +408,7 @@ pub struct SelectorInner {
     cp: Arc<CompletionPort>,
     update_queue: Mutex<VecDeque<Arc<Mutex<SockState>>>>,
     afd_group: AfdGroup,
+    is_polling: AtomicBool,
 }
 
 // We have ensured thread safety by introducing lock manually.
@@ -422,6 +424,7 @@ impl SelectorInner {
                 cp,
                 update_queue: Mutex::new(VecDeque::new()),
                 afd_group: AfdGroup::new(cp_afd),
+                is_polling: AtomicBool::new(false),
             }
         })
     }
@@ -476,19 +479,19 @@ impl SelectorInner {
         events: &mut Vec<Event>,
         timeout: Option<Duration>,
     ) -> io::Result<usize> {
-        unsafe {
-            self.update_sockets_events()?;
-        }
+        assert_eq!(self.is_polling.swap(true, Ordering::AcqRel), false);
+
+        unsafe { self.update_sockets_events() }?;
 
         let result = self.cp.get_many(statuses, timeout);
 
-        if let Err(e) = result {
-            if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) {
-                return Ok(0);
-            }
-            return Err(e);
+        self.is_polling.store(false, Ordering::Relaxed);
+
+        match result {
+            Ok(iocp_events) => Ok(unsafe { self.feed_events(events, iocp_events) }),
+            Err(ref e) if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) => Ok(0),
+            Err(e) => Err(e),
         }
-        unsafe { Ok(self.feed_events(events, result.unwrap())) }
     }
 
     pub fn register<S: SocketState + AsRawSocket>(
@@ -515,7 +518,7 @@ impl SelectorInner {
         socket.set_sock_state(Some(sock));
         unsafe {
             self.add_socket_to_update_queue(socket);
-            self.update_sockets_events()?;
+            self.update_sockets_events_if_polling()?;
         }
 
         Ok(())
@@ -543,7 +546,7 @@ impl SelectorInner {
         }
         unsafe {
             self.add_socket_to_update_queue(socket);
-            self.update_sockets_events()?;
+            self.update_sockets_events_if_polling()?;
         }
 
         Ok(())
@@ -572,6 +575,31 @@ impl SelectorInner {
         }
         self.afd_group.release_unused_afd();
         Ok(())
+    }
+
+    /// This function is called by register() and reregister() to start an
+    /// IOCTL_AFD_POLL operation corresponding to the registered events, but
+    /// only if necessary.
+    ///
+    /// Since it is not possible to modify or synchronously cancel an AFD_POLL
+    /// operation, and there can be only one active AFD_POLL operation per
+    /// (socket, completion port) pair at any time, it is expensive to change
+    /// a socket's event registration after it has been submitted to the kernel.
+    ///
+    /// Therefore, if no other threads are polling when interest in a socket
+    /// event is (re)registered, the socket is added to the 'update queue', but
+    /// the actual syscall to start the IOCTL_AFD_POLL operation is deferred
+    /// until just before the GetQueuedCompletionStatusEx() syscall is made.
+    ///
+    /// However, when another thread is already blocked on
+    /// GetQueuedCompletionStatusEx() we tell the kernel about the registered
+    /// socket event(s) immediately.
+    unsafe fn update_sockets_events_if_polling(&self) -> io::Result<()> {
+        if self.is_polling.load(Ordering::Acquire) {
+            self.update_sockets_events()
+        } else {
+            Ok(())
+        }
     }
 
     unsafe fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
