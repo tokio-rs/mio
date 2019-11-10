@@ -205,7 +205,7 @@ fn datagram_pair() {
 }
 
 #[test]
-fn stream_register() {
+fn register() {
     let (mut poll, mut events) = init_with_poll();
 
     let (sync_sender, sync_receiver) = channel();
@@ -215,30 +215,13 @@ fn stream_register() {
     let local = assert_ok!(UnixStream::connect(path));
     assert_ok!(sync_sender.send(()));
 
-    assert_ok!(poll.registry().register(&local, LOCAL, Interests::WRITABLE));
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(LOCAL, Interests::WRITABLE)],
-    );
+    assert_ok!(poll.registry().register(&local, LOCAL, Interests::READABLE));
+
+    expect_no_events(&mut poll, &mut events);
 
     // Close the connection to allow the remote to shutdown
     drop(local);
     assert_ok!(handle.join());
-}
-
-#[test]
-fn listener_register() {
-    let (mut poll, mut events) = init_with_poll();
-
-    let dir = assert_ok!(TempDir::new("uds"));
-    let path = dir.path().join("foo");
-    let listener = assert_ok!(UnixListener::bind(path));
-
-    assert_ok!(poll
-        .registry()
-        .register(&listener, LOCAL, Interests::READABLE));
-    expect_no_events(&mut poll, &mut events);
 }
 
 #[test]
@@ -252,6 +235,7 @@ fn reregister() {
     let local = assert_ok!(UnixStream::connect(path));
     assert_ok!(sync_sender.send(()));
 
+    assert_ok!(poll.registry().register(&local, LOCAL, Interests::READABLE));
     assert_ok!(poll
         .registry()
         .reregister(&local, LOCAL_CLONE, Interests::WRITABLE));
