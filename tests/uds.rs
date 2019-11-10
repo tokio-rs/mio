@@ -131,7 +131,81 @@ fn is_send_and_sync() {
 }
 
 #[test]
-fn register() {
+fn stream_pair() {
+    let (mut poll, mut events) = init_with_poll();
+    let (mut s1, mut s2) = assert_ok!(UnixStream::pair());
+
+    assert_ok!(poll
+        .registry()
+        .register(&s1, Token(0), Interests::READABLE | Interests::WRITABLE));
+    assert_ok!(poll
+        .registry()
+        .register(&s2, Token(1), Interests::READABLE | Interests::WRITABLE));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interests::WRITABLE)],
+    );
+
+    let mut buf = [0; DEFAULT_BUF_SIZE];
+    let wrote = assert_ok!(s1.write(&DATA1));
+    assert_eq!(wrote, DATA1_LEN);
+    assert_ok!(s1.flush());
+
+    let read = assert_ok!(s2.read(&mut buf));
+    assert_eq!(read, DATA1_LEN);
+    assert_eq!(&buf[..read], DATA1);
+    assert_eq!(read, wrote, "unequal reads and writes");
+
+    let wrote = assert_ok!(s2.write(&DATA2));
+    assert_eq!(wrote, DATA2_LEN);
+    assert_ok!(s2.flush());
+
+    let read = assert_ok!(s1.read(&mut buf));
+    assert_eq!(read, DATA2_LEN);
+    assert_eq!(&buf[..read], DATA2);
+    assert_eq!(read, wrote, "unequal reads and writes");
+}
+
+#[test]
+fn datagram_pair() {
+    let (mut poll, mut events) = init_with_poll();
+    let (s1, s2) = assert_ok!(UnixDatagram::pair());
+
+    assert_ok!(poll
+        .registry()
+        .register(&s1, Token(0), Interests::READABLE | Interests::WRITABLE));
+    assert_ok!(poll
+        .registry()
+        .register(&s2, Token(1), Interests::READABLE | Interests::WRITABLE));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interests::WRITABLE)],
+    );
+
+    let mut buf = [0; DEFAULT_BUF_SIZE];
+    let wrote = assert_ok!(s1.send(&DATA1));
+    assert_eq!(wrote, DATA1_LEN);
+
+    let read = assert_ok!(s2.recv(&mut buf));
+    assert_eq!(read, DATA1_LEN);
+    assert_eq!(&buf[..read], DATA1);
+    assert_eq!(read, wrote, "unequal reads and writes");
+
+    let wrote = assert_ok!(s2.send(&DATA2));
+    assert_eq!(wrote, DATA2_LEN);
+
+    let read = assert_ok!(s1.recv(&mut buf));
+    assert_eq!(read, DATA2_LEN);
+    assert_eq!(&buf[..read], DATA2);
+    assert_eq!(read, wrote, "unequal reads and writes");
+}
+
+#[test]
+fn stream_register() {
     let (mut poll, mut events) = init_with_poll();
 
     let (sync_sender, sync_receiver) = channel();
@@ -141,13 +215,30 @@ fn register() {
     let local = assert_ok!(UnixStream::connect(path));
     assert_ok!(sync_sender.send(()));
 
-    assert_ok!(poll.registry().register(&local, LOCAL, Interests::READABLE));
-
-    expect_no_events(&mut poll, &mut events);
+    assert_ok!(poll.registry().register(&local, LOCAL, Interests::WRITABLE));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(LOCAL, Interests::WRITABLE)],
+    );
 
     // Close the connection to allow the remote to shutdown
     drop(local);
     assert_ok!(handle.join());
+}
+
+#[test]
+fn listener_register() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let dir = assert_ok!(TempDir::new("uds"));
+    let path = dir.path().join("foo");
+    let listener = assert_ok!(UnixListener::bind(path));
+
+    assert_ok!(poll
+        .registry()
+        .register(&listener, LOCAL, Interests::READABLE));
+    expect_no_events(&mut poll, &mut events);
 }
 
 #[test]
@@ -161,7 +252,6 @@ fn reregister() {
     let local = assert_ok!(UnixStream::connect(path));
     assert_ok!(sync_sender.send(()));
 
-    assert_ok!(poll.registry().register(&local, LOCAL, Interests::READABLE));
     assert_ok!(poll
         .registry()
         .reregister(&local, LOCAL_CLONE, Interests::WRITABLE));

@@ -1,4 +1,4 @@
-use super::{pair_descriptors, socket_addr, SocketAddr};
+use super::{socket_addr, SocketAddr};
 use crate::event::Source;
 use crate::sys::unix::net::new_socket;
 use crate::unix::SourceFd;
@@ -40,33 +40,30 @@ impl UnixDatagram {
     pub(crate) fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {
         let mut fds = [-1; 2];
         let flags = libc::SOCK_DGRAM;
-
         #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
-        let pair = {
-            pair_descriptors(&mut fds, flags)?;
-            unsafe {
-                (
-                    UnixDatagram::from_raw_fd(fds[0]),
-                    UnixDatagram::from_raw_fd(fds[1]),
-                )
-            }
+        let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+
+        syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
+        let pair = unsafe {
+            (
+                UnixDatagram::from_raw_fd(fds[0]),
+                UnixDatagram::from_raw_fd(fds[1]),
+            )
         };
 
         // Darwin and Solaris do not have SOCK_NONBLOCK or SOCK_CLOEXEC.
         //
         // In order to set those flags, additional `fcntl` sys calls must be
-        // made in `pair_descriptors` that are fallible. If a `fnctl` fails
-        // after the sockets have been created, the file descriptors will
-        // leak. Creating `s1` and `s2` below ensure that if there is an
-        // error, the file descriptors are closed.
+        // performed. If a `fnctl` fails after the sockets have been created,
+        // the file descriptors will leak. Creating `pair` above ensures that
+        // if there is an error, the file descriptors are closed.
         #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
-        let pair = {
-            let s1 = unsafe { UnixDatagram::from_raw_fd(fds[0]) };
-            let s2 = unsafe { UnixDatagram::from_raw_fd(fds[1]) };
-            pair_descriptors(&mut fds, flags)?;
-            (s1, s2)
-        };
-
+        {
+            syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
+            syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
+            syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
+            syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
+        }
         Ok(pair)
     }
 
