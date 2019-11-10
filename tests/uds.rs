@@ -149,11 +149,13 @@ fn stream_pair() {
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
+    assert_would_block(s1.read(&mut buf));
     let wrote = assert_ok!(s1.write(&DATA1));
     assert_eq!(wrote, DATA1_LEN);
     assert_ok!(s1.flush());
 
     let read = assert_ok!(s2.read(&mut buf));
+    assert_would_block(s2.read(&mut buf));
     assert_eq!(read, DATA1_LEN);
     assert_eq!(&buf[..read], DATA1);
     assert_eq!(read, wrote, "unequal reads and writes");
@@ -187,10 +189,12 @@ fn datagram_pair() {
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
+    assert_would_block(s1.recv(&mut buf));
     let wrote = assert_ok!(s1.send(&DATA1));
     assert_eq!(wrote, DATA1_LEN);
 
     let read = assert_ok!(s2.recv(&mut buf));
+    assert_would_block(s2.recv(&mut buf));
     assert_eq!(read, DATA1_LEN);
     assert_eq!(&buf[..read], DATA1);
     assert_eq!(read, wrote, "unequal reads and writes");
