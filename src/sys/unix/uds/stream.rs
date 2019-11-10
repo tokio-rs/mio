@@ -45,12 +45,12 @@ impl UnixStream {
     }
 
     pub(crate) fn pair() -> io::Result<(UnixStream, UnixStream)> {
-        let fds = [-1; 2];
+        let mut fds = [-1; 2];
         let flags = libc::SOCK_STREAM;
 
         #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
         let pair = {
-            pair_descriptors(fds, flags)?;
+            pair_descriptors(&mut fds, flags)?;
             unsafe {
                 (
                     UnixStream::from_raw_fd(fds[0]),
@@ -70,7 +70,7 @@ impl UnixStream {
         let pair = {
             let s1 = unsafe { UnixStream::from_raw_fd(fds[0]) };
             let s2 = unsafe { UnixStream::from_raw_fd(fds[1]) };
-            pair_descriptors(fds, flags)?;
+            pair_descriptors(&mut fds, flags)?;
             (s1, s2)
         };
 

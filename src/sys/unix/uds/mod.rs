@@ -75,7 +75,7 @@ pub fn path_offset(sockaddr: &libc::sockaddr_un) -> usize {
     path - base
 }
 
-fn pair_descriptors(mut fds: [RawFd; 2], flags: i32) -> io::Result<()> {
+fn pair_descriptors(fds: &mut [RawFd; 2], flags: i32) -> io::Result<()> {
     #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
     let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
