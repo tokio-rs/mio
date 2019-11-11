@@ -283,9 +283,6 @@ where
     assert_ok!(handle.join());
 }
 
-/// Open `n_connections` connections to `sock_addr`. If a `barrier` is
-/// provided it will wait on it after each connection is made before it is
-/// dropped.
 fn open_connections(
     path: PathBuf,
     n_connections: usize,

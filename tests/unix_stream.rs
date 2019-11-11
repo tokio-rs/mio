@@ -44,7 +44,7 @@ fn unix_stream_connect() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
     let dir = assert_ok!(TempDir::new("unix"));
-    let path = dir.path().join("foo");
+    let path = dir.path().join("any");
 
     let listener = assert_ok!(net::UnixListener::bind(path.clone()));
     let stream = assert_ok!(UnixStream::connect(path));
@@ -95,14 +95,14 @@ fn unix_stream_pair() {
     let (mut s1, mut s2) = assert_ok!(UnixStream::pair());
     assert_ok!(poll
         .registry()
-        .register(&s1, Token(0), Interests::READABLE | Interests::WRITABLE));
+        .register(&s1, TOKEN_1, Interests::READABLE | Interests::WRITABLE));
     assert_ok!(poll
         .registry()
-        .register(&s2, Token(1), Interests::READABLE | Interests::WRITABLE));
+        .register(&s2, TOKEN_2, Interests::READABLE | Interests::WRITABLE));
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(Token(0), Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -184,65 +184,6 @@ fn unix_stream_peer_addr() {
         expected_path
     );
     assert!(assert_ok!(stream.local_addr()).as_pathname().is_none());
-
-    // Close the connection to allow the remote to shutdown
-    drop(stream);
-    assert_ok!(handle.join());
-}
-
-#[test]
-fn unix_stream_register() {
-    let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
-    let path = remote_addr.as_pathname().expect("failed to get pathname");
-
-    let stream = assert_ok!(UnixStream::connect(path));
-    assert_ok!(poll
-        .registry()
-        .register(&stream, TOKEN_1, Interests::READABLE));
-    expect_no_events(&mut poll, &mut events);
-
-    // Close the connection to allow the remote to shutdown
-    drop(stream);
-    assert_ok!(handle.join());
-}
-
-#[test]
-fn unix_stream_reregister() {
-    let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
-    let path = remote_addr.as_pathname().expect("failed to get pathname");
-
-    let stream = assert_ok!(UnixStream::connect(path));
-    assert_ok!(poll
-        .registry()
-        .register(&stream, TOKEN_1, Interests::READABLE));
-    assert_ok!(poll
-        .registry()
-        .reregister(&stream, TOKEN_1, Interests::WRITABLE));
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
-    );
-
-    // Close the connection to allow the remote to shutdown
-    drop(stream);
-    assert_ok!(handle.join());
-}
-
-#[test]
-fn unix_stream_deregister() {
-    let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
-    let path = remote_addr.as_pathname().expect("failed to get pathname");
-
-    let stream = assert_ok!(UnixStream::connect(path));
-    assert_ok!(poll
-        .registry()
-        .register(&stream, TOKEN_1, Interests::WRITABLE));
-    assert_ok!(poll.registry().deregister(&stream));
-    expect_no_events(&mut poll, &mut events);
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
@@ -433,6 +374,65 @@ fn unix_stream_shutdown_listener_write() {
     assert_ok!(handle.join());
 }
 
+#[test]
+fn unix_stream_register() {
+    let (mut poll, mut events) = init_with_poll();
+    let (handle, remote_addr) = new_echo_listener(1);
+    let path = remote_addr.as_pathname().expect("failed to get pathname");
+
+    let stream = assert_ok!(UnixStream::connect(path));
+    assert_ok!(poll
+        .registry()
+        .register(&stream, TOKEN_1, Interests::READABLE));
+    expect_no_events(&mut poll, &mut events);
+
+    // Close the connection to allow the remote to shutdown
+    drop(stream);
+    assert_ok!(handle.join());
+}
+
+#[test]
+fn unix_stream_reregister() {
+    let (mut poll, mut events) = init_with_poll();
+    let (handle, remote_addr) = new_echo_listener(1);
+    let path = remote_addr.as_pathname().expect("failed to get pathname");
+
+    let stream = assert_ok!(UnixStream::connect(path));
+    assert_ok!(poll
+        .registry()
+        .register(&stream, TOKEN_1, Interests::READABLE));
+    assert_ok!(poll
+        .registry()
+        .reregister(&stream, TOKEN_1, Interests::WRITABLE));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+    );
+
+    // Close the connection to allow the remote to shutdown
+    drop(stream);
+    assert_ok!(handle.join());
+}
+
+#[test]
+fn unix_stream_deregister() {
+    let (mut poll, mut events) = init_with_poll();
+    let (handle, remote_addr) = new_echo_listener(1);
+    let path = remote_addr.as_pathname().expect("failed to get pathname");
+
+    let stream = assert_ok!(UnixStream::connect(path));
+    assert_ok!(poll
+        .registry()
+        .register(&stream, TOKEN_1, Interests::WRITABLE));
+    assert_ok!(poll.registry().deregister(&stream));
+    expect_no_events(&mut poll, &mut events);
+
+    // Close the connection to allow the remote to shutdown
+    drop(stream);
+    assert_ok!(handle.join());
+}
+
 fn smoke_test<F>(connect_stream: F)
 where
     F: FnOnce(&Path) -> io::Result<UnixStream>,
@@ -501,10 +501,10 @@ fn new_echo_listener(connections: usize) -> (thread::JoinHandle<()>, net::Socket
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
         let dir = assert_ok!(TempDir::new("unix"));
-        let path = dir.path().join("foo");
+        let path = dir.path().join("any");
         let listener = assert_ok!(net::UnixListener::bind(path));
-        let sock_addr = assert_ok!(listener.local_addr());
-        assert_ok!(addr_sender.send(sock_addr));
+        let local_addr = assert_ok!(listener.local_addr());
+        assert_ok!(addr_sender.send(local_addr));
 
         for _ in 0..connections {
             let (mut stream, _) = assert_ok!(listener.accept());
@@ -547,10 +547,10 @@ fn new_noop_listener(
     let (sender, receiver) = channel();
     let handle = thread::spawn(move || {
         let dir = assert_ok!(TempDir::new("unix"));
-        let path = dir.path().join("foo");
+        let path = dir.path().join("any");
         let listener = assert_ok!(net::UnixListener::bind(path));
-        let sock_addr = assert_ok!(listener.local_addr());
-        assert_ok!(sender.send(sock_addr));
+        let local_addr = assert_ok!(listener.local_addr());
+        assert_ok!(sender.send(local_addr));
 
         for _ in 0..connections {
             let (stream, _) = assert_ok!(listener.accept());
