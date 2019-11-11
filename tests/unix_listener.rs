@@ -187,10 +187,9 @@ fn unix_listener_local_addr() {
 #[test]
 fn unix_listener_register() {
     let (mut poll, mut events) = init_with_poll();
-
     let dir = assert_ok!(TempDir::new("unix_listener"));
-    let listener = assert_ok!(UnixListener::bind(dir.path().join("any")));
 
+    let listener = assert_ok!(UnixListener::bind(dir.path().join("any")));
     assert_ok!(poll
         .registry()
         .register(&listener, TOKEN_1, Interests::READABLE));
@@ -252,11 +251,10 @@ where
 {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-
     let dir = assert_ok!(TempDir::new("unix_listener"));
     let path = dir.path().join("any");
-    let listener = assert_ok!(new_listener(&path));
 
+    let listener = assert_ok!(new_listener(&path));
     assert_ok!(poll.registry().register(
         &listener,
         TOKEN_1,
@@ -271,7 +269,7 @@ where
         vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
     );
 
-    let (mut stream, peer_addr) = assert_ok!(listener.accept());
+    let (mut stream, _) = assert_ok!(listener.accept());
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
     assert_would_block(stream.read(&mut buf));

@@ -32,92 +32,104 @@ fn is_send_and_sync() {
 
 #[test]
 fn unix_datagram_smoke_unconnected() {
-    let dir = assert_ok!(TempDir::new("unix"));
-    let path_1 = dir.path().join("one");
-    let path_2 = dir.path().join("two");
+    let dir = assert_ok!(TempDir::new("unix_datagram"));
+    let path1 = dir.path().join("one");
+    let path2 = dir.path().join("two");
 
-    let dg1 = assert_ok!(UnixDatagram::bind(&path_1));
-    let dg2 = assert_ok!(UnixDatagram::bind(&path_2));
-    smoke_test_unconnected(dg1, dg2);
+    let datagram1 = assert_ok!(UnixDatagram::bind(&path1));
+    let datagram2 = assert_ok!(UnixDatagram::bind(&path2));
+    smoke_test_unconnected(datagram1, datagram2);
 }
 
 #[test]
 fn unix_datagram_smoke_connected() {
-    let dir = assert_ok!(TempDir::new("unix"));
-    let path_1 = dir.path().join("one");
-    let path_2 = dir.path().join("two");
+    let dir = assert_ok!(TempDir::new("unix_datagram"));
+    let path1 = dir.path().join("one");
+    let path2 = dir.path().join("two");
 
-    let dg1 = assert_ok!(UnixDatagram::bind(&path_1));
-    let dg2 = assert_ok!(UnixDatagram::bind(&path_2));
+    let datagram1 = assert_ok!(UnixDatagram::bind(&path1));
+    let datagram2 = assert_ok!(UnixDatagram::bind(&path2));
 
-    assert_ok!(dg1.connect(&path_2));
-    assert_ok!(dg2.connect(&path_1));
-    smoke_test_connected(dg1, dg2);
+    assert_ok!(datagram1.connect(&path2));
+    assert_ok!(datagram2.connect(&path1));
+    smoke_test_connected(datagram1, datagram2);
 }
 
 #[test]
 fn unix_datagram_smoke_unconnected_from_std() {
-    let dir = assert_ok!(TempDir::new("unix"));
-    let path_1 = dir.path().join("one");
-    let path_2 = dir.path().join("two");
+    let dir = assert_ok!(TempDir::new("unix_datagram"));
+    let path1 = dir.path().join("one");
+    let path2 = dir.path().join("two");
 
-    let dg1 = assert_ok!(net::UnixDatagram::bind(&path_1));
-    let dg2 = assert_ok!(net::UnixDatagram::bind(&path_2));
+    let datagram1 = assert_ok!(net::UnixDatagram::bind(&path1));
+    let datagram2 = assert_ok!(net::UnixDatagram::bind(&path2));
 
-    assert_ok!(dg1.set_nonblocking(true));
-    assert_ok!(dg2.set_nonblocking(true));
+    assert_ok!(datagram1.set_nonblocking(true));
+    assert_ok!(datagram2.set_nonblocking(true));
 
-    let dg1 = UnixDatagram::from_std(dg1);
-    let dg2 = UnixDatagram::from_std(dg2);
-    smoke_test_unconnected(dg1, dg2);
+    let datagram1 = UnixDatagram::from_std(datagram1);
+    let datagram2 = UnixDatagram::from_std(datagram2);
+    smoke_test_unconnected(datagram1, datagram2);
 }
 
 #[test]
 fn unix_datagram_smoke_connected_from_std() {
-    let dir = assert_ok!(TempDir::new("unix"));
-    let path_1 = dir.path().join("one");
-    let path_2 = dir.path().join("two");
+    let dir = assert_ok!(TempDir::new("unix_datagram"));
+    let path1 = dir.path().join("one");
+    let path2 = dir.path().join("two");
 
-    let dg1 = assert_ok!(net::UnixDatagram::bind(&path_1));
-    let dg2 = assert_ok!(net::UnixDatagram::bind(&path_2));
+    let datagram1 = assert_ok!(net::UnixDatagram::bind(&path1));
+    let datagram2 = assert_ok!(net::UnixDatagram::bind(&path2));
 
-    assert_ok!(dg1.connect(&path_2));
-    assert_ok!(dg2.connect(&path_1));
+    assert_ok!(datagram1.connect(&path2));
+    assert_ok!(datagram2.connect(&path1));
 
-    assert_ok!(dg1.set_nonblocking(true));
-    assert_ok!(dg2.set_nonblocking(true));
+    assert_ok!(datagram1.set_nonblocking(true));
+    assert_ok!(datagram2.set_nonblocking(true));
 
-    let dg1 = UnixDatagram::from_std(dg1);
-    let dg2 = UnixDatagram::from_std(dg2);
-    smoke_test_connected(dg1, dg2);
+    let datagram1 = UnixDatagram::from_std(datagram1);
+    let datagram2 = UnixDatagram::from_std(datagram2);
+    smoke_test_connected(datagram1, datagram2);
 }
 
 #[test]
 fn unix_datagram_connect() {
-    let dir = assert_ok!(TempDir::new("unix"));
-    let path_1 = dir.path().join("one");
-    let path_2 = dir.path().join("two");
+    let dir = assert_ok!(TempDir::new("unix_datagram"));
+    let path1 = dir.path().join("one");
+    let path2 = dir.path().join("two");
 
-    let dg1 = assert_ok!(UnixDatagram::bind(&path_1));
-    let dg1_local = assert_ok!(dg1.local_addr());
-    let dg2 = assert_ok!(UnixDatagram::bind(&path_2));
-    let dg2_local = assert_ok!(dg2.local_addr());
+    let datagram1 = assert_ok!(UnixDatagram::bind(&path1));
+    let datagram1_local = assert_ok!(datagram1.local_addr());
+    let datagram2 = assert_ok!(UnixDatagram::bind(&path2));
+    let datagram2_local = assert_ok!(datagram2.local_addr());
 
-    assert_ok!(dg1.connect(dg1_local.as_pathname().expect("failed to get pathname")));
-    assert_ok!(dg2.connect(dg2_local.as_pathname().expect("failed to get pathname")));
+    assert_ok!(datagram1.connect(
+        datagram1_local
+            .as_pathname()
+            .expect("failed to get pathname")
+    ));
+    assert_ok!(datagram2.connect(
+        datagram2_local
+            .as_pathname()
+            .expect("failed to get pathname")
+    ));
 }
 
 #[test]
 fn unix_datagram_pair() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (dg1, dg2) = assert_ok!(UnixDatagram::pair());
-    assert_ok!(poll
-        .registry()
-        .register(&dg1, TOKEN_1, Interests::READABLE | Interests::WRITABLE));
-    assert_ok!(poll
-        .registry()
-        .register(&dg2, TOKEN_2, Interests::READABLE | Interests::WRITABLE));
+    let (datagram1, datagram2) = assert_ok!(UnixDatagram::pair());
+    assert_ok!(poll.registry().register(
+        &datagram1,
+        TOKEN_1,
+        Interests::READABLE | Interests::WRITABLE
+    ));
+    assert_ok!(poll.registry().register(
+        &datagram2,
+        TOKEN_2,
+        Interests::READABLE | Interests::WRITABLE
+    ));
     expect_events(
         &mut poll,
         &mut events,
@@ -128,51 +140,50 @@ fn unix_datagram_pair() {
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
-    assert_would_block(dg1.recv(&mut buf));
+    assert_would_block(datagram1.recv(&mut buf));
 
-    let wrote = assert_ok!(dg1.send(&DATA1));
+    let wrote = assert_ok!(datagram1.send(&DATA1));
     assert_eq!(wrote, DATA1_LEN);
 
-    let read = assert_ok!(dg2.recv(&mut buf));
-    assert_would_block(dg2.recv(&mut buf));
+    let read = assert_ok!(datagram2.recv(&mut buf));
+    assert_would_block(datagram2.recv(&mut buf));
     assert_eq!(read, DATA1_LEN);
     assert_eq!(&buf[..read], DATA1);
     assert_eq!(read, wrote, "unequal reads and writes");
 
-    let wrote = assert_ok!(dg2.send(&DATA2));
+    let wrote = assert_ok!(datagram2.send(&DATA2));
     assert_eq!(wrote, DATA2_LEN);
 
-    let read = assert_ok!(dg1.recv(&mut buf));
+    let read = assert_ok!(datagram1.recv(&mut buf));
     assert_eq!(read, DATA2_LEN);
     assert_eq!(&buf[..read], DATA2);
     assert_eq!(read, wrote, "unequal reads and writes");
 
-    assert!(assert_ok!(dg1.take_error()).is_none());
-    assert!(assert_ok!(dg2.take_error()).is_none());
+    assert!(assert_ok!(datagram1.take_error()).is_none());
+    assert!(assert_ok!(datagram2.take_error()).is_none());
 }
 
 #[test]
 fn unix_datagram_try_clone() {
     let (mut poll, mut events) = init_with_poll();
-
     let dir = assert_ok!(TempDir::new("unix_datagram"));
-    let path_1 = dir.path().join("one");
-    let path_2 = dir.path().join("two");
+    let path1 = dir.path().join("one");
+    let path2 = dir.path().join("two");
 
-    let dg1 = assert_ok!(UnixDatagram::bind(&path_1));
-    let dg2 = assert_ok!(dg1.try_clone());
-    assert_ne!(dg1.as_raw_fd(), dg2.as_raw_fd());
+    let datagram1 = assert_ok!(UnixDatagram::bind(&path1));
+    let datagram2 = assert_ok!(datagram1.try_clone());
+    assert_ne!(datagram1.as_raw_fd(), datagram2.as_raw_fd());
 
-    let dg3 = assert_ok!(UnixDatagram::bind(&path_2));
-    assert_ok!(dg3.connect(&path_1));
+    let dg3 = assert_ok!(UnixDatagram::bind(&path2));
+    assert_ok!(dg3.connect(&path1));
 
     assert_ok!(poll.registry().register(
-        &dg1,
+        &datagram1,
         TOKEN_1,
         Interests::READABLE.add(Interests::WRITABLE)
     ));
     assert_ok!(poll.registry().register(
-        &dg2,
+        &datagram2,
         TOKEN_2,
         Interests::READABLE.add(Interests::WRITABLE)
     ));
@@ -186,7 +197,7 @@ fn unix_datagram_try_clone() {
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
-    assert_would_block(dg1.recv_from(&mut buf));
+    assert_would_block(datagram1.recv_from(&mut buf));
 
     assert_ok!(dg3.send(DATA1));
     expect_events(
@@ -198,50 +209,49 @@ fn unix_datagram_try_clone() {
         ],
     );
 
-    let (read, from_addr_1) = assert_ok!(dg1.recv_from(&mut buf));
+    let (read, from_addr1) = assert_ok!(datagram1.recv_from(&mut buf));
     assert_eq!(read, DATA1.len());
     assert_eq!(buf[..read], DATA1[..]);
     assert_eq!(
-        from_addr_1.as_pathname().expect("failed to get pathname"),
-        path_2
+        from_addr1.as_pathname().expect("failed to get pathname"),
+        path2
     );
-    assert_would_block(dg2.recv_from(&mut buf));
+    assert_would_block(datagram2.recv_from(&mut buf));
 
-    assert!(assert_ok!(dg1.take_error()).is_none());
-    assert!(assert_ok!(dg2.take_error()).is_none());
+    assert!(assert_ok!(datagram1.take_error()).is_none());
+    assert!(assert_ok!(datagram2.take_error()).is_none());
     assert!(assert_ok!(dg3.take_error()).is_none());
 }
 
 #[test]
-fn unix_datagram_shutdown_both() {
+fn unix_datagram_shutdown() {
     let (mut poll, mut events) = init_with_poll();
+    let dir = assert_ok!(TempDir::new("unix_datagram"));
+    let path1 = dir.path().join("one");
+    let path2 = dir.path().join("two");
 
-    let dir = assert_ok!(TempDir::new("unix"));
-    let path_1 = dir.path().join("one");
-    let path_2 = dir.path().join("two");
-
-    let dg1 = assert_ok!(UnixDatagram::bind(&path_1));
-    let dg2 = assert_ok!(UnixDatagram::bind(&path_2));
+    let datagram1 = assert_ok!(UnixDatagram::bind(&path1));
+    let datagram2 = assert_ok!(UnixDatagram::bind(&path2));
 
     assert_ok!(poll.registry().register(
-        &dg1,
+        &datagram1,
         TOKEN_1,
         Interests::WRITABLE.add(Interests::READABLE)
     ));
     assert_ok!(poll.registry().register(
-        &dg2,
+        &datagram2,
         TOKEN_2,
         Interests::WRITABLE.add(Interests::READABLE)
     ));
 
-    assert_ok!(dg1.connect(&path_2));
+    assert_ok!(datagram1.connect(&path2));
     expect_events(
         &mut poll,
         &mut events,
         vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
     );
 
-    let wrote = assert_ok!(dg1.send(DATA1));
+    let wrote = assert_ok!(datagram1.send(DATA1));
     assert_eq!(wrote, DATA1_LEN);
     expect_events(
         &mut poll,
@@ -249,23 +259,22 @@ fn unix_datagram_shutdown_both() {
         vec![ExpectEvent::new(TOKEN_2, Interests::READABLE)],
     );
 
-    assert_ok!(dg1.shutdown(Shutdown::Both));
+    assert_ok!(datagram1.shutdown(Shutdown::Read));
+    expect_readiness!(poll, events, is_read_closed);
+
+    assert_ok!(datagram1.shutdown(Shutdown::Write));
     expect_readiness!(poll, events, is_write_closed);
 
-    let err = assert_err!(dg1.send(DATA2));
-    #[cfg(unix)]
+    let err = assert_err!(datagram1.send(DATA2));
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
-    #[cfg(window)]
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionAbroted);
 
-    assert!(assert_ok!(dg1.take_error()).is_none());
+    assert!(assert_ok!(datagram1.take_error()).is_none());
 }
 
 #[test]
 fn unix_datagram_register() {
     let (mut poll, mut events) = init_with_poll();
-
-    let dir = assert_ok!(TempDir::new("unix"));
+    let dir = assert_ok!(TempDir::new("unix_datagram"));
     let path = dir.path().join("any");
 
     let datagram = assert_ok!(UnixDatagram::bind(path));
@@ -278,19 +287,20 @@ fn unix_datagram_register() {
 #[test]
 fn unix_datagram_reregister() {
     let (mut poll, mut events) = init_with_poll();
+    let dir = assert_ok!(TempDir::new("unix_datagram"));
+    let path1 = dir.path().join("one");
+    let path2 = dir.path().join("two");
 
-    let dir = assert_ok!(TempDir::new("unix"));
-    let path_1 = dir.path().join("one");
-    let path_2 = dir.path().join("two");
-
-    let dg1 = assert_ok!(UnixDatagram::bind(&path_1));
-    assert_ok!(poll.registry().register(&dg1, TOKEN_1, Interests::READABLE));
-
-    let dg2 = assert_ok!(UnixDatagram::bind(&path_2));
-    assert_ok!(dg2.connect(&path_1));
+    let datagram1 = assert_ok!(UnixDatagram::bind(&path1));
     assert_ok!(poll
         .registry()
-        .reregister(&dg1, TOKEN_1, Interests::WRITABLE));
+        .register(&datagram1, TOKEN_1, Interests::READABLE));
+
+    let datagram2 = assert_ok!(UnixDatagram::bind(&path2));
+    assert_ok!(datagram2.connect(&path1));
+    assert_ok!(poll
+        .registry()
+        .reregister(&datagram1, TOKEN_1, Interests::WRITABLE));
     expect_events(
         &mut poll,
         &mut events,
@@ -301,35 +311,36 @@ fn unix_datagram_reregister() {
 #[test]
 fn unix_datagram_deregister() {
     let (mut poll, mut events) = init_with_poll();
+    let dir = assert_ok!(TempDir::new("unix_datagram"));
+    let path1 = dir.path().join("one");
+    let path2 = dir.path().join("two");
 
-    let dir = assert_ok!(TempDir::new("unix"));
-    let path_1 = dir.path().join("one");
-    let path_2 = dir.path().join("two");
+    let datagram1 = assert_ok!(UnixDatagram::bind(&path1));
+    assert_ok!(poll
+        .registry()
+        .register(&datagram1, TOKEN_1, Interests::WRITABLE));
 
-    let dg1 = assert_ok!(UnixDatagram::bind(&path_1));
-    assert_ok!(poll.registry().register(&dg1, TOKEN_1, Interests::WRITABLE));
-
-    let dg2 = assert_ok!(UnixDatagram::bind(&path_2));
-    assert_ok!(dg2.connect(&path_1));
-    assert_ok!(poll.registry().deregister(&dg1));
+    let datagram2 = assert_ok!(UnixDatagram::bind(&path2));
+    assert_ok!(datagram2.connect(&path1));
+    assert_ok!(poll.registry().deregister(&datagram1));
     expect_no_events(&mut poll, &mut events);
 }
 
-fn smoke_test_unconnected(dg1: UnixDatagram, dg2: UnixDatagram) {
+fn smoke_test_unconnected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
     let (mut poll, mut events) = init_with_poll();
 
-    let addr_1 = assert_ok!(dg1.local_addr());
-    let addr_2 = assert_ok!(dg2.local_addr());
-    let path_1 = addr_1.as_pathname().expect("failed to get pathname");
-    let path_2 = addr_2.as_pathname().expect("failed to get pathname");
+    let addr1 = assert_ok!(datagram1.local_addr());
+    let addr2 = assert_ok!(datagram2.local_addr());
+    let path1 = addr1.as_pathname().expect("failed to get pathname");
+    let path2 = addr2.as_pathname().expect("failed to get pathname");
 
     assert_ok!(poll.registry().register(
-        &dg1,
+        &datagram1,
         TOKEN_1,
         Interests::READABLE.add(Interests::WRITABLE)
     ));
     assert_ok!(poll.registry().register(
-        &dg2,
+        &datagram2,
         TOKEN_2,
         Interests::READABLE.add(Interests::WRITABLE)
     ));
@@ -343,10 +354,10 @@ fn smoke_test_unconnected(dg1: UnixDatagram, dg2: UnixDatagram) {
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
-    assert_would_block(dg1.recv_from(&mut buf));
+    assert_would_block(datagram1.recv_from(&mut buf));
 
-    assert_ok!(dg1.send_to(DATA1, path_2));
-    assert_ok!(dg2.send_to(DATA2, path_1));
+    assert_ok!(datagram1.send_to(DATA1, path2));
+    assert_ok!(datagram2.send_to(DATA2, path1));
     expect_events(
         &mut poll,
         &mut events,
@@ -356,36 +367,36 @@ fn smoke_test_unconnected(dg1: UnixDatagram, dg2: UnixDatagram) {
         ],
     );
 
-    let (read, from_addr_1) = assert_ok!(dg1.recv_from(&mut buf));
+    let (read, from_addr1) = assert_ok!(datagram1.recv_from(&mut buf));
     assert_eq!(read, DATA2.len());
     assert_eq!(buf[..read], DATA2[..]);
     assert_eq!(
-        from_addr_1.as_pathname().expect("failed to get pathname"),
-        path_2
+        from_addr1.as_pathname().expect("failed to get pathname"),
+        path2
     );
 
-    let (read, from_addr_2) = assert_ok!(dg2.recv_from(&mut buf));
+    let (read, from_addr2) = assert_ok!(datagram2.recv_from(&mut buf));
     assert_eq!(read, DATA1.len());
     assert_eq!(buf[..read], DATA1[..]);
     assert_eq!(
-        from_addr_2.as_pathname().expect("failed to get pathname"),
-        path_1
+        from_addr2.as_pathname().expect("failed to get pathname"),
+        path1
     );
 
-    assert!(assert_ok!(dg1.take_error()).is_none());
-    assert!(assert_ok!(dg2.take_error()).is_none());
+    assert!(assert_ok!(datagram1.take_error()).is_none());
+    assert!(assert_ok!(datagram2.take_error()).is_none());
 }
 
-fn smoke_test_connected(dg1: UnixDatagram, dg2: UnixDatagram) {
+fn smoke_test_connected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
     let (mut poll, mut events) = init_with_poll();
 
     assert_ok!(poll.registry().register(
-        &dg1,
+        &datagram1,
         TOKEN_1,
         Interests::READABLE.add(Interests::WRITABLE)
     ));
     assert_ok!(poll.registry().register(
-        &dg2,
+        &datagram2,
         TOKEN_2,
         Interests::READABLE.add(Interests::WRITABLE)
     ));
@@ -399,10 +410,10 @@ fn smoke_test_connected(dg1: UnixDatagram, dg2: UnixDatagram) {
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
-    assert_would_block(dg1.recv(&mut buf));
+    assert_would_block(datagram1.recv(&mut buf));
 
-    assert_ok!(dg1.send(DATA1));
-    assert_ok!(dg2.send(DATA2));
+    assert_ok!(datagram1.send(DATA1));
+    assert_ok!(datagram2.send(DATA2));
     expect_events(
         &mut poll,
         &mut events,
@@ -412,14 +423,14 @@ fn smoke_test_connected(dg1: UnixDatagram, dg2: UnixDatagram) {
         ],
     );
 
-    let read = assert_ok!(dg1.recv(&mut buf));
+    let read = assert_ok!(datagram1.recv(&mut buf));
     assert_eq!(read, DATA2.len());
     assert_eq!(buf[..read], DATA2[..]);
 
-    let read = assert_ok!(dg2.recv(&mut buf));
+    let read = assert_ok!(datagram2.recv(&mut buf));
     assert_eq!(read, DATA1.len());
     assert_eq!(buf[..read], DATA1[..]);
 
-    assert!(assert_ok!(dg1.take_error()).is_none());
-    assert!(assert_ok!(dg2.take_error()).is_none());
+    assert!(assert_ok!(datagram1.take_error()).is_none());
+    assert!(assert_ok!(datagram2.take_error()).is_none());
 }
