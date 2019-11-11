@@ -17,7 +17,6 @@ use util::{
 };
 
 const DEFAULT_BUF_SIZE: usize = 64;
-
 const TOKEN_1: Token = Token(0);
 const TOKEN_2: Token = Token(1);
 

@@ -21,11 +21,9 @@ use util::{
 
 const DATA1: &[u8] = b"Hello same host!";
 const DATA2: &[u8] = b"Why hello mio!";
-
-const DEFAULT_BUF_SIZE: usize = 64;
 const DATA1_LEN: usize = 16;
 const DATA2_LEN: usize = 14;
-
+const DEFAULT_BUF_SIZE: usize = 64;
 const TOKEN_1: Token = Token(0);
 const TOKEN_2: Token = Token(1);
 
