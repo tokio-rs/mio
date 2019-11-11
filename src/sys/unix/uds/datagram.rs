@@ -38,12 +38,12 @@ impl UnixDatagram {
     }
 
     pub(crate) fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {
-        let fds = [-1; 2];
+        let mut fds = [-1; 2];
         let flags = libc::SOCK_DGRAM;
 
         #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
         let pair = {
-            pair_descriptors(fds, flags)?;
+            pair_descriptors(&mut fds, flags)?;
             unsafe {
                 (
                     UnixDatagram::from_raw_fd(fds[0]),
@@ -63,7 +63,7 @@ impl UnixDatagram {
         let pair = {
             let s1 = unsafe { UnixDatagram::from_raw_fd(fds[0]) };
             let s2 = unsafe { UnixDatagram::from_raw_fd(fds[1]) };
-            pair_descriptors(fds, flags)?;
+            pair_descriptors(&mut fds, flags)?;
             (s1, s2)
         };
 
