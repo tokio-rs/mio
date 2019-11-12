@@ -13,6 +13,7 @@ use log::{debug, info};
 use mio::net::UdpSocket;
 use mio::{Events, Interests, Poll, Registry, Token};
 
+#[macro_use]
 mod util;
 
 use util::{
@@ -90,8 +91,8 @@ fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
     assert_would_block(socket1.peek_from(&mut buf));
     assert_would_block(socket1.recv_from(&mut buf));
 
-    socket1.send_to(DATA1, address2).unwrap();
-    socket2.send_to(DATA2, address1).unwrap();
+    checked_write!(socket1.send_to(DATA1, address2));
+    checked_write!(socket2.send_to(DATA2, address1));
 
     expect_events(
         &mut poll,
@@ -218,8 +219,8 @@ fn smoke_test_connected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
     assert_would_block(socket1.peek(&mut buf));
     assert_would_block(socket1.recv(&mut buf));
 
-    socket1.send(DATA1).unwrap();
-    socket2.send(DATA2).unwrap();
+    checked_write!(socket1.send(DATA1));
+    checked_write!(socket2.send(DATA2));
 
     expect_events(
         &mut poll,
@@ -283,7 +284,7 @@ fn reconnect_udp_socket_sending() {
         vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
     );
 
-    socket1.send(DATA1).unwrap();
+    checked_write!(socket1.send(DATA1));
 
     expect_events(
         &mut poll,
@@ -297,7 +298,7 @@ fn reconnect_udp_socket_sending() {
     assert_eq!(buf[..n], DATA1[..]);
 
     socket1.connect(address3).unwrap();
-    socket1.send(DATA2).unwrap();
+    checked_write!(socket1.send(DATA2));
 
     expect_events(
         &mut poll,
@@ -350,7 +351,7 @@ fn reconnect_udp_socket_receiving() {
         ],
     );
 
-    socket2.send(DATA1).unwrap();
+    checked_write!(socket2.send(DATA1));
 
     expect_events(
         &mut poll,
@@ -364,7 +365,7 @@ fn reconnect_udp_socket_receiving() {
     assert_eq!(buf[..n], DATA1[..]);
 
     socket1.connect(address3).unwrap();
-    socket3.send(DATA2).unwrap();
+    checked_write!(socket3.send(DATA2));
 
     expect_events(
         &mut poll,
@@ -380,7 +381,7 @@ fn reconnect_udp_socket_receiving() {
 
     // Now connect back to socket 2, dropping the unread data.
     socket1.connect(address2).unwrap();
-    socket2.send(DATA2).unwrap();
+    checked_write!(socket2.send(DATA2));
 
     expect_events(
         &mut poll,
@@ -423,7 +424,7 @@ fn unconnected_udp_socket_connected_methods() {
     assert_error(socket1.send(DATA1), "address required");
 
     // Now send some actual data.
-    socket1.send_to(DATA1, address2).unwrap();
+    checked_write!(socket1.send_to(DATA1, address2));
 
     expect_events(
         &mut poll,
@@ -488,7 +489,7 @@ fn connected_udp_socket_unconnected_methods() {
     #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
     assert_error(socket1.send_to(DATA1, address3), "already connected");
 
-    socket2.send_to(DATA2, address3).unwrap();
+    checked_write!(socket2.send_to(DATA2, address3));
 
     expect_events(
         &mut poll,
@@ -622,7 +623,7 @@ fn send_packets(
         let socket = net::UdpSocket::bind(any_local_address()).unwrap();
         for _ in 0..n_packets {
             barrier.wait();
-            assert_eq!(socket.send_to(DATA1, address).unwrap(), DATA1.len());
+            checked_write!(socket.send_to(DATA1, address));
         }
     })
 }
@@ -769,8 +770,7 @@ pub fn udp_socket_discard() {
 
     let mut poll = Poll::new().unwrap();
 
-    let r = udp_outside.send(b"hello world");
-    assert!(r.is_ok() || r.unwrap_err().kind() == ErrorKind::WouldBlock);
+    checked_write!(udp_outside.send(b"hello world"));
 
     poll.registry()
         .register(&rx, LISTENER, Interests::READABLE)

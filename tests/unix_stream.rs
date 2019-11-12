@@ -1,5 +1,6 @@
 #![cfg(unix)]
 
+#[macro_use]
 mod util;
 
 use mio::net::UnixStream;
@@ -104,24 +105,20 @@ fn unix_stream_pair() {
     let mut buf = [0; DEFAULT_BUF_SIZE];
     assert_would_block(s1.read(&mut buf));
 
-    let wrote = s1.write(&DATA1).unwrap();
-    assert_eq!(wrote, DATA1_LEN);
+    checked_write!(s1.write(&DATA1));
     s1.flush().unwrap();
 
     let read = s2.read(&mut buf).unwrap();
     assert_would_block(s2.read(&mut buf));
     assert_eq!(read, DATA1_LEN);
     assert_eq!(&buf[..read], DATA1);
-    assert_eq!(read, wrote, "unequal reads and writes");
 
-    let wrote = s2.write(&DATA2).unwrap();
-    assert_eq!(wrote, DATA2_LEN);
+    checked_write!(s2.write(&DATA2));
     s2.flush().unwrap();
 
     let read = s1.read(&mut buf).unwrap();
     assert_eq!(read, DATA2_LEN);
     assert_eq!(&buf[..read], DATA2);
-    assert_eq!(read, wrote, "unequal reads and writes");
 }
 
 #[test]
@@ -141,8 +138,7 @@ fn unix_stream_try_clone() {
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
-    let wrote = stream_1.write(&DATA1).unwrap();
-    assert_eq!(wrote, DATA1_LEN);
+    checked_write!(stream_1.write(&DATA1));
 
     let mut stream_2 = stream_1.try_clone().unwrap();
 
@@ -206,8 +202,7 @@ fn unix_stream_shutdown_read() {
         vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
     );
 
-    let wrote = stream.write(DATA1).unwrap();
-    assert_eq!(wrote, DATA1_LEN);
+    checked_write!(stream.write(&DATA1));
     expect_events(
         &mut poll,
         &mut events,
@@ -262,8 +257,7 @@ fn unix_stream_shutdown_write() {
         vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
     );
 
-    let wrote = stream.write(DATA1).unwrap();
-    assert_eq!(wrote, DATA1_LEN);
+    checked_write!(stream.write(&DATA1));
     expect_events(
         &mut poll,
         &mut events,
@@ -320,8 +314,7 @@ fn unix_stream_shutdown_both() {
         vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
     );
 
-    let wrote = stream.write(DATA1).unwrap();
-    assert_eq!(wrote, DATA1_LEN);
+    checked_write!(stream.write(&DATA1));
     expect_events(
         &mut poll,
         &mut events,
@@ -478,8 +471,7 @@ where
     let mut buf = [0; DEFAULT_BUF_SIZE];
     assert_would_block(stream.read(&mut buf));
 
-    let wrote = stream.write(&DATA1).unwrap();
-    assert_eq!(wrote, DATA1_LEN);
+    checked_write!(stream.write(&DATA1));
     stream.flush().unwrap();
     expect_events(
         &mut poll,
@@ -490,7 +482,6 @@ where
     let read = stream.read(&mut buf).unwrap();
     assert_eq!(read, DATA1_LEN);
     assert_eq!(&buf[..read], DATA1);
-    assert_eq!(read, wrote, "unequal reads and writes");
 
     assert!(stream.take_error().unwrap().is_none());
 
