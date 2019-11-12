@@ -1,6 +1,5 @@
 use std::io::Read;
 
-use bytes::BytesMut;
 use log::debug;
 
 use mio::net::{TcpListener, TcpStream};
@@ -58,7 +57,7 @@ impl TestHandler {
                     AfterRead => {}
                 }
 
-                let mut buf = BytesMut::with_capacity(1024);
+                let mut buf = Vec::with_capacity(1024);
 
                 match self.cli.read(&mut buf) {
                     Ok(0) => self.shutdown = true,
