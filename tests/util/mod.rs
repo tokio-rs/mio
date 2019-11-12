@@ -4,6 +4,7 @@
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::SocketAddr;
+use std::ops::BitOr;
 use std::sync::Once;
 use std::time::Duration;
 
@@ -155,23 +156,90 @@ impl<T> MapNonBlock<T> for io::Result<T> {
 #[derive(Debug)]
 pub struct ExpectEvent {
     token: Token,
-    // We're (ab)using `Interests` as readiness in `matches`.
-    interests: Interests,
+    readiness: Readiness,
 }
 
 impl ExpectEvent {
-    pub const fn new(token: Token, interests: Interests) -> ExpectEvent {
-        ExpectEvent { token, interests }
+    pub fn new<R>(token: Token, readiness: R) -> ExpectEvent
+    where
+        R: Into<Readiness>,
+    {
+        ExpectEvent {
+            token,
+            readiness: readiness.into(),
+        }
     }
 
     fn matches(&self, event: &Event) -> bool {
-        event.token() == self.token &&
-            // If we expect a readiness then also match on the event.
-            // In maths terms that is p -> q, which is the same  as !p || q.
-            (!self.interests.is_readable() || event.is_readable()) &&
-            (!self.interests.is_writable() || event.is_writable()) &&
-            (!self.interests.is_aio() || event.is_aio()) &&
-            (!self.interests.is_lio() || event.is_lio())
+        event.token() == self.token && self.readiness.matches(event)
+    }
+}
+
+#[derive(Debug)]
+pub struct Readiness(usize);
+
+const READABLE: usize = 0b00_000_001;
+const WRITABLE: usize = 0b00_000_010;
+const AIO: usize = 0b00_000_100;
+const LIO: usize = 0b00_001_000;
+const ERROR: usize = 0b00_010_000;
+const READ_CLOSED: usize = 0b00_100_000;
+const WRITE_CLOSED: usize = 0b01_000_000;
+const PRIORITY: usize = 0b10_000_000;
+
+impl Readiness {
+    pub const READABLE: Readiness = Readiness(READABLE);
+    pub const WRITABLE: Readiness = Readiness(WRITABLE);
+    pub const AIO: Readiness = Readiness(AIO);
+    pub const LIO: Readiness = Readiness(LIO);
+    pub const ERROR: Readiness = Readiness(ERROR);
+    pub const READ_CLOSED: Readiness = Readiness(READ_CLOSED);
+    pub const WRITE_CLOSED: Readiness = Readiness(WRITE_CLOSED);
+    pub const PRIORITY: Readiness = Readiness(PRIORITY);
+
+    fn matches(&self, event: &Event) -> bool {
+        // If we expect a readiness then also match on the event.
+        // In maths terms that is p -> q, which is the same  as !p || q.
+        (!self.is(READABLE) || event.is_readable())
+            && (!self.is(WRITABLE) || event.is_writable())
+            && (!self.is(AIO) || event.is_aio())
+            && (!self.is(LIO) || event.is_lio())
+            && (!self.is(ERROR) || event.is_error())
+            && (!self.is(READ_CLOSED) || event.is_read_closed())
+            && (!self.is(WRITE_CLOSED) || event.is_write_closed())
+            && (!self.is(PRIORITY) || event.is_priority())
+    }
+
+    /// Usage: `self.is(READABLE)`.
+    fn is(&self, value: usize) -> bool {
+        self.0 & value != 0
+    }
+}
+
+impl BitOr for Readiness {
+    type Output = Self;
+
+    fn bitor(self, other: Self) -> Self {
+        Readiness(self.0 | other.0)
+    }
+}
+
+impl From<Interests> for Readiness {
+    fn from(interests: Interests) -> Readiness {
+        let mut readiness = Readiness(0);
+        if interests.is_readable() {
+            readiness.0 |= READABLE;
+        }
+        if interests.is_writable() {
+            readiness.0 |= WRITABLE;
+        }
+        if interests.is_aio() {
+            readiness.0 |= AIO;
+        }
+        if interests.is_lio() {
+            readiness.0 |= LIO;
+        }
+        readiness
     }
 }
 
