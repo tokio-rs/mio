@@ -108,17 +108,14 @@ fn unix_stream_pair() {
     checked_write!(s1.write(&DATA1));
     s1.flush().unwrap();
 
-    let read = s2.read(&mut buf).unwrap();
+    expect_read!(s2.read(&mut buf), DATA1);
     assert_would_block(s2.read(&mut buf));
-    assert_eq!(read, DATA1_LEN);
-    assert_eq!(&buf[..read], DATA1);
 
     checked_write!(s2.write(&DATA2));
     s2.flush().unwrap();
 
-    let read = s1.read(&mut buf).unwrap();
-    assert_eq!(read, DATA2_LEN);
-    assert_eq!(&buf[..read], DATA2);
+    expect_read!(s1.read(&mut buf), DATA2);
+    assert_would_block(s2.read(&mut buf));
 }
 
 #[test]
@@ -155,9 +152,7 @@ fn unix_stream_try_clone() {
         vec![ExpectEvent::new(TOKEN_2, Interests::READABLE)],
     );
 
-    let read = stream_2.read(&mut buf).unwrap();
-    assert_eq!(read, DATA1_LEN);
-    assert_eq!(&buf[..read], DATA1);
+    expect_read!(stream_2.read(&mut buf), DATA1);
 
     // Close the connection to allow the remote to shutdown
     drop(stream_2);
@@ -228,8 +223,7 @@ fn unix_stream_shutdown_read() {
     ))]
     {
         let mut buf = [0; DEFAULT_BUF_SIZE];
-        let read = stream.read(&mut buf).unwrap();
-        assert_eq!(read, 0);
+        expect_read!(stream.read(&mut buf), &[]);
     }
 
     // Close the connection to allow the remote to shutdown
@@ -285,9 +279,7 @@ fn unix_stream_shutdown_write() {
 
     // Read should be ok
     let mut buf = [0; DEFAULT_BUF_SIZE];
-    let read = stream.read(&mut buf).unwrap();
-    assert_eq!(read, DATA1_LEN);
-    assert_eq!(&buf[..read], DATA1);
+    expect_read!(stream.read(&mut buf), DATA1);
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
@@ -340,8 +332,7 @@ fn unix_stream_shutdown_both() {
     ))]
     {
         let mut buf = [0; DEFAULT_BUF_SIZE];
-        let read = stream.read(&mut buf).unwrap();
-        assert_eq!(read, 0);
+        expect_read!(stream.read(&mut buf), &[]);
     }
 
     let err = stream.write(DATA2).unwrap_err();
@@ -479,9 +470,7 @@ where
         vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
     );
 
-    let read = stream.read(&mut buf).unwrap();
-    assert_eq!(read, DATA1_LEN);
-    assert_eq!(&buf[..read], DATA1);
+    expect_read!(stream.read(&mut buf), DATA1);
 
     assert!(stream.take_error().unwrap().is_none());
 

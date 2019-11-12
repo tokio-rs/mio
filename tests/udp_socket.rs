@@ -103,25 +103,11 @@ fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
         ],
     );
 
-    let (n, got_address1) = socket1.peek_from(&mut buf).unwrap();
-    assert_eq!(n, DATA2.len());
-    assert_eq!(buf[..n], DATA2[..]);
-    assert_eq!(got_address1, address2);
+    expect_read!(socket1.peek_from(&mut buf), DATA2, address2);
+    expect_read!(socket2.peek_from(&mut buf), DATA1, address1);
 
-    let (n, got_address2) = socket2.peek_from(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
-    assert_eq!(got_address2, address1);
-
-    let (n, got_address1) = socket1.recv_from(&mut buf).unwrap();
-    assert_eq!(n, DATA2.len());
-    assert_eq!(buf[..n], DATA2[..]);
-    assert_eq!(got_address1, address2);
-
-    let (n, got_address2) = socket2.recv_from(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
-    assert_eq!(got_address2, address1);
+    expect_read!(socket1.recv_from(&mut buf), DATA2, address2);
+    expect_read!(socket2.recv_from(&mut buf), DATA1, address1);
 
     assert!(socket1.take_error().unwrap().is_none());
     assert!(socket2.take_error().unwrap().is_none());
@@ -232,21 +218,11 @@ fn smoke_test_connected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
     );
 
     let mut buf = [0; 20];
-    let n = socket1.peek(&mut buf).unwrap();
-    assert_eq!(n, DATA2.len());
-    assert_eq!(buf[..n], DATA2[..]);
+    expect_read!(socket1.peek(&mut buf), DATA2);
+    expect_read!(socket2.peek(&mut buf), DATA1);
 
-    let n = socket2.peek(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
-
-    let n = socket1.recv(&mut buf).unwrap();
-    assert_eq!(n, DATA2.len());
-    assert_eq!(buf[..n], DATA2[..]);
-
-    let n = socket2.recv(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
+    expect_read!(socket1.recv(&mut buf), DATA2);
+    expect_read!(socket2.recv(&mut buf), DATA1);
 
     assert!(socket1.take_error().unwrap().is_none());
     assert!(socket2.take_error().unwrap().is_none());
@@ -293,9 +269,7 @@ fn reconnect_udp_socket_sending() {
     );
 
     let mut buf = [0; 20];
-    let n = socket2.recv(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
+    expect_read!(socket2.recv(&mut buf), DATA1);
 
     socket1.connect(address3).unwrap();
     checked_write!(socket1.send(DATA2));
@@ -306,9 +280,7 @@ fn reconnect_udp_socket_sending() {
         vec![ExpectEvent::new(ID3, Interests::READABLE)],
     );
 
-    let n = socket3.recv(&mut buf).unwrap();
-    assert_eq!(n, DATA2.len());
-    assert_eq!(buf[..n], DATA2[..]);
+    expect_read!(socket3.recv(&mut buf), DATA2);
 
     assert!(socket1.take_error().unwrap().is_none());
     assert!(socket2.take_error().unwrap().is_none());
@@ -360,9 +332,7 @@ fn reconnect_udp_socket_receiving() {
     );
 
     let mut buf = [0; 20];
-    let n = socket1.recv(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
+    expect_read!(socket1.recv(&mut buf), DATA1);
 
     socket1.connect(address3).unwrap();
     checked_write!(socket3.send(DATA2));
@@ -375,9 +345,7 @@ fn reconnect_udp_socket_receiving() {
 
     // Read only a part of the data.
     let max = 4;
-    let n = socket1.recv(&mut buf[..max]).unwrap();
-    assert_eq!(n, max);
-    assert_eq!(buf[..max], DATA2[..max]);
+    expect_read!(socket1.recv(&mut buf[..max]), &DATA2[..max]);
 
     // Now connect back to socket 2, dropping the unread data.
     socket1.connect(address2).unwrap();
@@ -389,9 +357,7 @@ fn reconnect_udp_socket_receiving() {
         vec![ExpectEvent::new(ID1, Interests::READABLE)],
     );
 
-    let n = socket1.recv(&mut buf).unwrap();
-    assert_eq!(n, DATA2.len());
-    assert_eq!(buf[..n], DATA2[..]);
+    expect_read!(socket1.recv(&mut buf), DATA2);
 
     assert!(socket1.take_error().unwrap().is_none());
     assert!(socket2.take_error().unwrap().is_none());
@@ -435,13 +401,8 @@ fn unconnected_udp_socket_connected_methods() {
     // Receive methods don't require the socket to be connected, you just won't
     // know the sender.
     let mut buf = [0; 20];
-    let n = socket2.peek(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
-
-    let n = socket2.recv(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
+    expect_read!(socket2.peek(&mut buf), DATA1);
+    expect_read!(socket2.recv(&mut buf), DATA1);
 
     assert!(socket1.take_error().unwrap().is_none());
     assert!(socket2.take_error().unwrap().is_none());
@@ -498,15 +459,8 @@ fn connected_udp_socket_unconnected_methods() {
     );
 
     let mut buf = [0; 20];
-    let (n, got_address1) = socket3.peek_from(&mut buf).unwrap();
-    assert_eq!(n, DATA2.len());
-    assert_eq!(buf[..n], DATA2[..]);
-    assert_eq!(got_address1, address2);
-
-    let (n, got_address2) = socket3.recv_from(&mut buf).unwrap();
-    assert_eq!(n, DATA2.len());
-    assert_eq!(buf[..n], DATA2[..]);
-    assert_eq!(got_address2, address2);
+    expect_read!(socket3.peek_from(&mut buf), DATA2, address2);
+    expect_read!(socket3.recv_from(&mut buf), DATA2, address2);
 
     assert!(socket1.take_error().unwrap().is_none());
     assert!(socket2.take_error().unwrap().is_none());
@@ -575,9 +529,7 @@ fn udp_socket_reregister() {
     );
 
     let mut buf = [0; 20];
-    let (n, _) = socket.recv_from(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
+    expect_read!(socket.recv_from(&mut buf), DATA1, __anywhere);
 
     thread_handle.join().expect("unable to join thread");
 }
@@ -605,9 +557,7 @@ fn udp_socket_no_events_after_deregister() {
 
     // But we do expect a packet to be send.
     let mut buf = [0; 20];
-    let (n, _) = socket.recv_from(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(buf[..n], DATA1[..]);
+    expect_read!(socket.recv_from(&mut buf), DATA1, __anywhere);
 
     thread_handle.join().expect("unable to join thread");
 }

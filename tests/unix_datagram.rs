@@ -16,8 +16,6 @@ use util::{
 
 const DATA1: &[u8] = b"Hello same host!";
 const DATA2: &[u8] = b"Why hello mio!";
-const DATA1_LEN: usize = DATA1.len();
-const DATA2_LEN: usize = DATA2.len();
 const DEFAULT_BUF_SIZE: usize = 64;
 const TEST_DIR: &str = "mio_unix_datagram_tests";
 const TOKEN_1: Token = Token(0);
@@ -162,14 +160,8 @@ fn unix_datagram_pair() {
         ],
     );
 
-    let read = datagram2.recv(&mut buf).unwrap();
-    assert_would_block(datagram2.recv(&mut buf));
-    assert_eq!(read, DATA1_LEN);
-    assert_eq!(&buf[..read], DATA1);
-
-    let read = datagram1.recv(&mut buf).unwrap();
-    assert_eq!(read, DATA2_LEN);
-    assert_eq!(&buf[..read], DATA2);
+    expect_read!(datagram1.recv(&mut buf), DATA2);
+    expect_read!(datagram2.recv(&mut buf), DATA1);
 
     assert!(datagram1.take_error().unwrap().is_none());
     assert!(datagram2.take_error().unwrap().is_none());
@@ -223,13 +215,7 @@ fn unix_datagram_try_clone() {
         ],
     );
 
-    let (read, from_addr1) = datagram1.recv_from(&mut buf).unwrap();
-    assert_eq!(read, DATA1_LEN);
-    assert_eq!(buf[..read], DATA1[..]);
-    assert_eq!(
-        from_addr1.as_pathname().expect("failed to get pathname"),
-        path2
-    );
+    expect_read!(datagram1.recv_from(&mut buf), DATA1, path: path2);
     assert_would_block(datagram2.recv_from(&mut buf));
 
     assert!(datagram1.take_error().unwrap().is_none());
@@ -397,21 +383,8 @@ fn smoke_test_unconnected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
         ],
     );
 
-    let (read, from_addr1) = datagram1.recv_from(&mut buf).unwrap();
-    assert_eq!(read, DATA2_LEN);
-    assert_eq!(buf[..read], DATA2[..]);
-    assert_eq!(
-        from_addr1.as_pathname().expect("failed to get pathname"),
-        path2
-    );
-
-    let (read, from_addr2) = datagram2.recv_from(&mut buf).unwrap();
-    assert_eq!(read, DATA1_LEN);
-    assert_eq!(buf[..read], DATA1[..]);
-    assert_eq!(
-        from_addr2.as_pathname().expect("failed to get pathname"),
-        path1
-    );
+    expect_read!(datagram1.recv_from(&mut buf), DATA2, path: path2);
+    expect_read!(datagram2.recv_from(&mut buf), DATA1, path: path1);
 
     assert!(datagram1.take_error().unwrap().is_none());
     assert!(datagram2.take_error().unwrap().is_none());
@@ -471,13 +444,8 @@ fn smoke_test_connected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
         ],
     );
 
-    let read = datagram1.recv(&mut buf).unwrap();
-    assert_eq!(read, DATA2_LEN);
-    assert_eq!(buf[..read], DATA2[..]);
-
-    let read = datagram2.recv(&mut buf).unwrap();
-    assert_eq!(read, DATA1_LEN);
-    assert_eq!(buf[..read], DATA1[..]);
+    expect_read!(datagram1.recv(&mut buf), DATA2);
+    expect_read!(datagram2.recv(&mut buf), DATA1);
 
     assert!(datagram1.take_error().unwrap().is_none());
     assert!(datagram2.take_error().unwrap().is_none());
