@@ -2,18 +2,16 @@
 #[macro_use]
 mod util;
 
-use log::warn;
 use mio::net::UnixDatagram;
 use mio::{Interests, Token};
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net;
-use std::time::Duration;
 use tempdir::TempDir;
 use util::{
     assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
-    ExpectEvent,
+    ExpectEvent, Readiness,
 };
 
 const DATA1: &[u8] = b"Hello same host!";
@@ -284,10 +282,18 @@ fn unix_datagram_shutdown() {
     );
 
     datagram1.shutdown(Shutdown::Read).unwrap();
-    expect_readiness!(poll, events, is_read_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Readiness::READ_CLOSED)],
+    );
 
     datagram1.shutdown(Shutdown::Write).unwrap();
-    expect_readiness!(poll, events, is_write_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Readiness::WRITE_CLOSED)],
+    );
 
     let err = datagram1.send(DATA2).unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
