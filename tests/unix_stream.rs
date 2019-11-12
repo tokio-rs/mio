@@ -14,7 +14,7 @@ use std::thread;
 use tempdir::TempDir;
 use util::{
     assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
-    ExpectEvent, Readiness, TryRead, TryWrite,
+    ExpectEvent, Readiness,
 };
 
 const DATA1: &[u8] = b"Hello same host!";
@@ -537,23 +537,23 @@ fn new_echo_listener(connections: usize) -> (thread::JoinHandle<()>, net::Socket
             let (mut read, mut written) = (0, 0);
             let mut buf = [0; DEFAULT_BUF_SIZE];
             loop {
-                let n = match stream.try_read(&mut buf) {
-                    Ok(Some(amount)) => {
+                let n = match stream.read(&mut buf) {
+                    Ok(amount) => {
                         read += amount;
                         amount
                     }
-                    Ok(None) => continue,
+                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
                     Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
                     Err(err) => panic!("{}", err),
                 };
                 if n == 0 {
                     break;
                 }
-                match stream.try_write(&buf[..n]) {
-                    Ok(Some(amount)) => written += amount,
-                    Ok(None) => continue,
+                match stream.write(&buf[..n]) {
+                    Ok(amount) => written += amount,
+                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
                     Err(ref err) if err.kind() == io::ErrorKind::BrokenPipe => break,
-                    Err(err) => panic!("{:?}", err),
+                    Err(err) => panic!("{}", err),
                 };
             }
             assert_eq!(read, written, "unequal reads and writes");
