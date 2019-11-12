@@ -1,3 +1,5 @@
+use slab::Slab;
+
 use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
@@ -17,6 +19,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use std::usize;
 use std::{io, ptr};
 use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
@@ -75,38 +78,6 @@ impl AfdGroup {
     }
 }
 
-/// This is the deallocation wrapper for overlapped pointer.
-/// In case of error or status changing before the overlapped pointer is actually used(or not even being used),
-/// this wrapper will decrease the reference count of Arc if being dropped.
-/// Remember call `forget` if you have used the Arc, or you could decrease the reference count by two causing double free.
-#[derive(Debug)]
-struct OverlappedArcWrapper<T>(*const T);
-
-unsafe impl<T> Send for OverlappedArcWrapper<T> {}
-
-impl<T> OverlappedArcWrapper<T> {
-    fn new(arc: &Arc<T>) -> OverlappedArcWrapper<T> {
-        OverlappedArcWrapper(Arc::into_raw(arc.clone()))
-    }
-
-    fn forget(&mut self) {
-        self.0 = 0 as *const T;
-    }
-
-    fn get_ptr(&self) -> *const T {
-        self.0
-    }
-}
-
-impl<T> Drop for OverlappedArcWrapper<T> {
-    fn drop(&mut self) {
-        if self.0 as usize == 0 {
-            return;
-        }
-        drop(unsafe { Arc::from_raw(self.0) });
-    }
-}
-
 #[derive(Debug)]
 enum SockPollStatus {
     Idle,
@@ -123,13 +94,13 @@ pub struct SockState {
     raw_socket: RawSocket,
     base_socket: RawSocket,
 
+    id: usize,
     user_evts: u32,
     pending_evts: u32,
 
     user_data: u64,
 
     poll_status: SockPollStatus,
-    self_wrapped: Option<OverlappedArcWrapper<Mutex<SockState>>>,
 
     delete_pending: bool,
 }
@@ -142,13 +113,27 @@ impl SockState {
             afd,
             raw_socket,
             base_socket: get_base_socket(raw_socket)?,
+            /// MAX is not a valid id, need to call set_id to have a valid id before using this field
+            id: usize::MAX,
             user_evts: 0,
             pending_evts: 0,
             user_data: 0,
             poll_status: SockPollStatus::Idle,
-            self_wrapped: None,
             delete_pending: false,
         })
+    }
+
+    /// Return true if id was set successfully, false otherwise
+    ///
+    /// Note: It is an error to set the id multiple times
+    fn set_id(&mut self, id: usize) -> bool {
+        let mut result = false;
+
+        if self.id == usize::MAX {
+            self.id = id;
+            result = true;
+        }
+        result
     }
 
     /// True if need to be added on update queue, false otherwise.
@@ -162,7 +147,7 @@ impl SockState {
         (events & !self.pending_evts) != 0
     }
 
-    fn update(&mut self, self_arc: &Arc<Mutex<SockState>>) -> io::Result<()> {
+    fn update(&mut self) -> io::Result<()> {
         assert!(!self.delete_pending);
 
         if let SockPollStatus::Pending = self.poll_status {
@@ -192,8 +177,10 @@ impl SockState {
             self.poll_info.handles[0].status = 0;
             self.poll_info.handles[0].events = self.user_evts | afd::POLL_LOCAL_CLOSE;
 
-            let wrapped_overlapped = OverlappedArcWrapper::new(self_arc);
-            let overlapped = wrapped_overlapped.get_ptr() as *const _ as PVOID;
+            // Use sock_state unique id as overlapped data. Id will be used to retrieve the sock_state.
+            // Notice: id is a slab key, which starts from 0. Overlapped data cannot be 0, that would mean NULL pointer,
+            // that is why id is increased by 1 when sending overlapped, the receiving side will decrease it by 1 before usage.
+            let overlapped = (self.id + 1) as PVOID;
             let result = unsafe {
                 self.afd
                     .poll(&mut self.poll_info, (*self.iosb).as_mut_ptr(), overlapped)
@@ -211,12 +198,7 @@ impl SockState {
                 }
             }
 
-            if self.self_wrapped.is_some() {
-                // This shouldn't be happening. We cannot deallocate already pending overlapped before feed_event so we need to stand out here to declare unreachable.
-                unreachable!();
-            }
             self.poll_status = SockPollStatus::Pending;
-            self.self_wrapped = Some(wrapped_overlapped);
             self.pending_evts = self.user_evts;
         } else {
             unreachable!();
@@ -239,12 +221,6 @@ impl SockState {
 
     // This is the function called from the overlapped using as Arc<Mutex<SockState>>. Watch out for reference counting.
     fn feed_event(&mut self) -> Option<Event> {
-        if self.self_wrapped.is_some() {
-            // Forget our arced-self first. We will decrease the reference count by two if we don't do this on overlapped.
-            self.self_wrapped.as_mut().unwrap().forget();
-            self.self_wrapped = None;
-        }
-
         self.poll_status = SockPollStatus::Idle;
         self.pending_evts = 0;
 
@@ -301,11 +277,11 @@ impl SockState {
 
     pub fn mark_delete(&mut self) {
         if !self.delete_pending {
+            self.delete_pending = true;
+
             if let SockPollStatus::Pending = self.poll_status {
                 drop(self.cancel());
             }
-
-            self.delete_pending = true;
         }
     }
 }
@@ -404,9 +380,17 @@ impl Selector {
 }
 
 #[derive(Debug)]
+pub struct SockStates {
+    /// contains sock_states which need to be updated by calling afd.poll
+    update_queue: VecDeque<Arc<Mutex<SockState>>>,
+    /// contains all sock_states which have been registered so far
+    all: Slab<Arc<Mutex<SockState>>>,
+}
+
+#[derive(Debug)]
 pub struct SelectorInner {
     cp: Arc<CompletionPort>,
-    update_queue: Mutex<VecDeque<Arc<Mutex<SockState>>>>,
+    sock_states: Mutex<SockStates>,
     afd_group: AfdGroup,
     is_polling: AtomicBool,
 }
@@ -414,15 +398,36 @@ pub struct SelectorInner {
 // We have ensured thread safety by introducing lock manually.
 unsafe impl Sync for SelectorInner {}
 
+impl Drop for SelectorInner {
+    fn drop(&mut self) {
+        let all_sock_states = &mut self.sock_states.lock().unwrap().all;
+        for sock_state in all_sock_states.drain() {
+            let sock_state_internal = &mut sock_state.lock().unwrap();
+            sock_state_internal.mark_delete();
+        }
+
+        self.afd_group.release_unused_afd();
+    }
+}
+
+enum SocketOps {
+    SocketRegister,
+    SocketReregister,
+    SocketDeregister,
+}
+
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
         CompletionPort::new(0).map(|cp| {
             let cp = Arc::new(cp);
             let cp_afd = Arc::clone(&cp);
-
+            let sock_states = SockStates {
+                update_queue: VecDeque::new(),
+                all: Slab::with_capacity(1024),
+            };
             SelectorInner {
                 cp,
-                update_queue: Mutex::new(VecDeque::new()),
+                sock_states: Mutex::new(sock_states),
                 afd_group: AfdGroup::new(cp_afd),
                 is_polling: AtomicBool::new(false),
             }
@@ -517,7 +522,7 @@ impl SelectorInner {
         }
         socket.set_sock_state(Some(sock));
         unsafe {
-            self.add_socket_to_update_queue(socket);
+            self.update_sock_states(socket, SocketOps::SocketRegister);
             self.update_sockets_events_if_polling()?;
         }
 
@@ -545,7 +550,7 @@ impl SelectorInner {
             sock.lock().unwrap().set_event(event);
         }
         unsafe {
-            self.add_socket_to_update_queue(socket);
+            self.update_sock_states(socket, SocketOps::SocketReregister);
             self.update_sockets_events_if_polling()?;
         }
 
@@ -556,23 +561,38 @@ impl SelectorInner {
         if socket.get_sock_state().is_none() {
             return Err(io::Error::from(io::ErrorKind::NotFound));
         }
+        unsafe {
+            self.update_sock_states(socket, SocketOps::SocketDeregister);
+        }
         socket.set_sock_state(None);
         self.afd_group.release_unused_afd();
         Ok(())
     }
 
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
-        let mut update_queue = self.update_queue.lock().unwrap();
+        let sock_states = &mut self.sock_states.lock().unwrap();
+
         loop {
-            let sock = match update_queue.pop_front() {
+            let sock = match sock_states.update_queue.pop_front() {
                 Some(sock) => sock,
                 None => break,
             };
+
             let mut sock_internal = sock.lock().unwrap();
             if !sock_internal.is_pending_deletion() {
-                sock_internal.update(&sock).unwrap();
+                sock_internal.update().unwrap();
+            }
+
+            // If during the sock_internal update, because of some error, this socket was marked for deletion,
+            // just remove it. Make sure to check the slab contains the socket, to avoid double removing a socket.
+            // This may happen for sockets which, during Selector drop, have been cancelled and removed already.
+            if sock_internal.is_pending_deletion() {
+                if sock_states.all.contains(sock_internal.id) {
+                    sock_states.all.remove(sock_internal.id);
+                }
             }
         }
+
         self.afd_group.release_unused_afd();
         Ok(())
     }
@@ -602,10 +622,34 @@ impl SelectorInner {
         }
     }
 
-    unsafe fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
+    unsafe fn update_sock_states<S: SocketState>(&self, socket: &S, sock_op: SocketOps) {
         let sock_state = socket.get_sock_state().unwrap();
-        let mut update_queue = self.update_queue.lock().unwrap();
-        update_queue.push_back(sock_state);
+        let sock_states = &mut self.sock_states.lock().unwrap();
+
+        match sock_op {
+            SocketOps::SocketRegister => {
+                sock_states.update_queue.push_back(sock_state.clone());
+
+                let entry = sock_states.all.vacant_entry();
+                let key = entry.key();
+                {
+                    let mut sock_state_internal = sock_state.lock().unwrap();
+                    assert!(sock_state_internal.set_id(key)); //this should always succeed, only called once
+                };
+                entry.insert(sock_state);
+            }
+
+            SocketOps::SocketReregister => {
+                assert!(sock_states.all.contains(sock_state.lock().unwrap().id));
+                sock_states.update_queue.push_back(sock_state);
+            }
+
+            SocketOps::SocketDeregister => {
+                let sock_state_internal = sock_state.lock().unwrap();
+                assert!(sock_states.all.contains(sock_state_internal.id));
+                sock_states.all.remove(sock_state_internal.id);
+            }
+        }
     }
 
     // It returns processed count of iocp_events rather than the events itself.
@@ -614,8 +658,8 @@ impl SelectorInner {
         events: &mut Vec<Event>,
         iocp_events: &[CompletionStatus],
     ) -> usize {
-        let mut n = 0;
-        let mut update_queue = self.update_queue.lock().unwrap();
+        let mut events_num = 0;
+        let sock_states = &mut self.sock_states.lock().unwrap();
         for iocp_event in iocp_events.iter() {
             if iocp_event.overlapped().is_null() {
                 // `Waker` event, we'll add a readable event to match the other platforms.
@@ -623,24 +667,40 @@ impl SelectorInner {
                     flags: afd::POLL_RECEIVE,
                     data: iocp_event.token() as u64,
                 });
-                n += 1;
+                events_num += 1;
                 continue;
             }
-            let sock_arc = Arc::from_raw(iocp_event.overlapped() as *const Mutex<SockState>);
-            let mut sock_guard = sock_arc.lock().unwrap();
-            match sock_guard.feed_event() {
+
+            // Use sock_state unique id as overlapped data. Id will be used to retrieve the sock_state.
+            // Notice: id is a slab key, which starts from 0, sending side increased it by 1 before
+            // sending it as overlapped data, so it will be decreased it by 1 before usage.
+            let id = (iocp_event.overlapped() as usize) - 1;
+            if sock_states.all.contains(id) == false {
+                // Cannot find a sock_state for this id, probably this is an event for a cancelled
+                // sock_state which has already been removed, silently drop it.
+                continue;
+            }
+
+            let sock_state = sock_states.all[id].clone();
+            let sock_state_internal = &mut sock_state.lock().unwrap();
+            match sock_state_internal.feed_event() {
                 Some(e) => {
                     events.push(e);
+                    events_num += 1;
                 }
                 None => {}
             }
-            n += 1;
-            if !sock_guard.is_pending_deletion() {
-                update_queue.push_back(sock_arc.clone());
+
+            if !sock_state_internal.is_pending_deletion() {
+                sock_states.update_queue.push_back(sock_state.clone());
+            } else {
+                // if sock_state got a close event, it was marked for deletion, so just remove it
+                assert!(sock_states.all.contains(sock_state_internal.id));
+                sock_states.all.remove(sock_state_internal.id);
             }
         }
         self.afd_group.release_unused_afd();
-        n
+        events_num
     }
 
     fn _alloc_sock_for_rawsocket(

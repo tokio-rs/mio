@@ -27,6 +27,7 @@ publish = false
 
 [dependencies]
 log = "0.4.8"
+slab = "0.4.2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.62"
