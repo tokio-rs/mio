@@ -151,10 +151,8 @@ fn unix_datagram_pair() {
     assert_would_block(datagram1.recv(&mut buf));
     assert_would_block(datagram2.recv(&mut buf));
 
-    let wrote1 = datagram1.send(&DATA1).unwrap();
-    assert_eq!(wrote1, DATA1_LEN);
-    let wrote2 = datagram2.send(&DATA2).unwrap();
-    assert_eq!(wrote2, DATA2_LEN);
+    checked_write!(datagram1.send(DATA1));
+    checked_write!(datagram2.send(DATA2));
     expect_events(
         &mut poll,
         &mut events,
@@ -168,12 +166,10 @@ fn unix_datagram_pair() {
     assert_would_block(datagram2.recv(&mut buf));
     assert_eq!(read, DATA1_LEN);
     assert_eq!(&buf[..read], DATA1);
-    assert_eq!(read, wrote1, "unequal reads and writes");
 
     let read = datagram1.recv(&mut buf).unwrap();
     assert_eq!(read, DATA2_LEN);
     assert_eq!(&buf[..read], DATA2);
-    assert_eq!(read, wrote2, "unequal reads and writes");
 
     assert!(datagram1.take_error().unwrap().is_none());
     assert!(datagram2.take_error().unwrap().is_none());
@@ -217,7 +213,7 @@ fn unix_datagram_try_clone() {
     assert_would_block(datagram2.recv_from(&mut buf));
     assert_would_block(datagram3.recv_from(&mut buf));
 
-    datagram3.send(DATA1).unwrap();
+    checked_write!(datagram3.send(DATA1));
     expect_events(
         &mut poll,
         &mut events,
@@ -273,8 +269,7 @@ fn unix_datagram_shutdown() {
         vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
     );
 
-    let wrote = datagram1.send(DATA1).unwrap();
-    assert_eq!(wrote, DATA1_LEN);
+    checked_write!(datagram1.send(DATA1));
     expect_events(
         &mut poll,
         &mut events,
@@ -391,8 +386,8 @@ fn smoke_test_unconnected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
     assert_would_block(datagram1.recv_from(&mut buf));
     assert_would_block(datagram2.recv_from(&mut buf));
 
-    datagram1.send_to(DATA1, path2).unwrap();
-    datagram2.send_to(DATA2, path1).unwrap();
+    checked_write!(datagram1.send_to(DATA1, path2));
+    checked_write!(datagram2.send_to(DATA2, path1));
     expect_events(
         &mut poll,
         &mut events,
@@ -465,8 +460,8 @@ fn smoke_test_connected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
     assert_would_block(datagram1.recv(&mut buf));
     assert_would_block(datagram2.recv(&mut buf));
 
-    datagram1.send(DATA1).unwrap();
-    datagram2.send(DATA2).unwrap();
+    checked_write!(datagram1.send(DATA1));
+    checked_write!(datagram2.send(DATA2));
     expect_events(
         &mut poll,
         &mut events,

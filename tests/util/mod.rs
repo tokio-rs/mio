@@ -1,5 +1,5 @@
 // Not all functions are used by all tests.
-#![allow(dead_code)]
+#![allow(dead_code, unused_macros)]
 
 use std::net::SocketAddr;
 use std::ops::BitOr;
@@ -195,4 +195,18 @@ pub fn any_local_address() -> SocketAddr {
 /// Bind to any port on localhost, using a IPv6 address.
 pub fn any_local_ipv6_address() -> SocketAddr {
     "[::1]:0".parse().unwrap()
+}
+
+/// A checked {write, send, send_to} macro that ensures the entire buffer is
+/// written.
+///
+/// Usage: `checked_write!(stream.write(&DATA));`
+/// Also works for send(_to): `checked_write!(socket.send_to(DATA, address))`.
+macro_rules! checked_write {
+    ($socket: ident . $method: ident ( $data: expr $(, $arg: expr)* ) ) => {
+        let data = $data;
+        let n = $socket.$method($data $(, $arg)*)
+            .expect("unable to write to socket");
+        assert_eq!(n, data.len(), "short write");
+    };
 }

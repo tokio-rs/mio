@@ -8,6 +8,7 @@ use std::thread;
 use mio::net::TcpStream;
 use mio::{Interests, Token};
 
+#[macro_use]
 mod util;
 
 use util::{
@@ -82,8 +83,7 @@ where
     assert_eq!(stream.peer_addr().unwrap(), addr);
     assert!(stream.local_addr().unwrap().ip().is_loopback());
 
-    let n = stream.write(&DATA1).expect("unable to write to stream");
-    assert_eq!(n, DATA1.len());
+    checked_write!(stream.write(&DATA1));
 
     stream.flush().unwrap();
 
@@ -149,8 +149,7 @@ fn try_clone() {
         vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
     );
 
-    let n = stream1.write(DATA1).unwrap();
-    assert_eq!(n, DATA1.len());
+    checked_write!(stream1.write(&DATA1));
 
     let mut stream2 = stream1.try_clone().unwrap();
 
@@ -321,8 +320,7 @@ fn shutdown_read() {
         vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
     );
 
-    let n = stream.write(DATA2).unwrap();
-    assert_eq!(n, DATA2.len());
+    checked_write!(stream.write(&DATA2));
 
     expect_events(
         &mut poll,
@@ -371,8 +369,7 @@ fn shutdown_write() {
         vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
     );
 
-    let n = stream.write(DATA1).unwrap();
-    assert_eq!(n, DATA1.len());
+    checked_write!(stream.write(&DATA1));
 
     stream.shutdown(Shutdown::Write).unwrap();
 
@@ -414,8 +411,7 @@ fn shutdown_both() {
         vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
     );
 
-    let n = stream.write(DATA1).unwrap();
-    assert_eq!(n, DATA1.len());
+    checked_write!(stream.write(&DATA1));
 
     expect_events(
         &mut poll,
@@ -546,8 +542,7 @@ fn no_events_after_deregister() {
     assert_would_block(stream.peek(&mut buf));
     assert_would_block(stream.read(&mut buf));
 
-    let n = stream.write(&DATA1).expect("unable to write to stream");
-    assert_eq!(n, DATA1.len());
+    checked_write!(stream.write(&DATA1));
     stream.flush().unwrap();
 
     expect_no_events(&mut poll, &mut events);
@@ -714,8 +709,7 @@ fn echo_listener(addr: SocketAddr, n_connections: usize) -> (thread::JoinHandle<
                 if n == 0 {
                     break;
                 }
-                let written = stream.write(&buf[..n]).expect("error writing");
-                assert_eq!(written, n, "short write");
+                checked_write!(stream.write(&buf[..n]));
             }
         }
     });
