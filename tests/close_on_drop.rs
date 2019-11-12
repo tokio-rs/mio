@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use bytes::BytesMut;
 use log::debug;
 
@@ -6,7 +8,7 @@ use mio::{Events, Interests, Poll, Token};
 
 mod util;
 
-use util::{any_local_address, init, TryRead};
+use util::{any_local_address, init};
 
 use self::TestState::{AfterRead, Initial};
 
@@ -50,7 +52,7 @@ impl TestHandler {
                 match self.state {
                     Initial => {
                         let mut buf = [0; 4096];
-                        debug!("GOT={:?}", self.cli.try_read(&mut buf[..]));
+                        debug!("GOT={:?}", self.cli.read(&mut buf[..]));
                         self.state = AfterRead;
                     }
                     AfterRead => {}
@@ -58,8 +60,8 @@ impl TestHandler {
 
                 let mut buf = BytesMut::with_capacity(1024);
 
-                match self.cli.try_read_buf(&mut buf) {
-                    Ok(Some(0)) => self.shutdown = true,
+                match self.cli.read(&mut buf) {
+                    Ok(0) => self.shutdown = true,
                     Ok(_) => panic!("the client socket should not be readable"),
                     Err(e) => panic!("Unexpected error {:?}", e),
                 }
