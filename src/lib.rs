@@ -177,10 +177,10 @@ pub mod guide {
     //! # }
     //! ```
     //!
-    //! As the name “event source” suggests it a source of events which can poll
-    //! using a `Poll` instance. Multiple event sources can be [registered] with
-    //! `Poll`. After we've done this we can start polling these events. If we do
-    //! this in a loop we've got ourselves an event loop.
+    //! As the name “event source” suggests it is a source of events which can
+    //! be polled using a `Poll` instance. Multiple event sources can be
+    //! [registered] with `Poll`. After we've done this we can start polling
+    //! these events. If we do this in a loop we've got ourselves an event loop.
     //!
     //! [registered]: crate::Registry::register
     //!
@@ -214,7 +214,7 @@ pub mod guide {
     //!                         println!("Got a connection from: {}", address);
     //! #                       drop(connection);
     //!                     },
-    //!                     // An "would block error" is returned if the operation
+    //!                     // A "would block error" is returned if the operation
     //!                     // is not ready, so we'll stop trying to accept
     //!                     // connections.
     //!                     Err(ref err) if would_block(err) => break,
