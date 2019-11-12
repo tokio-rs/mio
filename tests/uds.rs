@@ -154,6 +154,11 @@ fn stream_pair() {
     assert_eq!(wrote, DATA1_LEN);
     assert_ok!(s1.flush());
 
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(1), Interests::READABLE)],
+    );
     let read = assert_ok!(s2.read(&mut buf));
     assert_would_block(s2.read(&mut buf));
     assert_eq!(read, DATA1_LEN);
@@ -164,6 +169,11 @@ fn stream_pair() {
     assert_eq!(wrote, DATA2_LEN);
     assert_ok!(s2.flush());
 
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interests::READABLE)],
+    );
     let read = assert_ok!(s1.read(&mut buf));
     assert_eq!(read, DATA2_LEN);
     assert_eq!(&buf[..read], DATA2);
@@ -193,6 +203,11 @@ fn datagram_pair() {
     let wrote = assert_ok!(s1.send(&DATA1));
     assert_eq!(wrote, DATA1_LEN);
 
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(1), Interests::READABLE)],
+    );
     let read = assert_ok!(s2.recv(&mut buf));
     assert_would_block(s2.recv(&mut buf));
     assert_eq!(read, DATA1_LEN);
@@ -202,6 +217,11 @@ fn datagram_pair() {
     let wrote = assert_ok!(s2.send(&DATA2));
     assert_eq!(wrote, DATA2_LEN);
 
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interests::READABLE)],
+    );
     let read = assert_ok!(s1.recv(&mut buf));
     assert_eq!(read, DATA2_LEN);
     assert_eq!(&buf[..read], DATA2);
