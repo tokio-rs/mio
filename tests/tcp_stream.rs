@@ -93,13 +93,8 @@ where
         vec![ExpectEvent::new(ID1, Interests::READABLE)],
     );
 
-    let n = stream.peek(&mut buf).expect("unable to peek from stream");
-    assert_eq!(n, DATA1.len());
-    assert_eq!(&buf[..n], DATA1);
-
-    let n = stream.read(&mut buf).expect("unable to read from stream");
-    assert_eq!(n, DATA1.len());
-    assert_eq!(&buf[..n], DATA1);
+    expect_read!(stream.peek(&mut buf), DATA1);
+    expect_read!(stream.read(&mut buf), DATA1);
 
     assert!(stream.take_error().unwrap().is_none());
 
@@ -168,9 +163,7 @@ fn try_clone() {
     );
 
     let mut buf = [0; 20];
-    let n = stream2.read(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(&buf[..n], DATA1);
+    expect_read!(stream2.read(&mut buf), DATA1);
 
     drop(stream2);
     thread_handle.join().expect("unable to join thread");
@@ -342,8 +335,7 @@ fn shutdown_read() {
     ))]
     {
         let mut buf = [0; 20];
-        let n = stream.read(&mut buf).unwrap();
-        assert_eq!(n, 0);
+        expect_read!(stream.read(&mut buf), &[]);
     }
 
     drop(stream);
@@ -385,9 +377,7 @@ fn shutdown_write() {
 
     // Read should be ok.
     let mut buf = [0; 20];
-    let n = stream.read(&mut buf).unwrap();
-    assert_eq!(n, DATA1.len());
-    assert_eq!(&buf[..n], DATA1);
+    expect_read!(stream.read(&mut buf), DATA1);
 
     drop(stream);
     thread_handle.join().expect("unable to join thread");
@@ -433,8 +423,7 @@ fn shutdown_both() {
     ))]
     {
         let mut buf = [0; 20];
-        let n = stream.read(&mut buf).unwrap();
-        assert_eq!(n, 0);
+        expect_read!(stream.read(&mut buf), &[]);
     }
 
     let err = stream.write(DATA2).unwrap_err();

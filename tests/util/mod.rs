@@ -203,10 +203,58 @@ pub fn any_local_ipv6_address() -> SocketAddr {
 /// Usage: `checked_write!(stream.write(&DATA));`
 /// Also works for send(_to): `checked_write!(socket.send_to(DATA, address))`.
 macro_rules! checked_write {
-    ($socket: ident . $method: ident ( $data: expr $(, $arg: expr)* ) ) => {
+    ($socket: ident . $method: ident ( $data: expr $(, $arg: expr)* ) ) => {{
         let data = $data;
         let n = $socket.$method($data $(, $arg)*)
             .expect("unable to write to socket");
         assert_eq!(n, data.len(), "short write");
-    };
+    }};
+}
+
+/// A checked {read, recv, recv_from, peek, peek_from} macro that ensures the
+/// current buffer is read.
+///
+/// Usage: `expect_read!(stream.read(&mut buf), DATA);` reads into `buf` and
+/// compares it to `DATA`.
+/// Also works for recv(_from): `expect_read!(socket.recv_from(&mut buf), DATA, address)`.
+macro_rules! expect_read {
+    ($socket: ident . $method: ident ( $buf: expr $(, $arg: expr)* ), $expected: expr) => {{
+        let n = $socket.$method($buf $(, $arg)*)
+            .expect("unable to read from socket");
+        let expected = $expected;
+        assert_eq!(n, expected.len());
+        assert_eq!(&$buf[..n], expected);
+    }};
+    // TODO: change the call sites to check the source address.
+    // Support for recv_from and peek_from, without checking the address.
+    ($socket: ident . $method: ident ( $buf: expr $(, $arg: expr)* ), $expected: expr, __anywhere) => {{
+        let (n, _address) = $socket.$method($buf $(, $arg)*)
+            .expect("unable to read from socket");
+        let expected = $expected;
+        assert_eq!(n, expected.len());
+        assert_eq!(&$buf[..n], expected);
+    }};
+    // Support for recv_from and peek_from for `UnixDatagram`s.
+    ($socket: ident . $method: ident ( $buf: expr $(, $arg: expr)* ), $expected: expr, path: $source: expr) => {{
+        let (n, path) = $socket.$method($buf $(, $arg)*)
+            .expect("unable to read from socket");
+        let expected = $expected;
+        let source = $source;
+        assert_eq!(n, expected.len());
+        assert_eq!(&$buf[..n], expected);
+        assert_eq!(
+            path.as_pathname().expect("failed to get path name"),
+            source
+        );
+    }};
+    // Support for recv_from and peek_from for `UdpSocket`s.
+    ($socket: ident . $method: ident ( $buf: expr $(, $arg: expr)* ), $expected: expr, $source: expr) => {{
+        let (n, address) = $socket.$method($buf $(, $arg)*)
+            .expect("unable to read from socket");
+        let expected = $expected;
+        let source = $source;
+        assert_eq!(n, expected.len());
+        assert_eq!(&$buf[..n], expected);
+        assert_eq!(address, source);
+    }};
 }

@@ -1,11 +1,10 @@
 use std::io::{self, Read, Write};
-use std::net::Shutdown;
+use std::net::{self, Shutdown};
 #[cfg(unix)]
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::sync::mpsc::channel;
-use std::thread::sleep;
+use std::thread::{self, sleep};
 use std::time::Duration;
-use std::{net, thread};
 
 #[cfg(unix)]
 use net2::TcpStreamExt;
@@ -13,6 +12,7 @@ use net2::TcpStreamExt;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interests, Poll, Token};
 
+#[macro_use]
 mod util;
 
 use util::{
@@ -512,7 +512,7 @@ fn connection_reset_by_peer() {
     drop(client);
 
     // Wait a moment
-    thread::sleep(Duration::from_millis(100));
+    sleep(Duration::from_millis(100));
 
     // Register interest in the server socket
     poll.registry()
@@ -815,8 +815,7 @@ fn write_then_drop() {
     assert_eq!(events.iter().next().unwrap().token(), Token(3));
 
     let mut buf = [0; 10];
-    assert_eq!(s.read(&mut buf).unwrap(), 4);
-    assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
+    expect_read!(s.read(&mut buf), &[1, 2, 3, 4]);
 }
 
 #[test]
@@ -871,8 +870,7 @@ fn write_then_deregister() {
     assert_eq!(events.iter().next().unwrap().token(), Token(3));
 
     let mut buf = [0; 10];
-    assert_eq!(s.read(&mut buf).unwrap(), 4);
-    assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
+    expect_read!(s.read(&mut buf), &[1, 2, 3, 4]);
 }
 
 const ID1: Token = Token(1);
@@ -929,15 +927,13 @@ fn tcp_no_events_after_deregister() {
     expect_no_events(&mut poll, &mut events);
 
     let mut buf = [0; 10];
-    assert_eq!(stream.read(&mut buf).unwrap(), 4);
-    assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
+    expect_read!(stream.read(&mut buf), &[1, 2, 3, 4]);
 
-    stream2.write_all(&[1, 2, 3, 4]).unwrap();
+    checked_write!(stream2.write(&[1, 2, 3, 4]));
     expect_no_events(&mut poll, &mut events);
 
     sleep(Duration::from_millis(200));
-    assert_eq!(stream.read(&mut buf).unwrap(), 4);
-    assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
+    expect_read!(stream.read(&mut buf), &[1, 2, 3, 4]);
 
     expect_no_events(&mut poll, &mut events);
 }
