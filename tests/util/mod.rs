@@ -12,27 +12,6 @@ use log::{error, warn};
 use mio::event::Event;
 use mio::{Events, Interests, Poll, Token};
 
-#[macro_export]
-macro_rules! assert_err {
-    ($e:expr) => {
-        assert_err!($e,);
-    };
-    ($e:expr,) => {{
-        use std::result::Result::*;
-        match $e {
-            Ok(v) => panic!("assertion failed: Ok({:?})", v),
-            Err(e) => e,
-        }
-    }};
-    ($e:expr, $($arg:tt)+) => {{
-        use std::result::Result::*;
-        match $e {
-            Ok(v) => panic!("assertion failed: Ok({:?}): {}", v, format_args!($($arg)+)),
-            Err(e) => e,
-        }
-    }};
-}
-
 /// Expect specific readiness on an event.
 #[macro_export]
 macro_rules! expect_readiness {

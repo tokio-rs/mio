@@ -280,7 +280,7 @@ fn unix_stream_shutdown_write() {
     ))]
     expect_readiness!(poll, events, is_write_closed);
 
-    let err = assert_err!(stream.write(DATA2));
+    let err = stream.write(DATA2).unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
 
     // Read should be ok
@@ -341,7 +341,7 @@ fn unix_stream_shutdown_both() {
         assert_eq!(read, 0);
     }
 
-    let err = assert_err!(stream.write(DATA2));
+    let err = stream.write(DATA2).unwrap_err();
     #[cfg(unix)]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
     #[cfg(window)]

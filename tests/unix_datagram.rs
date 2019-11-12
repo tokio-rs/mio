@@ -289,7 +289,7 @@ fn unix_datagram_shutdown() {
     datagram1.shutdown(Shutdown::Write).unwrap();
     expect_readiness!(poll, events, is_write_closed);
 
-    let err = assert_err!(datagram1.send(DATA2));
+    let err = datagram1.send(DATA2).unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
 
     assert!(datagram1.take_error().unwrap().is_none());
