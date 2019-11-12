@@ -1,21 +1,18 @@
-use log::warn;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::sync::{mpsc::channel, Arc, Barrier};
 use std::thread;
-use std::time::Duration;
 
 use mio::net::TcpStream;
 use mio::{Interests, Token};
 
-#[macro_use]
 mod util;
 
 use util::{
     any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
-    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
+    expect_events, expect_no_events, init, init_with_poll, ExpectEvent, Readiness,
 };
 
 const DATA1: &[u8] = b"Hello world!";
@@ -582,7 +579,11 @@ fn tcp_shutdown_client_read_close_event() {
     );
 
     stream.shutdown(Shutdown::Read).unwrap();
-    expect_readiness!(poll, events, is_read_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READ_CLOSED)],
+    );
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -612,7 +613,11 @@ fn tcp_shutdown_client_write_close_event() {
     );
 
     stream.shutdown(Shutdown::Write).unwrap();
-    expect_readiness!(poll, events, is_write_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::WRITE_CLOSED)],
+    );
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -638,7 +643,11 @@ fn tcp_shutdown_server_write_close_event() {
 
     barrier.wait();
 
-    expect_readiness!(poll, events, is_read_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READ_CLOSED)],
+    );
 
     barrier.wait();
     handle.join().expect("failed to join thread");
@@ -667,7 +676,11 @@ fn tcp_shutdown_client_both_close_event() {
     );
 
     stream.shutdown(Shutdown::Both).unwrap();
-    expect_readiness!(poll, events, is_write_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::WRITE_CLOSED)],
+    );
 
     barrier.wait();
     handle.join().expect("failed to join thread");

@@ -1,8 +1,7 @@
 #![cfg(unix)]
-#[macro_use]
+
 mod util;
 
-use log::warn;
 use mio::net::UnixStream;
 use mio::{Interests, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
@@ -12,11 +11,10 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Barrier};
 use std::thread;
-use std::time::Duration;
 use tempdir::TempDir;
 use util::{
     assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
-    ExpectEvent, TryRead, TryWrite,
+    ExpectEvent, Readiness, TryRead, TryWrite,
 };
 
 const DATA1: &[u8] = b"Hello same host!";
@@ -217,7 +215,11 @@ fn unix_stream_shutdown_read() {
     );
 
     stream.shutdown(Shutdown::Read).unwrap();
-    expect_readiness!(poll, events, is_read_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Readiness::READ_CLOSED)],
+    );
 
     // Shutting down the reading side is different on each platform. For example
     // on Linux based systems we can still read.
@@ -278,7 +280,11 @@ fn unix_stream_shutdown_write() {
         target_os = "netbsd",
         target_os = "openbsd"
     ))]
-    expect_readiness!(poll, events, is_write_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Readiness::WRITE_CLOSED)],
+    );
 
     let err = stream.write(DATA2).unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
@@ -323,7 +329,11 @@ fn unix_stream_shutdown_both() {
     );
 
     stream.shutdown(Shutdown::Both).unwrap();
-    expect_readiness!(poll, events, is_write_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Readiness::WRITE_CLOSED)],
+    );
 
     // Shutting down the reading side is different on each platform. For example
     // on Linux based systems we can still read.
@@ -374,7 +384,11 @@ fn unix_stream_shutdown_listener_write() {
     );
 
     barrier.wait();
-    expect_readiness!(poll, events, is_read_closed);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Readiness::READ_CLOSED)],
+    );
 
     barrier.wait();
     handle.join().unwrap();

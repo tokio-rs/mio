@@ -13,42 +13,6 @@ use log::{error, warn};
 use mio::event::Event;
 use mio::{Events, Interests, Poll, Token};
 
-/// Expect specific readiness on an event.
-#[macro_export]
-macro_rules! expect_readiness {
-    ($poll:ident, $events:ident, $readiness:ident) => {{
-        let mut found = false;
-        // Poll a couple of times in case the event does not immediately
-        // happen
-        for _ in 0..3 {
-            $poll
-                .poll(&mut $events, Some(Duration::from_millis(500)))
-                .unwrap();
-            for event in $events.iter() {
-                if event.$readiness() {
-                    found = true;
-                    break;
-                } else {
-                    // Accept sporadic events.
-                    warn!("got unexpected event: {:?}", event);
-                }
-            }
-
-            // Explicitly break here instead of labeling the outer for loop
-            // because this introduces label shadowing if `expect_readiness!`
-            // is used more than once within one function.
-            //
-            // https://github.com/rust-lang/rust/issues/24278
-            if found {
-                break;
-            }
-        }
-        if !found {
-            panic!("failed to find event readiness")
-        }
-    }};
-}
-
 pub fn init() {
     static INIT: Once = Once::new();
 
