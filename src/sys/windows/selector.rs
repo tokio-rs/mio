@@ -8,7 +8,8 @@ use crate::{Interests, Token};
 use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::Overlapped;
 use std::collections::VecDeque;
-use std::mem::size_of;
+use std::marker::PhantomPinned;
+use std::mem::{forget, size_of, transmute_copy};
 use std::os::windows::io::{AsRawSocket, RawSocket};
 use std::pin::Pin;
 use std::ptr::null_mut;
@@ -75,38 +76,6 @@ impl AfdGroup {
     }
 }
 
-/// This is the deallocation wrapper for overlapped pointer.
-/// In case of error or status changing before the overlapped pointer is actually used(or not even being used),
-/// this wrapper will decrease the reference count of Arc if being dropped.
-/// Remember call `forget` if you have used the Arc, or you could decrease the reference count by two causing double free.
-#[derive(Debug)]
-struct OverlappedArcWrapper<T>(*const T);
-
-unsafe impl<T> Send for OverlappedArcWrapper<T> {}
-
-impl<T> OverlappedArcWrapper<T> {
-    fn new(arc: &Arc<T>) -> OverlappedArcWrapper<T> {
-        OverlappedArcWrapper(Arc::into_raw(arc.clone()))
-    }
-
-    fn forget(&mut self) {
-        self.0 = 0 as *const T;
-    }
-
-    fn get_ptr(&self) -> *const T {
-        self.0
-    }
-}
-
-impl<T> Drop for OverlappedArcWrapper<T> {
-    fn drop(&mut self) {
-        if self.0 as usize == 0 {
-            return;
-        }
-        drop(unsafe { Arc::from_raw(self.0) });
-    }
-}
-
 #[derive(Debug)]
 enum SockPollStatus {
     Idle,
@@ -116,7 +85,7 @@ enum SockPollStatus {
 
 #[derive(Debug)]
 pub struct SockState {
-    iosb: Pin<Box<IoStatusBlock>>,
+    iosb: IoStatusBlock,
     poll_info: AfdPollInfo,
     afd: Arc<Afd>,
 
@@ -129,15 +98,15 @@ pub struct SockState {
     user_data: u64,
 
     poll_status: SockPollStatus,
-    self_wrapped: Option<OverlappedArcWrapper<Mutex<SockState>>>,
-
     delete_pending: bool,
+
+    pinned: PhantomPinned,
 }
 
 impl SockState {
     fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
         Ok(SockState {
-            iosb: Pin::new(Box::new(IoStatusBlock::zeroed())),
+            iosb: IoStatusBlock::zeroed(),
             poll_info: AfdPollInfo::zeroed(),
             afd,
             raw_socket,
@@ -146,8 +115,8 @@ impl SockState {
             pending_evts: 0,
             user_data: 0,
             poll_status: SockPollStatus::Idle,
-            self_wrapped: None,
             delete_pending: false,
+            pinned: PhantomPinned,
         })
     }
 
@@ -162,7 +131,7 @@ impl SockState {
         (events & !self.pending_evts) != 0
     }
 
-    fn update(&mut self, self_arc: &Arc<Mutex<SockState>>) -> io::Result<()> {
+    fn update(&mut self, self_arc: &Pin<Arc<Mutex<SockState>>>) -> io::Result<()> {
         assert!(!self.delete_pending);
 
         if let SockPollStatus::Pending = self.poll_status {
@@ -192,11 +161,12 @@ impl SockState {
             self.poll_info.handles[0].status = 0;
             self.poll_info.handles[0].events = self.user_evts | afd::POLL_LOCAL_CLOSE;
 
-            let wrapped_overlapped = OverlappedArcWrapper::new(self_arc);
-            let overlapped = wrapped_overlapped.get_ptr() as *const _ as PVOID;
             let result = unsafe {
-                self.afd
-                    .poll(&mut self.poll_info, (*self.iosb).as_mut_ptr(), overlapped)
+                self.afd.poll(
+                    &mut self.poll_info,
+                    &mut *self.iosb,
+                    transmute_copy(self_arc),
+                )
             };
             if let Err(e) = result {
                 let code = e.raw_os_error().unwrap();
@@ -211,13 +181,9 @@ impl SockState {
                 }
             }
 
-            if self.self_wrapped.is_some() {
-                // This shouldn't be happening. We cannot deallocate already pending overlapped before feed_event so we need to stand out here to declare unreachable.
-                unreachable!();
-            }
             self.poll_status = SockPollStatus::Pending;
-            self.self_wrapped = Some(wrapped_overlapped);
             self.pending_evts = self.user_evts;
+            forget(self_arc.clone());
         } else {
             unreachable!();
         }
@@ -230,7 +196,7 @@ impl SockState {
             _ => unreachable!(),
         };
         unsafe {
-            self.afd.cancel((*self.iosb).as_mut_ptr())?;
+            self.afd.cancel(&mut *self.iosb)?;
         }
         self.poll_status = SockPollStatus::Cancelled;
         self.pending_evts = 0;
@@ -239,24 +205,17 @@ impl SockState {
 
     // This is the function called from the overlapped using as Arc<Mutex<SockState>>. Watch out for reference counting.
     fn feed_event(&mut self) -> Option<Event> {
-        if self.self_wrapped.is_some() {
-            // Forget our arced-self first. We will decrease the reference count by two if we don't do this on overlapped.
-            self.self_wrapped.as_mut().unwrap().forget();
-            self.self_wrapped = None;
-        }
-
         self.poll_status = SockPollStatus::Idle;
         self.pending_evts = 0;
 
         let mut afd_events = 0;
         // We use the status info in IO_STATUS_BLOCK to determine the socket poll status. It is unsafe to use a pointer of IO_STATUS_BLOCK.
         unsafe {
-            let iosb = &*(*self.iosb).as_ptr();
             if self.delete_pending {
                 return None;
-            } else if iosb.u.Status == STATUS_CANCELLED {
+            } else if self.iosb.u.Status == STATUS_CANCELLED {
                 /* The poll request was cancelled by CancelIoEx. */
-            } else if !NT_SUCCESS(iosb.u.Status) {
+            } else if !NT_SUCCESS(self.iosb.u.Status) {
                 /* The overlapped request itself failed in an unexpected way. */
                 afd_events = afd::POLL_CONNECT_FAIL;
             } else if self.poll_info.number_of_handles < 1 {
@@ -406,7 +365,7 @@ impl Selector {
 #[derive(Debug)]
 pub struct SelectorInner {
     cp: Arc<CompletionPort>,
-    update_queue: Mutex<VecDeque<Arc<Mutex<SockState>>>>,
+    update_queue: Mutex<VecDeque<Pin<Arc<Mutex<SockState>>>>>,
     afd_group: AfdGroup,
     is_polling: AtomicBool,
 }
@@ -626,7 +585,7 @@ impl SelectorInner {
                 n += 1;
                 continue;
             }
-            let sock_arc = Arc::from_raw(iocp_event.overlapped() as *const Mutex<SockState>);
+            let sock_arc: Pin<Arc<Mutex<SockState>>> = transmute_copy(&iocp_event.overlapped());
             let mut sock_guard = sock_arc.lock().unwrap();
             match sock_guard.feed_event() {
                 Some(e) => {
@@ -646,9 +605,9 @@ impl SelectorInner {
     fn _alloc_sock_for_rawsocket(
         &self,
         raw_socket: RawSocket,
-    ) -> io::Result<Arc<Mutex<SockState>>> {
+    ) -> io::Result<Pin<Arc<Mutex<SockState>>>> {
         let afd = self.afd_group.acquire()?;
-        Ok(Arc::new(Mutex::new(SockState::new(raw_socket, afd)?)))
+        Ok(Arc::pin(Mutex::new(SockState::new(raw_socket, afd)?)))
     }
 }
 
