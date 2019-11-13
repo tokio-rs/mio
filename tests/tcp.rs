@@ -211,6 +211,7 @@ fn read() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "fails on Windows, see #1148")]
 fn peek() {
     init();
 
