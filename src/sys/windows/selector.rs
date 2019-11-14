@@ -19,12 +19,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::{io, ptr};
-use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
-use winapi::shared::ntstatus::STATUS_CANCELLED;
+use winapi::shared::ntstatus::{STATUS_CANCELLED, STATUS_SUCCESS};
 use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, WAIT_TIMEOUT};
 use winapi::um::mswsock::SIO_BASE_HANDLE;
-use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
+use winapi::um::winsock2::{WSAGetLastError, WSAIoctl, SOCKET_ERROR};
 
 const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
 
@@ -76,7 +75,7 @@ impl AfdGroup {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum SockPollStatus {
     Idle,
     Pending,
@@ -134,70 +133,71 @@ impl SockState {
     fn update(&mut self, self_arc: &Pin<Arc<Mutex<SockState>>>) -> io::Result<()> {
         assert!(!self.delete_pending);
 
-        if let SockPollStatus::Pending = self.poll_status {
-            if (self.user_evts & afd::KNOWN_EVENTS & !self.pending_evts) == 0 {
-                /* All the events the user is interested in are already being monitored by
-                 * the pending poll operation. It might spuriously complete because of an
-                 * event that we're no longer interested in; when that happens we'll submit
-                 * a new poll operation with the updated event mask. */
-            } else {
-                /* A poll operation is already pending, but it's not monitoring for all the
-                 * events that the user is interested in. Therefore, cancel the pending
-                 * poll operation; when we receive it's completion package, a new poll
-                 * operation will be submitted with the correct event mask. */
-                self.cancel()?;
+        use SockPollStatus::*;
+        match self.poll_status {
+            Pending if (self.user_evts & afd::KNOWN_EVENTS & !self.pending_evts) == 0 => {
+                // All the events the user is interested in are already being monitored by
+                // the pending poll operation. It might spuriously complete because of an
+                // event that we're no longer interested in; when that happens we'll submit
+                // a new poll operation with the updated event mask.
+                Ok(())
             }
-        } else if let SockPollStatus::Cancelled = self.poll_status {
-            /* The poll operation has already been cancelled, we're still waiting for
-             * it to return. For now, there's nothing that needs to be done. */
-        } else if let SockPollStatus::Idle = self.poll_status {
-            /* No poll operation is pending; start one. */
-            self.poll_info.exclusive = 0;
-            self.poll_info.number_of_handles = 1;
-            unsafe {
-                *self.poll_info.timeout.QuadPart_mut() = std::i64::MAX;
+            Pending => {
+                // A poll operation is already pending, but it's not monitoring for all the
+                // events that the user is interested in. Therefore, cancel the pending
+                // poll operation; when we receive it's completion package, a new poll
+                // operation will be submitted with the correct event mask.
+                self.cancel()
             }
-            self.poll_info.handles[0].handle = self.base_socket as HANDLE;
-            self.poll_info.handles[0].status = 0;
-            self.poll_info.handles[0].events = self.user_evts | afd::POLL_LOCAL_CLOSE;
+            Cancelled => {
+                // The poll operation has already been cancelled, we're still waiting for
+                // it to return. For now, there's nothing that needs to be done.
+                Ok(())
+            }
+            Idle => {
+                // No poll operation is pending; start one.
+                self.poll_info.exclusive = 0;
+                self.poll_info.number_of_handles = 1;
+                *unsafe { self.poll_info.timeout.QuadPart_mut() } = std::i64::MAX;
 
-            let result = unsafe {
-                self.afd.poll(
-                    &mut self.poll_info,
-                    &mut *self.iosb,
-                    transmute_copy(self_arc),
-                )
-            };
-            if let Err(e) = result {
-                let code = e.raw_os_error().unwrap();
-                if code == ERROR_IO_PENDING as i32 {
-                    /* Overlapped poll operation in progress; this is expected. */
-                } else if code == ERROR_INVALID_HANDLE as i32 {
-                    /* Socket closed; it'll be dropped. */
-                    self.mark_delete();
-                    return Ok(());
-                } else {
-                    return Err(e);
+                self.poll_info.handles[0].handle = self.base_socket as HANDLE;
+                self.poll_info.handles[0].status = 0;
+                self.poll_info.handles[0].events = self.user_evts | afd::POLL_LOCAL_CLOSE;
+
+                let result = unsafe {
+                    self.afd.poll(
+                        &mut self.poll_info,
+                        &mut self.iosb,
+                        transmute_copy(self_arc),
+                    )
+                };
+
+                match result {
+                    Err(ref e) if e.raw_os_error() == Some(ERROR_INVALID_HANDLE as i32) => {
+                        // Socket has been closed behind our back; delete it.
+                        self.mark_delete();
+                        Ok(())
+                    }
+                    Err(ref e) if e.raw_os_error() == Some(ERROR_IO_PENDING as i32) => {
+                        // Afd::poll() returns `Ok(false)` if the operation is pending,
+                        // so this should never happen.
+                        unreachable!();
+                    }
+                    Err(e) => Err(e),
+                    Ok(_) => {
+                        self.poll_status = SockPollStatus::Pending;
+                        self.pending_evts = self.user_evts;
+                        forget(self_arc.clone());
+                        Ok(())
+                    }
                 }
             }
-
-            self.poll_status = SockPollStatus::Pending;
-            self.pending_evts = self.user_evts;
-            forget(self_arc.clone());
-        } else {
-            unreachable!();
         }
-        Ok(())
     }
 
     fn cancel(&mut self) -> io::Result<()> {
-        match self.poll_status {
-            SockPollStatus::Pending => {}
-            _ => unreachable!(),
-        };
-        unsafe {
-            self.afd.cancel(&mut *self.iosb)?;
-        }
+        assert_eq!(self.poll_status, SockPollStatus::Pending);
+        unsafe { self.afd.cancel(&mut self.iosb) }?;
         self.poll_status = SockPollStatus::Cancelled;
         self.pending_evts = 0;
         Ok(())
@@ -209,24 +209,22 @@ impl SockState {
         self.pending_evts = 0;
 
         let mut afd_events = 0;
-        // We use the status info in IO_STATUS_BLOCK to determine the socket poll status. It is unsafe to use a pointer of IO_STATUS_BLOCK.
-        unsafe {
-            if self.delete_pending {
-                return None;
-            } else if self.iosb.u.Status == STATUS_CANCELLED {
-                /* The poll request was cancelled by CancelIoEx. */
-            } else if !NT_SUCCESS(self.iosb.u.Status) {
-                /* The overlapped request itself failed in an unexpected way. */
-                afd_events = afd::POLL_CONNECT_FAIL;
-            } else if self.poll_info.number_of_handles < 1 {
-                /* This poll operation succeeded but didn't report any socket events. */
-            } else if self.poll_info.handles[0].events & afd::POLL_LOCAL_CLOSE != 0 {
-                /* The poll operation reported that the socket was closed. */
-                self.mark_delete();
-                return None;
-            } else {
-                afd_events = self.poll_info.handles[0].events;
-            }
+
+        if self.delete_pending {
+            return None;
+        } else if self.iosb.status() == STATUS_CANCELLED {
+            // The poll request was cancelled by CancelIoEx.
+        } else if self.iosb.status() != STATUS_SUCCESS {
+            // The overlapped request itself failed in an unexpected way.
+            unreachable!();
+        } else if self.poll_info.number_of_handles < 1 {
+            // This poll operation succeeded but didn't report any socket events.
+        } else if self.poll_info.handles[0].events & afd::POLL_LOCAL_CLOSE != 0 {
+            // The poll operation reported that the socket was closed.
+            self.mark_delete();
+            return None;
+        } else {
+            afd_events = self.poll_info.handles[0].events
         }
 
         afd_events &= self.user_evts;
@@ -260,10 +258,9 @@ impl SockState {
 
     pub fn mark_delete(&mut self) {
         if !self.delete_pending {
-            if let SockPollStatus::Pending = self.poll_status {
-                drop(self.cancel());
+            if self.poll_status == SockPollStatus::Pending {
+                self.cancel().unwrap();
             }
-
             self.delete_pending = true;
         }
     }
@@ -643,7 +640,7 @@ fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
             None,
         ) == SOCKET_ERROR
         {
-            return Err(io::Error::from_raw_os_error(INVALID_SOCKET as i32));
+            return Err(io::Error::from_raw_os_error(WSAGetLastError()));
         }
     }
     Ok(base_socket)

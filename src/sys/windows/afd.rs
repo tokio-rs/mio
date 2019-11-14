@@ -144,18 +144,25 @@ impl Afd {
     ///
     /// # Unsafety
     ///
-    /// This function is unsafe due to memory of `IO_STATUS_BLOCK` still being used by `Afd` instance while `Ok(false)` (`STATUS_PENDING`).
-    /// `iosb` needs to be untouched after the call while operation is in effective at ALL TIME except for `cancel` method.
-    /// So be careful not to `poll` twice while polling.
-    /// User should deallocate there overlapped value when error to prevent memory leak.
+    /// This function is unsafe because the memory of `IO_STATUS_BLOCK` and
+    /// `AfdPollInfo` may not be freed after poll() returns `Ok(_)`.
+    ///
+    /// If this function returns `Ok(false)` the operation is pending. The
+    /// `IO_STATUS_BLOCK` and `AfdPollInfo` structures will be updated by the
+    /// windows kernel at a later time, and after that the `overlapped` pointer
+    /// will be reported by the I/O completion port.
+    ///
+    /// If this function returns `Ok(true)`, the operation has already been
+    /// completed, but the `overlapped` pointer will still be received by the
+    /// I/O completion port.
     pub unsafe fn poll(
         &self,
         info: &mut AfdPollInfo,
-        iosb: *mut IO_STATUS_BLOCK,
+        iosb: &mut IO_STATUS_BLOCK,
         overlapped: PVOID,
     ) -> io::Result<bool> {
         let info_ptr: PVOID = info as *mut _ as PVOID;
-        (*iosb).u.Status = STATUS_PENDING;
+        iosb.u.Status = STATUS_PENDING;
         let status = NtDeviceIoControlFile(
             self.fd.as_raw_handle(),
             null_mut(),
@@ -186,8 +193,8 @@ impl Afd {
     /// This function is unsafe due to memory of `IO_STATUS_BLOCK` still being used by `Afd` instance while `Ok(false)` (`STATUS_PENDING`).
     /// Use it only with request is still being polled so that you have valid `IO_STATUS_BLOCK` to use.
     /// User should NOT deallocate there overlapped value after the `cancel` to prevent double free.
-    pub unsafe fn cancel(&self, iosb: *mut IO_STATUS_BLOCK) -> io::Result<()> {
-        if (*iosb).u.Status != STATUS_PENDING {
+    pub unsafe fn cancel(&self, iosb: &mut IO_STATUS_BLOCK) -> io::Result<()> {
+        if iosb.u.Status != STATUS_PENDING {
             return Ok(());
         }
 

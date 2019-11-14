@@ -1,6 +1,7 @@
 use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
 use std::fmt;
 use std::ops::{Deref, DerefMut};
+use winapi::shared::ntdef::NTSTATUS;
 
 pub struct IoStatusBlock(IO_STATUS_BLOCK);
 
@@ -10,6 +11,10 @@ impl IoStatusBlock {
             u: IO_STATUS_BLOCK_u { Status: 0 },
             Information: 0,
         })
+    }
+
+    pub fn status(&self) -> NTSTATUS {
+        unsafe { self.u.Status }
     }
 }
 
