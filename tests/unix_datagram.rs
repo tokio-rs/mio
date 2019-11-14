@@ -18,8 +18,8 @@ use util::{
 
 const DATA1: &[u8] = b"Hello same host!";
 const DATA2: &[u8] = b"Why hello mio!";
-const DATA1_LEN: usize = DATA1.len();
-const DATA2_LEN: usize = DATA2.len();
+const DATA1_LEN: usize = 16;
+const DATA2_LEN: usize = 14;
 const DEFAULT_BUF_SIZE: usize = 64;
 const TEST_DIR: &str = "mio_unix_datagram_tests";
 const TOKEN_1: Token = Token(0);
