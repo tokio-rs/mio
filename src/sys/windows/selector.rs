@@ -7,7 +7,7 @@ use crate::{Interests, Token};
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::Overlapped;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::marker::PhantomPinned;
 use std::mem::{forget, size_of, transmute_copy};
 use std::os::windows::io::{AsRawSocket, RawSocket};
@@ -363,12 +363,32 @@ impl Selector {
 pub struct SelectorInner {
     cp: Arc<CompletionPort>,
     update_queue: Mutex<VecDeque<Pin<Arc<Mutex<SockState>>>>>,
+    delete_queue: Mutex<HashMap<u64, Pin<Arc<Mutex<SockState>>>>>,
     afd_group: AfdGroup,
     is_polling: AtomicBool,
 }
 
 // We have ensured thread safety by introducing lock manually.
 unsafe impl Sync for SelectorInner {}
+
+impl Drop for SelectorInner {
+    fn drop(&mut self) {
+        let mut delete_queue = self.delete_queue.lock().unwrap();
+        for (_, sock) in delete_queue.drain() {
+            let mut sock_internal = sock.lock().unwrap();
+            sock_internal.mark_delete();
+        }
+
+        let mut events = Events::with_capacity(16);
+        let result = self.select(&mut events, Some(std::time::Duration::from_millis(0)));
+        match result {
+            Ok(_) => {}
+            Err(_) => {}
+        }
+
+        self.afd_group.release_unused_afd();
+    }
+}
 
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
@@ -379,6 +399,7 @@ impl SelectorInner {
             SelectorInner {
                 cp,
                 update_queue: Mutex::new(VecDeque::new()),
+                delete_queue: Mutex::new(HashMap::new()),
                 afd_group: AfdGroup::new(cp_afd),
                 is_polling: AtomicBool::new(false),
             }
@@ -474,6 +495,7 @@ impl SelectorInner {
         socket.set_sock_state(Some(sock));
         unsafe {
             self.add_socket_to_update_queue(socket);
+            self.add_socket_to_delete_queue(socket);
             self.update_sockets_events_if_polling()?;
         }
 
@@ -511,6 +533,9 @@ impl SelectorInner {
     pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
         if socket.get_sock_state().is_none() {
             return Err(io::Error::from(io::ErrorKind::NotFound));
+        }
+        unsafe {
+            self.remove_socket_from_delete_queue(socket);
         }
         socket.set_sock_state(None);
         self.afd_group.release_unused_afd();
@@ -562,6 +587,20 @@ impl SelectorInner {
         let sock_state = socket.get_sock_state().unwrap();
         let mut update_queue = self.update_queue.lock().unwrap();
         update_queue.push_back(sock_state);
+    }
+
+    unsafe fn add_socket_to_delete_queue<S: SocketState>(&self, socket: &S) {
+        let sock_state = socket.get_sock_state().unwrap();
+        let user_data = sock_state.lock().unwrap().user_data;
+        let mut delete_queue = self.delete_queue.lock().unwrap();
+        delete_queue.insert(user_data, sock_state);
+    }
+
+    unsafe fn remove_socket_from_delete_queue<S: SocketState>(&self, socket: &S) {
+        let sock_state = socket.get_sock_state().unwrap();
+        let sock_internal = sock_state.lock().unwrap();
+        let mut delete_queue = self.delete_queue.lock().unwrap();
+        delete_queue.remove(&sock_internal.user_data);
     }
 
     // It returns processed count of iocp_events rather than the events itself.
