@@ -1,8 +1,7 @@
 use std::io;
 use std::mem::size_of_val;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
-use std::pin::Pin;
-use std::sync::{Arc, Mutex, Once};
+use std::sync::{Arc, Once};
 use winapi::ctypes::c_int;
 use winapi::shared::ws2def::SOCKADDR;
 use winapi::um::winsock2::{
@@ -52,8 +51,8 @@ pub use udp::UdpSocket;
 pub use waker::Waker;
 
 pub trait SocketState {
-    fn get_sock_state(&self) -> Option<Pin<Arc<Mutex<SockState>>>>;
-    fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>);
+    fn get_sock_state(&self) -> Option<SockState>;
+    fn set_sock_state(&self, sock_state: Option<SockState>);
 }
 
 use crate::{Interests, Token};
@@ -62,7 +61,7 @@ struct InternalState {
     selector: Arc<SelectorInner>,
     token: Token,
     interests: Interests,
-    sock_state: Option<Pin<Arc<Mutex<SockState>>>>,
+    sock_state: Option<SockState>,
 }
 
 impl InternalState {
