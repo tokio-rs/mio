@@ -18,8 +18,8 @@ use mio::{Events, Interests, Poll, Registry, Token};
 mod util;
 
 use util::{
-    any_local_address, assert_send, assert_sync, expect_no_events, init, init_with_poll, TryRead,
-    TryWrite,
+    any_local_address, assert_send, assert_sync, expect_events, expect_no_events, init,
+    init_with_poll, ExpectEvent, TryRead, TryWrite,
 };
 
 const LISTEN: Token = Token(0);
@@ -1192,33 +1192,52 @@ fn write_then_deregister() {
     assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
 }
 
+const ID1: Token = Token(1);
+const ID2: Token = Token(2);
+const ID3: Token = Token(3);
+
 #[test]
 fn tcp_no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
 
-    let listener = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let listener = TcpListener::bind(any_local_address()).unwrap();
     let addr = listener.local_addr().unwrap();
     let mut stream = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&listener, Token(1), Interests::READABLE)
+        .register(&listener, ID1, Interests::READABLE)
         .unwrap();
     poll.registry()
-        .register(&stream, Token(3), Interests::READABLE)
+        .register(&stream, ID3, Interests::READABLE)
         .unwrap();
 
-    while events.is_empty() {
-        poll.poll(&mut events, None).unwrap();
-    }
-    assert_eq!(events.iter().count(), 1);
-    assert_eq!(events.iter().next().unwrap().token(), Token(1));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+    );
 
-    let mut stream2 = listener.accept().unwrap().0;
+    let (mut stream2, peer_address) = listener.accept().expect("unable to accept connection");
+    assert!(peer_address.ip().is_loopback());
+    assert_eq!(stream2.peer_addr().unwrap(), peer_address);
+    assert_eq!(stream2.local_addr().unwrap(), addr);
+
     poll.registry()
-        .register(&stream2, Token(2), Interests::WRITABLE)
+        .register(&stream2, ID2, Interests::WRITABLE)
         .unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::WRITABLE)],
+    );
 
     stream2.write_all(&[1, 2, 3, 4]).unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID3, Interests::READABLE)],
+    );
 
     poll.registry().deregister(&listener).unwrap();
     poll.registry().deregister(&stream).unwrap();
@@ -1229,4 +1248,13 @@ fn tcp_no_events_after_deregister() {
     let mut buf = [0; 10];
     assert_eq!(stream.read(&mut buf).unwrap(), 4);
     assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
+
+    stream2.write_all(&[1, 2, 3, 4]).unwrap();
+    expect_no_events(&mut poll, &mut events);
+
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    assert_eq!(stream.read(&mut buf).unwrap(), 4);
+    assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
+
+    expect_no_events(&mut poll, &mut events);
 }
