@@ -365,6 +365,7 @@ impl TcpListener {
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         try_io!(self, accept).and_then(|(inner, addr)| {
+            self.io_blocked_reregister()?;
             inner.set_nonblocking(true).map(|()| {
                 (
                     TcpStream {
