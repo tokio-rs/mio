@@ -132,6 +132,8 @@ pub mod unix {
     pub use crate::sys::SourceFd;
 }
 
+// Enable with `cargo doc --features guide`.
+#[cfg(feature = "guide")]
 pub mod guide {
     //! # Getting started guide.
     //!
