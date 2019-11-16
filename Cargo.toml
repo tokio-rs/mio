@@ -24,6 +24,10 @@ exclude       = [
 publish = false
 
 [features]
+default = []
+
+# Adds additional documentation in the form of a user guide.
+guide = []
 
 [dependencies]
 log = "0.4.8"
@@ -45,3 +49,7 @@ env_logger = { version = "0.6.2", default-features = false }
 slab       = "0.4.2"
 tempdir    = "0.3.7"
 net2       = "0.2.33"
+
+[package.metadata.docs.rs]
+# Enable the guide feature.
+all-features = true
