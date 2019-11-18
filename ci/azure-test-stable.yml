@@ -26,7 +26,7 @@ jobs:
     parameters:
       rust_version: ${{ parameters.rust_version }}
 
-  - script: cargo ${{ parameters.cmd }}
+  - script: cargo ${{ parameters.cmd }} -- --nocapture
     displayName: cargo ${{ parameters.cmd }}
     env:
       CI: 'True'

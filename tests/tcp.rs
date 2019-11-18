@@ -214,6 +214,7 @@ fn read() {
 //#[cfg_attr(windows, ignore = "fails on Windows, see #1148")]
 fn peek() {
     init();
+    println!("Entering peek test");
 
     const N: usize = 16 * 1024 * 1024;
     struct H {
