@@ -8,6 +8,7 @@ use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use winapi::um::winsock2::{bind, closesocket, connect, listen, SOCKET_ERROR, SOCK_STREAM};
 
@@ -127,7 +128,7 @@ impl TcpStream {
 }
 
 impl super::SocketState for TcpStream {
-    fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
+    fn get_sock_state(&self) -> Option<Pin<Arc<Mutex<SockState>>>> {
         let internal = self.internal.lock().unwrap();
         match &*internal {
             Some(internal) => match &internal.sock_state {
@@ -137,7 +138,7 @@ impl super::SocketState for TcpStream {
             None => None,
         }
     }
-    fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
+    fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>) {
         let mut internal = self.internal.lock().unwrap();
         match &mut *internal {
             Some(internal) => {
@@ -160,7 +161,7 @@ impl super::SocketState for TcpStream {
 }
 
 impl<'a> super::SocketState for &'a TcpStream {
-    fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
+    fn get_sock_state(&self) -> Option<Pin<Arc<Mutex<SockState>>>> {
         let internal = self.internal.lock().unwrap();
         match &*internal {
             Some(internal) => match &internal.sock_state {
@@ -170,7 +171,7 @@ impl<'a> super::SocketState for &'a TcpStream {
             None => None,
         }
     }
-    fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
+    fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>) {
         let mut internal = self.internal.lock().unwrap();
         match &mut *internal {
             Some(internal) => {
@@ -389,7 +390,7 @@ impl TcpListener {
 }
 
 impl super::SocketState for TcpListener {
-    fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
+    fn get_sock_state(&self) -> Option<Pin<Arc<Mutex<SockState>>>> {
         let internal = self.internal.lock().unwrap();
         match &*internal {
             Some(internal) => match &internal.sock_state {
@@ -399,7 +400,7 @@ impl super::SocketState for TcpListener {
             None => None,
         }
     }
-    fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
+    fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>) {
         let mut internal = self.internal.lock().unwrap();
         match &mut *internal {
             Some(internal) => {
