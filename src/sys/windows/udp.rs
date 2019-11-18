@@ -6,6 +6,7 @@ use crate::{event, poll, Interests, Registry, Token};
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::{fmt, io};
 use winapi::um::winsock2::{bind, closesocket, SOCKET_ERROR, SOCK_DGRAM};
@@ -160,7 +161,7 @@ impl UdpSocket {
 }
 
 impl super::SocketState for UdpSocket {
-    fn get_sock_state(&self) -> Option<Arc<Mutex<SockState>>> {
+    fn get_sock_state(&self) -> Option<Pin<Arc<Mutex<SockState>>>> {
         let internal = self.internal.lock().unwrap();
         match &*internal {
             Some(internal) => match &internal.sock_state {
@@ -170,7 +171,7 @@ impl super::SocketState for UdpSocket {
             None => None,
         }
     }
-    fn set_sock_state(&self, sock_state: Option<Arc<Mutex<SockState>>>) {
+    fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>) {
         let mut internal = self.internal.lock().unwrap();
         match &mut *internal {
             Some(internal) => {
