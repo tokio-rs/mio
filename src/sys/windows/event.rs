@@ -1,51 +1,43 @@
-pub struct Event {
-    pub flags: u32,
-    pub data: u64,
-}
-
 use miow::iocp::CompletionStatus;
 
 use super::afd;
 use crate::Token;
+
 use std::fmt;
 
-use super::afd::{
-    AFD_POLL_ABORT, AFD_POLL_ACCEPT, AFD_POLL_CONNECT_FAIL, AFD_POLL_DISCONNECT,
-    AFD_POLL_LOCAL_CLOSE, AFD_POLL_RECEIVE, AFD_POLL_RECEIVE_EXPEDITED, AFD_POLL_SEND,
-};
+pub struct Event {
+    pub flags: u32,
+    pub data: u64,
+}
 
 pub fn token(event: &Event) -> Token {
     Token(event.data as usize)
 }
 
 pub fn is_readable(event: &Event) -> bool {
-    if is_error(event) || is_read_closed(event) {
-        return true;
-    }
-    event.flags & (afd::AFD_POLL_RECEIVE | afd::AFD_POLL_ACCEPT) != 0
+    event.flags
+        & (afd::POLL_RECEIVE | afd::POLL_DISCONNECT | afd::POLL_ACCEPT | afd::POLL_CONNECT_FAIL)
+        != 0
 }
 
 pub fn is_writable(event: &Event) -> bool {
-    if is_error(event) {
-        return true;
-    }
-    event.flags & afd::AFD_POLL_SEND != 0
+    event.flags & (afd::POLL_SEND | afd::POLL_CONNECT_FAIL) != 0
 }
 
 pub fn is_error(event: &Event) -> bool {
-    event.flags & afd::AFD_POLL_CONNECT_FAIL != 0
+    event.flags & afd::POLL_CONNECT_FAIL != 0
 }
 
 pub fn is_read_closed(event: &Event) -> bool {
-    event.flags & afd::AFD_POLL_DISCONNECT != 0
+    event.flags & afd::POLL_DISCONNECT != 0
 }
 
 pub fn is_write_closed(event: &Event) -> bool {
-    event.flags & afd::AFD_POLL_ABORT != 0
+    event.flags & (afd::POLL_ABORT | afd::POLL_CONNECT_FAIL) != 0
 }
 
 pub fn is_priority(event: &Event) -> bool {
-    event.flags & afd::AFD_POLL_RECEIVE_EXPEDITED != 0
+    event.flags & afd::POLL_RECEIVE_EXPEDITED != 0
 }
 
 pub fn is_aio(_: &Event) -> bool {
@@ -61,29 +53,29 @@ pub fn is_lio(_: &Event) -> bool {
 impl fmt::Debug for Event {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "(")?;
-        if self.flags & AFD_POLL_RECEIVE != 0 {
-            write!(fmt, "AFD_POLL_RECEIVE ")?;
+        if self.flags & afd::POLL_RECEIVE != 0 {
+            write!(fmt, "POLL_RECEIVE ")?;
         }
-        if self.flags & AFD_POLL_RECEIVE_EXPEDITED != 0 {
-            write!(fmt, "AFD_POLL_RECEIVE_EXPEDITED ")?;
+        if self.flags & afd::POLL_RECEIVE_EXPEDITED != 0 {
+            write!(fmt, "POLL_RECEIVE_EXPEDITED ")?;
         }
-        if self.flags & AFD_POLL_SEND != 0 {
-            write!(fmt, "AFD_POLL_SEND ")?;
+        if self.flags & afd::POLL_SEND != 0 {
+            write!(fmt, "POLL_SEND ")?;
         }
-        if self.flags & AFD_POLL_DISCONNECT != 0 {
-            write!(fmt, "AFD_POLL_DISCONNECT ")?;
+        if self.flags & afd::POLL_DISCONNECT != 0 {
+            write!(fmt, "POLL_DISCONNECT ")?;
         }
-        if self.flags & AFD_POLL_ABORT != 0 {
-            write!(fmt, "AFD_POLL_ABORT ")?;
+        if self.flags & afd::POLL_ABORT != 0 {
+            write!(fmt, "POLL_ABORT ")?;
         }
-        if self.flags & AFD_POLL_LOCAL_CLOSE != 0 {
-            write!(fmt, "AFD_POLL_LOCAL_CLOSE ")?;
+        if self.flags & afd::POLL_LOCAL_CLOSE != 0 {
+            write!(fmt, "POLL_LOCAL_CLOSE ")?;
         }
-        if self.flags & AFD_POLL_ACCEPT != 0 {
-            write!(fmt, "AFD_POLL_ACCEPT ")?;
+        if self.flags & afd::POLL_ACCEPT != 0 {
+            write!(fmt, "POLL_ACCEPT ")?;
         }
-        if self.flags & AFD_POLL_CONNECT_FAIL != 0 {
-            write!(fmt, "AFD_POLL_CONNECT_FAIL ")?;
+        if self.flags & afd::POLL_CONNECT_FAIL != 0 {
+            write!(fmt, "POLL_CONNECT_FAIL ")?;
         }
         write!(fmt, ")")?;
         Ok(())
@@ -126,9 +118,9 @@ impl Events {
     }
 
     pub fn clear(&mut self) {
-        self.events.truncate(0);
-        for c in 0..self.statuses.len() {
-            self.statuses[c] = CompletionStatus::zero();
+        self.events.clear();
+        for status in self.statuses.iter_mut() {
+            *status = CompletionStatus::zero();
         }
     }
 }

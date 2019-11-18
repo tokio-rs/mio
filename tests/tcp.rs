@@ -17,7 +17,10 @@ use mio::{Events, Interests, Poll, Registry, Token};
 
 mod util;
 
-use util::{any_local_address, assert_send, assert_sync, init, TryRead, TryWrite};
+use util::{
+    any_local_address, assert_send, assert_sync, expect_no_events, init, init_with_poll, TryRead,
+    TryWrite,
+};
 
 const LISTEN: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -1186,5 +1189,44 @@ fn write_then_deregister() {
 
     let mut buf = [0; 10];
     assert_eq!(s.read(&mut buf).unwrap(), 4);
+    assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
+}
+
+#[test]
+fn tcp_no_events_after_deregister() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let listener = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = listener.local_addr().unwrap();
+    let mut stream = TcpStream::connect(addr).unwrap();
+
+    poll.registry()
+        .register(&listener, Token(1), Interests::READABLE)
+        .unwrap();
+    poll.registry()
+        .register(&stream, Token(3), Interests::READABLE)
+        .unwrap();
+
+    while events.is_empty() {
+        poll.poll(&mut events, None).unwrap();
+    }
+    assert_eq!(events.iter().count(), 1);
+    assert_eq!(events.iter().next().unwrap().token(), Token(1));
+
+    let mut stream2 = listener.accept().unwrap().0;
+    poll.registry()
+        .register(&stream2, Token(2), Interests::WRITABLE)
+        .unwrap();
+
+    stream2.write_all(&[1, 2, 3, 4]).unwrap();
+
+    poll.registry().deregister(&listener).unwrap();
+    poll.registry().deregister(&stream).unwrap();
+    poll.registry().deregister(&stream2).unwrap();
+
+    expect_no_events(&mut poll, &mut events);
+
+    let mut buf = [0; 10];
+    assert_eq!(stream.read(&mut buf).unwrap(), 4);
     assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
 }

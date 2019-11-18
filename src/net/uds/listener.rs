@@ -7,6 +7,7 @@ use crate::{sys, Interests, Registry, Token};
 
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::net;
 use std::path::Path;
 
 /// A non-blocking Unix domain socket server.
@@ -30,6 +31,21 @@ impl UnixListener {
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
         let sys = sys::UnixListener::bind(path.as_ref())?;
         Ok(UnixListener::new(sys))
+    }
+
+    /// Creates a new `UnixListener` from a standard `net::UnixListener`.
+    ///
+    /// This function is intended to be used to wrap a Unix listener from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying listener; it is left up to the user to set it in
+    /// non-blocking mode.
+    pub fn from_std(listener: net::UnixListener) -> UnixListener {
+        let sys = sys::UnixListener::from_std(listener);
+        UnixListener {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Accepts a new incoming connection to this listener.
@@ -66,7 +82,7 @@ impl Source for UnixListener {
     fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
-        self.sys.reregister(registry, token, interests)
+        self.sys.register(registry, token, interests)
     }
 
     fn reregister(

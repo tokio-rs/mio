@@ -205,18 +205,24 @@ impl Afd {
     }
 }
 
-pub const AFD_POLL_RECEIVE: u32 = 0x0001;
-pub const AFD_POLL_RECEIVE_EXPEDITED: u32 = 0x0002;
-pub const AFD_POLL_SEND: u32 = 0x0004;
-pub const AFD_POLL_DISCONNECT: u32 = 0x0008;
-pub const AFD_POLL_ABORT: u32 = 0x0010;
-pub const AFD_POLL_LOCAL_CLOSE: u32 = 0x0020;
-pub const AFD_POLL_ACCEPT: u32 = 0x0080;
-pub const AFD_POLL_CONNECT_FAIL: u32 = 0x0100;
-pub const KNOWN_AFD_EVENTS: u32 = AFD_POLL_RECEIVE
-    | AFD_POLL_RECEIVE_EXPEDITED
-    | AFD_POLL_SEND
-    | AFD_POLL_DISCONNECT
-    | AFD_POLL_ABORT
-    | AFD_POLL_ACCEPT
-    | AFD_POLL_CONNECT_FAIL;
+pub const POLL_RECEIVE: u32 = 0b000_000_001;
+pub const POLL_RECEIVE_EXPEDITED: u32 = 0b000_000_010;
+pub const POLL_SEND: u32 = 0b000_000_100;
+pub const POLL_DISCONNECT: u32 = 0b000_001_000;
+pub const POLL_ABORT: u32 = 0b000_010_000;
+pub const POLL_LOCAL_CLOSE: u32 = 0b000_100_000;
+// Not used as it indicated in each event where a connection is connected, not
+// just the first time a connection is established.
+// Also see https://github.com/piscisaureus/wepoll/commit/8b7b340610f88af3d83f40fb728e7b850b090ece.
+//pub const POLL_CONNECT: u32 = 0b001_000_000;
+pub const POLL_ACCEPT: u32 = 0b010_000_000;
+pub const POLL_CONNECT_FAIL: u32 = 0b100_000_000;
+
+pub const KNOWN_EVENTS: u32 = POLL_RECEIVE
+    | POLL_RECEIVE_EXPEDITED
+    | POLL_SEND
+    | POLL_DISCONNECT
+    | POLL_ABORT
+    | POLL_LOCAL_CLOSE
+    | POLL_ACCEPT
+    | POLL_CONNECT_FAIL;

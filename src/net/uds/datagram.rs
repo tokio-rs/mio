@@ -6,6 +6,7 @@ use crate::{sys, Interests, Registry, Token};
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::net;
 use std::path::Path;
 
 /// A Unix datagram socket.
@@ -29,6 +30,21 @@ impl UnixDatagram {
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixDatagram> {
         let sys = sys::UnixDatagram::bind(path.as_ref())?;
         Ok(UnixDatagram::new(sys))
+    }
+
+    /// Creates a new `UnixDatagram` from a standard `net::UnixDatagram`.
+    ///
+    /// This function is intended to be used to wrap a Unix datagram from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying datagram; ; it is left up to the user to set it
+    /// in non-blocking mode.
+    pub fn from_std(datagram: net::UnixDatagram) -> UnixDatagram {
+        let sys = sys::UnixDatagram::from_std(datagram);
+        UnixDatagram {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Connects the socket to the specified address.

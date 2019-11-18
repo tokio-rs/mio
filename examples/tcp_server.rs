@@ -4,7 +4,7 @@ use std::str::from_utf8;
 
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, Token};
+use mio::{Events, Interests, Poll, Registry, Token};
 
 // Setup some tokens to allow us to identify which event is for which socket.
 const SERVER: Token = Token(0);
@@ -60,7 +60,7 @@ fn main() -> io::Result<()> {
                 token => {
                     // (maybe) received an event for a TCP connection.
                     let done = if let Some(connection) = connections.get_mut(&token) {
-                        handle_connection_event(&mut poll, connection, event)?
+                        handle_connection_event(poll.registry(), connection, event)?
                     } else {
                         // Sporadic events happen.
                         false
@@ -82,7 +82,7 @@ fn next(current: &mut Token) -> Token {
 
 /// Returns `true` if the connection is done.
 fn handle_connection_event(
-    poll: &mut Poll,
+    registry: &Registry,
     connection: &mut TcpStream,
     event: &Event,
 ) -> io::Result<bool> {
@@ -96,15 +96,14 @@ fn handle_connection_event(
             Ok(_) => {
                 // After we've written something we'll reregister the connection
                 // to only respond to readable events.
-                poll.registry()
-                    .reregister(&connection, event.token(), Interests::READABLE)?
+                registry.reregister(&connection, event.token(), Interests::READABLE)?
             }
             // Would block "errors" are the OS's way of saying that the
             // connection is not actually ready to perform this I/O operation.
             Err(ref err) if would_block(err) => {}
             // Got interrupted (how rude!), we'll try again.
             Err(ref err) if interrupted(err) => {
-                return handle_connection_event(poll, connection, event)
+                return handle_connection_event(registry, connection, event)
             }
             // Other errors we'll consider fatal.
             Err(err) => return Err(err),

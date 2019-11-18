@@ -12,7 +12,6 @@ use std::fmt;
 /// [`Poll::poll`]: crate::Poll::poll
 /// [`Poll`]: crate::Poll
 /// [`Token`]: crate::Token
-#[repr(transparent)]
 pub struct Event {
     inner: sys::Event,
 }

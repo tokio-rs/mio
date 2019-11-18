@@ -1,9 +1,7 @@
 use super::selector::SockState;
-use super::InternalState;
-use super::{new_socket, socket_addr};
-use crate::poll;
+use super::{new_socket, socket_addr, InternalState};
 use crate::sys::windows::init;
-use crate::{event, Interests, Registry, Token};
+use crate::{event, poll, Interests, Registry, Token};
 
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
@@ -13,31 +11,8 @@ use std::{fmt, io};
 use winapi::um::winsock2::{bind, closesocket, SOCKET_ERROR, SOCK_DGRAM};
 
 pub struct UdpSocket {
-    internal: Arc<Mutex<Option<InternalState>>>,
-    io: net::UdpSocket,
-}
-
-macro_rules! wouldblock {
-    ($self:ident, $method:ident, $($args:expr),* )  => {{
-        let result = $self.io.$method($($args),*);
-        if let Err(ref e) = result {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                let internal = $self.internal.lock().unwrap();
-                if internal.is_some() {
-                    let selector = internal.as_ref().unwrap().selector.clone();
-                    let token = internal.as_ref().unwrap().token;
-                    let interests = internal.as_ref().unwrap().interests;
-                    drop(internal);
-                    selector.reregister(
-                        $self,
-                        token,
-                        interests,
-                    )?;
-                }
-            }
-        }
-        result
-    }};
+    internal: Box<Mutex<Option<InternalState>>>,
+    inner: net::UdpSocket,
 }
 
 impl UdpSocket {
@@ -57,109 +32,130 @@ impl UdpSocket {
                 err
             })
             .map(|_| UdpSocket {
-                internal: Arc::new(Mutex::new(None)),
-                io: unsafe { net::UdpSocket::from_raw_socket(socket as StdSocket) },
+                internal: Box::new(Mutex::new(None)),
+                inner: unsafe { net::UdpSocket::from_raw_socket(socket as StdSocket) },
             })
         })
     }
 
+    pub fn from_std(inner: net::UdpSocket) -> UdpSocket {
+        UdpSocket {
+            internal: Box::new(Mutex::new(None)),
+            inner,
+        }
+    }
+
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.local_addr()
+        self.inner.local_addr()
     }
 
     pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        self.io.try_clone().map(|io| UdpSocket {
-            internal: Arc::new(Mutex::new(None)),
-            io,
+        self.inner.try_clone().map(|inner| UdpSocket {
+            internal: Box::new(Mutex::new(None)),
+            inner,
         })
     }
 
     pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
-        wouldblock!(self, send_to, buf, target)
+        try_io!(self, send_to, buf, target)
     }
 
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        wouldblock!(self, recv_from, buf)
+        try_io!(self, recv_from, buf)
     }
 
     pub fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        wouldblock!(self, peek_from, buf)
+        try_io!(self, peek_from, buf)
     }
 
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        wouldblock!(self, send, buf)
+        try_io!(self, send, buf)
     }
 
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        wouldblock!(self, recv, buf)
+        try_io!(self, recv, buf)
     }
 
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
-        wouldblock!(self, peek, buf)
+        try_io!(self, peek, buf)
     }
 
     pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
-        self.io.connect(addr)
+        self.inner.connect(addr)
     }
 
     pub fn broadcast(&self) -> io::Result<bool> {
-        self.io.broadcast()
+        self.inner.broadcast()
     }
 
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
-        self.io.set_broadcast(on)
+        self.inner.set_broadcast(on)
     }
 
     pub fn multicast_loop_v4(&self) -> io::Result<bool> {
-        self.io.multicast_loop_v4()
+        self.inner.multicast_loop_v4()
     }
 
     pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
-        self.io.set_multicast_loop_v4(on)
+        self.inner.set_multicast_loop_v4(on)
     }
 
     pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
-        self.io.multicast_ttl_v4()
+        self.inner.multicast_ttl_v4()
     }
 
     pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
-        self.io.set_multicast_ttl_v4(ttl)
+        self.inner.set_multicast_ttl_v4(ttl)
     }
 
     pub fn multicast_loop_v6(&self) -> io::Result<bool> {
-        self.io.multicast_loop_v6()
+        self.inner.multicast_loop_v6()
     }
 
     pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
-        self.io.set_multicast_loop_v6(on)
+        self.inner.set_multicast_loop_v6(on)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
-        self.io.ttl()
+        self.inner.ttl()
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.io.set_ttl(ttl)
+        self.inner.set_ttl(ttl)
     }
 
     pub fn join_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
-        self.io.join_multicast_v4(&multiaddr, &interface)
+        self.inner.join_multicast_v4(&multiaddr, &interface)
     }
 
     pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
-        self.io.join_multicast_v6(multiaddr, interface)
+        self.inner.join_multicast_v6(multiaddr, interface)
     }
 
     pub fn leave_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
-        self.io.leave_multicast_v4(&multiaddr, &interface)
+        self.inner.leave_multicast_v4(&multiaddr, &interface)
     }
 
     pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
-        self.io.leave_multicast_v6(multiaddr, interface)
+        self.inner.leave_multicast_v6(multiaddr, interface)
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.io.take_error()
+        self.inner.take_error()
+    }
+
+    // Used by `try_io` to register after an I/O operation blocked.
+    fn io_blocked_reregister(&self) -> io::Result<()> {
+        let internal = self.internal.lock().unwrap();
+        if internal.is_some() {
+            let selector = internal.as_ref().unwrap().selector.clone();
+            let token = internal.as_ref().unwrap().token;
+            let interests = internal.as_ref().unwrap().interests;
+            drop(internal);
+            selector.reregister(self, token, interests)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -178,6 +174,17 @@ impl super::SocketState for UdpSocket {
         let mut internal = self.internal.lock().unwrap();
         match &mut *internal {
             Some(internal) => {
+                // action of setting a None state it's a sign of deregistering a socket, so
+                // existing socket must be marked for deletion so it won't be used by selector
+                // for subsequent updates (atm it will be removed during first selector poll update)
+                if sock_state.is_none() {
+                    if internal.sock_state.is_some() {
+                        let sock_state = internal.sock_state.as_ref();
+                        let mut sock_internal = sock_state.unwrap().lock().unwrap();
+                        sock_internal.mark_delete();
+                    }
+                }
+
                 internal.sock_state = sock_state;
             }
             None => {}
@@ -241,27 +248,27 @@ impl event::Source for UdpSocket {
 
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.io, f)
+        fmt::Debug::fmt(&self.inner, f)
     }
 }
 
 impl FromRawSocket for UdpSocket {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> UdpSocket {
         UdpSocket {
-            internal: Arc::new(Mutex::new(None)),
-            io: net::UdpSocket::from_raw_socket(rawsocket),
+            internal: Box::new(Mutex::new(None)),
+            inner: net::UdpSocket::from_raw_socket(rawsocket),
         }
     }
 }
 
 impl IntoRawSocket for UdpSocket {
     fn into_raw_socket(self) -> RawSocket {
-        self.io.as_raw_socket()
+        self.inner.as_raw_socket()
     }
 }
 
 impl AsRawSocket for UdpSocket {
     fn as_raw_socket(&self) -> RawSocket {
-        self.io.as_raw_socket()
+        self.inner.as_raw_socket()
     }
 }

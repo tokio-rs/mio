@@ -5,9 +5,12 @@ use crate::{event, sys, Interests, Registry, Token};
 
 use std::fmt;
 use std::io;
+use std::net;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 /// A structure representing a socket server
 ///
@@ -56,6 +59,21 @@ impl TcpListener {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })
+    }
+
+    /// Creates a new `TcpListener` from a standard `net::TcpListener`.
+    ///
+    /// This function is intended to be used to wrap a TCP listener from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying listener; ; it is left up to the user to set it
+    /// in non-blocking mode.
+    pub fn from_std(listener: net::TcpListener) -> TcpListener {
+        let sys = sys::TcpListener::from_std(listener);
+        TcpListener {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Accepts a new `TcpStream`.
@@ -166,5 +184,30 @@ impl FromRawFd for TcpListener {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         }
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for TcpListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.sys.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for TcpListener {
+    unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
+        TcpListener {
+            sys: FromRawSocket::from_raw_socket(socket),
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for TcpListener {
+    fn into_raw_socket(self) -> RawSocket {
+        self.sys.into_raw_socket()
     }
 }

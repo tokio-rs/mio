@@ -44,6 +44,10 @@ impl UdpSocket {
         })
     }
 
+    pub fn from_std(io: net::UdpSocket) -> UdpSocket {
+        UdpSocket { io }
+    }
+
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.local_addr()
     }

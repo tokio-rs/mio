@@ -36,20 +36,35 @@ fn is_send_and_sync() {
 #[test]
 #[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_ipv4() {
-    smoke_test_tcp_stream(any_local_address());
+    smoke_test_tcp_stream(any_local_address(), TcpStream::connect);
 }
 
 #[test]
 #[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
 fn tcp_stream_ipv6() {
-    smoke_test_tcp_stream(any_local_ipv6_address());
+    smoke_test_tcp_stream(any_local_ipv6_address(), TcpStream::connect);
 }
 
-fn smoke_test_tcp_stream(addr: SocketAddr) {
+#[test]
+#[cfg_attr(windows, ignore = "fails on Windows, see #1078")]
+fn tcp_stream_std() {
+    smoke_test_tcp_stream(any_local_address(), |addr| {
+        let stream = net::TcpStream::connect(addr).unwrap();
+        // `std::net::TcpStream`s are blocking by default, so make sure it is
+        // in non-blocking mode before wrapping in a Mio equivalent.
+        assert_ok!(stream.set_nonblocking(true));
+        Ok(TcpStream::from_std(stream))
+    });
+}
+
+fn smoke_test_tcp_stream<F>(addr: SocketAddr, make_stream: F)
+where
+    F: FnOnce(SocketAddr) -> io::Result<TcpStream>,
+{
     let (mut poll, mut events) = init_with_poll();
 
-    let (thread_handle, addr) = echo_listener(addr, 1);
-    let mut stream = TcpStream::connect(addr).unwrap();
+    let (handle, addr) = echo_listener(addr, 1);
+    let mut stream = make_stream(addr).unwrap();
 
     poll.registry()
         .register(&stream, ID1, Interests::WRITABLE.add(Interests::READABLE))
@@ -116,8 +131,7 @@ fn smoke_test_tcp_stream(addr: SocketAddr) {
 
     // Close the connection to allow the listener to shutdown.
     drop(stream);
-
-    thread_handle.join().expect("unable to join thread");
+    handle.join().expect("unable to join thread");
 }
 
 #[test]
@@ -510,15 +524,15 @@ fn reregistering() {
 }
 
 #[test]
-fn deregistering() {
+fn no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
 
     let (thread_handle, address) = echo_listener(any_local_address(), 1);
 
-    let stream = TcpStream::connect(address).unwrap();
+    let mut stream = TcpStream::connect(address).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interests::READABLE)
+        .register(&stream, ID1, Interests::WRITABLE.add(Interests::READABLE))
         .expect("unable to register TCP stream");
 
     poll.registry()
@@ -529,6 +543,17 @@ fn deregistering() {
 
     // We do expect to be connected.
     assert_eq!(stream.peer_addr().unwrap(), address);
+
+    // Also, write should work
+    let mut buf = [0; 16];
+    assert_would_block(stream.peek(&mut buf));
+    assert_would_block(stream.read(&mut buf));
+
+    let n = stream.write(&DATA1).expect("unable to write to stream");
+    assert_eq!(n, DATA1.len());
+    stream.flush().unwrap();
+
+    expect_no_events(&mut poll, &mut events);
 
     drop(stream);
     thread_handle.join().expect("unable to join thread");

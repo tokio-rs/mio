@@ -1,8 +1,11 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
+use std::net;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
@@ -63,6 +66,27 @@ impl TcpStream {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         })
+    }
+
+    /// Creates a new `TcpStream` from a standard `net::TcpStream`.
+    ///
+    /// This function is intended to be used to wrap a TCP stream from the
+    /// standard library in the Mio equivalent. The conversion assumes nothing
+    /// about the underlying stream; it is left up to the user to set it in
+    /// non-blocking mode.
+    ///
+    /// # Note
+    ///
+    /// The TCP stream here will not have `connect` called on it, so it
+    /// should already be connected via some other means (be it manually, or
+    /// the standard library).
+    pub fn from_std(stream: net::TcpStream) -> TcpStream {
+        let sys = sys::TcpStream::from_std(stream);
+        TcpStream {
+            sys,
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
     }
 
     /// Returns the socket address of the remote peer of this TCP connection.
@@ -276,5 +300,30 @@ impl FromRawFd for TcpStream {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         }
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for TcpStream {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.sys.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for TcpStream {
+    unsafe fn from_raw_socket(socket: RawSocket) -> TcpStream {
+        TcpStream {
+            sys: FromRawSocket::from_raw_socket(socket),
+            #[cfg(debug_assertions)]
+            selector_id: SelectorId::new(),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for TcpStream {
+    fn into_raw_socket(self) -> RawSocket {
+        self.sys.into_raw_socket()
     }
 }
