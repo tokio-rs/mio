@@ -213,8 +213,9 @@ impl fmt::Debug for Events {
         let mut d = f.debug_struct("Events");
         d.field("capacity", &self.capacity());
 
-        #[cfg(target_os = "windows")]
-        d.field("raw_events", &self.inner);
+        for event in self.iter() {
+            d.field("event", event);
+        }
 
         d.finish()
     }

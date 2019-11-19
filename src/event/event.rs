@@ -190,7 +190,8 @@ impl Event {
 
 impl fmt::Debug for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut d = f.debug_struct("Event");
+        let alternate = f.alternate();
+        let d = &mut f.debug_struct("Event");
         d.field("token", &self.token())
             .field("readable", &self.is_readable())
             .field("writable", &self.is_writable())
@@ -201,8 +202,11 @@ impl fmt::Debug for Event {
             .field("aio", &self.is_aio())
             .field("lio", &self.is_lio());
 
-        #[cfg(target_os = "windows")]
-        d.field("raw_flags", &self.inner);
+        if alternate {
+            let mut data_str = String::new();
+            sys::event::get_platform_event_data_str(&mut data_str, &self.inner);
+            d.field("platform ", &data_str);
+        }
 
         d.finish()
     }

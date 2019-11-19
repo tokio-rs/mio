@@ -338,6 +338,7 @@ unsafe impl Sync for Events {}
 pub mod event {
     use crate::sys::Event;
     use crate::Token;
+    use std::fmt::Write as FmtWrite;
 
     pub fn token(event: &Event) -> Token {
         Token(event.udata as usize)
@@ -415,6 +416,255 @@ pub mod event {
         {
             false
         }
+    }
+
+    pub fn get_platform_event_data_str(data_str: &mut String, event: &Event) {
+        write!(data_str, "filter (").unwrap();
+
+        macro_rules! is_filter {
+                ($($(#[$target: meta])* $filter: ident),+ $(,)*) => {
+                    $(
+                        $(#[$target])*
+                        {
+                            if event.filter == libc::$filter {
+                                write!(data_str, stringify!($filter)).unwrap();
+                            }
+                        }
+                    )+
+                };
+            }
+
+        is_filter!(
+            EVFILT_READ,
+            EVFILT_WRITE,
+            EVFILT_AIO,
+            EVFILT_VNODE,
+            EVFILT_PROC,
+            EVFILT_SIGNAL,
+            EVFILT_TIMER,
+            #[cfg(target_os = "freebsd")]
+            EVFILT_PROCDESC,
+            #[cfg(any(
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            EVFILT_FS,
+            #[cfg(target_os = "freebsd")]
+            EVFILT_LIO,
+            #[cfg(any(
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            EVFILT_USER,
+            #[cfg(target_os = "freebsd")]
+            EVFILT_SENDFILE,
+            #[cfg(target_os = "freebsd")]
+            EVFILT_EMPTY,
+            #[cfg(target_os = "dragonfly")]
+            EVFILT_EXCEPT,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            EVFILT_MACHPORT,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            EVFILT_VM,
+        );
+
+        write!(data_str, ") flag (").unwrap();
+
+        macro_rules! has_flag {
+                ($($(#[$target: meta])* $flag: ident),+ $(,)*) => {
+                    $(
+                        $(#[$target])*
+                        {
+                            if (event.flags & libc::$flag) != 0  {
+                                write!(data_str, stringify!($flag)).unwrap();
+                            }
+                        }
+                    )+
+                };
+            }
+
+        has_flag!(
+            EV_ADD,
+            EV_DELETE,
+            EV_ENABLE,
+            EV_DISABLE,
+            EV_ONESHOT,
+            EV_CLEAR,
+            EV_RECEIPT,
+            EV_DISPATCH,
+            #[cfg(target_os = "freebsd")]
+            EV_DROP,
+            EV_FLAG1,
+            EV_ERROR,
+            EV_EOF,
+            EV_SYSFLAGS,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            EV_FLAG0,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            EV_POLL,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            EV_OOBAND,
+            #[cfg(target_os = "dragonfly")]
+            EV_NODATA,
+        );
+
+        write!(data_str, ") fflag (").unwrap();
+
+        macro_rules! has_fflag {
+                ($($(#[$target: meta])* $fflag: ident),+ $(,)*) => {
+                    $(
+                        $(#[$target])*
+                        #[allow(clippy::bad_bit_mask)] // Apparently some flags are zero.
+                        {
+                            if (event.fflags & libc::$fflag) != 0  {
+                                write!(data_str, stringify!($fflag)).unwrap();
+                            }
+                        }
+                    )+
+                };
+            }
+
+        has_fflag!(
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            NOTE_TRIGGER,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            NOTE_FFNOP,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            NOTE_FFAND,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            NOTE_FFOR,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            NOTE_FFCOPY,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            NOTE_FFCTRLMASK,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            NOTE_FFLAGSMASK,
+            NOTE_LOWAT,
+            NOTE_DELETE,
+            NOTE_WRITE,
+            #[cfg(target_os = "dragonfly")]
+            NOTE_OOB,
+            #[cfg(target_os = "openbsd")]
+            NOTE_EOF,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_EXTEND,
+            NOTE_ATTRIB,
+            NOTE_LINK,
+            NOTE_RENAME,
+            NOTE_REVOKE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_NONE,
+            #[cfg(any(target_os = "openbsd"))]
+            NOTE_TRUNCATE,
+            NOTE_EXIT,
+            NOTE_FORK,
+            NOTE_EXEC,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_SIGNAL,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_EXITSTATUS,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_EXIT_DETAIL,
+            NOTE_PDATAMASK,
+            NOTE_PCTRLMASK,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd"
+            ))]
+            NOTE_TRACK,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd"
+            ))]
+            NOTE_TRACKERR,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd"
+            ))]
+            NOTE_CHILD,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_EXIT_DETAIL_MASK,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_EXIT_DECRYPTFAIL,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_EXIT_MEMORY,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_EXIT_CSERROR,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_VM_PRESSURE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_VM_PRESSURE_TERMINATE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_VM_PRESSURE_SUDDEN_TERMINATE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_VM_ERROR,
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            NOTE_SECONDS,
+            #[cfg(any(target_os = "freebsd"))]
+            NOTE_MSECONDS,
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            NOTE_USECONDS,
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            NOTE_NSECONDS,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            NOTE_ABSOLUTE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_LEEWAY,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            NOTE_CRITICAL,
+            #[cfg(any(target_os = "dragonfly"))]
+            NOTE_BACKGROUND,
+        );
+
+        write!(data_str, ") ").unwrap();
+
+        ()
     }
 }
 

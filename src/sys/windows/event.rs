@@ -3,8 +3,9 @@ use miow::iocp::CompletionStatus;
 use super::afd;
 use crate::Token;
 
-use std::fmt;
+use std::fmt::Write as FmtWrite;
 
+#[derive(Debug)]
 pub struct Event {
     pub flags: u32,
     pub data: u64,
@@ -50,36 +51,35 @@ pub fn is_lio(_: &Event) -> bool {
     false
 }
 
-impl fmt::Debug for Event {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "(")?;
-        if self.flags & afd::POLL_RECEIVE != 0 {
-            write!(fmt, "POLL_RECEIVE ")?;
+pub fn get_platform_event_data_str(data_str: &mut String, event: &Event) {
+    write!(data_str, "event (").unwrap();
+
+    macro_rules! has_event {
+            ($($(#[$target: meta])* $event: ident),+ $(,)*) => {
+                $(
+                    $(#[$target])*
+                    {
+                        if event.flags & afd::$event != 0 {
+                            write!(data_str, "{} ", stringify!($event)).unwrap();
+                        }
+                    }
+                )+
+            };
         }
-        if self.flags & afd::POLL_RECEIVE_EXPEDITED != 0 {
-            write!(fmt, "POLL_RECEIVE_EXPEDITED ")?;
-        }
-        if self.flags & afd::POLL_SEND != 0 {
-            write!(fmt, "POLL_SEND ")?;
-        }
-        if self.flags & afd::POLL_DISCONNECT != 0 {
-            write!(fmt, "POLL_DISCONNECT ")?;
-        }
-        if self.flags & afd::POLL_ABORT != 0 {
-            write!(fmt, "POLL_ABORT ")?;
-        }
-        if self.flags & afd::POLL_LOCAL_CLOSE != 0 {
-            write!(fmt, "POLL_LOCAL_CLOSE ")?;
-        }
-        if self.flags & afd::POLL_ACCEPT != 0 {
-            write!(fmt, "POLL_ACCEPT ")?;
-        }
-        if self.flags & afd::POLL_CONNECT_FAIL != 0 {
-            write!(fmt, "POLL_CONNECT_FAIL ")?;
-        }
-        write!(fmt, ")")?;
-        Ok(())
-    }
+
+    has_event!(
+        POLL_RECEIVE,
+        POLL_RECEIVE_EXPEDITED,
+        POLL_SEND,
+        POLL_DISCONNECT,
+        POLL_ABORT,
+        POLL_LOCAL_CLOSE,
+        POLL_ACCEPT,
+        POLL_CONNECT_FAIL,
+    );
+
+    write!(data_str, ")").unwrap();
+    ()
 }
 
 pub struct Events {
@@ -122,16 +122,5 @@ impl Events {
         for status in self.statuses.iter_mut() {
             *status = CompletionStatus::zero();
         }
-    }
-}
-
-impl fmt::Debug for Events {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "(")?;
-        for event in &self.events {
-            write!(fmt, "{:?}, ", event)?;
-        }
-        write!(fmt, ")")?;
-        Ok(())
     }
 }

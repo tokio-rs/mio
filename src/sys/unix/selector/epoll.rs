@@ -121,6 +121,7 @@ pub type Events = Vec<Event>;
 pub mod event {
     use crate::sys::Event;
     use crate::Token;
+    use std::fmt::Write as FmtWrite;
 
     pub fn token(event: &Event) -> Token {
         Token(event.u64 as usize)
@@ -167,6 +168,47 @@ pub mod event {
     pub fn is_lio(_: &Event) -> bool {
         // Not supported.
         false
+    }
+
+    pub fn get_platform_event_data_str(data_str: &mut String, event: &Event) {
+        write!(data_str, "events (").unwrap();
+
+        macro_rules! has_event {
+            ($($(#[$target: meta])* $event: ident),+ $(,)*) => {
+                $(
+                    $(#[$target])*
+                    {
+                        if (event.events as libc::c_int & libc::$event) != 0 {
+                            write!(data_str, stringify!($event)).unwrap();
+                        }
+                    }
+                )+
+            };
+        }
+
+        has_event!(
+            EPOLLIN,
+            EPOLLPRI,
+            EPOLLOUT,
+            EPOLLRDNORM,
+            EPOLLRDBAND,
+            EPOLLWRNORM,
+            EPOLLWRBAND,
+            EPOLLMSG,
+            EPOLLERR,
+            EPOLLHUP,
+            EPOLLET,
+            EPOLLRDHUP,
+            EPOLLONESHOT,
+            #[cfg(any(target_os = "linux", target_os = "solaris"))]
+            EPOLLEXCLUSIVE,
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            EPOLLWAKEUP,
+            EPOLL_CLOEXEC,
+        );
+
+        write!(data_str, ")").unwrap();
+        ()
     }
 }
 
