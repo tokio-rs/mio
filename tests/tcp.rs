@@ -5,6 +5,7 @@ use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 use std::{net, thread};
+use std::thread::sleep;
 
 use bytes::{Buf, Bytes, BytesMut};
 use log::{debug, info};
@@ -1252,7 +1253,7 @@ fn tcp_no_events_after_deregister() {
     stream2.write_all(&[1, 2, 3, 4]).unwrap();
     expect_no_events(&mut poll, &mut events);
 
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    sleep(Duration::from_millis(200));
     assert_eq!(stream.read(&mut buf).unwrap(), 4);
     assert_eq!(&buf[0..4], &[1, 2, 3, 4]);
 
