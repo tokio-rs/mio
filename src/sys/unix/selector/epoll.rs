@@ -208,7 +208,6 @@ pub mod event {
         );
 
         write!(data_str, ")").unwrap();
-        ()
     }
 }
 

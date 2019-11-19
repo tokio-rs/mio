@@ -364,7 +364,7 @@ fn platform_specific_data_print() {
         .register(&stream, ID2, Interests::WRITABLE)
         .unwrap();
 
-    poll.poll(&mut events, None).expect("unable to poll");;
+    poll.poll(&mut events, None).expect("unable to poll");
     println!("poll events: {:#?}", events);
 
     barrier.wait();
