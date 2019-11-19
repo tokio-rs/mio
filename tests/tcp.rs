@@ -3,9 +3,9 @@ use std::net::Shutdown;
 #[cfg(unix)]
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::sync::mpsc::channel;
+use std::thread::sleep;
 use std::time::Duration;
 use std::{net, thread};
-use std::thread::sleep;
 
 use bytes::{Buf, Bytes, BytesMut};
 use log::{debug, info};
