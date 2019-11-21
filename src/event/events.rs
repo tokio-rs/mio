@@ -105,6 +105,18 @@ impl Events {
         self.inner.capacity()
     }
 
+    /// Returns the number of `Event` values that `self` holds.
+    ///
+    /// ```
+    /// use mio::Events;
+    ///
+    /// let events = Events::with_capacity(1024);
+    /// assert_eq!(0, events.len());
+    /// ```
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
     /// Returns `true` if `self` contains no `Event` values.
     ///
     /// # Examples

@@ -80,6 +80,10 @@ impl Events {
         self.events.capacity()
     }
 
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
+
     pub fn get(&self, idx: usize) -> Option<&Event> {
         self.events.get(idx)
     }
