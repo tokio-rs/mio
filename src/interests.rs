@@ -14,7 +14,6 @@ use std::{fmt, ops};
 /// [readable]: Interests::READABLE
 /// [`poll`]: crate::Poll::poll
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-#[repr(transparent)]
 pub struct Interests(NonZeroU8);
 
 // These must be unique.
