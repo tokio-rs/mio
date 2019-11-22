@@ -35,10 +35,10 @@ fn unix_listener_smoke() {
 #[test]
 fn unix_listener_from_std() {
     smoke_test(|path| {
-        let listener = assert_ok!(net::UnixListener::bind(path));
+        let listener = net::UnixListener::bind(path).unwrap();
         // `std::os::unix::net::UnixStream`s are blocking by default, so make sure
         // it is in non-blocking mode before wrapping in a Mio equivalent.
-        assert_ok!(listener.set_nonblocking(true));
+        listener.set_nonblocking(true).unwrap();
         Ok(UnixListener::from_std(listener))
     })
 }
@@ -47,20 +47,20 @@ fn unix_listener_from_std() {
 fn unix_listener_try_clone_same_poll() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(3));
-    let dir = assert_ok!(TempDir::new("unix_listener"));
+    let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener1 = assert_ok!(UnixListener::bind(&path));
-    let listener2 = assert_ok!(listener1.try_clone());
+    let listener1 = UnixListener::bind(&path).unwrap();
+    let listener2 = listener1.try_clone().unwrap();
     assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
 
     let handle_1 = open_connections(path.clone(), 1, barrier.clone());
-    assert_ok!(poll
-        .registry()
-        .register(&listener1, TOKEN_1, Interests::READABLE));
-    assert_ok!(poll
-        .registry()
-        .register(&listener2, TOKEN_2, Interests::READABLE));
+    poll.registry()
+        .register(&listener1, TOKEN_1, Interests::READABLE)
+        .unwrap();
+    poll.registry()
+        .register(&listener2, TOKEN_2, Interests::READABLE)
+        .unwrap();
     expect_events(
         &mut poll,
         &mut events,
@@ -70,7 +70,7 @@ fn unix_listener_try_clone_same_poll() {
         ],
     );
 
-    assert_ok!(listener1.accept());
+    listener1.accept().unwrap();
 
     let handle_2 = open_connections(path.clone(), 1, barrier.clone());
     expect_events(
@@ -82,38 +82,40 @@ fn unix_listener_try_clone_same_poll() {
         ],
     );
 
-    assert_ok!(listener2.accept());
+    listener2.accept().unwrap();
 
     assert_would_block(listener1.accept());
     assert_would_block(listener2.accept());
 
-    assert!(assert_ok!(listener1.take_error()).is_none());
-    assert!(assert_ok!(listener2.take_error()).is_none());
+    assert!(listener1.take_error().unwrap().is_none());
+    assert!(listener2.take_error().unwrap().is_none());
 
     barrier.wait();
-    assert_ok!(handle_1.join());
-    assert_ok!(handle_2.join());
+    handle_1.join().unwrap();
+    handle_2.join().unwrap();
 }
 
 #[test]
 fn unix_listener_try_clone_different_poll() {
     let (mut poll1, mut events) = init_with_poll();
-    let mut poll2 = assert_ok!(Poll::new());
+    let mut poll2 = Poll::new().unwrap();
     let barrier = Arc::new(Barrier::new(3));
-    let dir = assert_ok!(TempDir::new("unix_listener"));
+    let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener1 = assert_ok!(UnixListener::bind(&path));
-    let listener2 = assert_ok!(listener1.try_clone());
+    let listener1 = UnixListener::bind(&path).unwrap();
+    let listener2 = listener1.try_clone().unwrap();
     assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
 
     let handle_1 = open_connections(path.clone(), 1, barrier.clone());
-    assert_ok!(poll1
+    poll1
         .registry()
-        .register(&listener1, TOKEN_1, Interests::READABLE));
-    assert_ok!(poll2
+        .register(&listener1, TOKEN_1, Interests::READABLE)
+        .unwrap();
+    poll2
         .registry()
-        .register(&listener2, TOKEN_2, Interests::READABLE));
+        .register(&listener2, TOKEN_2, Interests::READABLE)
+        .unwrap();
     expect_events(
         &mut poll1,
         &mut events,
@@ -125,7 +127,7 @@ fn unix_listener_try_clone_different_poll() {
         vec![ExpectEvent::new(TOKEN_2, Interests::READABLE)],
     );
 
-    assert_ok!(listener1.accept());
+    listener1.accept().unwrap();
 
     let handle_2 = open_connections(path.clone(), 1, barrier.clone());
     expect_events(
@@ -139,32 +141,34 @@ fn unix_listener_try_clone_different_poll() {
         vec![ExpectEvent::new(TOKEN_2, Interests::READABLE)],
     );
 
-    assert_ok!(listener2.accept());
+    listener2.accept().unwrap();
 
     assert_would_block(listener1.accept());
     assert_would_block(listener2.accept());
 
-    assert!(assert_ok!(listener1.take_error()).is_none());
-    assert!(assert_ok!(listener2.take_error()).is_none());
+    assert!(listener1.take_error().unwrap().is_none());
+    assert!(listener2.take_error().unwrap().is_none());
 
     barrier.wait();
-    assert_ok!(handle_1.join());
-    assert_ok!(handle_2.join());
+    handle_1.join().unwrap();
+    handle_2.join().unwrap();
 }
 
 #[test]
 fn unix_listener_local_addr() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = assert_ok!(TempDir::new("unix_listener"));
+    let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener = assert_ok!(UnixListener::bind(&path));
-    assert_ok!(poll.registry().register(
-        &listener,
-        TOKEN_1,
-        Interests::WRITABLE.add(Interests::READABLE)
-    ));
+    let listener = UnixListener::bind(&path).unwrap();
+    poll.registry()
+        .register(
+            &listener,
+            TOKEN_1,
+            Interests::WRITABLE.add(Interests::READABLE),
+        )
+        .unwrap();
 
     let handle = open_connections(path.clone(), 1, barrier.clone());
     expect_events(
@@ -173,26 +177,23 @@ fn unix_listener_local_addr() {
         vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
     );
 
-    let (stream, expected_addr) = assert_ok!(listener.accept());
-    assert_eq!(
-        assert_ok!(stream.local_addr()).as_pathname().unwrap(),
-        &path
-    );
+    let (stream, expected_addr) = listener.accept().unwrap();
+    assert_eq!(stream.local_addr().unwrap().as_pathname().unwrap(), &path);
     assert!(expected_addr.as_pathname().is_none());
 
     barrier.wait();
-    assert_ok!(handle.join());
+    handle.join().unwrap();
 }
 
 #[test]
 fn unix_listener_register() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = assert_ok!(TempDir::new("unix_listener"));
+    let dir = TempDir::new("unix_listener").unwrap();
 
-    let listener = assert_ok!(UnixListener::bind(dir.path().join("any")));
-    assert_ok!(poll
-        .registry()
-        .register(&listener, TOKEN_1, Interests::READABLE));
+    let listener = UnixListener::bind(dir.path().join("any")).unwrap();
+    poll.registry()
+        .register(&listener, TOKEN_1, Interests::READABLE)
+        .unwrap();
     expect_no_events(&mut poll, &mut events)
 }
 
@@ -200,20 +201,20 @@ fn unix_listener_register() {
 fn unix_listener_reregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = assert_ok!(TempDir::new("unix_listener"));
+    let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener = assert_ok!(UnixListener::bind(&path));
-    assert_ok!(poll
-        .registry()
-        .register(&listener, TOKEN_1, Interests::WRITABLE));
+    let listener = UnixListener::bind(&path).unwrap();
+    poll.registry()
+        .register(&listener, TOKEN_1, Interests::WRITABLE)
+        .unwrap();
 
     let handle = open_connections(path.clone(), 1, barrier.clone());
     expect_no_events(&mut poll, &mut events);
 
-    assert_ok!(poll
-        .registry()
-        .reregister(&listener, TOKEN_1, Interests::READABLE));
+    poll.registry()
+        .reregister(&listener, TOKEN_1, Interests::READABLE)
+        .unwrap();
     expect_events(
         &mut poll,
         &mut events,
@@ -221,28 +222,28 @@ fn unix_listener_reregister() {
     );
 
     barrier.wait();
-    assert_ok!(handle.join());
+    handle.join().unwrap();
 }
 
 #[test]
 fn unix_listener_deregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = assert_ok!(TempDir::new("unix_listener"));
+    let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener = assert_ok!(UnixListener::bind(&path));
-    assert_ok!(poll
-        .registry()
-        .register(&listener, TOKEN_1, Interests::READABLE));
+    let listener = UnixListener::bind(&path).unwrap();
+    poll.registry()
+        .register(&listener, TOKEN_1, Interests::READABLE)
+        .unwrap();
 
     let handle = open_connections(path.clone(), 1, barrier.clone());
 
-    assert_ok!(poll.registry().deregister(&listener));
+    poll.registry().deregister(&listener).unwrap();
     expect_no_events(&mut poll, &mut events);
 
     barrier.wait();
-    assert_ok!(handle.join());
+    handle.join().unwrap();
 }
 
 fn smoke_test<F>(new_listener: F)
@@ -251,15 +252,17 @@ where
 {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = assert_ok!(TempDir::new("unix_listener"));
+    let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener = assert_ok!(new_listener(&path));
-    assert_ok!(poll.registry().register(
-        &listener,
-        TOKEN_1,
-        Interests::WRITABLE.add(Interests::READABLE)
-    ));
+    let listener = new_listener(&path).unwrap();
+    poll.registry()
+        .register(
+            &listener,
+            TOKEN_1,
+            Interests::WRITABLE.add(Interests::READABLE),
+        )
+        .unwrap();
     expect_no_events(&mut poll, &mut events);
 
     let handle = open_connections(path.clone(), 1, barrier.clone());
@@ -269,16 +272,16 @@ where
         vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
     );
 
-    let (mut stream, _) = assert_ok!(listener.accept());
+    let (mut stream, _) = listener.accept().unwrap();
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
     assert_would_block(stream.read(&mut buf));
 
     assert_would_block(listener.accept());
-    assert!(assert_ok!(listener.take_error()).is_none());
+    assert!(listener.take_error().unwrap().is_none());
 
     barrier.wait();
-    assert_ok!(handle.join());
+    handle.join().unwrap();
 }
 
 fn open_connections(
@@ -288,7 +291,7 @@ fn open_connections(
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         for _ in 0..n_connections {
-            let conn = assert_ok!(net::UnixStream::connect(path.clone()));
+            let conn = net::UnixStream::connect(path.clone()).unwrap();
             barrier.wait();
             drop(conn);
         }
