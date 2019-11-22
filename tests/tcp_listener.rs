@@ -343,6 +343,57 @@ fn try_clone_different_poll() {
     thread_handle2.join().expect("unable to join thread");
 }
 
+/// This tests reregister on successful accept works
+#[test]
+fn tcp_listener_two_streams() {
+    let (mut poll1, mut events) = init_with_poll();
+
+    let listener = TcpListener::bind(any_local_address()).unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let barrier = Arc::new(Barrier::new(3));
+    let thread_handle1 = start_connections(address, 1, barrier.clone());
+
+    poll1
+        .registry()
+        .register(&listener, ID1, Interests::READABLE)
+        .unwrap();
+
+    expect_events(
+        &mut poll1,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+    );
+
+    {
+        let (stream, peer_address) = listener.accept().expect("unable to accept connection");
+        assert!(peer_address.ip().is_loopback());
+        assert_eq!(stream.peer_addr().unwrap(), peer_address);
+        assert_eq!(stream.local_addr().unwrap(), address);
+    }
+
+    let thread_handle2 = start_connections(address, 1, barrier.clone());
+
+    expect_events(
+        &mut poll1,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+    );
+
+    {
+        let (stream, peer_address) = listener.accept().expect("unable to accept connection");
+        assert!(peer_address.ip().is_loopback());
+        assert_eq!(stream.peer_addr().unwrap(), peer_address);
+        assert_eq!(stream.local_addr().unwrap(), address);
+    }
+
+    expect_no_events(&mut poll1, &mut events);
+
+    barrier.wait();
+    thread_handle1.join().expect("unable to join thread");
+    thread_handle2.join().expect("unable to join thread");
+}
+
 /// Start `n_connections` connections to `address`. If a `barrier` is provided
 /// it will wait on it after each connection is made before it is dropped.
 fn start_connections(
