@@ -18,6 +18,22 @@
 //!
 //! [`Poll`]: struct.Poll.html
 //! [`Events`]: struct.Events.html
+//!
+//! ## Examples
+//!
+//! Examples can found in the `examples` directory of the source code, or [on
+//! GitHub].
+//!
+//! [on GitHub]: https://github.com/tokio-rs/mio/tree/master/examples
+//!
+//! ## Guide
+//!
+//! A getting started guide is available in the
+#![cfg_attr(feature = "guide", doc = "[`guide`](crate::guide) module.")]
+#![cfg_attr(
+    not(feature = "guide"),
+    doc = "`guide` (only available when the `guide` feature is enabled)."
+)]
 
 mod interests;
 mod poll;
