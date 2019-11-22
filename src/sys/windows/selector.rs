@@ -16,7 +16,7 @@ use std::ptr::null_mut;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{io, ptr};
 use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
@@ -435,41 +435,17 @@ impl SelectorInner {
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
 
-        let mut n = 0;
-        let start = Instant::now();
-
-        loop {
-            if timeout.is_none() {
+        if timeout.is_none() {
+            loop {
                 let len = self.select2(&mut events.statuses, &mut events.events, None)?;
                 if len == 0 {
                     continue;
                 }
                 return Ok(());
-            } else {
-                if n >= events.statuses.len() {
-                    return Ok(());
-                }
-                let timeout = timeout.unwrap();
-                let deadline = start + timeout;
-                let now = Instant::now();
-                if timeout.as_nanos() != 0 {
-                    if now >= deadline {
-                        return Ok(());
-                    }
-                    let len = self.select2(
-                        &mut events.statuses[n..],
-                        &mut events.events,
-                        Some(deadline - now),
-                    )?;
-                    if len == 0 {
-                        return Ok(());
-                    }
-                    n += len;
-                } else {
-                    self.select2(&mut events.statuses[n..], &mut events.events, Some(timeout))?;
-                    return Ok(());
-                }
             }
+        } else {
+            self.select2(&mut events.statuses, &mut events.events, timeout)?;
+            return Ok(());
         }
     }
 
