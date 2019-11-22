@@ -343,34 +343,6 @@ fn try_clone_different_poll() {
     thread_handle2.join().expect("unable to join thread");
 }
 
-#[test]
-fn platform_specific_data_print() {
-    let (mut poll, mut events) = init_with_poll();
-
-    let listener = TcpListener::bind(any_local_address()).unwrap();
-    let address = listener.local_addr().unwrap();
-
-    let barrier = Arc::new(Barrier::new(2));
-    let thread_handle = start_connections(address, 1, barrier.clone());
-    poll.registry()
-        .register(&listener, ID1, Interests::READABLE)
-        .unwrap();
-
-    poll.poll(&mut events, None).expect("unable to poll");
-    println!("poll events: {:?}", events);
-
-    let (stream, _) = listener.accept().expect("unable to accept connection");
-    poll.registry()
-        .register(&stream, ID2, Interests::WRITABLE)
-        .unwrap();
-
-    poll.poll(&mut events, None).expect("unable to poll");
-    println!("poll events: {:#?}", events);
-
-    barrier.wait();
-    thread_handle.join().expect("unable to join thread");
-}
-
 /// Start `n_connections` connections to `address`. If a `barrier` is provided
 /// it will wait on it after each connection is made before it is dropped.
 fn start_connections(

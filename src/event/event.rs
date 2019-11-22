@@ -191,23 +191,24 @@ impl Event {
 impl fmt::Debug for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let alternate = f.alternate();
-        let d = &mut f.debug_struct("Event");
-        d.field("token", &self.token())
-            .field("readable", &self.is_readable())
-            .field("writable", &self.is_writable())
-            .field("error", &self.is_error())
-            .field("read_closed", &self.is_read_closed())
-            .field("write_closed", &self.is_write_closed())
-            .field("priority", &self.is_priority())
-            .field("aio", &self.is_aio())
-            .field("lio", &self.is_lio());
+        write!(f, "Event {{ ").unwrap();
+        write!(f, "token: {:?}, ", &self.token()).unwrap();
+        write!(f, "readable: {}, ", &self.is_readable()).unwrap();
+        write!(f, "writable: {}, ", &self.is_writable()).unwrap();
+        write!(f, "error: {}, ", &self.is_error()).unwrap();
+        write!(f, "read_closed: {}, ", &self.is_read_closed()).unwrap();
+        write!(f, "write_closed: {}, ", &self.is_write_closed()).unwrap();
+        write!(f, "priority: {}, ", &self.is_priority()).unwrap();
+        write!(f, "aio: {}, ", &self.is_aio()).unwrap();
+        write!(f, "lio: {}, ", &self.is_lio()).unwrap();
 
         if alternate {
-            let mut data_str = String::new();
-            sys::event::get_platform_event_data_str(&mut data_str, &self.inner);
-            d.field("platform ", &data_str);
+            write!(f, "platform: ").unwrap();
+            sys::event::write_details(f, &self.inner);
         }
 
-        d.finish()
+        write!(f, "}}").unwrap();
+
+        Ok(())
     }
 }

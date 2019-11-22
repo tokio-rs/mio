@@ -3,7 +3,7 @@ use miow::iocp::CompletionStatus;
 use super::afd;
 use crate::Token;
 
-use std::fmt::Write as FmtWrite;
+use std::fmt;
 
 #[derive(Debug)]
 pub struct Event {
@@ -51,16 +51,14 @@ pub fn is_lio(_: &Event) -> bool {
     false
 }
 
-pub fn get_platform_event_data_str(data_str: &mut String, event: &Event) {
-    write!(data_str, "event (").unwrap();
-
+pub fn write_details(f: &mut fmt::Formatter<'_>, event: &Event) {
     macro_rules! has_event {
             ($($(#[$target: meta])* $event: ident),+ $(,)*) => {
                 $(
                     $(#[$target])*
                     {
                         if event.flags & afd::$event != 0 {
-                            write!(data_str, "{} ", stringify!($event)).unwrap();
+                            write!(f, "{} ", stringify!($event)).unwrap();
                         }
                     }
                 )+
@@ -78,7 +76,6 @@ pub fn get_platform_event_data_str(data_str: &mut String, event: &Event) {
         POLL_CONNECT_FAIL,
     );
 
-    write!(data_str, ")").unwrap();
     ()
 }
 

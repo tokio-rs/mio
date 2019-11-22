@@ -338,7 +338,7 @@ unsafe impl Sync for Events {}
 pub mod event {
     use crate::sys::Event;
     use crate::Token;
-    use std::fmt::Write as FmtWrite;
+    use std::fmt;
 
     pub fn token(event: &Event) -> Token {
         Token(event.udata as usize)
@@ -418,8 +418,8 @@ pub mod event {
         }
     }
 
-    pub fn get_platform_event_data_str(data_str: &mut String, event: &Event) {
-        write!(data_str, "filter (").unwrap();
+    pub fn write_details(f: &mut fmt::Formatter<'_>, event: &Event) {
+        write!(f, "filter: ").unwrap();
 
         macro_rules! is_filter {
                 ($($(#[$target: meta])* $filter: ident),+ $(,)*) => {
@@ -427,7 +427,7 @@ pub mod event {
                         $(#[$target])*
                         {
                             if event.filter == libc::$filter {
-                                write!(data_str, stringify!($filter)).unwrap();
+                                write!(f, "{} ", stringify!($filter)).unwrap();
                             }
                         }
                     )+
@@ -472,7 +472,7 @@ pub mod event {
             EVFILT_VM,
         );
 
-        write!(data_str, ") flag (").unwrap();
+        write!(f, " flag: ").unwrap();
 
         macro_rules! has_flag {
                 ($($(#[$target: meta])* $flag: ident),+ $(,)*) => {
@@ -480,7 +480,7 @@ pub mod event {
                         $(#[$target])*
                         {
                             if (event.flags & libc::$flag) != 0  {
-                                write!(data_str, stringify!($flag)).unwrap();
+                                write!(f, "{} ", stringify!($flag)).unwrap();
                             }
                         }
                     )+
@@ -512,7 +512,7 @@ pub mod event {
             EV_NODATA,
         );
 
-        write!(data_str, ") fflag (").unwrap();
+        write!(f, " fflag: ").unwrap();
 
         macro_rules! has_fflag {
                 ($($(#[$target: meta])* $fflag: ident),+ $(,)*) => {
@@ -521,7 +521,7 @@ pub mod event {
                         #[allow(clippy::bad_bit_mask)] // Apparently some flags are zero.
                         {
                             if (event.fflags & libc::$fflag) != 0  {
-                                write!(data_str, stringify!($fflag)).unwrap();
+                                write!(f, "{} ", stringify!($fflag)).unwrap();
                             }
                         }
                     )+
@@ -661,9 +661,6 @@ pub mod event {
             #[cfg(any(target_os = "dragonfly"))]
             NOTE_BACKGROUND,
         );
-
-        write!(data_str, ") ").unwrap();
-
         ()
     }
 }

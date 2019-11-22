@@ -210,11 +210,14 @@ impl<'a> Iterator for Iter<'a> {
 
 impl fmt::Debug for Events {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let alternate = f.alternate();
         let mut d = f.debug_struct("Events");
         d.field("capacity", &self.capacity());
 
-        for event in self.iter() {
-            d.field("event", event);
+        if alternate {
+            for event in self.iter() {
+                d.field("", event);
+            }
         }
 
         d.finish()

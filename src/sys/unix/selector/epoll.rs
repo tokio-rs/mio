@@ -121,7 +121,7 @@ pub type Events = Vec<Event>;
 pub mod event {
     use crate::sys::Event;
     use crate::Token;
-    use std::fmt::Write as FmtWrite;
+    use std::fmt;
 
     pub fn token(event: &Event) -> Token {
         Token(event.u64 as usize)
@@ -170,16 +170,14 @@ pub mod event {
         false
     }
 
-    pub fn get_platform_event_data_str(data_str: &mut String, event: &Event) {
-        write!(data_str, "events (").unwrap();
-
+    pub fn write_details(f: &mut fmt::Formatter<'_>, event: &Event) {
         macro_rules! has_event {
             ($($(#[$target: meta])* $event: ident),+ $(,)*) => {
                 $(
                     $(#[$target])*
                     {
                         if (event.events as libc::c_int & libc::$event) != 0 {
-                            write!(data_str, stringify!($event)).unwrap();
+                            write!(f, "{} ", stringify!($event)).unwrap();
                         }
                     }
                 )+
@@ -206,8 +204,6 @@ pub mod event {
             EPOLLWAKEUP,
             EPOLL_CLOEXEC,
         );
-
-        write!(data_str, ")").unwrap();
     }
 }
 
