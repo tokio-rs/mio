@@ -52,7 +52,7 @@ fn tcp_stream_std() {
         let stream = net::TcpStream::connect(addr).unwrap();
         // `std::net::TcpStream`s are blocking by default, so make sure it is
         // in non-blocking mode before wrapping in a Mio equivalent.
-        assert_ok!(stream.set_nonblocking(true));
+        stream.set_nonblocking(true).unwrap();
         Ok(TcpStream::from_std(stream))
     });
 }
@@ -569,11 +569,11 @@ fn tcp_shutdown_client_read_close_event() {
     let barrier = Arc::new(Barrier::new(2));
 
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
-    let stream = assert_ok!(TcpStream::connect(sockaddr));
+    let stream = TcpStream::connect(sockaddr).unwrap();
 
     let interests = Interests::READABLE | Interests::WRITABLE;
 
-    assert_ok!(poll.registry().register(&stream, ID1, interests));
+    poll.registry().register(&stream, ID1, interests).unwrap();
 
     expect_events(
         &mut poll,
@@ -581,7 +581,7 @@ fn tcp_shutdown_client_read_close_event() {
         vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
     );
 
-    assert_ok!(stream.shutdown(Shutdown::Read));
+    stream.shutdown(Shutdown::Read).unwrap();
     expect_readiness!(poll, events, is_read_closed);
 
     barrier.wait();
@@ -599,11 +599,11 @@ fn tcp_shutdown_client_write_close_event() {
     let barrier = Arc::new(Barrier::new(2));
 
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
-    let stream = assert_ok!(TcpStream::connect(sockaddr));
+    let stream = TcpStream::connect(sockaddr).unwrap();
 
     let interests = Interests::READABLE | Interests::WRITABLE;
 
-    assert_ok!(poll.registry().register(&stream, ID1, interests));
+    poll.registry().register(&stream, ID1, interests).unwrap();
 
     expect_events(
         &mut poll,
@@ -611,7 +611,7 @@ fn tcp_shutdown_client_write_close_event() {
         vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
     );
 
-    assert_ok!(stream.shutdown(Shutdown::Write));
+    stream.shutdown(Shutdown::Write).unwrap();
     expect_readiness!(poll, events, is_write_closed);
 
     barrier.wait();
@@ -624,13 +624,11 @@ fn tcp_shutdown_server_write_close_event() {
     let barrier = Arc::new(Barrier::new(2));
 
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), true);
-    let stream = assert_ok!(TcpStream::connect(sockaddr));
+    let stream = TcpStream::connect(sockaddr).unwrap();
 
-    assert_ok!(poll.registry().register(
-        &stream,
-        ID1,
-        Interests::READABLE.add(Interests::WRITABLE)
-    ));
+    poll.registry()
+        .register(&stream, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .unwrap();
 
     expect_events(
         &mut poll,
@@ -656,13 +654,11 @@ fn tcp_shutdown_client_both_close_event() {
     let barrier = Arc::new(Barrier::new(2));
 
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
-    let stream = assert_ok!(TcpStream::connect(sockaddr));
+    let stream = TcpStream::connect(sockaddr).unwrap();
 
-    assert_ok!(poll.registry().register(
-        &stream,
-        ID1,
-        Interests::READABLE.add(Interests::WRITABLE)
-    ));
+    poll.registry()
+        .register(&stream, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .unwrap();
 
     expect_events(
         &mut poll,
@@ -670,7 +666,7 @@ fn tcp_shutdown_client_both_close_event() {
         vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
     );
 
-    assert_ok!(stream.shutdown(Shutdown::Both));
+    stream.shutdown(Shutdown::Both).unwrap();
     expect_readiness!(poll, events, is_write_closed);
 
     barrier.wait();
@@ -733,7 +729,7 @@ fn start_listener(
                 barrier.wait();
 
                 if shutdown_write {
-                    assert_ok!(stream.shutdown(Shutdown::Write));
+                    stream.shutdown(Shutdown::Write).unwrap();
                     barrier.wait();
                 }
             }

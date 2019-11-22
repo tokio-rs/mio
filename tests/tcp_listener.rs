@@ -40,7 +40,7 @@ fn tcp_listener_std() {
         let listener = net::TcpListener::bind(addr).unwrap();
         // `std::net::TcpListener`s are blocking by default, so make sure it is in
         // non-blocking mode before wrapping in a Mio equivalent.
-        assert_ok!(listener.set_nonblocking(true));
+        listener.set_nonblocking(true).unwrap();
         Ok(TcpListener::from_std(listener))
     });
 }

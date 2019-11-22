@@ -12,29 +12,6 @@ use log::{error, warn};
 use mio::event::Event;
 use mio::{Events, Interests, Poll, Token};
 
-// TODO: replace w/ assertive
-// https://github.com/carllerche/assertive
-#[macro_export]
-macro_rules! assert_ok {
-    ($e:expr) => {
-        assert_ok!($e,)
-    };
-    ($e:expr,) => {{
-        use std::result::Result::*;
-        match $e {
-            Ok(v) => v,
-            Err(e) => panic!("assertion failed: error = {:?}", e),
-        }
-    }};
-    ($e:expr, $($arg:tt)+) => {{
-        use std::result::Result::*;
-        match $e {
-            Ok(v) => v,
-            Err(e) => panic!("assertion failed: error = {:?}: {}", e, format_args!($($arg)+)),
-        }
-    }};
-}
-
 #[macro_export]
 macro_rules! assert_err {
     ($e:expr) => {
@@ -64,7 +41,9 @@ macro_rules! expect_readiness {
         // Poll a couple of times in case the event does not immediately
         // happen
         for _ in 0..3 {
-            assert_ok!($poll.poll(&mut $events, Some(Duration::from_millis(500))));
+            $poll
+                .poll(&mut $events, Some(Duration::from_millis(500)))
+                .unwrap();
             for event in $events.iter() {
                 if event.$readiness() {
                     found = true;

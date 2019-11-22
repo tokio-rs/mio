@@ -56,8 +56,8 @@ fn unconnected_udp_socket_std() {
 
     // `std::net::UdpSocket`s are blocking by default, so make sure they are
     // in non-blocking mode before wrapping in a Mio equivalent.
-    assert_ok!(socket1.set_nonblocking(true));
-    assert_ok!(socket2.set_nonblocking(true));
+    socket1.set_nonblocking(true).unwrap();
+    socket2.set_nonblocking(true).unwrap();
 
     let socket1 = UdpSocket::from_std(socket1);
     let socket2 = UdpSocket::from_std(socket2);
@@ -186,8 +186,8 @@ fn connected_udp_socket_std() {
 
     // `std::net::UdpSocket`s are blocking by default, so make sure they are
     // in non-blocking mode before wrapping in a Mio equivalent.
-    assert_ok!(socket1.set_nonblocking(true));
-    assert_ok!(socket2.set_nonblocking(true));
+    socket1.set_nonblocking(true).unwrap();
+    socket2.set_nonblocking(true).unwrap();
 
     let socket1 = UdpSocket::from_std(socket1);
     let socket2 = UdpSocket::from_std(socket2);
