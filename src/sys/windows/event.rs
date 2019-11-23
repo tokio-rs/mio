@@ -51,6 +51,7 @@ pub fn is_lio(_: &Event) -> bool {
 }
 
 pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn check_flags(got: &u32, want: &u32) -> bool {
         (got & want) != 0
     }

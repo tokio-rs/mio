@@ -470,6 +470,7 @@ pub mod event {
             libc::EVFILT_VM,
         );
 
+        #[allow(clippy::trivially_copy_pass_by_ref)]
         fn check_flag(got: &Flags, want: &Flags) -> bool {
             (got & want) != 0
         }
@@ -500,6 +501,7 @@ pub mod event {
             libc::EV_NODATA,
         );
 
+        #[allow(clippy::trivially_copy_pass_by_ref)]
         fn check_fflag(got: &u32, want: &u32) -> bool {
             (got & want) != 0
         }
