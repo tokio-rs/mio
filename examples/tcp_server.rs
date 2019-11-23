@@ -21,7 +21,7 @@ fn main() -> io::Result<()> {
     let mut events = Events::with_capacity(128);
 
     // Setup the TCP server socket.
-    let addr = "127.0.0.1:13265".parse().unwrap();
+    let addr = "127.0.0.1:9000".parse().unwrap();
     let server = TcpListener::bind(addr)?;
 
     // Register the server with poll we can receive events for it.
@@ -34,7 +34,7 @@ fn main() -> io::Result<()> {
     let mut unique_token = Token(SERVER.0 + 1);
 
     println!("You can connect to the server using `nc`:");
-    println!(" $ nc 127.0.0.1 13265");
+    println!(" $ nc 127.0.0.1 9000");
     println!("You'll see our welcome message and anything you type we'll be printed here.");
 
     loop {
