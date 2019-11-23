@@ -172,6 +172,7 @@ pub mod event {
     }
 
     pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
+        #[allow(clippy::trivially_copy_pass_by_ref)]
         fn check_events(got: &u32, want: &libc::c_int) -> bool {
             (*got as libc::c_int & want) != 0
         }
