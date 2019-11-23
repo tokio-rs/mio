@@ -13,5 +13,5 @@ jobs:
     - script: rustup component add clippy
       displayName: "Add component"
 
-    - script: cargo clippy --all-targets -- -D warnings -A clippy::cognitive-complexity
+    - script: cargo clippy --all-targets --all-features -- -D warnings -A clippy::cognitive-complexity
       displayName: "Run Clippy"
