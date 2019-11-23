@@ -13,6 +13,41 @@
 //! * `TcpListener`, `TcpStream` and `UdpSocket`: see [`crate::net`] module.
 //! * `Waker`: see [`crate::Waker`].
 
+macro_rules! debug_detail {
+    (
+        $type: ident ($event_type: ty), $test: path,
+        $($(#[$target: meta])* $libc: ident :: $flag: ident),+ $(,)*
+    ) => {
+        struct $type($event_type);
+
+        impl fmt::Debug for $type {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let mut written_one = false;
+                $(
+                    $(#[$target])*
+                    #[allow(clippy::bad_bit_mask)] // Apparently some flags are zero.
+                    {
+                        // Windows doesn't use `libc` but the `afd` module.
+                        if $test(&self.0, &$libc :: $flag) {
+                            if !written_one {
+                                write!(f, "{}", stringify!($flag))?;
+                                written_one = true;
+                            } else {
+                                write!(f, "|{}", stringify!($flag))?;
+                            }
+                        }
+                    }
+                )+
+                if !written_one {
+                    write!(f, "(empty)")
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    };
+}
+
 #[cfg(unix)]
 pub use self::unix::{
     event, Event, Events, Selector, SocketAddr, SourceFd, TcpListener, TcpStream, UdpSocket,

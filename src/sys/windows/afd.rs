@@ -214,7 +214,7 @@ pub const POLL_LOCAL_CLOSE: u32 = 0b000_100_000;
 // Not used as it indicated in each event where a connection is connected, not
 // just the first time a connection is established.
 // Also see https://github.com/piscisaureus/wepoll/commit/8b7b340610f88af3d83f40fb728e7b850b090ece.
-//pub const POLL_CONNECT: u32 = 0b001_000_000;
+pub const POLL_CONNECT: u32 = 0b001_000_000;
 pub const POLL_ACCEPT: u32 = 0b010_000_000;
 pub const POLL_CONNECT_FAIL: u32 = 0b100_000_000;
 
