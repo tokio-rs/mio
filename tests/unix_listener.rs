@@ -72,7 +72,7 @@ fn unix_listener_try_clone_same_poll() {
 
     listener1.accept().unwrap();
 
-    let handle_2 = open_connections(path.clone(), 1, barrier.clone());
+    let handle_2 = open_connections(path, 1, barrier.clone());
     expect_events(
         &mut poll,
         &mut events,
@@ -129,7 +129,7 @@ fn unix_listener_try_clone_different_poll() {
 
     listener1.accept().unwrap();
 
-    let handle_2 = open_connections(path.clone(), 1, barrier.clone());
+    let handle_2 = open_connections(path, 1, barrier.clone());
     expect_events(
         &mut poll1,
         &mut events,
@@ -209,7 +209,7 @@ fn unix_listener_reregister() {
         .register(&listener, TOKEN_1, Interests::WRITABLE)
         .unwrap();
 
-    let handle = open_connections(path.clone(), 1, barrier.clone());
+    let handle = open_connections(path, 1, barrier.clone());
     expect_no_events(&mut poll, &mut events);
 
     poll.registry()
@@ -237,7 +237,7 @@ fn unix_listener_deregister() {
         .register(&listener, TOKEN_1, Interests::READABLE)
         .unwrap();
 
-    let handle = open_connections(path.clone(), 1, barrier.clone());
+    let handle = open_connections(path, 1, barrier.clone());
 
     poll.registry().deregister(&listener).unwrap();
     expect_no_events(&mut poll, &mut events);
@@ -265,7 +265,7 @@ where
         .unwrap();
     expect_no_events(&mut poll, &mut events);
 
-    let handle = open_connections(path.clone(), 1, barrier.clone());
+    let handle = open_connections(path, 1, barrier.clone());
     expect_events(
         &mut poll,
         &mut events,
