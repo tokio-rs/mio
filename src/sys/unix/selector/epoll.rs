@@ -119,6 +119,8 @@ pub type Event = libc::epoll_event;
 pub type Events = Vec<Event>;
 
 pub mod event {
+    use std::fmt;
+
     use crate::sys::Event;
     use crate::Token;
 
@@ -167,6 +169,41 @@ pub mod event {
     pub fn is_lio(_: &Event) -> bool {
         // Not supported.
         false
+    }
+
+    pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
+        fn check_events(got: &u32, want: &libc::c_int) -> bool {
+            (*got as libc::c_int & want) != 0
+        }
+        debug_detail!(
+            EventsDetails(u32),
+            check_events,
+            libc::EPOLLIN,
+            libc::EPOLLPRI,
+            libc::EPOLLOUT,
+            libc::EPOLLRDNORM,
+            libc::EPOLLRDBAND,
+            libc::EPOLLWRNORM,
+            libc::EPOLLWRBAND,
+            libc::EPOLLMSG,
+            libc::EPOLLERR,
+            libc::EPOLLHUP,
+            libc::EPOLLET,
+            libc::EPOLLRDHUP,
+            libc::EPOLLONESHOT,
+            #[cfg(any(target_os = "linux", target_os = "solaris"))]
+            libc::EPOLLEXCLUSIVE,
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            libc::EPOLLWAKEUP,
+            libc::EPOLL_CLOEXEC,
+        );
+
+        // Can't reference fields in packed structures.
+        let e_u64 = event.u64;
+        f.debug_struct("epoll_event")
+            .field("events", &EventsDetails(event.events))
+            .field("u64", &e_u64)
+            .finish()
     }
 }
 

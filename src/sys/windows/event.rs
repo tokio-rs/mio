@@ -1,9 +1,10 @@
+use std::fmt;
+
 use miow::iocp::CompletionStatus;
 
 use super::afd;
 use crate::Token;
 
-#[derive(Debug)]
 pub struct Event {
     pub flags: u32,
     pub data: u64,
@@ -47,6 +48,30 @@ pub fn is_aio(_: &Event) -> bool {
 pub fn is_lio(_: &Event) -> bool {
     // Not supported.
     false
+}
+
+pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
+    fn check_flags(got: &u32, want: &u32) -> bool {
+        (got & want) != 0
+    }
+    debug_detail!(
+        FlagsDetails(u32),
+        check_flags,
+        afd::POLL_RECEIVE,
+        afd::POLL_RECEIVE_EXPEDITED,
+        afd::POLL_SEND,
+        afd::POLL_DISCONNECT,
+        afd::POLL_ABORT,
+        afd::POLL_LOCAL_CLOSE,
+        afd::POLL_CONNECT,
+        afd::POLL_ACCEPT,
+        afd::POLL_CONNECT_FAIL,
+    );
+
+    f.debug_struct("event")
+        .field("flags", &FlagsDetails(event.flags))
+        .field("data", &event.data)
+        .finish()
 }
 
 pub struct Events {

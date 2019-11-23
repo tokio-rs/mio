@@ -27,6 +27,14 @@ type Filter = i16;
 #[cfg(target_os = "netbsd")]
 type Filter = u32;
 
+// Type of the `flags` field in the `kevent` structure.
+#[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
+type Flags = libc::c_ushort;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+type Flags = u16;
+#[cfg(target_os = "netbsd")]
+type Flags = u32;
+
 // Type of the `data` field in the `kevent` structure.
 #[cfg(any(
     target_os = "dragonfly",
@@ -336,8 +344,12 @@ unsafe impl Send for Events {}
 unsafe impl Sync for Events {}
 
 pub mod event {
+    use std::fmt;
+
     use crate::sys::Event;
     use crate::Token;
+
+    use super::{Filter, Flags};
 
     pub fn token(event: &Event) -> Token {
         Token(event.udata as usize)
@@ -415,6 +427,230 @@ pub mod event {
         {
             false
         }
+    }
+
+    pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
+        debug_detail!(
+            FilterDetails(Filter),
+            PartialEq::eq,
+            libc::EVFILT_READ,
+            libc::EVFILT_WRITE,
+            libc::EVFILT_AIO,
+            libc::EVFILT_VNODE,
+            libc::EVFILT_PROC,
+            libc::EVFILT_SIGNAL,
+            libc::EVFILT_TIMER,
+            #[cfg(target_os = "freebsd")]
+            libc::EVFILT_PROCDESC,
+            #[cfg(any(
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            libc::EVFILT_FS,
+            #[cfg(target_os = "freebsd")]
+            libc::EVFILT_LIO,
+            #[cfg(any(
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            libc::EVFILT_USER,
+            #[cfg(target_os = "freebsd")]
+            libc::EVFILT_SENDFILE,
+            #[cfg(target_os = "freebsd")]
+            libc::EVFILT_EMPTY,
+            #[cfg(target_os = "dragonfly")]
+            libc::EVFILT_EXCEPT,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::EVFILT_MACHPORT,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::EVFILT_VM,
+        );
+
+        fn check_flag(got: &Flags, want: &Flags) -> bool {
+            (got & want) != 0
+        }
+        debug_detail!(
+            FlagsDetails(Flags),
+            check_flag,
+            libc::EV_ADD,
+            libc::EV_DELETE,
+            libc::EV_ENABLE,
+            libc::EV_DISABLE,
+            libc::EV_ONESHOT,
+            libc::EV_CLEAR,
+            libc::EV_RECEIPT,
+            libc::EV_DISPATCH,
+            #[cfg(target_os = "freebsd")]
+            libc::EV_DROP,
+            libc::EV_FLAG1,
+            libc::EV_ERROR,
+            libc::EV_EOF,
+            libc::EV_SYSFLAGS,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::EV_FLAG0,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::EV_POLL,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::EV_OOBAND,
+            #[cfg(target_os = "dragonfly")]
+            libc::EV_NODATA,
+        );
+
+        fn check_fflag(got: &u32, want: &u32) -> bool {
+            (got & want) != 0
+        }
+        debug_detail!(
+            FflagsDetails(u32),
+            check_fflag,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            libc::NOTE_TRIGGER,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            libc::NOTE_FFNOP,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            libc::NOTE_FFAND,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            libc::NOTE_FFOR,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            libc::NOTE_FFCOPY,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            libc::NOTE_FFCTRLMASK,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos"
+            ))]
+            libc::NOTE_FFLAGSMASK,
+            libc::NOTE_LOWAT,
+            libc::NOTE_DELETE,
+            libc::NOTE_WRITE,
+            #[cfg(target_os = "dragonfly")]
+            libc::NOTE_OOB,
+            #[cfg(target_os = "openbsd")]
+            libc::NOTE_EOF,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_EXTEND,
+            libc::NOTE_ATTRIB,
+            libc::NOTE_LINK,
+            libc::NOTE_RENAME,
+            libc::NOTE_REVOKE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_NONE,
+            #[cfg(any(target_os = "openbsd"))]
+            libc::NOTE_TRUNCATE,
+            libc::NOTE_EXIT,
+            libc::NOTE_FORK,
+            libc::NOTE_EXEC,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_SIGNAL,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_EXITSTATUS,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_EXIT_DETAIL,
+            libc::NOTE_PDATAMASK,
+            libc::NOTE_PCTRLMASK,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd"
+            ))]
+            libc::NOTE_TRACK,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd"
+            ))]
+            libc::NOTE_TRACKERR,
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd"
+            ))]
+            libc::NOTE_CHILD,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_EXIT_DETAIL_MASK,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_EXIT_DECRYPTFAIL,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_EXIT_MEMORY,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_EXIT_CSERROR,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_VM_PRESSURE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_VM_PRESSURE_TERMINATE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_VM_PRESSURE_SUDDEN_TERMINATE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_VM_ERROR,
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            libc::NOTE_SECONDS,
+            #[cfg(any(target_os = "freebsd"))]
+            libc::NOTE_MSECONDS,
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            libc::NOTE_USECONDS,
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            libc::NOTE_NSECONDS,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+            libc::NOTE_ABSOLUTE,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_LEEWAY,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            libc::NOTE_CRITICAL,
+            #[cfg(any(target_os = "dragonfly"))]
+            libc::NOTE_BACKGROUND,
+        );
+
+        // Can't reference fields in packed structures.
+        let ident = event.ident;
+        let data = event.data;
+        let udata = event.udata;
+        f.debug_struct("kevent")
+            .field("ident", &ident)
+            .field("filter", &FilterDetails(event.filter))
+            .field("flags", &FlagsDetails(event.flags))
+            .field("fflags", &FflagsDetails(event.fflags))
+            .field("data", &data)
+            .field("udata", &udata)
+            .finish()
     }
 }
 
