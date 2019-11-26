@@ -391,6 +391,41 @@ pub struct SelectorInner {
 // We have ensured thread safety by introducing lock manually.
 unsafe impl Sync for SelectorInner {}
 
+impl Drop for SelectorInner {
+    fn drop(&mut self) {
+        loop {
+            let events_num: usize;
+            let mut statuses: [CompletionStatus; 1024] = [CompletionStatus::zero(); 1024];
+
+            let result = self
+                .cp
+                .get_many(&mut statuses, Some(std::time::Duration::from_millis(0)));
+            match result {
+                Ok(iocp_events) => {
+                    events_num = iocp_events.iter().len();
+                    for iocp_event in iocp_events.iter() {
+                        if !iocp_event.overlapped().is_null() {
+                            // drain sock state to release memory of Arc reference
+                            let _sock_state = from_overlapped(iocp_event.overlapped());
+                        }
+                    }
+                }
+
+                Err(_) => {
+                    break;
+                }
+            }
+
+            if events_num < 1024 {
+                // continue looping until all completion statuses have been drained
+                break;
+            }
+        }
+
+        self.afd_group.release_unused_afd();
+    }
+}
+
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
         CompletionPort::new(0).map(|cp| {
