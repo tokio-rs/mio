@@ -9,7 +9,7 @@ use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::Overlapped;
 use std::collections::VecDeque;
 use std::marker::PhantomPinned;
-use std::mem::{forget, size_of, transmute_copy};
+use std::mem::size_of;
 use std::os::windows::io::{AsRawSocket, RawSocket};
 use std::pin::Pin;
 use std::ptr::null_mut;
@@ -23,6 +23,7 @@ use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
 use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, WAIT_TIMEOUT};
+use winapi::um::minwinbase::OVERLAPPED;
 use winapi::um::mswsock::SIO_BASE_HANDLE;
 use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
 
@@ -159,7 +160,8 @@ impl SockState {
             self.poll_info.handles[0].status = 0;
             self.poll_info.handles[0].events = self.user_evts | afd::POLL_LOCAL_CLOSE;
 
-            let overlapped_ptr: PVOID = unsafe { transmute_copy(self_arc) };
+            // Increase the ref count as the memory will be used by the kernel.
+            let overlapped_ptr = into_overlapped(self_arc.clone());
 
             let result = unsafe {
                 self.afd
@@ -169,24 +171,20 @@ impl SockState {
                 let code = e.raw_os_error().unwrap();
                 if code == ERROR_IO_PENDING as i32 {
                     /* Overlapped poll operation in progress; this is expected. */
-                } else if code == ERROR_INVALID_HANDLE as i32 {
-                    /* Socket closed; it'll be dropped. */
-                    self.mark_delete();
-                    return Ok(());
                 } else {
-                    return Err(e);
+                    // Since the operation failed it means the kernel won't be
+                    // using the memory any more.
+                    drop(from_overlapped(overlapped_ptr as *mut _));
+                    if code == ERROR_INVALID_HANDLE as i32 {
+                        /* Socket closed; it'll be dropped. */
+                        self.mark_delete();
+                        return Ok(());
+                    } else {
+                        return Err(e);
+                    }
                 }
             }
 
-            // We've effectively created another reference to the SockState
-            // struct by transmuting `self_arc` to a raw pointer, but the Arc's
-            // reference count has not been increased so far. Now that the
-            // AFD_POLL operation has succesfully started, it is certain that
-            // once the operation completes, this raw pointer will be received
-            // back from the kernel and converted to an actual Arc (in
-            // `feed_events()`). Therefore increase the Arc reference count here
-            // by cloning it and immediately leaking the clone.
-            forget(self_arc.clone());
             self.poll_status = SockPollStatus::Pending;
             self.pending_evts = self.user_evts;
         } else {
@@ -272,6 +270,21 @@ impl SockState {
             self.delete_pending = true;
         }
     }
+}
+
+/// Converts the pointer to a `SockState` into a raw pointer.
+/// To revert see `from_overlapped`.
+fn into_overlapped(sock_state: Pin<Arc<Mutex<SockState>>>) -> PVOID {
+    let overlapped_ptr: *const Mutex<SockState> =
+        unsafe { Arc::into_raw(Pin::into_inner_unchecked(sock_state)) };
+    overlapped_ptr as *mut _
+}
+
+/// Convert a raw overlapped pointer into a reference to `SockState`.
+/// Reverts `into_overlapped`.
+fn from_overlapped(ptr: *mut OVERLAPPED) -> Pin<Arc<Mutex<SockState>>> {
+    let sock_ptr: *const Mutex<SockState> = ptr as *const _;
+    unsafe { Pin::new_unchecked(Arc::from_raw(sock_ptr)) }
 }
 
 impl Drop for SockState {
@@ -566,8 +579,9 @@ impl SelectorInner {
                 n += 1;
                 continue;
             }
-            let sock_arc: Pin<Arc<Mutex<SockState>>> = transmute_copy(&iocp_event.overlapped());
-            let mut sock_guard = sock_arc.lock().unwrap();
+
+            let sock_state = from_overlapped(iocp_event.overlapped());
+            let mut sock_guard = sock_state.lock().unwrap();
             match sock_guard.feed_event() {
                 Some(e) => {
                     events.push(e);
@@ -576,7 +590,7 @@ impl SelectorInner {
             }
             n += 1;
             if !sock_guard.is_pending_deletion() {
-                update_queue.push_back(sock_arc.clone());
+                update_queue.push_back(sock_state.clone());
             }
         }
         self.afd_group.release_unused_afd();
