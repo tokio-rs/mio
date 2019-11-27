@@ -228,6 +228,14 @@ impl UdpSocket {
     /// Receives data from the socket. On success, returns the number of bytes
     /// read and the address from whence the data came.
     ///
+    /// # Notes
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and recv_from returns the error
+    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 64 kilobytes in size.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -255,6 +263,14 @@ impl UdpSocket {
     /// Receives data from the socket, without removing it from the input queue.
     /// On success, returns the number of bytes read and the address from whence
     /// the data came.
+    ///
+    /// # Notes
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and peek_from returns the error
+    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 64 kilobytes in size.
     ///
     /// # Examples
     ///
@@ -288,12 +304,28 @@ impl UdpSocket {
 
     /// Receives data from the socket previously bound with connect(). On success, returns
     /// the number of bytes read.
+    ///
+    /// # Notes
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and recv returns the error
+    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 64 kilobytes in size.
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.recv(buf)
     }
 
     /// Receives data from the socket, without removing it from the input queue.
     /// On success, returns the number of bytes read.
+    ///
+    /// # Notes
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and peek returns the error
+    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 64 kilobytes in size.
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.peek(buf)
     }
