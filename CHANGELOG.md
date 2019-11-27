@@ -1,3 +1,8 @@
+# 0.6.21 (November 27, 2019)
+
+### Fixed
+- remove `=` dependency on `cfg-if`.
+
 # 0.6.20 (November 21, 2019)
 
 ### Fixed
