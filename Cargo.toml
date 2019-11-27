@@ -31,7 +31,7 @@ log      = "0.4"
 slab     = "0.4.0"
 net2     = "0.2.29"
 iovec    = "0.1.1"
-cfg-if   = "=0.1.9"
+cfg-if   = "0.1.9"
 
 [target.'cfg(target_os = "fuchsia")'.dependencies]
 fuchsia-zircon = "0.3.2"
