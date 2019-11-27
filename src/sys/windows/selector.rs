@@ -416,7 +416,7 @@ impl Drop for SelectorInner {
                 }
             }
 
-            if events_num < 1024 {
+            if events_num == 0 {
                 // continue looping until all completion statuses have been drained
                 break;
             }
