@@ -288,7 +288,6 @@ fn reconnect_udp_socket_sending() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1080")]
 fn reconnect_udp_socket_receiving() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -334,7 +333,11 @@ fn reconnect_udp_socket_receiving() {
     let mut buf = [0; 20];
     expect_read!(socket1.recv(&mut buf), DATA1);
 
+    //this will reregister socket1 resetting the interests
+    assert_would_block(socket1.recv(&mut buf));
+
     socket1.connect(address3).unwrap();
+
     checked_write!(socket3.send(DATA2));
 
     expect_events(
@@ -343,12 +346,16 @@ fn reconnect_udp_socket_receiving() {
         vec![ExpectEvent::new(ID1, Interests::READABLE)],
     );
 
-    // Read only a part of the data.
-    let max = 4;
-    expect_read!(socket1.recv(&mut buf[..max]), &DATA2[..max]);
+    // Read all data.
+    // On Windows, reading part of data returns error WSAEMSGSIZE (10040).
+    expect_read!(socket1.recv(&mut buf), DATA2);
 
-    // Now connect back to socket 2, dropping the unread data.
+    //this will reregister socket1 resetting the interests
+    assert_would_block(socket1.recv(&mut buf));
+
+    // Now connect back to socket 2.
     socket1.connect(address2).unwrap();
+
     checked_write!(socket2.send(DATA2));
 
     expect_events(
@@ -365,7 +372,6 @@ fn reconnect_udp_socket_receiving() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1080")]
 fn unconnected_udp_socket_connected_methods() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -387,7 +393,15 @@ fn unconnected_udp_socket_connected_methods() {
     );
 
     // Socket is unconnected, but we're using an connected method.
-    assert_error(socket1.send(DATA1), "address required");
+    if cfg!(not(target_os = "windows")) {
+        assert_error(socket1.send(DATA1), "address required");
+    }
+    if cfg!(target_os = "windows") {
+        assert_error(
+            socket1.send(DATA1),
+            "no address was supplied. (os error 10057)",
+        );
+    }
 
     // Now send some actual data.
     checked_write!(socket1.send_to(DATA1, address2));
