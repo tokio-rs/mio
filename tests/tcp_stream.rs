@@ -98,6 +98,8 @@ where
 
     assert!(stream.take_error().unwrap().is_none());
 
+    assert_would_block(stream.read(&mut buf));
+
     let bufs = [IoSlice::new(&DATA1), IoSlice::new(&DATA2)];
     let n = stream
         .write_vectored(&bufs)
