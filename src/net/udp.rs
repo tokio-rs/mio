@@ -234,7 +234,7 @@ impl UdpSocket {
     /// is filled with the first part of the data, and recv_from returns the error
     /// WSAEMSGSIZE(10040). The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
-    /// maximum UDP packet size, which can be up to 64 kilobytes in size.
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
     /// # Examples
     ///
@@ -270,7 +270,7 @@ impl UdpSocket {
     /// is filled with the first part of the data, and peek_from returns the error
     /// WSAEMSGSIZE(10040). The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
-    /// maximum UDP packet size, which can be up to 64 kilobytes in size.
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
     /// # Examples
     ///
@@ -311,7 +311,7 @@ impl UdpSocket {
     /// is filled with the first part of the data, and recv returns the error
     /// WSAEMSGSIZE(10040). The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
-    /// maximum UDP packet size, which can be up to 64 kilobytes in size.
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.recv(buf)
     }
@@ -325,7 +325,7 @@ impl UdpSocket {
     /// is filled with the first part of the data, and peek returns the error
     /// WSAEMSGSIZE(10040). The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
-    /// maximum UDP packet size, which can be up to 64 kilobytes in size.
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.sys.peek(buf)
     }
