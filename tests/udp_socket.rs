@@ -873,40 +873,44 @@ fn et_behavior_recv() {
     let address2 = socket2.local_addr().unwrap();
 
     poll.registry()
+        .register(&socket1, ID1, Interests::WRITABLE)
+        .expect("unable to register UDP socket");
+    poll.registry()
         .register(&socket2, ID2, Interests::READABLE.add(Interests::WRITABLE))
         .expect("unable to register UDP socket");
 
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::WRITABLE)],
+        vec![
+            ExpectEvent::new(ID1, Interests::WRITABLE),
+            ExpectEvent::new(ID2, Interests::WRITABLE),
+        ],
     );
 
-    {
-        socket1.connect(address2).unwrap();
+    socket1.connect(address2).unwrap();
 
-        let mut buf = [0; 20];
-        checked_write!(socket1.send(DATA1));
-        expect_events(
-            &mut poll,
-            &mut events,
-            vec![ExpectEvent::new(ID2, Interests::READABLE)],
-        );
+    let mut buf = [0; 20];
+    checked_write!(socket1.send(DATA1));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
 
-        expect_read!(socket2.recv(&mut buf), DATA1);
+    expect_read!(socket2.recv(&mut buf), DATA1);
 
-        // this will reregister the socket2, resetting the interests
-        assert_would_block(socket2.recv(&mut buf));
-        checked_write!(socket1.send(DATA1));
-        expect_events(
-            &mut poll,
-            &mut events,
-            vec![ExpectEvent::new(ID2, Interests::READABLE)],
-        );
+    // this will reregister the socket2, resetting the interests
+    assert_would_block(socket2.recv(&mut buf));
+    checked_write!(socket1.send(DATA1));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
 
-        let mut buf = [0; 20];
-        expect_read!(socket2.recv(&mut buf), DATA1);
-    }
+    let mut buf = [0; 20];
+    expect_read!(socket2.recv(&mut buf), DATA1);
 }
 
 #[test]
