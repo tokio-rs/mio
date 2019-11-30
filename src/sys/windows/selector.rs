@@ -4,7 +4,6 @@ use super::Event;
 use super::SocketState;
 use crate::sys::Events;
 use crate::{Interests, Token};
-use log::error;
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::Overlapped;
@@ -62,13 +61,10 @@ impl AfdGroup {
 
         match afd_group.last() {
             Some(arc) => Ok(arc.clone()),
-            None => {
-                error!(
-                    "Cannot acquire afd, {:#?}, afd_group: {:#?}",
-                    self, afd_group
-                );
-                unreachable!()
-            }
+            None => unreachable!(
+                "Cannot acquire afd, {:#?}, afd_group: {:#?}",
+                self, afd_group
+            ),
         }
     }
 
@@ -196,8 +192,7 @@ impl SockState {
             self.poll_status = SockPollStatus::Pending;
             self.pending_evts = self.user_evts;
         } else {
-            error!("Invalid poll status during update, {:#?}", self);
-            unreachable!();
+            unreachable!("Invalid poll status during update, {:#?}", self)
         }
         Ok(())
     }
@@ -205,10 +200,7 @@ impl SockState {
     fn cancel(&mut self) -> io::Result<()> {
         match self.poll_status {
             SockPollStatus::Pending => {}
-            _ => {
-                error!("Invalid poll status during cancel, {:#?}", self);
-                unreachable!()
-            }
+            _ => unreachable!("Invalid poll status during cancel, {:#?}", self),
         };
         unsafe {
             self.afd.cancel(&mut *self.iosb)?;
