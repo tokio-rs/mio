@@ -99,20 +99,6 @@ impl TcpStream {
         self.sys.local_addr()
     }
 
-    /// Creates a new independently owned handle to the underlying socket.
-    ///
-    /// The returned `TcpStream` is a reference to the same stream that this
-    /// object references. Both handles will read and write the same stream of
-    /// data, and options set on one stream will be propagated to the other
-    /// stream.
-    pub fn try_clone(&self) -> io::Result<TcpStream> {
-        self.sys.try_clone().map(|s| TcpStream {
-            sys: s,
-            #[cfg(debug_assertions)]
-            selector_id: self.selector_id.clone(),
-        })
-    }
-
     /// Shuts down the read, write, or both halves of this connection.
     ///
     /// This function will cause all pending and future I/O on the specified

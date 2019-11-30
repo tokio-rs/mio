@@ -50,13 +50,6 @@ impl UdpSocket {
         self.inner.local_addr()
     }
 
-    pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        self.inner.try_clone().map(|inner| UdpSocket {
-            internal: Box::new(Mutex::new(None)),
-            inner,
-        })
-    }
-
     pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
         try_io!(self, send_to, buf, target)
     }

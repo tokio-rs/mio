@@ -48,10 +48,6 @@ impl TcpListener {
         self.inner.local_addr()
     }
 
-    pub fn try_clone(&self) -> io::Result<TcpListener> {
-        self.inner.try_clone().map(|s| TcpListener { inner: s })
-    }
-
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         self.inner.accept().and_then(|(inner, addr)| {
             inner
