@@ -172,8 +172,8 @@ pub fn assert_error<T, E: fmt::Display>(result: Result<T, E>, expected_msg: &str
         Err(err) => assert!(
             err.to_string().contains(expected_msg),
             "wanted: {}, got: {}",
+            expected_msg,
             err,
-            expected_msg
         ),
     }
 }

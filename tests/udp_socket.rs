@@ -288,7 +288,6 @@ fn reconnect_udp_socket_sending() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1080")]
 fn reconnect_udp_socket_receiving() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -334,7 +333,11 @@ fn reconnect_udp_socket_receiving() {
     let mut buf = [0; 20];
     expect_read!(socket1.recv(&mut buf), DATA1);
 
+    //this will reregister socket1 resetting the interests
+    assert_would_block(socket1.recv(&mut buf));
+
     socket1.connect(address3).unwrap();
+
     checked_write!(socket3.send(DATA2));
 
     expect_events(
@@ -343,12 +346,16 @@ fn reconnect_udp_socket_receiving() {
         vec![ExpectEvent::new(ID1, Interests::READABLE)],
     );
 
-    // Read only a part of the data.
-    let max = 4;
-    expect_read!(socket1.recv(&mut buf[..max]), &DATA2[..max]);
+    // Read all data.
+    // On Windows, reading part of data returns error WSAEMSGSIZE (10040).
+    expect_read!(socket1.recv(&mut buf), DATA2);
 
-    // Now connect back to socket 2, dropping the unread data.
+    //this will reregister socket1 resetting the interests
+    assert_would_block(socket1.recv(&mut buf));
+
+    // Now connect back to socket 2.
     socket1.connect(address2).unwrap();
+
     checked_write!(socket2.send(DATA2));
 
     expect_events(
@@ -365,7 +372,6 @@ fn reconnect_udp_socket_receiving() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1080")]
 fn unconnected_udp_socket_connected_methods() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -387,7 +393,15 @@ fn unconnected_udp_socket_connected_methods() {
     );
 
     // Socket is unconnected, but we're using an connected method.
-    assert_error(socket1.send(DATA1), "address required");
+    if cfg!(not(target_os = "windows")) {
+        assert_error(socket1.send(DATA1), "address required");
+    }
+    if cfg!(target_os = "windows") {
+        assert_error(
+            socket1.send(DATA1),
+            "no address was supplied. (os error 10057)",
+        );
+    }
 
     // Now send some actual data.
     checked_write!(socket1.send_to(DATA1, address2));
@@ -847,4 +861,106 @@ pub fn multicast() {
             }
         }
     }
+}
+
+#[test]
+fn et_behavior_recv() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+
+    let address2 = socket2.local_addr().unwrap();
+
+    poll.registry()
+        .register(&socket1, ID1, Interests::WRITABLE)
+        .expect("unable to register UDP socket");
+    poll.registry()
+        .register(&socket2, ID2, Interests::READABLE.add(Interests::WRITABLE))
+        .expect("unable to register UDP socket");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interests::WRITABLE),
+            ExpectEvent::new(ID2, Interests::WRITABLE),
+        ],
+    );
+
+    socket1.connect(address2).unwrap();
+
+    let mut buf = [0; 20];
+    checked_write!(socket1.send(DATA1));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
+
+    expect_read!(socket2.recv(&mut buf), DATA1);
+
+    // this will reregister the socket2, resetting the interests
+    assert_would_block(socket2.recv(&mut buf));
+    checked_write!(socket1.send(DATA1));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
+
+    let mut buf = [0; 20];
+    expect_read!(socket2.recv(&mut buf), DATA1);
+}
+
+#[test]
+fn et_behavior_recv_from() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+
+    let address1 = socket1.local_addr().unwrap();
+    let address2 = socket2.local_addr().unwrap();
+
+    poll.registry()
+        .register(&socket1, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .expect("unable to register UDP socket");
+    poll.registry()
+        .register(&socket2, ID2, Interests::READABLE.add(Interests::WRITABLE))
+        .expect("unable to register UDP socket");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interests::WRITABLE),
+            ExpectEvent::new(ID2, Interests::WRITABLE),
+        ],
+    );
+
+    checked_write!(socket1.send_to(DATA1, address2));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
+
+    let mut buf = [0; 20];
+    expect_read!(socket2.recv_from(&mut buf), DATA1, address1);
+
+    // this will reregister the socket2, resetting the interests
+    assert_would_block(socket2.recv_from(&mut buf));
+    checked_write!(socket1.send_to(DATA1, address2));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+    );
+
+    expect_read!(socket2.recv_from(&mut buf), DATA1, address1);
+
+    assert!(socket1.take_error().unwrap().is_none());
+    assert!(socket2.take_error().unwrap().is_none());
 }
