@@ -194,11 +194,6 @@ impl event::Source for UdpSocket {
                     let mut sock_state = sock_state.lock().unwrap();
                     sock_state.mark_delete();
                 }
-
-                // TODO: in `SelectorInner::deregister` the following is called.
-                // But this is also done when polling, so maybe its not needed
-                // here.
-                //self.afd_group.release_unused_afd();
                 Ok(())
             }
             None => Err(io::Error::from(io::ErrorKind::NotFound)),

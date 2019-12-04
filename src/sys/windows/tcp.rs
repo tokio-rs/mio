@@ -13,13 +13,9 @@ use std::sync::{Arc, Mutex};
 use winapi::um::winsock2::{bind, closesocket, connect, listen, SOCKET_ERROR, SOCK_STREAM};
 
 pub struct TcpStream {
-    internal: Box<Mutex<Option<InternalState>>>,
+    // This is `None` if the socket has not yet been registered.
+    state: Option<Box<InternalState>>,
     inner: net::TcpStream,
-}
-
-pub struct TcpListener {
-    internal: Box<Mutex<Option<InternalState>>>,
-    inner: net::TcpListener,
 }
 
 impl TcpStream {
@@ -57,16 +53,13 @@ impl TcpStream {
                 })
             })
             .map(|socket| TcpStream {
-                internal: Box::new(Mutex::new(None)),
+                state: None,
                 inner: unsafe { net::TcpStream::from_raw_socket(socket as StdSocket) },
             })
     }
 
     pub fn from_std(inner: net::TcpStream) -> TcpStream {
-        TcpStream {
-            internal: Box::new(Mutex::new(None)),
-            inner,
-        }
+        TcpStream { state: None, inner }
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
@@ -79,7 +72,7 @@ impl TcpStream {
 
     pub fn try_clone(&self) -> io::Result<TcpStream> {
         self.inner.try_clone().map(|s| TcpStream {
-            internal: Box::new(Mutex::new(None)),
+            state: None,
             inner: s,
         })
     }
@@ -114,82 +107,12 @@ impl TcpStream {
 
     // Used by `try_io` to register after an I/O operation blocked.
     fn io_blocked_reregister(&self) -> io::Result<()> {
-        let internal = self.internal.lock().unwrap();
-        if internal.is_some() {
-            let selector = internal.as_ref().unwrap().selector.clone();
-            let token = internal.as_ref().unwrap().token;
-            let interests = internal.as_ref().unwrap().interests;
-            drop(internal);
-            selector.reregister(self, token, interests)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl super::SocketState for TcpStream {
-    fn get_sock_state(&self) -> Option<Pin<Arc<Mutex<SockState>>>> {
-        let internal = self.internal.lock().unwrap();
-        match &*internal {
-            Some(internal) => match &internal.sock_state {
-                Some(arc) => Some(arc.clone()),
-                None => None,
-            },
-            None => None,
-        }
-    }
-    fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>) {
-        let mut internal = self.internal.lock().unwrap();
-        match &mut *internal {
-            Some(internal) => {
-                // action of setting a None state it's a sign of deregistering a socket, so
-                // existing socket must be marked for deletion so it won't be used by selector
-                // for subsequent updates (atm it will be removed during first selector poll update)
-                if sock_state.is_none() {
-                    if internal.sock_state.is_some() {
-                        let sock_state = internal.sock_state.as_ref();
-                        let mut sock_internal = sock_state.unwrap().lock().unwrap();
-                        sock_internal.mark_delete();
-                    }
-                }
-
-                internal.sock_state = sock_state;
-            }
-            None => {}
-        };
-    }
-}
-
-impl<'a> super::SocketState for &'a TcpStream {
-    fn get_sock_state(&self) -> Option<Pin<Arc<Mutex<SockState>>>> {
-        let internal = self.internal.lock().unwrap();
-        match &*internal {
-            Some(internal) => match &internal.sock_state {
-                Some(arc) => Some(arc.clone()),
-                None => None,
-            },
-            None => None,
-        }
-    }
-    fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>) {
-        let mut internal = self.internal.lock().unwrap();
-        match &mut *internal {
-            Some(internal) => {
-                // action of setting a None state it's a sign of deregistering a socket, so
-                // existing socket must be marked for deletion so it won't be used by selector
-                // for subsequent updates (atm it will be removed during first selector poll update)
-                if sock_state.is_none() {
-                    if internal.sock_state.is_some() {
-                        let sock_state = internal.sock_state.as_ref();
-                        let mut sock_internal = sock_state.unwrap().lock().unwrap();
-                        sock_internal.mark_delete();
-                    }
-                }
-
-                internal.sock_state = sock_state;
-            }
-            None => {}
-        };
+        self.state.as_ref().map_or(Ok(()), |state| {
+            let sock_state = state.sock_state.as_ref().unwrap();
+            state
+                .selector
+                .reregister2(sock_state, state.token, state.interests)
+        })
     }
 }
 
@@ -224,25 +147,15 @@ impl event::Source for TcpStream {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        {
-            let mut internal = self.internal.lock().unwrap();
-            if internal.is_none() {
-                *internal = Some(InternalState::new(
-                    poll::selector(registry).clone_inner(),
-                    token,
-                    interests,
-                ));
-            }
+        if self.state.is_some() {
+            Err(io::Error::from(io::ErrorKind::AlreadyExists))
+        } else {
+            poll::selector(registry)
+                .register2(self.inner.as_raw_socket(), token, interests)
+                .map(|state| {
+                    self.state = Some(Box::new(state));
+                })
         }
-        let result = poll::selector(registry).register(self, token, interests);
-        match result {
-            Ok(_) => {}
-            Err(_) => {
-                let mut internal = self.internal.lock().unwrap();
-                *internal = None;
-            }
-        }
-        result
     }
 
     fn reregister(
@@ -251,28 +164,31 @@ impl event::Source for TcpStream {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        let result = poll::selector(registry).reregister(self, token, interests);
-        match result {
-            Ok(_) => {
-                let mut internal = self.internal.lock().unwrap();
-                internal.as_mut().unwrap().token = token;
-                internal.as_mut().unwrap().interests = interests;
+        match self.state.as_mut() {
+            Some(state) => {
+                let sock_state = state.sock_state.as_ref().unwrap();
+                poll::selector(registry)
+                    .reregister2(sock_state, token, interests)
+                    .map(|()| {
+                        state.token = token;
+                        state.interests = interests;
+                    })
             }
-            Err(_) => {}
-        };
-        result
+            None => Err(io::Error::from(io::ErrorKind::NotFound)),
+        }
     }
 
-    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
-        let result = poll::selector(registry).deregister(self);
-        match result {
-            Ok(_) => {
-                let mut internal = self.internal.lock().unwrap();
-                *internal = None;
+    fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
+        match self.state.as_mut() {
+            Some(state) => {
+                if let Some(sock_state) = state.sock_state.as_ref() {
+                    let mut sock_state = sock_state.lock().unwrap();
+                    sock_state.mark_delete();
+                }
+                Ok(())
             }
-            Err(_) => {}
-        };
-        result
+            None => Err(io::Error::from(io::ErrorKind::NotFound)),
+        }
     }
 }
 
@@ -285,7 +201,7 @@ impl fmt::Debug for TcpStream {
 impl FromRawSocket for TcpStream {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> TcpStream {
         TcpStream {
-            internal: Box::new(Mutex::new(None)),
+            state: None,
             inner: net::TcpStream::from_raw_socket(rawsocket),
         }
     }
@@ -301,6 +217,11 @@ impl AsRawSocket for TcpStream {
     fn as_raw_socket(&self) -> RawSocket {
         self.inner.as_raw_socket()
     }
+}
+
+pub struct TcpListener {
+    internal: Box<Mutex<Option<InternalState>>>,
+    inner: net::TcpListener,
 }
 
 impl TcpListener {
@@ -347,15 +268,9 @@ impl TcpListener {
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         try_io!(self, accept).and_then(|(inner, addr)| {
-            inner.set_nonblocking(true).map(|()| {
-                (
-                    TcpStream {
-                        internal: Box::new(Mutex::new(None)),
-                        inner,
-                    },
-                    addr,
-                )
-            })
+            inner
+                .set_nonblocking(true)
+                .map(|()| (TcpStream { state: None, inner }, addr))
         })
     }
 
