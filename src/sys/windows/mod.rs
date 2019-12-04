@@ -66,6 +66,7 @@ struct InternalState {
     selector: Arc<SelectorInner>,
     token: Token,
     interests: Interest,
+    // FIXME: this `Option` can be removed.
     sock_state: Option<Pin<Arc<Mutex<SockState>>>>,
 }
 
