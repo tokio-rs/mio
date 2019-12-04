@@ -73,17 +73,17 @@ pub trait SocketState {
     fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>);
 }
 
-use crate::{Interests, Token};
+use crate::{Interest, Token};
 
 struct InternalState {
     selector: Arc<SelectorInner>,
     token: Token,
-    interests: Interests,
+    interests: Interest,
     sock_state: Option<Pin<Arc<Mutex<SockState>>>>,
 }
 
 impl InternalState {
-    fn new(selector: Arc<SelectorInner>, token: Token, interests: Interests) -> InternalState {
+    fn new(selector: Arc<SelectorInner>, token: Token, interests: Interest) -> InternalState {
         InternalState {
             selector,
             token,

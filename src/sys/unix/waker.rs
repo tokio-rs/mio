@@ -1,7 +1,7 @@
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod eventfd {
     use crate::sys::Selector;
-    use crate::{Interests, Token};
+    use crate::{Interest, Token};
 
     use std::fs::File;
     use std::io::{self, Read, Write};
@@ -25,7 +25,7 @@ mod eventfd {
                 // it's closed when dropped, e.g. when register below fails.
                 let file = unsafe { File::from_raw_fd(fd) };
                 selector
-                    .register(fd, token, Interests::READABLE)
+                    .register(fd, token, Interest::READABLE)
                     .map(|()| Waker { fd: file })
             })
         }
@@ -106,7 +106,7 @@ pub use self::kqueue::Waker;
 ))]
 mod pipe {
     use crate::sys::unix::Selector;
-    use crate::{Interests, Token};
+    use crate::{Interest, Token};
 
     use std::fs::File;
     use std::io::{self, Read, Write};
@@ -131,7 +131,7 @@ mod pipe {
             let sender = unsafe { File::from_raw_fd(fds[1]) };
             let receiver = unsafe { File::from_raw_fd(fds[0]) };
             selector
-                .register(fds[0], token, Interests::READABLE)
+                .register(fds[0], token, Interest::READABLE)
                 .map(|()| Waker { sender, receiver })
         }
 

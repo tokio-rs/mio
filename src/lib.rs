@@ -35,7 +35,7 @@
     doc = "`guide` (only available when the `guide` feature is enabled)."
 )]
 
-mod interests;
+mod interest;
 mod poll;
 mod sys;
 mod token;
@@ -46,7 +46,7 @@ pub mod net;
 
 #[doc(no_inline)]
 pub use event::Events;
-pub use interests::Interests;
+pub use interest::Interest;
 pub use poll::{Poll, Registry};
 pub use token::Token;
 pub use waker::Waker;
@@ -91,7 +91,7 @@ pub mod guide {
     //!
     //! ```
     //! # use mio::net::TcpListener;
-    //! # use mio::{Poll, Token, Interests};
+    //! # use mio::{Poll, Token, Interest};
     //! # fn main() -> std::io::Result<()> {
     //! # let poll = Poll::new()?;
     //! # let address = "127.0.0.1:0".parse().unwrap();
@@ -102,7 +102,7 @@ pub mod guide {
     //! // `Token` is used to determine that we received an event for the listener
     //! // later on.
     //! const SERVER: Token = Token(0);
-    //! poll.registry().register(&listener, SERVER, Interests::READABLE)?;
+    //! poll.registry().register(&listener, SERVER, Interest::READABLE)?;
     //! # Ok(())
     //! # }
     //! ```
@@ -118,14 +118,14 @@ pub mod guide {
     //! # use std::io;
     //! # use std::time::Duration;
     //! # use mio::net::TcpListener;
-    //! # use mio::{Poll, Token, Interests, Events};
+    //! # use mio::{Poll, Token, Interest, Events};
     //! # fn main() -> io::Result<()> {
     //! # let mut poll = Poll::new()?;
     //! # let mut events = Events::with_capacity(128);
     //! # let address = "127.0.0.1:0".parse().unwrap();
     //! # let listener = TcpListener::bind(address)?;
     //! # const SERVER: Token = Token(0);
-    //! # poll.registry().register(&listener, SERVER, Interests::READABLE)?;
+    //! # poll.registry().register(&listener, SERVER, Interest::READABLE)?;
     //! // Start our event loop.
     //! loop {
     //!     // Poll Mio for events, waiting at most 100 milliseconds.

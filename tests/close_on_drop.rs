@@ -3,7 +3,7 @@ use std::io::Read;
 use log::debug;
 
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, Token};
+use mio::{Events, Interest, Poll, Token};
 
 mod util;
 
@@ -68,7 +68,7 @@ impl TestHandler {
             _ => panic!("received unknown token {:?}", tok),
         }
         poll.registry()
-            .reregister(&self.cli, CLIENT, Interests::READABLE)
+            .reregister(&self.cli, CLIENT, Interest::READABLE)
             .unwrap();
     }
 
@@ -78,7 +78,7 @@ impl TestHandler {
             CLIENT => {
                 debug!("client connected");
                 poll.registry()
-                    .reregister(&self.cli, CLIENT, Interests::READABLE)
+                    .reregister(&self.cli, CLIENT, Interest::READABLE)
                     .unwrap();
             }
             _ => panic!("received unknown token {:?}", tok),
@@ -97,14 +97,14 @@ pub fn close_on_drop() {
     let addr = srv.local_addr().unwrap();
 
     poll.registry()
-        .register(&srv, SERVER, Interests::READABLE)
+        .register(&srv, SERVER, Interest::READABLE)
         .unwrap();
 
     // == Create & setup client socket
     let sock = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&sock, CLIENT, Interests::WRITABLE)
+        .register(&sock, CLIENT, Interest::WRITABLE)
         .unwrap();
 
     // == Create storage for events

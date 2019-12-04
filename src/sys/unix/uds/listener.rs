@@ -3,7 +3,7 @@ use crate::event::Source;
 use crate::sys::unix::net::new_socket;
 use crate::sys::unix::UnixStream;
 use crate::unix::SourceFd;
-use crate::{Interests, Registry, Token};
+use crate::{Interest, Registry, Token};
 
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
@@ -134,16 +134,11 @@ impl UnixListener {
 }
 
 impl Source for UnixListener {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 

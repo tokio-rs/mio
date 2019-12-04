@@ -6,7 +6,7 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 
 use mio::net::TcpListener;
-use mio::{Interests, Poll, Token};
+use mio::{Interest, Poll, Token};
 
 mod util;
 
@@ -55,7 +55,7 @@ where
     let address = listener.local_addr().unwrap();
 
     poll.registry()
-        .register(&listener, ID1, Interests::READABLE)
+        .register(&listener, ID1, Interest::READABLE)
         .expect("unable to register TCP listener");
 
     let barrier = Arc::new(Barrier::new(2));
@@ -64,7 +64,7 @@ where
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
 
     // Expect a single connection.
@@ -134,7 +134,7 @@ fn registering() {
     let stream = TcpListener::bind(any_local_address()).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interests::READABLE)
+        .register(&stream, ID1, Interest::READABLE)
         .expect("unable to register TCP listener");
 
     expect_no_events(&mut poll, &mut events);
@@ -150,10 +150,10 @@ fn reregister() {
     let address = listener.local_addr().unwrap();
 
     poll.registry()
-        .register(&listener, ID1, Interests::READABLE)
+        .register(&listener, ID1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .reregister(&listener, ID2, Interests::READABLE)
+        .reregister(&listener, ID2, Interest::READABLE)
         .unwrap();
 
     let barrier = Arc::new(Barrier::new(2));
@@ -162,7 +162,7 @@ fn reregister() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     let (stream, peer_address) = listener.accept().expect("unable to accept connection");
@@ -186,7 +186,7 @@ fn no_events_after_deregister() {
     let address = listener.local_addr().unwrap();
 
     poll.registry()
-        .register(&listener, ID1, Interests::READABLE)
+        .register(&listener, ID1, Interest::READABLE)
         .unwrap();
 
     let barrier = Arc::new(Barrier::new(2));
@@ -226,18 +226,18 @@ fn try_clone_same_poll() {
     let thread_handle1 = start_connections(address, 1, barrier.clone());
 
     poll.registry()
-        .register(&listener1, ID1, Interests::READABLE)
+        .register(&listener1, ID1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&listener2, ID2, Interests::READABLE)
+        .register(&listener2, ID2, Interest::READABLE)
         .unwrap();
 
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID1, Interests::READABLE),
-            ExpectEvent::new(ID2, Interests::READABLE),
+            ExpectEvent::new(ID1, Interest::READABLE),
+            ExpectEvent::new(ID2, Interest::READABLE),
         ],
     );
 
@@ -252,8 +252,8 @@ fn try_clone_same_poll() {
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID1, Interests::READABLE),
-            ExpectEvent::new(ID2, Interests::READABLE),
+            ExpectEvent::new(ID1, Interest::READABLE),
+            ExpectEvent::new(ID2, Interest::READABLE),
         ],
     );
 
@@ -291,22 +291,22 @@ fn try_clone_different_poll() {
 
     poll1
         .registry()
-        .register(&listener1, ID1, Interests::READABLE)
+        .register(&listener1, ID1, Interest::READABLE)
         .unwrap();
     poll2
         .registry()
-        .register(&listener2, ID2, Interests::READABLE)
+        .register(&listener2, ID2, Interest::READABLE)
         .unwrap();
 
     expect_events(
         &mut poll1,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
     expect_events(
         &mut poll2,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     let (stream, peer_address) = listener1.accept().expect("unable to accept connection");
@@ -319,12 +319,12 @@ fn try_clone_different_poll() {
     expect_events(
         &mut poll1,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
     expect_events(
         &mut poll2,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     let (stream, peer_address) = listener2.accept().expect("unable to accept connection");
@@ -356,13 +356,13 @@ fn tcp_listener_two_streams() {
 
     poll1
         .registry()
-        .register(&listener, ID1, Interests::READABLE)
+        .register(&listener, ID1, Interest::READABLE)
         .unwrap();
 
     expect_events(
         &mut poll1,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
 
     {
@@ -377,7 +377,7 @@ fn tcp_listener_two_streams() {
     expect_events(
         &mut poll1,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
 
     {

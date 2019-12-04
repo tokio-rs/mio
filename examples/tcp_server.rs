@@ -4,7 +4,7 @@ use std::str::from_utf8;
 
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, Registry, Token};
+use mio::{Events, Interest, Poll, Registry, Token};
 
 // Setup some tokens to allow us to identify which event is for which socket.
 const SERVER: Token = Token(0);
@@ -26,7 +26,7 @@ fn main() -> io::Result<()> {
 
     // Register the server with poll we can receive events for it.
     poll.registry()
-        .register(&server, SERVER, Interests::READABLE)?;
+        .register(&server, SERVER, Interest::READABLE)?;
 
     // Map of `Token` -> `TcpStream`.
     let mut connections = HashMap::new();
@@ -52,7 +52,7 @@ fn main() -> io::Result<()> {
                     poll.registry().register(
                         &connection,
                         token,
-                        Interests::READABLE.add(Interests::WRITABLE),
+                        Interest::READABLE.add(Interest::WRITABLE),
                     )?;
 
                     connections.insert(token, connection);
@@ -96,7 +96,7 @@ fn handle_connection_event(
             Ok(_) => {
                 // After we've written something we'll reregister the connection
                 // to only respond to readable events.
-                registry.reregister(&connection, event.token(), Interests::READABLE)?
+                registry.reregister(&connection, event.token(), Interest::READABLE)?
             }
             // Would block "errors" are the OS's way of saying that the
             // connection is not actually ready to perform this I/O operation.

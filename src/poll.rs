@@ -1,4 +1,4 @@
-use crate::{event, sys, Events, Interests, Token};
+use crate::{event, sys, Events, Interest, Token};
 
 use log::trace;
 #[cfg(unix)]
@@ -36,7 +36,7 @@ use std::{fmt, io};
 /// ```
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// use mio::{Events, Poll, Interests, Token};
+/// use mio::{Events, Poll, Interest, Token};
 /// use mio::net::TcpStream;
 ///
 /// use std::net::{TcpListener, SocketAddr};
@@ -53,7 +53,7 @@ use std::{fmt, io};
 /// let stream = TcpStream::connect(server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// poll.registry().register(&stream, Token(0), Interests::READABLE | Interests::WRITABLE)?;
+/// poll.registry().register(&stream, Token(0), Interest::READABLE | Interest::WRITABLE)?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -133,7 +133,7 @@ use std::{fmt, io};
 /// # use std::error::Error;
 /// # use std::net;
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// use mio::{Poll, Interests, Token};
+/// use mio::{Poll, Interest, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 /// use std::thread;
@@ -148,7 +148,7 @@ use std::{fmt, io};
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// poll.registry().register(&sock, Token(0), Interests::READABLE | Interests::WRITABLE)?;
+/// poll.registry().register(&sock, Token(0), Interest::READABLE | Interest::WRITABLE)?;
 /// #     Ok(())
 /// # }
 /// ```
@@ -298,8 +298,8 @@ impl Poll {
     /// polling.
     ///
     /// [`event::Source`]: crate::event::Source
-    /// [`readable`]: struct.Interests.html#method.readable
-    /// [`writable`]: struct.Interests.html#method.writable
+    /// [`readable`]: struct.Interest.html#method.readable
+    /// [`writable`]: struct.Interest.html#method.writable
     /// [struct]: #
     /// [`iter`]: struct.Events.html#method.iter
     ///
@@ -316,7 +316,7 @@ impl Poll {
     /// ```
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// use mio::{Events, Poll, Interests, Token};
+    /// use mio::{Events, Poll, Interest, Token};
     /// use mio::net::TcpStream;
     ///
     /// use std::net::{TcpListener, SocketAddr};
@@ -343,7 +343,7 @@ impl Poll {
     /// poll.registry().register(
     ///     &stream,
     ///     Token(0),
-    ///     Interests::READABLE | Interests::WRITABLE)?;
+    ///     Interest::READABLE | Interest::WRITABLE)?;
     ///
     /// // Wait for the socket to become ready. This has to happens in a loop to
     /// // handle spurious wakeups.
@@ -409,7 +409,7 @@ impl Registry {
     /// See documentation on [`Token`] for an example showing how to pick
     /// [`Token`] values.
     ///
-    /// `interest: Interests`: Specifies which operations `Poll` should monitor
+    /// `interest: Interest`: Specifies which operations `Poll` should monitor
     /// for readiness. `Poll` will only return readiness events for operations
     /// specified by this argument.
     ///
@@ -442,7 +442,7 @@ impl Registry {
     /// # use std::error::Error;
     /// # use std::net;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// use mio::{Events, Poll, Interests, Token};
+    /// use mio::{Events, Poll, Interest, Token};
     /// use mio::net::TcpStream;
     /// use std::time::{Duration, Instant};
     ///
@@ -456,7 +456,7 @@ impl Registry {
     /// poll.registry().register(
     ///     &socket,
     ///     Token(0),
-    ///     Interests::READABLE | Interests::WRITABLE)?;
+    ///     Interest::READABLE | Interest::WRITABLE)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     /// let start = Instant::now();
@@ -482,7 +482,7 @@ impl Registry {
     /// }
     /// # }
     /// ```
-    pub fn register<S>(&self, source: &S, token: Token, interests: Interests) -> io::Result<()>
+    pub fn register<S>(&self, source: &S, token: Token, interests: Interest) -> io::Result<()>
     where
         S: event::Source + ?Sized,
     {
@@ -518,7 +518,7 @@ impl Registry {
     /// # use std::error::Error;
     /// # use std::net;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// use mio::{Poll, Interests, Token};
+    /// use mio::{Poll, Interest, Token};
     /// use mio::net::TcpStream;
     ///
     /// let poll = Poll::new()?;
@@ -531,14 +531,14 @@ impl Registry {
     /// poll.registry().register(
     ///     &socket,
     ///     Token(0),
-    ///     Interests::READABLE)?;
+    ///     Interest::READABLE)?;
     ///
     /// // Reregister the socket specifying write interest instead. Even though
     /// // the token is the same it must be specified.
     /// poll.registry().reregister(
     ///     &socket,
     ///     Token(2),
-    ///     Interests::WRITABLE)?;
+    ///     Interest::WRITABLE)?;
     /// #     Ok(())
     /// # }
     /// ```
@@ -548,7 +548,7 @@ impl Registry {
     /// [`register`]: #method.register
     /// [`readable`]: crate::event::Event::is_readable
     /// [`writable`]: crate::event::Event::is_writable
-    pub fn reregister<S>(&self, source: &S, token: Token, interests: Interests) -> io::Result<()>
+    pub fn reregister<S>(&self, source: &S, token: Token, interests: Interest) -> io::Result<()>
     where
         S: event::Source + ?Sized,
     {
@@ -580,7 +580,7 @@ impl Registry {
     /// # use std::error::Error;
     /// # use std::net;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// use mio::{Events, Poll, Interests, Token};
+    /// use mio::{Events, Poll, Interest, Token};
     /// use mio::net::TcpStream;
     /// use std::time::Duration;
     ///
@@ -594,7 +594,7 @@ impl Registry {
     /// poll.registry().register(
     ///     &socket,
     ///     Token(0),
-    ///     Interests::READABLE)?;
+    ///     Interest::READABLE)?;
     ///
     /// poll.registry().deregister(&socket)?;
     ///

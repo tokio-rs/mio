@@ -1,4 +1,4 @@
-use crate::{Interests, Registry, Token};
+use crate::{Interest, Registry, Token};
 
 use std::io;
 use std::ops::Deref;
@@ -40,7 +40,7 @@ use std::ops::Deref;
 /// Implementing `Source` on a struct containing a socket:
 ///
 /// ```
-/// use mio::{Interests, Registry, Token};
+/// use mio::{Interest, Registry, Token};
 /// use mio::event::Source;
 /// use mio::net::TcpStream;
 ///
@@ -52,14 +52,14 @@ use std::ops::Deref;
 /// }
 ///
 /// impl Source for MySource {
-///     fn register(&self, registry: &Registry, token: Token, interests: Interests)
+///     fn register(&self, registry: &Registry, token: Token, interests: Interest)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `register` call to `socket`
 ///         self.socket.register(registry, token, interests)
 ///     }
 ///
-///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests)
+///     fn reregister(&self, registry: &Registry, token: Token, interests: Interest)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `reregister` call to `socket`
@@ -80,7 +80,7 @@ pub trait Source {
     /// to another `Source` type.
     ///
     /// [`Registry::register`]: crate::Registry::register
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()>;
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()>;
 
     /// Re-register `self` with the given `Registry` instance.
     ///
@@ -89,8 +89,7 @@ pub trait Source {
     /// re-registration by either delegating the call to another `Source` type.
     ///
     /// [`Registry::reregister`]: crate::Registry::reregister
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interests)
-        -> io::Result<()>;
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()>;
 
     /// Deregister `self` from the given `Registry` instance.
     ///
@@ -107,16 +106,11 @@ where
     T: Deref<Target = S>,
     S: Source + ?Sized,
 {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         self.deref().register(registry, token, interests)
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         self.deref().reregister(registry, token, interests)
     }
 

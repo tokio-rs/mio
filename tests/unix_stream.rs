@@ -4,7 +4,7 @@
 mod util;
 
 use mio::net::UnixStream;
-use mio::{Interests, Token};
+use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::net;
@@ -56,19 +56,19 @@ fn unix_stream_connect() {
     });
 
     poll.registry()
-        .register(&stream, TOKEN_1, Interests::READABLE | Interests::WRITABLE)
+        .register(&stream, TOKEN_1, Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     barrier.wait();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
 
     handle.join().unwrap();
@@ -91,15 +91,15 @@ fn unix_stream_pair() {
 
     let (mut s1, mut s2) = UnixStream::pair().unwrap();
     poll.registry()
-        .register(&s1, TOKEN_1, Interests::READABLE | Interests::WRITABLE)
+        .register(&s1, TOKEN_1, Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&s2, TOKEN_2, Interests::READABLE | Interests::WRITABLE)
+        .register(&s2, TOKEN_2, Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -126,12 +126,12 @@ fn unix_stream_try_clone() {
 
     let mut stream_1 = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream_1, TOKEN_1, Interests::WRITABLE)
+        .register(&stream_1, TOKEN_1, Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -144,12 +144,12 @@ fn unix_stream_try_clone() {
     drop(stream_1);
 
     poll.registry()
-        .register(&stream_2, TOKEN_2, Interests::READABLE)
+        .register(&stream_2, TOKEN_2, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_2, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_2, Interest::READABLE)],
     );
 
     expect_read!(stream_2.read(&mut buf), DATA1);
@@ -185,23 +185,19 @@ fn unix_stream_shutdown_read() {
 
     let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(
-            &stream,
-            TOKEN_1,
-            Interests::READABLE.add(Interests::WRITABLE),
-        )
+        .register(&stream, TOKEN_1, Interest::READABLE.add(Interest::WRITABLE))
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     checked_write!(stream.write(&DATA1));
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
 
     stream.shutdown(Shutdown::Read).unwrap();
@@ -239,23 +235,19 @@ fn unix_stream_shutdown_write() {
 
     let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(
-            &stream,
-            TOKEN_1,
-            Interests::WRITABLE.add(Interests::READABLE),
-        )
+        .register(&stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     checked_write!(stream.write(&DATA1));
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
 
     stream.shutdown(Shutdown::Write).unwrap();
@@ -294,23 +286,19 @@ fn unix_stream_shutdown_both() {
 
     let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(
-            &stream,
-            TOKEN_1,
-            Interests::WRITABLE.add(Interests::READABLE),
-        )
+        .register(&stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     checked_write!(stream.write(&DATA1));
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
 
     stream.shutdown(Shutdown::Both).unwrap();
@@ -355,16 +343,12 @@ fn unix_stream_shutdown_listener_write() {
 
     let stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(
-            &stream,
-            TOKEN_1,
-            Interests::READABLE.add(Interests::WRITABLE),
-        )
+        .register(&stream, TOKEN_1, Interest::READABLE.add(Interest::WRITABLE))
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     barrier.wait();
@@ -386,7 +370,7 @@ fn unix_stream_register() {
 
     let stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interests::READABLE)
+        .register(&stream, TOKEN_1, Interest::READABLE)
         .unwrap();
     expect_no_events(&mut poll, &mut events);
 
@@ -403,15 +387,15 @@ fn unix_stream_reregister() {
 
     let stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interests::READABLE)
+        .register(&stream, TOKEN_1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .reregister(&stream, TOKEN_1, Interests::WRITABLE)
+        .reregister(&stream, TOKEN_1, Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     // Close the connection to allow the remote to shutdown
@@ -427,7 +411,7 @@ fn unix_stream_deregister() {
 
     let stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interests::WRITABLE)
+        .register(&stream, TOKEN_1, Interest::WRITABLE)
         .unwrap();
     poll.registry().deregister(&stream).unwrap();
     expect_no_events(&mut poll, &mut events);
@@ -447,16 +431,12 @@ where
 
     let mut stream = connect_stream(path).unwrap();
     poll.registry()
-        .register(
-            &stream,
-            TOKEN_1,
-            Interests::WRITABLE.add(Interests::READABLE),
-        )
+        .register(&stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -467,7 +447,7 @@ where
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
 
     expect_read!(stream.read(&mut buf), DATA1);
@@ -480,7 +460,7 @@ where
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
 
     let mut buf1 = [1; DATA1_LEN];

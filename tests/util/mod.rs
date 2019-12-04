@@ -9,7 +9,7 @@ use std::{fmt, io};
 
 use log::{error, warn};
 use mio::event::Event;
-use mio::{Events, Interests, Poll, Token};
+use mio::{Events, Interest, Poll, Token};
 
 pub fn init() {
     static INIT: Once = Once::new();
@@ -103,8 +103,8 @@ impl BitOr for Readiness {
     }
 }
 
-impl From<Interests> for Readiness {
-    fn from(interests: Interests) -> Readiness {
+impl From<Interest> for Readiness {
+    fn from(interests: Interest) -> Readiness {
         let mut readiness = Readiness(0);
         if interests.is_readable() {
             readiness.0 |= READABLE;

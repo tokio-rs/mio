@@ -1,7 +1,7 @@
 use super::selector::SockState;
 use super::{new_socket, socket_addr, InternalState};
 use crate::sys::windows::init;
-use crate::{event, poll, Interests, Registry, Token};
+use crate::{event, poll, Interest, Registry, Token};
 
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
@@ -194,7 +194,7 @@ impl super::SocketState for UdpSocket {
 }
 
 impl event::Source for UdpSocket {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         {
             let mut internal = self.internal.lock().unwrap();
             if internal.is_none() {
@@ -216,12 +216,7 @@ impl event::Source for UdpSocket {
         result
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {

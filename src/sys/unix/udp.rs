@@ -1,6 +1,6 @@
 use crate::sys::unix::net::{new_ip_socket, socket_addr};
 use crate::unix::SourceFd;
-use crate::{event, Interests, Registry, Token};
+use crate::{event, Interest, Registry, Token};
 
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -146,16 +146,11 @@ impl UdpSocket {
 }
 
 impl event::Source for UdpSocket {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 

@@ -1,5 +1,5 @@
 use mio::net::{TcpListener, TcpStream};
-use mio::{event, Events, Interests, Poll, Registry, Token};
+use mio::{event, Events, Interest, Poll, Registry, Token};
 
 use std::net;
 use std::sync::{Arc, Barrier, Mutex};
@@ -41,7 +41,7 @@ fn add_then_drop() {
     let l = TcpListener::bind(any_local_address()).unwrap();
     let mut poll = Poll::new().unwrap();
     poll.registry()
-        .register(&l, Token(1), Interests::READABLE | Interests::WRITABLE)
+        .register(&l, Token(1), Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     drop(l);
     poll.poll(&mut events, Some(Duration::from_millis(100)))
@@ -62,7 +62,7 @@ fn zero_duration_polls_events() {
         .map(|n| {
             let stream = TcpStream::connect(addr).unwrap();
             poll.registry()
-                .register(&stream, Token(n), Interests::WRITABLE)
+                .register(&stream, Token(n), Interest::WRITABLE)
                 .unwrap();
             stream
         })
@@ -130,7 +130,7 @@ fn drop_cancels_interest_and_shuts_down() {
     let mut s = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interests::READABLE | Interests::WRITABLE)
+        .register(&s, Token(1), Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     let mut events = Events::with_capacity(16);
     'outer: loop {
@@ -174,14 +174,14 @@ fn registry_behind_arc() {
 
     let handle1 = thread::spawn(move || {
         registry2
-            .register(&listener, Token(0), Interests::READABLE)
+            .register(&listener, Token(0), Interest::READABLE)
             .unwrap();
         barrier2.wait();
     });
     let handle2 = thread::spawn(move || {
         let stream = TcpStream::connect(addr).unwrap();
         registry3
-            .register(&stream, Token(1), Interests::READABLE | Interests::WRITABLE)
+            .register(&stream, Token(1), Interest::READABLE | Interest::WRITABLE)
             .unwrap();
         barrier3.wait();
     });
@@ -207,20 +207,20 @@ pub fn double_register() {
     let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
 
     poll.registry()
-        .register(&l, Token(0), Interests::READABLE)
+        .register(&l, Token(0), Interest::READABLE)
         .unwrap();
 
     assert!(poll
         .registry()
-        .register(&l, Token(1), Interests::READABLE)
+        .register(&l, Token(1), Interest::READABLE)
         .is_err());
 }
 
 struct TestEventSource(Mutex<TestEventSourceData>);
 
 struct TestEventSourceData {
-    registrations: Vec<(Token, Interests)>,
-    reregistrations: Vec<(Token, Interests)>,
+    registrations: Vec<(Token, Interest)>,
+    reregistrations: Vec<(Token, Interest)>,
     deregister_count: usize,
 }
 
@@ -235,7 +235,7 @@ impl TestEventSource {
 }
 
 impl event::Source for TestEventSource {
-    fn register(&self, _registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, _registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         let mut inner = self.0.lock().unwrap();
         inner.registrations.push((token, interests));
         Ok(())
@@ -245,7 +245,7 @@ impl event::Source for TestEventSource {
         &self,
         _registry: &Registry,
         token: Token,
-        interests: Interests,
+        interests: Interest,
     ) -> io::Result<()> {
         let mut inner = self.0.lock().unwrap();
         inner.reregistrations.push((token, interests));
@@ -267,7 +267,7 @@ fn poll_registration() {
 
     let source = TestEventSource::new();
     let token = Token(0);
-    let interests = Interests::READABLE;
+    let interests = Interest::READABLE;
     registry.register(&source, token, interests).unwrap();
     {
         let source = source.0.lock().unwrap();
@@ -278,7 +278,7 @@ fn poll_registration() {
     }
 
     let re_token = Token(0);
-    let re_interests = Interests::READABLE;
+    let re_interests = Interest::READABLE;
     registry
         .reregister(&source, re_token, re_interests)
         .unwrap();
@@ -309,7 +309,7 @@ impl event::Source for ErroneousTestEventSource {
         &self,
         _registry: &Registry,
         _token: Token,
-        _interests: Interests,
+        _interests: Interest,
     ) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "register"))
     }
@@ -318,7 +318,7 @@ impl event::Source for ErroneousTestEventSource {
         &self,
         _registry: &Registry,
         _token: Token,
-        _interests: Interests,
+        _interests: Interest,
     ) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "reregister"))
     }
@@ -336,7 +336,7 @@ fn poll_erroneous_registration() {
 
     let source = ErroneousTestEventSource;
     let token = Token(0);
-    let interests = Interests::READABLE;
+    let interests = Interest::READABLE;
     assert_error(registry.register(&source, token, interests), "register");
     assert_error(registry.reregister(&source, token, interests), "reregister");
     assert_error(registry.deregister(&source), "deregister");

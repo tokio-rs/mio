@@ -1,28 +1,28 @@
-use mio::Interests;
+use mio::Interest;
 
 #[test]
 fn is_tests() {
-    assert!(Interests::READABLE.is_readable());
-    assert!(!Interests::READABLE.is_writable());
-    assert!(!Interests::WRITABLE.is_readable());
-    assert!(Interests::WRITABLE.is_writable());
-    assert!(!Interests::WRITABLE.is_aio());
-    assert!(!Interests::WRITABLE.is_lio());
+    assert!(Interest::READABLE.is_readable());
+    assert!(!Interest::READABLE.is_writable());
+    assert!(!Interest::WRITABLE.is_readable());
+    assert!(Interest::WRITABLE.is_writable());
+    assert!(!Interest::WRITABLE.is_aio());
+    assert!(!Interest::WRITABLE.is_lio());
 }
 
 #[test]
 fn bit_or() {
-    let interests = Interests::READABLE | Interests::WRITABLE;
+    let interests = Interest::READABLE | Interest::WRITABLE;
     assert!(interests.is_readable());
     assert!(interests.is_writable());
 }
 
 #[test]
 fn fmt_debug() {
-    assert_eq!(format!("{:?}", Interests::READABLE), "READABLE");
-    assert_eq!(format!("{:?}", Interests::WRITABLE), "WRITABLE");
+    assert_eq!(format!("{:?}", Interest::READABLE), "READABLE");
+    assert_eq!(format!("{:?}", Interest::WRITABLE), "WRITABLE");
     assert_eq!(
-        format!("{:?}", Interests::READABLE | Interests::WRITABLE),
+        format!("{:?}", Interest::READABLE | Interest::WRITABLE),
         "READABLE | WRITABLE"
     );
     #[cfg(any(
@@ -32,10 +32,10 @@ fn fmt_debug() {
         target_os = "macos"
     ))]
     {
-        assert_eq!(format!("{:?}", Interests::AIO), "AIO");
+        assert_eq!(format!("{:?}", Interest::AIO), "AIO");
     }
     #[cfg(any(target_os = "freebsd"))]
     {
-        assert_eq!(format!("{:?}", Interests::LIO), "LIO");
+        assert_eq!(format!("{:?}", Interest::LIO), "LIO");
     }
 }

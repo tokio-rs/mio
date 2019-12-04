@@ -3,7 +3,7 @@
 mod util;
 
 use mio::net::UnixDatagram;
-use mio::{Interests, Token};
+use mio::{Interest, Token};
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::AsRawFd;
@@ -123,25 +123,17 @@ fn unix_datagram_pair() {
 
     let (datagram1, datagram2) = UnixDatagram::pair().unwrap();
     poll.registry()
-        .register(
-            &datagram1,
-            TOKEN_1,
-            Interests::READABLE | Interests::WRITABLE,
-        )
+        .register(&datagram1, TOKEN_1, Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(
-            &datagram2,
-            TOKEN_2,
-            Interests::READABLE | Interests::WRITABLE,
-        )
+        .register(&datagram2, TOKEN_2, Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(TOKEN_1, Interests::WRITABLE),
-            ExpectEvent::new(TOKEN_2, Interests::WRITABLE),
+            ExpectEvent::new(TOKEN_1, Interest::WRITABLE),
+            ExpectEvent::new(TOKEN_2, Interest::WRITABLE),
         ],
     );
 
@@ -155,8 +147,8 @@ fn unix_datagram_pair() {
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(TOKEN_1, Interests::READABLE),
-            ExpectEvent::new(TOKEN_2, Interests::READABLE),
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
         ],
     );
 
@@ -182,22 +174,22 @@ fn unix_datagram_try_clone() {
     datagram3.connect(&path1).unwrap();
 
     poll.registry()
-        .register(&datagram1, TOKEN_1, Interests::READABLE)
+        .register(&datagram1, TOKEN_1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&datagram2, TOKEN_2, Interests::READABLE)
+        .register(&datagram2, TOKEN_2, Interest::READABLE)
         .unwrap();
     poll.registry()
         .register(
             &datagram3,
             TOKEN_3,
-            Interests::READABLE.add(Interests::WRITABLE),
+            Interest::READABLE.add(Interest::WRITABLE),
         )
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_3, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_3, Interest::WRITABLE)],
     );
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -210,8 +202,8 @@ fn unix_datagram_try_clone() {
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(TOKEN_1, Interests::READABLE),
-            ExpectEvent::new(TOKEN_2, Interests::READABLE),
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
         ],
     );
 
@@ -237,14 +229,14 @@ fn unix_datagram_shutdown() {
         .register(
             &datagram1,
             TOKEN_1,
-            Interests::WRITABLE.add(Interests::READABLE),
+            Interest::WRITABLE.add(Interest::READABLE),
         )
         .unwrap();
     poll.registry()
         .register(
             &datagram2,
             TOKEN_2,
-            Interests::WRITABLE.add(Interests::READABLE),
+            Interest::WRITABLE.add(Interest::READABLE),
         )
         .unwrap();
 
@@ -252,14 +244,14 @@ fn unix_datagram_shutdown() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
     checked_write!(datagram1.send(DATA1));
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_2, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_2, Interest::READABLE)],
     );
 
     datagram1.shutdown(Shutdown::Read).unwrap();
@@ -290,7 +282,7 @@ fn unix_datagram_register() {
 
     let datagram = UnixDatagram::bind(path).unwrap();
     poll.registry()
-        .register(&datagram, TOKEN_1, Interests::READABLE)
+        .register(&datagram, TOKEN_1, Interest::READABLE)
         .unwrap();
     expect_no_events(&mut poll, &mut events);
 }
@@ -304,18 +296,18 @@ fn unix_datagram_reregister() {
 
     let datagram1 = UnixDatagram::bind(&path1).unwrap();
     poll.registry()
-        .register(&datagram1, TOKEN_1, Interests::READABLE)
+        .register(&datagram1, TOKEN_1, Interest::READABLE)
         .unwrap();
 
     let datagram2 = UnixDatagram::bind(&path2).unwrap();
     datagram2.connect(&path1).unwrap();
     poll.registry()
-        .reregister(&datagram1, TOKEN_1, Interests::WRITABLE)
+        .reregister(&datagram1, TOKEN_1, Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 }
 
@@ -328,7 +320,7 @@ fn unix_datagram_deregister() {
 
     let datagram1 = UnixDatagram::bind(&path1).unwrap();
     poll.registry()
-        .register(&datagram1, TOKEN_1, Interests::WRITABLE)
+        .register(&datagram1, TOKEN_1, Interest::WRITABLE)
         .unwrap();
 
     let datagram2 = UnixDatagram::bind(&path2).unwrap();
@@ -349,22 +341,22 @@ fn smoke_test_unconnected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
         .register(
             &datagram1,
             TOKEN_1,
-            Interests::READABLE.add(Interests::WRITABLE),
+            Interest::READABLE.add(Interest::WRITABLE),
         )
         .unwrap();
     poll.registry()
         .register(
             &datagram2,
             TOKEN_2,
-            Interests::READABLE.add(Interests::WRITABLE),
+            Interest::READABLE.add(Interest::WRITABLE),
         )
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(TOKEN_1, Interests::WRITABLE),
-            ExpectEvent::new(TOKEN_2, Interests::WRITABLE),
+            ExpectEvent::new(TOKEN_1, Interest::WRITABLE),
+            ExpectEvent::new(TOKEN_2, Interest::WRITABLE),
         ],
     );
 
@@ -378,8 +370,8 @@ fn smoke_test_unconnected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(TOKEN_1, Interests::READABLE),
-            ExpectEvent::new(TOKEN_2, Interests::READABLE),
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
         ],
     );
 
@@ -410,22 +402,22 @@ fn smoke_test_connected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
         .register(
             &datagram1,
             TOKEN_1,
-            Interests::READABLE.add(Interests::WRITABLE),
+            Interest::READABLE.add(Interest::WRITABLE),
         )
         .unwrap();
     poll.registry()
         .register(
             &datagram2,
             TOKEN_2,
-            Interests::READABLE.add(Interests::WRITABLE),
+            Interest::READABLE.add(Interest::WRITABLE),
         )
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(TOKEN_1, Interests::WRITABLE),
-            ExpectEvent::new(TOKEN_2, Interests::WRITABLE),
+            ExpectEvent::new(TOKEN_1, Interest::WRITABLE),
+            ExpectEvent::new(TOKEN_2, Interest::WRITABLE),
         ],
     );
 
@@ -439,8 +431,8 @@ fn smoke_test_connected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(TOKEN_1, Interests::READABLE),
-            ExpectEvent::new(TOKEN_2, Interests::READABLE),
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
         ],
     );
 

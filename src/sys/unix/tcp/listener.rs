@@ -1,6 +1,6 @@
 use crate::sys::unix::net::{new_ip_socket, socket_addr};
 use crate::sys::unix::{SourceFd, TcpStream};
-use crate::{event, Interests, Registry, Token};
+use crate::{event, Interest, Registry, Token};
 
 use std::fmt;
 use std::io;
@@ -74,16 +74,11 @@ impl TcpListener {
 }
 
 impl event::Source for TcpListener {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
