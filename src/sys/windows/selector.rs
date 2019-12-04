@@ -483,12 +483,10 @@ impl SelectorInner {
         token: Token,
         interests: Interest,
     ) -> io::Result<InternalState> {
-        let flags = interests_to_afd_flags(interests);
-
         let sock = {
             let sock = this._alloc_sock_for_rawsocket(socket)?;
             let event = Event {
-                flags,
+                flags: interests_to_afd_flags(interests),
                 data: token.0 as u64,
             };
             sock.lock().unwrap().set_event(event);
@@ -502,16 +500,12 @@ impl SelectorInner {
             sock_state: sock.clone(),
         };
 
-        unsafe {
-            let mut update_queue = this.update_queue.lock().unwrap();
-            update_queue.push_back(sock);
-            this.update_sockets_events_if_polling()?;
-        }
-
-        Ok(state)
+        let mut update_queue = this.update_queue.lock().unwrap();
+        update_queue.push_back(sock);
+        unsafe { this.update_sockets_events_if_polling().map(|()| state) }
     }
 
-    pub fn reregister(
+    pub(super) fn reregister(
         &self,
         state: &Pin<Arc<Mutex<SockState>>>,
         token: Token,
@@ -522,7 +516,6 @@ impl SelectorInner {
                 flags: interests_to_afd_flags(interests),
                 data: token.0 as u64,
             };
-
             state.lock().unwrap().set_event(event);
         }
 
