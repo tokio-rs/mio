@@ -3,7 +3,7 @@ use super::io_status_block::IoStatusBlock;
 use super::Event;
 use super::SocketState;
 use crate::sys::Events;
-use crate::{Interests, Token};
+use crate::{Interest, Token};
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::Overlapped;
@@ -247,12 +247,12 @@ impl SockState {
         // then reregister the socket to reset the interests.
 
         // Reset readable event
-        if (afd_events & interests_to_afd_flags(Interests::READABLE)) != 0 {
-            self.user_evts &= !(interests_to_afd_flags(Interests::READABLE));
+        if (afd_events & interests_to_afd_flags(Interest::READABLE)) != 0 {
+            self.user_evts &= !(interests_to_afd_flags(Interest::READABLE));
         }
         // Reset writable event
-        if (afd_events & interests_to_afd_flags(Interests::WRITABLE)) != 0 {
-            self.user_evts &= !interests_to_afd_flags(Interests::WRITABLE);
+        if (afd_events & interests_to_afd_flags(Interest::WRITABLE)) != 0 {
+            self.user_evts &= !interests_to_afd_flags(Interest::WRITABLE);
         }
 
         Some(Event {
@@ -352,7 +352,7 @@ impl Selector {
         &self,
         socket: &S,
         token: Token,
-        interests: Interests,
+        interests: Interest,
     ) -> io::Result<()> {
         self.inner.register(socket, token, interests)
     }
@@ -361,7 +361,7 @@ impl Selector {
         &self,
         socket: &S,
         token: Token,
-        interests: Interests,
+        interests: Interest,
     ) -> io::Result<()> {
         self.inner.reregister(socket, token, interests)
     }
@@ -490,7 +490,7 @@ impl SelectorInner {
         &self,
         socket: &S,
         token: Token,
-        interests: Interests,
+        interests: Interest,
     ) -> io::Result<()> {
         if socket.get_sock_state().is_some() {
             return Err(io::Error::from(io::ErrorKind::AlreadyExists));
@@ -520,7 +520,7 @@ impl SelectorInner {
         &self,
         socket: &S,
         token: Token,
-        interests: Interests,
+        interests: Interest,
     ) -> io::Result<()> {
         let flags = interests_to_afd_flags(interests);
 
@@ -645,7 +645,7 @@ impl SelectorInner {
     }
 }
 
-fn interests_to_afd_flags(interests: Interests) -> u32 {
+fn interests_to_afd_flags(interests: Interest) -> u32 {
     let mut flags = 0;
 
     if interests.is_readable() {

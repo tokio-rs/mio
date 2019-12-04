@@ -1,4 +1,4 @@
-use crate::{Interests, Token};
+use crate::{Interest, Token};
 
 use log::error;
 use std::mem::MaybeUninit;
@@ -127,7 +127,7 @@ impl Selector {
         })
     }
 
-    pub fn register(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
+    pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let flags = libc::EV_CLEAR | libc::EV_RECEIPT | libc::EV_ADD;
         // At most we need two changes, but maybe we only need 1.
         let mut changes: [MaybeUninit<libc::kevent>; 2] =
@@ -166,7 +166,7 @@ impl Selector {
         kevent_register(self.kq, changes, &[libc::EPIPE as Data])
     }
 
-    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
         let write_flags = if interests.is_writable() {
             flags | libc::EV_ADD
@@ -668,6 +668,6 @@ fn does_not_register_rw() {
     // Registering kqueue fd will fail if write is requested (On anything but
     // some versions of macOS).
     poll.registry()
-        .register(&kqf, Token(1234), Interests::READABLE)
+        .register(&kqf, Token(1234), Interest::READABLE)
         .unwrap();
 }

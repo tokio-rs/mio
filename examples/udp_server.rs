@@ -2,7 +2,7 @@ use std::io;
 
 use log::warn;
 use mio::net::UdpSocket;
-use mio::{Events, Interests, Poll, Token};
+use mio::{Events, Interest, Poll, Token};
 
 // A token to allow us to identify which event is for the `UdpSocket`.
 const UDP_SOCKET: Token = Token(0);
@@ -23,7 +23,7 @@ fn main() -> io::Result<()> {
     // Register our socket with the token defined above and an interest in being
     // `READABLE`.
     poll.registry()
-        .register(&socket, UDP_SOCKET, Interests::READABLE)?;
+        .register(&socket, UDP_SOCKET, Interest::READABLE)?;
 
     println!("You can connect to the server using `nc`:");
     println!(" $ nc -u 127.0.0.1 9000");

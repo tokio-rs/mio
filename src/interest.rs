@@ -1,9 +1,9 @@
 use std::num::NonZeroU8;
 use std::{fmt, ops};
 
-/// Interests used in registering.
+/// Interest used in registering.
 ///
-/// Interests are used in [registering] [`event::Source`]s with [`Poll`], they
+/// Interest are used in [registering] [`event::Source`]s with [`Poll`], they
 /// indicate what readiness should be monitored for. For example if a socket is
 /// registered with [readable] interests and the socket becomes writable, no
 /// event will be returned from a call to [`poll`].
@@ -11,10 +11,10 @@ use std::{fmt, ops};
 /// [registering]: crate::Registry::register
 /// [`event::Source`]: crate::event::Source
 /// [`Poll`]: crate::Poll
-/// [readable]: Interests::READABLE
+/// [readable]: Interest::READABLE
 /// [`poll`]: crate::Poll::poll
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct Interests(NonZeroU8);
+pub struct Interest(NonZeroU8);
 
 // These must be unique.
 const READABLE: u8 = 0b0_001;
@@ -33,41 +33,41 @@ const AIO: u8 = 0b0_100;
 #[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
 const LIO: u8 = 0b1_000;
 
-impl Interests {
-    /// Returns a `Interests` set representing readable interests.
-    pub const READABLE: Interests = Interests(unsafe { NonZeroU8::new_unchecked(READABLE) });
+impl Interest {
+    /// Returns a `Interest` set representing readable interests.
+    pub const READABLE: Interest = Interest(unsafe { NonZeroU8::new_unchecked(READABLE) });
 
-    /// Returns a `Interests` set representing writable interests.
-    pub const WRITABLE: Interests = Interests(unsafe { NonZeroU8::new_unchecked(WRITABLE) });
+    /// Returns a `Interest` set representing writable interests.
+    pub const WRITABLE: Interest = Interest(unsafe { NonZeroU8::new_unchecked(WRITABLE) });
 
-    /// Returns a `Interests` set representing AIO completion interests.
+    /// Returns a `Interest` set representing AIO completion interests.
     #[cfg(any(
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "ios",
         target_os = "macos"
     ))]
-    pub const AIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(AIO) });
+    pub const AIO: Interest = Interest(unsafe { NonZeroU8::new_unchecked(AIO) });
 
-    /// Returns a `Interests` set representing LIO completion interests.
+    /// Returns a `Interest` set representing LIO completion interests.
     #[cfg(target_os = "freebsd")]
-    pub const LIO: Interests = Interests(unsafe { NonZeroU8::new_unchecked(LIO) });
+    pub const LIO: Interest = Interest(unsafe { NonZeroU8::new_unchecked(LIO) });
 
-    /// Add together two `Interests`.
+    /// Add together two `Interest`.
     ///
     /// This does the same thing as the `BitOr` implementation, but is a
     /// constant function.
     ///
     /// ```
-    /// use mio::Interests;
+    /// use mio::Interest;
     ///
-    /// const INTERESTS: Interests = Interests::READABLE.add(Interests::WRITABLE);
-    /// # fn silent_dead_code_warning(_: Interests) { }
+    /// const INTERESTS: Interest = Interest::READABLE.add(Interest::WRITABLE);
+    /// # fn silent_dead_code_warning(_: Interest) { }
     /// # silent_dead_code_warning(INTERESTS)
     /// ```
     #[allow(clippy::should_implement_trait)]
-    pub const fn add(self, other: Interests) -> Interests {
-        Interests(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
+    pub const fn add(self, other: Interest) -> Interest {
+        Interest(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
     }
 
     /// Returns true if the value includes readable readiness.
@@ -80,34 +80,34 @@ impl Interests {
         (self.0.get() & WRITABLE) != 0
     }
 
-    /// Returns true if `Interests` contains AIO readiness
+    /// Returns true if `Interest` contains AIO readiness
     pub const fn is_aio(self) -> bool {
         (self.0.get() & AIO) != 0
     }
 
-    /// Returns true if `Interests` contains LIO readiness
+    /// Returns true if `Interest` contains LIO readiness
     pub const fn is_lio(self) -> bool {
         (self.0.get() & LIO) != 0
     }
 }
 
-impl ops::BitOr for Interests {
+impl ops::BitOr for Interest {
     type Output = Self;
 
     #[inline]
     fn bitor(self, other: Self) -> Self {
-        Interests(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
+        Interest(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
     }
 }
 
-impl ops::BitOrAssign for Interests {
+impl ops::BitOrAssign for Interest {
     #[inline]
     fn bitor_assign(&mut self, other: Self) {
         self.0 = (*self | other).0;
     }
 }
 
-impl fmt::Debug for Interests {
+impl fmt::Debug for Interest {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut one = false;
         if self.is_readable() {

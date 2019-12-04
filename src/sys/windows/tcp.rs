@@ -1,7 +1,7 @@
 use super::selector::SockState;
 use super::{inaddr_any, new_socket, socket_addr, InternalState};
 use crate::sys::windows::init;
-use crate::{event, poll, Interests, Registry, Token};
+use crate::{event, poll, Interest, Registry, Token};
 
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
@@ -224,7 +224,7 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl event::Source for TcpStream {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         {
             let mut internal = self.internal.lock().unwrap();
             if internal.is_none() {
@@ -246,12 +246,7 @@ impl event::Source for TcpStream {
         result
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {
@@ -423,7 +418,7 @@ impl super::SocketState for TcpListener {
 }
 
 impl event::Source for TcpListener {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         {
             let mut internal = self.internal.lock().unwrap();
             if internal.is_none() {
@@ -445,12 +440,7 @@ impl event::Source for TcpListener {
         result
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {

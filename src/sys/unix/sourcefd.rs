@@ -1,4 +1,4 @@
-use crate::{event, poll, Interests, Registry, Token};
+use crate::{event, poll, Interest, Registry, Token};
 
 use std::io;
 use std::os::unix::io::RawFd;
@@ -28,7 +28,7 @@ use std::os::unix::io::RawFd;
 /// ```
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// use mio::{Interests, Poll, Token};
+/// use mio::{Interest, Poll, Token};
 /// use mio::unix::SourceFd;
 ///
 /// use std::os::unix::io::AsRawFd;
@@ -43,7 +43,7 @@ use std::os::unix::io::RawFd;
 /// poll.registry().register(
 ///     &SourceFd(&listener.as_raw_fd()),
 ///     Token(0),
-///     Interests::READABLE)?;
+///     Interest::READABLE)?;
 /// #     Ok(())
 /// # }
 /// ```
@@ -51,7 +51,7 @@ use std::os::unix::io::RawFd;
 /// Implementing [`event::Source`] for a custom type backed by a [`RawFd`].
 ///
 /// ```
-/// use mio::{event, Interests, Registry, Token};
+/// use mio::{event, Interest, Registry, Token};
 /// use mio::unix::SourceFd;
 ///
 /// use std::os::unix::io::RawFd;
@@ -63,13 +63,13 @@ use std::os::unix::io::RawFd;
 /// }
 ///
 /// impl event::Source for MyIo {
-///     fn register(&self, registry: &Registry, token: Token, interests: Interests)
+///     fn register(&self, registry: &Registry, token: Token, interests: Interest)
 ///         -> io::Result<()>
 ///     {
 ///         SourceFd(&self.fd).register(registry, token, interests)
 ///     }
 ///
-///     fn reregister(&self, registry: &Registry, token: Token, interests: Interests)
+///     fn reregister(&self, registry: &Registry, token: Token, interests: Interest)
 ///         -> io::Result<()>
 ///     {
 ///         SourceFd(&self.fd).reregister(registry, token, interests)
@@ -84,16 +84,11 @@ use std::os::unix::io::RawFd;
 pub struct SourceFd<'a>(pub &'a RawFd);
 
 impl<'a> event::Source for SourceFd<'a> {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         poll::selector(registry).register(*self.0, token, interests)
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         poll::selector(registry).reregister(*self.0, token, interests)
     }
 

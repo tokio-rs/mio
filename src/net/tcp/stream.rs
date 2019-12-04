@@ -9,7 +9,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
-use crate::{event, sys, Interests, Registry, Token};
+use crate::{event, sys, Interest, Registry, Token};
 
 /// A non-blocking TCP stream between a local socket and a remote socket.
 ///
@@ -23,7 +23,7 @@ use crate::{event, sys, Interests, Registry, Token};
 /// #
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// #     let _listener = TcpListener::bind("127.0.0.1:34254")?;
-/// use mio::{Events, Interests, Poll, Token};
+/// use mio::{Events, Interest, Poll, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
@@ -33,7 +33,7 @@ use crate::{event, sys, Interests, Registry, Token};
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.registry().register(&stream, Token(0), Interests::WRITABLE)?;
+/// poll.registry().register(&stream, Token(0), Interest::WRITABLE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -252,18 +252,13 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl event::Source for TcpStream {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         self.sys.reregister(registry, token, interests)
     }
 

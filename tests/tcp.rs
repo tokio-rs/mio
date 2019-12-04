@@ -10,7 +10,7 @@ use std::time::Duration;
 use net2::TcpStreamExt;
 
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, Token};
+use mio::{Events, Interest, Poll, Token};
 
 #[macro_use]
 mod util;
@@ -53,7 +53,7 @@ fn accept() {
     let mut poll = Poll::new().unwrap();
 
     poll.registry()
-        .register(&l, Token(1), Interests::READABLE)
+        .register(&l, Token(1), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -104,7 +104,7 @@ fn connect() {
     let s = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interests::READABLE | Interests::WRITABLE)
+        .register(&s, Token(1), Interest::READABLE | Interest::WRITABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -176,7 +176,7 @@ fn read() {
     let s = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interests::READABLE)
+        .register(&s, Token(1), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -235,7 +235,7 @@ fn peek() {
     let s = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interests::READABLE)
+        .register(&s, Token(1), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -300,7 +300,7 @@ fn write() {
     let s = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interests::WRITABLE)
+        .register(&s, Token(1), Interest::WRITABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -346,10 +346,10 @@ fn connect_then_close() {
     let s = TcpStream::connect(l.local_addr().unwrap()).unwrap();
 
     poll.registry()
-        .register(&l, Token(1), Interests::READABLE)
+        .register(&l, Token(1), Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&s, Token(2), Interests::READABLE)
+        .register(&s, Token(2), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
@@ -365,7 +365,7 @@ fn connect_then_close() {
             if event.token() == Token(1) {
                 let s = h.listener.accept().unwrap().0;
                 poll.registry()
-                    .register(&s, Token(3), Interests::READABLE | Interests::WRITABLE)
+                    .register(&s, Token(3), Interest::READABLE | Interest::WRITABLE)
                     .unwrap();
                 drop(s);
             } else if event.token() == Token(2) {
@@ -383,7 +383,7 @@ fn listen_then_close() {
     let l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
 
     poll.registry()
-        .register(&l, Token(1), Interests::READABLE)
+        .register(&l, Token(1), Interest::READABLE)
         .unwrap();
     drop(l);
 
@@ -435,7 +435,7 @@ fn multiple_writes_immediate_success() {
     let mut poll = Poll::new().unwrap();
     let mut s = TcpStream::connect(addr).unwrap();
     poll.registry()
-        .register(&s, Token(1), Interests::WRITABLE)
+        .register(&s, Token(1), Interest::WRITABLE)
         .unwrap();
     let mut events = Events::with_capacity(16);
 
@@ -481,12 +481,12 @@ fn connection_reset_by_peer() {
 
     // Register server
     poll.registry()
-        .register(&l, Token(0), Interests::READABLE)
+        .register(&l, Token(0), Interest::READABLE)
         .unwrap();
 
     // Register interest in the client
     poll.registry()
-        .register(&client, Token(1), Interests::READABLE | Interests::WRITABLE)
+        .register(&client, Token(1), Interest::READABLE | Interest::WRITABLE)
         .unwrap();
 
     // Wait for listener to be ready
@@ -516,7 +516,7 @@ fn connection_reset_by_peer() {
 
     // Register interest in the server socket
     poll.registry()
-        .register(&server, Token(3), Interests::READABLE)
+        .register(&server, Token(3), Interest::READABLE)
         .unwrap();
 
     loop {
@@ -556,7 +556,7 @@ fn connect_error() {
     };
 
     poll.registry()
-        .register(&l, Token(0), Interests::WRITABLE)
+        .register(&l, Token(0), Interest::WRITABLE)
         .unwrap();
 
     'outer: loop {
@@ -591,7 +591,7 @@ fn write_error() {
 
     let mut s = TcpStream::connect(addr).unwrap();
     poll.registry()
-        .register(&s, Token(0), Interests::READABLE | Interests::WRITABLE)
+        .register(&s, Token(0), Interest::READABLE | Interest::WRITABLE)
         .unwrap();
 
     let mut wait_writable = || 'outer: loop {
@@ -669,7 +669,7 @@ fn write_shutdown() {
         .register(
             &client,
             Token(0),
-            Interests::READABLE.add(Interests::WRITABLE),
+            Interest::READABLE.add(Interest::WRITABLE),
         )
         .unwrap();
 
@@ -710,12 +710,12 @@ fn local_addr_ready() {
 
     let mut poll = Poll::new().unwrap();
     poll.registry()
-        .register(&server, LISTEN, Interests::READABLE)
+        .register(&server, LISTEN, Interest::READABLE)
         .unwrap();
 
     let sock = TcpStream::connect(addr).unwrap();
     poll.registry()
-        .register(&sock, CLIENT, Interests::READABLE)
+        .register(&sock, CLIENT, Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -735,7 +735,7 @@ fn local_addr_ready() {
                 LISTEN => {
                     let sock = handler.listener.accept().unwrap().0;
                     poll.registry()
-                        .register(&sock, SERVER, Interests::WRITABLE)
+                        .register(&sock, SERVER, Interest::WRITABLE)
                         .unwrap();
                     handler.accepted = Some(sock);
                 }
@@ -773,11 +773,11 @@ fn write_then_drop() {
     let mut poll = Poll::new().unwrap();
 
     poll.registry()
-        .register(&a, Token(1), Interests::READABLE)
+        .register(&a, Token(1), Interest::READABLE)
         .unwrap();
 
     poll.registry()
-        .register(&s, Token(3), Interests::READABLE)
+        .register(&s, Token(3), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -790,7 +790,7 @@ fn write_then_drop() {
     let mut s2 = a.accept().unwrap().0;
 
     poll.registry()
-        .register(&s2, Token(2), Interests::WRITABLE)
+        .register(&s2, Token(2), Interest::WRITABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -804,7 +804,7 @@ fn write_then_drop() {
     drop(s2);
 
     poll.registry()
-        .reregister(&s, Token(3), Interests::READABLE)
+        .reregister(&s, Token(3), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -829,10 +829,10 @@ fn write_then_deregister() {
     let mut poll = Poll::new().unwrap();
 
     poll.registry()
-        .register(&a, Token(1), Interests::READABLE)
+        .register(&a, Token(1), Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&s, Token(3), Interests::READABLE)
+        .register(&s, Token(3), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -845,7 +845,7 @@ fn write_then_deregister() {
     let mut s2 = a.accept().unwrap().0;
 
     poll.registry()
-        .register(&s2, Token(2), Interests::WRITABLE)
+        .register(&s2, Token(2), Interest::WRITABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -859,7 +859,7 @@ fn write_then_deregister() {
     poll.registry().deregister(&s2).unwrap();
 
     poll.registry()
-        .reregister(&s, Token(3), Interests::READABLE)
+        .reregister(&s, Token(3), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -886,16 +886,16 @@ fn tcp_no_events_after_deregister() {
     let mut stream = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&listener, ID1, Interests::READABLE)
+        .register(&listener, ID1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&stream, ID3, Interests::READABLE)
+        .register(&stream, ID3, Interest::READABLE)
         .unwrap();
 
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
 
     let (mut stream2, peer_address) = listener.accept().expect("unable to accept connection");
@@ -904,12 +904,12 @@ fn tcp_no_events_after_deregister() {
     assert_eq!(stream2.local_addr().unwrap(), addr);
 
     poll.registry()
-        .register(&stream2, ID2, Interests::WRITABLE)
+        .register(&stream2, ID2, Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::WRITABLE)],
+        vec![ExpectEvent::new(ID2, Interest::WRITABLE)],
     );
 
     stream2.write_all(&[1, 2, 3, 4]).unwrap();
@@ -917,7 +917,7 @@ fn tcp_no_events_after_deregister() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID3, Interests::READABLE)],
+        vec![ExpectEvent::new(ID3, Interest::READABLE)],
     );
 
     poll.registry().deregister(&listener).unwrap();

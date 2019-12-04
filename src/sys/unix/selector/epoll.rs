@@ -1,4 +1,4 @@
-use crate::{Interests, Token};
+use crate::{Interest, Token};
 
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLRDHUP};
 use log::error;
@@ -64,7 +64,7 @@ impl Selector {
         })
     }
 
-    pub fn register(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
+    pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let mut event = libc::epoll_event {
             events: interests_to_epoll(interests),
             u64: usize::from(token) as u64,
@@ -73,7 +73,7 @@ impl Selector {
         syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
     }
 
-    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let mut event = libc::epoll_event {
             events: interests_to_epoll(interests),
             u64: usize::from(token) as u64,
@@ -87,7 +87,7 @@ impl Selector {
     }
 }
 
-fn interests_to_epoll(interests: Interests) -> u32 {
+fn interests_to_epoll(interests: Interest) -> u32 {
     let mut kind = EPOLLET;
 
     if interests.is_readable() {

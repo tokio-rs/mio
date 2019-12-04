@@ -1,7 +1,7 @@
 use super::TcpStream;
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
-use crate::{event, sys, Interests, Registry, Token};
+use crate::{event, sys, Interest, Registry, Token};
 
 use std::fmt;
 use std::io;
@@ -19,7 +19,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 /// ```
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// use mio::{Events, Interests, Poll, Token};
+/// use mio::{Events, Interest, Poll, Token};
 /// use mio::net::TcpListener;
 /// use std::time::Duration;
 ///
@@ -29,7 +29,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.registry().register(&listener, Token(0), Interests::READABLE)?;
+/// poll.registry().register(&listener, Token(0), Interest::READABLE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -136,18 +136,13 @@ impl TcpListener {
 }
 
 impl event::Source for TcpListener {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         self.sys.reregister(registry, token, interests)
     }
 

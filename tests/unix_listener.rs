@@ -3,7 +3,7 @@
 mod util;
 
 use mio::net::UnixListener;
-use mio::{Interests, Poll, Token};
+use mio::{Interest, Poll, Token};
 use std::io::{self, Read};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net;
@@ -56,17 +56,17 @@ fn unix_listener_try_clone_same_poll() {
 
     let handle_1 = open_connections(path.clone(), 1, barrier.clone());
     poll.registry()
-        .register(&listener1, TOKEN_1, Interests::READABLE)
+        .register(&listener1, TOKEN_1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&listener2, TOKEN_2, Interests::READABLE)
+        .register(&listener2, TOKEN_2, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(TOKEN_1, Interests::READABLE),
-            ExpectEvent::new(TOKEN_2, Interests::READABLE),
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
         ],
     );
 
@@ -77,8 +77,8 @@ fn unix_listener_try_clone_same_poll() {
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(TOKEN_1, Interests::READABLE),
-            ExpectEvent::new(TOKEN_2, Interests::READABLE),
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
         ],
     );
 
@@ -110,21 +110,21 @@ fn unix_listener_try_clone_different_poll() {
     let handle_1 = open_connections(path.clone(), 1, barrier.clone());
     poll1
         .registry()
-        .register(&listener1, TOKEN_1, Interests::READABLE)
+        .register(&listener1, TOKEN_1, Interest::READABLE)
         .unwrap();
     poll2
         .registry()
-        .register(&listener2, TOKEN_2, Interests::READABLE)
+        .register(&listener2, TOKEN_2, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll1,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
     expect_events(
         &mut poll2,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_2, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_2, Interest::READABLE)],
     );
 
     listener1.accept().unwrap();
@@ -133,12 +133,12 @@ fn unix_listener_try_clone_different_poll() {
     expect_events(
         &mut poll1,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
     expect_events(
         &mut poll2,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_2, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_2, Interest::READABLE)],
     );
 
     listener2.accept().unwrap();
@@ -166,7 +166,7 @@ fn unix_listener_local_addr() {
         .register(
             &listener,
             TOKEN_1,
-            Interests::WRITABLE.add(Interests::READABLE),
+            Interest::WRITABLE.add(Interest::READABLE),
         )
         .unwrap();
 
@@ -174,7 +174,7 @@ fn unix_listener_local_addr() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
 
     let (stream, expected_addr) = listener.accept().unwrap();
@@ -192,7 +192,7 @@ fn unix_listener_register() {
 
     let listener = UnixListener::bind(dir.path().join("any")).unwrap();
     poll.registry()
-        .register(&listener, TOKEN_1, Interests::READABLE)
+        .register(&listener, TOKEN_1, Interest::READABLE)
         .unwrap();
     expect_no_events(&mut poll, &mut events)
 }
@@ -206,19 +206,19 @@ fn unix_listener_reregister() {
 
     let listener = UnixListener::bind(&path).unwrap();
     poll.registry()
-        .register(&listener, TOKEN_1, Interests::WRITABLE)
+        .register(&listener, TOKEN_1, Interest::WRITABLE)
         .unwrap();
 
     let handle = open_connections(path, 1, barrier.clone());
     expect_no_events(&mut poll, &mut events);
 
     poll.registry()
-        .reregister(&listener, TOKEN_1, Interests::READABLE)
+        .reregister(&listener, TOKEN_1, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
 
     barrier.wait();
@@ -234,7 +234,7 @@ fn unix_listener_deregister() {
 
     let listener = UnixListener::bind(&path).unwrap();
     poll.registry()
-        .register(&listener, TOKEN_1, Interests::READABLE)
+        .register(&listener, TOKEN_1, Interest::READABLE)
         .unwrap();
 
     let handle = open_connections(path, 1, barrier.clone());
@@ -260,7 +260,7 @@ where
         .register(
             &listener,
             TOKEN_1,
-            Interests::WRITABLE.add(Interests::READABLE),
+            Interest::WRITABLE.add(Interest::READABLE),
         )
         .unwrap();
     expect_no_events(&mut poll, &mut events);
@@ -269,7 +269,7 @@ where
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interests::READABLE)],
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
 
     let (mut stream, _) = listener.accept().unwrap();

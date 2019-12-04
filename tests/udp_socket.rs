@@ -11,7 +11,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use log::{debug, info};
 
 use mio::net::UdpSocket;
-use mio::{Events, Interests, Poll, Registry, Token};
+use mio::{Events, Interest, Poll, Registry, Token};
 
 #[macro_use]
 mod util;
@@ -72,18 +72,18 @@ fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
     let address2 = socket2.local_addr().unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .register(&socket1, ID1, Interest::READABLE.add(Interest::WRITABLE))
         .expect("unable to register UDP socket");
     poll.registry()
-        .register(&socket2, ID2, Interests::READABLE.add(Interests::WRITABLE))
+        .register(&socket2, ID2, Interest::READABLE.add(Interest::WRITABLE))
         .expect("unable to register UDP socket");
 
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID1, Interests::WRITABLE),
-            ExpectEvent::new(ID2, Interests::WRITABLE),
+            ExpectEvent::new(ID1, Interest::WRITABLE),
+            ExpectEvent::new(ID2, Interest::WRITABLE),
         ],
     );
 
@@ -98,8 +98,8 @@ fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID1, Interests::READABLE),
-            ExpectEvent::new(ID2, Interests::READABLE),
+            ExpectEvent::new(ID1, Interest::READABLE),
+            ExpectEvent::new(ID2, Interest::READABLE),
         ],
     );
 
@@ -186,18 +186,18 @@ fn smoke_test_connected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
     let (mut poll, mut events) = init_with_poll();
 
     poll.registry()
-        .register(&socket1, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .register(&socket1, ID1, Interest::READABLE.add(Interest::WRITABLE))
         .expect("unable to register UDP socket");
     poll.registry()
-        .register(&socket2, ID2, Interests::READABLE.add(Interests::WRITABLE))
+        .register(&socket2, ID2, Interest::READABLE.add(Interest::WRITABLE))
         .expect("unable to register UDP socket");
 
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID1, Interests::WRITABLE),
-            ExpectEvent::new(ID2, Interests::WRITABLE),
+            ExpectEvent::new(ID1, Interest::WRITABLE),
+            ExpectEvent::new(ID2, Interest::WRITABLE),
         ],
     );
 
@@ -212,8 +212,8 @@ fn smoke_test_connected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID1, Interests::READABLE),
-            ExpectEvent::new(ID2, Interests::READABLE),
+            ExpectEvent::new(ID1, Interest::READABLE),
+            ExpectEvent::new(ID2, Interest::READABLE),
         ],
     );
 
@@ -245,19 +245,19 @@ fn reconnect_udp_socket_sending() {
     socket3.connect(address1).unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .register(&socket1, ID1, Interest::READABLE.add(Interest::WRITABLE))
         .unwrap();
     poll.registry()
-        .register(&socket2, ID2, Interests::READABLE)
+        .register(&socket2, ID2, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&socket3, ID3, Interests::READABLE)
+        .register(&socket3, ID3, Interest::READABLE)
         .unwrap();
 
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
     );
 
     checked_write!(socket1.send(DATA1));
@@ -265,7 +265,7 @@ fn reconnect_udp_socket_sending() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     let mut buf = [0; 20];
@@ -277,7 +277,7 @@ fn reconnect_udp_socket_sending() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID3, Interests::READABLE)],
+        vec![ExpectEvent::new(ID3, Interest::READABLE)],
     );
 
     expect_read!(socket3.recv(&mut buf), DATA2);
@@ -304,21 +304,21 @@ fn reconnect_udp_socket_receiving() {
     socket3.connect(address1).unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interests::READABLE)
+        .register(&socket1, ID1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&socket2, ID2, Interests::WRITABLE)
+        .register(&socket2, ID2, Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&socket3, ID3, Interests::WRITABLE)
+        .register(&socket3, ID3, Interest::WRITABLE)
         .unwrap();
 
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID2, Interests::WRITABLE),
-            ExpectEvent::new(ID3, Interests::WRITABLE),
+            ExpectEvent::new(ID2, Interest::WRITABLE),
+            ExpectEvent::new(ID3, Interest::WRITABLE),
         ],
     );
 
@@ -327,7 +327,7 @@ fn reconnect_udp_socket_receiving() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
 
     let mut buf = [0; 20];
@@ -343,7 +343,7 @@ fn reconnect_udp_socket_receiving() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
 
     // Read all data.
@@ -361,7 +361,7 @@ fn reconnect_udp_socket_receiving() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::READABLE)],
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
 
     expect_read!(socket1.recv(&mut buf), DATA2);
@@ -380,16 +380,16 @@ fn unconnected_udp_socket_connected_methods() {
     let address2 = socket2.local_addr().unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interests::WRITABLE)
+        .register(&socket1, ID1, Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&socket2, ID2, Interests::READABLE)
+        .register(&socket2, ID2, Interest::READABLE)
         .unwrap();
 
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::WRITABLE)],
+        vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
     );
 
     // Socket is unconnected, but we're using an connected method.
@@ -409,7 +409,7 @@ fn unconnected_udp_socket_connected_methods() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     // Receive methods don't require the socket to be connected, you just won't
@@ -437,21 +437,21 @@ fn connected_udp_socket_unconnected_methods() {
     socket3.connect(address2).unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interests::WRITABLE)
+        .register(&socket1, ID1, Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&socket2, ID2, Interests::WRITABLE)
+        .register(&socket2, ID2, Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&socket3, ID3, Interests::READABLE)
+        .register(&socket3, ID3, Interest::READABLE)
         .unwrap();
 
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID1, Interests::WRITABLE),
-            ExpectEvent::new(ID2, Interests::WRITABLE),
+            ExpectEvent::new(ID1, Interest::WRITABLE),
+            ExpectEvent::new(ID2, Interest::WRITABLE),
         ],
     );
 
@@ -469,7 +469,7 @@ fn connected_udp_socket_unconnected_methods() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID3, Interests::READABLE)],
+        vec![ExpectEvent::new(ID3, Interest::READABLE)],
     );
 
     let mut buf = [0; 20];
@@ -504,7 +504,7 @@ fn udp_socket_register() {
 
     let socket = UdpSocket::bind(any_local_address()).unwrap();
     poll.registry()
-        .register(&socket, ID1, Interests::READABLE)
+        .register(&socket, ID1, Interest::READABLE)
         .expect("unable to register UDP socket");
 
     expect_no_events(&mut poll, &mut events);
@@ -523,23 +523,23 @@ fn udp_socket_reregister() {
     let thread_handle = send_packets(address, 1, barrier.clone());
 
     poll.registry()
-        .register(&socket, ID1, Interests::WRITABLE)
+        .register(&socket, ID1, Interest::WRITABLE)
         .unwrap();
     // Let the first packet be send.
     barrier.wait();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interests::WRITABLE)], // Not readable!
+        vec![ExpectEvent::new(ID1, Interest::WRITABLE)], // Not readable!
     );
 
     poll.registry()
-        .reregister(&socket, ID2, Interests::READABLE)
+        .reregister(&socket, ID2, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     let mut buf = [0; 20];
@@ -559,7 +559,7 @@ fn udp_socket_no_events_after_deregister() {
     let thread_handle = send_packets(address, 1, barrier.clone());
 
     poll.registry()
-        .register(&socket, ID1, Interests::READABLE)
+        .register(&socket, ID1, Interest::READABLE)
         .unwrap();
 
     // Let the packet be send.
@@ -632,12 +632,12 @@ fn send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
     info!("Registering SENDER");
     poll.registry()
-        .register(&tx, SENDER, Interests::WRITABLE)
+        .register(&tx, SENDER, Interest::WRITABLE)
         .unwrap();
 
     info!("Registering LISTENER");
     poll.registry()
-        .register(&rx, LISTENER, Interests::READABLE)
+        .register(&rx, LISTENER, Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -737,10 +737,10 @@ pub fn udp_socket_discard() {
     checked_write!(udp_outside.send(b"hello world"));
 
     poll.registry()
-        .register(&rx, LISTENER, Interests::READABLE)
+        .register(&rx, LISTENER, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&tx, SENDER, Interests::WRITABLE)
+        .register(&tx, SENDER, Interest::WRITABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -834,12 +834,12 @@ pub fn multicast() {
 
     info!("Registering SENDER");
     poll.registry()
-        .register(&tx, SENDER, Interests::WRITABLE)
+        .register(&tx, SENDER, Interest::WRITABLE)
         .unwrap();
 
     info!("Registering LISTENER");
     poll.registry()
-        .register(&rx, LISTENER, Interests::READABLE)
+        .register(&rx, LISTENER, Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -873,18 +873,18 @@ fn et_behavior_recv() {
     let address2 = socket2.local_addr().unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interests::WRITABLE)
+        .register(&socket1, ID1, Interest::WRITABLE)
         .expect("unable to register UDP socket");
     poll.registry()
-        .register(&socket2, ID2, Interests::READABLE.add(Interests::WRITABLE))
+        .register(&socket2, ID2, Interest::READABLE.add(Interest::WRITABLE))
         .expect("unable to register UDP socket");
 
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID1, Interests::WRITABLE),
-            ExpectEvent::new(ID2, Interests::WRITABLE),
+            ExpectEvent::new(ID1, Interest::WRITABLE),
+            ExpectEvent::new(ID2, Interest::WRITABLE),
         ],
     );
 
@@ -895,7 +895,7 @@ fn et_behavior_recv() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     expect_read!(socket2.recv(&mut buf), DATA1);
@@ -906,7 +906,7 @@ fn et_behavior_recv() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     let mut buf = [0; 20];
@@ -924,18 +924,18 @@ fn et_behavior_recv_from() {
     let address2 = socket2.local_addr().unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interests::READABLE.add(Interests::WRITABLE))
+        .register(&socket1, ID1, Interest::READABLE.add(Interest::WRITABLE))
         .expect("unable to register UDP socket");
     poll.registry()
-        .register(&socket2, ID2, Interests::READABLE.add(Interests::WRITABLE))
+        .register(&socket2, ID2, Interest::READABLE.add(Interest::WRITABLE))
         .expect("unable to register UDP socket");
 
     expect_events(
         &mut poll,
         &mut events,
         vec![
-            ExpectEvent::new(ID1, Interests::WRITABLE),
-            ExpectEvent::new(ID2, Interests::WRITABLE),
+            ExpectEvent::new(ID1, Interest::WRITABLE),
+            ExpectEvent::new(ID2, Interest::WRITABLE),
         ],
     );
 
@@ -944,7 +944,7 @@ fn et_behavior_recv_from() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     let mut buf = [0; 20];
@@ -956,7 +956,7 @@ fn et_behavior_recv_from() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interests::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     expect_read!(socket2.recv_from(&mut buf), DATA1, address1);

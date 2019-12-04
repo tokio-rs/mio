@@ -9,7 +9,7 @@
 
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
-use crate::{event, sys, Interests, Registry, Token};
+use crate::{event, sys, Interest, Registry, Token};
 
 use std::fmt;
 use std::io;
@@ -37,7 +37,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 /// // ECHOER -> listens and prints the message received.
 ///
 /// use mio::net::UdpSocket;
-/// use mio::{Events, Interests, Poll, Token};
+/// use mio::{Events, Interest, Poll, Token};
 /// use std::time::Duration;
 ///
 /// const SENDER: Token = Token(0);
@@ -57,8 +57,8 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 /// let mut poll = Poll::new()?;
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// poll.registry().register(&sender_socket, SENDER, Interests::WRITABLE)?;
-/// poll.registry().register(&echoer_socket, ECHOER, Interests::READABLE)?;
+/// poll.registry().register(&sender_socket, SENDER, Interest::WRITABLE)?;
+/// poll.registry().register(&echoer_socket, ECHOER, Interest::READABLE)?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];
@@ -550,18 +550,13 @@ impl UdpSocket {
 }
 
 impl event::Source for UdpSocket {
-    fn register(&self, registry: &Registry, token: Token, interests: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
-    fn reregister(
-        &self,
-        registry: &Registry,
-        token: Token,
-        interests: Interests,
-    ) -> io::Result<()> {
+    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
         self.sys.reregister(registry, token, interests)
     }
 

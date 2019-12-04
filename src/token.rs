@@ -20,7 +20,7 @@
 /// ```
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// use mio::{Events, Interests, Poll, Token};
+/// use mio::{Events, Interest, Poll, Token};
 /// use mio::net::TcpListener;
 ///
 /// use std::thread;
@@ -47,7 +47,7 @@
 /// let listener = TcpListener::bind("127.0.0.1:0".parse()?)?;
 ///
 /// // Register the listener
-/// poll.registry().register(&listener, LISTENER, Interests::READABLE)?;
+/// poll.registry().register(&listener, LISTENER, Interest::READABLE)?;
 ///
 /// // Spawn a thread that will connect a bunch of sockets then close them
 /// let addr = listener.local_addr()?;
@@ -90,7 +90,7 @@
 ///                             next_socket_index += 1;
 ///
 ///                             // Register the new socket w/ poll
-///                             poll.registry().register(&socket, token, Interests::READABLE)?;
+///                             poll.registry().register(&socket, token, Interest::READABLE)?;
 ///
 ///                             // Store the socket
 ///                             sockets.insert(token, socket);
