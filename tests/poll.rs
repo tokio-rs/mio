@@ -2,7 +2,7 @@ use mio::net::{TcpListener, TcpStream};
 use mio::{event, Events, Interest, Poll, Registry, Token};
 
 use std::net;
-use std::sync::{Arc, Barrier, Mutex};
+use std::sync::{Arc, Barrier};
 use std::thread::{self, sleep};
 use std::time::Duration;
 use std::{fmt, io};
@@ -220,9 +220,7 @@ pub fn double_register() {
         .is_err());
 }
 
-struct TestEventSource(Mutex<TestEventSourceData>);
-
-struct TestEventSourceData {
+struct TestEventSource {
     registrations: Vec<(Token, Interest)>,
     reregistrations: Vec<(Token, Interest)>,
     deregister_count: usize,
@@ -230,11 +228,11 @@ struct TestEventSourceData {
 
 impl TestEventSource {
     fn new() -> TestEventSource {
-        TestEventSource(Mutex::new(TestEventSourceData {
+        TestEventSource {
             registrations: Vec::new(),
             reregistrations: Vec::new(),
             deregister_count: 0,
-        }))
+        }
     }
 }
 
@@ -245,8 +243,7 @@ impl event::Source for TestEventSource {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        let mut inner = self.0.lock().unwrap();
-        inner.registrations.push((token, interests));
+        self.registrations.push((token, interests));
         Ok(())
     }
 
@@ -256,14 +253,12 @@ impl event::Source for TestEventSource {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        let mut inner = self.0.lock().unwrap();
-        inner.reregistrations.push((token, interests));
+        self.reregistrations.push((token, interests));
         Ok(())
     }
 
     fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
-        let mut inner = self.0.lock().unwrap();
-        inner.deregister_count += 1;
+        self.deregister_count += 1;
         Ok(())
     }
 }
@@ -278,37 +273,28 @@ fn poll_registration() {
     let token = Token(0);
     let interests = Interest::READABLE;
     registry.register(&mut source, token, interests).unwrap();
-    {
-        let source = source.0.lock().unwrap();
-        assert_eq!(source.registrations.len(), 1);
-        assert_eq!(source.registrations.get(0), Some(&(token, interests)));
-        assert!(source.reregistrations.is_empty());
-        assert_eq!(source.deregister_count, 0);
-    }
+    assert_eq!(source.registrations.len(), 1);
+    assert_eq!(source.registrations.get(0), Some(&(token, interests)));
+    assert!(source.reregistrations.is_empty());
+    assert_eq!(source.deregister_count, 0);
 
     let re_token = Token(0);
     let re_interests = Interest::READABLE;
     registry
         .reregister(&mut source, re_token, re_interests)
         .unwrap();
-    {
-        let source = source.0.lock().unwrap();
-        assert_eq!(source.registrations.len(), 1);
-        assert_eq!(source.reregistrations.len(), 1);
-        assert_eq!(
-            source.reregistrations.get(0),
-            Some(&(re_token, re_interests))
-        );
-        assert_eq!(source.deregister_count, 0);
-    }
+    assert_eq!(source.registrations.len(), 1);
+    assert_eq!(source.reregistrations.len(), 1);
+    assert_eq!(
+        source.reregistrations.get(0),
+        Some(&(re_token, re_interests))
+    );
+    assert_eq!(source.deregister_count, 0);
 
     registry.deregister(&mut source).unwrap();
-    {
-        let source = source.0.lock().unwrap();
-        assert_eq!(source.registrations.len(), 1);
-        assert_eq!(source.reregistrations.len(), 1);
-        assert_eq!(source.deregister_count, 1);
-    }
+    assert_eq!(source.registrations.len(), 1);
+    assert_eq!(source.reregistrations.len(), 1);
+    assert_eq!(source.deregister_count, 1);
 }
 
 struct ErroneousTestEventSource;
