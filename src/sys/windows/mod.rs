@@ -58,16 +58,13 @@ struct InternalState {
     selector: Arc<SelectorInner>,
     token: Token,
     interests: Interest,
-    // FIXME: this `Option` can be removed.
-    sock_state: Option<Pin<Arc<Mutex<SockState>>>>,
+    sock_state: Pin<Arc<Mutex<SockState>>>,
 }
 
 impl Drop for InternalState {
     fn drop(&mut self) {
-        if let Some(sock_state) = self.sock_state.as_ref() {
-            let mut sock_state = sock_state.lock().unwrap();
-            sock_state.mark_delete();
-        }
+        let mut sock_state = self.sock_state.lock().unwrap();
+        sock_state.mark_delete();
     }
 }
 

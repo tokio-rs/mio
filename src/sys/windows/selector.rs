@@ -499,7 +499,7 @@ impl SelectorInner {
             selector: this.clone(),
             token,
             interests,
-            sock_state: Some(sock.clone()),
+            sock_state: sock.clone(),
         };
 
         unsafe {

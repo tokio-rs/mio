@@ -105,10 +105,9 @@ impl TcpStream {
     // Used by `try_io` to register after an I/O operation blocked.
     fn io_blocked_reregister(&self) -> io::Result<()> {
         self.state.as_ref().map_or(Ok(()), |state| {
-            let sock_state = state.sock_state.as_ref().unwrap();
             state
                 .selector
-                .reregister(sock_state, state.token, state.interests)
+                .reregister(&state.sock_state, state.token, state.interests)
         })
     }
 }
@@ -162,15 +161,12 @@ impl event::Source for TcpStream {
         interests: Interest,
     ) -> io::Result<()> {
         match self.state.as_mut() {
-            Some(state) => {
-                let sock_state = state.sock_state.as_ref().unwrap();
-                poll::selector(registry)
-                    .reregister(sock_state, token, interests)
-                    .map(|()| {
-                        state.token = token;
-                        state.interests = interests;
-                    })
-            }
+            Some(state) => poll::selector(registry)
+                .reregister(&state.sock_state, token, interests)
+                .map(|()| {
+                    state.token = token;
+                    state.interests = interests;
+                }),
             None => Err(io::Error::from(io::ErrorKind::NotFound)),
         }
     }
@@ -178,10 +174,8 @@ impl event::Source for TcpStream {
     fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
         match self.state.as_mut() {
             Some(state) => {
-                if let Some(sock_state) = state.sock_state.as_ref() {
-                    let mut sock_state = sock_state.lock().unwrap();
-                    sock_state.mark_delete();
-                }
+                let mut sock_state = state.sock_state.lock().unwrap();
+                sock_state.mark_delete();
                 Ok(())
             }
             None => Err(io::Error::from(io::ErrorKind::NotFound)),
@@ -284,10 +278,9 @@ impl TcpListener {
     // Used by `try_io` to register after an I/O operation blocked.
     fn io_blocked_reregister(&self) -> io::Result<()> {
         self.state.as_ref().map_or(Ok(()), |state| {
-            let sock_state = state.sock_state.as_ref().unwrap();
             state
                 .selector
-                .reregister(sock_state, state.token, state.interests)
+                .reregister(&state.sock_state, state.token, state.interests)
         })
     }
 }
@@ -317,15 +310,12 @@ impl event::Source for TcpListener {
         interests: Interest,
     ) -> io::Result<()> {
         match self.state.as_mut() {
-            Some(state) => {
-                let sock_state = state.sock_state.as_ref().unwrap();
-                poll::selector(registry)
-                    .reregister(sock_state, token, interests)
-                    .map(|()| {
-                        state.token = token;
-                        state.interests = interests;
-                    })
-            }
+            Some(state) => poll::selector(registry)
+                .reregister(&state.sock_state, token, interests)
+                .map(|()| {
+                    state.token = token;
+                    state.interests = interests;
+                }),
             None => Err(io::Error::from(io::ErrorKind::NotFound)),
         }
     }
@@ -333,10 +323,8 @@ impl event::Source for TcpListener {
     fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
         match self.state.as_mut() {
             Some(state) => {
-                if let Some(sock_state) = state.sock_state.as_ref() {
-                    let mut sock_state = sock_state.lock().unwrap();
-                    sock_state.mark_delete();
-                }
+                let mut sock_state = state.sock_state.lock().unwrap();
+                sock_state.mark_delete();
                 Ok(())
             }
             None => Err(io::Error::from(io::ErrorKind::NotFound)),
