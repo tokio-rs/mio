@@ -70,17 +70,6 @@ struct InternalState {
     sock_state: Option<Pin<Arc<Mutex<SockState>>>>,
 }
 
-impl InternalState {
-    fn new(selector: Arc<SelectorInner>, token: Token, interests: Interest) -> InternalState {
-        InternalState {
-            selector,
-            token,
-            interests,
-            sock_state: None,
-        }
-    }
-}
-
 impl Drop for InternalState {
     fn drop(&mut self) {
         if let Some(sock_state) = self.sock_state.as_ref() {

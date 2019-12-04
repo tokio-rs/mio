@@ -144,7 +144,7 @@ impl UdpSocket {
             let sock_state = state.sock_state.as_ref().unwrap();
             state
                 .selector
-                .reregister2(sock_state, state.token, state.interests)
+                .reregister(sock_state, state.token, state.interests)
         })
     }
 }
@@ -160,7 +160,7 @@ impl event::Source for UdpSocket {
             Err(io::Error::from(io::ErrorKind::AlreadyExists))
         } else {
             poll::selector(registry)
-                .register2(self.inner.as_raw_socket(), token, interests)
+                .register(self.inner.as_raw_socket(), token, interests)
                 .map(|state| {
                     self.state = Some(Box::new(state));
                 })
@@ -177,7 +177,7 @@ impl event::Source for UdpSocket {
             Some(state) => {
                 let sock_state = state.sock_state.as_ref().unwrap();
                 poll::selector(registry)
-                    .reregister2(sock_state, token, interests)
+                    .reregister(sock_state, token, interests)
                     .map(|()| {
                         state.token = token;
                         state.interests = interests;
