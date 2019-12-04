@@ -27,7 +27,7 @@ fn issue_776() {
     let mut s = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&s, Token(1), Interest::READABLE | Interest::WRITABLE)
+        .register(&mut s, Token(1), Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     let mut events = Events::with_capacity(16);
     'outer: loop {

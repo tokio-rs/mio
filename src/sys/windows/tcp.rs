@@ -218,7 +218,12 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl event::Source for TcpStream {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         {
             let mut internal = self.internal.lock().unwrap();
             if internal.is_none() {
@@ -240,7 +245,12 @@ impl event::Source for TcpStream {
         result
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {
@@ -253,7 +263,7 @@ impl event::Source for TcpStream {
         result
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         let result = poll::selector(registry).deregister(self);
         match result {
             Ok(_) => {
@@ -410,7 +420,12 @@ impl super::SocketState for TcpListener {
 }
 
 impl event::Source for TcpListener {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         {
             let mut internal = self.internal.lock().unwrap();
             if internal.is_none() {
@@ -432,7 +447,12 @@ impl event::Source for TcpListener {
         result
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {
@@ -445,7 +465,7 @@ impl event::Source for TcpListener {
         result
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         let result = poll::selector(registry).deregister(self);
         match result {
             Ok(_) => {

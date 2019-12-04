@@ -51,11 +51,11 @@ where
 {
     let (mut poll, mut events) = init_with_poll();
 
-    let listener = make_listener(addr).unwrap();
+    let mut listener = make_listener(addr).unwrap();
     let address = listener.local_addr().unwrap();
 
     poll.registry()
-        .register(&listener, ID1, Interest::READABLE)
+        .register(&mut listener, ID1, Interest::READABLE)
         .expect("unable to register TCP listener");
 
     let barrier = Arc::new(Barrier::new(2));
@@ -131,10 +131,10 @@ fn raw_fd() {
 fn registering() {
     let (mut poll, mut events) = init_with_poll();
 
-    let stream = TcpListener::bind(any_local_address()).unwrap();
+    let mut stream = TcpListener::bind(any_local_address()).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::READABLE)
+        .register(&mut stream, ID1, Interest::READABLE)
         .expect("unable to register TCP listener");
 
     expect_no_events(&mut poll, &mut events);
@@ -146,14 +146,14 @@ fn registering() {
 fn reregister() {
     let (mut poll, mut events) = init_with_poll();
 
-    let listener = TcpListener::bind(any_local_address()).unwrap();
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
     let address = listener.local_addr().unwrap();
 
     poll.registry()
-        .register(&listener, ID1, Interest::READABLE)
+        .register(&mut listener, ID1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .reregister(&listener, ID2, Interest::READABLE)
+        .reregister(&mut listener, ID2, Interest::READABLE)
         .unwrap();
 
     let barrier = Arc::new(Barrier::new(2));
@@ -182,17 +182,17 @@ fn reregister() {
 fn no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
 
-    let listener = TcpListener::bind(any_local_address()).unwrap();
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
     let address = listener.local_addr().unwrap();
 
     poll.registry()
-        .register(&listener, ID1, Interest::READABLE)
+        .register(&mut listener, ID1, Interest::READABLE)
         .unwrap();
 
     let barrier = Arc::new(Barrier::new(2));
     let thread_handle = start_connections(address, 1, barrier.clone());
 
-    poll.registry().deregister(&listener).unwrap();
+    poll.registry().deregister(&mut listener).unwrap();
 
     expect_no_events(&mut poll, &mut events);
 
@@ -215,8 +215,8 @@ fn no_events_after_deregister() {
 fn try_clone_same_poll() {
     let (mut poll, mut events) = init_with_poll();
 
-    let listener1 = TcpListener::bind(any_local_address()).unwrap();
-    let listener2 = listener1.try_clone().expect("unable to clone TCP listener");
+    let mut listener1 = TcpListener::bind(any_local_address()).unwrap();
+    let mut listener2 = listener1.try_clone().expect("unable to clone TCP listener");
     #[cfg(unix)]
     assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
     let address = listener1.local_addr().unwrap();
@@ -226,10 +226,10 @@ fn try_clone_same_poll() {
     let thread_handle1 = start_connections(address, 1, barrier.clone());
 
     poll.registry()
-        .register(&listener1, ID1, Interest::READABLE)
+        .register(&mut listener1, ID1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&listener2, ID2, Interest::READABLE)
+        .register(&mut listener2, ID2, Interest::READABLE)
         .unwrap();
 
     expect_events(
@@ -279,8 +279,8 @@ fn try_clone_different_poll() {
     let (mut poll1, mut events) = init_with_poll();
     let mut poll2 = Poll::new().unwrap();
 
-    let listener1 = TcpListener::bind(any_local_address()).unwrap();
-    let listener2 = listener1.try_clone().expect("unable to clone TCP listener");
+    let mut listener1 = TcpListener::bind(any_local_address()).unwrap();
+    let mut listener2 = listener1.try_clone().expect("unable to clone TCP listener");
     #[cfg(unix)]
     assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
     let address = listener1.local_addr().unwrap();
@@ -291,11 +291,11 @@ fn try_clone_different_poll() {
 
     poll1
         .registry()
-        .register(&listener1, ID1, Interest::READABLE)
+        .register(&mut listener1, ID1, Interest::READABLE)
         .unwrap();
     poll2
         .registry()
-        .register(&listener2, ID2, Interest::READABLE)
+        .register(&mut listener2, ID2, Interest::READABLE)
         .unwrap();
 
     expect_events(
@@ -348,7 +348,7 @@ fn try_clone_different_poll() {
 fn tcp_listener_two_streams() {
     let (mut poll1, mut events) = init_with_poll();
 
-    let listener = TcpListener::bind(any_local_address()).unwrap();
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
     let address = listener.local_addr().unwrap();
 
     let barrier = Arc::new(Barrier::new(3));
@@ -356,7 +356,7 @@ fn tcp_listener_two_streams() {
 
     poll1
         .registry()
-        .register(&listener, ID1, Interest::READABLE)
+        .register(&mut listener, ID1, Interest::READABLE)
         .unwrap();
 
     expect_events(

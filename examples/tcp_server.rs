@@ -22,11 +22,11 @@ fn main() -> io::Result<()> {
 
     // Setup the TCP server socket.
     let addr = "127.0.0.1:9000".parse().unwrap();
-    let server = TcpListener::bind(addr)?;
+    let mut server = TcpListener::bind(addr)?;
 
     // Register the server with poll we can receive events for it.
     poll.registry()
-        .register(&server, SERVER, Interest::READABLE)?;
+        .register(&mut server, SERVER, Interest::READABLE)?;
 
     // Map of `Token` -> `TcpStream`.
     let mut connections = HashMap::new();
@@ -45,12 +45,12 @@ fn main() -> io::Result<()> {
                 SERVER => {
                     // Received an event for the TCP server socket.
                     // Accept an connection.
-                    let (connection, address) = server.accept()?;
+                    let (mut connection, address) = server.accept()?;
                     println!("Accepted connection from: {}", address);
 
                     let token = next(&mut unique_token);
                     poll.registry().register(
-                        &connection,
+                        &mut connection,
                         token,
                         Interest::READABLE.add(Interest::WRITABLE),
                     )?;
@@ -96,7 +96,7 @@ fn handle_connection_event(
             Ok(_) => {
                 // After we've written something we'll reregister the connection
                 // to only respond to readable events.
-                registry.reregister(&connection, event.token(), Interest::READABLE)?
+                registry.reregister(connection, event.token(), Interest::READABLE)?
             }
             // Would block "errors" are the OS's way of saying that the
             // connection is not actually ready to perform this I/O operation.

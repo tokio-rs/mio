@@ -18,12 +18,12 @@ fn main() -> io::Result<()> {
 
     // Setup the UDP socket.
     let addr = "127.0.0.1:9000".parse().unwrap();
-    let socket = UdpSocket::bind(addr)?;
+    let mut socket = UdpSocket::bind(addr)?;
 
     // Register our socket with the token defined above and an interest in being
     // `READABLE`.
     poll.registry()
-        .register(&socket, UDP_SOCKET, Interest::READABLE)?;
+        .register(&mut socket, UDP_SOCKET, Interest::READABLE)?;
 
     println!("You can connect to the server using `nc`:");
     println!(" $ nc -u 127.0.0.1 9000");

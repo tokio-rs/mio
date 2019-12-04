@@ -65,17 +65,25 @@ fn unconnected_udp_socket_std() {
     smoke_test_unconnected_udp_socket(socket1, socket2);
 }
 
-fn smoke_test_unconnected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
+fn smoke_test_unconnected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocket) {
     let (mut poll, mut events) = init_with_poll();
 
     let address1 = socket1.local_addr().unwrap();
     let address2 = socket2.local_addr().unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut socket1,
+            ID1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .expect("unable to register UDP socket");
     poll.registry()
-        .register(&socket2, ID2, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut socket2,
+            ID2,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .expect("unable to register UDP socket");
 
     expect_events(
@@ -182,14 +190,22 @@ fn connected_udp_socket_std() {
     smoke_test_connected_udp_socket(socket1, socket2);
 }
 
-fn smoke_test_connected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
+fn smoke_test_connected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocket) {
     let (mut poll, mut events) = init_with_poll();
 
     poll.registry()
-        .register(&socket1, ID1, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut socket1,
+            ID1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .expect("unable to register UDP socket");
     poll.registry()
-        .register(&socket2, ID2, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut socket2,
+            ID2,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .expect("unable to register UDP socket");
 
     expect_events(
@@ -232,9 +248,9 @@ fn smoke_test_connected_udp_socket(socket1: UdpSocket, socket2: UdpSocket) {
 fn reconnect_udp_socket_sending() {
     let (mut poll, mut events) = init_with_poll();
 
-    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
-    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
-    let socket3 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket3 = UdpSocket::bind(any_local_address()).unwrap();
 
     let address1 = socket1.local_addr().unwrap();
     let address2 = socket2.local_addr().unwrap();
@@ -245,13 +261,17 @@ fn reconnect_udp_socket_sending() {
     socket3.connect(address1).unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut socket1,
+            ID1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .unwrap();
     poll.registry()
-        .register(&socket2, ID2, Interest::READABLE)
+        .register(&mut socket2, ID2, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&socket3, ID3, Interest::READABLE)
+        .register(&mut socket3, ID3, Interest::READABLE)
         .unwrap();
 
     expect_events(
@@ -291,9 +311,9 @@ fn reconnect_udp_socket_sending() {
 fn reconnect_udp_socket_receiving() {
     let (mut poll, mut events) = init_with_poll();
 
-    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
-    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
-    let socket3 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket3 = UdpSocket::bind(any_local_address()).unwrap();
 
     let address1 = socket1.local_addr().unwrap();
     let address2 = socket2.local_addr().unwrap();
@@ -304,13 +324,13 @@ fn reconnect_udp_socket_receiving() {
     socket3.connect(address1).unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interest::READABLE)
+        .register(&mut socket1, ID1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&socket2, ID2, Interest::WRITABLE)
+        .register(&mut socket2, ID2, Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&socket3, ID3, Interest::WRITABLE)
+        .register(&mut socket3, ID3, Interest::WRITABLE)
         .unwrap();
 
     expect_events(
@@ -375,15 +395,15 @@ fn reconnect_udp_socket_receiving() {
 fn unconnected_udp_socket_connected_methods() {
     let (mut poll, mut events) = init_with_poll();
 
-    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
-    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket2 = UdpSocket::bind(any_local_address()).unwrap();
     let address2 = socket2.local_addr().unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interest::WRITABLE)
+        .register(&mut socket1, ID1, Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&socket2, ID2, Interest::READABLE)
+        .register(&mut socket2, ID2, Interest::READABLE)
         .unwrap();
 
     expect_events(
@@ -426,9 +446,9 @@ fn unconnected_udp_socket_connected_methods() {
 fn connected_udp_socket_unconnected_methods() {
     let (mut poll, mut events) = init_with_poll();
 
-    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
-    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
-    let socket3 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket3 = UdpSocket::bind(any_local_address()).unwrap();
 
     let address2 = socket2.local_addr().unwrap();
     let address3 = socket3.local_addr().unwrap();
@@ -437,13 +457,13 @@ fn connected_udp_socket_unconnected_methods() {
     socket3.connect(address2).unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interest::WRITABLE)
+        .register(&mut socket1, ID1, Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&socket2, ID2, Interest::WRITABLE)
+        .register(&mut socket2, ID2, Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&socket3, ID3, Interest::READABLE)
+        .register(&mut socket3, ID3, Interest::READABLE)
         .unwrap();
 
     expect_events(
@@ -502,9 +522,9 @@ fn udp_socket_raw_fd() {
 fn udp_socket_register() {
     let (mut poll, mut events) = init_with_poll();
 
-    let socket = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket = UdpSocket::bind(any_local_address()).unwrap();
     poll.registry()
-        .register(&socket, ID1, Interest::READABLE)
+        .register(&mut socket, ID1, Interest::READABLE)
         .expect("unable to register UDP socket");
 
     expect_no_events(&mut poll, &mut events);
@@ -516,14 +536,14 @@ fn udp_socket_register() {
 fn udp_socket_reregister() {
     let (mut poll, mut events) = init_with_poll();
 
-    let socket = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket = UdpSocket::bind(any_local_address()).unwrap();
     let address = socket.local_addr().unwrap();
 
     let barrier = Arc::new(Barrier::new(2));
     let thread_handle = send_packets(address, 1, barrier.clone());
 
     poll.registry()
-        .register(&socket, ID1, Interest::WRITABLE)
+        .register(&mut socket, ID1, Interest::WRITABLE)
         .unwrap();
     // Let the first packet be send.
     barrier.wait();
@@ -534,7 +554,7 @@ fn udp_socket_reregister() {
     );
 
     poll.registry()
-        .reregister(&socket, ID2, Interest::READABLE)
+        .reregister(&mut socket, ID2, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll,
@@ -552,20 +572,20 @@ fn udp_socket_reregister() {
 fn udp_socket_no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
 
-    let socket = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket = UdpSocket::bind(any_local_address()).unwrap();
     let address = socket.local_addr().unwrap();
 
     let barrier = Arc::new(Barrier::new(2));
     let thread_handle = send_packets(address, 1, barrier.clone());
 
     poll.registry()
-        .register(&socket, ID1, Interest::READABLE)
+        .register(&mut socket, ID1, Interest::READABLE)
         .unwrap();
 
     // Let the packet be send.
     barrier.wait();
 
-    poll.registry().deregister(&socket).unwrap();
+    poll.registry().deregister(&mut socket).unwrap();
 
     expect_no_events(&mut poll, &mut events);
 
@@ -617,7 +637,7 @@ impl UdpHandlerSendRecv {
 }
 
 #[cfg(test)]
-fn send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
+fn send_recv_udp(mut tx: UdpSocket, mut rx: UdpSocket, connected: bool) {
     init();
 
     debug!("Starting TEST_UDP_SOCKETS");
@@ -632,12 +652,12 @@ fn send_recv_udp(tx: UdpSocket, rx: UdpSocket, connected: bool) {
 
     info!("Registering SENDER");
     poll.registry()
-        .register(&tx, SENDER, Interest::WRITABLE)
+        .register(&mut tx, SENDER, Interest::WRITABLE)
         .unwrap();
 
     info!("Registering LISTENER");
     poll.registry()
-        .register(&rx, LISTENER, Interest::READABLE)
+        .register(&mut rx, LISTENER, Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -721,8 +741,8 @@ pub fn udp_socket_send_recv() {
 pub fn udp_socket_discard() {
     init();
 
-    let tx = UdpSocket::bind(any_local_address()).unwrap();
-    let rx = UdpSocket::bind(any_local_address()).unwrap();
+    let mut tx = UdpSocket::bind(any_local_address()).unwrap();
+    let mut rx = UdpSocket::bind(any_local_address()).unwrap();
     let udp_outside = UdpSocket::bind(any_local_address()).unwrap();
 
     let tx_addr = tx.local_addr().unwrap();
@@ -737,10 +757,10 @@ pub fn udp_socket_discard() {
     checked_write!(udp_outside.send(b"hello world"));
 
     poll.registry()
-        .register(&rx, LISTENER, Interest::READABLE)
+        .register(&mut rx, LISTENER, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&tx, SENDER, Interest::WRITABLE)
+        .register(&mut tx, SENDER, Interest::WRITABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -820,8 +840,8 @@ pub fn multicast() {
     debug!("Starting TEST_UDP_CONNECTIONLESS");
     let mut poll = Poll::new().unwrap();
 
-    let tx = UdpSocket::bind(any_local_address()).unwrap();
-    let rx = UdpSocket::bind(any_local_address()).unwrap();
+    let mut tx = UdpSocket::bind(any_local_address()).unwrap();
+    let mut rx = UdpSocket::bind(any_local_address()).unwrap();
 
     info!("Joining group 227.1.1.100");
     let any = "0.0.0.0".parse().unwrap();
@@ -834,12 +854,12 @@ pub fn multicast() {
 
     info!("Registering SENDER");
     poll.registry()
-        .register(&tx, SENDER, Interest::WRITABLE)
+        .register(&mut tx, SENDER, Interest::WRITABLE)
         .unwrap();
 
     info!("Registering LISTENER");
     poll.registry()
-        .register(&rx, LISTENER, Interest::READABLE)
+        .register(&mut rx, LISTENER, Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
@@ -867,16 +887,20 @@ pub fn multicast() {
 fn et_behavior_recv() {
     let (mut poll, mut events) = init_with_poll();
 
-    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
-    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket2 = UdpSocket::bind(any_local_address()).unwrap();
 
     let address2 = socket2.local_addr().unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interest::WRITABLE)
+        .register(&mut socket1, ID1, Interest::WRITABLE)
         .expect("unable to register UDP socket");
     poll.registry()
-        .register(&socket2, ID2, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut socket2,
+            ID2,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .expect("unable to register UDP socket");
 
     expect_events(
@@ -917,17 +941,25 @@ fn et_behavior_recv() {
 fn et_behavior_recv_from() {
     let (mut poll, mut events) = init_with_poll();
 
-    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
-    let socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut socket2 = UdpSocket::bind(any_local_address()).unwrap();
 
     let address1 = socket1.local_addr().unwrap();
     let address2 = socket2.local_addr().unwrap();
 
     poll.registry()
-        .register(&socket1, ID1, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut socket1,
+            ID1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .expect("unable to register UDP socket");
     poll.registry()
-        .register(&socket2, ID2, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut socket2,
+            ID2,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .expect("unable to register UDP socket");
 
     expect_events(

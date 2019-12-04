@@ -1,7 +1,7 @@
 use crate::{Interest, Registry, Token};
 
 use std::io;
-use std::ops::Deref;
+use std::ops::DerefMut;
 
 /// An event source that may be registered with [`Registry`].
 ///
@@ -52,21 +52,21 @@ use std::ops::Deref;
 /// }
 ///
 /// impl Source for MySource {
-///     fn register(&self, registry: &Registry, token: Token, interests: Interest)
+///     fn register(&mut self, registry: &Registry, token: Token, interests: Interest)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `register` call to `socket`
 ///         self.socket.register(registry, token, interests)
 ///     }
 ///
-///     fn reregister(&self, registry: &Registry, token: Token, interests: Interest)
+///     fn reregister(&mut self, registry: &Registry, token: Token, interests: Interest)
 ///         -> io::Result<()>
 ///     {
 ///         // Delegate the `reregister` call to `socket`
 ///         self.socket.reregister(registry, token, interests)
 ///     }
 ///
-///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
+///     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
 ///         // Delegate the `deregister` call to `socket`
 ///         self.socket.deregister(registry)
 ///     }
@@ -80,7 +80,12 @@ pub trait Source {
     /// to another `Source` type.
     ///
     /// [`Registry::register`]: crate::Registry::register
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()>;
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()>;
 
     /// Re-register `self` with the given `Registry` instance.
     ///
@@ -89,7 +94,12 @@ pub trait Source {
     /// re-registration by either delegating the call to another `Source` type.
     ///
     /// [`Registry::reregister`]: crate::Registry::reregister
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()>;
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()>;
 
     /// Deregister `self` from the given `Registry` instance.
     ///
@@ -98,23 +108,33 @@ pub trait Source {
     /// deregistration by delegating the call to another `Source` type.
     ///
     /// [`Registry::deregister`]: crate::Registry::deregister
-    fn deregister(&self, registry: &Registry) -> io::Result<()>;
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()>;
 }
 
 impl<T, S> Source for T
 where
-    T: Deref<Target = S>,
+    T: DerefMut<Target = S>,
     S: Source + ?Sized,
 {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
-        self.deref().register(registry, token, interests)
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        self.deref_mut().register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
-        self.deref().reregister(registry, token, interests)
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        self.deref_mut().reregister(registry, token, interests)
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
-        self.deref().deregister(registry)
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
+        self.deref_mut().deregister(registry)
     }
 }

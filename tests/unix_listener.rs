@@ -50,16 +50,16 @@ fn unix_listener_try_clone_same_poll() {
     let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener1 = UnixListener::bind(&path).unwrap();
-    let listener2 = listener1.try_clone().unwrap();
+    let mut listener1 = UnixListener::bind(&path).unwrap();
+    let mut listener2 = listener1.try_clone().unwrap();
     assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
 
     let handle_1 = open_connections(path.clone(), 1, barrier.clone());
     poll.registry()
-        .register(&listener1, TOKEN_1, Interest::READABLE)
+        .register(&mut listener1, TOKEN_1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&listener2, TOKEN_2, Interest::READABLE)
+        .register(&mut listener2, TOKEN_2, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll,
@@ -103,18 +103,18 @@ fn unix_listener_try_clone_different_poll() {
     let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener1 = UnixListener::bind(&path).unwrap();
-    let listener2 = listener1.try_clone().unwrap();
+    let mut listener1 = UnixListener::bind(&path).unwrap();
+    let mut listener2 = listener1.try_clone().unwrap();
     assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
 
     let handle_1 = open_connections(path.clone(), 1, barrier.clone());
     poll1
         .registry()
-        .register(&listener1, TOKEN_1, Interest::READABLE)
+        .register(&mut listener1, TOKEN_1, Interest::READABLE)
         .unwrap();
     poll2
         .registry()
-        .register(&listener2, TOKEN_2, Interest::READABLE)
+        .register(&mut listener2, TOKEN_2, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll1,
@@ -161,10 +161,10 @@ fn unix_listener_local_addr() {
     let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener = UnixListener::bind(&path).unwrap();
+    let mut listener = UnixListener::bind(&path).unwrap();
     poll.registry()
         .register(
-            &listener,
+            &mut listener,
             TOKEN_1,
             Interest::WRITABLE.add(Interest::READABLE),
         )
@@ -190,9 +190,9 @@ fn unix_listener_register() {
     let (mut poll, mut events) = init_with_poll();
     let dir = TempDir::new("unix_listener").unwrap();
 
-    let listener = UnixListener::bind(dir.path().join("any")).unwrap();
+    let mut listener = UnixListener::bind(dir.path().join("any")).unwrap();
     poll.registry()
-        .register(&listener, TOKEN_1, Interest::READABLE)
+        .register(&mut listener, TOKEN_1, Interest::READABLE)
         .unwrap();
     expect_no_events(&mut poll, &mut events)
 }
@@ -204,16 +204,16 @@ fn unix_listener_reregister() {
     let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener = UnixListener::bind(&path).unwrap();
+    let mut listener = UnixListener::bind(&path).unwrap();
     poll.registry()
-        .register(&listener, TOKEN_1, Interest::WRITABLE)
+        .register(&mut listener, TOKEN_1, Interest::WRITABLE)
         .unwrap();
 
     let handle = open_connections(path, 1, barrier.clone());
     expect_no_events(&mut poll, &mut events);
 
     poll.registry()
-        .reregister(&listener, TOKEN_1, Interest::READABLE)
+        .reregister(&mut listener, TOKEN_1, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll,
@@ -232,14 +232,14 @@ fn unix_listener_deregister() {
     let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener = UnixListener::bind(&path).unwrap();
+    let mut listener = UnixListener::bind(&path).unwrap();
     poll.registry()
-        .register(&listener, TOKEN_1, Interest::READABLE)
+        .register(&mut listener, TOKEN_1, Interest::READABLE)
         .unwrap();
 
     let handle = open_connections(path, 1, barrier.clone());
 
-    poll.registry().deregister(&listener).unwrap();
+    poll.registry().deregister(&mut listener).unwrap();
     expect_no_events(&mut poll, &mut events);
 
     barrier.wait();
@@ -255,10 +255,10 @@ where
     let dir = TempDir::new("unix_listener").unwrap();
     let path = dir.path().join("any");
 
-    let listener = new_listener(&path).unwrap();
+    let mut listener = new_listener(&path).unwrap();
     poll.registry()
         .register(
-            &listener,
+            &mut listener,
             TOKEN_1,
             Interest::WRITABLE.add(Interest::READABLE),
         )

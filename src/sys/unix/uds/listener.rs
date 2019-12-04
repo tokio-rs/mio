@@ -1,9 +1,8 @@
 use super::{path_offset, socket_addr};
-use crate::event::Source;
 use crate::sys::unix::net::new_socket;
 use crate::sys::unix::UnixStream;
 use crate::unix::SourceFd;
-use crate::{Interest, Registry, Token};
+use crate::{event, Interest, Registry, Token};
 
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
@@ -133,16 +132,26 @@ impl UnixListener {
     }
 }
 
-impl Source for UnixListener {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+impl event::Source for UnixListener {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).deregister(registry)
     }
 }

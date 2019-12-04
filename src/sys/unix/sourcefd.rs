@@ -41,7 +41,7 @@ use std::os::unix::io::RawFd;
 ///
 /// // Register the listener
 /// poll.registry().register(
-///     &SourceFd(&listener.as_raw_fd()),
+///     &mut SourceFd(&listener.as_raw_fd()),
 ///     Token(0),
 ///     Interest::READABLE)?;
 /// #     Ok(())
@@ -63,19 +63,19 @@ use std::os::unix::io::RawFd;
 /// }
 ///
 /// impl event::Source for MyIo {
-///     fn register(&self, registry: &Registry, token: Token, interests: Interest)
+///     fn register(&mut self, registry: &Registry, token: Token, interests: Interest)
 ///         -> io::Result<()>
 ///     {
 ///         SourceFd(&self.fd).register(registry, token, interests)
 ///     }
 ///
-///     fn reregister(&self, registry: &Registry, token: Token, interests: Interest)
+///     fn reregister(&mut self, registry: &Registry, token: Token, interests: Interest)
 ///         -> io::Result<()>
 ///     {
 ///         SourceFd(&self.fd).reregister(registry, token, interests)
 ///     }
 ///
-///     fn deregister(&self, registry: &Registry) -> io::Result<()> {
+///     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
 ///         SourceFd(&self.fd).deregister(registry)
 ///     }
 /// }
@@ -84,15 +84,25 @@ use std::os::unix::io::RawFd;
 pub struct SourceFd<'a>(pub &'a RawFd);
 
 impl<'a> event::Source for SourceFd<'a> {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         poll::selector(registry).register(*self.0, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         poll::selector(registry).reregister(*self.0, token, interests)
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         poll::selector(registry).deregister(*self.0)
     }
 }
