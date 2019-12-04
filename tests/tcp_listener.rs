@@ -372,6 +372,8 @@ fn tcp_listener_two_streams() {
         assert_eq!(stream.local_addr().unwrap(), address);
     }
 
+    assert_would_block(listener.accept());
+
     let thread_handle2 = start_connections(address, 1, barrier.clone());
 
     expect_events(
