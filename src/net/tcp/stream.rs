@@ -27,13 +27,13 @@ use crate::{event, sys, Interest, Registry, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
-/// let stream = TcpStream::connect("127.0.0.1:34254".parse()?)?;
+/// let mut stream = TcpStream::connect("127.0.0.1:34254".parse()?)?;
 ///
 /// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(128);
 ///
 /// // Register the socket with `Poll`
-/// poll.registry().register(&stream, Token(0), Interest::WRITABLE)?;
+/// poll.registry().register(&mut stream, Token(0), Interest::WRITABLE)?;
 ///
 /// poll.poll(&mut events, Some(Duration::from_millis(100)))?;
 ///
@@ -252,17 +252,27 @@ impl<'a> Write for &'a TcpStream {
 }
 
 impl event::Source for TcpStream {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         self.sys.reregister(registry, token, interests)
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         self.sys.deregister(registry)
     }
 }

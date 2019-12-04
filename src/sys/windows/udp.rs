@@ -194,7 +194,12 @@ impl super::SocketState for UdpSocket {
 }
 
 impl event::Source for UdpSocket {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         {
             let mut internal = self.internal.lock().unwrap();
             if internal.is_none() {
@@ -216,7 +221,12 @@ impl event::Source for UdpSocket {
         result
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         let result = poll::selector(registry).reregister(self, token, interests);
         match result {
             Ok(_) => {
@@ -229,7 +239,7 @@ impl event::Source for UdpSocket {
         result
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         let result = poll::selector(registry).deregister(self);
         match result {
             Ok(_) => {

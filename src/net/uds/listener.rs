@@ -1,9 +1,8 @@
-use crate::event::Source;
 use crate::net::UnixStream;
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
 use crate::unix::SocketAddr;
-use crate::{sys, Interest, Registry, Token};
+use crate::{event, sys, Interest, Registry, Token};
 
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -78,18 +77,28 @@ impl UnixListener {
     }
 }
 
-impl Source for UnixListener {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+impl event::Source for UnixListener {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         self.sys.reregister(registry, token, interests)
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         self.sys.deregister(registry)
     }
 }

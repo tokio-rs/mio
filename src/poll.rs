@@ -39,21 +39,21 @@ use std::{fmt, io};
 /// use mio::{Events, Poll, Interest, Token};
 /// use mio::net::TcpStream;
 ///
-/// use std::net::{TcpListener, SocketAddr};
+/// use std::net::{self, SocketAddr};
 ///
 /// // Bind a server socket to connect to.
 /// let addr: SocketAddr = "127.0.0.1:0".parse()?;
-/// let server = TcpListener::bind(addr)?;
+/// let server = net::TcpListener::bind(addr)?;
 ///
 /// // Construct a new `Poll` handle as well as the `Events` we'll store into
 /// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(1024);
 ///
 /// // Connect the stream
-/// let stream = TcpStream::connect(server.local_addr()?)?;
+/// let mut stream = TcpStream::connect(server.local_addr()?)?;
 ///
 /// // Register the stream with `Poll`
-/// poll.registry().register(&stream, Token(0), Interest::READABLE | Interest::WRITABLE)?;
+/// poll.registry().register(&mut stream, Token(0), Interest::READABLE | Interest::WRITABLE)?;
 ///
 /// // Wait for the socket to become ready. This has to happens in a loop to
 /// // handle spurious wakeups.
@@ -140,7 +140,7 @@ use std::{fmt, io};
 ///
 /// let address = "127.0.0.1:9001".parse()?;
 /// # let _listener = net::TcpListener::bind(address)?;
-/// let sock = TcpStream::connect(address)?;
+/// let mut sock = TcpStream::connect(address)?;
 ///
 /// thread::sleep(Duration::from_secs(1));
 ///
@@ -148,7 +148,7 @@ use std::{fmt, io};
 ///
 /// // The connect is not guaranteed to have started until it is registered at
 /// // this point
-/// poll.registry().register(&sock, Token(0), Interest::READABLE | Interest::WRITABLE)?;
+/// poll.registry().register(&mut sock, Token(0), Interest::READABLE | Interest::WRITABLE)?;
 /// #     Ok(())
 /// # }
 /// ```
@@ -210,12 +210,6 @@ pub struct Registry {
 pub struct SelectorId {
     id: AtomicUsize,
 }
-
-/*
- *
- * ===== Poll =====
- *
- */
 
 impl Poll {
     /// Return a new `Poll` handle.
@@ -337,11 +331,11 @@ impl Poll {
     /// let mut events = Events::with_capacity(1024);
     ///
     /// // Connect the stream
-    /// let stream = TcpStream::connect(addr)?;
+    /// let mut stream = TcpStream::connect(addr)?;
     ///
     /// // Register the stream with `Poll`
     /// poll.registry().register(
-    ///     &stream,
+    ///     &mut stream,
     ///     Token(0),
     ///     Interest::READABLE | Interest::WRITABLE)?;
     ///
@@ -450,11 +444,11 @@ impl Registry {
     ///
     /// let address = "127.0.0.1:9002".parse()?;
     /// # let _listener = net::TcpListener::bind(address)?;
-    /// let socket = TcpStream::connect(address)?;
+    /// let mut socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`
     /// poll.registry().register(
-    ///     &socket,
+    ///     &mut socket,
     ///     Token(0),
     ///     Interest::READABLE | Interest::WRITABLE)?;
     ///
@@ -482,7 +476,7 @@ impl Registry {
     /// }
     /// # }
     /// ```
-    pub fn register<S>(&self, source: &S, token: Token, interests: Interest) -> io::Result<()>
+    pub fn register<S>(&self, source: &mut S, token: Token, interests: Interest) -> io::Result<()>
     where
         S: event::Source + ?Sized,
     {
@@ -525,18 +519,18 @@ impl Registry {
     ///
     /// let address = "127.0.0.1:9003".parse()?;
     /// # let _listener = net::TcpListener::bind(address)?;
-    /// let socket = TcpStream::connect(address)?;
+    /// let mut socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`, requesting readable
     /// poll.registry().register(
-    ///     &socket,
+    ///     &mut socket,
     ///     Token(0),
     ///     Interest::READABLE)?;
     ///
     /// // Reregister the socket specifying write interest instead. Even though
     /// // the token is the same it must be specified.
     /// poll.registry().reregister(
-    ///     &socket,
+    ///     &mut socket,
     ///     Token(2),
     ///     Interest::WRITABLE)?;
     /// #     Ok(())
@@ -548,7 +542,7 @@ impl Registry {
     /// [`register`]: #method.register
     /// [`readable`]: crate::event::Event::is_readable
     /// [`writable`]: crate::event::Event::is_writable
-    pub fn reregister<S>(&self, source: &S, token: Token, interests: Interest) -> io::Result<()>
+    pub fn reregister<S>(&self, source: &mut S, token: Token, interests: Interest) -> io::Result<()>
     where
         S: event::Source + ?Sized,
     {
@@ -588,15 +582,15 @@ impl Registry {
     ///
     /// let address = "127.0.0.1:9004".parse()?;
     /// # let _listener = net::TcpListener::bind(address)?;
-    /// let socket = TcpStream::connect(address)?;
+    /// let mut socket = TcpStream::connect(address)?;
     ///
     /// // Register the socket with `poll`
     /// poll.registry().register(
-    ///     &socket,
+    ///     &mut socket,
     ///     Token(0),
     ///     Interest::READABLE)?;
     ///
-    /// poll.registry().deregister(&socket)?;
+    /// poll.registry().deregister(&mut socket)?;
     ///
     /// let mut events = Events::with_capacity(1024);
     ///
@@ -606,7 +600,7 @@ impl Registry {
     /// #     Ok(())
     /// # }
     /// ```
-    pub fn deregister<S>(&self, source: &S) -> io::Result<()>
+    pub fn deregister<S>(&self, source: &mut S) -> io::Result<()>
     where
         S: event::Source + ?Sized,
     {

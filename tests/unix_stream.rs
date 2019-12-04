@@ -46,7 +46,7 @@ fn unix_stream_connect() {
     let path = dir.path().join("any");
 
     let listener = net::UnixListener::bind(path.clone()).unwrap();
-    let stream = UnixStream::connect(path).unwrap();
+    let mut stream = UnixStream::connect(path).unwrap();
 
     let barrier_clone = barrier.clone();
     let handle = thread::spawn(move || {
@@ -56,7 +56,11 @@ fn unix_stream_connect() {
     });
 
     poll.registry()
-        .register(&stream, TOKEN_1, Interest::READABLE | Interest::WRITABLE)
+        .register(
+            &mut stream,
+            TOKEN_1,
+            Interest::READABLE | Interest::WRITABLE,
+        )
         .unwrap();
     expect_events(
         &mut poll,
@@ -91,10 +95,10 @@ fn unix_stream_pair() {
 
     let (mut s1, mut s2) = UnixStream::pair().unwrap();
     poll.registry()
-        .register(&s1, TOKEN_1, Interest::READABLE | Interest::WRITABLE)
+        .register(&mut s1, TOKEN_1, Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     poll.registry()
-        .register(&s2, TOKEN_2, Interest::READABLE | Interest::WRITABLE)
+        .register(&mut s2, TOKEN_2, Interest::READABLE | Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
@@ -126,7 +130,7 @@ fn unix_stream_try_clone() {
 
     let mut stream_1 = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream_1, TOKEN_1, Interest::WRITABLE)
+        .register(&mut stream_1, TOKEN_1, Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
@@ -140,11 +144,11 @@ fn unix_stream_try_clone() {
     let mut stream_2 = stream_1.try_clone().unwrap();
 
     // When using `try_clone` the `TcpStream` needs to be deregistered!
-    poll.registry().deregister(&stream_1).unwrap();
+    poll.registry().deregister(&mut stream_1).unwrap();
     drop(stream_1);
 
     poll.registry()
-        .register(&stream_2, TOKEN_2, Interest::READABLE)
+        .register(&mut stream_2, TOKEN_2, Interest::READABLE)
         .unwrap();
     expect_events(
         &mut poll,
@@ -185,7 +189,11 @@ fn unix_stream_shutdown_read() {
 
     let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut stream,
+            TOKEN_1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .unwrap();
     expect_events(
         &mut poll,
@@ -235,7 +243,11 @@ fn unix_stream_shutdown_write() {
 
     let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
+        .register(
+            &mut stream,
+            TOKEN_1,
+            Interest::WRITABLE.add(Interest::READABLE),
+        )
         .unwrap();
     expect_events(
         &mut poll,
@@ -286,7 +298,11 @@ fn unix_stream_shutdown_both() {
 
     let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
+        .register(
+            &mut stream,
+            TOKEN_1,
+            Interest::WRITABLE.add(Interest::READABLE),
+        )
         .unwrap();
     expect_events(
         &mut poll,
@@ -341,9 +357,13 @@ fn unix_stream_shutdown_listener_write() {
     let (handle, remote_addr) = new_noop_listener(1, barrier.clone());
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
-    let stream = UnixStream::connect(path).unwrap();
+    let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interest::READABLE.add(Interest::WRITABLE))
+        .register(
+            &mut stream,
+            TOKEN_1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
         .unwrap();
     expect_events(
         &mut poll,
@@ -368,9 +388,9 @@ fn unix_stream_register() {
     let (handle, remote_addr) = new_echo_listener(1);
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
-    let stream = UnixStream::connect(path).unwrap();
+    let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interest::READABLE)
+        .register(&mut stream, TOKEN_1, Interest::READABLE)
         .unwrap();
     expect_no_events(&mut poll, &mut events);
 
@@ -385,12 +405,12 @@ fn unix_stream_reregister() {
     let (handle, remote_addr) = new_echo_listener(1);
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
-    let stream = UnixStream::connect(path).unwrap();
+    let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interest::READABLE)
+        .register(&mut stream, TOKEN_1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .reregister(&stream, TOKEN_1, Interest::WRITABLE)
+        .reregister(&mut stream, TOKEN_1, Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
@@ -409,11 +429,11 @@ fn unix_stream_deregister() {
     let (handle, remote_addr) = new_echo_listener(1);
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
-    let stream = UnixStream::connect(path).unwrap();
+    let mut stream = UnixStream::connect(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interest::WRITABLE)
+        .register(&mut stream, TOKEN_1, Interest::WRITABLE)
         .unwrap();
-    poll.registry().deregister(&stream).unwrap();
+    poll.registry().deregister(&mut stream).unwrap();
     expect_no_events(&mut poll, &mut events);
 
     // Close the connection to allow the remote to shutdown
@@ -431,7 +451,11 @@ where
 
     let mut stream = connect_stream(path).unwrap();
     poll.registry()
-        .register(&stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
+        .register(
+            &mut stream,
+            TOKEN_1,
+            Interest::WRITABLE.add(Interest::READABLE),
+        )
         .unwrap();
     expect_events(
         &mut poll,

@@ -45,8 +45,8 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 ///
 /// // This operation will fail if the address is in use, so we select different ports for each
 /// // socket.
-/// let sender_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
-/// let echoer_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
+/// let mut sender_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
+/// let mut echoer_socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
 ///
 /// // If we do not use connect here, SENDER and ECHOER would need to call send_to and recv_from
 /// // respectively.
@@ -57,8 +57,8 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 /// let mut poll = Poll::new()?;
 ///
 /// // We register our sockets here so that we can check if they are ready to be written/read.
-/// poll.registry().register(&sender_socket, SENDER, Interest::WRITABLE)?;
-/// poll.registry().register(&echoer_socket, ECHOER, Interest::READABLE)?;
+/// poll.registry().register(&mut sender_socket, SENDER, Interest::WRITABLE)?;
+/// poll.registry().register(&mut echoer_socket, ECHOER, Interest::READABLE)?;
 ///
 /// let msg_to_send = [9; 9];
 /// let mut buffer = [0; 9];
@@ -550,17 +550,27 @@ impl UdpSocket {
 }
 
 impl event::Source for UdpSocket {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         self.sys.reregister(registry, token, interests)
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         self.sys.deregister(registry)
     }
 }

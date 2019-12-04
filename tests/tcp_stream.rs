@@ -65,7 +65,7 @@ where
     let mut stream = make_stream(addr).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
+        .register(&mut stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -137,7 +137,7 @@ fn try_clone() {
     let mut stream1 = TcpStream::connect(address).unwrap();
 
     poll.registry()
-        .register(&stream1, ID1, Interest::WRITABLE)
+        .register(&mut stream1, ID1, Interest::WRITABLE)
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -151,11 +151,11 @@ fn try_clone() {
     let mut stream2 = stream1.try_clone().unwrap();
 
     // When using `try_clone` the `TcpStream` needs to be deregistered!
-    poll.registry().deregister(&stream1).unwrap();
+    poll.registry().deregister(&mut stream1).unwrap();
     drop(stream1);
 
     poll.registry()
-        .register(&stream2, ID2, Interest::READABLE)
+        .register(&mut stream2, ID2, Interest::READABLE)
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -178,13 +178,13 @@ fn set_get_ttl() {
     let barrier = Arc::new(Barrier::new(2));
     let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
 
-    let stream = TcpStream::connect(address).unwrap();
+    let mut stream = TcpStream::connect(address).unwrap();
 
     // on Windows: the stream must be connected before setting the ttl, otherwise
     // it is undefined behavior, register and expect a WRITABLE here to make sure
     // the stream is connected
     poll.registry()
-        .register(&stream, ID1, Interest::WRITABLE)
+        .register(&mut stream, ID1, Interest::WRITABLE)
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -210,13 +210,13 @@ fn get_ttl_without_previous_set() {
     let barrier = Arc::new(Barrier::new(2));
     let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
 
-    let stream = TcpStream::connect(address).unwrap();
+    let mut stream = TcpStream::connect(address).unwrap();
 
     // on Windows: the stream must be connected before getting the ttl, otherwise
     // it is undefined behavior, register and expect a WRITABLE here to make sure
     // the stream is connected
     poll.registry()
-        .register(&stream, ID1, Interest::WRITABLE)
+        .register(&mut stream, ID1, Interest::WRITABLE)
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -240,13 +240,13 @@ fn set_get_nodelay() {
     let barrier = Arc::new(Barrier::new(2));
     let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
 
-    let stream = TcpStream::connect(address).unwrap();
+    let mut stream = TcpStream::connect(address).unwrap();
 
     // on Windows: the stream must be connected before setting the nodelay, otherwise
     // it is undefined behavior, register and expect a WRITABLE here to make sure
     // the stream is connected
     poll.registry()
-        .register(&stream, ID1, Interest::WRITABLE)
+        .register(&mut stream, ID1, Interest::WRITABLE)
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -272,13 +272,13 @@ fn get_nodelay_without_previous_set() {
     let barrier = Arc::new(Barrier::new(2));
     let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
 
-    let stream = TcpStream::connect(address).unwrap();
+    let mut stream = TcpStream::connect(address).unwrap();
 
     // on Windows: the stream must be connected before setting the nodelay, otherwise
     // it is undefined behavior, register and expect a WRITABLE here to make sure
     // the stream is connected
     poll.registry()
-        .register(&stream, ID1, Interest::WRITABLE)
+        .register(&mut stream, ID1, Interest::WRITABLE)
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -306,7 +306,7 @@ fn shutdown_read() {
     let mut stream = TcpStream::connect(address).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
+        .register(&mut stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -354,7 +354,7 @@ fn shutdown_write() {
     let mut stream = TcpStream::connect(address).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
+        .register(&mut stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -394,7 +394,7 @@ fn shutdown_both() {
     let mut stream = TcpStream::connect(address).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
+        .register(&mut stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
         .expect("unable to register TCP stream");
 
     expect_events(
@@ -465,10 +465,10 @@ fn registering() {
 
     let (thread_handle, address) = echo_listener(any_local_address(), 1);
 
-    let stream = TcpStream::connect(address).unwrap();
+    let mut stream = TcpStream::connect(address).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::READABLE)
+        .register(&mut stream, ID1, Interest::READABLE)
         .expect("unable to register TCP stream");
 
     expect_no_events(&mut poll, &mut events);
@@ -485,14 +485,14 @@ fn reregistering() {
 
     let (thread_handle, address) = echo_listener(any_local_address(), 1);
 
-    let stream = TcpStream::connect(address).unwrap();
+    let mut stream = TcpStream::connect(address).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::READABLE)
+        .register(&mut stream, ID1, Interest::READABLE)
         .expect("unable to register TCP stream");
 
     poll.registry()
-        .reregister(&stream, ID2, Interest::WRITABLE)
+        .reregister(&mut stream, ID2, Interest::WRITABLE)
         .expect("unable to reregister TCP stream");
 
     expect_events(
@@ -516,11 +516,11 @@ fn no_events_after_deregister() {
     let mut stream = TcpStream::connect(address).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
+        .register(&mut stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
         .expect("unable to register TCP stream");
 
     poll.registry()
-        .deregister(&stream)
+        .deregister(&mut stream)
         .expect("unable to deregister TCP stream");
 
     expect_no_events(&mut poll, &mut events);
@@ -552,11 +552,13 @@ fn tcp_shutdown_client_read_close_event() {
     let barrier = Arc::new(Barrier::new(2));
 
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
-    let stream = TcpStream::connect(sockaddr).unwrap();
+    let mut stream = TcpStream::connect(sockaddr).unwrap();
 
     let interests = Interest::READABLE | Interest::WRITABLE;
 
-    poll.registry().register(&stream, ID1, interests).unwrap();
+    poll.registry()
+        .register(&mut stream, ID1, interests)
+        .unwrap();
 
     expect_events(
         &mut poll,
@@ -586,11 +588,13 @@ fn tcp_shutdown_client_write_close_event() {
     let barrier = Arc::new(Barrier::new(2));
 
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
-    let stream = TcpStream::connect(sockaddr).unwrap();
+    let mut stream = TcpStream::connect(sockaddr).unwrap();
 
     let interests = Interest::READABLE | Interest::WRITABLE;
 
-    poll.registry().register(&stream, ID1, interests).unwrap();
+    poll.registry()
+        .register(&mut stream, ID1, interests)
+        .unwrap();
 
     expect_events(
         &mut poll,
@@ -615,10 +619,10 @@ fn tcp_shutdown_server_write_close_event() {
     let barrier = Arc::new(Barrier::new(2));
 
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), true);
-    let stream = TcpStream::connect(sockaddr).unwrap();
+    let mut stream = TcpStream::connect(sockaddr).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::READABLE.add(Interest::WRITABLE))
+        .register(&mut stream, ID1, Interest::READABLE.add(Interest::WRITABLE))
         .unwrap();
 
     expect_events(
@@ -649,10 +653,10 @@ fn tcp_shutdown_client_both_close_event() {
     let barrier = Arc::new(Barrier::new(2));
 
     let (handle, sockaddr) = start_listener(1, Some(barrier.clone()), false);
-    let stream = TcpStream::connect(sockaddr).unwrap();
+    let mut stream = TcpStream::connect(sockaddr).unwrap();
 
     poll.registry()
-        .register(&stream, ID1, Interest::READABLE.add(Interest::WRITABLE))
+        .register(&mut stream, ID1, Interest::READABLE.add(Interest::WRITABLE))
         .unwrap();
 
     expect_events(

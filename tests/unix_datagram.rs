@@ -121,12 +121,20 @@ fn unix_datagram_connect() {
 fn unix_datagram_pair() {
     let (mut poll, mut events) = init_with_poll();
 
-    let (datagram1, datagram2) = UnixDatagram::pair().unwrap();
+    let (mut datagram1, mut datagram2) = UnixDatagram::pair().unwrap();
     poll.registry()
-        .register(&datagram1, TOKEN_1, Interest::READABLE | Interest::WRITABLE)
+        .register(
+            &mut datagram1,
+            TOKEN_1,
+            Interest::READABLE | Interest::WRITABLE,
+        )
         .unwrap();
     poll.registry()
-        .register(&datagram2, TOKEN_2, Interest::READABLE | Interest::WRITABLE)
+        .register(
+            &mut datagram2,
+            TOKEN_2,
+            Interest::READABLE | Interest::WRITABLE,
+        )
         .unwrap();
     expect_events(
         &mut poll,
@@ -166,22 +174,22 @@ fn unix_datagram_try_clone() {
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
-    let datagram1 = UnixDatagram::bind(&path1).unwrap();
-    let datagram2 = datagram1.try_clone().unwrap();
+    let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
+    let mut datagram2 = datagram1.try_clone().unwrap();
     assert_ne!(datagram1.as_raw_fd(), datagram2.as_raw_fd());
 
-    let datagram3 = UnixDatagram::bind(&path2).unwrap();
+    let mut datagram3 = UnixDatagram::bind(&path2).unwrap();
     datagram3.connect(&path1).unwrap();
 
     poll.registry()
-        .register(&datagram1, TOKEN_1, Interest::READABLE)
+        .register(&mut datagram1, TOKEN_1, Interest::READABLE)
         .unwrap();
     poll.registry()
-        .register(&datagram2, TOKEN_2, Interest::READABLE)
+        .register(&mut datagram2, TOKEN_2, Interest::READABLE)
         .unwrap();
     poll.registry()
         .register(
-            &datagram3,
+            &mut datagram3,
             TOKEN_3,
             Interest::READABLE.add(Interest::WRITABLE),
         )
@@ -222,19 +230,19 @@ fn unix_datagram_shutdown() {
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
-    let datagram1 = UnixDatagram::bind(&path1).unwrap();
-    let datagram2 = UnixDatagram::bind(&path2).unwrap();
+    let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
+    let mut datagram2 = UnixDatagram::bind(&path2).unwrap();
 
     poll.registry()
         .register(
-            &datagram1,
+            &mut datagram1,
             TOKEN_1,
             Interest::WRITABLE.add(Interest::READABLE),
         )
         .unwrap();
     poll.registry()
         .register(
-            &datagram2,
+            &mut datagram2,
             TOKEN_2,
             Interest::WRITABLE.add(Interest::READABLE),
         )
@@ -280,9 +288,9 @@ fn unix_datagram_register() {
     let dir = TempDir::new(TEST_DIR).unwrap();
     let path = dir.path().join("any");
 
-    let datagram = UnixDatagram::bind(path).unwrap();
+    let mut datagram = UnixDatagram::bind(path).unwrap();
     poll.registry()
-        .register(&datagram, TOKEN_1, Interest::READABLE)
+        .register(&mut datagram, TOKEN_1, Interest::READABLE)
         .unwrap();
     expect_no_events(&mut poll, &mut events);
 }
@@ -294,15 +302,15 @@ fn unix_datagram_reregister() {
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
-    let datagram1 = UnixDatagram::bind(&path1).unwrap();
+    let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
     poll.registry()
-        .register(&datagram1, TOKEN_1, Interest::READABLE)
+        .register(&mut datagram1, TOKEN_1, Interest::READABLE)
         .unwrap();
 
     let datagram2 = UnixDatagram::bind(&path2).unwrap();
     datagram2.connect(&path1).unwrap();
     poll.registry()
-        .reregister(&datagram1, TOKEN_1, Interest::WRITABLE)
+        .reregister(&mut datagram1, TOKEN_1, Interest::WRITABLE)
         .unwrap();
     expect_events(
         &mut poll,
@@ -318,18 +326,18 @@ fn unix_datagram_deregister() {
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
-    let datagram1 = UnixDatagram::bind(&path1).unwrap();
+    let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
     poll.registry()
-        .register(&datagram1, TOKEN_1, Interest::WRITABLE)
+        .register(&mut datagram1, TOKEN_1, Interest::WRITABLE)
         .unwrap();
 
     let datagram2 = UnixDatagram::bind(&path2).unwrap();
     datagram2.connect(&path1).unwrap();
-    poll.registry().deregister(&datagram1).unwrap();
+    poll.registry().deregister(&mut datagram1).unwrap();
     expect_no_events(&mut poll, &mut events);
 }
 
-fn smoke_test_unconnected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
+fn smoke_test_unconnected(mut datagram1: UnixDatagram, mut datagram2: UnixDatagram) {
     let (mut poll, mut events) = init_with_poll();
 
     let addr1 = datagram1.local_addr().unwrap();
@@ -339,14 +347,14 @@ fn smoke_test_unconnected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
 
     poll.registry()
         .register(
-            &datagram1,
+            &mut datagram1,
             TOKEN_1,
             Interest::READABLE.add(Interest::WRITABLE),
         )
         .unwrap();
     poll.registry()
         .register(
-            &datagram2,
+            &mut datagram2,
             TOKEN_2,
             Interest::READABLE.add(Interest::WRITABLE),
         )
@@ -382,7 +390,7 @@ fn smoke_test_unconnected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
     assert!(datagram2.take_error().unwrap().is_none());
 }
 
-fn smoke_test_connected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
+fn smoke_test_connected(mut datagram1: UnixDatagram, mut datagram2: UnixDatagram) {
     let (mut poll, mut events) = init_with_poll();
 
     let local_addr1 = datagram1.local_addr().unwrap();
@@ -400,14 +408,14 @@ fn smoke_test_connected(datagram1: UnixDatagram, datagram2: UnixDatagram) {
 
     poll.registry()
         .register(
-            &datagram1,
+            &mut datagram1,
             TOKEN_1,
             Interest::READABLE.add(Interest::WRITABLE),
         )
         .unwrap();
     poll.registry()
         .register(
-            &datagram2,
+            &mut datagram2,
             TOKEN_2,
             Interest::READABLE.add(Interest::WRITABLE),
         )

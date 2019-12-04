@@ -1,7 +1,6 @@
-use crate::event::Source;
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
-use crate::{sys, Interest, Registry, Token};
+use crate::{event, sys, Interest, Registry, Token};
 
 use std::io::{self, IoSlice, IoSliceMut};
 use std::net::Shutdown;
@@ -99,18 +98,28 @@ impl UnixStream {
     }
 }
 
-impl Source for UnixStream {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+impl event::Source for UnixStream {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate_selector(registry)?;
         self.sys.register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         self.sys.reregister(registry, token, interests)
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         self.sys.deregister(registry)
     }
 }

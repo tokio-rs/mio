@@ -1,8 +1,7 @@
 use super::{socket_addr, SocketAddr};
-use crate::event::Source;
 use crate::sys::unix::net::new_socket;
 use crate::sys::unix::SourceFd;
-use crate::{Interest, Registry, Token};
+use crate::{event, Interest, Registry, Token};
 
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
@@ -100,16 +99,26 @@ impl UnixStream {
     }
 }
 
-impl Source for UnixStream {
-    fn register(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+impl event::Source for UnixStream {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).register(registry, token, interests)
     }
 
-    fn reregister(&self, registry: &Registry, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).reregister(registry, token, interests)
     }
 
-    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).deregister(registry)
     }
 }
