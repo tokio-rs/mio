@@ -195,27 +195,21 @@ impl<'a> super::SocketState for &'a TcpStream {
 
 impl<'a> Read for &'a TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        try_io!(self.read(buf), |bytes_read: &usize| *bytes_read
-            <= buf.len())
+        try_io!(self, read, buf)
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        try_io!(self.read_vectored(bufs), |bytes_read: &usize| *bytes_read
-            <= bufs.iter().map(|b| b.len()).sum())
+        try_io!(self, read_vectored, bufs)
     }
 }
 
 impl<'a> Write for &'a TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        try_io!(self.write(buf), |bytes_written: &usize| *bytes_written
-            <= buf.len())
+        try_io!(self, write, buf)
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        try_io!(
-            self.write_vectored(bufs),
-            |bytes_written: &usize| *bytes_written <= bufs.iter().map(|b| b.len()).sum()
-        )
+        try_io!(self, write_vectored, bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -343,8 +337,6 @@ impl TcpListener {
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         try_io!(self, accept).and_then(|(inner, addr)| {
-            // intentionally ignore result of reregister and return the stream no matter what
-            let _ = self.io_blocked_reregister();
             inner.set_nonblocking(true).map(|()| {
                 (
                     TcpStream {
