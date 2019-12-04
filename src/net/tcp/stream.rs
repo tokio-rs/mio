@@ -18,16 +18,17 @@ use crate::{event, sys, Interest, Registry, Token};
 /// # Examples
 ///
 /// ```
-/// # use std::net::TcpListener;
+/// # use std::net::{TcpListener, SocketAddr};
 /// # use std::error::Error;
 /// #
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// #     let _listener = TcpListener::bind("127.0.0.1:34254")?;
+/// let address: SocketAddr = "127.0.0.1:0".parse()?;
+/// let listener = TcpListener::bind(address)?;
 /// use mio::{Events, Interest, Poll, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
-/// let mut stream = TcpStream::connect("127.0.0.1:34254".parse()?)?;
+/// let mut stream = TcpStream::connect(listener.local_addr()?)?;
 ///
 /// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(128);

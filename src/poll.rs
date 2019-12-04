@@ -135,12 +135,13 @@ use std::{fmt, io};
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Poll, Interest, Token};
 /// use mio::net::TcpStream;
+/// use std::net::SocketAddr;
 /// use std::time::Duration;
 /// use std::thread;
 ///
-/// let address = "127.0.0.1:9001".parse()?;
-/// # let _listener = net::TcpListener::bind(address)?;
-/// let mut sock = TcpStream::connect(address)?;
+/// let address: SocketAddr = "127.0.0.1:0".parse()?;
+/// let listener = net::TcpListener::bind(address)?;
+/// let mut sock = TcpStream::connect(listener.local_addr()?)?;
 ///
 /// thread::sleep(Duration::from_secs(1));
 ///
@@ -438,13 +439,14 @@ impl Registry {
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interest, Token};
     /// use mio::net::TcpStream;
+    /// use std::net::SocketAddr;
     /// use std::time::{Duration, Instant};
     ///
     /// let mut poll = Poll::new()?;
     ///
-    /// let address = "127.0.0.1:9002".parse()?;
-    /// # let _listener = net::TcpListener::bind(address)?;
-    /// let mut socket = TcpStream::connect(address)?;
+    /// let address: SocketAddr = "127.0.0.1:0".parse()?;
+    /// let listener = net::TcpListener::bind(address)?;
+    /// let mut socket = TcpStream::connect(listener.local_addr()?)?;
     ///
     /// // Register the socket with `poll`
     /// poll.registry().register(
@@ -514,12 +516,13 @@ impl Registry {
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Poll, Interest, Token};
     /// use mio::net::TcpStream;
+    /// use std::net::SocketAddr;
     ///
     /// let poll = Poll::new()?;
     ///
-    /// let address = "127.0.0.1:9003".parse()?;
-    /// # let _listener = net::TcpListener::bind(address)?;
-    /// let mut socket = TcpStream::connect(address)?;
+    /// let address: SocketAddr = "127.0.0.1:0".parse()?;
+    /// let listener = net::TcpListener::bind(address)?;
+    /// let mut socket = TcpStream::connect(listener.local_addr()?)?;
     ///
     /// // Register the socket with `poll`, requesting readable
     /// poll.registry().register(
@@ -576,13 +579,14 @@ impl Registry {
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interest, Token};
     /// use mio::net::TcpStream;
+    /// use std::net::SocketAddr;
     /// use std::time::Duration;
     ///
     /// let mut poll = Poll::new()?;
     ///
-    /// let address = "127.0.0.1:9004".parse()?;
-    /// # let _listener = net::TcpListener::bind(address)?;
-    /// let mut socket = TcpStream::connect(address)?;
+    /// let address: SocketAddr = "127.0.0.1:0".parse()?;
+    /// let listener = net::TcpListener::bind(address)?;
+    /// let mut socket = TcpStream::connect(listener.local_addr()?)?;
     ///
     /// // Register the socket with `poll`
     /// poll.registry().register(
