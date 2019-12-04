@@ -3,11 +3,14 @@ use std::mem::size_of_val;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, Once};
+
 use winapi::ctypes::c_int;
 use winapi::shared::ws2def::SOCKADDR;
 use winapi::um::winsock2::{
     ioctlsocket, socket, FIONBIO, INVALID_SOCKET, PF_INET, PF_INET6, SOCKET,
 };
+
+use crate::{Interest, Token};
 
 /// Helper macro to execute a system call that returns an `io::Result`.
 //
@@ -50,17 +53,6 @@ pub use selector::{Selector, SelectorInner, SockState};
 pub use tcp::{TcpListener, TcpStream};
 pub use udp::UdpSocket;
 pub use waker::Waker;
-
-pub trait SocketState {
-    // The `SockState` struct needs to be pinned in memory because it contains
-    // `OVERLAPPED` and `AFD_POLL_INFO` fields which are modified in the
-    // background by the windows kernel, therefore we need to ensure they are
-    // never moved to a different memory address.
-    fn get_sock_state(&self) -> Option<Pin<Arc<Mutex<SockState>>>>;
-    fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>);
-}
-
-use crate::{Interest, Token};
 
 struct InternalState {
     selector: Arc<SelectorInner>,
