@@ -1,58 +1,8 @@
-[package]
-edition = "2018"
-name = "mio"
-# When releasing to crates.io:
-# - Update html_root_url.
-# - Update CHANGELOG.md.
-# - Update doc URL.
-# - Create git tag
-version       = "0.7.0"
-license       = "MIT"
-authors       = ["Carl Lerche <me@carllerche.com>"]
-description   = "Lightweight non-blocking IO"
-documentation = "https://docs.rs/mio/0.7.0/mio/"
-homepage      = "https://github.com/tokio-rs/mio"
-repository    = "https://github.com/tokio-rs/mio"
-readme        = "README.md"
-keywords      = ["io", "async", "non-blocking"]
-categories    = ["asynchronous"]
-exclude       = [
-  ".gitignore",
-  ".travis.yml",
-  "deploy.sh",
+[workspace]
+
+members = [
+  "mio",
+
+  # Internal
+  "examples",
 ]
-publish = false
-
-[features]
-os-poll = []
-os-ext = []
-tcp = []
-udp = []
-uds = []
-
-# Adds additional documentation in the form of a user guide.
-guide = []
-
-[dependencies]
-log = "0.4.8"
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2.62"
-
-[target.'cfg(windows)'.dependencies]
-miow   = "0.3.3"
-winapi = { version = "0.3", features = ["winsock2", "mswsock"] }
-ntapi  = "0.3"
-lazy_static = "1.4.0"
-
-[dev-dependencies]
-# Bytes v0.4 still depends on winapi v0.2, but Bytes v0.5 is released yet. So
-# for testing we'll use the git version.
-bytes      = { version = "0.5.0", git = "https://github.com/tokio-rs/bytes", rev = "79e4b2847f27137faaf149d116a352cbeae47fd1" }
-env_logger = { version = "0.6.2", default-features = false }
-tempdir    = "0.3.7"
-net2       = "0.2.33"
-
-[package.metadata.docs.rs]
-# Enable the guide feature.
-all-features = true

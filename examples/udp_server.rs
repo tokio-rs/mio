@@ -1,8 +1,7 @@
-use std::io;
-
 use log::warn;
 use mio::net::UdpSocket;
 use mio::{Events, Interest, Poll, Token};
+use std::io;
 
 // A token to allow us to identify which event is for the `UdpSocket`.
 const UDP_SOCKET: Token = Token(0);

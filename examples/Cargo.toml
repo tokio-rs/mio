@@ -1,0 +1,18 @@
+[package]
+name = "examples"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[dev-dependencies]
+env_logger = { version = "0.6.2", default-features = false }
+log = "0.4.8"
+mio = { path = "../mio", features = ["os-poll", "tcp", "udp"] }
+
+[[example]]
+name = "tcp_server"
+path = "tcp_server.rs"
+
+[[example]]
+name = "udp_server"
+path = "udp_server.rs"
