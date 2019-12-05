@@ -1,7 +1,7 @@
-use super::{inaddr_any, new_socket, socket_addr, InternalState};
+use super::{inaddr_any, new_socket, socket_addr};
 use crate::sys::windows::init;
 use crate::windows::{SocketState, SourceSocket};
-use crate::{event, poll, Interest, Registry, Token};
+use crate::{event, Interest, Registry, Token};
 
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
@@ -184,8 +184,7 @@ impl AsRawSocket for TcpStream {
 }
 
 pub struct TcpListener {
-    // This is `None` if the socket has not yet been registered.
-    state: Option<Box<InternalState>>,
+    state: SocketState,
     inner: net::TcpListener,
 }
 
@@ -207,14 +206,17 @@ impl TcpListener {
                 err
             })
             .map(|_| TcpListener {
-                state: None,
+                state: SocketState::new(),
                 inner: unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) },
             })
         })
     }
 
     pub fn from_std(inner: net::TcpListener) -> TcpListener {
-        TcpListener { state: None, inner }
+        TcpListener {
+            state: SocketState::new(),
+            inner,
+        }
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -223,23 +225,25 @@ impl TcpListener {
 
     pub fn try_clone(&self) -> io::Result<TcpListener> {
         self.inner.try_clone().map(|s| TcpListener {
-            state: None,
+            state: SocketState::new(),
             inner: s,
         })
     }
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        try_io!(self, accept).and_then(|(inner, addr)| {
-            inner.set_nonblocking(true).map(|()| {
-                (
-                    TcpStream {
-                        state: SocketState::new(),
-                        inner,
-                    },
-                    addr,
-                )
+        self.state
+            .do_io(|| self.inner.accept())
+            .and_then(|(inner, addr)| {
+                inner.set_nonblocking(true).map(|()| {
+                    (
+                        TcpStream {
+                            state: SocketState::new(),
+                            inner,
+                        },
+                        addr,
+                    )
+                })
             })
-        })
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
@@ -253,15 +257,6 @@ impl TcpListener {
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.inner.take_error()
     }
-
-    // Used by `try_io` to register after an I/O operation blocked.
-    fn io_blocked_reregister(&self) -> io::Result<()> {
-        self.state.as_ref().map_or(Ok(()), |state| {
-            state
-                .selector
-                .reregister(&state.sock_state, state.token, state.interests)
-        })
-    }
 }
 
 impl event::Source for TcpListener {
@@ -271,15 +266,8 @@ impl event::Source for TcpListener {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        if self.state.is_some() {
-            Err(io::Error::from(io::ErrorKind::AlreadyExists))
-        } else {
-            poll::selector(registry)
-                .register(self.inner.as_raw_socket(), token, interests)
-                .map(|state| {
-                    self.state = Some(Box::new(state));
-                })
-        }
+        SourceSocket(&self.inner.as_raw_socket(), &mut self.state)
+            .register(registry, token, interests)
     }
 
     fn reregister(
@@ -288,26 +276,12 @@ impl event::Source for TcpListener {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        match self.state.as_mut() {
-            Some(state) => poll::selector(registry)
-                .reregister(&state.sock_state, token, interests)
-                .map(|()| {
-                    state.token = token;
-                    state.interests = interests;
-                }),
-            None => Err(io::Error::from(io::ErrorKind::NotFound)),
-        }
+        SourceSocket(&self.inner.as_raw_socket(), &mut self.state)
+            .reregister(registry, token, interests)
     }
 
-    fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
-        match self.state.as_mut() {
-            Some(state) => {
-                let mut sock_state = state.sock_state.lock().unwrap();
-                sock_state.mark_delete();
-                Ok(())
-            }
-            None => Err(io::Error::from(io::ErrorKind::NotFound)),
-        }
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
+        SourceSocket(&self.inner.as_raw_socket(), &mut self.state).deregister(registry)
     }
 }
 
@@ -320,7 +294,7 @@ impl fmt::Debug for TcpListener {
 impl FromRawSocket for TcpListener {
     unsafe fn from_raw_socket(rawsocket: RawSocket) -> TcpListener {
         TcpListener {
-            state: None,
+            state: SocketState::new(),
             inner: net::TcpListener::from_raw_socket(rawsocket),
         }
     }
