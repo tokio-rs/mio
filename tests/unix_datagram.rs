@@ -168,62 +168,6 @@ fn unix_datagram_pair() {
 }
 
 #[test]
-fn unix_datagram_try_clone() {
-    let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path1 = dir.path().join("one");
-    let path2 = dir.path().join("two");
-
-    let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
-    let mut datagram2 = datagram1.try_clone().unwrap();
-    assert_ne!(datagram1.as_raw_fd(), datagram2.as_raw_fd());
-
-    let mut datagram3 = UnixDatagram::bind(&path2).unwrap();
-    datagram3.connect(&path1).unwrap();
-
-    poll.registry()
-        .register(&mut datagram1, TOKEN_1, Interest::READABLE)
-        .unwrap();
-    poll.registry()
-        .register(&mut datagram2, TOKEN_2, Interest::READABLE)
-        .unwrap();
-    poll.registry()
-        .register(
-            &mut datagram3,
-            TOKEN_3,
-            Interest::READABLE.add(Interest::WRITABLE),
-        )
-        .unwrap();
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(TOKEN_3, Interest::WRITABLE)],
-    );
-
-    let mut buf = [0; DEFAULT_BUF_SIZE];
-    assert_would_block(datagram1.recv_from(&mut buf));
-    assert_would_block(datagram2.recv_from(&mut buf));
-    assert_would_block(datagram3.recv_from(&mut buf));
-
-    checked_write!(datagram3.send(DATA1));
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![
-            ExpectEvent::new(TOKEN_1, Interest::READABLE),
-            ExpectEvent::new(TOKEN_2, Interest::READABLE),
-        ],
-    );
-
-    expect_read!(datagram1.recv_from(&mut buf), DATA1, path: path2);
-    assert_would_block(datagram2.recv_from(&mut buf));
-
-    assert!(datagram1.take_error().unwrap().is_none());
-    assert!(datagram2.take_error().unwrap().is_none());
-    assert!(datagram3.take_error().unwrap().is_none());
-}
-
-#[test]
 fn unix_datagram_shutdown() {
     let (mut poll, mut events) = init_with_poll();
     let dir = TempDir::new(TEST_DIR).unwrap();
