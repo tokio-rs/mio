@@ -6,7 +6,6 @@ use mio::net::UnixDatagram;
 use mio::{Interest, Token};
 use std::io;
 use std::net::Shutdown;
-use std::os::unix::io::AsRawFd;
 use std::os::unix::net;
 use tempdir::TempDir;
 use util::{
