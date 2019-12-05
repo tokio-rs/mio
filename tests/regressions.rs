@@ -1,6 +1,8 @@
 use std::io::{self, Read};
-use std::sync::Arc;
-use std::time::Duration;
+
+use std::time::{Duration, Instant};
+
+use std::sync::{Arc, Barrier};
 use std::{net, thread};
 
 use mio::net::{TcpListener, TcpStream};
@@ -92,4 +94,66 @@ fn issue_1205() {
     assert!(waker_event.is_readable());
     assert_eq!(waker_event.token(), WAKE_TOKEN);
     handle.join().unwrap();
+}
+
+#[test]
+fn issue_1189() {
+    init();
+
+    for _idx in 0..1000 {
+        let mut poll = Poll::new().unwrap();
+        let registry1 = Arc::new(poll.registry().try_clone().unwrap());
+        let registry2 = Arc::clone(&registry1);
+        let registry3 = Arc::clone(&registry1);
+
+        let join_barrier1 = Arc::new(Barrier::new(3));
+        let join_barrier2 = Arc::clone(&join_barrier1);
+        let join_barrier3 = Arc::clone(&join_barrier1);
+
+        // Used to make sure the listener is ready to accept connections before
+        // the stream attempts connect. If there's no one listening the connect
+        // packet is dropped and it is retransmitted ~500ms later because
+        // there's been no response.
+        let listen_barrier2 = Arc::new(Barrier::new(2));
+        let listen_barrier3 = Arc::clone(&listen_barrier2);
+
+        let mut events = Events::with_capacity(128);
+        let addr = "127.0.0.1:9999".parse().unwrap();
+
+        let thread_handle2 = thread::spawn(move || {
+            let mut listener2 = TcpListener::bind(addr).unwrap();
+            listen_barrier2.wait();
+
+            registry2
+                .register(&mut listener2, Token(0), Interest::READABLE)
+                .unwrap();
+
+            join_barrier2.wait();
+        });
+
+        let thread_handle3 = thread::spawn(move || {
+            listen_barrier3.wait();
+            let mut stream3 = TcpStream::connect(addr).unwrap();
+            registry3
+                .register(
+                    &mut stream3,
+                    Token(1),
+                    Interest::READABLE | Interest::WRITABLE,
+                )
+                .unwrap();
+
+            join_barrier3.wait();
+        });
+
+        let now = Instant::now();
+        poll.poll(&mut events, None).unwrap();
+        assert!(now.elapsed().as_millis() <= 10);
+        assert!(events.iter().count() >= 1);
+
+        // Let the threads return.
+        join_barrier1.wait();
+
+        thread_handle2.join().unwrap();
+        thread_handle3.join().unwrap();
+    }
 }
