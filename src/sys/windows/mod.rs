@@ -44,16 +44,19 @@ mod afd;
 pub mod event;
 mod io_status_block;
 mod selector;
+mod source_socket;
 mod tcp;
 mod udp;
 mod waker;
 
 pub use event::{Event, Events};
 pub use selector::{Selector, SelectorInner, SockState};
+pub use source_socket::{SocketState, SourceSocket};
 pub use tcp::{TcpListener, TcpStream};
 pub use udp::UdpSocket;
 pub use waker::Waker;
 
+#[derive(Debug)]
 struct InternalState {
     selector: Arc<SelectorInner>,
     token: Token,

@@ -54,8 +54,15 @@ pub use waker::Waker;
 #[cfg(unix)]
 pub mod unix {
     //! Unix only extensions.
-    pub use crate::sys::SocketAddr;
-    pub use crate::sys::SourceFd;
+
+    pub use crate::sys::{SocketAddr, SourceFd};
+}
+
+#[cfg(windows)]
+pub mod windows {
+    //! Windows only extensions.
+
+    pub use crate::sys::{SocketState, SourceSocket};
 }
 
 // Enable with `cargo doc --features guide`.
