@@ -20,6 +20,7 @@ impl Selector {
     }
 }
 
+#[cfg(unix)]
 cfg_any_os_util! {
     use crate::{Interest, Token};
 

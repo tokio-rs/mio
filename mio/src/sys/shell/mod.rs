@@ -20,6 +20,7 @@ cfg_udp! {
     pub(crate) use self::udp::UdpSocket;
 }
 
+#[cfg(unix)]
 cfg_uds! {
     mod uds;
     pub(crate) use self::uds::{UnixDatagram, UnixListener, UnixStream};

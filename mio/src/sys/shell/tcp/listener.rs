@@ -2,7 +2,10 @@ use super::TcpStream;
 use crate::{event, Interest, Registry, Token};
 use std::io;
 use std::net::{self, SocketAddr};
+#[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 #[derive(Debug)]
 pub struct TcpListener {}
@@ -55,20 +58,44 @@ impl event::Source for TcpListener {
     }
 }
 
+#[cfg(unix)]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         os_required!();
     }
 }
 
+#[cfg(unix)]
 impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(_: RawFd) -> TcpListener {
         os_required!();
     }
 }
 
+#[cfg(unix)]
 impl IntoRawFd for TcpListener {
     fn into_raw_fd(self) -> RawFd {
         os_required!();
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for TcpListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        os_required!()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for TcpListener {
+    unsafe fn from_raw_socket(_: RawSocket) -> TcpListener {
+        os_required!()
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for TcpListener {
+    fn into_raw_socket(self) -> RawSocket {
+        os_required!()
     }
 }

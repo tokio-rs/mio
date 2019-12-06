@@ -77,16 +77,17 @@ cfg_os_poll! {
     pub(crate) use self::windows::*;
 }
 
-#[cfg(unix)]
 cfg_not_os_poll! {
     mod shell;
     pub(crate) use self::shell::*;
 
+    #[cfg(unix)]
     cfg_any_os_util! {
         mod unix;
         pub use self::unix::SourceFd;
     }
 
+    #[cfg(unix)]
     cfg_uds! {
         pub use self::unix::SocketAddr;
     }

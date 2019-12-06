@@ -663,6 +663,7 @@ cfg_net! {
     }
 }
 
+#[cfg(unix)]
 #[test]
 pub fn as_raw_fd() {
     let poll = Poll::new().unwrap();

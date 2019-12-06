@@ -1,30 +1,21 @@
 use lazy_static::lazy_static;
-use miow::iocp::CompletionPort;
-use ntapi::ntioapi::FILE_OPEN;
 use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
-use ntapi::ntioapi::{NtCancelIoFileEx, NtCreateFile, NtDeviceIoControlFile};
+use ntapi::ntioapi::{NtCancelIoFileEx, NtDeviceIoControlFile};
 use ntapi::ntrtl::RtlNtStatusToDosError;
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs::File;
 use std::io;
-use std::mem::{size_of, zeroed};
+use std::mem::size_of;
 use std::os::windows::ffi::OsStrExt;
-use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
+use std::os::windows::io::AsRawHandle;
 use std::ptr::null_mut;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use winapi::shared::ntdef::{
     HANDLE, LARGE_INTEGER, NTSTATUS, OBJECT_ATTRIBUTES, PVOID, ULONG, UNICODE_STRING,
 };
 use winapi::shared::ntstatus::{STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS};
-use winapi::um::handleapi::INVALID_HANDLE_VALUE;
-use winapi::um::winbase::{SetFileCompletionNotificationModes, FILE_SKIP_SET_EVENT_ON_HANDLE};
-use winapi::um::winnt::SYNCHRONIZE;
-use winapi::um::winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE};
 
 const IOCTL_AFD_POLL: ULONG = 0x00012024;
-
-static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
     static ref AFD_HELPER_NAME: Vec<u16> = {
@@ -86,60 +77,77 @@ pub struct AfdPollInfo {
     pub handles: [AfdPollHandleInfo; 1],
 }
 
-impl AfdPollInfo {
-    pub fn zeroed() -> AfdPollInfo {
-        unsafe { zeroed() }
-    }
-}
-
 impl fmt::Debug for AfdPollInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AfdPollInfo").finish()
     }
 }
 
-impl Afd {
-    /// Create new Afd instance.
-    pub fn new(cp: &CompletionPort) -> io::Result<Afd> {
-        let mut afd_helper_handle: HANDLE = INVALID_HANDLE_VALUE;
-        let mut iosb = IO_STATUS_BLOCK {
-            u: IO_STATUS_BLOCK_u { Status: 0 },
-            Information: 0,
-        };
+cfg_net! {
+    use miow::iocp::CompletionPort;
+    use ntapi::ntioapi::FILE_OPEN;
+    use ntapi::ntioapi::NtCreateFile;
+    use std::mem::zeroed;
+    use std::os::windows::io::{FromRawHandle, RawHandle};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use winapi::um::handleapi::INVALID_HANDLE_VALUE;
+    use winapi::um::winbase::{SetFileCompletionNotificationModes, FILE_SKIP_SET_EVENT_ON_HANDLE};
+    use winapi::um::winnt::SYNCHRONIZE;
+    use winapi::um::winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE};
 
-        unsafe {
-            let status = NtCreateFile(
-                &mut afd_helper_handle as *mut _,
-                SYNCHRONIZE,
-                &AFD_HELPER_ATTRIBUTES.0 as *const _ as *mut _,
-                &mut iosb,
-                null_mut(),
-                0 as ULONG,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                FILE_OPEN,
-                0 as ULONG,
-                null_mut(),
-                0 as ULONG,
-            );
-            if status != STATUS_SUCCESS {
-                return Err(io::Error::from_raw_os_error(
-                    RtlNtStatusToDosError(status) as i32
-                ));
-            }
-            let fd = File::from_raw_handle(afd_helper_handle as RawHandle);
-            let token = NEXT_TOKEN.fetch_add(1, Ordering::Relaxed) + 1;
-            let afd = Afd { fd };
-            cp.add_handle(token, &afd.fd)?;
-            match SetFileCompletionNotificationModes(
-                afd_helper_handle,
-                FILE_SKIP_SET_EVENT_ON_HANDLE,
-            ) {
-                0 => Err(io::Error::last_os_error()),
-                _ => Ok(afd),
-            }
+    static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(0);
+
+    impl AfdPollInfo {
+        pub fn zeroed() -> AfdPollInfo {
+            unsafe { zeroed() }
         }
     }
 
+    impl Afd {
+        /// Create new Afd instance.
+        pub fn new(cp: &CompletionPort) -> io::Result<Afd> {
+            let mut afd_helper_handle: HANDLE = INVALID_HANDLE_VALUE;
+            let mut iosb = IO_STATUS_BLOCK {
+                u: IO_STATUS_BLOCK_u { Status: 0 },
+                Information: 0,
+            };
+
+            unsafe {
+                let status = NtCreateFile(
+                    &mut afd_helper_handle as *mut _,
+                    SYNCHRONIZE,
+                    &AFD_HELPER_ATTRIBUTES.0 as *const _ as *mut _,
+                    &mut iosb,
+                    null_mut(),
+                    0 as ULONG,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    FILE_OPEN,
+                    0 as ULONG,
+                    null_mut(),
+                    0 as ULONG,
+                );
+                if status != STATUS_SUCCESS {
+                    return Err(io::Error::from_raw_os_error(
+                        RtlNtStatusToDosError(status) as i32
+                    ));
+                }
+                let fd = File::from_raw_handle(afd_helper_handle as RawHandle);
+                let token = NEXT_TOKEN.fetch_add(1, Ordering::Relaxed) + 1;
+                let afd = Afd { fd };
+                cp.add_handle(token, &afd.fd)?;
+                match SetFileCompletionNotificationModes(
+                    afd_helper_handle,
+                    FILE_SKIP_SET_EVENT_ON_HANDLE,
+                ) {
+                    0 => Err(io::Error::last_os_error()),
+                    _ => Ok(afd),
+                }
+            }
+        }
+    }
+}
+
+impl Afd {
     /// Poll `Afd` instance with `AfdPollInfo`.
     ///
     /// # Unsafety

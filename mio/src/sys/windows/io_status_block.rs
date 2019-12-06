@@ -1,15 +1,19 @@
-use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
+use ntapi::ntioapi::IO_STATUS_BLOCK;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 pub struct IoStatusBlock(IO_STATUS_BLOCK);
 
-impl IoStatusBlock {
-    pub fn zeroed() -> Self {
-        Self(IO_STATUS_BLOCK {
-            u: IO_STATUS_BLOCK_u { Status: 0 },
-            Information: 0,
-        })
+cfg_net! {
+    use ntapi::ntioapi::IO_STATUS_BLOCK_u;
+
+    impl IoStatusBlock {
+        pub fn zeroed() -> Self {
+            Self(IO_STATUS_BLOCK {
+                u: IO_STATUS_BLOCK_u { Status: 0 },
+                Information: 0,
+            })
+        }
     }
 }
 
