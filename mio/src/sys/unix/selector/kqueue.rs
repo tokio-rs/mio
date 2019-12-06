@@ -151,7 +151,7 @@ impl Selector {
     }
 }
 
-cfg_todo! {
+cfg_os_poll! {
     use crate::Interest;
     use std::mem::MaybeUninit;
     use std::slice;
@@ -256,17 +256,6 @@ cfg_todo! {
         }
     }
 
-    cfg_net! {
-        impl Selector {
-            #[cfg(debug_assertions)]
-            pub fn id(&self) -> usize {
-                self.id
-            }
-        }
-    }
-}
-
-cfg_todo! {
     /// Register `changes` with `kq`ueue.
     fn kevent_register(
         kq: RawFd,
@@ -294,9 +283,7 @@ cfg_todo! {
         })
         .and_then(|()| check_errors(&changes, ignored_errors))
     }
-}
 
-cfg_todo! {
     /// Check all events for possible errors, it returns the first error found.
     fn check_errors(events: &[libc::kevent], ignored_errors: &[Data]) -> io::Result<()> {
         for event in events {
@@ -310,6 +297,15 @@ cfg_todo! {
             }
         }
         Ok(())
+    }
+}
+
+cfg_net! {
+    impl Selector {
+        #[cfg(debug_assertions)]
+        pub fn id(&self) -> usize {
+            self.id
+        }
     }
 }
 
@@ -671,20 +667,18 @@ pub mod event {
     }
 }
 
-cfg_os_ext! {
-    #[test]
-    fn does_not_register_rw() {
-        use crate::unix::SourceFd;
-        use crate::{Poll, Token};
+#[test]
+fn does_not_register_rw() {
+    use crate::unix::SourceFd;
+    use crate::{Poll, Token};
 
-        let kq = unsafe { libc::kqueue() };
-        let mut kqf = SourceFd(&kq);
-        let poll = Poll::new().unwrap();
+    let kq = unsafe { libc::kqueue() };
+    let mut kqf = SourceFd(&kq);
+    let poll = Poll::new().unwrap();
 
-        // Registering kqueue fd will fail if write is requested (On anything but
-        // some versions of macOS).
-        poll.registry()
-            .register(&mut kqf, Token(1234), Interest::READABLE)
-            .unwrap();
-    }
+    // Registering kqueue fd will fail if write is requested (On anything but
+    // some versions of macOS).
+    poll.registry()
+        .register(&mut kqf, Token(1234), Interest::READABLE)
+        .unwrap();
 }
