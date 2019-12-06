@@ -22,15 +22,6 @@ macro_rules! cfg_not_os_poll {
 
 // ===== Net =====
 
-macro_rules! cfg_todo {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(feature = "os-ext", feature = "tcp", feature = "udp", feature = "uds"))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_net {
     ($($item:item)*) => {
         $(
@@ -43,7 +34,7 @@ macro_rules! cfg_net {
 macro_rules! cfg_tcp {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "tcp"))]
+            #[cfg(feature = "tcp")]
             $item
         )*
     }
@@ -52,7 +43,7 @@ macro_rules! cfg_tcp {
 macro_rules! cfg_udp {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "udp"))]
+            #[cfg(feature = "udp")]
             $item
         )*
     }
@@ -61,7 +52,7 @@ macro_rules! cfg_udp {
 macro_rules! cfg_uds {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "uds"))]
+            #[cfg(feature = "uds")]
             $item
         )*
     }
@@ -69,19 +60,21 @@ macro_rules! cfg_uds {
 
 // ===== Utility =====
 
-macro_rules! cfg_os_ext {
+// cfg for any feature that requires the OS's adapter for `RawFd` or `RawSocket`
+macro_rules! cfg_any_os_util {
     ($($item:item)*) => {
         $(
-            #[cfg(all(feature = "os-ext", feature = "unix"))]
+            #[cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "uds"))]
             $item
         )*
     }
 }
 
-macro_rules! cfg_unix_only {
+// cfg for depending only on the OS's adapter for `RawFd` or `RawSocket`
+macro_rules! cfg_os_util {
     ($($item:item)*) => {
         $(
-            #[cfg(any(all(unix, feature = "os-ext"), all(unix, feature = "uds")))]
+            #[cfg(feature = "os-util")]
             $item
         )*
     }

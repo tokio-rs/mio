@@ -25,7 +25,7 @@ publish = false
 
 [features]
 os-poll = []
-os-ext = []
+os-util = []
 tcp = []
 udp = []
 uds = []

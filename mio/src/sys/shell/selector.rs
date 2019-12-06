@@ -1,5 +1,6 @@
 use std::io;
 #[cfg(unix)]
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -19,9 +20,8 @@ impl Selector {
     }
 }
 
-cfg_todo! {
+cfg_any_os_util! {
     use crate::{Interest, Token};
-    use std::os::unix::io::RawFd;
 
     impl Selector {
         pub fn register(&self, _: RawFd, _: Token, _: Interest) -> io::Result<()> {
@@ -44,6 +44,13 @@ cfg_net! {
         pub fn id(&self) -> usize {
             os_required!();
         }
+    }
+}
+
+#[cfg(unix)]
+impl AsRawFd for Selector {
+    fn as_raw_fd(&self) -> RawFd {
+        os_required!()
     }
 }
 

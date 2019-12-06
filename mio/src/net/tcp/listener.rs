@@ -168,13 +168,6 @@ impl fmt::Debug for TcpListener {
 }
 
 #[cfg(unix)]
-impl IntoRawFd for TcpListener {
-    fn into_raw_fd(self) -> RawFd {
-        self.sys.into_raw_fd()
-    }
-}
-
-#[cfg(unix)]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.sys.as_raw_fd()
@@ -189,6 +182,13 @@ impl FromRawFd for TcpListener {
             #[cfg(debug_assertions)]
             selector_id: SelectorId::new(),
         }
+    }
+}
+
+#[cfg(unix)]
+impl IntoRawFd for TcpListener {
+    fn into_raw_fd(self) -> RawFd {
+        self.sys.into_raw_fd()
     }
 }
 

@@ -52,33 +52,40 @@ macro_rules! debug_detail {
 #[cfg(unix)]
 cfg_os_poll! {
     mod unix;
-    pub use self::unix::*;
+
+    pub(crate) use self::unix::{event, Event, Events, Selector};
+    pub(crate) use self::unix::Waker;
+
+    cfg_tcp! {
+        pub(crate) use self::unix::{TcpListener, TcpStream};
+    }
+
+    cfg_udp! {
+        pub(crate) use self::unix::UdpSocket;
+    }
+
+    cfg_uds! {
+        pub(crate) use self::unix::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
+    }
+
+    pub use self::unix::SourceFd;
 }
 
 #[cfg(windows)]
 cfg_os_poll! {
     mod windows;
-    pub use self::windows::*;
+    pub(crate) use self::windows::*;
 }
 
+#[cfg(unix)]
 cfg_not_os_poll! {
     mod shell;
     pub(crate) use self::shell::*;
 
-    #[cfg(any(
-        all(unix, feature = "tcp"),
-        all(unix, feature = "udp"),
-        all(unix, feature = "uds"),
-        all(unix, feature = "os-ext"),
-    ))]
-    mod unix;
-    #[cfg(any(
-        all(unix, feature = "tcp"),
-        all(unix, feature = "udp"),
-        all(unix, feature = "uds"),
-        all(unix, feature = "os-ext"),
-    ))]
-    pub use self::unix::SourceFd;
+    cfg_any_os_util! {
+        mod unix;
+        pub use self::unix::SourceFd;
+    }
 
     cfg_uds! {
         pub use self::unix::SocketAddr;

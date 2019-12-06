@@ -7,6 +7,9 @@ macro_rules! os_required {
 mod selector;
 pub(crate) use self::selector::{event, Event, Events, Selector};
 
+mod waker;
+pub(crate) use self::waker::Waker;
+
 cfg_tcp! {
     mod tcp;
     pub(crate) use self::tcp::{TcpStream, TcpListener};
@@ -21,6 +24,3 @@ cfg_uds! {
     mod uds;
     pub(crate) use self::uds::{UnixDatagram, UnixListener, UnixStream};
 }
-
-mod waker;
-pub(crate) use self::waker::Waker;

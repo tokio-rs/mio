@@ -6,7 +6,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{cmp, i32, io, ptr};
+use std::{cmp, i32, io};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -29,11 +29,6 @@ impl Selector {
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             ep,
         })
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn id(&self) -> usize {
-        self.id
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
@@ -72,18 +67,33 @@ impl Selector {
 
         syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
     }
+}
 
-    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        let mut event = libc::epoll_event {
-            events: interests_to_epoll(interests),
-            u64: usize::from(token) as u64,
-        };
+cfg_os_poll! {
+    use std::ptr;
 
-        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_MOD, fd, &mut event)).map(|_| ())
+    impl Selector {
+        pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
+            let mut event = libc::epoll_event {
+                events: interests_to_epoll(interests),
+                u64: usize::from(token) as u64,
+            };
+
+            syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_MOD, fd, &mut event)).map(|_| ())
+        }
+
+        pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
+            syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_DEL, fd, ptr::null_mut())).map(|_| ())
+        }
     }
+}
 
-    pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_DEL, fd, ptr::null_mut())).map(|_| ())
+cfg_net! {
+    impl Selector {
+        #[cfg(debug_assertions)]
+        pub fn id(&self) -> usize {
+            self.id
+        }
     }
 }
 

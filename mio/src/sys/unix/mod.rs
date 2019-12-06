@@ -17,24 +17,27 @@ cfg_os_poll! {
     mod net;
 
     mod selector;
-    pub use self::selector::{event, Event, Events, Selector};
+    pub(crate) use self::selector::{event, Event, Events, Selector};
 
     mod waker;
-    pub use self::waker::Waker;
+    pub(crate) use self::waker::Waker;
+
+    mod sourcefd;
+    pub use self::sourcefd::SourceFd;
 
     cfg_tcp! {
         mod tcp;
-        pub use self::tcp::{TcpListener, TcpStream};
+        pub(crate) use self::tcp::{TcpListener, TcpStream};
     }
 
     cfg_udp! {
         mod udp;
-        pub use self::udp::UdpSocket;
+        pub(crate) use self::udp::UdpSocket;
     }
 
     cfg_uds! {
         mod uds;
-        pub use self::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
+        pub(crate) use self::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
     }
 }
 
@@ -42,22 +45,10 @@ cfg_not_os_poll! {
     cfg_uds! {
         mod uds;
         pub use self::uds::SocketAddr;
+    }
 
-        // pub(crate) use crate::sys::shell::UnixStream;
+    cfg_any_os_util! {
+        mod sourcefd;
+        pub use self::sourcefd::SourceFd;
     }
 }
-
-#[cfg(any(
-    all(unix, feature = "tcp"),
-    all(unix, feature = "udp"),
-    all(unix, feature = "uds"),
-    all(unix, feature = "os-ext"),
-))]
-mod sourcefd;
-#[cfg(any(
-    all(unix, feature = "tcp"),
-    all(unix, feature = "udp"),
-    all(unix, feature = "uds"),
-    all(unix, feature = "os-ext"),
-))]
-pub use self::sourcefd::SourceFd;

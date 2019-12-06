@@ -1,6 +1,7 @@
 use crate::{event, sys, Events, Interest, Token};
-
 use log::trace;
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
@@ -363,13 +364,10 @@ impl Poll {
     }
 }
 
-cfg_os_ext! {
-    use std::os::unix::io::{AsRawFd, RawFd};
-
-    impl AsRawFd for Poll {
-        fn as_raw_fd(&self) -> RawFd {
-            self.registry.selector.as_raw_fd()
-        }
+#[cfg(unix)]
+impl AsRawFd for Poll {
+    fn as_raw_fd(&self) -> RawFd {
+        self.registry.selector.as_raw_fd()
     }
 }
 
@@ -665,10 +663,8 @@ cfg_net! {
     }
 }
 
-cfg_os_ext! {
-    #[test]
-    pub fn as_raw_fd() {
-        let poll = Poll::new().unwrap();
-        assert!(poll.as_raw_fd() > 0);
-    }
+#[test]
+pub fn as_raw_fd() {
+    let poll = Poll::new().unwrap();
+    assert!(poll.as_raw_fd() > 0);
 }

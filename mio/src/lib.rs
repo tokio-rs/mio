@@ -62,13 +62,9 @@ pub mod unix {
         pub use crate::sys::SocketAddr;
     }
 
-    #[cfg(any(
-        all(unix, feature = "tcp"),
-        all(unix, feature = "udp"),
-        all(unix, feature = "uds"),
-        all(unix, feature = "os-ext"),
-    ))]
-    pub use crate::sys::SourceFd;
+    cfg_any_os_util! {
+        pub use crate::sys::SourceFd;
+    }
 }
 
 // Enable with `cargo doc --features guide`.

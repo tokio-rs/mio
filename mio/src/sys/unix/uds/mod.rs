@@ -7,7 +7,7 @@ pub use self::socketaddr::SocketAddr;
 /// `size_of::<sa_family_t>()`, but some other implementations include
 /// other fields before `sun_path`, so the expression more portably
 /// describes the size of the address structure.
-pub fn path_offset(sockaddr: &libc::sockaddr_un) -> usize {
+pub(in crate::sys) fn path_offset(sockaddr: &libc::sockaddr_un) -> usize {
     let base = sockaddr as *const _ as usize;
     let path = &sockaddr.sun_path as *const _ as usize;
     path - base
@@ -20,15 +20,16 @@ cfg_os_poll! {
     use std::{io, mem};
 
     mod datagram;
-    pub use self::datagram::UnixDatagram;
+    // TODO?
+    pub(in crate::sys) use self::datagram::UnixDatagram;
 
     mod listener;
-    pub use self::listener::UnixListener;
+    pub(in crate::sys) use self::listener::UnixListener;
 
     mod stream;
-    pub use self::stream::UnixStream;
+    pub(in crate::sys) use self::stream::UnixStream;
 
-    pub fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
+    pub(in crate::sys) fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
         let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
 
         // This is safe to assume because a `libc::sockaddr_un` filled with `0`
