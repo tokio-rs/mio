@@ -10,10 +10,6 @@ use std::path::Path;
 pub struct UnixListener {}
 
 impl UnixListener {
-    fn new(_: sys::UnixListener) -> UnixListener {
-        os_required!()
-    }
-
     pub fn bind<P: AsRef<Path>>(_: P) -> io::Result<UnixListener> {
         os_required!()
     }

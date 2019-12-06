@@ -9,10 +9,6 @@ use std::path::Path;
 pub struct UnixStream {}
 
 impl UnixStream {
-    pub fn new(_: sys::UnixStream) -> UnixStream {
-        os_required!()
-    }
-
     pub fn connect<P: AsRef<Path>>(_: P) -> io::Result<UnixStream> {
         os_required!()
     }

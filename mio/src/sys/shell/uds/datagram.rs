@@ -9,10 +9,6 @@ use std::path::Path;
 pub struct UnixDatagram {}
 
 impl UnixDatagram {
-    fn new(_: sys::UnixDatagram) -> UnixDatagram {
-        os_required!()
-    }
-
     pub fn bind<P: AsRef<Path>>(_: P) -> io::Result<UnixDatagram> {
         os_required!()
     }

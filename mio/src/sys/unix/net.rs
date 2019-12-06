@@ -12,12 +12,9 @@ pub fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> std::io::Res
 }
 
 /// Create a new non-blocking socket.
-#[cfg(any(
-    // feature = "uds",
-    all(
-        feature = "os-poll",
-        any(feature = "tcp", feature = "udp", feature = "uds")
-    )
+#[cfg(all(
+    feature = "os-poll",
+    any(feature = "tcp", feature = "udp", feature = "uds")
 ))]
 pub fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> std::io::Result<libc::c_int> {
     #[cfg(any(

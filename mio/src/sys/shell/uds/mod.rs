@@ -1,8 +1,8 @@
 mod datagram;
-pub use self::datagram::UnixDatagram;
+pub(crate) use self::datagram::UnixDatagram;
 
 mod listener;
-pub use self::listener::UnixListener;
+pub(crate) use self::listener::UnixListener;
 
 mod stream;
-pub use self::stream::UnixStream;
+pub(crate) use self::stream::UnixStream;

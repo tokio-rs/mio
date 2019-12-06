@@ -1,5 +1,5 @@
 mod listener;
-pub use self::listener::TcpListener;
+pub(crate) use self::listener::TcpListener;
 
 mod stream;
-pub use self::stream::TcpStream;
+pub(crate) use self::stream::TcpStream;

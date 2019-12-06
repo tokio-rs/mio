@@ -1,7 +1,5 @@
-use crate::{Interest, Token};
 use std::io;
 #[cfg(unix)]
-use std::os::unix::io::RawFd;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -19,17 +17,24 @@ impl Selector {
     pub fn select(&self, _: &mut Events, _: Option<Duration>) -> io::Result<()> {
         os_required!();
     }
+}
 
-    pub fn register(&self, _: RawFd, _: Token, _: Interest) -> io::Result<()> {
-        os_required!();
-    }
+cfg_todo! {
+    use crate::{Interest, Token};
+    use std::os::unix::io::RawFd;
 
-    pub fn reregister(&self, _: RawFd, _: Token, _: Interest) -> io::Result<()> {
-        os_required!();
-    }
+    impl Selector {
+        pub fn register(&self, _: RawFd, _: Token, _: Interest) -> io::Result<()> {
+            os_required!();
+        }
 
-    pub fn deregister(&self, _: RawFd) -> io::Result<()> {
-        os_required!();
+        pub fn reregister(&self, _: RawFd, _: Token, _: Interest) -> io::Result<()> {
+            os_required!();
+        }
+
+        pub fn deregister(&self, _: RawFd) -> io::Result<()> {
+            os_required!();
+        }
     }
 }
 

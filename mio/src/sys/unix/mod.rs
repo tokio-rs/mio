@@ -13,9 +13,9 @@ macro_rules! syscall {
     }};
 }
 
-mod net;
-
 cfg_os_poll! {
+    mod net;
+
     mod selector;
     pub use self::selector::{event, Event, Events, Selector};
 
@@ -43,7 +43,7 @@ cfg_not_os_poll! {
         mod uds;
         pub use self::uds::SocketAddr;
 
-        pub(crate) use crate::sys::shell::UnixStream;
+        // pub(crate) use crate::sys::shell::UnixStream;
     }
 }
 

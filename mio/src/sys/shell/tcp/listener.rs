@@ -12,7 +12,6 @@ impl TcpListener {
         os_required!();
     }
 
-    // This can be implemented
     pub fn from_std(_: net::TcpListener) -> TcpListener {
         os_required!()
     }
