@@ -64,4 +64,23 @@ cfg_os_poll! {
 cfg_not_os_poll! {
     mod shell;
     pub(crate) use self::shell::*;
+
+    #[cfg(any(
+        all(unix, feature = "tcp"),
+        all(unix, feature = "udp"),
+        all(unix, feature = "uds"),
+        all(unix, feature = "os-ext"),
+    ))]
+    mod unix;
+    #[cfg(any(
+        all(unix, feature = "tcp"),
+        all(unix, feature = "udp"),
+        all(unix, feature = "uds"),
+        all(unix, feature = "os-ext"),
+    ))]
+    pub use self::unix::SourceFd;
+
+    cfg_uds! {
+        pub use self::unix::SocketAddr;
+    }
 }

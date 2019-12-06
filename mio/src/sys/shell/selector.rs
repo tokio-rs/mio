@@ -1,4 +1,7 @@
+use crate::{Interest, Token};
 use std::io;
+#[cfg(unix)]
+use std::os::unix::io::RawFd;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -9,36 +12,34 @@ pub type Event = usize;
 pub type Events = Vec<Event>;
 
 impl Selector {
-    pub fn new() -> io::Result<Selector> {
-        os_required!();
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn id(&self) -> usize {
-        os_required!();
-    }
-
     pub fn try_clone(&self) -> io::Result<Selector> {
         os_required!();
     }
 
-    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+    pub fn select(&self, _: &mut Events, _: Option<Duration>) -> io::Result<()> {
         os_required!();
     }
 
-    /*
-    pub fn register(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
+    pub fn register(&self, _: RawFd, _: Token, _: Interest) -> io::Result<()> {
         os_required!();
     }
 
-    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interests) -> io::Result<()> {
+    pub fn reregister(&self, _: RawFd, _: Token, _: Interest) -> io::Result<()> {
         os_required!();
     }
 
-    pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
+    pub fn deregister(&self, _: RawFd) -> io::Result<()> {
         os_required!();
     }
-    */
+}
+
+cfg_net! {
+    impl Selector {
+        #[cfg(debug_assertions)]
+        pub fn id(&self) -> usize {
+            os_required!();
+        }
+    }
 }
 
 pub mod event {
@@ -46,31 +47,31 @@ pub mod event {
     use crate::Token;
     use std::fmt;
 
-    pub fn token(event: &Event) -> Token {
+    pub fn token(_: &Event) -> Token {
         os_required!();
     }
 
-    pub fn is_readable(event: &Event) -> bool {
+    pub fn is_readable(_: &Event) -> bool {
         os_required!();
     }
 
-    pub fn is_writable(event: &Event) -> bool {
+    pub fn is_writable(_: &Event) -> bool {
         os_required!();
     }
 
-    pub fn is_error(event: &Event) -> bool {
+    pub fn is_error(_: &Event) -> bool {
         os_required!();
     }
 
-    pub fn is_read_closed(event: &Event) -> bool {
+    pub fn is_read_closed(_: &Event) -> bool {
         os_required!();
     }
 
-    pub fn is_write_closed(event: &Event) -> bool {
+    pub fn is_write_closed(_: &Event) -> bool {
         os_required!();
     }
 
-    pub fn is_priority(event: &Event) -> bool {
+    pub fn is_priority(_: &Event) -> bool {
         os_required!();
     }
 

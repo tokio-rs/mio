@@ -1,7 +1,7 @@
-#[cfg(any(feature = "tcp", feature = "udp"))]
+#[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
 use std::net::SocketAddr;
 
-#[cfg(any(feature = "tcp", feature = "udp"))]
+#[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
 pub fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> std::io::Result<libc::c_int> {
     let domain = match addr {
         SocketAddr::V4(..) => libc::AF_INET,
@@ -12,7 +12,13 @@ pub fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> std::io::Res
 }
 
 /// Create a new non-blocking socket.
-#[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
+#[cfg(any(
+    // feature = "uds",
+    all(
+        feature = "os-poll",
+        any(feature = "tcp", feature = "udp", feature = "uds")
+    )
+))]
 pub fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> std::io::Result<libc::c_int> {
     #[cfg(any(
         target_os = "android",
@@ -47,7 +53,7 @@ pub fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> std::io::Res
     socket
 }
 
-#[cfg(any(feature = "tcp", feature = "udp"))]
+#[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
 pub fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t) {
     use std::mem::size_of_val;
 

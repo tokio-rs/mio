@@ -22,10 +22,19 @@ macro_rules! cfg_not_os_poll {
 
 // ===== Net =====
 
+macro_rules! cfg_todo {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(feature = "os-ext", feature = "tcp", feature = "udp", feature = "uds"))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_net {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "tcp", feature = "udp", features = "uds"))]
+            #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
             $item
         )*
     }
