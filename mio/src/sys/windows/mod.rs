@@ -10,6 +10,37 @@ pub use event::{Event, Events};
 mod selector;
 pub use selector::{Selector, SelectorInner, SockState};
 
+// Macros must be defined before the modules that use them
+cfg_net! {
+    /// Helper macro to execute a system call that returns an `io::Result`.
+    //
+    // Macro must be defined before any modules that uses them.
+    macro_rules! syscall {
+        ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
+            let res = unsafe { $fn($($arg, )*) };
+            if $err_test(&res, &$err_value) {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(res)
+            }
+        }};
+    }
+
+    /// Helper macro to execute an I/O operation and register interests if the
+    /// operation would block.
+    macro_rules! try_io {
+        ($self: ident, $method: ident $(, $args: expr)*)  => {{
+            let result = (&$self.inner).$method($($args),*);
+            if let Err(ref e) = result {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    $self.io_blocked_reregister()?;
+                }
+            }
+            result
+        }};
+    }
+}
+
 cfg_tcp! {
     mod tcp;
     pub use tcp::{TcpListener, TcpStream};
@@ -43,35 +74,6 @@ cfg_net! {
     use winapi::um::winsock2::{
         ioctlsocket, socket, FIONBIO, INVALID_SOCKET, PF_INET, PF_INET6, SOCKET,
     };
-
-    /// Helper macro to execute a system call that returns an `io::Result`.
-    //
-    // Macro must be defined before any modules that uses them.
-    macro_rules! syscall {
-        ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
-            let res = unsafe { $fn($($arg, )*) };
-            if $err_test(&res, &$err_value) {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(res)
-            }
-        }};
-    }
-
-    /// Helper macro to execute an I/O operation and register interests if the
-    /// operation would block.
-    #[allow(unused_macros)]
-    macro_rules! try_io {
-        ($self: ident, $method: ident $(, $args: expr)*)  => {{
-            let result = (&$self.inner).$method($($args),*);
-            if let Err(ref e) = result {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    $self.io_blocked_reregister()?;
-                }
-            }
-            result
-        }};
-    }
 
     struct InternalState {
         selector: Arc<SelectorInner>,
