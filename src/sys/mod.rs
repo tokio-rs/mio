@@ -7,6 +7,7 @@
 //! * `event`: a module with various helper functions for `Event`, see
 //!            [`crate::event::Event`] for the required functions.
 //! * `Events`: collection of `Event`s, see [`crate::Events`].
+//! * `IoSourceState`: state for the `IoSource` type.
 //! * `Selector`: selector used to register event sources and poll for events,
 //!               see [`crate::Poll`] and [`crate::Registry`] for required
 //!               methods.
@@ -67,6 +68,10 @@ cfg_os_poll! {
     cfg_uds! {
         pub(crate) use self::unix::{UnixDatagram, UnixListener, UnixStream};
         pub use self::unix::SocketAddr;
+    }
+
+    cfg_any_os_util! {
+        pub(crate) use self::unix::IoSourceState;
     }
 }
 
