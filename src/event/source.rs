@@ -1,7 +1,6 @@
 use crate::{Interest, Registry, Token};
 
 use std::io;
-use std::ops::DerefMut;
 
 /// An event source that may be registered with [`Registry`].
 ///
@@ -111,10 +110,9 @@ pub trait Source {
     fn deregister(&mut self, registry: &Registry) -> io::Result<()>;
 }
 
-impl<T, S> Source for T
+impl<T> Source for Box<T>
 where
-    T: DerefMut<Target = S>,
-    S: Source + ?Sized,
+    T: Source + ?Sized,
 {
     fn register(
         &mut self,
@@ -122,7 +120,7 @@ where
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        self.deref_mut().register(registry, token, interests)
+        (&mut **self).register(registry, token, interests)
     }
 
     fn reregister(
@@ -131,10 +129,10 @@ where
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        self.deref_mut().reregister(registry, token, interests)
+        (&mut **self).reregister(registry, token, interests)
     }
 
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
-        self.deref_mut().deregister(registry)
+        (&mut **self).deregister(registry)
     }
 }
