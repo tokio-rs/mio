@@ -1,7 +1,6 @@
-use crate::net::UnixStream;
+use crate::net::{SocketAddr, UnixStream};
 #[cfg(debug_assertions)]
 use crate::poll::SelectorId;
-use crate::unix::SocketAddr;
 use crate::{event, sys, Interest, Registry, Token};
 
 use std::io;
