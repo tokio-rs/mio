@@ -13,48 +13,48 @@
 //! * `TcpListener`, `TcpStream` and `UdpSocket`: see [`crate::net`] module.
 //! * `Waker`: see [`crate::Waker`].
 
-#[allow(unused_macros)]
-macro_rules! debug_detail {
-    (
-        $type: ident ($event_type: ty), $test: path,
-        $($(#[$target: meta])* $libc: ident :: $flag: ident),+ $(,)*
-    ) => {
-        struct $type($event_type);
+cfg_os_poll! {
+    macro_rules! debug_detail {
+        (
+            $type: ident ($event_type: ty), $test: path,
+            $($(#[$target: meta])* $libc: ident :: $flag: ident),+ $(,)*
+        ) => {
+            struct $type($event_type);
 
-        impl fmt::Debug for $type {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let mut written_one = false;
-                $(
-                    $(#[$target])*
-                    #[allow(clippy::bad_bit_mask)] // Apparently some flags are zero.
-                    {
-                        // Windows doesn't use `libc` but the `afd` module.
-                        if $test(&self.0, &$libc :: $flag) {
-                            if !written_one {
-                                write!(f, "{}", stringify!($flag))?;
-                                written_one = true;
-                            } else {
-                                write!(f, "|{}", stringify!($flag))?;
+            impl fmt::Debug for $type {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    let mut written_one = false;
+                    $(
+                        $(#[$target])*
+                        #[allow(clippy::bad_bit_mask)] // Apparently some flags are zero.
+                        {
+                            // Windows doesn't use `libc` but the `afd` module.
+                            if $test(&self.0, &$libc :: $flag) {
+                                if !written_one {
+                                    write!(f, "{}", stringify!($flag))?;
+                                    written_one = true;
+                                } else {
+                                    write!(f, "|{}", stringify!($flag))?;
+                                }
                             }
                         }
+                    )+
+                    if !written_one {
+                        write!(f, "(empty)")
+                    } else {
+                        Ok(())
                     }
-                )+
-                if !written_one {
-                    write!(f, "(empty)")
-                } else {
-                    Ok(())
                 }
             }
-        }
-    };
+        };
+    }
 }
 
 #[cfg(unix)]
 cfg_os_poll! {
     mod unix;
-
-    pub(crate) use self::unix::{event, Event, Events, Selector};
-    pub(crate) use self::unix::Waker;
+    pub use self::unix::SourceFd;
+    pub(crate) use self::unix::{event, Event, Events, Selector, Waker};
 
     cfg_tcp! {
         pub(crate) use self::unix::{TcpListener, TcpStream};
@@ -68,8 +68,6 @@ cfg_os_poll! {
         pub(crate) use self::unix::{UnixDatagram, UnixListener, UnixStream};
         pub use self::unix::SocketAddr;
     }
-
-    pub use self::unix::SourceFd;
 }
 
 #[cfg(windows)]

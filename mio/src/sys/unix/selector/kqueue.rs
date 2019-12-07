@@ -301,8 +301,8 @@ cfg_os_poll! {
 }
 
 cfg_net! {
+    #[cfg(debug_assertions)]
     impl Selector {
-        #[cfg(debug_assertions)]
         pub fn id(&self) -> usize {
             self.id
         }

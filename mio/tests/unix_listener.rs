@@ -1,5 +1,4 @@
-#![cfg(unix)]
-#![cfg(all(feature = "os-poll", feature = "uds"))]
+#![cfg(all(unix, feature = "os-poll", feature = "uds"))]
 
 use mio::net::UnixListener;
 use mio::{Interest, Poll, Token};

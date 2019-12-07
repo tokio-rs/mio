@@ -107,37 +107,6 @@ pub struct SockState {
     pinned: PhantomPinned,
 }
 
-cfg_net! {
-    impl SockState {
-        fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
-            Ok(SockState {
-                iosb: IoStatusBlock::zeroed(),
-                poll_info: AfdPollInfo::zeroed(),
-                afd,
-                raw_socket,
-                base_socket: get_base_socket(raw_socket)?,
-                user_evts: 0,
-                pending_evts: 0,
-                user_data: 0,
-                poll_status: SockPollStatus::Idle,
-                delete_pending: false,
-                pinned: PhantomPinned,
-            })
-        }
-
-        /// True if need to be added on update queue, false otherwise.
-        fn set_event(&mut self, ev: Event) -> bool {
-            /* afd::POLL_CONNECT_FAIL and afd::POLL_ABORT are always reported, even when not requested by the caller. */
-            let events = ev.flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
-
-            self.user_evts = events;
-            self.user_data = ev.data;
-
-            (events & !self.pending_evts) != 0
-        }
-    }
-}
-
 impl SockState {
     fn update(&mut self, self_arc: &Pin<Arc<Mutex<SockState>>>) -> io::Result<()> {
         assert!(!self.delete_pending);
@@ -279,6 +248,43 @@ impl SockState {
     }
 }
 
+cfg_net! {
+    impl SockState {
+        fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
+            Ok(SockState {
+                iosb: IoStatusBlock::zeroed(),
+                poll_info: AfdPollInfo::zeroed(),
+                afd,
+                raw_socket,
+                base_socket: get_base_socket(raw_socket)?,
+                user_evts: 0,
+                pending_evts: 0,
+                user_data: 0,
+                poll_status: SockPollStatus::Idle,
+                delete_pending: false,
+                pinned: PhantomPinned,
+            })
+        }
+
+        /// True if need to be added on update queue, false otherwise.
+        fn set_event(&mut self, ev: Event) -> bool {
+            /* afd::POLL_CONNECT_FAIL and afd::POLL_ABORT are always reported, even when not requested by the caller. */
+            let events = ev.flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
+
+            self.user_evts = events;
+            self.user_data = ev.data;
+
+            (events & !self.pending_evts) != 0
+        }
+    }
+}
+
+impl Drop for SockState {
+    fn drop(&mut self) {
+        self.mark_delete();
+    }
+}
+
 /// Converts the pointer to a `SockState` into a raw pointer.
 /// To revert see `from_overlapped`.
 fn into_overlapped(sock_state: Pin<Arc<Mutex<SockState>>>) -> PVOID {
@@ -292,12 +298,6 @@ fn into_overlapped(sock_state: Pin<Arc<Mutex<SockState>>>) -> PVOID {
 fn from_overlapped(ptr: *mut OVERLAPPED) -> Pin<Arc<Mutex<SockState>>> {
     let sock_ptr: *const Mutex<SockState> = ptr as *const _;
     unsafe { Pin::new_unchecked(Arc::from_raw(sock_ptr)) }
-}
-
-impl Drop for SockState {
-    fn drop(&mut self) {
-        self.mark_delete();
-    }
 }
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
@@ -387,11 +387,7 @@ cfg_net! {
         pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
             self.inner.clone()
         }
-    }
-}
 
-cfg_net! {
-    impl Selector {
         #[cfg(debug_assertions)]
         pub fn id(&self) -> usize {
             self.id
@@ -409,41 +405,6 @@ pub struct SelectorInner {
 
 // We have ensured thread safety by introducing lock manually.
 unsafe impl Sync for SelectorInner {}
-
-impl Drop for SelectorInner {
-    fn drop(&mut self) {
-        loop {
-            let events_num: usize;
-            let mut statuses: [CompletionStatus; 1024] = [CompletionStatus::zero(); 1024];
-
-            let result = self
-                .cp
-                .get_many(&mut statuses, Some(std::time::Duration::from_millis(0)));
-            match result {
-                Ok(iocp_events) => {
-                    events_num = iocp_events.iter().len();
-                    for iocp_event in iocp_events.iter() {
-                        if !iocp_event.overlapped().is_null() {
-                            // drain sock state to release memory of Arc reference
-                            let _sock_state = from_overlapped(iocp_event.overlapped());
-                        }
-                    }
-                }
-
-                Err(_) => {
-                    break;
-                }
-            }
-
-            if events_num == 0 {
-                // continue looping until all completion statuses have been drained
-                break;
-            }
-        }
-
-        self.afd_group.release_unused_afd();
-    }
-}
 
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
@@ -689,6 +650,41 @@ cfg_net! {
             }
         }
         Ok(base_socket)
+    }
+}
+
+impl Drop for SelectorInner {
+    fn drop(&mut self) {
+        loop {
+            let events_num: usize;
+            let mut statuses: [CompletionStatus; 1024] = [CompletionStatus::zero(); 1024];
+
+            let result = self
+                .cp
+                .get_many(&mut statuses, Some(std::time::Duration::from_millis(0)));
+            match result {
+                Ok(iocp_events) => {
+                    events_num = iocp_events.iter().len();
+                    for iocp_event in iocp_events.iter() {
+                        if !iocp_event.overlapped().is_null() {
+                            // drain sock state to release memory of Arc reference
+                            let _sock_state = from_overlapped(iocp_event.overlapped());
+                        }
+                    }
+                }
+
+                Err(_) => {
+                    break;
+                }
+            }
+
+            if events_num == 0 {
+                // continue looping until all completion statuses have been drained
+                break;
+            }
+        }
+
+        self.afd_group.release_unused_afd();
     }
 }
 

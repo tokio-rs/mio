@@ -17,6 +17,8 @@ pub struct SocketAddr {
     socklen: libc::socklen_t,
 }
 
+struct AsciiEscaped<'a>(&'a [u8]);
+
 enum AddressKind<'a> {
     Unnamed,
     Pathname(&'a Path),
@@ -104,7 +106,8 @@ impl fmt::Debug for SocketAddr {
         }
     }
 }
-struct AsciiEscaped<'a>(&'a [u8]);
+
+// ===== impl AsciiEscaped =====
 
 impl<'a> fmt::Display for AsciiEscaped<'a> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -3,12 +3,12 @@ use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::Duration;
 
-#[derive(Debug)]
-pub struct Selector {}
-
 pub type Event = usize;
 
 pub type Events = Vec<Event>;
+
+#[derive(Debug)]
+pub struct Selector {}
 
 impl Selector {
     pub fn try_clone(&self) -> io::Result<Selector> {
@@ -40,8 +40,8 @@ cfg_any_os_util! {
 }
 
 cfg_net! {
+    #[cfg(debug_assertions)]
     impl Selector {
-        #[cfg(debug_assertions)]
         pub fn id(&self) -> usize {
             os_required!();
         }

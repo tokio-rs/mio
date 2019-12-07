@@ -1,6 +1,5 @@
 use crate::sys::Selector;
 use crate::Token;
-
 use std::io;
 
 #[derive(Debug)]
@@ -15,7 +14,3 @@ impl Waker {
         os_required!();
     }
 }
-// /// Reset the eventfd object, only need to call this if `wake` fails.
-// fn reset(&self) -> io::Result<()> {
-//     os_required!();
-// }

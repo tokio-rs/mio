@@ -1,4 +1,4 @@
-#![cfg(all(feature = "tcp"))]
+#![cfg(feature = "tcp")]
 
 use log::debug;
 use mio::net::{TcpListener, TcpStream};

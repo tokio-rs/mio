@@ -140,14 +140,14 @@ impl AsRawFd for UnixListener {
     }
 }
 
-impl IntoRawFd for UnixListener {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_raw_fd()
-    }
-}
-
 impl FromRawFd for UnixListener {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixListener {
         UnixListener::new(net::UnixListener::from_raw_fd(fd))
+    }
+}
+
+impl IntoRawFd for UnixListener {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_raw_fd()
     }
 }

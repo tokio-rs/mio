@@ -19,11 +19,11 @@ cfg_os_poll! {
     mod selector;
     pub(crate) use self::selector::{event, Event, Events, Selector};
 
-    mod waker;
-    pub(crate) use self::waker::Waker;
-
     mod sourcefd;
     pub use self::sourcefd::SourceFd;
+
+    mod waker;
+    pub(crate) use self::waker::Waker;
 
     cfg_tcp! {
         mod tcp;
@@ -37,8 +37,8 @@ cfg_os_poll! {
 
     cfg_uds! {
         mod uds;
-        pub(crate) use self::uds::{UnixDatagram, UnixListener, UnixStream};
         pub use self::uds::SocketAddr;
+        pub(crate) use self::uds::{UnixDatagram, UnixListener, UnixStream};
     }
 }
 

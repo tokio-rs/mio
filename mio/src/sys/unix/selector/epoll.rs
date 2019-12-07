@@ -97,20 +97,6 @@ cfg_net! {
     }
 }
 
-fn interests_to_epoll(interests: Interest) -> u32 {
-    let mut kind = EPOLLET;
-
-    if interests.is_readable() {
-        kind = kind | EPOLLIN | EPOLLRDHUP;
-    }
-
-    if interests.is_writable() {
-        kind |= EPOLLOUT;
-    }
-
-    kind as u32
-}
-
 impl AsRawFd for Selector {
     fn as_raw_fd(&self) -> RawFd {
         self.ep
@@ -123,6 +109,20 @@ impl Drop for Selector {
             error!("error closing epoll: {}", err);
         }
     }
+}
+
+fn interests_to_epoll(interests: Interest) -> u32 {
+    let mut kind = EPOLLET;
+
+    if interests.is_readable() {
+        kind = kind | EPOLLIN | EPOLLRDHUP;
+    }
+
+    if interests.is_writable() {
+        kind |= EPOLLOUT;
+    }
+
+    kind as u32
 }
 
 pub type Event = libc::epoll_event;
