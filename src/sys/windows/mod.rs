@@ -64,10 +64,11 @@ pub trait SocketState {
 }
 
 cfg_net! {
-    use crate::{Interest, Token};
+    use crate::{poll, Interest, Registry, Token};
     use std::io;
     use std::mem::size_of_val;
     use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+    use std::os::windows::io::RawSocket;
     use std::sync::Once;
     use winapi::ctypes::c_int;
     use winapi::shared::ws2def::SOCKADDR;
@@ -98,6 +99,93 @@ cfg_net! {
             if let Some(sock_state) = self.sock_state.as_ref() {
                 let mut sock_state = sock_state.lock().unwrap();
                 sock_state.mark_delete();
+            }
+        }
+    }
+
+    pub struct IoSourceState {
+        // This is `None` if the socket has not yet been registered.
+        //
+        // We box the internal state to not increase the size on the stack as the
+        // type might move around a lot.
+        inner: Option<Box<InternalState>>,
+    }
+
+    impl IoSourceState {
+        pub fn new() -> IoSourceState {
+            IoSourceState { inner: None }
+        }
+
+        pub fn do_io<T, F, R>(&mut self, f: F, io: &mut T) -> io::Result<R>
+        where
+            F: FnOnce(&mut T) -> io::Result<R>,
+        {
+            let result = f(io);
+            if let Err(ref e) = result {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.inner.as_ref().map_or(Ok(()), |state| {
+                        // TODO: remove this unwrap once `InternalState.sock_state`
+                        // no longer uses `Option`.
+                        let sock_state = state.sock_state.as_ref().unwrap();
+                        state
+                            .selector
+                            .reregister2(sock_state, state.token, state.interests)
+                    })?;
+                }
+            }
+            result
+        }
+
+        pub fn register(
+            &mut self,
+            registry: &Registry,
+            token: Token,
+            interests: Interest,
+            socket: RawSocket,
+        ) -> io::Result<()> {
+            if self.inner.is_some() {
+                Err(io::Error::from(io::ErrorKind::AlreadyExists))
+            } else {
+                poll::selector(registry)
+                    .register2(socket, token, interests)
+                    .map(|state| {
+                        self.inner = Some(Box::new(state));
+                    })
+            }
+        }
+
+        pub fn reregister(
+            &mut self,
+            registry: &Registry,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            match self.inner.as_mut() {
+                Some(state) => {
+                    let sock_state = state.sock_state.as_ref().unwrap();
+                    poll::selector(registry)
+                        .reregister2(sock_state, token, interests)
+                        .map(|()| {
+                            state.token = token;
+                            state.interests = interests;
+                        })
+                }
+                None => Err(io::Error::from(io::ErrorKind::NotFound)),
+            }
+        }
+
+        pub fn deregister(&mut self) -> io::Result<()> {
+            match self.inner.as_mut() {
+                Some(state) => {
+                    {
+                        let sock_state = state.sock_state.as_ref().unwrap();
+                        let mut sock_state = sock_state.lock().unwrap();
+                        sock_state.mark_delete();
+                    }
+                    self.inner = None;
+                    Ok(())
+                }
+                None => Err(io::Error::from(io::ErrorKind::NotFound)),
             }
         }
     }

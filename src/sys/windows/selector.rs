@@ -1,6 +1,6 @@
 use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
-use super::Event;
+use super::{Event, InternalState};
 use crate::sys::Events;
 use crate::Interest;
 
@@ -371,6 +371,15 @@ cfg_net! {
             self.inner.register(socket, token, interests)
         }
 
+        pub(super) fn register2(
+            &self,
+            socket: RawSocket,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<InternalState> {
+            SelectorInner::register2(&self.inner, socket, token, interests)
+        }
+
         pub fn reregister<S: SocketState>(
             &self,
             socket: &S,
@@ -378,6 +387,15 @@ cfg_net! {
             interests: Interest,
         ) -> io::Result<()> {
             self.inner.reregister(socket, token, interests)
+        }
+
+        pub fn reregister2(
+            &self,
+            state: &Pin<Arc<Mutex<SockState>>>,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            self.inner.reregister2(state, token, interests)
         }
 
         pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
@@ -553,6 +571,40 @@ cfg_net! {
             Ok(())
         }
 
+        fn register2(
+            this: &Arc<Self>,
+            socket: RawSocket,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<InternalState> {
+            let flags = interests_to_afd_flags(interests);
+
+            let sock = {
+                let sock = this._alloc_sock_for_rawsocket(socket)?;
+                let event = Event {
+                    flags,
+                    data: token.0 as u64,
+                };
+                sock.lock().unwrap().set_event(event);
+                sock
+            };
+
+            let state = InternalState {
+                selector: this.clone(),
+                token,
+                interests,
+                sock_state: Some(sock.clone()),
+            };
+
+            unsafe {
+                let mut update_queue = this.update_queue.lock().unwrap();
+                update_queue.push_back(sock);
+                this.update_sockets_events_if_polling()?;
+            }
+
+            Ok(state)
+        }
+
         pub fn reregister<S: SocketState>(
             &self,
             socket: &S,
@@ -579,6 +631,26 @@ cfg_net! {
             }
 
             Ok(())
+        }
+
+        pub fn reregister2(
+            &self,
+            state: &Pin<Arc<Mutex<SockState>>>,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            {
+                let event = Event {
+                    flags: interests_to_afd_flags(interests),
+                    data: token.0 as u64,
+                };
+
+                state.lock().unwrap().set_event(event);
+            }
+
+            let mut update_queue = self.update_queue.lock().unwrap();
+            update_queue.push_back(state.clone());
+            unsafe { self.update_sockets_events_if_polling() }
         }
 
         pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
