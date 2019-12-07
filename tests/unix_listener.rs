@@ -3,9 +3,8 @@
 mod util;
 
 use mio::net::UnixListener;
-use mio::{Interest, Poll, Token};
+use mio::{Interest, Token};
 use std::io::{self, Read};
-use std::os::unix::io::AsRawFd;
 use std::os::unix::net;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};

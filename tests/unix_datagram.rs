@@ -19,7 +19,6 @@ const DEFAULT_BUF_SIZE: usize = 64;
 const TEST_DIR: &str = "mio_unix_datagram_tests";
 const TOKEN_1: Token = Token(0);
 const TOKEN_2: Token = Token(1);
-const TOKEN_3: Token = Token(2);
 
 #[test]
 fn is_send_and_sync() {
