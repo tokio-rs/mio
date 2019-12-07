@@ -4,6 +4,7 @@
 use mio::net::UnixListener;
 use mio::{Interest, Poll, Token};
 use std::io::{self, Read};
+use std::os::unix::io::AsRawFd;
 use std::os::unix::net;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
@@ -44,60 +45,56 @@ fn unix_listener_from_std() {
     })
 }
 
-cfg_os_ext! {
-    use std::os::unix::io::AsRawFd;
+#[test]
+fn unix_listener_try_clone_same_poll() {
+    let (mut poll, mut events) = init_with_poll();
+    let barrier = Arc::new(Barrier::new(3));
+    let dir = TempDir::new("unix_listener").unwrap();
+    let path = dir.path().join("any");
 
-    #[test]
-    fn unix_listener_try_clone_same_poll() {
-        let (mut poll, mut events) = init_with_poll();
-        let barrier = Arc::new(Barrier::new(3));
-        let dir = TempDir::new("unix_listener").unwrap();
-        let path = dir.path().join("any");
+    let mut listener1 = UnixListener::bind(&path).unwrap();
+    let mut listener2 = listener1.try_clone().unwrap();
+    assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
 
-        let mut listener1 = UnixListener::bind(&path).unwrap();
-        let mut listener2 = listener1.try_clone().unwrap();
-        assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
+    let handle_1 = open_connections(path.clone(), 1, barrier.clone());
+    poll.registry()
+        .register(&mut listener1, TOKEN_1, Interest::READABLE)
+        .unwrap();
+    poll.registry()
+        .register(&mut listener2, TOKEN_2, Interest::READABLE)
+        .unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
+        ],
+    );
 
-        let handle_1 = open_connections(path.clone(), 1, barrier.clone());
-        poll.registry()
-            .register(&mut listener1, TOKEN_1, Interest::READABLE)
-            .unwrap();
-        poll.registry()
-            .register(&mut listener2, TOKEN_2, Interest::READABLE)
-            .unwrap();
-        expect_events(
-            &mut poll,
-            &mut events,
-            vec![
-                ExpectEvent::new(TOKEN_1, Interest::READABLE),
-                ExpectEvent::new(TOKEN_2, Interest::READABLE),
-            ],
-        );
+    listener1.accept().unwrap();
 
-        listener1.accept().unwrap();
+    let handle_2 = open_connections(path, 1, barrier.clone());
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
+        ],
+    );
 
-        let handle_2 = open_connections(path, 1, barrier.clone());
-        expect_events(
-            &mut poll,
-            &mut events,
-            vec![
-                ExpectEvent::new(TOKEN_1, Interest::READABLE),
-                ExpectEvent::new(TOKEN_2, Interest::READABLE),
-            ],
-        );
+    listener2.accept().unwrap();
 
-        listener2.accept().unwrap();
+    assert_would_block(listener1.accept());
+    assert_would_block(listener2.accept());
 
-        assert_would_block(listener1.accept());
-        assert_would_block(listener2.accept());
+    assert!(listener1.take_error().unwrap().is_none());
+    assert!(listener2.take_error().unwrap().is_none());
 
-        assert!(listener1.take_error().unwrap().is_none());
-        assert!(listener2.take_error().unwrap().is_none());
-
-        barrier.wait();
-        handle_1.join().unwrap();
-        handle_2.join().unwrap();
-    }
+    barrier.wait();
+    handle_1.join().unwrap();
+    handle_2.join().unwrap();
 }
 
 #[test]

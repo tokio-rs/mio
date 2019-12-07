@@ -20,14 +20,13 @@ cfg_os_poll! {
     use std::{io, mem};
 
     mod datagram;
-    // TODO?
-    pub(in crate::sys) use self::datagram::UnixDatagram;
+    pub(crate) use self::datagram::UnixDatagram;
 
     mod listener;
-    pub(in crate::sys) use self::listener::UnixListener;
+    pub(crate) use self::listener::UnixListener;
 
     mod stream;
-    pub(in crate::sys) use self::stream::UnixStream;
+    pub(crate) use self::stream::UnixStream;
 
     pub(in crate::sys) fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
         let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
