@@ -40,6 +40,28 @@ cfg_os_poll! {
         pub use self::uds::SocketAddr;
         pub(crate) use self::uds::{UnixDatagram, UnixListener, UnixStream};
     }
+
+    cfg_net! {
+        use std::io;
+
+        // Both `kqueue` and `epoll` don't need to hold any user space state.
+        pub struct IoSourceState;
+
+        impl IoSourceState {
+            pub fn new() -> IoSourceState {
+                IoSourceState
+            }
+
+            pub fn do_io<T, F, R>(&mut self, f: F, io: &mut T) -> io::Result<R>
+            where
+                F: FnOnce(&mut T) -> io::Result<R>,
+            {
+                // We don't hold state, so we can just call the function and
+                // return.
+                f(io)
+            }
+        }
+    }
 }
 
 cfg_not_os_poll! {
