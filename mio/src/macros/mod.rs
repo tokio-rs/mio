@@ -93,13 +93,3 @@ macro_rules! cfg_any_os_util {
         )*
     }
 }
-
-// cfg for depending only on the OS's adapter for `RawFd` or `RawSocket`
-macro_rules! cfg_os_util {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "os-util")]
-            $item
-        )*
-    }
-}

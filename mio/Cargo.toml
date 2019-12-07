@@ -24,10 +24,15 @@ exclude       = [
 publish = false
 
 [features]
+# Include implementations of I/O source readiness polling.
 os-poll = []
+# Include adapters for underlying OS I/O sources.
 os-util = []
+# Include TCP primitives
 tcp = []
+# Include UDP primitives
 udp = []
+# Include UDS primitives
 uds = []
 
 # Adds additional documentation in the form of a user guide.
