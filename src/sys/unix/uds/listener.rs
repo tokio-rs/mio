@@ -115,11 +115,6 @@ impl UnixListener {
         UnixListener { inner }
     }
 
-    pub(crate) fn try_clone(&self) -> io::Result<UnixListener> {
-        let inner = self.inner.try_clone()?;
-        Ok(UnixListener::new(inner))
-    }
-
     pub(crate) fn local_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|sockaddr, socklen| {
             syscall!(getsockname(self.inner.as_raw_fd(), sockaddr, socklen))

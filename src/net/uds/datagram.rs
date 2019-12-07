@@ -65,16 +65,6 @@ impl UnixDatagram {
         Ok((a, b))
     }
 
-    /// Creates a new independently owned handle to the underlying socket.
-    ///
-    /// The returned `UnixListener` is a reference to the same socket that this
-    /// object references. Both handles can be used to accept incoming
-    /// connections and options set on one listener will affect the other.
-    pub fn try_clone(&self) -> io::Result<UnixDatagram> {
-        let sys = self.sys.try_clone()?;
-        Ok(UnixDatagram::new(sys))
-    }
-
     /// Returns the address of this socket.
     pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
         self.sys.local_addr()

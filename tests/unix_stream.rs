@@ -123,47 +123,6 @@ fn unix_stream_pair() {
 }
 
 #[test]
-fn unix_stream_try_clone() {
-    let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
-    let path = remote_addr.as_pathname().expect("failed to get pathname");
-
-    let mut stream_1 = UnixStream::connect(path).unwrap();
-    poll.registry()
-        .register(&mut stream_1, TOKEN_1, Interest::WRITABLE)
-        .unwrap();
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
-    );
-
-    let mut buf = [0; DEFAULT_BUF_SIZE];
-    checked_write!(stream_1.write(&DATA1));
-
-    let mut stream_2 = stream_1.try_clone().unwrap();
-
-    // When using `try_clone` the `TcpStream` needs to be deregistered!
-    poll.registry().deregister(&mut stream_1).unwrap();
-    drop(stream_1);
-
-    poll.registry()
-        .register(&mut stream_2, TOKEN_2, Interest::READABLE)
-        .unwrap();
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(TOKEN_2, Interest::READABLE)],
-    );
-
-    expect_read!(stream_2.read(&mut buf), DATA1);
-
-    // Close the connection to allow the remote to shutdown
-    drop(stream_2);
-    handle.join().unwrap();
-}
-
-#[test]
 fn unix_stream_peer_addr() {
     let (handle, expected_addr) = new_echo_listener(1);
     let expected_path = expected_addr.as_pathname().expect("failed to get pathname");

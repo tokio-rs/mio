@@ -62,17 +62,6 @@ impl UnixStream {
         Ok((a, b))
     }
 
-    /// Creates a new independently owned handle to the underlying socket.
-    ///
-    /// The returned `UnixStream` is a reference to the same stream that this
-    /// object references. Both handles will read and write the same stream of
-    /// data, and options set on one stream will be propogated to the other
-    /// stream.
-    pub fn try_clone(&self) -> io::Result<UnixStream> {
-        let sys = self.sys.try_clone()?;
-        Ok(UnixStream::new(sys))
-    }
-
     /// Returns the socket address of the local half of this connection.
     pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
         self.sys.local_addr()
