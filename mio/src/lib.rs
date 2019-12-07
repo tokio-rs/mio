@@ -105,13 +105,13 @@ pub mod guide {
     //! # let poll = Poll::new()?;
     //! # let address = "127.0.0.1:0".parse().unwrap();
     //! // Create a `TcpListener`, binding it to `address`.
-    //! let listener = TcpListener::bind(address)?;
+    //! let mut listener = TcpListener::bind(address)?;
     //!
     //! // Next we register it with `Poll` to receive events for it. The `SERVER`
     //! // `Token` is used to determine that we received an event for the listener
     //! // later on.
     //! const SERVER: Token = Token(0);
-    //! poll.registry().register(&listener, SERVER, Interest::READABLE)?;
+    //! poll.registry().register(&mut listener, SERVER, Interest::READABLE)?;
     //! # Ok(())
     //! # }
     //! ```
@@ -132,9 +132,9 @@ pub mod guide {
     //! # let mut poll = Poll::new()?;
     //! # let mut events = Events::with_capacity(128);
     //! # let address = "127.0.0.1:0".parse().unwrap();
-    //! # let listener = TcpListener::bind(address)?;
+    //! # let mut listener = TcpListener::bind(address)?;
     //! # const SERVER: Token = Token(0);
-    //! # poll.registry().register(&listener, SERVER, Interest::READABLE)?;
+    //! # poll.registry().register(&mut listener, SERVER, Interest::READABLE)?;
     //! // Start our event loop.
     //! loop {
     //!     // Poll Mio for events, waiting at most 100 milliseconds.
