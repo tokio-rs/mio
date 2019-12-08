@@ -54,7 +54,6 @@ pub use waker::Waker;
 #[cfg(unix)]
 pub mod unix {
     //! Unix only extensions.
-    pub use crate::sys::SocketAddr;
     pub use crate::sys::SourceFd;
 }
 
