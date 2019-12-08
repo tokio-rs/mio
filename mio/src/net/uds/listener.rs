@@ -56,16 +56,6 @@ impl UnixListener {
         Ok((UnixStream::new(sys), sockaddr))
     }
 
-    /// Creates a new independently owned handle to the underlying socket.
-    ///
-    /// The returned `UnixListener` is a reference to the same socket that this
-    /// object references. Both handles can be used to accept incoming
-    /// connections and options set on one listener will affect the other.
-    pub fn try_clone(&self) -> io::Result<UnixListener> {
-        let sys = self.sys.try_clone()?;
-        Ok(UnixListener::new(sys))
-    }
-
     /// Returns the local socket address of this listener.
     pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
         self.sys.local_addr()

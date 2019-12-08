@@ -29,10 +29,6 @@ impl UnixDatagram {
         os_required!()
     }
 
-    pub fn try_clone(&self) -> io::Result<UnixDatagram> {
-        os_required!()
-    }
-
     pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
         os_required!()
     }

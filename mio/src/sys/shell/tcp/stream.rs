@@ -30,10 +30,6 @@ impl TcpStream {
         os_required!();
     }
 
-    pub fn try_clone(&self) -> io::Result<TcpStream> {
-        os_required!();
-    }
-
     pub fn shutdown(&self, _: net::Shutdown) -> io::Result<()> {
         os_required!();
     }

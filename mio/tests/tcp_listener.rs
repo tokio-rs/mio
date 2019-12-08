@@ -1,7 +1,7 @@
 #![cfg(all(feature = "os-poll", feature = "tcp"))]
 
 use mio::net::TcpListener;
-use mio::{Interest, Poll, Token};
+use mio::{Interest, Token};
 use std::io::{self, Read};
 use std::net::{self, SocketAddr};
 #[cfg(unix)]
@@ -208,139 +208,6 @@ fn no_events_after_deregister() {
 
     barrier.wait();
     thread_handle.join().expect("unable to join thread");
-}
-
-#[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1073")]
-fn try_clone_same_poll() {
-    let (mut poll, mut events) = init_with_poll();
-
-    let mut listener1 = TcpListener::bind(any_local_address()).unwrap();
-    let mut listener2 = listener1.try_clone().expect("unable to clone TCP listener");
-    #[cfg(unix)]
-    assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
-    let address = listener1.local_addr().unwrap();
-    assert_eq!(address, listener2.local_addr().unwrap());
-
-    let barrier = Arc::new(Barrier::new(3));
-    let thread_handle1 = start_connections(address, 1, barrier.clone());
-
-    poll.registry()
-        .register(&mut listener1, ID1, Interest::READABLE)
-        .unwrap();
-    poll.registry()
-        .register(&mut listener2, ID2, Interest::READABLE)
-        .unwrap();
-
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![
-            ExpectEvent::new(ID1, Interest::READABLE),
-            ExpectEvent::new(ID2, Interest::READABLE),
-        ],
-    );
-
-    let (stream, peer_address) = listener1.accept().expect("unable to accept connection");
-    assert!(peer_address.ip().is_loopback());
-    assert_eq!(stream.peer_addr().unwrap(), peer_address);
-    assert_eq!(stream.local_addr().unwrap(), address);
-
-    let thread_handle2 = start_connections(address, 1, barrier.clone());
-
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![
-            ExpectEvent::new(ID1, Interest::READABLE),
-            ExpectEvent::new(ID2, Interest::READABLE),
-        ],
-    );
-
-    let (stream, peer_address) = listener2.accept().expect("unable to accept connection");
-    assert!(peer_address.ip().is_loopback());
-    assert_eq!(stream.peer_addr().unwrap(), peer_address);
-    assert_eq!(stream.local_addr().unwrap(), address);
-
-    assert_would_block(listener1.accept());
-    assert_would_block(listener2.accept());
-
-    assert!(listener1.take_error().unwrap().is_none());
-    assert!(listener2.take_error().unwrap().is_none());
-
-    barrier.wait();
-    thread_handle1.join().expect("unable to join thread");
-    thread_handle2.join().expect("unable to join thread");
-}
-
-#[test]
-#[cfg_attr(windows, ignore = "fails on Windows, see #1073")]
-fn try_clone_different_poll() {
-    let (mut poll1, mut events) = init_with_poll();
-    let mut poll2 = Poll::new().unwrap();
-
-    let mut listener1 = TcpListener::bind(any_local_address()).unwrap();
-    let mut listener2 = listener1.try_clone().expect("unable to clone TCP listener");
-    #[cfg(unix)]
-    assert_ne!(listener1.as_raw_fd(), listener2.as_raw_fd());
-    let address = listener1.local_addr().unwrap();
-    assert_eq!(address, listener2.local_addr().unwrap());
-
-    let barrier = Arc::new(Barrier::new(3));
-    let thread_handle1 = start_connections(address, 1, barrier.clone());
-
-    poll1
-        .registry()
-        .register(&mut listener1, ID1, Interest::READABLE)
-        .unwrap();
-    poll2
-        .registry()
-        .register(&mut listener2, ID2, Interest::READABLE)
-        .unwrap();
-
-    expect_events(
-        &mut poll1,
-        &mut events,
-        vec![ExpectEvent::new(ID1, Interest::READABLE)],
-    );
-    expect_events(
-        &mut poll2,
-        &mut events,
-        vec![ExpectEvent::new(ID2, Interest::READABLE)],
-    );
-
-    let (stream, peer_address) = listener1.accept().expect("unable to accept connection");
-    assert!(peer_address.ip().is_loopback());
-    assert_eq!(stream.peer_addr().unwrap(), peer_address);
-    assert_eq!(stream.local_addr().unwrap(), address);
-
-    let thread_handle2 = start_connections(address, 1, barrier.clone());
-
-    expect_events(
-        &mut poll1,
-        &mut events,
-        vec![ExpectEvent::new(ID1, Interest::READABLE)],
-    );
-    expect_events(
-        &mut poll2,
-        &mut events,
-        vec![ExpectEvent::new(ID2, Interest::READABLE)],
-    );
-
-    let (stream, peer_address) = listener2.accept().expect("unable to accept connection");
-    assert!(peer_address.ip().is_loopback());
-    assert_eq!(stream.peer_addr().unwrap(), peer_address);
-    assert_eq!(stream.local_addr().unwrap(), address);
-
-    assert_would_block(listener1.accept());
-    assert_would_block(listener2.accept());
-
-    assert!(listener1.take_error().unwrap().is_none());
-    assert!(listener2.take_error().unwrap().is_none());
-
-    barrier.wait();
-    thread_handle1.join().expect("unable to join thread");
-    thread_handle2.join().expect("unable to join thread");
 }
 
 /// This tests reregister on successful accept works

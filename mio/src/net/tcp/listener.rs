@@ -95,19 +95,6 @@ impl TcpListener {
         self.sys.local_addr()
     }
 
-    /// Creates a new independently owned handle to the underlying socket.
-    ///
-    /// The returned `TcpListener` is a reference to the same socket that this
-    /// object references. Both handles can be used to accept incoming
-    /// connections and options set on one listener will affect the other.
-    pub fn try_clone(&self) -> io::Result<TcpListener> {
-        self.sys.try_clone().map(|s| TcpListener {
-            sys: s,
-            #[cfg(debug_assertions)]
-            selector_id: self.selector_id.clone(),
-        })
-    }
-
     /// Sets the value for the `IP_TTL` option on this socket.
     ///
     /// This value sets the time-to-live field that is used in every packet sent

@@ -128,49 +128,6 @@ where
 }
 
 #[test]
-fn try_clone() {
-    let (mut poll, mut events) = init_with_poll();
-
-    let (thread_handle, address) = echo_listener(any_local_address(), 1);
-
-    let mut stream1 = TcpStream::connect(address).unwrap();
-
-    poll.registry()
-        .register(&mut stream1, ID1, Interest::WRITABLE)
-        .expect("unable to register TCP stream");
-
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
-    );
-
-    checked_write!(stream1.write(&DATA1));
-
-    let mut stream2 = stream1.try_clone().unwrap();
-
-    // When using `try_clone` the `TcpStream` needs to be deregistered!
-    poll.registry().deregister(&mut stream1).unwrap();
-    drop(stream1);
-
-    poll.registry()
-        .register(&mut stream2, ID2, Interest::READABLE)
-        .expect("unable to register TCP stream");
-
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(ID2, Interest::READABLE)],
-    );
-
-    let mut buf = [0; 20];
-    expect_read!(stream2.read(&mut buf), DATA1);
-
-    drop(stream2);
-    thread_handle.join().expect("unable to join thread");
-}
-
-#[test]
 fn set_get_ttl() {
     let (mut poll, mut events) = init_with_poll();
 

@@ -21,10 +21,6 @@ impl UdpSocket {
         os_required!()
     }
 
-    pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        os_required!()
-    }
-
     pub fn send_to(&self, _: &[u8], _: SocketAddr) -> io::Result<usize> {
         os_required!()
     }

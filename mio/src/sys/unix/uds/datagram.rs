@@ -71,11 +71,6 @@ impl UnixDatagram {
         Ok(unsafe { UnixDatagram::from_raw_fd(socket) })
     }
 
-    pub(crate) fn try_clone(&self) -> io::Result<UnixDatagram> {
-        let inner = self.inner.try_clone()?;
-        Ok(UnixDatagram::new(inner))
-    }
-
     pub(crate) fn local_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|sockaddr, socklen| {
             syscall!(getsockname(self.inner.as_raw_fd(), sockaddr, socklen))

@@ -166,37 +166,6 @@ impl UdpSocket {
         self.sys.local_addr()
     }
 
-    /// Creates a new independently owned handle to the underlying socket.
-    ///
-    /// The returned `UdpSocket` is a reference to the same socket that this
-    /// object references. Both handles will read and write the same port, and
-    /// options set on one socket will be propagated to the other.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error::Error;
-    /// #
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// use mio::net::UdpSocket;
-    ///
-    /// // We must bind it to an open address.
-    /// let socket = UdpSocket::bind("127.0.0.1:0".parse()?)?;
-    /// let cloned_socket = socket.try_clone()?;
-    ///
-    /// assert_eq!(socket.local_addr()?, cloned_socket.local_addr()?);
-    ///
-    /// #    Ok(())
-    /// # }
-    /// ```
-    pub fn try_clone(&self) -> io::Result<UdpSocket> {
-        self.sys.try_clone().map(|s| UdpSocket {
-            sys: s,
-            #[cfg(debug_assertions)]
-            selector_id: self.selector_id.clone(),
-        })
-    }
-
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///

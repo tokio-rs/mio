@@ -23,10 +23,6 @@ impl TcpListener {
         os_required!();
     }
 
-    pub fn try_clone(&self) -> io::Result<TcpListener> {
-        os_required!();
-    }
-
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         os_required!();
     }

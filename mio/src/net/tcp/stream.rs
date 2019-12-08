@@ -18,16 +18,17 @@ use crate::{event, sys, Interest, Registry, Token};
 /// # Examples
 ///
 /// ```
-/// # use std::net::TcpListener;
+/// # use std::net::{TcpListener, SocketAddr};
 /// # use std::error::Error;
 /// #
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// #     let _listener = TcpListener::bind("127.0.0.1:34254")?;
+/// let address: SocketAddr = "127.0.0.1:0".parse()?;
+/// let listener = TcpListener::bind(address)?;
 /// use mio::{Events, Interest, Poll, Token};
 /// use mio::net::TcpStream;
 /// use std::time::Duration;
 ///
-/// let mut stream = TcpStream::connect("127.0.0.1:34254".parse()?)?;
+/// let mut stream = TcpStream::connect(listener.local_addr()?)?;
 ///
 /// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(128);
@@ -97,20 +98,6 @@ impl TcpStream {
     /// Returns the socket address of the local half of this TCP connection.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.sys.local_addr()
-    }
-
-    /// Creates a new independently owned handle to the underlying socket.
-    ///
-    /// The returned `TcpStream` is a reference to the same stream that this
-    /// object references. Both handles will read and write the same stream of
-    /// data, and options set on one stream will be propagated to the other
-    /// stream.
-    pub fn try_clone(&self) -> io::Result<TcpStream> {
-        self.sys.try_clone().map(|s| TcpStream {
-            sys: s,
-            #[cfg(debug_assertions)]
-            selector_id: self.selector_id.clone(),
-        })
     }
 
     /// Shuts down the read, write, or both halves of this connection.
