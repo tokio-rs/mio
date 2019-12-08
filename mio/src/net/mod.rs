@@ -20,5 +20,5 @@ cfg_udp! {
 #[cfg(unix)]
 cfg_uds! {
     mod uds;
-    pub use self::uds::{UnixDatagram, UnixListener, UnixStream};
+    pub use self::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
 }
