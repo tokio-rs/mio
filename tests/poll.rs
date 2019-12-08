@@ -473,6 +473,58 @@ fn poll_ok_after_cancelling_pending_ops() {
     handle.join().expect("unable to join thread");
 }
 
+// This test checks the following reregister constraint:
+// The event source must have previously been registered with this instance
+// of `Poll`, otherwise the behavior is undefined.
+//
+// This test is done on Windows and epoll platforms where reregistering a
+// source without a previous register is defined behavior that fail with an
+// error code.
+//
+// On kqueue platforms reregistering w/o registering works but that's not a
+// test goal, so it is not tested.
+#[test]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+fn reregister_without_register() {
+    let poll = Poll::new().expect("unable to create Poll instance");
+
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
+
+    assert_eq!(
+        poll.registry()
+            .reregister(&mut listener, ID1, Interest::READABLE)
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::NotFound
+    );
+}
+
+// This test checks the following register/deregister constraint:
+// The event source must have previously been registered with this instance
+// of `Poll`, otherwise the behavior is undefined.
+//
+// This test is done on Windows and epoll platforms where deregistering a
+// source without a previous register is defined behavior that fail with an
+// error code.
+//
+// On kqueue platforms deregistering w/o registering works but that's not a
+// test goal, so it is not tested.
+#[test]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+fn deregister_without_register() {
+    let poll = Poll::new().expect("unable to create Poll instance");
+
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
+
+    assert_eq!(
+        poll.registry()
+            .deregister(&mut listener)
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::NotFound
+    );
+}
+
 struct TestEventSource {
     registrations: Vec<(Token, Interest)>,
     reregistrations: Vec<(Token, Interest)>,
