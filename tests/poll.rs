@@ -12,7 +12,8 @@ use std::{fmt, io};
 mod util;
 
 use util::{
-    any_local_address, assert_send, assert_sync, expect_events, init, init_with_poll, ExpectEvent,
+    any_local_address, assert_send, assert_sync, expect_events, expect_no_events, init,
+    init_with_poll, start_listener, ExpectEvent,
 };
 
 const ID1: Token = Token(1);
@@ -310,10 +311,70 @@ fn registry_operations_are_thread_safe() {
     handle3.join().unwrap();
 }
 
-// On kqueue platforms registering twice (not *re*registering) works.
+// This test checks the following reregister constraints:
+// The `reregister` arguments fully override the previous values. In other
+// words, if a socket is registered with [`readable`] interest and the call
+// to `reregister` specifies [`writable`], then read interest is no longer
+// requested for the handle.
+#[test]
+fn reregister_overrides_interest() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let barrier = Arc::new(Barrier::new(2));
+    let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
+
+    let mut stream = TcpStream::connect(address).unwrap();
+
+    poll.registry()
+        .register(&mut stream, ID1, Interest::WRITABLE)
+        .expect("unable to register TCP stream");
+
+    poll.registry()
+        .reregister(&mut stream, ID2, Interest::READABLE)
+        .expect("unable to register TCP stream");
+
+    expect_no_events(&mut poll, &mut events);
+
+    barrier.wait();
+    thread_handle.join().expect("unable to join thread");
+}
+
+// This test checks the following constraints:
+// - reregister can use the same token as register
+// - reregister can use different token from register
+// - multiple reregister are ok
+#[test]
+fn register_reregister_token_usage() {
+    let poll = Poll::new().expect("unable to create Poll instance");
+
+    let mut listener1 = TcpListener::bind(any_local_address()).unwrap();
+
+    poll.registry()
+        .register(&mut listener1, ID1, Interest::READABLE)
+        .expect("unable to register listener");
+
+    poll.registry()
+        .reregister(&mut listener1, ID1, Interest::READABLE)
+        .expect("unable to register listener");
+
+    poll.registry()
+        .reregister(&mut listener1, ID2, Interest::READABLE)
+        .expect("unable to register listener");
+}
+
+// This test checks the following register constraint:
+// The event source must **not** have been previously registered with this
+// instance of `Poll`, otherwise the behavior is undefined.
+//
+// This test is done on Windows only because Windows is the only platform where
+// there is a defined behavior by design, that is: registering twice must
+// fail with an error code.
+//
+// On kqueue platforms registering twice (not *re*registering) works, but that
+// is not a test goal, so it is not tested.
 #[test]
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-pub fn double_register() {
+pub fn double_register_different_token() {
     init();
     let poll = Poll::new().unwrap();
 
