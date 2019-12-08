@@ -39,3 +39,11 @@ fn fmt_debug() {
         assert_eq!(format!("{:?}", Interest::LIO), "LIO");
     }
 }
+
+#[test]
+fn add() {
+    let interest: Interest = Interest::READABLE.add(Interest::WRITABLE);
+
+    assert!(interest.is_readable());
+    assert!(interest.is_writable());
+}
