@@ -566,7 +566,7 @@ impl Registry {
     ///
     /// A handle can be passed back to `register` after it has been
     /// deregistered; however, it must be passed back to the **same** `Poll`
-    /// instance.
+    /// instance, otherwise the behavior is undefined.
     ///
     /// # Examples
     ///
