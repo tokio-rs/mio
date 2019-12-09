@@ -1,6 +1,7 @@
 #![cfg(all(feature = "os-poll", feature = "tcp"))]
 
-use mio::net::{TcpListener, TcpStream};
+use mio::event::Source;
+use mio::net::{TcpListener, TcpStream, UdpSocket};
 use mio::{event, Events, Interest, Poll, Registry, Token};
 use std::net;
 use std::sync::{Arc, Barrier};
@@ -9,7 +10,14 @@ use std::time::Duration;
 use std::{fmt, io};
 
 mod util;
-use util::{any_local_address, assert_send, assert_sync, init};
+
+use util::{
+    any_local_address, assert_send, assert_sync, expect_events, init, init_with_poll, ExpectEvent,
+};
+
+const ID1: Token = Token(1);
+const ID2: Token = Token(2);
+const ID3: Token = Token(3);
 
 #[test]
 fn is_send_and_sync() {
@@ -199,6 +207,107 @@ fn registry_behind_arc() {
 
     handle1.join().unwrap();
     handle2.join().unwrap();
+}
+
+/// Call all registration operations, ending with `source` being registered with `token` and `final_interests`.
+pub fn registry_ops_flow(
+    registry: &Registry,
+    source: &mut dyn Source,
+    token: Token,
+    init_interests: Interest,
+    final_interests: Interest,
+) -> io::Result<()> {
+    registry.register(source, token, init_interests).unwrap();
+    registry.deregister(source).unwrap();
+
+    registry.register(source, token, init_interests).unwrap();
+    registry.reregister(source, token, final_interests)
+}
+
+#[test]
+fn registry_operations_are_thread_safe() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let registry = Arc::new(poll.registry().try_clone().unwrap());
+    let registry1 = Arc::clone(&registry);
+    let registry2 = Arc::clone(&registry);
+    let registry3 = Arc::clone(&registry);
+
+    let barrier = Arc::new(Barrier::new(4));
+    let barrier1 = Arc::clone(&barrier);
+    let barrier2 = Arc::clone(&barrier);
+    let barrier3 = Arc::clone(&barrier);
+
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    // Expect that multiple register/deregister/reregister work fine on multiple
+    // threads. Main thread will wait before the expect_events for all other 3
+    // threads to do their work. Otherwise expect_events timeout might be too short
+    // for all threads to complete, and call might fail.
+
+    let handle1 = thread::spawn(move || {
+        registry_ops_flow(
+            &registry1,
+            &mut listener,
+            ID1,
+            Interest::READABLE,
+            Interest::READABLE,
+        )
+        .unwrap();
+
+        barrier1.wait();
+        barrier1.wait();
+    });
+
+    let handle2 = thread::spawn(move || {
+        let mut udp_socket = UdpSocket::bind(any_local_address()).unwrap();
+        registry_ops_flow(
+            &registry2,
+            &mut udp_socket,
+            ID2,
+            Interest::WRITABLE,
+            Interest::WRITABLE.add(Interest::READABLE),
+        )
+        .unwrap();
+
+        barrier2.wait();
+        barrier2.wait();
+    });
+
+    let handle3 = thread::spawn(move || {
+        let mut stream = TcpStream::connect(addr).unwrap();
+        registry_ops_flow(
+            &registry3,
+            &mut stream,
+            ID3,
+            Interest::READABLE,
+            Interest::READABLE | Interest::WRITABLE,
+        )
+        .unwrap();
+
+        barrier3.wait();
+        barrier3.wait();
+    });
+
+    // wait for threads to finish before expect_events
+    barrier.wait();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interest::READABLE),
+            ExpectEvent::new(ID2, Interest::WRITABLE),
+            ExpectEvent::new(ID3, Interest::WRITABLE),
+        ],
+    );
+
+    // Let the threads return.
+    barrier.wait();
+
+    handle1.join().unwrap();
+    handle2.join().unwrap();
+    handle3.join().unwrap();
 }
 
 // On kqueue platforms registering twice (not *re*registering) works.
