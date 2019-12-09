@@ -1,5 +1,5 @@
 use mio::net::{TcpListener, TcpStream};
-use mio::{event, Events, Interest, Poll, Registry, Token};
+use mio::{event, Events, Interest, Poll, Registry, Token, Waker};
 
 use std::net;
 use std::sync::{Arc, Barrier};
@@ -10,6 +10,9 @@ use std::{fmt, io};
 mod util;
 
 use util::{any_local_address, assert_send, assert_sync, init};
+
+const ID1: Token = Token(1);
+const WAKE_TOKEN: Token = Token(10);
 
 #[test]
 fn is_send_and_sync() {
@@ -199,6 +202,49 @@ fn registry_behind_arc() {
 
     handle1.join().unwrap();
     handle2.join().unwrap();
+}
+
+#[test]
+fn poll_no_timeout_not_affected_by_deregister() {
+    // Test to verify issue 1205 does not reproduce again
+    init();
+
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(128);
+
+    let waker = Arc::new(Waker::new(poll.registry(), WAKE_TOKEN).unwrap());
+    let waker1 = waker.clone();
+
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
+
+    poll.registry()
+        .register(&mut listener, ID1, Interest::READABLE)
+        .unwrap();
+
+    poll.poll(&mut events, Some(std::time::Duration::from_millis(0)))
+        .unwrap();
+    assert!(events.iter().count() == 0);
+
+    let _stream = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+
+    poll.registry().deregister(&mut listener).unwrap();
+
+    // spawn a waker thread to wake the poll call below
+    let handle = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(500));
+        waker1.wake().expect("unable to wake");
+    });
+
+    poll.poll(&mut events, None).unwrap();
+
+    // the poll should return only one event that being the waker event.
+    // the poll should not retrieve event for the listener above because it was
+    // deregistered
+    assert!(events.iter().count() == 1);
+    let waker_event = events.iter().next().unwrap();
+    assert!(waker_event.is_readable());
+    assert_eq!(waker_event.token(), WAKE_TOKEN);
+    handle.join().unwrap();
 }
 
 // On kqueue platforms registering twice (not *re*registering) works.

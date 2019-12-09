@@ -624,10 +624,11 @@ impl SelectorInner {
             match sock_guard.feed_event() {
                 Some(e) => {
                     events.push(e);
+                    n += 1;
                 }
                 None => {}
             }
-            n += 1;
+
             if !sock_guard.is_pending_deletion() {
                 update_queue.push_back(sock_state.clone());
             }
