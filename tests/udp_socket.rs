@@ -140,6 +140,92 @@ fn get_ttl_without_previous_set() {
 }
 
 #[test]
+fn set_get_broadcast() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+
+    socket1.set_broadcast(true).unwrap();
+    assert_eq!(socket1.broadcast().unwrap(), true);
+
+    socket1.set_broadcast(false).unwrap();
+    assert_eq!(socket1.broadcast().unwrap(), false);
+
+    assert!(socket1.take_error().unwrap().is_none());
+}
+
+#[test]
+fn get_broadcast_without_previous_set() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+
+    socket1
+        .broadcast()
+        .expect("unable to get broadcast for UDP socket");
+}
+
+#[test]
+fn set_get_multicast_loop_v4() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+
+    socket1.set_multicast_loop_v4(true).unwrap();
+    assert_eq!(socket1.multicast_loop_v4().unwrap(), true);
+
+    socket1.set_multicast_loop_v4(false).unwrap();
+    assert_eq!(socket1.multicast_loop_v4().unwrap(), false);
+
+    assert!(socket1.take_error().unwrap().is_none());
+}
+
+#[test]
+fn get_multicast_loop_v4_without_previous_set() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+
+    socket1
+        .multicast_loop_v4()
+        .expect("unable to get multicast_loop_v4 for UDP socket");
+}
+
+#[test]
+fn set_get_multicast_ttl_v4() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+
+    const TTL: u32 = 10;
+    socket1.set_multicast_ttl_v4(TTL).unwrap();
+    assert_eq!(socket1.multicast_ttl_v4().unwrap(), TTL);
+
+    assert!(socket1.take_error().unwrap().is_none());
+}
+
+#[test]
+fn get_multicast_ttl_v4_without_previous_set() {
+    let socket1 = UdpSocket::bind(any_local_address()).unwrap();
+
+    socket1
+        .multicast_ttl_v4()
+        .expect("unable to get multicast_ttl_v4 for UDP socket");
+}
+
+#[test]
+fn set_get_multicast_loop_v6() {
+    let socket1 = UdpSocket::bind(any_local_ipv6_address()).unwrap();
+
+    socket1.set_multicast_loop_v6(true).unwrap();
+    assert_eq!(socket1.multicast_loop_v6().unwrap(), true);
+
+    socket1.set_multicast_loop_v6(false).unwrap();
+    assert_eq!(socket1.multicast_loop_v6().unwrap(), false);
+
+    assert!(socket1.take_error().unwrap().is_none());
+}
+
+#[test]
+fn get_multicast_loop_v6_without_previous_set() {
+    let socket1 = UdpSocket::bind(any_local_ipv6_address()).unwrap();
+
+    socket1
+        .multicast_loop_v6()
+        .expect("unable to get multicast_loop_v6 for UDP socket");
+}
+
+#[test]
 fn connected_udp_socket_ipv4() {
     let socket1 = UdpSocket::bind(any_local_address()).unwrap();
     let address1 = socket1.local_addr().unwrap();
