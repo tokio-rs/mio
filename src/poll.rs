@@ -422,9 +422,6 @@ impl Registry {
     /// if the event source is deregistered from the poll instance using
     /// [`deregister`].
     ///
-    /// This function is **thread safe**. It can be called concurrently from
-    /// multiple threads.
-    ///
     /// [`event::Source`]: crate::event::Source
     /// [`poll`]: Poll::poll
     /// [`reregister`]: Registry::reregister
