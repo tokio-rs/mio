@@ -499,7 +499,7 @@ impl Registry {
     /// requested for the handle.
     ///
     /// The event source must have previously been registered with this instance
-    /// of `Poll` otherwise the call to `reregister` will return with an error.
+    /// of `Poll`, otherwise the behavior is undefined.
     ///
     /// See the [`register`] documentation for details about the function
     /// arguments and see the [`struct`] docs for a high level overview of
@@ -563,6 +563,9 @@ impl Registry {
     /// registered to this handle will not be returned by a future poll, so long
     /// as a happens-before relationship is established between this call and
     /// the poll.
+    ///
+    /// The event source must have previously been registered with this instance
+    /// of `Poll`, otherwise the behavior is undefined.
     ///
     /// A handle can be passed back to `register` after it has been
     /// deregistered; however, it must be passed back to the **same** `Poll`
