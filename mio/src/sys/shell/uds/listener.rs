@@ -1,5 +1,5 @@
 use super::UnixStream;
-use crate::unix::SocketAddr;
+use crate::net::SocketAddr;
 use crate::{event, sys, Interest, Registry, Token};
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
