@@ -9,6 +9,14 @@ use util::init_with_poll;
 const WAKE_TOKEN: Token = Token(10);
 
 #[test]
+fn assert_event_source_implemented_for() {
+    fn assert_event_source<E: event::Source>() {}
+
+    assert_event_source::<Box<dyn event::Source>>();
+    assert_event_source::<Box<TcpStream>>();
+}
+
+#[test]
 fn events_all() {
     let (mut poll, mut events) = init_with_poll();
     assert_eq!(events.capacity(), 16);
