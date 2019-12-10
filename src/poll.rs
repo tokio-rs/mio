@@ -422,9 +422,6 @@ impl Registry {
     /// if the event source is deregistered from the poll instance using
     /// [`deregister`].
     ///
-    /// This function is **thread safe**. It can be called concurrently from
-    /// multiple threads.
-    ///
     /// [`event::Source`]: crate::event::Source
     /// [`poll`]: Poll::poll
     /// [`reregister`]: Registry::reregister
@@ -502,7 +499,7 @@ impl Registry {
     /// requested for the handle.
     ///
     /// The event source must have previously been registered with this instance
-    /// of `Poll` otherwise the call to `reregister` will return with an error.
+    /// of `Poll`, otherwise the behavior is undefined.
     ///
     /// See the [`register`] documentation for details about the function
     /// arguments and see the [`struct`] docs for a high level overview of
@@ -567,9 +564,12 @@ impl Registry {
     /// as a happens-before relationship is established between this call and
     /// the poll.
     ///
+    /// The event source must have previously been registered with this instance
+    /// of `Poll`, otherwise the behavior is undefined.
+    ///
     /// A handle can be passed back to `register` after it has been
     /// deregistered; however, it must be passed back to the **same** `Poll`
-    /// instance.
+    /// instance, otherwise the behavior is undefined.
     ///
     /// # Examples
     ///
