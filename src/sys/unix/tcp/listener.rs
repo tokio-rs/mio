@@ -1,5 +1,6 @@
+use super::TcpStream;
 use crate::sys::unix::net::{new_ip_socket, socket_addr};
-use crate::sys::unix::{SourceFd, TcpStream};
+use crate::sys::unix::SourceFd;
 use crate::{event, Interest, Registry, Token};
 
 use std::fmt;

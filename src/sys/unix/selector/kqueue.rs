@@ -1,5 +1,4 @@
 use crate::{Interest, Token};
-
 use log::error;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
@@ -81,11 +80,6 @@ impl Selector {
                 id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
                 kq,
             })
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn id(&self) -> usize {
-        self.id
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
@@ -296,6 +290,15 @@ fn check_errors(events: &[libc::kevent], ignored_errors: &[Data]) -> io::Result<
         }
     }
     Ok(())
+}
+
+cfg_net! {
+    #[cfg(debug_assertions)]
+    impl Selector {
+        pub fn id(&self) -> usize {
+            self.id
+        }
+    }
 }
 
 impl AsRawFd for Selector {

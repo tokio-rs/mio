@@ -52,17 +52,8 @@ jobs:
     - script: cargo check --target $(target)
       displayName: Check source
 
-    - script: cargo check --tests --target $(target)
+    - script: cargo check --tests --target $(target) --all-features
       displayName: Check tests
 
-    - script: cargo check --examples --target $(target)
+    - script: cargo check --examples --target $(target) --all-features
       displayName: Check examples
-
-    - script: cargo check --target $(target) --no-default-features
-      displayName: Check source (no default features)
-
-    - script: cargo check --tests --target $(target) --no-default-features
-      displayName: Check tests (no default features)
-
-    - script: cargo check --examples --target $(target) --no-default-features
-      displayName: Check examples (no default features)

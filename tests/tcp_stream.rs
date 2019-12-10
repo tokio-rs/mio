@@ -1,3 +1,7 @@
+#![cfg(all(feature = "os-poll", feature = "tcp"))]
+
+use mio::net::TcpStream;
+use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
@@ -5,15 +9,10 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::sync::{mpsc::channel, Arc, Barrier};
 use std::thread;
 
-use mio::net::TcpStream;
-use mio::{Interest, Token};
-
 #[macro_use]
 mod util;
-
 #[cfg(not(target_os = "windows"))]
 use util::init;
-
 use util::{
     any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
     expect_events, expect_no_events, init_with_poll, ExpectEvent, Readiness,
@@ -395,8 +394,8 @@ fn shutdown_both() {
     thread_handle.join().expect("unable to join thread");
 }
 
-#[test]
 #[cfg(unix)]
+#[test]
 fn raw_fd() {
     init();
 

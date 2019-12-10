@@ -1,3 +1,7 @@
+#![cfg(all(feature = "os-poll", feature = "tcp"))]
+
+use mio::net::TcpListener;
+use mio::{Interest, Token};
 use std::io::{self, Read};
 use std::net::{self, SocketAddr};
 #[cfg(unix)]
@@ -5,11 +9,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::sync::{Arc, Barrier};
 use std::thread;
 
-use mio::net::TcpListener;
-use mio::{Interest, Token};
-
 mod util;
-
 use util::{
     any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
     expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
@@ -110,8 +110,8 @@ fn get_ttl_without_previous_set() {
     assert!(listener.take_error().unwrap().is_none());
 }
 
-#[test]
 #[cfg(unix)]
+#[test]
 fn raw_fd() {
     init();
 

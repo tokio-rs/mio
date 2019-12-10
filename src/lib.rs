@@ -1,5 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/mio/0.7.0")]
 #![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 // Disallow warnings when running tests.
 #![cfg_attr(test, deny(warnings))]
 // Disallow warnings in examples.
@@ -35,6 +36,10 @@
     doc = "`guide` (only available when the `guide` feature is enabled)."
 )]
 
+// macros used internally
+#[macro_use]
+mod macros;
+
 mod interest;
 mod poll;
 mod sys;
@@ -42,7 +47,10 @@ mod token;
 mod waker;
 
 pub mod event;
-pub mod net;
+
+cfg_net! {
+    pub mod net;
+}
 
 #[doc(no_inline)]
 pub use event::Events;
@@ -52,9 +60,11 @@ pub use token::Token;
 pub use waker::Waker;
 
 #[cfg(unix)]
-pub mod unix {
-    //! Unix only extensions.
-    pub use crate::sys::SourceFd;
+cfg_any_os_util! {
+    pub mod unix {
+        //! Unix only extensions.
+        pub use crate::sys::SourceFd;
+    }
 }
 
 // Enable with `cargo doc --features guide`.
@@ -95,13 +105,13 @@ pub mod guide {
     //! # let poll = Poll::new()?;
     //! # let address = "127.0.0.1:0".parse().unwrap();
     //! // Create a `TcpListener`, binding it to `address`.
-    //! let listener = TcpListener::bind(address)?;
+    //! let mut listener = TcpListener::bind(address)?;
     //!
     //! // Next we register it with `Poll` to receive events for it. The `SERVER`
     //! // `Token` is used to determine that we received an event for the listener
     //! // later on.
     //! const SERVER: Token = Token(0);
-    //! poll.registry().register(&listener, SERVER, Interest::READABLE)?;
+    //! poll.registry().register(&mut listener, SERVER, Interest::READABLE)?;
     //! # Ok(())
     //! # }
     //! ```
@@ -122,9 +132,9 @@ pub mod guide {
     //! # let mut poll = Poll::new()?;
     //! # let mut events = Events::with_capacity(128);
     //! # let address = "127.0.0.1:0".parse().unwrap();
-    //! # let listener = TcpListener::bind(address)?;
+    //! # let mut listener = TcpListener::bind(address)?;
     //! # const SERVER: Token = Token(0);
-    //! # poll.registry().register(&listener, SERVER, Interest::READABLE)?;
+    //! # poll.registry().register(&mut listener, SERVER, Interest::READABLE)?;
     //! // Start our event loop.
     //! loop {
     //!     // Poll Mio for events, waiting at most 100 milliseconds.

@@ -1,13 +1,13 @@
+#![cfg(all(feature = "os-poll", feature = "tcp"))]
+
+use mio::net::{TcpListener, TcpStream};
+use mio::{Events, Interest, Poll, Token, Waker};
 use std::io::{self, Read};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{net, thread};
 
-use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interest, Poll, Token, Waker};
-
 mod util;
-
 use util::{any_local_address, init, init_with_poll};
 
 const ID1: Token = Token(1);

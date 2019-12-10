@@ -1,3 +1,9 @@
+#![cfg(all(feature = "os-poll", feature = "tcp"))]
+
+use mio::net::{TcpListener, TcpStream};
+use mio::{Events, Interest, Poll, Token};
+#[cfg(unix)]
+use net2::TcpStreamExt;
 use std::io::{self, Read, Write};
 use std::net::{self, Shutdown};
 #[cfg(unix)]
@@ -6,15 +12,8 @@ use std::sync::mpsc::channel;
 use std::thread::{self, sleep};
 use std::time::Duration;
 
-#[cfg(unix)]
-use net2::TcpStreamExt;
-
-use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interest, Poll, Token};
-
 #[macro_use]
 mod util;
-
 use util::{
     any_local_address, assert_send, assert_sync, expect_events, expect_no_events, init,
     init_with_poll, ExpectEvent,
@@ -456,8 +455,8 @@ fn multiple_writes_immediate_success() {
     t.join().unwrap();
 }
 
-#[test]
 #[cfg(unix)]
+#[test]
 fn connection_reset_by_peer() {
     init();
 

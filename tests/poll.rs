@@ -1,6 +1,7 @@
+#![cfg(all(feature = "os-poll", feature = "tcp"))]
+
 use mio::net::{TcpListener, TcpStream};
 use mio::{event, Events, Interest, Poll, Registry, Token};
-
 use std::net;
 use std::sync::{Arc, Barrier};
 use std::thread::{self, sleep};
@@ -8,7 +9,6 @@ use std::time::Duration;
 use std::{fmt, io};
 
 mod util;
-
 use util::{any_local_address, assert_send, assert_sync, init};
 
 #[test]

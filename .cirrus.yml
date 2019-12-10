@@ -18,10 +18,10 @@ task:
     - cargo build --no-default-features
   amd64_test_script:
     - . $HOME/.cargo/env
-    - cargo test
+    - cargo test --all-features
   i386_test_script:
     - . $HOME/.cargo/env
     - rustup target add i686-unknown-freebsd
-    - cargo test --target i686-unknown-freebsd
+    - cargo test --target i686-unknown-freebsd --all-features
   before_cache_script:
     - rm -rf $HOME/.cargo/registry/index

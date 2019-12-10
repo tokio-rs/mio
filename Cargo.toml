@@ -25,6 +25,17 @@ publish = false
 
 [features]
 default = []
+# Include implementations of I/O source readiness polling.
+os-poll = []
+# Include adapters for underlying OS I/O sources.
+# Note: This is currently only supported on Unix and provides `SourceFd`
+os-util = []
+# Include TCP primitives
+tcp = []
+# Include UDP primitives
+udp = []
+# Include UDS primitives
+uds = []
 
 # Adds additional documentation in the form of a user guide.
 guide = []
@@ -50,5 +61,13 @@ tempdir    = "0.3.7"
 net2       = "0.2.33"
 
 [package.metadata.docs.rs]
-# Enable the guide feature.
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[[example]]
+name = "tcp_server"
+required-features = ["os-poll", "tcp"]
+
+[[example]]
+name = "udp_server"
+required-features = ["os-poll", "udp"]

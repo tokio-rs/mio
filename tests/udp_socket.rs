@@ -1,3 +1,9 @@
+#![cfg(all(feature = "os-poll", feature = "udp"))]
+
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use log::{debug, info};
+use mio::net::UdpSocket;
+use mio::{Events, Interest, Poll, Registry, Token};
 use std::io::ErrorKind;
 use std::net::{self, IpAddr, SocketAddr};
 #[cfg(unix)]
@@ -7,15 +13,8 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use log::{debug, info};
-
-use mio::net::UdpSocket;
-use mio::{Events, Interest, Poll, Registry, Token};
-
 #[macro_use]
 mod util;
-
 use util::{
     any_local_address, any_local_ipv6_address, assert_error, assert_send, assert_sync,
     assert_would_block, expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
@@ -501,8 +500,8 @@ fn connected_udp_socket_unconnected_methods() {
     assert!(socket3.take_error().unwrap().is_none());
 }
 
-#[test]
 #[cfg(unix)]
+#[test]
 fn udp_socket_raw_fd() {
     init();
 

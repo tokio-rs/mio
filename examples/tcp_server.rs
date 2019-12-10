@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-use std::io::{self, Read, Write};
-use std::str::from_utf8;
-
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Registry, Token};
+use std::collections::HashMap;
+use std::io::{self, Read, Write};
+use std::str::from_utf8;
 
 // Setup some tokens to allow us to identify which event is for which socket.
 const SERVER: Token = Token(0);

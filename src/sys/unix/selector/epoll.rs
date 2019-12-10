@@ -31,11 +31,6 @@ impl Selector {
         })
     }
 
-    #[cfg(debug_assertions)]
-    pub fn id(&self) -> usize {
-        self.id
-    }
-
     pub fn try_clone(&self) -> io::Result<Selector> {
         syscall!(dup(self.ep)).map(|ep| Selector {
             // It's the same selector, so we use the same id.
@@ -87,18 +82,13 @@ impl Selector {
     }
 }
 
-fn interests_to_epoll(interests: Interest) -> u32 {
-    let mut kind = EPOLLET;
-
-    if interests.is_readable() {
-        kind = kind | EPOLLIN | EPOLLRDHUP;
+cfg_net! {
+    impl Selector {
+        #[cfg(debug_assertions)]
+        pub fn id(&self) -> usize {
+            self.id
+        }
     }
-
-    if interests.is_writable() {
-        kind |= EPOLLOUT;
-    }
-
-    kind as u32
 }
 
 impl AsRawFd for Selector {
@@ -113,6 +103,20 @@ impl Drop for Selector {
             error!("error closing epoll: {}", err);
         }
     }
+}
+
+fn interests_to_epoll(interests: Interest) -> u32 {
+    let mut kind = EPOLLET;
+
+    if interests.is_readable() {
+        kind = kind | EPOLLIN | EPOLLRDHUP;
+    }
+
+    if interests.is_writable() {
+        kind |= EPOLLOUT;
+    }
+
+    kind as u32
 }
 
 pub type Event = libc::epoll_event;

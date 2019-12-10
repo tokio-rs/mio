@@ -1,38 +1,16 @@
-use super::{path_offset, socket_addr};
+use super::socket_addr;
 use crate::sys::unix::net::new_socket;
-use crate::sys::unix::UnixStream;
+use crate::sys::unix::{SocketAddr, UnixStream};
 use crate::unix::SourceFd;
 use crate::{event, Interest, Registry, Token};
-
-use std::ffi::OsStr;
-use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
-use std::{ascii, fmt, io, mem};
+use std::{io, mem};
 
 #[derive(Debug)]
 pub struct UnixListener {
     inner: net::UnixListener,
-}
-
-/// An address associated with a `mio` specific Unix socket.
-///
-/// This is implemented instead of imported from [`net::SocketAddr`] because
-/// there is no way to create a [`net::SocketAddr`]. One must be returned by
-/// [`accept`], so this is returned instead.
-///
-/// [`net::SocketAddr`]: std::os::unix::net::SocketAddr
-/// [`accept`]: #method.accept
-pub struct SocketAddr {
-    sockaddr: libc::sockaddr_un,
-    socklen: libc::socklen_t,
-}
-
-enum AddressKind<'a> {
-    Unnamed,
-    Pathname(&'a Path),
-    Abstract(&'a [u8]),
 }
 
 impl UnixListener {
@@ -157,101 +135,14 @@ impl AsRawFd for UnixListener {
     }
 }
 
-impl IntoRawFd for UnixListener {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_raw_fd()
-    }
-}
-
 impl FromRawFd for UnixListener {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixListener {
         UnixListener::new(net::UnixListener::from_raw_fd(fd))
     }
 }
 
-impl SocketAddr {
-    pub(crate) fn new<F>(f: F) -> io::Result<SocketAddr>
-    where
-        F: FnOnce(*mut libc::sockaddr, &mut libc::socklen_t) -> io::Result<libc::c_int>,
-    {
-        let mut sockaddr = {
-            let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
-            unsafe { sockaddr.assume_init() }
-        };
-
-        let raw_sockaddr = &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr;
-        let mut socklen = mem::size_of_val(&sockaddr) as libc::socklen_t;
-
-        f(raw_sockaddr, &mut socklen)?;
-        Ok(SocketAddr::from_parts(sockaddr, socklen))
-    }
-
-    pub(crate) fn from_parts(sockaddr: libc::sockaddr_un, socklen: libc::socklen_t) -> SocketAddr {
-        SocketAddr { sockaddr, socklen }
-    }
-
-    /// Returns `true` if the address is unnamed.
-    ///
-    /// Documentation reflected in [`SocketAddr`]
-    ///
-    /// [`SocketAddr`]: std::os::unix::net::SocketAddr
-    pub fn is_unnamed(&self) -> bool {
-        if let AddressKind::Unnamed = self.address() {
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Returns the contents of this address if it is a `pathname` address.
-    ///
-    /// Documentation reflected in [`SocketAddr`]
-    ///
-    /// [`SocketAddr`]: std::os::unix::net::SocketAddr
-    pub fn as_pathname(&self) -> Option<&Path> {
-        if let AddressKind::Pathname(path) = self.address() {
-            Some(path)
-        } else {
-            None
-        }
-    }
-
-    fn address(&self) -> AddressKind<'_> {
-        let offset = path_offset(&self.sockaddr);
-        let len = self.socklen as usize - offset;
-        let path = unsafe { &*(&self.sockaddr.sun_path as *const [libc::c_char] as *const [u8]) };
-
-        // macOS seems to return a len of 16 and a zeroed sun_path for unnamed addresses
-        if len == 0
-            || (cfg!(not(any(target_os = "linux", target_os = "android")))
-                && self.sockaddr.sun_path[0] == 0)
-        {
-            AddressKind::Unnamed
-        } else if self.sockaddr.sun_path[0] == 0 {
-            AddressKind::Abstract(&path[1..len])
-        } else {
-            AddressKind::Pathname(OsStr::from_bytes(&path[..len - 1]).as_ref())
-        }
-    }
-}
-
-impl fmt::Debug for SocketAddr {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.address() {
-            AddressKind::Unnamed => write!(fmt, "(unnamed)"),
-            AddressKind::Abstract(name) => write!(fmt, "{} (abstract)", AsciiEscaped(name)),
-            AddressKind::Pathname(path) => write!(fmt, "{:?} (pathname)", path),
-        }
-    }
-}
-struct AsciiEscaped<'a>(&'a [u8]);
-
-impl<'a> fmt::Display for AsciiEscaped<'a> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "\"")?;
-        for byte in self.0.iter().cloned().flat_map(ascii::escape_default) {
-            write!(fmt, "{}", byte as char)?;
-        }
-        write!(fmt, "\"")
+impl IntoRawFd for UnixListener {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_raw_fd()
     }
 }

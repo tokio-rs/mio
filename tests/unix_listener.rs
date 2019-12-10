@@ -1,6 +1,4 @@
-#![cfg(unix)]
-#[macro_use]
-mod util;
+#![cfg(all(unix, feature = "os-poll", feature = "uds"))]
 
 use mio::net::UnixListener;
 use mio::{Interest, Token};
@@ -10,6 +8,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use tempdir::TempDir;
+
+#[macro_use]
+mod util;
 use util::{
     assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
     ExpectEvent,

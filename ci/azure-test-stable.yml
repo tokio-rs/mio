@@ -26,13 +26,8 @@ jobs:
     parameters:
       rust_version: ${{ parameters.rust_version }}
 
-  - script: cargo ${{ parameters.cmd }}
-    displayName: cargo ${{ parameters.cmd }}
-    env:
-      CI: 'True'
-
-  - script: cargo ${{ parameters.cmd }} --no-default-features
-    displayName: cargo ${{ parameters.cmd }} --no-default-features
+  - script: cargo ${{ parameters.cmd }} --all-features
+    displayName: cargo ${{ parameters.cmd }} --all-features
     env:
       CI: 'True'
 

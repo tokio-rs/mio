@@ -1,3 +1,5 @@
+#![cfg(feature = "tcp")]
+
 use mio::event;
 use mio::net::TcpStream;
 

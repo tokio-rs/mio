@@ -1,18 +1,15 @@
 use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
-use super::SocketState;
 use crate::sys::Events;
-use crate::{Interest, Token};
+use crate::Interest;
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::Overlapped;
 use std::collections::VecDeque;
 use std::marker::PhantomPinned;
-use std::mem::size_of;
-use std::os::windows::io::{AsRawSocket, RawSocket};
+use std::os::windows::io::RawSocket;
 use std::pin::Pin;
-use std::ptr::null_mut;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,10 +21,6 @@ use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
 use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, WAIT_TIMEOUT};
 use winapi::um::minwinbase::OVERLAPPED;
-use winapi::um::mswsock::SIO_BASE_HANDLE;
-use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
-
-const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
 
 /// Overlapped value to indicate a `Waker` event.
 //
@@ -48,36 +41,42 @@ impl AfdGroup {
         }
     }
 
-    pub fn acquire(&self) -> io::Result<Arc<Afd>> {
-        let mut afd_group = self.afd_group.lock().unwrap();
-        if afd_group.len() == 0 {
-            self._alloc_afd_group(&mut afd_group)?;
-        } else {
-            // + 1 reference in Vec
-            if Arc::strong_count(afd_group.last().unwrap()) >= POLL_GROUP__MAX_GROUP_SIZE + 1 {
-                self._alloc_afd_group(&mut afd_group)?;
-            }
-        }
-
-        match afd_group.last() {
-            Some(arc) => Ok(arc.clone()),
-            None => unreachable!(
-                "Cannot acquire afd, {:#?}, afd_group: {:#?}",
-                self, afd_group
-            ),
-        }
-    }
-
     pub fn release_unused_afd(&self) {
         let mut afd_group = self.afd_group.lock().unwrap();
         afd_group.retain(|g| Arc::strong_count(&g) > 1);
     }
+}
 
-    fn _alloc_afd_group(&self, afd_group: &mut Vec<Arc<Afd>>) -> io::Result<()> {
-        let afd = Afd::new(&self.cp)?;
-        let arc = Arc::new(afd);
-        afd_group.push(arc);
-        Ok(())
+cfg_net! {
+    const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
+
+    impl AfdGroup {
+        pub fn acquire(&self) -> io::Result<Arc<Afd>> {
+            let mut afd_group = self.afd_group.lock().unwrap();
+            if afd_group.len() == 0 {
+                self._alloc_afd_group(&mut afd_group)?;
+            } else {
+                // + 1 reference in Vec
+                if Arc::strong_count(afd_group.last().unwrap()) >= POLL_GROUP__MAX_GROUP_SIZE + 1 {
+                    self._alloc_afd_group(&mut afd_group)?;
+                }
+            }
+
+            match afd_group.last() {
+                Some(arc) => Ok(arc.clone()),
+                None => unreachable!(
+                    "Cannot acquire afd, {:#?}, afd_group: {:#?}",
+                    self, afd_group
+                ),
+            }
+        }
+
+        fn _alloc_afd_group(&self, afd_group: &mut Vec<Arc<Afd>>) -> io::Result<()> {
+            let afd = Afd::new(&self.cp)?;
+            let arc = Arc::new(afd);
+            afd_group.push(arc);
+            Ok(())
+        }
     }
 }
 
@@ -109,33 +108,6 @@ pub struct SockState {
 }
 
 impl SockState {
-    fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
-        Ok(SockState {
-            iosb: IoStatusBlock::zeroed(),
-            poll_info: AfdPollInfo::zeroed(),
-            afd,
-            raw_socket,
-            base_socket: get_base_socket(raw_socket)?,
-            user_evts: 0,
-            pending_evts: 0,
-            user_data: 0,
-            poll_status: SockPollStatus::Idle,
-            delete_pending: false,
-            pinned: PhantomPinned,
-        })
-    }
-
-    /// True if need to be added on update queue, false otherwise.
-    fn set_event(&mut self, ev: Event) -> bool {
-        /* afd::POLL_CONNECT_FAIL and afd::POLL_ABORT are always reported, even when not requested by the caller. */
-        let events = ev.flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
-
-        self.user_evts = events;
-        self.user_data = ev.data;
-
-        (events & !self.pending_evts) != 0
-    }
-
     fn update(&mut self, self_arc: &Pin<Arc<Mutex<SockState>>>) -> io::Result<()> {
         assert!(!self.delete_pending);
 
@@ -276,6 +248,43 @@ impl SockState {
     }
 }
 
+cfg_net! {
+    impl SockState {
+        fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
+            Ok(SockState {
+                iosb: IoStatusBlock::zeroed(),
+                poll_info: AfdPollInfo::zeroed(),
+                afd,
+                raw_socket,
+                base_socket: get_base_socket(raw_socket)?,
+                user_evts: 0,
+                pending_evts: 0,
+                user_data: 0,
+                poll_status: SockPollStatus::Idle,
+                delete_pending: false,
+                pinned: PhantomPinned,
+            })
+        }
+
+        /// True if need to be added on update queue, false otherwise.
+        fn set_event(&mut self, ev: Event) -> bool {
+            /* afd::POLL_CONNECT_FAIL and afd::POLL_ABORT are always reported, even when not requested by the caller. */
+            let events = ev.flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
+
+            self.user_evts = events;
+            self.user_data = ev.data;
+
+            (events & !self.pending_evts) != 0
+        }
+    }
+}
+
+impl Drop for SockState {
+    fn drop(&mut self) {
+        self.mark_delete();
+    }
+}
+
 /// Converts the pointer to a `SockState` into a raw pointer.
 /// To revert see `from_overlapped`.
 fn into_overlapped(sock_state: Pin<Arc<Mutex<SockState>>>) -> PVOID {
@@ -289,12 +298,6 @@ fn into_overlapped(sock_state: Pin<Arc<Mutex<SockState>>>) -> PVOID {
 fn from_overlapped(ptr: *mut OVERLAPPED) -> Pin<Arc<Mutex<SockState>>> {
     let sock_ptr: *const Mutex<SockState> = ptr as *const _;
     unsafe { Pin::new_unchecked(Arc::from_raw(sock_ptr)) }
-}
-
-impl Drop for SockState {
-    fn drop(&mut self) {
-        self.mark_delete();
-    }
 }
 
 /// Each Selector has a globally unique(ish) ID associated with it. This ID
@@ -348,39 +351,47 @@ impl Selector {
         self.inner.select(events, timeout)
     }
 
-    pub fn register<S: SocketState + AsRawSocket>(
-        &self,
-        socket: &S,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        self.inner.register(socket, token, interests)
-    }
-
-    pub fn reregister<S: SocketState>(
-        &self,
-        socket: &S,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        self.inner.reregister(socket, token, interests)
-    }
-
-    pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
-        self.inner.deregister(socket)
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn id(&self) -> usize {
-        self.id
-    }
-
-    pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
-        self.inner.clone()
-    }
-
     pub(super) fn clone_port(&self) -> Arc<CompletionPort> {
         self.inner.cp.clone()
+    }
+}
+
+cfg_net! {
+    use super::SocketState;
+    use crate::Token;
+    use std::os::windows::io::AsRawSocket;
+
+    impl Selector {
+        pub fn register<S: SocketState + AsRawSocket>(
+            &self,
+            socket: &S,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            self.inner.register(socket, token, interests)
+        }
+
+        pub fn reregister<S: SocketState>(
+            &self,
+            socket: &S,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            self.inner.reregister(socket, token, interests)
+        }
+
+        pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
+            self.inner.deregister(socket)
+        }
+
+        pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
+            self.inner.clone()
+        }
+
+        #[cfg(debug_assertions)]
+        pub fn id(&self) -> usize {
+            self.id
+        }
     }
 }
 
@@ -394,41 +405,6 @@ pub struct SelectorInner {
 
 // We have ensured thread safety by introducing lock manually.
 unsafe impl Sync for SelectorInner {}
-
-impl Drop for SelectorInner {
-    fn drop(&mut self) {
-        loop {
-            let events_num: usize;
-            let mut statuses: [CompletionStatus; 1024] = [CompletionStatus::zero(); 1024];
-
-            let result = self
-                .cp
-                .get_many(&mut statuses, Some(std::time::Duration::from_millis(0)));
-            match result {
-                Ok(iocp_events) => {
-                    events_num = iocp_events.iter().len();
-                    for iocp_event in iocp_events.iter() {
-                        if !iocp_event.overlapped().is_null() {
-                            // drain sock state to release memory of Arc reference
-                            let _sock_state = from_overlapped(iocp_event.overlapped());
-                        }
-                    }
-                }
-
-                Err(_) => {
-                    break;
-                }
-            }
-
-            if events_num == 0 {
-                // continue looping until all completion statuses have been drained
-                break;
-            }
-        }
-
-        self.afd_group.release_unused_afd();
-    }
-}
 
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
@@ -486,73 +462,6 @@ impl SelectorInner {
         }
     }
 
-    pub fn register<S: SocketState + AsRawSocket>(
-        &self,
-        socket: &S,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        if socket.get_sock_state().is_some() {
-            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
-        }
-
-        let flags = interests_to_afd_flags(interests);
-
-        let sock = self._alloc_sock_for_rawsocket(socket.as_raw_socket())?;
-        let event = Event {
-            flags,
-            data: token.0 as u64,
-        };
-
-        {
-            sock.lock().unwrap().set_event(event);
-        }
-        socket.set_sock_state(Some(sock));
-        unsafe {
-            self.add_socket_to_update_queue(socket);
-            self.update_sockets_events_if_polling()?;
-        }
-
-        Ok(())
-    }
-
-    pub fn reregister<S: SocketState>(
-        &self,
-        socket: &S,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        let flags = interests_to_afd_flags(interests);
-
-        let sock = match socket.get_sock_state() {
-            Some(sock) => sock,
-            None => return Err(io::Error::from(io::ErrorKind::NotFound)),
-        };
-        let event = Event {
-            flags,
-            data: token.0 as u64,
-        };
-
-        {
-            sock.lock().unwrap().set_event(event);
-        }
-        unsafe {
-            self.add_socket_to_update_queue(socket);
-            self.update_sockets_events_if_polling()?;
-        }
-
-        Ok(())
-    }
-
-    pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
-        if socket.get_sock_state().is_none() {
-            return Err(io::Error::from(io::ErrorKind::NotFound));
-        }
-        socket.set_sock_state(None);
-        self.afd_group.release_unused_afd();
-        Ok(())
-    }
-
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
         let mut update_queue = self.update_queue.lock().unwrap();
         loop {
@@ -567,37 +476,6 @@ impl SelectorInner {
         }
         self.afd_group.release_unused_afd();
         Ok(())
-    }
-
-    /// This function is called by register() and reregister() to start an
-    /// IOCTL_AFD_POLL operation corresponding to the registered events, but
-    /// only if necessary.
-    ///
-    /// Since it is not possible to modify or synchronously cancel an AFD_POLL
-    /// operation, and there can be only one active AFD_POLL operation per
-    /// (socket, completion port) pair at any time, it is expensive to change
-    /// a socket's event registration after it has been submitted to the kernel.
-    ///
-    /// Therefore, if no other threads are polling when interest in a socket
-    /// event is (re)registered, the socket is added to the 'update queue', but
-    /// the actual syscall to start the IOCTL_AFD_POLL operation is deferred
-    /// until just before the GetQueuedCompletionStatusEx() syscall is made.
-    ///
-    /// However, when another thread is already blocked on
-    /// GetQueuedCompletionStatusEx() we tell the kernel about the registered
-    /// socket event(s) immediately.
-    unsafe fn update_sockets_events_if_polling(&self) -> io::Result<()> {
-        if self.is_polling.load(Ordering::Acquire) {
-            self.update_sockets_events()
-        } else {
-            Ok(())
-        }
-    }
-
-    unsafe fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
-        let sock_state = socket.get_sock_state().unwrap();
-        let mut update_queue = self.update_queue.lock().unwrap();
-        update_queue.push_back(sock_state);
     }
 
     // It returns processed count of iocp_events rather than the events itself.
@@ -636,13 +514,178 @@ impl SelectorInner {
         self.afd_group.release_unused_afd();
         n
     }
+}
 
-    fn _alloc_sock_for_rawsocket(
-        &self,
-        raw_socket: RawSocket,
-    ) -> io::Result<Pin<Arc<Mutex<SockState>>>> {
-        let afd = self.afd_group.acquire()?;
-        Ok(Arc::pin(Mutex::new(SockState::new(raw_socket, afd)?)))
+cfg_net! {
+    use std::mem::size_of;
+    use std::ptr::null_mut;
+    use winapi::um::mswsock::SIO_BASE_HANDLE;
+    use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
+
+    impl SelectorInner {
+        pub fn register<S: SocketState + AsRawSocket>(
+            &self,
+            socket: &S,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            if socket.get_sock_state().is_some() {
+                return Err(io::Error::from(io::ErrorKind::AlreadyExists));
+            }
+
+            let flags = interests_to_afd_flags(interests);
+
+            let sock = self._alloc_sock_for_rawsocket(socket.as_raw_socket())?;
+            let event = Event {
+                flags,
+                data: token.0 as u64,
+            };
+
+            {
+                sock.lock().unwrap().set_event(event);
+            }
+            socket.set_sock_state(Some(sock));
+            unsafe {
+                self.add_socket_to_update_queue(socket);
+                self.update_sockets_events_if_polling()?;
+            }
+
+            Ok(())
+        }
+
+        pub fn reregister<S: SocketState>(
+            &self,
+            socket: &S,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            let flags = interests_to_afd_flags(interests);
+
+            let sock = match socket.get_sock_state() {
+                Some(sock) => sock,
+                None => return Err(io::Error::from(io::ErrorKind::NotFound)),
+            };
+            let event = Event {
+                flags,
+                data: token.0 as u64,
+            };
+
+            {
+                sock.lock().unwrap().set_event(event);
+            }
+            unsafe {
+                self.add_socket_to_update_queue(socket);
+                self.update_sockets_events_if_polling()?;
+            }
+
+            Ok(())
+        }
+
+        pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
+            if socket.get_sock_state().is_none() {
+                return Err(io::Error::from(io::ErrorKind::NotFound));
+            }
+            socket.set_sock_state(None);
+            self.afd_group.release_unused_afd();
+            Ok(())
+        }
+
+        /// This function is called by register() and reregister() to start an
+        /// IOCTL_AFD_POLL operation corresponding to the registered events, but
+        /// only if necessary.
+        ///
+        /// Since it is not possible to modify or synchronously cancel an AFD_POLL
+        /// operation, and there can be only one active AFD_POLL operation per
+        /// (socket, completion port) pair at any time, it is expensive to change
+        /// a socket's event registration after it has been submitted to the kernel.
+        ///
+        /// Therefore, if no other threads are polling when interest in a socket
+        /// event is (re)registered, the socket is added to the 'update queue', but
+        /// the actual syscall to start the IOCTL_AFD_POLL operation is deferred
+        /// until just before the GetQueuedCompletionStatusEx() syscall is made.
+        ///
+        /// However, when another thread is already blocked on
+        /// GetQueuedCompletionStatusEx() we tell the kernel about the registered
+        /// socket event(s) immediately.
+        unsafe fn update_sockets_events_if_polling(&self) -> io::Result<()> {
+            if self.is_polling.load(Ordering::Acquire) {
+                self.update_sockets_events()
+            } else {
+                Ok(())
+            }
+        }
+
+        unsafe fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
+            let sock_state = socket.get_sock_state().unwrap();
+            let mut update_queue = self.update_queue.lock().unwrap();
+            update_queue.push_back(sock_state);
+        }
+
+        fn _alloc_sock_for_rawsocket(
+            &self,
+            raw_socket: RawSocket,
+        ) -> io::Result<Pin<Arc<Mutex<SockState>>>> {
+            let afd = self.afd_group.acquire()?;
+            Ok(Arc::pin(Mutex::new(SockState::new(raw_socket, afd)?)))
+        }
+    }
+
+    fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
+        let mut base_socket: RawSocket = 0;
+        let mut bytes: u32 = 0;
+
+        unsafe {
+            if WSAIoctl(
+                raw_socket as usize,
+                SIO_BASE_HANDLE,
+                null_mut(),
+                0,
+                &mut base_socket as *mut _ as PVOID,
+                size_of::<RawSocket>() as u32,
+                &mut bytes,
+                null_mut(),
+                None,
+            ) == SOCKET_ERROR
+            {
+                return Err(io::Error::from_raw_os_error(INVALID_SOCKET as i32));
+            }
+        }
+        Ok(base_socket)
+    }
+}
+
+impl Drop for SelectorInner {
+    fn drop(&mut self) {
+        loop {
+            let events_num: usize;
+            let mut statuses: [CompletionStatus; 1024] = [CompletionStatus::zero(); 1024];
+
+            let result = self
+                .cp
+                .get_many(&mut statuses, Some(std::time::Duration::from_millis(0)));
+            match result {
+                Ok(iocp_events) => {
+                    events_num = iocp_events.iter().len();
+                    for iocp_event in iocp_events.iter() {
+                        if !iocp_event.overlapped().is_null() {
+                            // drain sock state to release memory of Arc reference
+                            let _sock_state = from_overlapped(iocp_event.overlapped());
+                        }
+                    }
+                }
+
+                Err(_) => {
+                    break;
+                }
+            }
+
+            if events_num == 0 {
+                // continue looping until all completion statuses have been drained
+                break;
+            }
+        }
+
+        self.afd_group.release_unused_afd();
     }
 }
 
@@ -659,27 +702,4 @@ fn interests_to_afd_flags(interests: Interest) -> u32 {
     }
 
     flags
-}
-
-fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
-    let mut base_socket: RawSocket = 0;
-    let mut bytes: u32 = 0;
-
-    unsafe {
-        if WSAIoctl(
-            raw_socket as usize,
-            SIO_BASE_HANDLE,
-            null_mut(),
-            0,
-            &mut base_socket as *mut _ as PVOID,
-            size_of::<RawSocket>() as u32,
-            &mut bytes,
-            null_mut(),
-            None,
-        ) == SOCKET_ERROR
-        {
-            return Err(io::Error::from_raw_os_error(INVALID_SOCKET as i32));
-        }
-    }
-    Ok(base_socket)
 }

@@ -26,12 +26,7 @@ jobs:
     env:
       CI: 'True'
 
-  - script: cargo test
-    displayName: cargo test
-    env:
-      CI: 'True'
-
-  - script: cargo test --no-default-features
-    displayName: cargo test --no-default-features
+  - script: cargo test --all-features
+    displayName: cargo test --all-features
     env:
       CI: 'True'

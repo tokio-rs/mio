@@ -1,10 +1,9 @@
 use crate::{event, sys, Events, Interest, Token};
-
 use log::trace;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 use std::{fmt, io};
 
@@ -213,45 +212,6 @@ pub struct SelectorId {
 }
 
 impl Poll {
-    /// Return a new `Poll` handle.
-    ///
-    /// This function will make a syscall to the operating system to create the
-    /// system selector. If this syscall fails, `Poll::new` will return with the
-    /// error.
-    ///
-    /// See [struct] level docs for more details.
-    ///
-    /// [struct]: struct.Poll.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// use mio::{Poll, Events};
-    /// use std::time::Duration;
-    ///
-    /// let mut poll = match Poll::new() {
-    ///     Ok(poll) => poll,
-    ///     Err(e) => panic!("failed to create Poll instance; err={:?}", e),
-    /// };
-    ///
-    /// // Create a structure to receive polled events
-    /// let mut events = Events::with_capacity(1024);
-    ///
-    /// // Wait for events, but none will be received because no
-    /// // `event::Source`s have been registered with this `Poll` instance.
-    /// poll.poll(&mut events, Some(Duration::from_millis(500)))?;
-    /// assert!(events.is_empty());
-    /// #     Ok(())
-    /// # }
-    /// ```
-    pub fn new() -> io::Result<Poll> {
-        sys::Selector::new().map(|selector| Poll {
-            registry: Registry { selector },
-        })
-    }
-
     /// Create a separate `Registry` which can be used to register
     /// `event::Source`s.
     pub fn registry(&self) -> &Registry {
@@ -362,15 +322,46 @@ impl Poll {
     }
 }
 
-impl fmt::Debug for Poll {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Poll").finish()
-    }
-}
-
-impl fmt::Debug for Registry {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Registry").finish()
+cfg_os_poll! {
+    impl Poll {
+        /// Return a new `Poll` handle.
+        ///
+        /// This function will make a syscall to the operating system to create the
+        /// system selector. If this syscall fails, `Poll::new` will return with the
+        /// error.
+        ///
+        /// See [struct] level docs for more details.
+        ///
+        /// [struct]: struct.Poll.html
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # use std::error::Error;
+        /// # fn main() -> Result<(), Box<dyn Error>> {
+        /// use mio::{Poll, Events};
+        /// use std::time::Duration;
+        ///
+        /// let mut poll = match Poll::new() {
+        ///     Ok(poll) => poll,
+        ///     Err(e) => panic!("failed to create Poll instance; err={:?}", e),
+        /// };
+        ///
+        /// // Create a structure to receive polled events
+        /// let mut events = Events::with_capacity(1024);
+        ///
+        /// // Wait for events, but none will be received because no
+        /// // `event::Source`s have been registered with this `Poll` instance.
+        /// poll.poll(&mut events, Some(Duration::from_millis(500)))?;
+        /// assert!(events.is_empty());
+        /// #     Ok(())
+        /// # }
+        /// ```
+        pub fn new() -> io::Result<Poll> {
+            sys::Selector::new().map(|selector| Poll {
+                registry: Registry { selector },
+            })
+        }
     }
 }
 
@@ -378,6 +369,12 @@ impl fmt::Debug for Registry {
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
         self.registry.selector.as_raw_fd()
+    }
+}
+
+impl fmt::Debug for Poll {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("Poll").finish()
     }
 }
 
@@ -623,6 +620,12 @@ impl Registry {
     }
 }
 
+impl fmt::Debug for Registry {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("Registry").finish()
+    }
+}
+
 // ===== Accessors for internal usage =====
 
 pub fn selector(registry: &Registry) -> &sys::Selector {
@@ -630,40 +633,45 @@ pub fn selector(registry: &Registry) -> &sys::Selector {
 }
 
 #[cfg(debug_assertions)]
-impl SelectorId {
-    pub fn new() -> SelectorId {
-        SelectorId {
-            id: AtomicUsize::new(0),
+cfg_net! {
+    use std::sync::atomic::Ordering;
+
+    impl SelectorId {
+        pub fn new() -> SelectorId {
+            SelectorId {
+                id: AtomicUsize::new(0),
+            }
+        }
+
+        pub fn associate_selector(&self, registry: &Registry) -> io::Result<()> {
+            let selector_id = self.id.load(Ordering::SeqCst);
+
+            if selector_id != 0 && selector_id != registry.selector.id() {
+                Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "socket already registered",
+                ))
+            } else {
+                self.id.store(registry.selector.id(), Ordering::SeqCst);
+                Ok(())
+            }
         }
     }
 
-    pub fn associate_selector(&self, registry: &Registry) -> io::Result<()> {
-        let selector_id = self.id.load(Ordering::SeqCst);
-
-        if selector_id != 0 && selector_id != registry.selector.id() {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "socket already registered",
-            ))
-        } else {
-            self.id.store(registry.selector.id(), Ordering::SeqCst);
-            Ok(())
+    impl Clone for SelectorId {
+        fn clone(&self) -> SelectorId {
+            SelectorId {
+                id: AtomicUsize::new(self.id.load(Ordering::SeqCst)),
+            }
         }
     }
 }
 
-#[cfg(debug_assertions)]
-impl Clone for SelectorId {
-    fn clone(&self) -> SelectorId {
-        SelectorId {
-            id: AtomicUsize::new(self.id.load(Ordering::SeqCst)),
-        }
+cfg_os_poll! {
+    #[cfg(unix)]
+    #[test]
+    pub fn as_raw_fd() {
+        let poll = Poll::new().unwrap();
+        assert!(poll.as_raw_fd() > 0);
     }
-}
-
-#[test]
-#[cfg(unix)]
-pub fn as_raw_fd() {
-    let poll = Poll::new().unwrap();
-    assert!(poll.as_raw_fd() > 0);
 }
