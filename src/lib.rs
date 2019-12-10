@@ -47,7 +47,10 @@ mod token;
 mod waker;
 
 pub mod event;
-pub mod net;
+
+cfg_net! {
+    pub mod net;
+}
 
 #[doc(no_inline)]
 pub use event::Events;
@@ -57,9 +60,9 @@ pub use token::Token;
 pub use waker::Waker;
 
 #[cfg(unix)]
-pub mod unix {
-    //! Unix only extensions.
-    cfg_any_os_util! {
+cfg_any_os_util! {
+    pub mod unix {
+        //! Unix only extensions.
         pub use crate::sys::SourceFd;
     }
 }

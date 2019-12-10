@@ -1,7 +1,5 @@
 #![allow(unused_macros)]
 
-// ===== Poll =====
-
 macro_rules! cfg_os_poll {
     ($($item:item)*) => {
         $(
@@ -20,8 +18,6 @@ macro_rules! cfg_not_os_poll {
         )*
     }
 }
-
-// ===== Net =====
 
 #[cfg(unix)]
 macro_rules! cfg_net {
@@ -75,8 +71,6 @@ macro_rules! cfg_uds {
         )*
     }
 }
-
-// ===== Utility =====
 
 // cfg for any feature that requires the OS's adapter for `RawFd`
 #[cfg(unix)]

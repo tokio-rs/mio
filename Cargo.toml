@@ -28,6 +28,7 @@ default = []
 # Include implementations of I/O source readiness polling.
 os-poll = []
 # Include adapters for underlying OS I/O sources.
+# Note: This is currently only supported on Unix and provides `SourceFd`
 os-util = []
 # Include TCP primitives
 tcp = []
