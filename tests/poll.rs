@@ -9,6 +9,7 @@ use std::thread::{self, sleep};
 use std::time::Duration;
 use std::{fmt, io};
 
+#[macro_use]
 mod util;
 
 use util::{
@@ -368,6 +369,67 @@ pub fn double_register_different_token() {
         .registry()
         .register(&mut l, Token(1), Interest::READABLE)
         .is_err());
+}
+
+#[test]
+fn poll_ok_after_cancelling_pending_ops() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let registry = Arc::new(poll.registry().try_clone().unwrap());
+    let registry1 = Arc::clone(&registry);
+
+    let barrier = Arc::new(Barrier::new(2));
+    let barrier1 = Arc::clone(&barrier);
+
+    registry
+        .register(&mut listener, ID1, Interest::READABLE)
+        .unwrap();
+
+    // Call a dummy poll just to submit an afd poll request
+    poll.poll(&mut events, Some(Duration::from_millis(0)))
+        .unwrap();
+
+    // this reregister will cancel the previous pending poll op
+    registry
+        .reregister(&mut listener, ID1, Interest::READABLE | Interest::WRITABLE)
+        .unwrap();
+
+    let handle = thread::spawn(move || {
+        let mut stream = TcpStream::connect(address).unwrap();
+
+        barrier1.wait();
+
+        registry1
+            .register(&mut stream, ID2, Interest::WRITABLE)
+            .unwrap();
+
+        barrier1.wait();
+    });
+
+    // listener ready to accept stream? getting `READABLE` here means the
+    // cancelled poll op was cleared, another poll request was submited
+    // which resulted in returning this event
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
+
+    let (_, _) = listener.accept().unwrap();
+    barrier.wait();
+
+    // for the sake of completeness check stream `WRITABLE`
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interest::WRITABLE)],
+    );
+
+    barrier.wait();
+    handle.join().expect("unable to join thread");
 }
 
 struct TestEventSource {
