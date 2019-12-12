@@ -1,7 +1,8 @@
-use std::time::Duration;
+#![cfg(feature = "tcp")]
 
 use mio::net::TcpStream;
 use mio::{event, Token, Waker};
+use std::time::Duration;
 
 mod util;
 use util::init_with_poll;
