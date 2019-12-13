@@ -7,9 +7,9 @@ use std::io;
 /// When created it will cause events with [`readable`] readiness and the
 /// provided `token` if [`wake`] is called, possibly from another thread.
 ///
-/// [`Poll`]: crate::Poll
-/// [`readable`]: crate::event::Event::is_readable
-/// [`wake`]: Waker::wake
+/// [`Poll`]: struct.Poll.html
+/// [`readable`]: ./event/struct.Event.html#method.is_readable
+/// [`wake`]: struct.Waker.html#method.wake
 ///
 /// # Notes
 ///
@@ -86,7 +86,7 @@ impl Waker {
 
     /// Wake up the [`Poll`] associated with this `Waker`.
     ///
-    /// [`Poll`]: crate::Poll
+    /// [`Poll`]: struct.Poll.html
     pub fn wake(&self) -> io::Result<()> {
         self.inner.wake()
     }

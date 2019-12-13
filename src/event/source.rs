@@ -12,7 +12,7 @@ use std::ops::DerefMut;
 ///
 /// See [`Registry`] for more details.
 ///
-/// [`Registry`]: crate::Registry
+/// [`Registry`]: ../struct.Registry.html
 ///
 /// # Implementing `event::Source`
 ///
@@ -22,8 +22,8 @@ use std::ops::DerefMut;
 /// lower level handle. Examples of this are [`TcpStream`]s, or the *unix only*
 /// [`SourceFd`].
 ///
-/// [`TcpStream`]: crate::net::TcpStream
-/// [`SourceFd`]: crate::unix::SourceFd
+/// [`TcpStream`]: ../net/struct.TcpStream.html
+/// [`SourceFd`]: ../unix/struct.SourceFd.html
 ///
 /// # Dropping `event::Source`s
 ///
@@ -33,7 +33,7 @@ use std::ops::DerefMut;
 /// a `File` will close itself. However since deregistering needs access to
 /// [`Registry`] this cannot be done while being dropped.
 ///
-/// [deregistered]: crate::Registry::deregister
+/// [deregistered]: ../struct.Registry.html#method.deregister
 ///
 /// # Examples
 ///
@@ -79,7 +79,7 @@ pub trait Source {
     /// instead. Implementors should handle registration by delegating the call
     /// to another `Source` type.
     ///
-    /// [`Registry::register`]: crate::Registry::register
+    /// [`Registry::register`]: ../struct.Registry.html#method.register
     fn register(
         &mut self,
         registry: &Registry,
@@ -93,7 +93,7 @@ pub trait Source {
     /// [`Registry::reregister`] instead. Implementors should handle
     /// re-registration by either delegating the call to another `Source` type.
     ///
-    /// [`Registry::reregister`]: crate::Registry::reregister
+    /// [`Registry::reregister`]: ../struct.Registry.html#method.reregister
     fn reregister(
         &mut self,
         registry: &Registry,
@@ -107,7 +107,7 @@ pub trait Source {
     /// [`Registry::deregister`] instead. Implementors should handle
     /// deregistration by delegating the call to another `Source` type.
     ///
-    /// [`Registry::deregister`]: crate::Registry::deregister
+    /// [`Registry::deregister`]: ../struct.Registry.html#method.deregister
     fn deregister(&mut self, registry: &Registry) -> io::Result<()>;
 }
 

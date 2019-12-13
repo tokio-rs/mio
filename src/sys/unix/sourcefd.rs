@@ -17,9 +17,9 @@ use std::os::unix::io::RawFd;
 /// that the `SourceFd` is constructed right before a call to
 /// [`Registry::register`]. See the examples for more detail.
 ///
-/// [`event::Source`]: crate::event::Source
-/// [`Poll`]: crate::Poll
-/// [`Registry::register`]: crate::Registry::register
+/// [`event::Source`]: ../event/trait.Source.html
+/// [`Poll`]: ../struct.Poll.html
+/// [`Registry::register`]: ../struct.Registry.html#method.register
 ///
 /// # Examples
 ///

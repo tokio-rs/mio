@@ -8,11 +8,11 @@ use std::{fmt, ops};
 /// registered with [readable] interests and the socket becomes writable, no
 /// event will be returned from a call to [`poll`].
 ///
-/// [registering]: crate::Registry::register
-/// [`event::Source`]: crate::event::Source
-/// [`Poll`]: crate::Poll
-/// [readable]: Interest::READABLE
-/// [`poll`]: crate::Poll::poll
+/// [registering]: struct.Registry.html#method.reregister
+/// [`event::Source`]: ./event/trait.Source.html
+/// [`Poll`]: struct.Poll.html
+/// [readable]: struct.Interest.html#associatedconstant.READABLE
+/// [`poll`]: struct.Poll.html#method.poll
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Interest(NonZeroU8);
 

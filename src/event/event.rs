@@ -9,9 +9,9 @@ use std::fmt;
 ///
 /// For more documentation on polling and events, see [`Poll`].
 ///
-/// [`Poll::poll`]: crate::Poll::poll
-/// [`Poll`]: crate::Poll
-/// [`Token`]: crate::Token
+/// [`Poll::poll`]: ../struct.Poll.html#method.poll
+/// [`Poll`]: ../struct.Poll.html
+/// [`Token`]: ../struct.Token.html
 pub struct Event {
     inner: sys::Event,
 }
