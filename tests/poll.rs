@@ -392,9 +392,11 @@ fn poll_ok_after_cancelling_pending_ops() {
     poll.poll(&mut events, Some(Duration::from_millis(0)))
         .unwrap();
 
-    // this reregister will cancel the previous pending poll op
+    // This reregister will cancel the previous pending poll op.
+    // The token is different from the register done above, so it can ensure
+    // the proper event got returned exoect_events below.
     registry
-        .reregister(&mut listener, ID1, Interest::READABLE | Interest::WRITABLE)
+        .reregister(&mut listener, ID2, Interest::READABLE)
         .unwrap();
 
     let handle = thread::spawn(move || {
@@ -403,19 +405,19 @@ fn poll_ok_after_cancelling_pending_ops() {
         barrier1.wait();
 
         registry1
-            .register(&mut stream, ID2, Interest::WRITABLE)
+            .register(&mut stream, ID3, Interest::WRITABLE)
             .unwrap();
 
         barrier1.wait();
     });
 
     // listener ready to accept stream? getting `READABLE` here means the
-    // cancelled poll op was cleared, another poll request was submited
+    // cancelled poll op was cleared, another poll request was submitted
     // which resulted in returning this event
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID1, Interest::READABLE)],
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
     );
 
     let (_, _) = listener.accept().unwrap();
@@ -425,7 +427,7 @@ fn poll_ok_after_cancelling_pending_ops() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![ExpectEvent::new(ID2, Interest::WRITABLE)],
+        vec![ExpectEvent::new(ID3, Interest::WRITABLE)],
     );
 
     barrier.wait();
