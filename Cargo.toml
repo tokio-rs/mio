@@ -6,11 +6,11 @@ name = "mio"
 # - Update CHANGELOG.md.
 # - Update doc URL.
 # - Create git tag
-version       = "0.7.0"
+version       = "0.7.0-alpha.1"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
-documentation = "https://docs.rs/mio/0.7.0/mio/"
+documentation = "https://docs.rs/mio/0.7.0-alpha.1/mio/"
 homepage      = "https://github.com/tokio-rs/mio"
 repository    = "https://github.com/tokio-rs/mio"
 readme        = "README.md"
@@ -19,7 +19,6 @@ categories    = ["asynchronous"]
 exclude       = [
   ".gitignore",
   ".travis.yml",
-  "deploy.sh",
 ]
 publish = false
 
