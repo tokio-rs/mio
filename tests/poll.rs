@@ -320,52 +320,29 @@ fn register_during_poll() {
     let barrier = Arc::new(Barrier::new(2));
     let barrier1 = Arc::clone(&barrier);
 
-    let mut listener = TcpListener::bind(any_local_address()).unwrap();
-    let addr = listener.local_addr().unwrap();
-    registry
-        .register(&mut listener, ID1, Interest::READABLE)
-        .unwrap();
-
     let handle1 = thread::spawn(move || {
-        let mut listener2 = TcpListener::bind(any_local_address()).unwrap();
-        let addr2 = listener2.local_addr().unwrap();
+        let mut stream = UdpSocket::bind(any_local_address()).unwrap();
 
-        // Main thread should be blocked in poll before entering this register.
-        // This is done to check register done during poll works
-        registry1
-            .register(&mut listener2, ID3, Interest::READABLE)
-            .unwrap(); // this should go through update_if_polling
-
-        let mut stream = TcpStream::connect(addr).unwrap();
         barrier1.wait();
-
         registry1
-            .register(&mut stream, ID2, Interest::READABLE | Interest::WRITABLE)
+            .register(&mut stream, ID1, Interest::WRITABLE)
             .unwrap();
 
-        // this is done to check we get an event for a register done during poll
-        let _stream2 = TcpStream::connect(addr2).unwrap();
-
         barrier1.wait();
+        drop(stream);
     });
 
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(ID1, Interest::READABLE)],
-    );
-
+    // Unlock the thread, allow it to register the `UdpSocket`.
     barrier.wait();
-    let (_, _) = listener.accept().unwrap();
+    // Concurrently (at least we attempt to) call `Poll::poll`.
+    poll.poll(&mut events, Some(Duration::from_secs(5)))
+        .unwrap();
 
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![
-            ExpectEvent::new(ID2, Interest::WRITABLE),
-            ExpectEvent::new(ID3, Interest::READABLE),
-        ],
-    );
+    let mut iter = events.iter();
+    let event = iter.next().expect("expect an event");
+    assert_eq!(event.token(), ID1);
+    assert!(event.is_writable());
+    assert!(iter.next().is_none(), "unexpected extra event");
 
     barrier.wait();
     handle1.join().unwrap();
