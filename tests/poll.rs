@@ -310,10 +310,51 @@ fn registry_operations_are_thread_safe() {
     handle3.join().unwrap();
 }
 
-// On kqueue platforms registering twice (not *re*registering) works.
+// This test checks the following reregister constraints:
+// - `reregister` arguments fully override the previous values. In other
+// words, if a socket is registered with `READABLE` interest and the call
+// to `reregister` specifies `WRITABLE`, then read interest is no longer
+// requested for the handle.
+// - `reregister` can use the same token as `register`
+// - `reregister` can use different token from `register`
+// - multiple `reregister` are ok
+#[test]
+fn reregister_interest_token_usage() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let mut udp_socket = UdpSocket::bind(any_local_address()).unwrap();
+
+    poll.registry()
+        .register(&mut udp_socket, ID1, Interest::READABLE)
+        .expect("unable to register listener");
+
+    poll.registry()
+        .reregister(&mut udp_socket, ID1, Interest::READABLE)
+        .expect("unable to register listener");
+
+    poll.registry()
+        .reregister(&mut udp_socket, ID2, Interest::WRITABLE)
+        .expect("unable to register listener");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interest::WRITABLE)],
+    );
+}
+
+// This test checks the following register constraint:
+// The event source must **not** have been previously registered with this
+// instance of `Poll`, otherwise the behavior is undefined.
+//
+// This test is done on Windows and epoll platforms where registering a
+// source twice is defined behavior that fail with an error code.
+//
+// On kqueue platforms registering twice (not *re*registering) works, but that
+// is not a test goal, so it is not tested.
 #[test]
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-pub fn double_register() {
+pub fn double_register_different_token() {
     init();
     let poll = Poll::new().unwrap();
 

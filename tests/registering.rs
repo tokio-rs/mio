@@ -111,7 +111,7 @@ pub fn register_deregister() {
 }
 
 #[test]
-pub fn reregister_different_without_poll() {
+pub fn reregister_different_interest_without_poll() {
     init();
 
     let mut events = Events::with_capacity(1024);
