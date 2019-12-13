@@ -12,8 +12,7 @@ use std::{fmt, io};
 mod util;
 
 use util::{
-    any_local_address, assert_send, assert_sync, expect_events, expect_no_events, init,
-    init_with_poll, start_listener, ExpectEvent,
+    any_local_address, assert_send, assert_sync, expect_events, init, init_with_poll, ExpectEvent,
 };
 
 const ID1: Token = Token(1);
@@ -312,63 +311,44 @@ fn registry_operations_are_thread_safe() {
 }
 
 // This test checks the following reregister constraints:
-// The `reregister` arguments fully override the previous values. In other
-// words, if a socket is registered with [`readable`] interest and the call
-// to `reregister` specifies [`writable`], then read interest is no longer
+// - `reregister` arguments fully override the previous values. In other
+// words, if a socket is registered with `READABLE` interest and the call
+// to `reregister` specifies `WRITABLE`, then read interest is no longer
 // requested for the handle.
+// - `reregister` can use the same token as `register`
+// - `reregister` can use different token from `register`
+// - multiple `reregister` are ok
 #[test]
-fn reregister_overrides_interest() {
+fn reregister_interest_token_usage() {
     let (mut poll, mut events) = init_with_poll();
 
-    let barrier = Arc::new(Barrier::new(2));
-    let (thread_handle, address) = start_listener(1, Some(barrier.clone()), false);
-
-    let mut stream = TcpStream::connect(address).unwrap();
+    let mut udp_socket = UdpSocket::bind(any_local_address()).unwrap();
 
     poll.registry()
-        .register(&mut stream, ID1, Interest::WRITABLE)
-        .expect("unable to register TCP stream");
-
-    poll.registry()
-        .reregister(&mut stream, ID2, Interest::READABLE)
-        .expect("unable to register TCP stream");
-
-    expect_no_events(&mut poll, &mut events);
-
-    barrier.wait();
-    thread_handle.join().expect("unable to join thread");
-}
-
-// This test checks the following constraints:
-// - reregister can use the same token as register
-// - reregister can use different token from register
-// - multiple reregister are ok
-#[test]
-fn register_reregister_token_usage() {
-    let poll = Poll::new().expect("unable to create Poll instance");
-
-    let mut listener1 = TcpListener::bind(any_local_address()).unwrap();
-
-    poll.registry()
-        .register(&mut listener1, ID1, Interest::READABLE)
+        .register(&mut udp_socket, ID1, Interest::READABLE)
         .expect("unable to register listener");
 
     poll.registry()
-        .reregister(&mut listener1, ID1, Interest::READABLE)
+        .reregister(&mut udp_socket, ID1, Interest::READABLE)
         .expect("unable to register listener");
 
     poll.registry()
-        .reregister(&mut listener1, ID2, Interest::READABLE)
+        .reregister(&mut udp_socket, ID2, Interest::WRITABLE)
         .expect("unable to register listener");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interest::WRITABLE)],
+    );
 }
 
 // This test checks the following register constraint:
 // The event source must **not** have been previously registered with this
 // instance of `Poll`, otherwise the behavior is undefined.
 //
-// This test is done on Windows only because Windows is the only platform where
-// there is a defined behavior by design, that is: registering twice must
-// fail with an error code.
+// This test is done on Windows and epoll platforms where registering a
+// source twice is defined behavior that fail with an error code.
 //
 // On kqueue platforms registering twice (not *re*registering) works, but that
 // is not a test goal, so it is not tested.
