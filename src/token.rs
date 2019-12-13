@@ -5,10 +5,10 @@
 ///
 /// See [`Poll`] for more documentation on polling.
 ///
-/// [`event::Source`]: crate::event::Source
-/// [`Poll`]: crate::Poll
-/// [`Registry::register`]: crate::Registry::register
-/// [`Registry::reregister`]: crate::Registry::reregister
+/// [`event::Source`]: ./event/trait.Source.html
+/// [`Poll`]: struct.Poll.html
+/// [`Registry::register`]: struct.Registry.html#method.register
+/// [`Registry::reregister`]: struct.Registry.html#method.reregister
 ///
 /// # Example
 ///

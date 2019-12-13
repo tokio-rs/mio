@@ -12,8 +12,8 @@ use std::fmt;
 ///
 /// See [`Poll`] for more documentation on polling.
 ///
-/// [`Poll::poll`]: crate::Poll::poll
-/// [`Poll`]: crate::Poll
+/// [`Poll::poll`]: ../struct.Poll.html#method.poll
+/// [`Poll`]: ../struct.Poll.html
 ///
 /// # Examples
 ///
@@ -46,8 +46,8 @@ pub struct Events {
 ///
 /// This struct is created by the [`iter`] method on [`Events`].
 ///
-/// [`Events`]: crate::event::Events
-/// [`iter`]: crate::event::Events::iter
+/// [`Events`]: struct.Events.html
+/// [`iter`]: struct.Events.html#method.iter
 ///
 /// # Examples
 ///

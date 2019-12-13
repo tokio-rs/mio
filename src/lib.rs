@@ -17,8 +17,8 @@
 //!
 //! For more detail, see [`Poll`].
 //!
-//! [`Poll`]: struct.Poll.html
-//! [`Events`]: struct.Events.html
+//! [`Poll`]: ../mio/struct.Poll.html
+//! [`Events`]: ../mio/event/struct.Events.html
 //!
 //! ## Examples
 //!
@@ -30,7 +30,7 @@
 //! ## Guide
 //!
 //! A getting started guide is available in the
-#![cfg_attr(feature = "guide", doc = "[`guide`](crate::guide) module.")]
+#![cfg_attr(feature = "guide", doc = "[`guide`](../mio/guide/index.html) module.")]
 #![cfg_attr(
     not(feature = "guide"),
     doc = "`guide` (only available when the `guide` feature is enabled)."
@@ -75,8 +75,8 @@ pub mod guide {
     //! Using Mio starts by creating a [`Poll`] instance, which reads events from
     //! the OS and puts them into [`Events`].
     //!
-    //! [`Poll`]: crate::Poll
-    //! [`Events`]: crate::Events
+    //! [`Poll`]: ../struct.Poll.html
+    //! [`Events`]: ../event/struct.Events.html
     //!
     //! ```
     //! # use mio::{Poll, Events};
@@ -95,8 +95,8 @@ pub mod guide {
     //! events for it. We'll use a [`TcpListener`] for which we'll receive an event
     //! once a connection is ready to be accepted.
     //!
-    //! [event source]: crate::event::Source
-    //! [`TcpListener`]: crate::net::TcpListener
+    //! [event source]: ../event/trait.Source.html
+    //! [`TcpListener`]: ../net/struct.TcpListener.html
     //!
     //! ```
     //! # use mio::net::TcpListener;
@@ -121,7 +121,7 @@ pub mod guide {
     //! [registered] with `Poll`. After we've done this we can start polling
     //! these events. If we do this in a loop we've got ourselves an event loop.
     //!
-    //! [registered]: crate::Registry::register
+    //! [registered]: ../struct.Registry.html#method.html
     //!
     //! ```
     //! # use std::io;
