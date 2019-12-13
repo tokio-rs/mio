@@ -1,4 +1,6 @@
-# Unreleased (Unreleased)
+# 0.7.0 alpha.1
+
+Currently the changelog for v0.7.0 is incomplete, this tracked in issue #1217.
 
 * The `join_multicast_v4` and `leave_multicast_v4` methods now take their
   `Ipv4Addr` arguments by value rather than by reference.
