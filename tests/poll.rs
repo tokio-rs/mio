@@ -315,7 +315,6 @@ fn register_during_poll() {
     let (mut poll, mut events) = init_with_poll();
 
     let registry = Arc::new(poll.registry().try_clone().unwrap());
-    let registry1 = registry.clone();
 
     let barrier = Arc::new(Barrier::new(2));
     let barrier1 = Arc::clone(&barrier);
@@ -324,7 +323,7 @@ fn register_during_poll() {
         let mut stream = UdpSocket::bind(any_local_address()).unwrap();
 
         barrier1.wait();
-        registry1
+        registry
             .register(&mut stream, ID1, Interest::WRITABLE)
             .unwrap();
 

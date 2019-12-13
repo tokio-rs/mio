@@ -60,7 +60,6 @@ fn issue_1205() {
     let (mut poll, mut events) = init_with_poll();
 
     let waker = Arc::new(Waker::new(poll.registry(), WAKE_TOKEN).unwrap());
-    let waker1 = waker.clone();
 
     let mut listener = TcpListener::bind(any_local_address()).unwrap();
 
@@ -79,7 +78,7 @@ fn issue_1205() {
     // spawn a waker thread to wake the poll call below
     let handle = thread::spawn(move || {
         thread::sleep(Duration::from_millis(500));
-        waker1.wake().expect("unable to wake");
+        waker.wake().expect("unable to wake");
     });
 
     poll.poll(&mut events, None).unwrap();
