@@ -9,7 +9,6 @@ use std::thread::{self, sleep};
 use std::time::Duration;
 use std::{fmt, io};
 
-#[macro_use]
 mod util;
 
 use util::{
@@ -394,7 +393,7 @@ fn poll_ok_after_cancelling_pending_ops() {
 
     // This reregister will cancel the previous pending poll op.
     // The token is different from the register done above, so it can ensure
-    // the proper event got returned exoect_events below.
+    // the proper event got returned expect_events below.
     registry
         .reregister(&mut listener, ID2, Interest::READABLE)
         .unwrap();
