@@ -323,6 +323,10 @@ fn register_during_poll() {
         let mut stream = UdpSocket::bind(any_local_address()).unwrap();
 
         barrier1.wait();
+        // Get closer to "trying" to register during a poll by doing a short
+        // sleep before register to give main thread enough time to start
+        // waiting the 5 sec long poll.
+        sleep(Duration::from_millis(200));
         registry
             .register(&mut stream, ID1, Interest::WRITABLE)
             .unwrap();
