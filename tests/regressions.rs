@@ -57,6 +57,8 @@ fn issue_776() {
 
 #[test]
 fn issue_1205() {
+    use log::debug;
+
     let (mut poll, mut events) = init_with_poll();
 
     let waker = Arc::new(Waker::new(poll.registry(), WAKE_TOKEN).unwrap());
@@ -79,10 +81,13 @@ fn issue_1205() {
     // spawn a waker thread to wake the poll call below
     let handle = thread::spawn(move || {
         thread::sleep(Duration::from_millis(500));
+        debug!("spawned thread: awake from sleep");
         waker1.wake().expect("unable to wake");
     });
 
+    println!("main thread: polling until event is received");
     poll.poll(&mut events, None).unwrap();
+    println!("main thread: received at least one poll event");
 
     // the poll should return only one event that being the waker event.
     // the poll should not retrieve event for the listener above because it was

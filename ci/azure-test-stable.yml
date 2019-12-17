@@ -19,17 +19,25 @@ jobs:
     vmImage: $(vmImage)
 
   variables:
+    RUST_LOG: debug
     RUST_BACKTRACE: full
 
   steps:
   - template: azure-install-rust.yml
     parameters:
       rust_version: ${{ parameters.rust_version }}
+  
+  - ${{ if eq(parameters.cmd, 'test') }}:
+    - script: cargo test --all-features -- --nocapture
+      displayName: cargo test --all-features -- --nocapture
+      env:
+        CI: 'True'
 
-  - script: cargo ${{ parameters.cmd }} --all-features
-    displayName: cargo ${{ parameters.cmd }} --all-features
-    env:
-      CI: 'True'
+  - ${{ if ne(parameters.cmd, 'test') }}:
+    - script: cargo ${{ parameters.cmd }} --all-features
+      displayName: cargo ${{ parameters.cmd }} --all-features
+      env:
+        CI: 'True'
 
   - ${{ if eq(parameters.cmd, 'test') }}:
     - script: cargo doc --no-deps
