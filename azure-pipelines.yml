@@ -2,64 +2,64 @@ trigger: ["master", "v0.6.x"]
 pr: ["master", "v0.6.x"]
 
 jobs:
-# Check formatting
-- template: ci/azure-rustfmt.yml
-  parameters:
-    name: rustfmt
+  # Check formatting
+  - template: ci/azure-rustfmt.yml
+    parameters:
+      name: rustfmt
 
-# Stable
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: stable
-    displayName: Test
-    cross: true
+  # Stable
+  - template: ci/azure-test-stable.yml
+    parameters:
+      name: stable
+      displayName: Test
+      cross: true
 
-# Stable --release
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: stable_release
-    displayName: Test --release
-    cmd: test --release
+  # Stable --release
+  - template: ci/azure-test-stable.yml
+    parameters:
+      name: stable_release
+      displayName: Test --release
+      cmd: test --release
 
-# Nightly
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: nightly
-    displayName: Nightly
-    # Pin nightly to avoid being impacted by breakage
-    rust_version: nightly-2019-11-14
-    benches: true
+  # Nightly
+  - template: ci/azure-test-stable.yml
+    parameters:
+      name: nightly
+      displayName: Nightly
+      # Pin nightly to avoid being impacted by breakage
+      rust_version: nightly-2019-11-14
+      benches: true
 
-# This represents the minimum Rust version supported by
-# Mio. Updating this should be done in a dedicated PR.
-#
-# Tests are not run as tests may require newer versions of
-# rust.
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: minrust
-    displayName: Min Rust
-    rust_version: 1.39.0
-    cmd: check
-    cross: true
+  # This represents the minimum Rust version supported by
+  # Mio. Updating this should be done in a dedicated PR.
+  #
+  # Tests are not run as tests may require newer versions of
+  # rust.
+  - template: ci/azure-test-stable.yml
+    parameters:
+      name: minrust
+      displayName: Min Rust
+      rust_version: 1.39.0
+      cmd: check
+      cross: true
 
-- template: ci/azure-minimal-versions.yml
-  parameters:
-    name: minimal_versions
+  - template: ci/azure-minimal-versions.yml
+    parameters:
+      name: minimal_versions
 
-- template: ci/azure-clippy.yml
-  parameters:
-    name: clippy
+  - template: ci/azure-clippy.yml
+    parameters:
+      name: clippy
 
-- template: ci/azure-cross-compile.yml
-  parameters:
-    name: cross
+  - template: ci/azure-cross-compile.yml
+    parameters:
+      name: cross
 
-- template: ci/azure-deploy-docs.yml
-  parameters:
-    dependsOn:
-      # - rustfmt
-      - stable
-      - nightly
-      - minrust
-      - cross
+  - template: ci/azure-deploy-docs.yml
+    parameters:
+      dependsOn:
+        # - rustfmt
+        - stable
+        - nightly
+        - minrust
+        - cross
