@@ -310,6 +310,48 @@ fn registry_operations_are_thread_safe() {
     handle3.join().unwrap();
 }
 
+#[test]
+fn register_during_poll() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let registry = Arc::new(poll.registry().try_clone().unwrap());
+    let registry1 = registry.clone();
+
+    let barrier = Arc::new(Barrier::new(2));
+    let barrier1 = Arc::clone(&barrier);
+
+    let handle1 = thread::spawn(move || {
+        let mut stream = UdpSocket::bind(any_local_address()).unwrap();
+
+        barrier1.wait();
+        // Get closer to "trying" to register during a poll by doing a short
+        // sleep before register to give main thread enough time to start
+        // waiting the 5 sec long poll.
+        sleep(Duration::from_millis(200));
+        registry1
+            .register(&mut stream, ID1, Interest::WRITABLE)
+            .unwrap();
+
+        barrier1.wait();
+        drop(stream);
+    });
+
+    // Unlock the thread, allow it to register the `UdpSocket`.
+    barrier.wait();
+    // Concurrently (at least we attempt to) call `Poll::poll`.
+    poll.poll(&mut events, Some(Duration::from_secs(5)))
+        .unwrap();
+
+    let mut iter = events.iter();
+    let event = iter.next().expect("expect an event");
+    assert_eq!(event.token(), ID1);
+    assert!(event.is_writable());
+    assert!(iter.next().is_none(), "unexpected extra event");
+
+    barrier.wait();
+    handle1.join().unwrap();
+}
+
 // This test checks the following reregister constraints:
 // - `reregister` arguments fully override the previous values. In other
 // words, if a socket is registered with `READABLE` interest and the call
