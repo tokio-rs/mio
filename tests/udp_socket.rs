@@ -18,6 +18,7 @@ mod util;
 use util::{
     any_local_address, any_local_ipv6_address, assert_error, assert_send, assert_sync,
     assert_would_block, expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
+    NO_TIMEOUT,
 };
 
 const DATA1: &[u8] = b"Hello world!";
@@ -751,7 +752,8 @@ fn send_recv_udp(mut tx: UdpSocket, mut rx: UdpSocket, connected: bool) {
     let mut handler = UdpHandlerSendRecv::new(tx, rx, connected, "hello world");
 
     while !handler.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             if event.is_readable() {
@@ -954,7 +956,8 @@ pub fn multicast() {
     info!("Starting event loop to test with...");
 
     while !handler.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             if event.is_readable() {

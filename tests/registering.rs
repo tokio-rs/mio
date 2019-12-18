@@ -10,7 +10,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 mod util;
-use util::{any_local_address, init};
+use util::{any_local_address, init, NO_TIMEOUT};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -91,7 +91,8 @@ pub fn register_deregister() {
     let mut handler = TestHandler::new(server, client);
 
     loop {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         if let Some(event) = events.iter().next() {
             if event.is_readable() {

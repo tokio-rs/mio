@@ -1,12 +1,13 @@
 #![cfg(feature = "tcp")]
 
+use self::TestState::{AfterRead, Initial};
 use log::debug;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use std::io::Read;
+
 mod util;
-use self::TestState::{AfterRead, Initial};
-use util::{any_local_address, init};
+use util::{any_local_address, init, NO_TIMEOUT};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -112,7 +113,8 @@ pub fn close_on_drop() {
 
     // == Run test
     while !handler.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             if event.is_readable() {

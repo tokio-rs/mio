@@ -13,6 +13,7 @@ mod util;
 
 use util::{
     any_local_address, assert_send, assert_sync, expect_events, init, init_with_poll, ExpectEvent,
+    NO_TIMEOUT,
 };
 
 const ID1: Token = Token(1);
@@ -142,7 +143,8 @@ fn drop_cancels_interest_and_shuts_down() {
         .unwrap();
     let mut events = Events::with_capacity(16);
     'outer: loop {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
         for event in &events {
             if event.token() == Token(1) {
                 // connected

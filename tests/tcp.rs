@@ -16,7 +16,7 @@ use std::time::Duration;
 mod util;
 use util::{
     any_local_address, assert_send, assert_sync, expect_events, expect_no_events, init,
-    init_with_poll, ExpectEvent,
+    init_with_poll, ExpectEvent, NO_TIMEOUT,
 };
 
 const LISTEN: Token = Token(0);
@@ -63,7 +63,8 @@ fn accept() {
         shutdown: false,
     };
     while !h.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             h.hit = true;
@@ -113,7 +114,8 @@ fn connect() {
         shutdown: false,
     };
     while !h.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
@@ -131,7 +133,8 @@ fn connect() {
     rx2.recv().unwrap();
     h.shutdown = false;
     while !h.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
@@ -186,7 +189,8 @@ fn read() {
         shutdown: false,
     };
     while !h.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
@@ -245,7 +249,8 @@ fn peek() {
         shutdown: false,
     };
     while !h.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
@@ -310,7 +315,8 @@ fn write() {
         shutdown: false,
     };
     while !h.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
@@ -358,7 +364,8 @@ fn connect_then_close() {
         shutdown: false,
     };
     while !h.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             if event.token() == Token(1) {
@@ -440,7 +447,8 @@ fn multiple_writes_immediate_success() {
 
     // Wait for our TCP stream to connect
     'outer: loop {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
         for event in events.iter() {
             if event.token() == Token(1) && event.is_writable() {
                 break 'outer;
@@ -495,7 +503,8 @@ fn connection_reset_by_peer() {
     // Wait for listener to be ready
     let mut server;
     'outer: loop {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             if event.token() == Token(0) {
@@ -523,7 +532,8 @@ fn connection_reset_by_peer() {
         .unwrap();
 
     loop {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             if event.token() == Token(3) {
@@ -563,7 +573,8 @@ fn connect_error() {
         .unwrap();
 
     'outer: loop {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             if event.token() == Token(0) {
@@ -598,7 +609,8 @@ fn write_error() {
         .unwrap();
 
     let mut wait_writable = || 'outer: loop {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             if event.token() == Token(0) && event.is_writable() {
@@ -731,7 +743,8 @@ fn local_addr_ready() {
     };
 
     while !handler.shutdown {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
 
         for event in &events {
             match event.token() {
@@ -784,9 +797,7 @@ fn write_then_drop() {
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.is_empty() {
-        poll.poll(&mut events, None).unwrap();
-    }
+    poll.poll(&mut events, NO_TIMEOUT).unwrap();
     assert_eq!(events.iter().count(), 1);
     assert_eq!(events.iter().next().unwrap().token(), Token(1));
 
@@ -797,9 +808,7 @@ fn write_then_drop() {
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.is_empty() {
-        poll.poll(&mut events, None).unwrap();
-    }
+    poll.poll(&mut events, NO_TIMEOUT).unwrap();
     assert_eq!(events.iter().count(), 1);
     assert_eq!(events.iter().next().unwrap().token(), Token(2));
 
@@ -811,9 +820,7 @@ fn write_then_drop() {
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.is_empty() {
-        poll.poll(&mut events, None).unwrap();
-    }
+    poll.poll(&mut events, NO_TIMEOUT).unwrap();
     assert_eq!(events.iter().count(), 1);
     assert_eq!(events.iter().next().unwrap().token(), Token(3));
 
@@ -839,9 +846,7 @@ fn write_then_deregister() {
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.is_empty() {
-        poll.poll(&mut events, None).unwrap();
-    }
+    poll.poll(&mut events, NO_TIMEOUT).unwrap();
     assert_eq!(events.iter().count(), 1);
     assert_eq!(events.iter().next().unwrap().token(), Token(1));
 
@@ -852,9 +857,7 @@ fn write_then_deregister() {
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.is_empty() {
-        poll.poll(&mut events, None).unwrap();
-    }
+    poll.poll(&mut events, NO_TIMEOUT).unwrap();
     assert_eq!(events.iter().count(), 1);
     assert_eq!(events.iter().next().unwrap().token(), Token(2));
 
@@ -866,9 +869,7 @@ fn write_then_deregister() {
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
-    while events.is_empty() {
-        poll.poll(&mut events, None).unwrap();
-    }
+    poll.poll(&mut events, NO_TIMEOUT).unwrap();
     assert_eq!(events.iter().count(), 1);
     assert_eq!(events.iter().next().unwrap().token(), Token(3));
 

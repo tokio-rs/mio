@@ -8,7 +8,7 @@ use std::time::Duration;
 use std::{net, thread};
 
 mod util;
-use util::{any_local_address, init, init_with_poll};
+use util::{any_local_address, init, init_with_poll, NO_TIMEOUT};
 
 const ID1: Token = Token(1);
 const WAKE_TOKEN: Token = Token(10);
@@ -35,7 +35,8 @@ fn issue_776() {
         .unwrap();
     let mut events = Events::with_capacity(16);
     'outer: loop {
-        poll.poll(&mut events, None).unwrap();
+        poll.poll(&mut events, NO_TIMEOUT).unwrap();
+        assert!(!events.is_empty(), "expected at least one event");
         for event in &events {
             if event.token() == Token(1) {
                 // connected
@@ -68,7 +69,7 @@ fn issue_1205() {
         .register(&mut listener, ID1, Interest::READABLE)
         .unwrap();
 
-    poll.poll(&mut events, Some(std::time::Duration::from_millis(0)))
+    poll.poll(&mut events, Some(Duration::from_millis(0)))
         .unwrap();
     assert!(events.iter().count() == 0);
 
@@ -82,7 +83,7 @@ fn issue_1205() {
         waker1.wake().expect("unable to wake");
     });
 
-    poll.poll(&mut events, None).unwrap();
+    poll.poll(&mut events, NO_TIMEOUT).unwrap();
 
     // the poll should return only one event that being the waker event.
     // the poll should not retrieve event for the listener above because it was

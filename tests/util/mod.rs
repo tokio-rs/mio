@@ -12,6 +12,16 @@ use log::{error, warn};
 use mio::event::Event;
 use mio::{Events, Interest, Poll, Token};
 
+/// This timeout represents cases where we want to use no timeout, i.e. `None`,
+/// but we don't actually want to use no timeout as that could cause a failing
+/// test, one in which an event never comes, to run forever. This causes the CI
+/// to remain idle, up to one hour, after which its forcefully killed. This
+/// leaves us with a single line of logs; `test $name has been running for over
+/// 60 seconds`, not the best debugging experience. Instead we use this high,
+/// but not infinite, timeout after which assertions (that check the returned
+/// events) should start failing.
+pub const NO_TIMEOUT: Option<Duration> = Some(Duration::from_secs(10));
+
 pub fn init() {
     static INIT: Once = Once::new();
 
