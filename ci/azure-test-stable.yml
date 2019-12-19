@@ -26,7 +26,7 @@ jobs:
         parameters:
           rust_version: ${{ parameters.rust_version }}
 
-      - ${{ if eq(parameters.cmd, 'test') }}:
+      - ${{ if contains(parameters.cmd, 'test') }}:
           - script: cargo ${{ parameters.cmd }} --all-features
             displayName: cargo ${{ parameters.cmd }} --all-features
             env:
