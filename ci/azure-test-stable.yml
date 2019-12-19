@@ -26,14 +26,21 @@ jobs:
         parameters:
           rust_version: ${{ parameters.rust_version }}
 
-      - script: cargo ${{ parameters.cmd }} --all-features
-        displayName: cargo ${{ parameters.cmd }} --all-features
-        env:
-          CI: "True"
+      - ${{ if eq(parameters.cmd, 'test') }}:
+          - script: cargo ${{ parameters.cmd }} --all-features
+            displayName: cargo ${{ parameters.cmd }} --all-features
+            env:
+              CI: "True"
 
       - ${{ if eq(parameters.cmd, 'test') }}:
           - script: cargo doc --no-deps
             displayName: cargo doc --no-deps
+
+      - ${{ if ne(parameters.cmd, 'test') }}:
+          - script: cargo ${{ parameters.cmd }}
+            displayName: cargo ${{ parameters.cmd }}
+            env:
+              CI: "True"
 
       - ${{ if parameters.benches }}:
           - script: cargo check --benches

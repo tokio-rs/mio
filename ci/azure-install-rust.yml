@@ -30,4 +30,5 @@ steps:
       rustup toolchain list
       rustc -Vv
       cargo -V
+      cargo install cargo-hack
     displayName: Query rust and cargo versions

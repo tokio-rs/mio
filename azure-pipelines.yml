@@ -21,6 +21,13 @@ jobs:
       displayName: Test --release
       cmd: test --release
 
+  # Stable feature powerset
+  - template: ci/azure-test-stable.yml
+    parameters:
+      name: stable_feature_powerset
+      displayName: Check feature powerset
+      cmd: hack check --feature-powerset
+
   # Nightly
   - template: ci/azure-test-stable.yml
     parameters:
