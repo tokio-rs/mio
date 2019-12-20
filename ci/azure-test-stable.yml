@@ -32,11 +32,11 @@ jobs:
             env:
               CI: "True"
 
-      - ${{ if eq(parameters.cmd, 'test') }}:
+      - ${{ if contains(parameters.cmd, 'test') }}:
           - script: cargo doc --no-deps
             displayName: cargo doc --no-deps
 
-      - ${{ if ne(parameters.cmd, 'test') }}:
+      - ${{ if contains(parameters.cmd, 'check') }}:
           - script: cargo ${{ parameters.cmd }}
             displayName: cargo ${{ parameters.cmd }}
             env:
