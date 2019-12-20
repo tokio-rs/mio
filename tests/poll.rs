@@ -313,9 +313,7 @@ fn registry_operations_are_thread_safe() {
 #[test]
 fn register_during_poll() {
     let (mut poll, mut events) = init_with_poll();
-
-    let registry = Arc::new(poll.registry().try_clone().unwrap());
-    let registry1 = registry.clone();
+    let registry = poll.registry().try_clone().unwrap();
 
     let barrier = Arc::new(Barrier::new(2));
     let barrier1 = Arc::clone(&barrier);
@@ -328,7 +326,7 @@ fn register_during_poll() {
         // sleep before register to give main thread enough time to start
         // waiting the 5 sec long poll.
         sleep(Duration::from_millis(200));
-        registry1
+        registry
             .register(&mut stream, ID1, Interest::WRITABLE)
             .unwrap();
 
