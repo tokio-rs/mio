@@ -60,7 +60,12 @@ fn issue_1205() {
     let (mut poll, mut events) = init_with_poll();
 
     let waker = Arc::new(Waker::new(poll.registry(), WAKE_TOKEN).unwrap());
-    let waker1 = waker.clone();
+
+    // `_waker` must stay in scope in order for `Waker` events to be delivered
+    // when the test polls for events. If it is not cloned, it is moved out of
+    // scope in `thread::spawn` and `Poll::poll` will timeout.
+    #[allow(clippy::redundant_clone)]
+    let _waker = waker.clone();
 
     let mut listener = TcpListener::bind(any_local_address()).unwrap();
 
@@ -79,7 +84,7 @@ fn issue_1205() {
     // spawn a waker thread to wake the poll call below
     let handle = thread::spawn(move || {
         thread::sleep(Duration::from_millis(500));
-        waker1.wake().expect("unable to wake");
+        waker.wake().expect("unable to wake");
     });
 
     poll.poll(&mut events, None).unwrap();
