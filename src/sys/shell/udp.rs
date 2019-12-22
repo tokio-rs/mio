@@ -21,6 +21,10 @@ impl UdpSocket {
         os_required!()
     }
 
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        os_required!()
+    }
+
     pub fn send_to(&self, _: &[u8], _: SocketAddr) -> io::Result<usize> {
         os_required!()
     }

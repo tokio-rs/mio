@@ -50,6 +50,10 @@ impl UdpSocket {
         self.inner.local_addr()
     }
 
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.peer_addr()
+    }
+
     pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
         try_io!(self, send_to, buf, target)
     }
