@@ -596,11 +596,8 @@ cfg_net! {
                 sock_state: Some(sock.clone()),
             };
 
-            unsafe {
-                let mut update_queue = this.update_queue.lock().unwrap();
-                update_queue.push_back(sock);
-                this.update_sockets_events_if_polling()?;
-            }
+            this.queue_state(sock);
+            unsafe { this.update_sockets_events_if_polling()?; }
 
             Ok(state)
         }
@@ -648,8 +645,7 @@ cfg_net! {
                 state.lock().unwrap().set_event(event);
             }
 
-            let mut update_queue = self.update_queue.lock().unwrap();
-            update_queue.push_back(state.clone());
+            self.queue_state(state.clone());
             unsafe { self.update_sockets_events_if_polling() }
         }
 
@@ -689,6 +685,11 @@ cfg_net! {
 
         unsafe fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
             let sock_state = socket.get_sock_state().unwrap();
+            let mut update_queue = self.update_queue.lock().unwrap();
+            update_queue.push_back(sock_state);
+        }
+
+        fn queue_state(&self, sock_state: Pin<Arc<Mutex<SockState>>>) {
             let mut update_queue = self.update_queue.lock().unwrap();
             update_queue.push_back(sock_state);
         }
