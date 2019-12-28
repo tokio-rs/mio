@@ -26,8 +26,8 @@ cfg_os_poll! {
     pub(crate) use self::waker::Waker;
 
     cfg_tcp! {
-        mod tcp;
-        pub(crate) use self::tcp::{TcpListener, TcpStream};
+        pub mod tcp;
+        pub(crate) use self::tcp::TcpListener;
     }
 
     cfg_udp! {

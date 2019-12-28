@@ -1,4 +1,3 @@
-use super::TcpStream;
 use crate::{event, Interest, Registry, Token};
 use std::io;
 use std::net::{self, SocketAddr};
@@ -23,7 +22,7 @@ impl TcpListener {
         os_required!();
     }
 
-    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+    pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
         os_required!();
     }
 

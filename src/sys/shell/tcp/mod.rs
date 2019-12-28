@@ -1,5 +1,9 @@
+use std::io;
+use std::net::{self, SocketAddr};
+
 mod listener;
 pub(crate) use self::listener::TcpListener;
 
-mod stream;
-pub(crate) use self::stream::TcpStream;
+pub fn connect(_: SocketAddr) -> io::Result<net::TcpStream> {
+    os_required!();
+}

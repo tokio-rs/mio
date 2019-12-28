@@ -87,7 +87,7 @@ impl TcpListener {
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         self.sys
             .accept()
-            .map(|(sys, addr)| (TcpStream::new(sys), addr))
+            .map(|(stream, addr)| (TcpStream::from_std(stream), addr))
     }
 
     /// Returns the local socket address of this listener.

@@ -42,8 +42,8 @@ cfg_net! {
 }
 
 cfg_tcp! {
-    mod tcp;
-    pub use tcp::{TcpListener, TcpStream};
+    pub mod tcp;
+    pub use tcp::TcpListener;
 }
 
 cfg_udp! {

@@ -78,7 +78,7 @@ impl<T> IoSource<T> {
     }
 
     /// Execute an I/O operations ensuring that the socket receives more events
-    /// if it hit a [`WouldBlock`] error.
+    /// if it hits a [`WouldBlock`] error.
     ///
     /// # Notes
     ///

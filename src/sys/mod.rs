@@ -11,7 +11,7 @@
 //! * `Selector`: selector used to register event sources and poll for events,
 //!               see [`crate::Poll`] and [`crate::Registry`] for required
 //!               methods.
-//! * `TcpListener`, `TcpStream` and `UdpSocket`: see [`crate::net`] module.
+//! * `tcp` and `udp` modules: see the [`crate::net`] module.
 //! * `Waker`: see [`crate::Waker`].
 
 cfg_os_poll! {
@@ -58,7 +58,7 @@ cfg_os_poll! {
     pub(crate) use self::unix::{event, Event, Events, Selector, Waker};
 
     cfg_tcp! {
-        pub(crate) use self::unix::{TcpListener, TcpStream};
+        pub(crate) use self::unix::{tcp, TcpListener};
     }
 
     cfg_udp! {
