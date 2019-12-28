@@ -31,8 +31,7 @@ cfg_os_poll! {
     }
 
     cfg_udp! {
-        mod udp;
-        pub(crate) use self::udp::UdpSocket;
+        pub mod udp;
     }
 
     cfg_uds! {
@@ -52,9 +51,9 @@ cfg_os_poll! {
                 IoSourceState
             }
 
-            pub fn do_io<T, F, R>(&mut self, f: F, io: &mut T) -> io::Result<R>
+            pub fn do_io<T, F, R>(&self, f: F, io: &T) -> io::Result<R>
             where
-                F: FnOnce(&mut T) -> io::Result<R>,
+                F: FnOnce(&T) -> io::Result<R>,
             {
                 // We don't hold state, so we can just call the function and
                 // return.
