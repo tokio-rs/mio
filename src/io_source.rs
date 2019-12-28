@@ -89,11 +89,11 @@ impl<T> IoSource<T> {
     /// returning a [`WouldBlock`] error.
     ///
     /// [`WouldBlock`]: io::ErrorKind::WouldBlock
-    pub fn do_io<F, R>(&mut self, f: F) -> io::Result<R>
+    pub fn do_io<F, R>(&self, f: F) -> io::Result<R>
     where
-        F: FnOnce(&mut T) -> io::Result<R>,
+        F: FnOnce(&T) -> io::Result<R>,
     {
-        self.state.do_io(f, &mut self.inner)
+        self.state.do_io(f, &self.inner)
     }
 
     /// Returns the I/O source, dropping the state.
