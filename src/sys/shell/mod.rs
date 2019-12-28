@@ -16,8 +16,7 @@ cfg_tcp! {
 }
 
 cfg_udp! {
-    mod udp;
-    pub(crate) use self::udp::UdpSocket;
+    pub mod udp;
 }
 
 #[cfg(unix)]

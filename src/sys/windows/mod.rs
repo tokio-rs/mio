@@ -47,8 +47,7 @@ cfg_tcp! {
 }
 
 cfg_udp! {
-    mod udp;
-    pub use udp::UdpSocket;
+    pub mod udp;
 }
 
 mod waker;
@@ -116,9 +115,9 @@ cfg_net! {
             IoSourceState { inner: None }
         }
 
-        pub fn do_io<T, F, R>(&mut self, f: F, io: &mut T) -> io::Result<R>
+        pub fn do_io<T, F, R>(&self, f: F, io: &T) -> io::Result<R>
         where
-            F: FnOnce(&mut T) -> io::Result<R>,
+            F: FnOnce(&T) -> io::Result<R>,
         {
             let result = f(io);
             if let Err(ref e) = result {

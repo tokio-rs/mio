@@ -62,7 +62,7 @@ cfg_os_poll! {
     }
 
     cfg_udp! {
-        pub(crate) use self::unix::UdpSocket;
+        pub(crate) use self::unix::udp;
     }
 
     cfg_uds! {

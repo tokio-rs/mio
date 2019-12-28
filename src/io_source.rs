@@ -1,5 +1,3 @@
-#![allow(dead_code)] // Currently unused.
-
 use std::ops::{Deref, DerefMut};
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd;
