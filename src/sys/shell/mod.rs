@@ -11,8 +11,8 @@ mod waker;
 pub(crate) use self::waker::Waker;
 
 cfg_tcp! {
-    mod tcp;
-    pub(crate) use self::tcp::{TcpStream, TcpListener};
+    pub mod tcp;
+    pub(crate) use self::tcp::TcpListener;
 }
 
 cfg_udp! {

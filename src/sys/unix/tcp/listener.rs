@@ -1,4 +1,3 @@
-use super::TcpStream;
 use crate::sys::unix::net::{new_ip_socket, socket_addr};
 use crate::sys::unix::SourceFd;
 use crate::{event, Interest, Registry, Token};
@@ -49,12 +48,10 @@ impl TcpListener {
         self.inner.local_addr()
     }
 
-    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.inner.accept().and_then(|(inner, addr)| {
-            inner
-                .set_nonblocking(true)
-                .map(|()| (TcpStream::new(inner), addr))
-        })
+    pub fn accept(&self) -> io::Result<(net::TcpStream, SocketAddr)> {
+        self.inner
+            .accept()
+            .and_then(|(stream, addr)| stream.set_nonblocking(true).map(|()| (stream, addr)))
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
