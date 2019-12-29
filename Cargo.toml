@@ -56,7 +56,7 @@ lazy_static = "1.4.0"
 # for testing we'll use the git version.
 bytes      = { version = "0.5.0", git = "https://github.com/tokio-rs/bytes", rev = "79e4b2847f27137faaf149d116a352cbeae47fd1" }
 env_logger = { version = "0.6.2", default-features = false }
-tempdir    = "0.3.7"
+tempfile   = "3"
 net2       = "0.2.33"
 
 [package.metadata.docs.rs]

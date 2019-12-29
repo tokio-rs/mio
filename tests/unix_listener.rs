@@ -7,7 +7,6 @@ use std::os::unix::net;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 use std::thread;
-use tempdir::TempDir;
 
 #[macro_use]
 mod util;
@@ -17,6 +16,7 @@ use util::{
 };
 
 const DEFAULT_BUF_SIZE: usize = 64;
+const TEST_DIR: &str = "unix_listener";
 const TOKEN_1: Token = Token(0);
 
 #[test]
@@ -46,7 +46,7 @@ fn unix_listener_from_std() {
 fn unix_listener_local_addr() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix_listener").unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path = dir.path().join("any");
 
     let mut listener = UnixListener::bind(&path).unwrap();
@@ -76,7 +76,7 @@ fn unix_listener_local_addr() {
 #[test]
 fn unix_listener_register() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new("unix_listener").unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
 
     let mut listener = UnixListener::bind(dir.path().join("any")).unwrap();
     poll.registry()
@@ -89,7 +89,7 @@ fn unix_listener_register() {
 fn unix_listener_reregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix_listener").unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path = dir.path().join("any");
 
     let mut listener = UnixListener::bind(&path).unwrap();
@@ -117,7 +117,7 @@ fn unix_listener_reregister() {
 fn unix_listener_deregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix_listener").unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path = dir.path().join("any");
 
     let mut listener = UnixListener::bind(&path).unwrap();
@@ -140,7 +140,7 @@ where
 {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix_listener").unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path = dir.path().join("any");
 
     let mut listener = new_listener(&path).unwrap();

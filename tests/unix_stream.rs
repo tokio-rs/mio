@@ -9,7 +9,6 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Barrier};
 use std::thread;
-use tempdir::TempDir;
 
 #[macro_use]
 mod util;
@@ -23,6 +22,7 @@ const DATA2: &[u8] = b"Why hello mio!";
 const DATA1_LEN: usize = 16;
 const DATA2_LEN: usize = 14;
 const DEFAULT_BUF_SIZE: usize = 64;
+const TEST_DIR: &str = "unix";
 const TOKEN_1: Token = Token(0);
 const TOKEN_2: Token = Token(1);
 
@@ -42,7 +42,7 @@ fn unix_stream_smoke() {
 fn unix_stream_connect() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix").unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path = dir.path().join("any");
 
     let listener = net::UnixListener::bind(path.clone()).unwrap();
@@ -465,7 +465,7 @@ where
 fn new_echo_listener(connections: usize) -> (thread::JoinHandle<()>, net::SocketAddr) {
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
-        let dir = TempDir::new("unix").unwrap();
+        let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
         let path = dir.path().join("any");
         let listener = net::UnixListener::bind(path).unwrap();
         let local_addr = listener.local_addr().unwrap();
@@ -511,7 +511,7 @@ fn new_noop_listener(
 ) -> (thread::JoinHandle<()>, net::SocketAddr) {
     let (sender, receiver) = channel();
     let handle = thread::spawn(move || {
-        let dir = TempDir::new("unix").unwrap();
+        let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
         let path = dir.path().join("any");
         let listener = net::UnixListener::bind(path).unwrap();
         let local_addr = listener.local_addr().unwrap();

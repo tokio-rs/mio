@@ -5,7 +5,6 @@ use mio::{Interest, Token};
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::net;
-use tempdir::TempDir;
 
 #[macro_use]
 mod util;
@@ -29,7 +28,7 @@ fn is_send_and_sync() {
 
 #[test]
 fn unix_datagram_smoke_unconnected() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
@@ -40,7 +39,7 @@ fn unix_datagram_smoke_unconnected() {
 
 #[test]
 fn unix_datagram_smoke_connected() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
@@ -54,7 +53,7 @@ fn unix_datagram_smoke_connected() {
 
 #[test]
 fn unix_datagram_smoke_unconnected_from_std() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
@@ -71,7 +70,7 @@ fn unix_datagram_smoke_unconnected_from_std() {
 
 #[test]
 fn unix_datagram_smoke_connected_from_std() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
@@ -91,7 +90,7 @@ fn unix_datagram_smoke_connected_from_std() {
 
 #[test]
 fn unix_datagram_connect() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
@@ -169,7 +168,7 @@ fn unix_datagram_pair() {
 #[test]
 fn unix_datagram_shutdown() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new(TEST_DIR).unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
@@ -228,7 +227,7 @@ fn unix_datagram_shutdown() {
 #[test]
 fn unix_datagram_register() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new(TEST_DIR).unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path = dir.path().join("any");
 
     let mut datagram = UnixDatagram::bind(path).unwrap();
@@ -241,7 +240,7 @@ fn unix_datagram_register() {
 #[test]
 fn unix_datagram_reregister() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new(TEST_DIR).unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
@@ -265,7 +264,7 @@ fn unix_datagram_reregister() {
 #[test]
 fn unix_datagram_deregister() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new(TEST_DIR).unwrap();
+    let dir = tempfile::Builder::new().prefix(TEST_DIR).tempdir().unwrap();
     let path1 = dir.path().join("one");
     let path2 = dir.path().join("two");
 
