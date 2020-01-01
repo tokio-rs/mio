@@ -635,6 +635,7 @@ impl Registry {
     ///
     /// Event sources registered with this `Registry` will be registered with
     /// the original `Registry` and `Poll` instance.
+    #[cfg(not(target_os = "wasi"))]
     pub fn try_clone(&self) -> io::Result<Registry> {
         self.selector
             .try_clone()
@@ -643,7 +644,7 @@ impl Registry {
 
     /// Internal check to ensure only a single `Waker` is active per [`Poll`]
     /// instance.
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, not(target_os = "wasi")))]
     pub(crate) fn register_waker(&self) {
         assert!(
             !self.selector.register_waker(),
@@ -652,6 +653,7 @@ impl Registry {
     }
 
     /// Get access to the `sys::Selector`.
+    #[cfg(any(not(target_os = "wasi"), feature = "net"))]
     pub(crate) fn selector(&self) -> &sys::Selector {
         &self.selector
     }
