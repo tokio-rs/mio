@@ -52,9 +52,7 @@ ntapi  = "0.3"
 lazy_static = "1.4.0"
 
 [dev-dependencies]
-# Bytes v0.4 still depends on winapi v0.2, but Bytes v0.5 is released yet. So
-# for testing we'll use the git version.
-bytes      = { version = "0.5.0", git = "https://github.com/tokio-rs/bytes", rev = "79e4b2847f27137faaf149d116a352cbeae47fd1" }
+bytes      = "0.5"
 env_logger = { version = "0.6.2", default-features = false }
 tempdir    = "0.3.7"
 net2       = "0.2.33"

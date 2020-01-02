@@ -757,16 +757,18 @@ fn send_recv_udp(mut tx: UdpSocket, mut rx: UdpSocket, connected: bool) {
             if event.is_readable() {
                 if let LISTENER = event.token() {
                     debug!("We are receiving a datagram now...");
-                    let cnt = unsafe {
-                        if !handler.connected {
-                            handler.rx.recv_from(handler.rx_buf.bytes_mut()).unwrap().0
-                        } else {
-                            handler.rx.recv(handler.rx_buf.bytes_mut()).unwrap()
-                        }
+                    let data = &mut handler.rx_buf.bytes_mut();
+                    let data = unsafe {
+                        std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u8, data.len())
+                    };
+                    let cnt = if !handler.connected {
+                        handler.rx.recv_from(data).unwrap().0
+                    } else {
+                        handler.rx.recv(data).unwrap()
                     };
 
                     unsafe {
-                        BufMut::advance_mut(&mut handler.rx_buf, cnt);
+                        handler.rx_buf.advance_mut(cnt);
                     }
                     assert!(str::from_utf8(handler.rx_buf.as_ref()).unwrap() == handler.msg);
                     handler.shutdown = true;
@@ -889,10 +891,13 @@ impl UdpHandler {
     fn handle_read(&mut self, _: &Registry, token: Token) {
         if let LISTENER = token {
             debug!("We are receiving a datagram now...");
-            match unsafe { self.rx.recv_from(self.rx_buf.bytes_mut()) } {
+            let data = &mut self.rx_buf.bytes_mut();
+            let data =
+                unsafe { std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u8, data.len()) };
+            match self.rx.recv_from(data) {
                 Ok((cnt, addr)) => {
                     unsafe {
-                        BufMut::advance_mut(&mut self.rx_buf, cnt);
+                        self.rx_buf.advance_mut(cnt);
                     }
                     assert_eq!(addr.ip(), self.localhost);
                 }
