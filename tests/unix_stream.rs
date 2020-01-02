@@ -9,13 +9,12 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Barrier};
 use std::thread;
-use tempdir::TempDir;
 
 #[macro_use]
 mod util;
 use util::{
-    assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
-    ExpectEvent, Readiness,
+    assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init,
+    init_with_poll, temp_file, ExpectEvent, Readiness,
 };
 
 const DATA1: &[u8] = b"Hello same host!";
@@ -35,15 +34,14 @@ fn unix_stream_send_and_sync() {
 #[test]
 fn unix_stream_smoke() {
     #[allow(clippy::redundant_closure)]
-    smoke_test(|path| UnixStream::connect(path));
+    smoke_test(|path| UnixStream::connect(path), "unix_stream_smoke");
 }
 
 #[test]
 fn unix_stream_connect() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix").unwrap();
-    let path = dir.path().join("any");
+    let path = temp_file("unix_stream_connect");
 
     let listener = net::UnixListener::bind(path.clone()).unwrap();
     let mut stream = UnixStream::connect(path).unwrap();
@@ -80,13 +78,16 @@ fn unix_stream_connect() {
 
 #[test]
 fn unix_stream_from_std() {
-    smoke_test(|path| {
-        let local = net::UnixStream::connect(path).unwrap();
-        // `std::os::unix::net::UnixStream`s are blocking by default, so make sure
-        // it is in non-blocking mode before wrapping in a Mio equivalent.
-        local.set_nonblocking(true).unwrap();
-        Ok(UnixStream::from_std(local))
-    })
+    smoke_test(
+        |path| {
+            let local = net::UnixStream::connect(path).unwrap();
+            // `std::os::unix::net::UnixStream`s are blocking by default, so make sure
+            // it is in non-blocking mode before wrapping in a Mio equivalent.
+            local.set_nonblocking(true).unwrap();
+            Ok(UnixStream::from_std(local))
+        },
+        "unix_stream_from_std",
+    )
 }
 
 #[test]
@@ -124,7 +125,8 @@ fn unix_stream_pair() {
 
 #[test]
 fn unix_stream_peer_addr() {
-    let (handle, expected_addr) = new_echo_listener(1);
+    init();
+    let (handle, expected_addr) = new_echo_listener(1, "unix_stream_peer_addr");
     let expected_path = expected_addr.as_pathname().expect("failed to get pathname");
 
     let stream = UnixStream::connect(expected_path).unwrap();
@@ -143,7 +145,7 @@ fn unix_stream_peer_addr() {
 #[test]
 fn unix_stream_shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
+    let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_read");
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = UnixStream::connect(path).unwrap();
@@ -197,7 +199,7 @@ fn unix_stream_shutdown_read() {
 #[test]
 fn unix_stream_shutdown_write() {
     let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
+    let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_write");
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = UnixStream::connect(path).unwrap();
@@ -252,7 +254,7 @@ fn unix_stream_shutdown_write() {
 #[test]
 fn unix_stream_shutdown_both() {
     let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
+    let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_both");
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = UnixStream::connect(path).unwrap();
@@ -311,9 +313,10 @@ fn unix_stream_shutdown_both() {
 
 #[test]
 fn unix_stream_shutdown_listener_write() {
-    let barrier = Arc::new(Barrier::new(2));
     let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_noop_listener(1, barrier.clone());
+    let barrier = Arc::new(Barrier::new(2));
+    let (handle, remote_addr) =
+        new_noop_listener(1, barrier.clone(), "unix_stream_shutdown_listener_write");
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = UnixStream::connect(path).unwrap();
@@ -344,7 +347,7 @@ fn unix_stream_shutdown_listener_write() {
 #[test]
 fn unix_stream_register() {
     let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
+    let (handle, remote_addr) = new_echo_listener(1, "unix_stream_register");
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = UnixStream::connect(path).unwrap();
@@ -361,7 +364,7 @@ fn unix_stream_register() {
 #[test]
 fn unix_stream_reregister() {
     let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
+    let (handle, remote_addr) = new_echo_listener(1, "unix_stream_reregister");
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = UnixStream::connect(path).unwrap();
@@ -385,7 +388,7 @@ fn unix_stream_reregister() {
 #[test]
 fn unix_stream_deregister() {
     let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
+    let (handle, remote_addr) = new_echo_listener(1, "unix_stream_deregister");
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = UnixStream::connect(path).unwrap();
@@ -400,12 +403,12 @@ fn unix_stream_deregister() {
     handle.join().unwrap();
 }
 
-fn smoke_test<F>(connect_stream: F)
+fn smoke_test<F>(connect_stream: F, test_name: &'static str)
 where
     F: FnOnce(&Path) -> io::Result<UnixStream>,
 {
     let (mut poll, mut events) = init_with_poll();
-    let (handle, remote_addr) = new_echo_listener(1);
+    let (handle, remote_addr) = new_echo_listener(1, test_name);
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = connect_stream(path).unwrap();
@@ -462,11 +465,13 @@ where
     handle.join().unwrap();
 }
 
-fn new_echo_listener(connections: usize) -> (thread::JoinHandle<()>, net::SocketAddr) {
+fn new_echo_listener(
+    connections: usize,
+    test_name: &'static str,
+) -> (thread::JoinHandle<()>, net::SocketAddr) {
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
-        let dir = TempDir::new("unix").unwrap();
-        let path = dir.path().join("any");
+        let path = temp_file(test_name);
         let listener = net::UnixListener::bind(path).unwrap();
         let local_addr = listener.local_addr().unwrap();
         addr_sender.send(local_addr).unwrap();
@@ -508,11 +513,11 @@ fn new_echo_listener(connections: usize) -> (thread::JoinHandle<()>, net::Socket
 fn new_noop_listener(
     connections: usize,
     barrier: Arc<Barrier>,
+    test_name: &'static str,
 ) -> (thread::JoinHandle<()>, net::SocketAddr) {
     let (sender, receiver) = channel();
     let handle = thread::spawn(move || {
-        let dir = TempDir::new("unix").unwrap();
-        let path = dir.path().join("any");
+        let path = temp_file(test_name);
         let listener = net::UnixListener::bind(path).unwrap();
         let local_addr = listener.local_addr().unwrap();
         sender.send(local_addr).unwrap();

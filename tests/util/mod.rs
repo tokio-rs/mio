@@ -4,9 +4,10 @@
 
 use std::net::SocketAddr;
 use std::ops::BitOr;
+use std::path::PathBuf;
 use std::sync::Once;
 use std::time::Duration;
-use std::{fmt, io};
+use std::{env, fmt, fs, io};
 
 use log::{error, warn};
 use mio::event::Event;
@@ -17,6 +18,11 @@ pub fn init() {
 
     INIT.call_once(|| {
         env_logger::try_init().expect("unable to initialise logger");
+
+        // Remove all temporary files from previous test runs.
+        let dir = temp_dir();
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("unable to create temporary directory");
     })
 }
 
@@ -196,6 +202,20 @@ pub fn any_local_address() -> SocketAddr {
 /// Bind to any port on localhost, using a IPv6 address.
 pub fn any_local_ipv6_address() -> SocketAddr {
     "[::1]:0".parse().unwrap()
+}
+
+/// Returns a path to a temporary file using `name` as filename.
+pub fn temp_file(name: &'static str) -> PathBuf {
+    let mut path = temp_dir();
+    path.push(name);
+    path
+}
+
+/// Returns the temporary directory for Mio test files.
+fn temp_dir() -> PathBuf {
+    let mut path = env::temp_dir();
+    path.push("mio_tests");
+    path
 }
 
 /// A checked {write, send, send_to} macro that ensures the entire buffer is
