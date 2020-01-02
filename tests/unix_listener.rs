@@ -7,13 +7,12 @@ use std::os::unix::net;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 use std::thread;
-use tempdir::TempDir;
 
 #[macro_use]
 mod util;
 use util::{
     assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
-    ExpectEvent,
+    temp_file, ExpectEvent,
 };
 
 const DEFAULT_BUF_SIZE: usize = 64;
@@ -28,27 +27,29 @@ fn unix_listener_send_and_sync() {
 #[test]
 fn unix_listener_smoke() {
     #[allow(clippy::redundant_closure)]
-    smoke_test(|path| UnixListener::bind(path));
+    smoke_test(|path| UnixListener::bind(path), "unix_listener_smoke");
 }
 
 #[test]
 fn unix_listener_from_std() {
-    smoke_test(|path| {
-        let listener = net::UnixListener::bind(path).unwrap();
-        // `std::os::unix::net::UnixStream`s are blocking by default, so make sure
-        // it is in non-blocking mode before wrapping in a Mio equivalent.
-        listener.set_nonblocking(true).unwrap();
-        Ok(UnixListener::from_std(listener))
-    })
+    smoke_test(
+        |path| {
+            let listener = net::UnixListener::bind(path).unwrap();
+            // `std::os::unix::net::UnixStream`s are blocking by default, so make sure
+            // it is in non-blocking mode before wrapping in a Mio equivalent.
+            listener.set_nonblocking(true).unwrap();
+            Ok(UnixListener::from_std(listener))
+        },
+        "unix_listener_from_std",
+    )
 }
 
 #[test]
 fn unix_listener_local_addr() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix_listener").unwrap();
-    let path = dir.path().join("any");
 
+    let path = temp_file("unix_listener_local_addr");
     let mut listener = UnixListener::bind(&path).unwrap();
     poll.registry()
         .register(
@@ -76,9 +77,9 @@ fn unix_listener_local_addr() {
 #[test]
 fn unix_listener_register() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new("unix_listener").unwrap();
 
-    let mut listener = UnixListener::bind(dir.path().join("any")).unwrap();
+    let path = temp_file("unix_listener_register");
+    let mut listener = UnixListener::bind(path).unwrap();
     poll.registry()
         .register(&mut listener, TOKEN_1, Interest::READABLE)
         .unwrap();
@@ -89,9 +90,8 @@ fn unix_listener_register() {
 fn unix_listener_reregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix_listener").unwrap();
-    let path = dir.path().join("any");
 
+    let path = temp_file("unix_listener_reregister");
     let mut listener = UnixListener::bind(&path).unwrap();
     poll.registry()
         .register(&mut listener, TOKEN_1, Interest::WRITABLE)
@@ -117,9 +117,8 @@ fn unix_listener_reregister() {
 fn unix_listener_deregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix_listener").unwrap();
-    let path = dir.path().join("any");
 
+    let path = temp_file("unix_listener_deregister");
     let mut listener = UnixListener::bind(&path).unwrap();
     poll.registry()
         .register(&mut listener, TOKEN_1, Interest::READABLE)
@@ -134,14 +133,13 @@ fn unix_listener_deregister() {
     handle.join().unwrap();
 }
 
-fn smoke_test<F>(new_listener: F)
+fn smoke_test<F>(new_listener: F, test_name: &'static str)
 where
     F: FnOnce(&Path) -> io::Result<UnixListener>,
 {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let dir = TempDir::new("unix_listener").unwrap();
-    let path = dir.path().join("any");
+    let path = temp_file(test_name);
 
     let mut listener = new_listener(&path).unwrap();
     poll.registry()

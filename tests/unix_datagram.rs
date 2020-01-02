@@ -5,19 +5,17 @@ use mio::{Interest, Token};
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::net;
-use tempdir::TempDir;
 
 #[macro_use]
 mod util;
 use util::{
-    assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
-    ExpectEvent, Readiness,
+    assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init,
+    init_with_poll, temp_file, ExpectEvent, Readiness,
 };
 
 const DATA1: &[u8] = b"Hello same host!";
 const DATA2: &[u8] = b"Why hello mio!";
 const DEFAULT_BUF_SIZE: usize = 64;
-const TEST_DIR: &str = "mio_unix_datagram_tests";
 const TOKEN_1: Token = Token(0);
 const TOKEN_2: Token = Token(1);
 
@@ -29,9 +27,9 @@ fn is_send_and_sync() {
 
 #[test]
 fn unix_datagram_smoke_unconnected() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path1 = dir.path().join("one");
-    let path2 = dir.path().join("two");
+    init();
+    let path1 = temp_file("unix_datagram_smoke_unconnected1");
+    let path2 = temp_file("unix_datagram_smoke_unconnected2");
 
     let datagram1 = UnixDatagram::bind(&path1).unwrap();
     let datagram2 = UnixDatagram::bind(&path2).unwrap();
@@ -40,9 +38,9 @@ fn unix_datagram_smoke_unconnected() {
 
 #[test]
 fn unix_datagram_smoke_connected() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path1 = dir.path().join("one");
-    let path2 = dir.path().join("two");
+    init();
+    let path1 = temp_file("unix_datagram_smoke_connected1");
+    let path2 = temp_file("unix_datagram_smoke_connected2");
 
     let datagram1 = UnixDatagram::bind(&path1).unwrap();
     let datagram2 = UnixDatagram::bind(&path2).unwrap();
@@ -54,9 +52,9 @@ fn unix_datagram_smoke_connected() {
 
 #[test]
 fn unix_datagram_smoke_unconnected_from_std() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path1 = dir.path().join("one");
-    let path2 = dir.path().join("two");
+    init();
+    let path1 = temp_file("unix_datagram_smoke_unconnected_from_std1");
+    let path2 = temp_file("unix_datagram_smoke_unconnected_from_std2");
 
     let datagram1 = net::UnixDatagram::bind(&path1).unwrap();
     let datagram2 = net::UnixDatagram::bind(&path2).unwrap();
@@ -71,9 +69,9 @@ fn unix_datagram_smoke_unconnected_from_std() {
 
 #[test]
 fn unix_datagram_smoke_connected_from_std() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path1 = dir.path().join("one");
-    let path2 = dir.path().join("two");
+    init();
+    let path1 = temp_file("unix_datagram_smoke_connected_from_std1");
+    let path2 = temp_file("unix_datagram_smoke_connected_from_std2");
 
     let datagram1 = net::UnixDatagram::bind(&path1).unwrap();
     let datagram2 = net::UnixDatagram::bind(&path2).unwrap();
@@ -91,9 +89,9 @@ fn unix_datagram_smoke_connected_from_std() {
 
 #[test]
 fn unix_datagram_connect() {
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path1 = dir.path().join("one");
-    let path2 = dir.path().join("two");
+    init();
+    let path1 = temp_file("unix_datagram_connect1");
+    let path2 = temp_file("unix_datagram_connect2");
 
     let datagram1 = UnixDatagram::bind(&path1).unwrap();
     let datagram1_local = datagram1.local_addr().unwrap();
@@ -169,9 +167,8 @@ fn unix_datagram_pair() {
 #[test]
 fn unix_datagram_shutdown() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path1 = dir.path().join("one");
-    let path2 = dir.path().join("two");
+    let path1 = temp_file("unix_datagram_shutdown1");
+    let path2 = temp_file("unix_datagram_shutdown2");
 
     let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
     let mut datagram2 = UnixDatagram::bind(&path2).unwrap();
@@ -228,8 +225,7 @@ fn unix_datagram_shutdown() {
 #[test]
 fn unix_datagram_register() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path = dir.path().join("any");
+    let path = temp_file("unix_datagram_register");
 
     let mut datagram = UnixDatagram::bind(path).unwrap();
     poll.registry()
@@ -241,9 +237,8 @@ fn unix_datagram_register() {
 #[test]
 fn unix_datagram_reregister() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path1 = dir.path().join("one");
-    let path2 = dir.path().join("two");
+    let path1 = temp_file("unix_datagram_reregister1");
+    let path2 = temp_file("unix_datagram_reregister2");
 
     let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
     poll.registry()
@@ -265,9 +260,8 @@ fn unix_datagram_reregister() {
 #[test]
 fn unix_datagram_deregister() {
     let (mut poll, mut events) = init_with_poll();
-    let dir = TempDir::new(TEST_DIR).unwrap();
-    let path1 = dir.path().join("one");
-    let path2 = dir.path().join("two");
+    let path1 = temp_file("unix_datagram_deregister1");
+    let path2 = temp_file("unix_datagram_deregister2");
 
     let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
     poll.registry()
