@@ -361,7 +361,6 @@ cfg_net! {
     use crate::Token;
     use std::os::windows::io::AsRawSocket;
 
-
     impl Selector {
         pub fn register<S: SocketState + AsRawSocket>(
             &self,
