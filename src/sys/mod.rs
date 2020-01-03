@@ -70,7 +70,7 @@ cfg_os_poll! {
         pub use self::unix::SocketAddr;
     }
 
-    cfg_any_os_util! {
+    cfg_net! {
         pub(crate) use self::unix::IoSourceState;
     }
 }
