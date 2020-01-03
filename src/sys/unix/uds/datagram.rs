@@ -22,48 +22,15 @@ pub(crate) fn unbound() -> io::Result<net::UnixDatagram> {
 }
 
 pub(crate) fn pair() -> io::Result<(net::UnixDatagram, net::UnixDatagram)> {
-    let mut fds = [-1; 2];
-    let flags = libc::SOCK_DGRAM;
-    #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
-    let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-
-    syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
-    let pair = unsafe {
-        (
-            net::UnixDatagram::from_raw_fd(fds[0]),
-            net::UnixDatagram::from_raw_fd(fds[1]),
-        )
-    };
-
-    // Darwin and Solaris do not have `SOCK_NONBLOCK` or `SOCK_CLOEXEC`.
-    //
-    // In order to set those flags, additional `fcntl` sys calls must be
-    // performed. If a `fnctl` fails after the sockets have been created, the
-    // file descriptors will leak. Creating `pair` above ensures that if there
-    // is an error, the file descriptors are closed.
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
-    {
-        syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
-        syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
-        syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
-        syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
-    }
-    Ok(pair)
+    super::pair(libc::SOCK_DGRAM)
 }
 
-// The following functions can't simply be replaced with a call to
-// `net::UnixDatagram` because of our `SocketAddr` type.
-
 pub(crate) fn local_addr(socket: &net::UnixDatagram) -> io::Result<SocketAddr> {
-    SocketAddr::new(|sockaddr, socklen| {
-        syscall!(getsockname(socket.as_raw_fd(), sockaddr, socklen))
-    })
+    super::local_addr(socket.as_raw_fd())
 }
 
 pub(crate) fn peer_addr(socket: &net::UnixDatagram) -> io::Result<SocketAddr> {
-    SocketAddr::new(|sockaddr, socklen| {
-        syscall!(getpeername(socket.as_raw_fd(), sockaddr, socklen))
-    })
+    super::peer_addr(socket.as_raw_fd())
 }
 
 pub(crate) fn recv_from(
