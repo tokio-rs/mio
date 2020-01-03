@@ -520,7 +520,7 @@ cfg_net! {
     use std::mem::size_of;
     use std::ptr::null_mut;
     use winapi::um::mswsock::SIO_BASE_HANDLE;
-    use winapi::um::winsock2::{WSAIoctl, INVALID_SOCKET, SOCKET_ERROR};
+    use winapi::um::winsock2::{WSAIoctl, SOCKET_ERROR};
 
     impl SelectorInner {
         pub fn register<S: SocketState + AsRawSocket>(
@@ -647,10 +647,11 @@ cfg_net! {
                 None,
             ) == SOCKET_ERROR
             {
-                return Err(io::Error::from_raw_os_error(INVALID_SOCKET as i32));
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(base_socket)
             }
         }
-        Ok(base_socket)
     }
 }
 
