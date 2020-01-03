@@ -1,16 +1,13 @@
-use super::TcpStream;
-#[cfg(debug_assertions)]
-use crate::poll::SelectorId;
-use crate::{event, sys, Interest, Registry, Token};
-
-use std::fmt;
-use std::io;
-use std::net;
-use std::net::SocketAddr;
+use std::net::{self, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::{fmt, io};
+
+use super::TcpStream;
+use crate::io_source::IoSource;
+use crate::{event, sys, Interest, Registry, Token};
 
 /// A structure representing a socket server
 ///
@@ -38,9 +35,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 /// # }
 /// ```
 pub struct TcpListener {
-    sys: sys::TcpListener,
-    #[cfg(debug_assertions)]
-    selector_id: SelectorId,
+    inner: IoSource<net::TcpListener>,
 }
 
 impl TcpListener {
@@ -54,10 +49,8 @@ impl TcpListener {
     /// 3. Bind the socket to the specified address.
     /// 4. Calls `listen` on the socket to prepare it to receive new connections.
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
-        sys::TcpListener::bind(addr).map(|sys| TcpListener {
-            sys,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
+        sys::tcp::bind(addr).map(|listener| TcpListener {
+            inner: IoSource::new(listener),
         })
     }
 
@@ -68,11 +61,8 @@ impl TcpListener {
     /// about the underlying listener; ; it is left up to the user to set it
     /// in non-blocking mode.
     pub fn from_std(listener: net::TcpListener) -> TcpListener {
-        let sys = sys::TcpListener::from_std(listener);
         TcpListener {
-            sys,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
+            inner: IoSource::new(listener),
         }
     }
 
@@ -85,14 +75,16 @@ impl TcpListener {
     /// If an accepted stream is returned, the remote address of the peer is
     /// returned along with it.
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.sys
-            .accept()
-            .map(|(stream, addr)| (TcpStream::from_std(stream), addr))
+        self.inner.do_io(|inner| {
+            (&*inner)
+                .accept()
+                .map(|(stream, addr)| (TcpStream::from_std(stream), addr))
+        })
     }
 
     /// Returns the local socket address of this listener.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.sys.local_addr()
+        self.inner.local_addr()
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -100,7 +92,7 @@ impl TcpListener {
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.sys.set_ttl(ttl)
+        self.inner.set_ttl(ttl)
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -109,7 +101,7 @@ impl TcpListener {
     ///
     /// [link]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
-        self.sys.ttl()
+        self.inner.ttl()
     }
 
     /// Get the value of the `SO_ERROR` option on this socket.
@@ -118,7 +110,7 @@ impl TcpListener {
     /// the field in the process. This can be useful for checking errors between
     /// calls.
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.sys.take_error()
+        self.inner.take_error()
     }
 }
 
@@ -129,9 +121,7 @@ impl event::Source for TcpListener {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.associate_selector(registry)?;
-        self.sys.register(registry, token, interests)
+        self.inner.register(registry, token, interests)
     }
 
     fn reregister(
@@ -140,24 +130,24 @@ impl event::Source for TcpListener {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        self.sys.reregister(registry, token, interests)
+        self.inner.reregister(registry, token, interests)
     }
 
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
-        self.sys.deregister(registry)
+        self.inner.deregister(registry)
     }
 }
 
 impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.sys, f)
+        self.inner.fmt(f)
     }
 }
 
 #[cfg(unix)]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
-        self.sys.as_raw_fd()
+        self.inner.as_raw_fd()
     }
 }
 
@@ -165,9 +155,7 @@ impl AsRawFd for TcpListener {
 impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener {
-            sys: FromRawFd::from_raw_fd(fd),
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
+            inner: IoSource::new(FromRawFd::from_raw_fd(fd)),
         }
     }
 }
@@ -175,14 +163,14 @@ impl FromRawFd for TcpListener {
 #[cfg(unix)]
 impl IntoRawFd for TcpListener {
     fn into_raw_fd(self) -> RawFd {
-        self.sys.into_raw_fd()
+        self.inner.into_inner().into_raw_fd()
     }
 }
 
 #[cfg(windows)]
 impl AsRawSocket for TcpListener {
     fn as_raw_socket(&self) -> RawSocket {
-        self.sys.as_raw_socket()
+        self.inner.as_raw_socket()
     }
 }
 
@@ -190,9 +178,7 @@ impl AsRawSocket for TcpListener {
 impl FromRawSocket for TcpListener {
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
         TcpListener {
-            sys: FromRawSocket::from_raw_socket(socket),
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
+            inner: IoSource::new(FromRawSocket::from_raw_socket(socket)),
         }
     }
 }
@@ -200,6 +186,6 @@ impl FromRawSocket for TcpListener {
 #[cfg(windows)]
 impl IntoRawSocket for TcpListener {
     fn into_raw_socket(self) -> RawSocket {
-        self.sys.into_raw_socket()
+        self.inner.into_inner().into_raw_socket()
     }
 }

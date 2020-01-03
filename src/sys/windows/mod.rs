@@ -25,33 +25,18 @@ cfg_net! {
             }
         }};
     }
-
-    /// Helper macro to execute an I/O operation and register interests if the
-    /// operation would block.
-    macro_rules! try_io {
-        ($self: ident, $method: ident $(, $args: expr)*)  => {{
-            let result = (&$self.inner).$method($($args),*);
-            if let Err(ref e) = result {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    $self.io_blocked_reregister()?;
-                }
-            }
-            result
-        }};
-    }
 }
 
 cfg_tcp! {
-    pub mod tcp;
-    pub use tcp::TcpListener;
+    pub(crate) mod tcp;
 }
 
 cfg_udp! {
-    pub mod udp;
+    pub(crate) mod udp;
 }
 
 mod waker;
-pub use waker::Waker;
+pub(crate) use waker::Waker;
 
 pub trait SocketState {
     // The `SockState` struct needs to be pinned in memory because it contains
@@ -80,17 +65,6 @@ cfg_net! {
         token: Token,
         interests: Interest,
         sock_state: Option<Pin<Arc<Mutex<SockState>>>>,
-    }
-
-    impl InternalState {
-        fn new(selector: Arc<SelectorInner>, token: Token, interests: Interest) -> InternalState {
-            InternalState {
-                selector,
-                token,
-                interests,
-                sock_state: None,
-            }
-        }
     }
 
     impl Drop for InternalState {
@@ -128,7 +102,7 @@ cfg_net! {
                         let sock_state = state.sock_state.as_ref().unwrap();
                         state
                             .selector
-                            .reregister2(sock_state, state.token, state.interests)
+                            .reregister(sock_state, state.token, state.interests)
                     })?;
                 }
             }
@@ -146,7 +120,7 @@ cfg_net! {
                 Err(io::Error::from(io::ErrorKind::AlreadyExists))
             } else {
                 poll::selector(registry)
-                    .register2(socket, token, interests)
+                    .register(socket, token, interests)
                     .map(|state| {
                         self.inner = Some(Box::new(state));
                     })
@@ -163,7 +137,7 @@ cfg_net! {
                 Some(state) => {
                     let sock_state = state.sock_state.as_ref().unwrap();
                     poll::selector(registry)
-                        .reregister2(sock_state, token, interests)
+                        .reregister(sock_state, token, interests)
                         .map(|()| {
                             state.token = token;
                             state.interests = interests;

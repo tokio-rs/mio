@@ -11,12 +11,11 @@ mod waker;
 pub(crate) use self::waker::Waker;
 
 cfg_tcp! {
-    pub mod tcp;
-    pub(crate) use self::tcp::TcpListener;
+    pub(crate) mod tcp;
 }
 
 cfg_udp! {
-    pub mod udp;
+    pub(crate) mod udp;
 }
 
 #[cfg(unix)]
@@ -33,7 +32,7 @@ cfg_net! {
     #[cfg(windows)]
     use crate::{Registry, Token, Interest};
 
-    pub struct IoSourceState;
+    pub(crate) struct IoSourceState;
 
     impl IoSourceState {
         pub fn new() -> IoSourceState {

@@ -26,12 +26,11 @@ cfg_os_poll! {
     pub(crate) use self::waker::Waker;
 
     cfg_tcp! {
-        pub mod tcp;
-        pub(crate) use self::tcp::TcpListener;
+        pub(crate) mod tcp;
     }
 
     cfg_udp! {
-        pub mod udp;
+        pub(crate) mod udp;
     }
 
     cfg_uds! {
@@ -44,7 +43,7 @@ cfg_os_poll! {
         use std::io;
 
         // Both `kqueue` and `epoll` don't need to hold any user space state.
-        pub struct IoSourceState;
+        pub(crate) struct IoSourceState;
 
         impl IoSourceState {
             pub fn new() -> IoSourceState {
