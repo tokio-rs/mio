@@ -1,6 +1,6 @@
 use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
-use super::{Event, InternalState};
+use super::Event;
 use crate::sys::Events;
 use crate::Interest;
 
@@ -357,9 +357,10 @@ impl Selector {
 }
 
 cfg_net! {
-    use super::SocketState;
+    use super::{SocketState, InternalState};
     use crate::Token;
     use std::os::windows::io::AsRawSocket;
+
 
     impl Selector {
         pub fn register<S: SocketState + AsRawSocket>(
