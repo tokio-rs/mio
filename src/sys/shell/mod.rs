@@ -21,8 +21,8 @@ cfg_udp! {
 
 #[cfg(unix)]
 cfg_uds! {
-    mod uds;
-    pub(crate) use self::uds::{UnixDatagram, UnixListener, UnixStream};
+    pub(crate) mod uds;
+    pub(crate) use self::uds::{UnixListener, UnixStream};
 }
 
 cfg_net! {

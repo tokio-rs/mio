@@ -19,8 +19,7 @@ cfg_os_poll! {
     use std::path::Path;
     use std::{io, mem};
 
-    mod datagram;
-    pub(crate) use self::datagram::UnixDatagram;
+    pub(crate) mod datagram;
 
     mod listener;
     pub(crate) use self::listener::UnixListener;
