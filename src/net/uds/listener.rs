@@ -51,8 +51,9 @@ impl UnixListener {
     /// The call is responsible for ensuring that the listening socket is in
     /// non-blocking mode.
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        let (sys, sockaddr) = self.sys.accept()?;
-        Ok((UnixStream::new(sys), sockaddr))
+        self.sys
+            .accept()
+            .map(|(stream, sockaddr)| (UnixStream::from_std(stream), sockaddr))
     }
 
     /// Returns the local socket address of this listener.

@@ -1,4 +1,3 @@
-use super::UnixStream;
 use crate::net::SocketAddr;
 use crate::{event, sys, Interest, Registry, Token};
 use std::io;
@@ -18,7 +17,7 @@ impl UnixListener {
         os_required!()
     }
 
-    pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
+    pub fn accept(&self) -> io::Result<(net::UnixStream, SocketAddr)> {
         os_required!()
     }
 
