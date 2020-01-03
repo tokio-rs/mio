@@ -25,6 +25,10 @@ jobs:
       - template: azure-install-rust.yml
         parameters:
           rust_version: ${{ parameters.rust_version }}
+      
+      - ${{ if eq(parameters.cmd, 'test') }}:
+          - script: ./bin/check-powerset
+            displayName: Check feature powerset
 
       - script: cargo ${{ parameters.cmd }} --all-features
         displayName: cargo ${{ parameters.cmd }} --all-features
