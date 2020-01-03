@@ -67,7 +67,7 @@ cfg_os_poll! {
 
     cfg_uds! {
         pub(crate) use self::unix::uds;
-        pub(crate) use self::unix::{UnixListener, UnixStream};
+        pub(crate) use self::unix::UnixListener;
         pub use self::unix::SocketAddr;
     }
 

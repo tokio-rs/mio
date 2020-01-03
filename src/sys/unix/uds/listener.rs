@@ -1,6 +1,6 @@
 use super::socket_addr;
 use crate::sys::unix::net::new_socket;
-use crate::sys::unix::{SocketAddr, UnixStream};
+use crate::sys::unix::SocketAddr;
 use crate::unix::SourceFd;
 use crate::{event, Interest, Registry, Token};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -18,7 +18,7 @@ impl UnixListener {
         UnixListener { inner }
     }
 
-    pub(crate) fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
+    pub(crate) fn accept(&self) -> io::Result<(net::UnixStream, SocketAddr)> {
         let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
 
         // This is safe to assume because a `libc::sockaddr_un` filled with `0`
@@ -48,7 +48,7 @@ impl UnixListener {
                 &mut socklen,
                 flags
             ))
-            .map(|socket| unsafe { UnixStream::from_raw_fd(socket) })
+            .map(|socket| unsafe { net::UnixStream::from_raw_fd(socket) })
         };
 
         #[cfg(any(
@@ -65,7 +65,7 @@ impl UnixListener {
         .and_then(|socket| {
             // Ensure the socket is closed if either of the `fcntl` calls
             // error below.
-            let s = unsafe { UnixStream::from_raw_fd(socket) };
+            let s = unsafe { net::UnixStream::from_raw_fd(socket) };
             syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))
                 .and_then(|_| syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| s))
         });
