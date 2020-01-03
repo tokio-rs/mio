@@ -1,10 +1,8 @@
 #![cfg(all(feature = "os-poll", feature = "udp"))]
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
 use log::{debug, info};
 use mio::net::UdpSocket;
 use mio::{Events, Interest, Poll, Registry, Token};
-use std::io::ErrorKind;
 use std::net::{self, IpAddr, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
@@ -701,8 +699,8 @@ pub struct UdpHandlerSendRecv {
     tx: UdpSocket,
     rx: UdpSocket,
     msg: &'static str,
-    buf: Bytes,
-    rx_buf: BytesMut,
+    buf: Vec<u8>,
+    rx_buf: Vec<u8>,
     connected: bool,
     shutdown: bool,
 }
@@ -713,15 +711,14 @@ impl UdpHandlerSendRecv {
             tx,
             rx,
             msg,
-            buf: Bytes::from_static(msg.as_bytes()),
-            rx_buf: BytesMut::with_capacity(1024),
+            buf: msg.as_bytes().to_vec(),
+            rx_buf: vec![0; 1024],
             connected,
             shutdown: false,
         }
     }
 }
 
-#[cfg(test)]
 fn send_recv_udp(mut tx: UdpSocket, mut rx: UdpSocket, connected: bool) {
     init();
 
@@ -730,10 +727,7 @@ fn send_recv_udp(mut tx: UdpSocket, mut rx: UdpSocket, connected: bool) {
 
     // ensure that the sockets are non-blocking
     let mut buf = [0; 128];
-    assert_eq!(
-        ErrorKind::WouldBlock,
-        rx.recv_from(&mut buf).unwrap_err().kind()
-    );
+    assert_would_block(rx.recv_from(&mut buf));
 
     info!("Registering SENDER");
     poll.registry()
@@ -757,18 +751,17 @@ fn send_recv_udp(mut tx: UdpSocket, mut rx: UdpSocket, connected: bool) {
             if event.is_readable() {
                 if let LISTENER = event.token() {
                     debug!("We are receiving a datagram now...");
-                    let cnt = unsafe {
-                        if !handler.connected {
-                            handler.rx.recv_from(handler.rx_buf.bytes_mut()).unwrap().0
-                        } else {
-                            handler.rx.recv(handler.rx_buf.bytes_mut()).unwrap()
-                        }
+                    let cnt = if !handler.connected {
+                        handler.rx.recv_from(&mut handler.rx_buf).unwrap().0
+                    } else {
+                        handler.rx.recv(&mut handler.rx_buf).unwrap()
                     };
 
-                    unsafe {
-                        BufMut::advance_mut(&mut handler.rx_buf, cnt);
-                    }
-                    assert!(str::from_utf8(handler.rx_buf.as_ref()).unwrap() == handler.msg);
+                    unsafe { handler.rx_buf.set_len(cnt) };
+                    assert_eq!(
+                        str::from_utf8(handler.rx_buf.as_ref()).unwrap(),
+                        handler.msg
+                    );
                     handler.shutdown = true;
                 }
             }
@@ -777,12 +770,13 @@ fn send_recv_udp(mut tx: UdpSocket, mut rx: UdpSocket, connected: bool) {
                 if let SENDER = event.token() {
                     let cnt = if !handler.connected {
                         let addr = handler.rx.local_addr().unwrap();
-                        handler.tx.send_to(handler.buf.as_ref(), addr).unwrap()
+                        handler.tx.send_to(&handler.buf, addr).unwrap()
                     } else {
-                        handler.tx.send(handler.buf.as_ref()).unwrap()
+                        handler.tx.send(&handler.buf).unwrap()
                     };
 
-                    handler.buf.advance(cnt);
+                    // Advance the buffer.
+                    drop(handler.buf.drain(..cnt));
                 }
             }
         }
@@ -866,21 +860,21 @@ pub struct UdpHandler {
     tx: UdpSocket,
     rx: UdpSocket,
     msg: &'static str,
-    buf: Bytes,
-    rx_buf: BytesMut,
+    buf: Vec<u8>,
+    rx_buf: Vec<u8>,
     localhost: IpAddr,
     shutdown: bool,
 }
 
 impl UdpHandler {
     fn new(tx: UdpSocket, rx: UdpSocket, msg: &'static str) -> UdpHandler {
-        let sock = UdpSocket::bind("127.0.0.1:12345".parse().unwrap()).unwrap();
+        let sock = UdpSocket::bind(any_local_address()).unwrap();
         UdpHandler {
             tx,
             rx,
             msg,
-            buf: Bytes::from_static(msg.as_bytes()),
-            rx_buf: BytesMut::with_capacity(1024),
+            buf: msg.as_bytes().to_vec(),
+            rx_buf: Vec::with_capacity(1024),
             localhost: sock.local_addr().unwrap().ip(),
             shutdown: false,
         }
@@ -889,16 +883,15 @@ impl UdpHandler {
     fn handle_read(&mut self, _: &Registry, token: Token) {
         if let LISTENER = token {
             debug!("We are receiving a datagram now...");
-            match unsafe { self.rx.recv_from(self.rx_buf.bytes_mut()) } {
+            unsafe { self.rx_buf.set_len(self.rx_buf.capacity()) };
+            match self.rx.recv_from(&mut self.rx_buf) {
                 Ok((cnt, addr)) => {
-                    unsafe {
-                        BufMut::advance_mut(&mut self.rx_buf, cnt);
-                    }
+                    unsafe { self.rx_buf.set_len(cnt) };
                     assert_eq!(addr.ip(), self.localhost);
                 }
                 res => panic!("unexpected result: {:?}", res),
             }
-            assert!(str::from_utf8(self.rx_buf.as_ref()).unwrap() == self.msg);
+            assert_eq!(str::from_utf8(&self.rx_buf).unwrap(), self.msg);
             self.shutdown = true;
         }
     }
@@ -907,7 +900,7 @@ impl UdpHandler {
         if let SENDER = token {
             let addr = self.rx.local_addr().unwrap();
             let cnt = self.tx.send_to(self.buf.as_ref(), addr).unwrap();
-            self.buf.advance(cnt);
+            self.buf.drain(..cnt);
         }
     }
 }
