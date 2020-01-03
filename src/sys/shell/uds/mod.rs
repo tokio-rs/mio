@@ -1,5 +1,4 @@
-mod datagram;
-pub(crate) use self::datagram::UnixDatagram;
+pub(crate) mod datagram;
 
 mod listener;
 pub(crate) use self::listener::UnixListener;

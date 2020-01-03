@@ -1,5 +1,4 @@
-#[cfg(debug_assertions)]
-use crate::poll::SelectorId;
+use crate::io_source::IoSource;
 use crate::{event, sys, Interest, Registry, Token};
 
 use std::io;
@@ -11,24 +10,13 @@ use std::path::Path;
 /// A Unix datagram socket.
 #[derive(Debug)]
 pub struct UnixDatagram {
-    sys: sys::UnixDatagram,
-    #[cfg(debug_assertions)]
-    selector_id: SelectorId,
+    inner: IoSource<net::UnixDatagram>,
 }
 
 impl UnixDatagram {
-    fn new(sys: sys::UnixDatagram) -> UnixDatagram {
-        UnixDatagram {
-            sys,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
-        }
-    }
-
     /// Creates a Unix datagram socket bound to the given path.
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixDatagram> {
-        let sys = sys::UnixDatagram::bind(path.as_ref())?;
-        Ok(UnixDatagram::new(sys))
+        sys::uds::datagram::bind(path.as_ref()).map(UnixDatagram::from_std)
     }
 
     /// Creates a new `UnixDatagram` from a standard `net::UnixDatagram`.
@@ -37,66 +25,65 @@ impl UnixDatagram {
     /// standard library in the Mio equivalent. The conversion assumes nothing
     /// about the underlying datagram; ; it is left up to the user to set it
     /// in non-blocking mode.
-    pub fn from_std(datagram: net::UnixDatagram) -> UnixDatagram {
-        let sys = sys::UnixDatagram::from_std(datagram);
+    pub fn from_std(socket: net::UnixDatagram) -> UnixDatagram {
         UnixDatagram {
-            sys,
-            #[cfg(debug_assertions)]
-            selector_id: SelectorId::new(),
+            inner: IoSource::new(socket),
         }
     }
 
     /// Connects the socket to the specified address.
     pub fn connect<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
-        self.sys.connect(path)
+        self.inner.connect(path)
     }
 
     /// Creates a Unix Datagram socket which is not bound to any address.
     pub fn unbound() -> io::Result<UnixDatagram> {
-        let sys = sys::UnixDatagram::unbound()?;
-        Ok(UnixDatagram::new(sys))
+        sys::uds::datagram::unbound().map(UnixDatagram::from_std)
     }
 
     /// Create an unnamed pair of connected sockets.
     pub fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {
-        let (a, b) = sys::UnixDatagram::pair()?;
-        let a = UnixDatagram::new(a);
-        let b = UnixDatagram::new(b);
-        Ok((a, b))
+        sys::uds::datagram::pair().map(|(socket1, socket2)| {
+            (
+                UnixDatagram::from_std(socket1),
+                UnixDatagram::from_std(socket2),
+            )
+        })
     }
 
     /// Returns the address of this socket.
     pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
-        self.sys.local_addr()
+        sys::uds::datagram::local_addr(&self.inner)
     }
 
     /// Returns the address of this socket's peer.
     ///
     /// The `connect` method will connect the socket to a peer.
     pub fn peer_addr(&self) -> io::Result<sys::SocketAddr> {
-        self.sys.peer_addr()
+        sys::uds::datagram::peer_addr(&self.inner)
     }
 
     /// Receives data from the socket.
     ///
     /// On success, returns the number of bytes read and the address from
     /// whence the data came.
-    pub fn recv_from(&self, dst: &mut [u8]) -> io::Result<(usize, sys::SocketAddr)> {
-        self.sys.recv_from(dst)
+    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, sys::SocketAddr)> {
+        self.inner
+            .do_io(|inner| sys::uds::datagram::recv_from(inner, buf))
     }
 
     /// Receives data from the socket.
     ///
     /// On success, returns the number of bytes read.
-    pub fn recv(&self, dst: &mut [u8]) -> io::Result<usize> {
-        self.sys.recv(dst)
+    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.do_io(|inner| inner.recv(buf))
     }
 
     /// Sends data on the socket to the specified address.
     ///
     /// On success, returns the number of bytes written.
-    pub fn send_to<P: AsRef<Path>>(&self, src: &[u8], path: P) -> io::Result<usize> {
-        self.sys.send_to(src, path)
+    pub fn send_to<P: AsRef<Path>>(&self, buf: &[u8], path: P) -> io::Result<usize> {
+        self.inner.do_io(|inner| inner.send_to(buf, path))
     }
 
     /// Sends data on the socket to the socket's peer.
@@ -105,13 +92,13 @@ impl UnixDatagram {
     /// will return an error if the socket has not already been connected.
     ///
     /// On success, returns the number of bytes written.
-    pub fn send(&self, src: &[u8]) -> io::Result<usize> {
-        self.sys.send(src)
+    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.do_io(|inner| inner.send(buf))
     }
 
     /// Returns the value of the `SO_ERROR` option.
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.sys.take_error()
+        self.inner.take_error()
     }
 
     /// Shut down the read, write, or both halves of this connection.
@@ -120,7 +107,7 @@ impl UnixDatagram {
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.sys.shutdown(how)
+        self.inner.shutdown(how)
     }
 }
 
@@ -131,9 +118,7 @@ impl event::Source for UnixDatagram {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.associate_selector(registry)?;
-        self.sys.register(registry, token, interests)
+        self.inner.register(registry, token, interests)
     }
 
     fn reregister(
@@ -142,17 +127,17 @@ impl event::Source for UnixDatagram {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        self.sys.reregister(registry, token, interests)
+        self.inner.reregister(registry, token, interests)
     }
 
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
-        self.sys.deregister(registry)
+        self.inner.deregister(registry)
     }
 }
 
 impl AsRawFd for UnixDatagram {
     fn as_raw_fd(&self) -> RawFd {
-        self.sys.as_raw_fd()
+        self.inner.as_raw_fd()
     }
 }
 
@@ -162,12 +147,14 @@ impl FromRawFd for UnixDatagram {
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixDatagram {
-        UnixDatagram::new(FromRawFd::from_raw_fd(fd))
+        UnixDatagram {
+            inner: IoSource::new(FromRawFd::from_raw_fd(fd)),
+        }
     }
 }
 
 impl IntoRawFd for UnixDatagram {
     fn into_raw_fd(self) -> RawFd {
-        self.sys.into_raw_fd()
+        self.inner.into_inner().into_raw_fd()
     }
 }
