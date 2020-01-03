@@ -27,6 +27,11 @@ cfg_uds! {
 
 cfg_net! {
     use std::io;
+    #[cfg(windows)]
+    use std::os::windows::io::RawSocket;
+
+    #[cfg(windows)]
+    use crate::{Registry, Token, Interest};
 
     pub struct IoSourceState;
 
@@ -42,6 +47,32 @@ cfg_net! {
             // We don't hold state, so we can just call the function and
             // return.
             f(io)
+        }
+    }
+
+    #[cfg(windows)]
+    impl IoSourceState {
+         pub fn register(
+            &mut self,
+            _: &Registry,
+            _: Token,
+            _: Interest,
+            _: RawSocket,
+        ) -> io::Result<()> {
+            os_required!()
+        }
+
+        pub fn reregister(
+            &mut self,
+            _: &Registry,
+            _: Token,
+            _: Interest,
+        ) -> io::Result<()> {
+           os_required!()
+        }
+
+        pub fn deregister(&mut self) -> io::Result<()> {
+            os_required!()
         }
     }
 }
