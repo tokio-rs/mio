@@ -58,7 +58,7 @@ cfg_os_poll! {
     pub(crate) use self::unix::{event, Event, Events, Selector, Waker};
 
     cfg_tcp! {
-        pub(crate) use self::unix::{tcp, TcpListener};
+        pub(crate) use self::unix::tcp;
     }
 
     cfg_udp! {

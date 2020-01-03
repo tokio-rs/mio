@@ -245,7 +245,7 @@ impl event::Source for TcpStream {
 
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.inner, f)
+        self.inner.fmt(f)
     }
 }
 
