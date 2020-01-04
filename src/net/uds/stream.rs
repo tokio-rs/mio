@@ -155,7 +155,7 @@ impl FromRawFd for UnixStream {
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixStream {
-        UnixStream::from_std(net::UnixStream::from_raw_fd(fd))
+        UnixStream::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
 

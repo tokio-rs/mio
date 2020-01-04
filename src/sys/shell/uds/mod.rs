@@ -1,6 +1,3 @@
 pub(crate) mod datagram;
-
-mod listener;
-pub(crate) use self::listener::UnixListener;
-
+pub(crate) mod listener;
 pub(crate) mod stream;

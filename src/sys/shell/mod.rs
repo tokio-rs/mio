@@ -21,7 +21,6 @@ cfg_udp! {
 #[cfg(unix)]
 cfg_uds! {
     pub(crate) mod uds;
-    pub(crate) use self::uds::UnixListener;
 }
 
 cfg_net! {

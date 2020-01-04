@@ -55,6 +55,7 @@ cfg_os_poll! {
 cfg_os_poll! {
     mod unix;
     pub use self::unix::SourceFd;
+
     pub(crate) use self::unix::{event, Event, Events, Selector, Waker};
 
     cfg_tcp! {
@@ -66,9 +67,9 @@ cfg_os_poll! {
     }
 
     cfg_uds! {
-        pub(crate) use self::unix::uds;
-        pub(crate) use self::unix::UnixListener;
         pub use self::unix::SocketAddr;
+
+        pub(crate) use self::unix::uds;
     }
 
     cfg_net! {
