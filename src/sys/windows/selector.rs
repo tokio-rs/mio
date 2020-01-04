@@ -370,9 +370,9 @@ cfg_net! {
             SelectorInner::register(&self.inner, socket, token, interests)
         }
 
-        pub fn reregister(
+        pub(super) fn reregister(
             &self,
-            state: &Pin<Arc<Mutex<SockState>>>,
+            state: Pin<Arc<Mutex<SockState>>>,
             token: Token,
             interests: Interest,
         ) -> io::Result<()> {
@@ -536,7 +536,7 @@ cfg_net! {
                 selector: this.clone(),
                 token,
                 interests,
-                sock_state: Some(sock.clone()),
+                sock_state: sock.clone(),
             };
 
             this.queue_state(sock);
@@ -545,9 +545,10 @@ cfg_net! {
             Ok(state)
         }
 
-        pub fn reregister(
+        // Directly accessed in `IoSourceState::do_io`.
+        pub(super) fn reregister(
             &self,
-            state: &Pin<Arc<Mutex<SockState>>>,
+            state: Pin<Arc<Mutex<SockState>>>,
             token: Token,
             interests: Interest,
         ) -> io::Result<()> {
@@ -560,7 +561,7 @@ cfg_net! {
                 state.lock().unwrap().set_event(event);
             }
 
-            self.queue_state(state.clone());
+            self.queue_state(state);
             unsafe { self.update_sockets_events_if_polling() }
         }
 
