@@ -21,10 +21,7 @@ cfg_os_poll! {
     use std::{io, mem};
 
     pub(crate) mod datagram;
-
-    mod listener;
-    pub(crate) use self::listener::UnixListener;
-
+    pub(crate) mod listener;
     pub(crate) mod stream;
 
     pub(in crate::sys) fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
