@@ -1,13 +1,13 @@
-use super::{inaddr_any, new_socket, socket_addr};
-use crate::sys::windows::init;
-
 use std::io;
 use std::net::{self, SocketAddr};
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
+
 use winapi::um::winsock2::{
     bind as win_bind, closesocket, connect as win_connect, listen, SOCKET_ERROR, SOCK_STREAM,
 };
+
+use crate::sys::windows::net::{inaddr_any, init, new_socket, socket_addr};
 
 pub fn connect(addr: SocketAddr) -> io::Result<net::TcpStream> {
     init();
