@@ -48,9 +48,7 @@ impl TcpStream {
     /// Create a new TCP stream and issue a non-blocking connect to the
     /// specified address.
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
-        sys::tcp::connect(addr).map(|stream| TcpStream {
-            inner: IoSource::new(stream),
-        })
+        sys::tcp::connect(addr).map(TcpStream::from_std)
     }
 
     /// Creates a new `TcpStream` from a standard `net::TcpStream`.
@@ -266,9 +264,7 @@ impl AsRawFd for TcpStream {
 #[cfg(unix)]
 impl FromRawFd for TcpStream {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
-        TcpStream {
-            inner: IoSource::new(FromRawFd::from_raw_fd(fd)),
-        }
+        TcpStream::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
 
@@ -289,8 +285,6 @@ impl AsRawSocket for TcpStream {
 #[cfg(windows)]
 impl FromRawSocket for TcpStream {
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpStream {
-        TcpStream {
-            inner: IoSource::new(FromRawSocket::from_raw_socket(socket)),
-        }
+        TcpStream::from_std(FromRawSocket::from_raw_socket(socket))
     }
 }
