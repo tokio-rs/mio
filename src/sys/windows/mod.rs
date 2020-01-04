@@ -38,15 +38,6 @@ cfg_udp! {
 mod waker;
 pub(crate) use waker::Waker;
 
-pub trait SocketState {
-    // The `SockState` struct needs to be pinned in memory because it contains
-    // `OVERLAPPED` and `AFD_POLL_INFO` fields which are modified in the
-    // background by the windows kernel, therefore we need to ensure they are
-    // never moved to a different memory address.
-    fn get_sock_state(&self) -> Option<Pin<Arc<Mutex<SockState>>>>;
-    fn set_sock_state(&self, sock_state: Option<Pin<Arc<Mutex<SockState>>>>);
-}
-
 cfg_net! {
     use crate::{poll, Interest, Registry, Token};
     use std::io;
@@ -64,15 +55,13 @@ cfg_net! {
         selector: Arc<SelectorInner>,
         token: Token,
         interests: Interest,
-        sock_state: Option<Pin<Arc<Mutex<SockState>>>>,
+        sock_state: Pin<Arc<Mutex<SockState>>>,
     }
 
     impl Drop for InternalState {
         fn drop(&mut self) {
-            if let Some(sock_state) = self.sock_state.as_ref() {
-                let mut sock_state = sock_state.lock().unwrap();
-                sock_state.mark_delete();
-            }
+            let mut sock_state = self.sock_state.lock().unwrap();
+            sock_state.mark_delete();
         }
     }
 
@@ -97,12 +86,9 @@ cfg_net! {
             if let Err(ref e) = result {
                 if e.kind() == io::ErrorKind::WouldBlock {
                     self.inner.as_ref().map_or(Ok(()), |state| {
-                        // TODO: remove this unwrap once `InternalState.sock_state`
-                        // no longer uses `Option`.
-                        let sock_state = state.sock_state.as_ref().unwrap();
                         state
                             .selector
-                            .reregister(sock_state, state.token, state.interests)
+                            .reregister(state.sock_state.clone(), state.token, state.interests)
                     })?;
                 }
             }
@@ -117,7 +103,7 @@ cfg_net! {
             socket: RawSocket,
         ) -> io::Result<()> {
             if self.inner.is_some() {
-                Err(io::Error::from(io::ErrorKind::AlreadyExists))
+                Err(io::ErrorKind::AlreadyExists.into())
             } else {
                 poll::selector(registry)
                     .register(socket, token, interests)
@@ -135,15 +121,14 @@ cfg_net! {
         ) -> io::Result<()> {
             match self.inner.as_mut() {
                 Some(state) => {
-                    let sock_state = state.sock_state.as_ref().unwrap();
                     poll::selector(registry)
-                        .reregister(sock_state, token, interests)
+                        .reregister(state.sock_state.clone(), token, interests)
                         .map(|()| {
                             state.token = token;
                             state.interests = interests;
                         })
                 }
-                None => Err(io::Error::from(io::ErrorKind::NotFound)),
+                None => Err(io::ErrorKind::NotFound.into()),
             }
         }
 
@@ -151,14 +136,13 @@ cfg_net! {
             match self.inner.as_mut() {
                 Some(state) => {
                     {
-                        let sock_state = state.sock_state.as_ref().unwrap();
-                        let mut sock_state = sock_state.lock().unwrap();
+                        let mut sock_state = state.sock_state.lock().unwrap();
                         sock_state.mark_delete();
                     }
                     self.inner = None;
                     Ok(())
                 }
-                None => Err(io::Error::from(io::ErrorKind::NotFound)),
+                None => Err(io::ErrorKind::NotFound.into()),
             }
         }
     }
