@@ -64,3 +64,8 @@ pub fn bind(addr: SocketAddr) -> io::Result<net::TcpListener> {
         .map(|_| unsafe { net::TcpListener::from_raw_socket(socket as StdSocket) })
     })
 }
+
+pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
+    // The non-blocking state of `listener` is inherited.
+    listener.accept()
+}

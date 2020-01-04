@@ -74,11 +74,7 @@ impl TcpListener {
     /// returned along with it.
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         self.inner.do_io(|inner| {
-            (&*inner).accept().and_then(|(stream, addr)| {
-                stream
-                    .set_nonblocking(true)
-                    .map(|()| (TcpStream::from_std(stream), addr))
-            })
+            sys::tcp::accept(inner).map(|(stream, addr)| (TcpStream::from_std(stream), addr))
         })
     }
 
