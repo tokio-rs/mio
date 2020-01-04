@@ -49,9 +49,7 @@ impl TcpListener {
     /// 3. Bind the socket to the specified address.
     /// 4. Calls `listen` on the socket to prepare it to receive new connections.
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
-        sys::tcp::bind(addr).map(|listener| TcpListener {
-            inner: IoSource::new(listener),
-        })
+        sys::tcp::bind(addr).map(TcpListener::from_std)
     }
 
     /// Creates a new `TcpListener` from a standard `net::TcpListener`.
@@ -154,9 +152,7 @@ impl AsRawFd for TcpListener {
 #[cfg(unix)]
 impl FromRawFd for TcpListener {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
-        TcpListener {
-            inner: IoSource::new(FromRawFd::from_raw_fd(fd)),
-        }
+        TcpListener::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
 
@@ -177,9 +173,7 @@ impl AsRawSocket for TcpListener {
 #[cfg(windows)]
 impl FromRawSocket for TcpListener {
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
-        TcpListener {
-            inner: IoSource::new(FromRawSocket::from_raw_socket(socket)),
-        }
+        TcpListener::from_std(FromRawSocket::from_raw_socket(socket))
     }
 }
 
