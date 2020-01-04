@@ -13,8 +13,9 @@ use std::thread;
 #[macro_use]
 mod util;
 use util::{
-    assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init,
-    init_with_poll, temp_file, ExpectEvent, Readiness,
+    assert_send, assert_socket_close_on_exec, assert_socket_non_blocking, assert_sync,
+    assert_would_block, expect_events, expect_no_events, init, init_with_poll, temp_file,
+    ExpectEvent, Readiness,
 };
 
 const DATA1: &[u8] = b"Hello same host!";
@@ -412,6 +413,10 @@ where
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = connect_stream(path).unwrap();
+
+    assert_socket_non_blocking(&stream);
+    assert_socket_close_on_exec(&stream);
+
     poll.registry()
         .register(
             &mut stream,

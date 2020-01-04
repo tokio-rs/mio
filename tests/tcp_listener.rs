@@ -11,8 +11,9 @@ use std::thread;
 
 mod util;
 use util::{
-    any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
-    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
+    any_local_address, any_local_ipv6_address, assert_send, assert_socket_close_on_exec,
+    assert_socket_non_blocking, assert_sync, assert_would_block, expect_events, expect_no_events,
+    init, init_with_poll, ExpectEvent,
 };
 
 const ID1: Token = Token(0);
@@ -53,6 +54,9 @@ where
 
     let mut listener = make_listener(addr).unwrap();
     let address = listener.local_addr().unwrap();
+
+    assert_socket_non_blocking(&listener);
+    assert_socket_close_on_exec(&listener);
 
     poll.registry()
         .register(&mut listener, ID1, Interest::READABLE)

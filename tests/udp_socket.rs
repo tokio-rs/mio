@@ -14,8 +14,9 @@ use std::time::Duration;
 #[macro_use]
 mod util;
 use util::{
-    any_local_address, any_local_ipv6_address, assert_error, assert_send, assert_sync,
-    assert_would_block, expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
+    any_local_address, any_local_ipv6_address, assert_error, assert_send,
+    assert_socket_close_on_exec, assert_socket_non_blocking, assert_sync, assert_would_block,
+    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
 };
 
 const DATA1: &[u8] = b"Hello world!";
@@ -64,6 +65,11 @@ fn unconnected_udp_socket_std() {
 
 fn smoke_test_unconnected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocket) {
     let (mut poll, mut events) = init_with_poll();
+
+    assert_socket_non_blocking(&socket1);
+    assert_socket_close_on_exec(&socket1);
+    assert_socket_non_blocking(&socket2);
+    assert_socket_close_on_exec(&socket2);
 
     let address1 = socket1.local_addr().unwrap();
     let address2 = socket2.local_addr().unwrap();
@@ -275,6 +281,11 @@ fn connected_udp_socket_std() {
 
 fn smoke_test_connected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocket) {
     let (mut poll, mut events) = init_with_poll();
+
+    assert_socket_non_blocking(&socket1);
+    assert_socket_close_on_exec(&socket1);
+    assert_socket_non_blocking(&socket2);
+    assert_socket_close_on_exec(&socket2);
 
     poll.registry()
         .register(
