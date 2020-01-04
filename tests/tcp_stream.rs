@@ -14,8 +14,9 @@ mod util;
 #[cfg(not(target_os = "windows"))]
 use util::init;
 use util::{
-    any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
-    expect_events, expect_no_events, init_with_poll, ExpectEvent, Readiness,
+    any_local_address, any_local_ipv6_address, assert_send, assert_socket_close_on_exec,
+    assert_socket_non_blocking, assert_sync, assert_would_block, expect_events, expect_no_events,
+    init_with_poll, ExpectEvent, Readiness,
 };
 
 const DATA1: &[u8] = b"Hello world!";
@@ -62,6 +63,9 @@ where
 
     let (handle, addr) = echo_listener(addr, 1);
     let mut stream = make_stream(addr).unwrap();
+
+    assert_socket_non_blocking(&stream);
+    assert_socket_close_on_exec(&stream);
 
     poll.registry()
         .register(&mut stream, ID1, Interest::WRITABLE.add(Interest::READABLE))

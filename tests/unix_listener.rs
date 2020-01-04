@@ -11,8 +11,8 @@ use std::thread;
 #[macro_use]
 mod util;
 use util::{
-    assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init_with_poll,
-    temp_file, ExpectEvent,
+    assert_send, assert_socket_close_on_exec, assert_socket_non_blocking, assert_sync,
+    assert_would_block, expect_events, expect_no_events, init_with_poll, temp_file, ExpectEvent,
 };
 
 const DEFAULT_BUF_SIZE: usize = 64;
@@ -142,6 +142,10 @@ where
     let path = temp_file(test_name);
 
     let mut listener = new_listener(&path).unwrap();
+
+    assert_socket_non_blocking(&listener);
+    assert_socket_close_on_exec(&listener);
+
     poll.registry()
         .register(
             &mut listener,

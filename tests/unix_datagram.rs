@@ -9,8 +9,9 @@ use std::os::unix::net;
 #[macro_use]
 mod util;
 use util::{
-    assert_send, assert_sync, assert_would_block, expect_events, expect_no_events, init,
-    init_with_poll, temp_file, ExpectEvent, Readiness,
+    assert_send, assert_socket_close_on_exec, assert_socket_non_blocking, assert_sync,
+    assert_would_block, expect_events, expect_no_events, init, init_with_poll, temp_file,
+    ExpectEvent, Readiness,
 };
 
 const DATA1: &[u8] = b"Hello same host!";
@@ -277,6 +278,11 @@ fn unix_datagram_deregister() {
 fn smoke_test_unconnected(mut datagram1: UnixDatagram, mut datagram2: UnixDatagram) {
     let (mut poll, mut events) = init_with_poll();
 
+    assert_socket_non_blocking(&datagram1);
+    assert_socket_close_on_exec(&datagram1);
+    assert_socket_non_blocking(&datagram2);
+    assert_socket_close_on_exec(&datagram2);
+
     let addr1 = datagram1.local_addr().unwrap();
     let addr2 = datagram2.local_addr().unwrap();
     let path1 = addr1.as_pathname().expect("failed to get pathname");
@@ -329,6 +335,11 @@ fn smoke_test_unconnected(mut datagram1: UnixDatagram, mut datagram2: UnixDatagr
 
 fn smoke_test_connected(mut datagram1: UnixDatagram, mut datagram2: UnixDatagram) {
     let (mut poll, mut events) = init_with_poll();
+
+    assert_socket_non_blocking(&datagram1);
+    assert_socket_close_on_exec(&datagram1);
+    assert_socket_non_blocking(&datagram2);
+    assert_socket_close_on_exec(&datagram2);
 
     let local_addr1 = datagram1.local_addr().unwrap();
     let peer_addr1 = datagram1.peer_addr().unwrap();
