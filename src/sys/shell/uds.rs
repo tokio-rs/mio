@@ -1,9 +1,9 @@
-use crate::net::{SocketAddr, UnixStream};
-use std::io;
-use std::os::unix::net;
-use std::path::Path;
-
 pub(crate) mod datagram {
+    use crate::net::SocketAddr;
+    use std::io;
+    use std::os::unix::net;
+    use std::path::Path;
+
     pub(crate) fn bind(_: &Path) -> io::Result<net::UnixDatagram> {
         os_required!()
     }
@@ -33,6 +33,11 @@ pub(crate) mod datagram {
 }
 
 pub(crate) mod listener {
+    use crate::net::{SocketAddr, UnixStream};
+    use std::io;
+    use std::os::unix::net;
+    use std::path::Path;
+
     pub(crate) fn bind(_: &Path) -> io::Result<net::UnixListener> {
         os_required!()
     }
@@ -47,6 +52,11 @@ pub(crate) mod listener {
 }
 
 pub(crate) mod stream {
+    use crate::net::SocketAddr;
+    use std::io;
+    use std::os::unix::net;
+    use std::path::Path;
+
     pub(crate) fn connect(_: &Path) -> io::Result<net::UnixStream> {
         os_required!()
     }
