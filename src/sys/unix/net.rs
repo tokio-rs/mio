@@ -73,7 +73,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::so
 }
 
 /// `storage` must be initialised to `sockaddr_in` or `sockaddr_in6`.
-#[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
+#[cfg(all(feature = "os-poll", any(feature = "tcp")))]
 pub(crate) unsafe fn to_socket_addr(
     storage: *const libc::sockaddr_storage,
 ) -> std::io::Result<SocketAddr> {
