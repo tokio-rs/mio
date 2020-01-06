@@ -66,6 +66,7 @@ pub fn bind(addr: SocketAddr) -> io::Result<net::TcpListener> {
 }
 
 pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
-    // The non-blocking state of `listener` is inherited.
+    // The non-blocking state of `listener` is inherited. See
+    // https://docs.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-accept#remarks.
     listener.accept()
 }
