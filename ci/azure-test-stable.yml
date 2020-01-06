@@ -28,7 +28,7 @@ jobs:
       
       - ${{ if eq(parameters.cmd, 'test') }}:
           - script: |
-              cargo install cargo-hack --git https://github.com/taiki-e/cargo-hack.git --rev ab711714af17bbfd1815ba0059f6ea8302bba78a
+              cargo install cargo-hack
               cargo hack check --feature-powerset --skip guide
             displayName: Check feature powerset
 
