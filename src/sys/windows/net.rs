@@ -50,6 +50,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (*const SOCKADDR, c_int) {
     }
 }
 
+#[cfg(all(feature = "os-poll", feature = "tcp"))]
 pub(crate) fn inaddr_any(other: SocketAddr) -> SocketAddr {
     match other {
         SocketAddr::V4(..) => {

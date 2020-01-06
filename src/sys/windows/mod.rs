@@ -1,6 +1,3 @@
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
-
 mod afd;
 mod io_status_block;
 
@@ -41,6 +38,8 @@ pub(crate) use waker::Waker;
 cfg_net! {
     use std::io;
     use std::os::windows::io::RawSocket;
+    use std::pin::Pin;
+    use std::sync::{Arc, Mutex};
 
     use crate::{poll, Interest, Registry, Token};
 
