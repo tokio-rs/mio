@@ -27,7 +27,9 @@ jobs:
           rust_version: ${{ parameters.rust_version }}
       
       - ${{ if eq(parameters.cmd, 'test') }}:
-          - script: ./bin/check-powerset
+          - script: |
+              cargo install cargo-hack --git https://github.com/taiki-e/cargo-hack.git --rev ab711714af17bbfd1815ba0059f6ea8302bba78a
+              cargo hack check --feature-powerset --skip guide
             displayName: Check feature powerset
 
       - script: cargo ${{ parameters.cmd }} --all-features
