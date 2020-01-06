@@ -70,8 +70,7 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
         // Ensure the socket is closed if either of the `fcntl` calls
         // error below.
         let s = unsafe { net::UnixStream::from_raw_fd(socket) };
-        syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))
-            .and_then(|_| syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| s))
+        syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| s)
     });
 
     socket
