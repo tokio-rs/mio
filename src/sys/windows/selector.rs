@@ -357,53 +357,26 @@ impl Selector {
 }
 
 cfg_net! {
-    use super::{SocketState, InternalState};
+    use super::InternalState;
     use crate::Token;
-    use std::os::windows::io::AsRawSocket;
 
     impl Selector {
-        pub fn register<S: SocketState + AsRawSocket>(
-            &self,
-            socket: &S,
-            token: Token,
-            interests: Interest,
-        ) -> io::Result<()> {
-            self.inner.register(socket, token, interests)
-        }
-
-        pub(super) fn register2(
+        pub(super) fn register(
             &self,
             socket: RawSocket,
             token: Token,
             interests: Interest,
         ) -> io::Result<InternalState> {
-            SelectorInner::register2(&self.inner, socket, token, interests)
+            SelectorInner::register(&self.inner, socket, token, interests)
         }
 
-        pub fn reregister<S: SocketState>(
+        pub(super) fn reregister(
             &self,
-            socket: &S,
+            state: Pin<Arc<Mutex<SockState>>>,
             token: Token,
             interests: Interest,
         ) -> io::Result<()> {
-            self.inner.reregister(socket, token, interests)
-        }
-
-        pub fn reregister2(
-            &self,
-            state: &Pin<Arc<Mutex<SockState>>>,
-            token: Token,
-            interests: Interest,
-        ) -> io::Result<()> {
-            self.inner.reregister2(state, token, interests)
-        }
-
-        pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
-            self.inner.deregister(socket)
-        }
-
-        pub(super) fn clone_inner(&self) -> Arc<SelectorInner> {
-            self.inner.clone()
+            self.inner.reregister(state, token, interests)
         }
 
         #[cfg(debug_assertions)]
@@ -541,37 +514,7 @@ cfg_net! {
     use winapi::um::winsock2::{WSAIoctl, SOCKET_ERROR};
 
     impl SelectorInner {
-        pub fn register<S: SocketState + AsRawSocket>(
-            &self,
-            socket: &S,
-            token: Token,
-            interests: Interest,
-        ) -> io::Result<()> {
-            if socket.get_sock_state().is_some() {
-                return Err(io::Error::from(io::ErrorKind::AlreadyExists));
-            }
-
-            let flags = interests_to_afd_flags(interests);
-
-            let sock = self._alloc_sock_for_rawsocket(socket.as_raw_socket())?;
-            let event = Event {
-                flags,
-                data: token.0 as u64,
-            };
-
-            {
-                sock.lock().unwrap().set_event(event);
-            }
-            socket.set_sock_state(Some(sock));
-            unsafe {
-                self.add_socket_to_update_queue(socket);
-                self.update_sockets_events_if_polling()?;
-            }
-
-            Ok(())
-        }
-
-        fn register2(
+        fn register(
             this: &Arc<Self>,
             socket: RawSocket,
             token: Token,
@@ -593,7 +536,7 @@ cfg_net! {
                 selector: this.clone(),
                 token,
                 interests,
-                sock_state: Some(sock.clone()),
+                sock_state: sock.clone(),
             };
 
             this.queue_state(sock);
@@ -602,37 +545,10 @@ cfg_net! {
             Ok(state)
         }
 
-        pub fn reregister<S: SocketState>(
+        // Directly accessed in `IoSourceState::do_io`.
+        pub(super) fn reregister(
             &self,
-            socket: &S,
-            token: Token,
-            interests: Interest,
-        ) -> io::Result<()> {
-            let flags = interests_to_afd_flags(interests);
-
-            let sock = match socket.get_sock_state() {
-                Some(sock) => sock,
-                None => return Err(io::Error::from(io::ErrorKind::NotFound)),
-            };
-            let event = Event {
-                flags,
-                data: token.0 as u64,
-            };
-
-            {
-                sock.lock().unwrap().set_event(event);
-            }
-            unsafe {
-                self.add_socket_to_update_queue(socket);
-                self.update_sockets_events_if_polling()?;
-            }
-
-            Ok(())
-        }
-
-        pub fn reregister2(
-            &self,
-            state: &Pin<Arc<Mutex<SockState>>>,
+            state: Pin<Arc<Mutex<SockState>>>,
             token: Token,
             interests: Interest,
         ) -> io::Result<()> {
@@ -645,17 +561,8 @@ cfg_net! {
                 state.lock().unwrap().set_event(event);
             }
 
-            self.queue_state(state.clone());
+            self.queue_state(state);
             unsafe { self.update_sockets_events_if_polling() }
-        }
-
-        pub fn deregister<S: SocketState>(&self, socket: &S) -> io::Result<()> {
-            if socket.get_sock_state().is_none() {
-                return Err(io::Error::from(io::ErrorKind::NotFound));
-            }
-            socket.set_sock_state(None);
-            self.afd_group.release_unused_afd();
-            Ok(())
         }
 
         /// This function is called by register() and reregister() to start an
@@ -681,12 +588,6 @@ cfg_net! {
             } else {
                 Ok(())
             }
-        }
-
-        unsafe fn add_socket_to_update_queue<S: SocketState>(&self, socket: &S) {
-            let sock_state = socket.get_sock_state().unwrap();
-            let mut update_queue = self.update_queue.lock().unwrap();
-            update_queue.push_back(sock_state);
         }
 
         fn queue_state(&self, sock_state: Pin<Arc<Mutex<SockState>>>) {

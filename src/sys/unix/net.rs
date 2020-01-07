@@ -2,7 +2,10 @@
 use std::net::SocketAddr;
 
 #[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
-pub fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> std::io::Result<libc::c_int> {
+pub(crate) fn new_ip_socket(
+    addr: SocketAddr,
+    socket_type: libc::c_int,
+) -> std::io::Result<libc::c_int> {
     let domain = match addr {
         SocketAddr::V4(..) => libc::AF_INET,
         SocketAddr::V6(..) => libc::AF_INET6,
@@ -16,7 +19,10 @@ pub fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> std::io::Res
     feature = "os-poll",
     any(feature = "tcp", feature = "udp", feature = "uds")
 ))]
-pub fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> std::io::Result<libc::c_int> {
+pub(crate) fn new_socket(
+    domain: libc::c_int,
+    socket_type: libc::c_int,
+) -> std::io::Result<libc::c_int> {
     #[cfg(any(
         target_os = "android",
         target_os = "dragonfly",
@@ -51,7 +57,7 @@ pub fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> std::io::Res
 }
 
 #[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
-pub fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t) {
+pub(crate) fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t) {
     use std::mem::size_of_val;
 
     match addr {
@@ -63,5 +69,21 @@ pub fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t
             addr as *const _ as *const libc::sockaddr,
             size_of_val(addr) as libc::socklen_t,
         ),
+    }
+}
+
+/// `storage` must be initialised to `sockaddr_in` or `sockaddr_in6`.
+#[cfg(all(feature = "os-poll", any(feature = "tcp")))]
+pub(crate) unsafe fn to_socket_addr(
+    storage: *const libc::sockaddr_storage,
+) -> std::io::Result<SocketAddr> {
+    match (*storage).ss_family as libc::c_int {
+        libc::AF_INET => Ok(SocketAddr::V4(
+            *(storage as *const libc::sockaddr_in as *const _),
+        )),
+        libc::AF_INET6 => Ok(SocketAddr::V6(
+            *(storage as *const libc::sockaddr_in6 as *const _),
+        )),
+        _ => Err(std::io::ErrorKind::InvalidInput.into()),
     }
 }

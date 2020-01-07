@@ -16,17 +16,13 @@ pub(in crate::sys) fn path_offset(sockaddr: &libc::sockaddr_un) -> usize {
 cfg_os_poll! {
     use std::cmp::Ordering;
     use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::io::{RawFd, FromRawFd};
     use std::path::Path;
     use std::{io, mem};
 
-    mod datagram;
-    pub(crate) use self::datagram::UnixDatagram;
-
-    mod listener;
-    pub(crate) use self::listener::UnixListener;
-
-    mod stream;
-    pub(crate) use self::stream::UnixStream;
+    pub(crate) mod datagram;
+    pub(crate) mod listener;
+    pub(crate) mod stream;
 
     pub(in crate::sys) fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
         let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
@@ -76,6 +72,43 @@ cfg_os_poll! {
         }
 
         Ok((sockaddr, socklen as libc::socklen_t))
+    }
+
+    fn pair<T>(flags: libc::c_int) -> io::Result<(T, T)>
+        where T: FromRawFd,
+    {
+        #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
+        let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+
+        let mut fds = [-1; 2];
+        syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
+        let pair = unsafe { (T::from_raw_fd(fds[0]), T::from_raw_fd(fds[1])) };
+
+        // Darwin and Solaris do not have SOCK_NONBLOCK or SOCK_CLOEXEC.
+        //
+        // In order to set those flags, additional `fcntl` sys calls must be
+        // performed. If a `fnctl` fails after the sockets have been created,
+        // the file descriptors will leak. Creating `pair` above ensures that if
+        // there is an error, the file descriptors are closed.
+        #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
+        {
+            syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
+            syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
+            syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
+            syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
+        }
+        Ok(pair)
+    }
+
+    // The following functions can't simply be replaced with a call to
+    // `net::UnixDatagram` because of our `SocketAddr` type.
+
+    fn local_addr(socket: RawFd) -> io::Result<SocketAddr> {
+        SocketAddr::new(|sockaddr, socklen| syscall!(getsockname(socket, sockaddr, socklen)))
+    }
+
+    fn peer_addr(socket: RawFd) -> io::Result<SocketAddr> {
+        SocketAddr::new(|sockaddr, socklen| syscall!(getpeername(socket, sockaddr, socklen)))
     }
 
     #[cfg(test)]

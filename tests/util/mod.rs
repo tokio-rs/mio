@@ -4,6 +4,8 @@
 
 use std::net::SocketAddr;
 use std::ops::BitOr;
+#[cfg(unix)]
+use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::sync::Once;
 use std::time::Duration;
@@ -192,6 +194,36 @@ pub fn assert_would_block<T>(result: io::Result<T>) {
         Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {}
         Err(err) => panic!("unexpected error result: {}", err),
     }
+}
+
+/// Assert that `NONBLOCK` is set on `socket`.
+#[cfg(unix)]
+pub fn assert_socket_non_blocking<S>(socket: &S)
+where
+    S: AsRawFd,
+{
+    let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFL) };
+    assert!(flags & libc::O_NONBLOCK != 0, "socket not non-blocking");
+}
+
+#[cfg(windows)]
+pub fn assert_socket_non_blocking<S>(_: &S) {
+    // No way to get this information...
+}
+
+/// Assert that `CLOEXEC` is set on `socket`.
+#[cfg(unix)]
+pub fn assert_socket_close_on_exec<S>(socket: &S)
+where
+    S: AsRawFd,
+{
+    let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFD) };
+    assert!(flags & libc::FD_CLOEXEC != 0, "socket flag CLOEXEC not set");
+}
+
+#[cfg(windows)]
+pub fn assert_socket_close_on_exec<S>(_: &S) {
+    // Windows doesn't have this concept.
 }
 
 /// Bind to any port on localhost.
