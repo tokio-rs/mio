@@ -2,8 +2,6 @@ use crate::{event, sys, Events, Interest, Token};
 use log::trace;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
-#[cfg(debug_assertions)]
-use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 use std::{fmt, io};
 
@@ -199,13 +197,6 @@ pub struct Registry {
     selector: sys::Selector,
 }
 
-/// Used to associate an IO type with a Selector
-#[derive(Debug)]
-#[cfg(debug_assertions)]
-pub struct SelectorId {
-    id: AtomicUsize,
-}
-
 impl Poll {
     /// Create a separate `Registry` which can be used to register
     /// `event::Source`s.
@@ -321,9 +312,9 @@ cfg_os_poll! {
     impl Poll {
         /// Return a new `Poll` handle.
         ///
-        /// This function will make a syscall to the operating system to create the
-        /// system selector. If this syscall fails, `Poll::new` will return with the
-        /// error.
+        /// This function will make a syscall to the operating system to create
+        /// the system selector. If this syscall fails, `Poll::new` will return
+        /// with the error.
         ///
         /// See [struct] level docs for more details.
         ///
@@ -626,45 +617,9 @@ impl fmt::Debug for Registry {
     }
 }
 
-// ===== Accessors for internal usage =====
-
-pub fn selector(registry: &Registry) -> &sys::Selector {
+/// Get access to the `sys::Selector` from `Registry`.
+pub(crate) fn selector(registry: &Registry) -> &sys::Selector {
     &registry.selector
-}
-
-#[cfg(debug_assertions)]
-cfg_net! {
-    use std::sync::atomic::Ordering;
-
-    impl SelectorId {
-        pub fn new() -> SelectorId {
-            SelectorId {
-                id: AtomicUsize::new(0),
-            }
-        }
-
-        pub fn associate_selector(&self, registry: &Registry) -> io::Result<()> {
-            let selector_id = self.id.load(Ordering::SeqCst);
-
-            if selector_id != 0 && selector_id != registry.selector.id() {
-                Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "socket already registered",
-                ))
-            } else {
-                self.id.store(registry.selector.id(), Ordering::SeqCst);
-                Ok(())
-            }
-        }
-    }
-
-    impl Clone for SelectorId {
-        fn clone(&self) -> SelectorId {
-            SelectorId {
-                id: AtomicUsize::new(self.id.load(Ordering::SeqCst)),
-            }
-        }
-    }
 }
 
 cfg_os_poll! {
