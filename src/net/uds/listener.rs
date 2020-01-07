@@ -2,13 +2,12 @@ use crate::io_source::IoSource;
 use crate::net::{SocketAddr, UnixStream};
 use crate::{event, sys, Interest, Registry, Token};
 
-use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
+use std::{fmt, io};
 
 /// A non-blocking Unix domain socket server.
-#[derive(Debug)]
 pub struct UnixListener {
     inner: IoSource<net::UnixListener>,
 }
@@ -71,6 +70,12 @@ impl event::Source for UnixListener {
 
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         self.inner.deregister(registry)
+    }
+}
+
+impl fmt::Debug for UnixListener {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(f)
     }
 }
 
