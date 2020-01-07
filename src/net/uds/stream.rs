@@ -149,6 +149,12 @@ impl fmt::Debug for UnixStream {
     }
 }
 
+impl IntoRawFd for UnixStream {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_inner().into_raw_fd()
+    }
+}
+
 impl AsRawFd for UnixStream {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
@@ -156,17 +162,13 @@ impl AsRawFd for UnixStream {
 }
 
 impl FromRawFd for UnixStream {
-    /// Converts a `std` `RawFd` to a `mio` `UnixStream`.
+    /// Converts a `RawFd` to a `UnixStream`.
+    ///
+    /// # Notes
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixStream {
         UnixStream::from_std(FromRawFd::from_raw_fd(fd))
-    }
-}
-
-impl IntoRawFd for UnixStream {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_inner().into_raw_fd()
     }
 }

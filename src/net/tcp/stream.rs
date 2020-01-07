@@ -263,6 +263,12 @@ impl AsRawFd for TcpStream {
 
 #[cfg(unix)]
 impl FromRawFd for TcpStream {
+    /// Converts a `RawFd` to a `TcpStream`.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream::from_std(FromRawFd::from_raw_fd(fd))
     }
@@ -284,6 +290,12 @@ impl AsRawSocket for TcpStream {
 
 #[cfg(windows)]
 impl FromRawSocket for TcpStream {
+    /// Converts a `RawSocket` to a `TcpStream`.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpStream {
         TcpStream::from_std(FromRawSocket::from_raw_socket(socket))
     }

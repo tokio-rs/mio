@@ -79,20 +79,22 @@ impl fmt::Debug for UnixListener {
     }
 }
 
-impl AsRawFd for UnixListener {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.as_raw_fd()
-    }
-}
-
 impl IntoRawFd for UnixListener {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
+impl AsRawFd for UnixListener {
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.as_raw_fd()
+    }
+}
+
 impl FromRawFd for UnixListener {
-    /// Converts a `std` `RawFd` to a `mio` `UnixListener`.
+    /// Converts a `RawFd` to a `UnixListener`.
+    ///
+    /// # Notes
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
