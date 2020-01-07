@@ -153,7 +153,8 @@ impl Events {
     ///
     /// # Notes
     ///
-    /// Events are cleared before every `poll`, so this is not required.
+    /// Events are cleared before every `poll`, so it is not required to call
+    /// this manually.
     ///
     /// # Examples
     ///
@@ -180,6 +181,7 @@ impl Events {
         self.inner.clear();
     }
 
+    /// Returns the inner `sys::Events`.
     pub(crate) fn sys(&mut self) -> &mut sys::Events {
         &mut self.inner
     }
