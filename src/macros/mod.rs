@@ -1,5 +1,9 @@
+//! Macros to ease conditional code based on enabled features.
+
+// Depending on the features not all macros are used.
 #![allow(unused_macros)]
 
+/// Feature `os-poll` enabled.
 macro_rules! cfg_os_poll {
     ($($item:item)*) => {
         $(
@@ -10,6 +14,7 @@ macro_rules! cfg_os_poll {
     }
 }
 
+/// Feature `os-poll` disabled.
 macro_rules! cfg_not_os_poll {
     ($($item:item)*) => {
         $(
@@ -19,6 +24,7 @@ macro_rules! cfg_not_os_poll {
     }
 }
 
+/// One of the `tcp`, `udp`, `uds` features enabled.
 #[cfg(unix)]
 macro_rules! cfg_net {
     ($($item:item)*) => {
@@ -30,6 +36,7 @@ macro_rules! cfg_net {
     }
 }
 
+/// One of the `tcp`, `udp` features enabled.
 #[cfg(windows)]
 macro_rules! cfg_net {
     ($($item:item)*) => {
@@ -41,6 +48,7 @@ macro_rules! cfg_net {
     }
 }
 
+/// Feature `tcp` enabled.
 macro_rules! cfg_tcp {
     ($($item:item)*) => {
         $(
@@ -51,6 +59,7 @@ macro_rules! cfg_tcp {
     }
 }
 
+/// Feature `udp` enabled.
 macro_rules! cfg_udp {
     ($($item:item)*) => {
         $(
@@ -61,6 +70,7 @@ macro_rules! cfg_udp {
     }
 }
 
+/// Feature `uds` enabled.
 #[cfg(unix)]
 macro_rules! cfg_uds {
     ($($item:item)*) => {
@@ -72,7 +82,7 @@ macro_rules! cfg_uds {
     }
 }
 
-// cfg for any feature that requires the OS's adapter for `RawFd`
+/// Feature `os-util` enabled, or one of the features that need `os-util`.
 #[cfg(unix)]
 macro_rules! cfg_any_os_util {
     ($($item:item)*) => {
@@ -84,7 +94,7 @@ macro_rules! cfg_any_os_util {
     }
 }
 
-// cfg for any feature that requires the OS's adapter for `RawSocket`
+/// Feature `os-util` enabled, or one of the features that need `os-util`.
 #[cfg(windows)]
 macro_rules! cfg_any_os_util {
     ($($item:item)*) => {
