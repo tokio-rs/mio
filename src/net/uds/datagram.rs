@@ -140,6 +140,12 @@ impl fmt::Debug for UnixDatagram {
     }
 }
 
+impl IntoRawFd for UnixDatagram {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_inner().into_raw_fd()
+    }
+}
+
 impl AsRawFd for UnixDatagram {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
@@ -147,19 +153,13 @@ impl AsRawFd for UnixDatagram {
 }
 
 impl FromRawFd for UnixDatagram {
-    /// Converts a `std` `RawFd` to a `mio` `UnixDatagram`.
+    /// Converts a `RawFd` to a `UnixDatagram`.
+    ///
+    /// # Notes
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixDatagram {
-        UnixDatagram {
-            inner: IoSource::new(FromRawFd::from_raw_fd(fd)),
-        }
-    }
-}
-
-impl IntoRawFd for UnixDatagram {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_inner().into_raw_fd()
+        UnixDatagram::from_std(FromRawFd::from_raw_fd(fd))
     }
 }

@@ -141,6 +141,13 @@ impl fmt::Debug for TcpListener {
 }
 
 #[cfg(unix)]
+impl IntoRawFd for TcpListener {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_inner().into_raw_fd()
+    }
+}
+
+#[cfg(unix)]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
@@ -149,15 +156,21 @@ impl AsRawFd for TcpListener {
 
 #[cfg(unix)]
 impl FromRawFd for TcpListener {
+    /// Converts a `RawFd` to a `TcpListener`.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
 
-#[cfg(unix)]
-impl IntoRawFd for TcpListener {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_inner().into_raw_fd()
+#[cfg(windows)]
+impl IntoRawSocket for TcpListener {
+    fn into_raw_socket(self) -> RawSocket {
+        self.inner.into_inner().into_raw_socket()
     }
 }
 
@@ -170,14 +183,13 @@ impl AsRawSocket for TcpListener {
 
 #[cfg(windows)]
 impl FromRawSocket for TcpListener {
+    /// Converts a `RawSocket` to a `TcpListener`.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
         TcpListener::from_std(FromRawSocket::from_raw_socket(socket))
-    }
-}
-
-#[cfg(windows)]
-impl IntoRawSocket for TcpListener {
-    fn into_raw_socket(self) -> RawSocket {
-        self.inner.into_inner().into_raw_socket()
     }
 }

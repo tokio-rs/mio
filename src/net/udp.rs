@@ -117,9 +117,7 @@ impl UdpSocket {
     /// # }
     /// ```
     pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
-        sys::udp::bind(addr).map(|socket| UdpSocket {
-            inner: IoSource::new(socket),
-        })
+        sys::udp::bind(addr).map(UdpSocket::from_std)
     }
 
     /// Creates a new `UdpSocket` from a standard `net::UdpSocket`.
@@ -556,10 +554,14 @@ impl AsRawFd for UdpSocket {
 
 #[cfg(unix)]
 impl FromRawFd for UdpSocket {
+    /// Converts a `RawFd` to a `UdpSocket`.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
-        UdpSocket {
-            inner: IoSource::new(FromRawFd::from_raw_fd(fd)),
-        }
+        UdpSocket::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
 
@@ -579,9 +581,13 @@ impl AsRawSocket for UdpSocket {
 
 #[cfg(windows)]
 impl FromRawSocket for UdpSocket {
+    /// Converts a `RawSocket` to a `UdpSocket`.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
     unsafe fn from_raw_socket(socket: RawSocket) -> UdpSocket {
-        UdpSocket {
-            inner: IoSource::new(FromRawSocket::from_raw_socket(socket)),
-        }
+        UdpSocket::from_std(FromRawSocket::from_raw_socket(socket))
     }
 }
