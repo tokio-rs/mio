@@ -18,19 +18,16 @@ pub struct Event {
 
 impl Event {
     /// Returns the event's token.
-    #[inline]
     pub fn token(&self) -> Token {
         sys::event::token(&self.inner)
     }
 
     /// Returns true if the event contains readable readiness.
-    #[inline]
     pub fn is_readable(&self) -> bool {
         sys::event::is_readable(&self.inner)
     }
 
     /// Returns true if the event contains writable readiness.
-    #[inline]
     pub fn is_writable(&self) -> bool {
         sys::event::is_writable(&self.inner)
     }
@@ -56,7 +53,6 @@ impl Event {
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
     /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
-    #[inline]
     pub fn is_error(&self) -> bool {
         sys::event::is_error(&self.inner)
     }
@@ -88,7 +84,6 @@ impl Event {
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
     /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
-    #[inline]
     pub fn is_read_closed(&self) -> bool {
         sys::event::is_read_closed(&self.inner)
     }
@@ -162,7 +157,6 @@ impl Event {
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
     /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
-    #[inline]
     pub fn is_aio(&self) -> bool {
         sys::event::is_aio(&self.inner)
     }
@@ -173,7 +167,6 @@ impl Event {
     ///
     /// Method is available on all platforms, but only FreeBSD supports LIO. On
     /// FreeBSD this method checks the `EVFILT_LIO` flag.
-    #[inline]
     pub fn is_lio(&self) -> bool {
         sys::event::is_lio(&self.inner)
     }
