@@ -1,5 +1,11 @@
 #![doc(html_root_url = "https://docs.rs/mio/0.7.0-alpha.1")]
-#![deny(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![deny(
+    missing_docs,
+    missing_debug_implementations,
+    rust_2018_idioms,
+    unused_imports,
+    dead_code
+)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // Disallow warnings when running tests.
 #![cfg_attr(test, deny(warnings))]
