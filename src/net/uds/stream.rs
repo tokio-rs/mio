@@ -1,6 +1,7 @@
 use crate::io_source::IoSource;
 use crate::{event, sys, Interest, Registry, Token};
 
+use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -8,7 +9,6 @@ use std::os::unix::net;
 use std::path::Path;
 
 /// A non-blocking Unix stream socket.
-#[derive(Debug)]
 pub struct UnixStream {
     inner: IoSource<net::UnixStream>,
 }
@@ -140,6 +140,12 @@ impl event::Source for UnixStream {
 
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         self.inner.deregister(registry)
+    }
+}
+
+impl fmt::Debug for UnixStream {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(f)
     }
 }
 
