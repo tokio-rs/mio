@@ -10,7 +10,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 mod util;
-use util::{any_local_address, init};
+use util::{any_local_address, assert_error, init};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -167,8 +167,7 @@ fn tcp_register_multiple_event_loops() {
         Token(0),
         Interest::READABLE | Interest::WRITABLE,
     );
-    assert!(res.is_err());
-    assert_eq!(res.unwrap_err().kind(), io::ErrorKind::Other);
+    assert_error(res, "I/O source already registered with a `Registry`");
 
     // Try the stream
     let mut stream = TcpStream::connect(addr).unwrap();
@@ -187,8 +186,7 @@ fn tcp_register_multiple_event_loops() {
         Token(1),
         Interest::READABLE | Interest::WRITABLE,
     );
-    assert!(res.is_err());
-    assert_eq!(res.unwrap_err().kind(), io::ErrorKind::Other);
+    assert_error(res, "I/O source already registered with a `Registry`");
 }
 
 #[test]
@@ -216,8 +214,7 @@ fn udp_register_multiple_event_loops() {
         Token(0),
         Interest::READABLE | Interest::WRITABLE,
     );
-    assert!(res.is_err());
-    assert_eq!(res.unwrap_err().kind(), io::ErrorKind::Other);
+    assert_error(res, "I/O source already registered with a `Registry`");
 }
 
 #[test]
