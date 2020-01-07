@@ -1,6 +1,8 @@
 use std::io;
 use std::mem::size_of_val;
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::net::SocketAddr;
+#[cfg(all(feature = "os-poll", feature = "tcp"))]
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::sync::Once;
 
 use winapi::ctypes::c_int;
