@@ -12,6 +12,7 @@ use std::fmt;
 /// [`Poll::poll`]: ../struct.Poll.html#method.poll
 /// [`Poll`]: ../struct.Poll.html
 /// [`Token`]: ../struct.Token.html
+#[repr(transparent)]
 pub struct Event {
     inner: sys::Event,
 }
