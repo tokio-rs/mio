@@ -37,28 +37,25 @@ impl Socket {
 
         // Gives a warning for platforms without SOCK_NONBLOCK.
         #[allow(clippy::let_and_return)]
-        let socket = syscall!(socket(domain, socket_type, protocol));
+        let socket = syscall!(socket(domain, socket_type, protocol))?;
 
-        // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC. Not sure about
-        // Solaris, couldn't find anything online.
+        // Darwin and Solaris do not have SOCK_NONBLOCK or SOCK_CLOEXEC.
+        //
+        // In order to set those flags, additional `fcntl` sys calls must be
+        // performed. If a `fnctl` fails after the socket has been created,
+        // `close` ensures the socket does not leak.
         #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
-        let socket = socket.and_then(|socket| {
-            // For platforms that don't support flags in socket, we need to
-            // set the flags ourselves.
-            syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))
-                .and_then(|_| {
-                    syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| socket)
-                })
-                .map_err(|e| {
-                    // If either of the `fcntl` calls failed, close the
-                    // socket. Ignore the error from closing since we can't
-                    // pass back two errors.
-                    let _ = syscall!(close(socket));
-                    e
-                })
-        });
+        syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))
+            .and_then(|_| syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| socket))
+            .map_err(|e| {
+                // If either of the `fcntl` calls failed, close the
+                // socket. Ignore the error from closing since we can't
+                // pass back two errors.
+                let _ = syscall!(close(socket));
+                e
+            })?;
 
-        socket.map(|socket| unsafe { Socket::from_raw_fd(socket) })
+        Ok(unsafe { Socket::from_raw_fd(socket) })
     }
 
     #[cfg(feature = "uds")]
@@ -84,8 +81,7 @@ impl Socket {
         //
         // In order to set those flags, additional `fcntl` sys calls must be
         // performed. If a `fnctl` fails after the sockets have been created,
-        // the file descriptors will leak. Creating `pair` above ensures that if
-        // there is an error, the file descriptors are closed.
+        // `close` ensures the sockets does not leak.
         #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
         syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))
             .and_then(|_| syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK)))
@@ -134,6 +130,17 @@ impl Socket {
     #[cfg(any(feature = "tcp", feature = "udp"))]
     pub(crate) fn bind(&self, addr: SocketAddr) -> Result<i32> {
         let (storage, len) = from_socket_addr(&addr);
+        self.bind2(storage, len)
+    }
+
+    /// Provide bind functionality for types that will be bound to
+    /// `std::net::SocketAddr` or `mio::net::SocketAddr`.
+    #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
+    pub(crate) fn bind2(
+        &self,
+        storage: *const libc::sockaddr,
+        len: libc::socklen_t,
+    ) -> Result<i32> {
         syscall!(bind(self.fd, storage, len)).map_err(|err| {
             // Close the socket if we hit an error, ignoring the error
             // from closing since we can't pass back two errors.
@@ -142,16 +149,35 @@ impl Socket {
         })
     }
 
-    #[cfg(feature = "tcp")]
+    #[cfg(any(feature = "tcp", feature = "uds"))]
     pub(crate) fn listen(&self, backlog: i32) -> Result<i32> {
         syscall!(listen(self.fd, backlog))
     }
 
     #[cfg(feature = "tcp")]
     pub(crate) fn accept(&self) -> Result<(Self, SocketAddr)> {
-        let mut storage: MaybeUninit<libc::sockaddr_storage> = MaybeUninit::uninit();
-        let mut len = mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t;
+        let storage = MaybeUninit::<libc::sockaddr_storage>::zeroed();
 
+        // Todo: Explain why this is safe (it is).
+        let mut storage = unsafe { storage.assume_init() };
+
+        let len = mem::size_of_val(&storage) as libc::socklen_t;
+        let (socket, storage) = self.accept2(
+            &mut storage as *mut libc::sockaddr_storage as *mut libc::sockaddr,
+            len,
+        )?;
+        let addr = unsafe { to_socket_addr(storage as *const libc::sockaddr_storage)? };
+        Ok((socket, addr))
+    }
+
+    /// Provide accept functionality for types that will accept on
+    /// `std::net::SocketAddr` or `mio::net::SocketAddr`.
+    #[cfg(any(feature = "tcp", feature = "uds"))]
+    pub(crate) fn accept2(
+        &self,
+        storage: *mut libc::sockaddr,
+        mut len: libc::socklen_t,
+    ) -> Result<(Self, *const libc::sockaddr)> {
         // On platforms that support it we can use `accept4(2)` to set `NONBLOCK`
         // and `CLOEXEC` in the call to accept the connection.
         #[cfg(any(
@@ -163,7 +189,7 @@ impl Socket {
         ))]
         let socket = syscall!(accept4(
             self.fd,
-            storage.as_mut_ptr() as *mut libc::sockaddr,
+            storage,
             &mut len,
             libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
         ))?;
@@ -180,20 +206,12 @@ impl Socket {
             target_os = "solaris",
         ))]
         let socket = {
-            let socket = syscall!(accept(
-                self.fd,
-                storage.as_mut_ptr() as *mut libc::sockaddr,
-                &mut len
-            ))?;
+            let socket = syscall!(accept(self.fd, storage, &mut len))?;
             syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC))?;
             socket
         };
 
-        // This is safe because `accept` calls above ensures the address
-        // initialised.
-        let socket_addr = unsafe { to_socket_addr(storage.as_ptr())? };
-
-        Ok((Socket { fd: socket }, socket_addr))
+        Ok((unsafe { Socket::from_raw_fd(socket) }, storage))
     }
 
     #[cfg(feature = "tcp")]

@@ -1,4 +1,4 @@
-use super::socket_addr;
+use super::from_socket_addr;
 use crate::net::{SocketAddr, UnixStream};
 use crate::sys::Socket;
 
@@ -8,24 +8,19 @@ use std::path::Path;
 use std::{io, mem};
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
-    let socket = Socket::new(libc::AF_UNIX, libc::SOCK_STREAM, 0)?.into_raw_fd();
-    let (storage, len) = socket_addr(path)?;
-    let sockaddr = &storage as *const libc::sockaddr_un as *const libc::sockaddr;
-
-    // `Socket::bind` does not satisfy this case because of Mio's `SocketAddr`.
-    syscall!(bind(socket, sockaddr, len))
-        .and_then(|_| syscall!(listen(socket, 1024)))
-        .map_err(|err| {
-            // Close the socket if we hit an error, ignoring the error from
-            // closing since we can't pass back two errors.
-            let _ = unsafe { libc::close(socket) };
-            err
-        })
-        .map(|_| unsafe { net::UnixListener::from_raw_fd(socket) })
+    let socket = Socket::new(libc::AF_UNIX, libc::SOCK_STREAM, 0)?;
+    let (storage, len) = from_socket_addr(path)?;
+    socket.bind2(
+        &storage as *const libc::sockaddr_un as *const libc::sockaddr,
+        len,
+    )?;
+    socket.listen(1024)?;
+    Ok(unsafe { net::UnixListener::from_raw_fd(socket.into_raw_fd()) })
 }
 
 pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
-    let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
+    let socket = unsafe { Socket::from_raw_fd(listener.as_raw_fd()) };
+    let storage = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
 
     // This is safe to assume because a `libc::sockaddr_un` filled with `0`
     // bytes is properly initialized.
@@ -35,49 +30,17 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
     //
     // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
     // abstract path.
-    let mut sockaddr = unsafe { sockaddr.assume_init() };
+    let mut storage = unsafe { storage.assume_init() };
 
-    sockaddr.sun_family = libc::AF_UNIX as libc::sa_family_t;
-    let mut socklen = mem::size_of_val(&sockaddr) as libc::socklen_t;
-
-    #[cfg(not(any(
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "netbsd",
-        target_os = "solaris"
-    )))]
-    let socket = {
-        let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-        syscall!(accept4(
-            listener.as_raw_fd(),
-            &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr,
-            &mut socklen,
-            flags
-        ))
-        .map(|socket| unsafe { net::UnixStream::from_raw_fd(socket) })
-    };
-
-    #[cfg(any(
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "netbsd",
-        target_os = "solaris"
-    ))]
-    let socket = syscall!(accept(
-        listener.as_raw_fd(),
-        &mut sockaddr as *mut libc::sockaddr_un as *mut libc::sockaddr,
-        &mut socklen,
-    ))
-    .and_then(|socket| {
-        // Ensure the socket is closed if either of the `fcntl` calls
-        // error below.
-        let s = unsafe { net::UnixStream::from_raw_fd(socket) };
-        syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| s)
-    });
-
-    socket
-        .map(UnixStream::from_std)
-        .map(|stream| (stream, SocketAddr::from_parts(sockaddr, socklen)))
+    storage.sun_family = libc::AF_UNIX as libc::sa_family_t;
+    let len = mem::size_of_val(&storage) as libc::socklen_t;
+    let (socket, storage) = socket.accept2(
+        &mut storage as *mut libc::sockaddr_un as *mut libc::sockaddr,
+        len,
+    )?;
+    let stream = unsafe { net::UnixStream::from_raw_fd(socket.into_raw_fd()) };
+    let addr = unsafe { SocketAddr::from_parts(*(storage as *const libc::sockaddr_un), len) };
+    Ok((UnixStream::from_std(stream), addr))
 }
 
 pub(crate) fn local_addr(listener: &net::UnixListener) -> io::Result<SocketAddr> {

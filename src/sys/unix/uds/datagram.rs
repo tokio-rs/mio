@@ -1,4 +1,4 @@
-use super::{socket_addr, SocketAddr};
+use super::{from_socket_addr, SocketAddr};
 use crate::sys::Socket;
 
 use std::io;
@@ -10,7 +10,7 @@ pub(crate) fn bind(path: &Path) -> io::Result<net::UnixDatagram> {
     let socket = Socket::new(libc::AF_UNIX, libc::SOCK_DGRAM, 0)?;
 
     // `Socket::bind` does not satisfy this case because of Mio's `SocketAddr`.
-    let (storage, len) = socket_addr(path)?;
+    let (storage, len) = from_socket_addr(path)?;
     let sockaddr = &storage as *const libc::sockaddr_un as *const _;
     match syscall!(bind(socket.as_raw_fd(), sockaddr, len)) {
         Ok(_) => Ok(unsafe { net::UnixDatagram::from_raw_fd(socket.into_raw_fd()) }),

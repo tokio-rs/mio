@@ -26,7 +26,7 @@ cfg_os_poll! {
     pub(crate) mod listener;
     pub(crate) mod stream;
 
-    pub(in crate::sys) fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
+    pub(crate) fn from_socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
         let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
 
         // This is safe to assume because a `libc::sockaddr_un` filled with `0`
@@ -96,7 +96,7 @@ cfg_os_poll! {
 
     #[cfg(test)]
     mod tests {
-        use super::{path_offset, socket_addr};
+        use super::{path_offset, from_socket_addr};
         use std::path::Path;
         use std::str;
 
@@ -108,7 +108,7 @@ cfg_os_poll! {
             // Pathname addresses do have a null terminator, so `socklen` is
             // expected to be `PATH_LEN` + `offset` + 1.
             let path = Path::new(PATH);
-            let (sockaddr, actual) = socket_addr(path).unwrap();
+            let (sockaddr, actual) = from_socket_addr(path).unwrap();
             let offset = path_offset(&sockaddr);
             let expected = PATH_LEN + offset + 1;
             assert_eq!(expected as libc::socklen_t, actual)
@@ -123,7 +123,7 @@ cfg_os_poll! {
             // expected to be `PATH_LEN` + `offset`.
             let abstract_path = str::from_utf8(PATH).unwrap();
             let path = Path::new(abstract_path);
-            let (sockaddr, actual) = socket_addr(path).unwrap();
+            let (sockaddr, actual) = from_socket_addr(path).unwrap();
             let offset = path_offset(&sockaddr);
             let expected = PATH_LEN + offset;
             assert_eq!(expected as libc::socklen_t, actual)
