@@ -36,13 +36,13 @@ mio = "0.6"
 ```
 
 Next we can start using Mio. The following is quick introduction using
-`TcpListener` and `TcpStream`.
+`TcpListener` and `TcpStream`. Note that `features = ["os-poll", "tcp"]` must be specified for this example.
 
 ```rust
 use std::error::Error;
 
 use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interests, Poll, Token};
+use mio::{Events, Interest, Poll, Token};
 
 // Some tokens to allow us to identify which event is for which socket.
 const SERVER: Token = Token(0);
@@ -56,16 +56,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Setup the server socket.
     let addr = "127.0.0.1:13265".parse()?;
-    let server = TcpListener::bind(addr)?;
+    let mut server = TcpListener::bind(addr)?;
     // Start listening for incoming connections.
     poll.registry()
-        .register(&server, SERVER, Interests::READABLE)?;
+        .register(&mut server, SERVER, Interest::READABLE)?;
 
     // Setup the client socket.
-    let client = TcpStream::connect(addr)?;
+    let mut client = TcpStream::connect(addr)?;
     // Register the socket.
     poll.registry()
-        .register(&client, CLIENT, Interests::READABLE | Interests::WRITABLE)?;
+        .register(&mut client, CLIENT, Interest::READABLE | Interest::WRITABLE)?;
 
     // Start an event loop.
     loop {
@@ -78,10 +78,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             // determine for which socket the event is.
             match event.token() {
                 SERVER => {
-                    // If we can an event for the server it means a connection
+                    // If this is an event for the server, it means a connection
                     // is ready to be accepted.
                     //
-                    // Accept the connection and drop it immediately, this will
+                    // Accept the connection and drop it immediately. This will
                     // close the socket and notify the client of the EOF.
                     let connection = server.accept();
                     drop(connection);
@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // just exit from our event loop.
                     return Ok(());
                 }
-                // We don't expect any events with tokens other then we provided.
+                // We don't expect any events with tokens other than those we provided.
                 _ => unreachable!(),
             }
         }
