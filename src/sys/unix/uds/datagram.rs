@@ -8,19 +8,12 @@ use std::path::Path;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixDatagram> {
     let socket = Socket::new(libc::AF_UNIX, libc::SOCK_DGRAM, 0)?;
-
-    // `Socket::bind` does not satisfy this case because of Mio's `SocketAddr`.
     let (storage, len) = from_socket_addr(path)?;
-    let sockaddr = &storage as *const libc::sockaddr_un as *const _;
-    match syscall!(bind(socket.as_raw_fd(), sockaddr, len)) {
-        Ok(_) => Ok(unsafe { net::UnixDatagram::from_raw_fd(socket.into_raw_fd()) }),
-        Err(err) => {
-            // Close the socket if we hit an error, ignoring the error
-            // from closing since we can't pass back two errors.
-            let _ = unsafe { libc::close(socket.into_raw_fd()) };
-            Err(err)
-        }
-    }
+    socket.bind2(
+        &storage as *const libc::sockaddr_un as *const libc::sockaddr,
+        len,
+    )?;
+    Ok(unsafe { net::UnixDatagram::from_raw_fd(socket.into_raw_fd()) })
 }
 
 pub(crate) fn unbound() -> io::Result<net::UnixDatagram> {

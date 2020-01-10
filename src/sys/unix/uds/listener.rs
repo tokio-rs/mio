@@ -22,8 +22,8 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
     let socket = unsafe { Socket::from_raw_fd(listener.as_raw_fd()) };
     let storage = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
 
-    // This is safe to assume because a `libc::sockaddr_un` filled with `0`
-    // bytes is properly initialized.
+    // Safety: A `libc::sockaddr_un` initialized with `0` bytes is properly
+    // initialized.
     //
     // `0` is a valid value for `sockaddr_un::sun_family`; it is
     // `libc::AF_UNSPEC`.

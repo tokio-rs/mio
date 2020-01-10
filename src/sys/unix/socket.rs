@@ -35,8 +35,6 @@ impl Socket {
         ))]
         let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
-        // Gives a warning for platforms without SOCK_NONBLOCK.
-        #[allow(clippy::let_and_return)]
         let socket = syscall!(socket(domain, socket_type, protocol))?;
 
         // Darwin and Solaris do not have SOCK_NONBLOCK or SOCK_CLOEXEC.
@@ -111,8 +109,18 @@ impl Socket {
     #[cfg(feature = "tcp")]
     pub(crate) fn connect(&self, addr: SocketAddr) -> Result<i32> {
         let (storage, len) = from_socket_addr(&addr);
-        let res = syscall!(connect(self.fd, storage, len));
-        match res {
+        self.connect2(storage, len)
+    }
+
+    /// Provide connect functionality for types that will be bound to
+    /// `std::net::SocketAddr` or `mio::net::SocketAddr`.
+    #[cfg(any(feature = "tcp", feature = "uds"))]
+    pub(crate) fn connect2(
+        &self,
+        storage: *const libc::sockaddr,
+        len: libc::socklen_t,
+    ) -> Result<i32> {
+        match syscall!(connect(self.fd, storage, len)) {
             Ok(res) => Ok(res),
             Err(ref err) if err.raw_os_error() == Some(libc::EINPROGRESS) => {
                 // Connect hasn't finished, but that is fine.
@@ -158,7 +166,12 @@ impl Socket {
     pub(crate) fn accept(&self) -> Result<(Self, SocketAddr)> {
         let storage = MaybeUninit::<libc::sockaddr_storage>::zeroed();
 
-        // Todo: Explain why this is safe (it is).
+        // Safety: A `libc::sockaddr` initialized with memory filled with `0`
+        // bytes is properly initialized.
+        //
+        // `0` is a valid value for `sockaddr::ss_len` and
+        // `sockaddr::ss_family`. The remaining fields are padding used by
+        // `accept`.
         let mut storage = unsafe { storage.assume_init() };
 
         let len = mem::size_of_val(&storage) as libc::socklen_t;
@@ -194,7 +207,7 @@ impl Socket {
             libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
         ))?;
 
-        // But not all platforms have the `accept4(2)` call. Luckily BSD (derived)
+        // Not all platforms have the `accept4(2)` call. Luckily BSD (derived)
         // OSes inherit the non-blocking flag from the listener, so we just have to
         // set `CLOEXEC`.
         #[cfg(any(
