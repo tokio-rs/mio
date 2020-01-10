@@ -11,6 +11,9 @@ mod waker;
 pub(crate) use self::waker::Waker;
 
 cfg_tcp! {
+    pub(crate) mod socket;
+    pub(crate) use self::socket::Socket;
+
     pub(crate) mod tcp;
 }
 
