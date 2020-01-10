@@ -3,7 +3,10 @@ use crate::sys::unix::net::from_socket_addr;
 #[cfg(feature = "tcp")]
 use crate::sys::unix::net::to_socket_addr;
 use std::io::Result;
-#[cfg(any(feature = "tcp", feature = "udp"))]
+#[cfg(any(
+    feature = "tcp",
+    all(any(target_os = "ios", target_os = "macos"), feature = "udp")
+))]
 use std::mem;
 #[cfg(feature = "tcp")]
 use std::mem::MaybeUninit;
@@ -204,6 +207,7 @@ impl Socket {
         ))
     }
 
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
     #[cfg(feature = "udp")]
     pub(crate) fn set_no_sigpipe(&self) -> Result<i32> {
         syscall!(setsockopt(
