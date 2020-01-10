@@ -1,5 +1,5 @@
 use super::{socket_addr, SocketAddr};
-use crate::sys::unix::net::new_socket;
+use crate::sys::Socket;
 
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -7,7 +7,12 @@ use std::os::unix::net;
 use std::path::Path;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixDatagram> {
-    let fd = new_socket(libc::AF_UNIX, libc::SOCK_DGRAM)?;
+    let socket = Socket::new(libc::AF_UNIX, libc::SOCK_DGRAM, 0)?;
+
+    // temp: Most of the below can be moved into `Socket` methods. Create a
+    // `RawFd` for now until those are added.
+    let fd = socket.as_raw_fd();
+
     // Ensure the fd is closed.
     let socket = unsafe { net::UnixDatagram::from_raw_fd(fd) };
     let (sockaddr, socklen) = socket_addr(path)?;
@@ -17,8 +22,8 @@ pub(crate) fn bind(path: &Path) -> io::Result<net::UnixDatagram> {
 }
 
 pub(crate) fn unbound() -> io::Result<net::UnixDatagram> {
-    new_socket(libc::AF_UNIX, libc::SOCK_DGRAM)
-        .map(|socket| unsafe { net::UnixDatagram::from_raw_fd(socket) })
+    Socket::new(libc::AF_UNIX, libc::SOCK_DGRAM, 0)
+        .map(|socket| unsafe { net::UnixDatagram::from_raw_fd(socket.as_raw_fd()) })
 }
 
 pub(crate) fn pair() -> io::Result<(net::UnixDatagram, net::UnixDatagram)> {

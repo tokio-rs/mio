@@ -41,6 +41,9 @@ cfg_os_poll! {
     cfg_net! {
         use std::io;
 
+        pub(crate) mod socket;
+        pub(crate) use self::socket::Socket;
+
         // Both `kqueue` and `epoll` don't need to hold any user space state.
         pub(crate) struct IoSourceState;
 

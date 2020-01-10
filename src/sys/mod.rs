@@ -68,11 +68,11 @@ cfg_os_poll! {
 
     cfg_uds! {
         pub use self::unix::SocketAddr;
-
         pub(crate) use self::unix::uds;
     }
 
     cfg_net! {
+        pub(crate) use self::unix::Socket;
         pub(crate) use self::unix::IoSourceState;
     }
 }
