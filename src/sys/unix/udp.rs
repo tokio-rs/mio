@@ -5,7 +5,7 @@ use std::net::{self, SocketAddr};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 
 pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
-    let socket = Socket::from_addr(addr, libc::SOCK_DGRAM)?;
+    let socket = Socket::from_addr(addr, libc::SOCK_DGRAM, 0)?;
 
     // Set SO_NOSIGPIPE on iOS and macOS (mirrors what libstd does).
     #[cfg(any(target_os = "ios", target_os = "macos"))]

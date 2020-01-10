@@ -98,12 +98,16 @@ impl Socket {
     }
 
     #[cfg(any(feature = "tcp", feature = "udp"))]
-    pub(crate) fn from_addr(addr: SocketAddr, socket_type: libc::c_int) -> Result<Self> {
+    pub(crate) fn from_addr(
+        addr: SocketAddr,
+        socket_type: libc::c_int,
+        protocol: libc::c_int,
+    ) -> Result<Self> {
         let domain = match addr {
             SocketAddr::V4(..) => libc::AF_INET,
             SocketAddr::V6(..) => libc::AF_INET6,
         };
-        Self::new(domain, socket_type, 0)
+        Self::new(domain, socket_type, protocol)
     }
 
     #[cfg(feature = "tcp")]

@@ -5,7 +5,7 @@ use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 
 pub fn connect(addr: SocketAddr) -> io::Result<net::TcpStream> {
-    let socket = Socket::from_addr(addr, libc::SOCK_STREAM)?;
+    let socket = Socket::from_addr(addr, libc::SOCK_STREAM, 0)?;
 
     // Set SO_REUSEADDR (mirrors what libstd does).
     socket.set_reuse_address()?;
@@ -15,7 +15,7 @@ pub fn connect(addr: SocketAddr) -> io::Result<net::TcpStream> {
 }
 
 pub fn bind(addr: SocketAddr) -> io::Result<net::TcpListener> {
-    let socket = Socket::from_addr(addr, libc::SOCK_STREAM)?;
+    let socket = Socket::from_addr(addr, libc::SOCK_STREAM, 0)?;
     socket.bind(addr)?;
     socket.listen(1024)?;
     unsafe { Ok(net::TcpListener::from_raw_fd(socket.into_raw_fd())) }

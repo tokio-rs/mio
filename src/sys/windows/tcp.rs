@@ -9,7 +9,7 @@ use winapi::um::winsock2::SOCK_STREAM;
 
 pub fn connect(addr: SocketAddr) -> io::Result<net::TcpStream> {
     init();
-    let socket = Socket::from_addr(addr, SOCK_STREAM)?;
+    let socket = Socket::from_addr(addr, SOCK_STREAM, 0)?;
 
     // Required for a future `connect_overlapped` operation to be executed
     // successfully (todo: ?).
@@ -22,7 +22,7 @@ pub fn connect(addr: SocketAddr) -> io::Result<net::TcpStream> {
 
 pub fn bind(addr: SocketAddr) -> io::Result<net::TcpListener> {
     init();
-    let socket = Socket::from_addr(addr, SOCK_STREAM)?;
+    let socket = Socket::from_addr(addr, SOCK_STREAM, 0)?;
     socket.bind(addr)?;
     socket.listen(1024)?;
     Ok(unsafe { net::TcpListener::from_raw_socket(socket.into_raw_socket()) })

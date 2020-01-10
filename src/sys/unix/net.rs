@@ -1,4 +1,4 @@
-#![cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
+#![cfg(any(feature = "tcp", feature = "udp"))]
 
 use std::net::SocketAddr;
 

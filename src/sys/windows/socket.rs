@@ -30,12 +30,12 @@ impl Socket {
         Ok(unsafe { Socket::from_raw_socket(socket as StdSocket) })
     }
 
-    pub(crate) fn from_addr(addr: SocketAddr, socket_type: c_int) -> Result<Self> {
+    pub(crate) fn from_addr(addr: SocketAddr, socket_type: c_int, protocol: c_int) -> Result<Self> {
         let af = match addr {
             SocketAddr::V4(..) => PF_INET,
             SocketAddr::V6(..) => PF_INET6,
         };
-        Self::new(af, socket_type, 0)
+        Self::new(af, socket_type, protocol)
     }
 
     #[cfg(feature = "tcp")]
