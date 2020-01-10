@@ -2,23 +2,25 @@ use super::{socket_addr, SocketAddr};
 use crate::sys::Socket;
 
 use std::io;
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::os::unix::net;
 use std::path::Path;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixDatagram> {
     let socket = Socket::new(libc::AF_UNIX, libc::SOCK_DGRAM, 0)?;
 
-    // temp: Most of the below can be moved into `Socket` methods. Create a
-    // `RawFd` for now until those are added.
-    let fd = socket.as_raw_fd();
-
-    // Ensure the fd is closed.
-    let socket = unsafe { net::UnixDatagram::from_raw_fd(fd) };
-    let (sockaddr, socklen) = socket_addr(path)?;
-    let sockaddr = &sockaddr as *const libc::sockaddr_un as *const _;
-    syscall!(bind(fd, sockaddr, socklen))?;
-    Ok(socket)
+    // `Socket::bind` does not satisfy this case because of Mio's `SocketAddr`.
+    let (storage, len) = socket_addr(path)?;
+    let sockaddr = &storage as *const libc::sockaddr_un as *const _;
+    match syscall!(bind(socket.as_raw_fd(), sockaddr, len)) {
+        Ok(_) => Ok(unsafe { net::UnixDatagram::from_raw_fd(socket.into_raw_fd()) }),
+        Err(err) => {
+            // Close the socket if we hit an error, ignoring the error
+            // from closing since we can't pass back two errors.
+            let _ = unsafe { libc::close(socket.into_raw_fd()) };
+            Err(err)
+        }
+    }
 }
 
 pub(crate) fn unbound() -> io::Result<net::UnixDatagram> {

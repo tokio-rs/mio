@@ -55,7 +55,49 @@ impl Socket {
                 })
         });
 
-        socket.map(|socket| Socket { fd: socket })
+        socket.map(|socket| unsafe { Socket::from_raw_fd(socket) })
+    }
+
+    #[cfg(feature = "uds")]
+    pub(crate) fn pair(
+        domain: libc::c_int,
+        socket_type: libc::c_int,
+        protocol: libc::c_int,
+    ) -> Result<(Self, Self)> {
+        #[cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "linux",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+
+        let mut fds = [-1; 2];
+        syscall!(socketpair(domain, socket_type, protocol, fds.as_mut_ptr()))?;
+
+        // Darwin and Solaris do not have SOCK_NONBLOCK or SOCK_CLOEXEC.
+        //
+        // In order to set those flags, additional `fcntl` sys calls must be
+        // performed. If a `fnctl` fails after the sockets have been created,
+        // the file descriptors will leak. Creating `pair` above ensures that if
+        // there is an error, the file descriptors are closed.
+        #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
+        syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))
+            .and_then(|_| syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK)))
+            .and_then(|_| syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC)))
+            .and_then(|_| syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK)))
+            .map_err(|e| {
+                // If either of the `fcntl` calls failed, close the
+                // socket. Ignore the error from closing since we can't
+                // pass back two errors.
+                let _ = syscall!(close(fds[0]));
+                let _ = syscall!(close(fds[1]));
+                e
+            })?;
+
+        Ok(unsafe { (Socket::from_raw_fd(fds[0]), Socket::from_raw_fd(fds[1])) })
     }
 
     #[cfg(any(feature = "tcp", feature = "udp"))]
@@ -118,7 +160,7 @@ impl Socket {
         ))]
         let socket = syscall!(accept4(
             self.fd,
-            storage.as_mut_ptr() as *mut _,
+            storage.as_mut_ptr() as *mut libc::sockaddr,
             &mut len,
             libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
         ))?;
@@ -135,7 +177,11 @@ impl Socket {
             target_os = "solaris",
         ))]
         let socket = {
-            let socket = syscall!(accept(self.fd, storage.as_mut_ptr() as *mut _, &mut len))?;
+            let socket = syscall!(accept(
+                self.fd,
+                storage.as_mut_ptr() as *mut libc::sockaddr,
+                &mut len
+            ))?;
             syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC))?;
             socket
         };

@@ -2,21 +2,18 @@ use super::socket_addr;
 use crate::net::{SocketAddr, UnixStream};
 use crate::sys::Socket;
 
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::{io, mem};
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
-    let socket = Socket::new(libc::AF_UNIX, libc::SOCK_STREAM, 0)?;
-    let (sockaddr, socklen) = socket_addr(path)?;
-    let sockaddr = &sockaddr as *const libc::sockaddr_un as *const libc::sockaddr;
+    let socket = Socket::new(libc::AF_UNIX, libc::SOCK_STREAM, 0)?.into_raw_fd();
+    let (storage, len) = socket_addr(path)?;
+    let sockaddr = &storage as *const libc::sockaddr_un as *const libc::sockaddr;
 
-    // temp: Most of the below can be moved into `Socket` methods. Create a
-    // `RawFd` for now until those are added.
-    let socket = socket.as_raw_fd();
-
-    syscall!(bind(socket, sockaddr, socklen))
+    // `Socket::bind` does not satisfy this case because of Mio's `SocketAddr`.
+    syscall!(bind(socket, sockaddr, len))
         .and_then(|_| syscall!(listen(socket, 1024)))
         .map_err(|err| {
             // Close the socket if we hit an error, ignoring the error from
