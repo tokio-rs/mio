@@ -6,7 +6,7 @@ name          = "mio"
 # - Update CHANGELOG.md.
 # - Update doc URL.
 # - Create git tag
-version       = "0.6.21"
+version       = "0.6.22"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "Lightweight non-blocking IO"
@@ -41,9 +41,9 @@ fuchsia-zircon-sys = "0.3.2"
 libc   = "0.2.42"
 
 [target.'cfg(windows)'.dependencies]
-winapi = "0.2.6"
-miow   = "0.2.1"
-kernel32-sys = "0.2"
+winapi = "0.3.8"
+miow   = "0.3.3"
+socket2   = "0.3"
 
 [dev-dependencies]
 env_logger = { version = "0.4.0", default-features = false }

@@ -8,8 +8,11 @@ use std::time::Duration;
 
 use miow::iocp::CompletionStatus;
 use miow::net::*;
-use net2::{TcpBuilder, TcpStreamExt as Net2TcpExt};
-use winapi::*;
+use net2::{TcpStreamExt as Net2TcpExt};
+
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
+use winapi::um::winnt::HANDLE;
+
 use iovec::IoVec;
 
 use {poll, Ready, Poll, PollOpt, Token};
@@ -741,18 +744,24 @@ impl ListenerImp {
 
         me.iocp.set_readiness(me.iocp.readiness() - Ready::readable());
 
-        let res = match self.inner.family {
-            Family::V4 => TcpBuilder::new_v4(),
-            Family::V6 => TcpBuilder::new_v6(),
-        }.and_then(|builder| unsafe {
+        use socket2::{Socket, Type, Domain};
+        let res = {
+            let domain = match self.inner.family {
+                Family::V4 => Domain::ipv4(),
+                Family::V6 => Domain::ipv6(),
+            };
+            Socket::new(domain, Type::stream(), None)
+        }.and_then(|socket| unsafe {
             trace!("scheduling an accept");
-            self.inner.socket.accept_overlapped(&builder, &mut me.accept_buf,
+            let stream = socket.into_tcp_stream();
+            self.inner.socket.accept_overlapped(&stream, &mut me.accept_buf,
                                                 self.inner.accept.as_mut_ptr())
+            .and_then(|_| Ok(stream))
         });
         match res {
-            Ok((socket, _)) => {
+            Ok(stream) => {
                 // see docs above on StreamImp.inner for rationale on forget
-                me.accept = State::Pending(socket);
+                me.accept = State::Pending(stream);
                 mem::forget(self.clone());
             }
             Err(e) => {
