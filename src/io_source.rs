@@ -221,7 +221,7 @@ impl SelectorId {
     const UNASSOCIATED: usize = 0;
 
     /// Create a new `SelectorId`.
-    fn new() -> SelectorId {
+    const fn new() -> SelectorId {
         SelectorId {
             id: AtomicUsize::new(Self::UNASSOCIATED),
         }
