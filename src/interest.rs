@@ -96,7 +96,7 @@ impl ops::BitOr for Interest {
 
     #[inline]
     fn bitor(self, other: Self) -> Self {
-        Interest(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
+        self.add(other)
     }
 }
 
