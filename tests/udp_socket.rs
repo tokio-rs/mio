@@ -29,6 +29,39 @@ const ID2: Token = Token(3);
 const ID3: Token = Token(4);
 
 #[test]
+fn empty_datagram() {
+    const EMPTY: &[u8] = b"";
+
+    let (mut poll, mut events) = init_with_poll();
+    let mut s1 = UdpSocket::bind(any_local_address()).unwrap();
+    let mut s2 = UdpSocket::bind(any_local_address()).unwrap();
+
+    poll.registry()
+        .register(&mut s1, ID1, Interest::WRITABLE)
+        .unwrap();
+    poll.registry()
+        .register(&mut s2, ID2, Interest::READABLE)
+        .unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
+    );
+
+    checked_write!(s1.send_to(EMPTY, s2.local_addr().unwrap()));
+
+    let mut buf = [0; 10];
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID2, Interest::READABLE)],
+    );
+    expect_read!(s2.recv_from(&mut buf), EMPTY, s1.local_addr().unwrap());
+}
+
+#[test]
 fn is_send_and_sync() {
     assert_send::<UdpSocket>();
     assert_sync::<UdpSocket>();
