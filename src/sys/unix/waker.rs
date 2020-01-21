@@ -104,13 +104,14 @@ pub use self::kqueue::Waker;
     target_os = "openbsd",
     target_os = "solaris"
 ))]
-mod pipe {
+pub(crate) mod pipe {
+
     use crate::sys::unix::Selector;
     use crate::{Interest, Token};
 
     use std::fs::File;
-    use std::io::{self, Read, Write};
-    use std::os::unix::io::FromRawFd;
+    use std::io::{self, Write};
+    use std::os::unix::io::{FromRawFd, RawFd};
 
     /// Waker backed by a unix pipe.
     ///
@@ -130,9 +131,7 @@ mod pipe {
             // they're closed when dropped, e.g. when register below fails.
             let sender = unsafe { File::from_raw_fd(fds[1]) };
             let receiver = unsafe { File::from_raw_fd(fds[0]) };
-            selector
-                .register(fds[0], token, Interest::READABLE)
-                .map(|()| Waker { sender, receiver })
+            Self::register_waker(fds[0], selector, token).map(|()| Waker { sender, receiver })
         }
 
         pub fn wake(&self) -> io::Result<()> {
@@ -148,15 +147,37 @@ mod pipe {
                 Err(err) => Err(err),
             }
         }
+    }
 
-        /// Empty the pipe's buffer, only need to call this if `wake` fails.
-        /// This ignores any errors.
-        fn empty(&self) {
-            let mut buf = [0; 4096];
-            loop {
-                match (&self.receiver).read(&mut buf) {
-                    Ok(n) if n > 0 => continue,
-                    _ => return,
+    cfg_neither_epoll_nor_kqueue! {
+        impl Waker {
+            // Empty not needed in poll(2) case, emptying is done by selector.
+            fn empty(&self) {}
+            fn register_waker(fd: RawFd, selector: &Selector, token: Token)
+            -> io::Result<()> {
+                // Register fd using a custom down-call to ensure
+                // level-triggered semantic required by a waker.
+                selector.register_pipe_waker(fd, token, Interest::READABLE)
+            }
+        }
+    }
+
+    cfg_epoll_or_kqueue! {
+        use std::io::Read;
+        impl Waker {
+            fn register_waker(fd: RawFd, selector: &Selector, token: Token)
+            -> io::Result<()> {
+                selector.register(fd, token, Interest::READABLE)
+            }
+            /// Empty the pipe's buffer, only need to call this if `wake` fails.
+            /// This ignores any errors.
+            fn empty(&self) {
+                let mut buf = [0; 4096];
+                loop {
+                    match (&self.receiver).read(&mut buf) {
+                        Ok(n) if n > 0 => continue,
+                        _ => return,
+                    }
                 }
             }
         }

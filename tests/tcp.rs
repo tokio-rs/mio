@@ -375,30 +375,6 @@ fn connect_then_close() {
 }
 
 #[test]
-fn listen_then_close() {
-    init();
-
-    let mut poll = Poll::new().unwrap();
-    let mut l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
-
-    poll.registry()
-        .register(&mut l, Token(1), Interest::READABLE)
-        .unwrap();
-    drop(l);
-
-    let mut events = Events::with_capacity(128);
-
-    poll.poll(&mut events, Some(Duration::from_millis(100)))
-        .unwrap();
-
-    for event in &events {
-        if event.token() == Token(1) {
-            panic!("recieved ready() on a closed TcpListener")
-        }
-    }
-}
-
-#[test]
 fn bind_twice_bad() {
     init();
 
@@ -658,7 +634,8 @@ macro_rules! wait {
     }};
 }
 
-#[test]
+test_read_write_closed! {
+["event.is_write_closed() not supported"]
 fn write_shutdown() {
     init();
 
@@ -695,6 +672,7 @@ fn write_shutdown() {
 
     wait!(poll, is_readable, true);
 }
+} // test_read_write_closed!
 
 struct MyHandler {
     listener: TcpListener,

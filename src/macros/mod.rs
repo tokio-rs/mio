@@ -105,3 +105,74 @@ macro_rules! cfg_any_os_util {
         )*
     }
 }
+
+/// OS supports epoll(7) interface
+macro_rules! cfg_epoll {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                target_os = "linux",
+                target_os = "android",
+                target_os = "illumos"
+            ))]
+            $item
+        )*
+    }
+}
+
+/// OS supports kqueue(2) interface
+macro_rules! cfg_kqueue {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos",
+                target_os = "netbsd",
+                target_os = "openbsd"
+            ))]
+            $item
+        )*
+    }
+}
+
+/// OS supports either epoll(7) or kqueue(2) interface
+macro_rules! cfg_epoll_or_kqueue {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos",
+                target_os = "netbsd",
+                target_os = "openbsd",
+                target_os = "linux",
+                target_os = "android",
+                target_os = "illumos"
+            ))]
+            $item
+        )*
+    }
+}
+
+/// OS neither supports epoll(7) nor kqueue(2) interfaces
+macro_rules! cfg_neither_epoll_nor_kqueue {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos",
+                target_os = "netbsd",
+                target_os = "openbsd",
+                target_os = "linux",
+                target_os = "android",
+                target_os = "illumos"
+            )))]
+            $item
+        )*
+    }
+}

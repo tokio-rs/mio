@@ -196,14 +196,23 @@ pub fn assert_would_block<T>(result: io::Result<T>) {
     }
 }
 
-/// Assert that `NONBLOCK` is set on `socket`.
+/// Assert that socket is non-blocking.
 #[cfg(unix)]
 pub fn assert_socket_non_blocking<S>(socket: &S)
 where
     S: AsRawFd,
 {
+    let expected = if cfg!(target_os = "solaris") {
+        /*
+         * On Solaris O_NDELAY and O_NONBLOCK behave the same for sockets.
+         * For more details, see read(2) man page.
+         */
+        libc::O_NONBLOCK | libc::O_NDELAY
+    } else {
+        libc::O_NONBLOCK
+    };
     let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFL) };
-    assert!(flags & libc::O_NONBLOCK != 0, "socket not non-blocking");
+    assert!(flags & expected != 0, "socket not non-blocking");
 }
 
 #[cfg(windows)]
@@ -310,4 +319,49 @@ macro_rules! expect_read {
         assert_eq!(&$buf[..n], expected);
         assert_eq!(address, source);
     }};
+}
+
+/// tests READ_CLOSED or WRITE_CLOSED events, not supported using poll(2),
+/// but expected to work on Windows
+macro_rules! test_read_write_closed {
+    ([$msg:expr] $($item:item)*) => {
+        $(
+	    #[test]
+            #[cfg_attr(not(any(
+                windows,
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos",
+                target_os = "netbsd",
+                target_os = "openbsd",
+                target_os = "linux",
+                target_os = "android",
+                target_os = "illumos"
+            )), ignore = $msg)]
+            $item
+        )*
+    }
+}
+
+/// tests READ_CLOSED or WRITE_CLOSED events, after shutdown on client side,
+/// neither supported using poll(2) nor Windows
+macro_rules! test_shutdown_client {
+    ([$msg:expr] $($item:item)*) => {
+        $(
+	    #[test]
+            #[cfg_attr(not(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos",
+                target_os = "netbsd",
+                target_os = "openbsd",
+                target_os = "linux",
+                target_os = "android",
+                target_os = "illumos"
+            )), ignore = $msg)]
+            $item
+        )*
+    }
 }

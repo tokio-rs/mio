@@ -129,72 +129,91 @@ impl<T> DerefMut for IoSource<T> {
     }
 }
 
-#[cfg(unix)]
-impl<T> event::Source for IoSource<T>
-where
-    T: AsRawFd,
-{
-    fn register(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.associate(registry)?;
-        poll::selector(registry).register(self.inner.as_raw_fd(), token, interests)
-    }
+cfg_epoll_or_kqueue! {
+    impl<T> event::Source for IoSource<T>
+    where
+        T: AsRawFd,
+    {
+        fn register(
+            &mut self,
+            registry: &Registry,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            #[cfg(debug_assertions)]
+            self.selector_id.associate(registry)?;
+            poll::selector(registry).register(self.inner.as_raw_fd(), token,
+                interests)
+        }
 
-    fn reregister(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.check_association(registry)?;
-        poll::selector(registry).reregister(self.inner.as_raw_fd(), token, interests)
-    }
+        fn reregister(
+            &mut self,
+            registry: &Registry,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            #[cfg(debug_assertions)]
+            self.selector_id.check_association(registry)?;
+            poll::selector(registry).reregister(self.inner.as_raw_fd(), token,
+                interests)
+        }
 
-    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.remove_association(registry)?;
-        poll::selector(registry).deregister(self.inner.as_raw_fd())
+        fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
+            #[cfg(debug_assertions)]
+            self.selector_id.remove_association(registry)?;
+            poll::selector(registry).deregister(self.inner.as_raw_fd())
+        }
     }
 }
 
+cfg_neither_epoll_nor_kqueue! {
+    #[cfg(not(windows))]
+    pub trait IoSourceTrait = AsRawFd;
+    #[cfg(windows)]
+    pub trait IoSourceTrait = AsRawSocket;
+
+    impl<T> event::Source for IoSource<T>
+    where
+        T: IoSourceTrait,
+    {
+        fn register(
+            &mut self,
+            registry: &Registry,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            #[cfg(debug_assertions)]
+            self.selector_id.associate(registry)?;
 #[cfg(windows)]
-impl<T> event::Source for IoSource<T>
-where
-    T: AsRawSocket,
-{
-    fn register(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.associate(registry)?;
-        self.state
-            .register(registry, token, interests, self.inner.as_raw_socket())
-    }
+            {
+                self.state
+                    .register(registry, token, interests,
+                        self.inner.as_raw_socket())
+            }
+#[cfg(not(windows))]
+            {
+            self.state
+                .register(registry, token, interests,
+                    self.inner.as_raw_fd())
+            }
+        }
 
-    fn reregister(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.check_association(registry)?;
-        self.state.reregister(registry, token, interests)
-    }
+        fn reregister(
+            &mut self,
+            registry: &Registry,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            #[cfg(debug_assertions)]
+            self.selector_id.check_association(registry)?;
+            self.state.reregister(registry, token, interests)
+        }
 
-    fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.remove_association(_registry)?;
-        self.state.deregister()
+        fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
+            #[cfg(debug_assertions)]
+            self.selector_id.remove_association(_registry)?;
+            self.state.deregister()
+        }
     }
 }
 

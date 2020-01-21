@@ -293,7 +293,8 @@ fn shutdown_read() {
         target_os = "ios",
         target_os = "macos",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "solaris"
     ))]
     {
         let mut buf = [0; 20];
@@ -381,7 +382,8 @@ fn shutdown_both() {
         target_os = "ios",
         target_os = "macos",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "solaris"
     ))]
     {
         let mut buf = [0; 20];
@@ -502,11 +504,8 @@ fn no_events_after_deregister() {
     thread_handle.join().expect("unable to join thread");
 }
 
-#[test]
-#[cfg_attr(
-    windows,
-    ignore = "fails on Windows; client read closed events are not triggered"
-)]
+test_shutdown_client! {
+["client close events are not found"]
 fn tcp_shutdown_client_read_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -536,13 +535,10 @@ fn tcp_shutdown_client_read_close_event() {
     barrier.wait();
     handle.join().expect("failed to join thread");
 }
+} // test_shutdown_client!
 
-#[test]
-#[cfg_attr(windows, ignore = "fails; client write_closed events are not found")]
-#[cfg_attr(
-    any(target_os = "linux", target_os = "android", target_os = "solaris"),
-    ignore = "fails; client write_closed events are not found"
-)]
+test_shutdown_client! {
+["client write closed events are not found"]
 fn tcp_shutdown_client_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -572,8 +568,10 @@ fn tcp_shutdown_client_write_close_event() {
     barrier.wait();
     handle.join().expect("failed to join thread");
 }
+} // test_shutdown_client!
 
-#[test]
+test_read_write_closed! {
+["event.is_read_closed() not supported"]
 fn tcp_shutdown_server_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -602,12 +600,10 @@ fn tcp_shutdown_server_write_close_event() {
     barrier.wait();
     handle.join().expect("failed to join thread");
 }
+} // test_read_write_closed!
 
-#[test]
-#[cfg_attr(
-    windows,
-    ignore = "fails on Windows; client close events are not found"
-)]
+test_shutdown_client! {
+["client close events are not found"]
 fn tcp_shutdown_client_both_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -635,6 +631,7 @@ fn tcp_shutdown_client_both_close_event() {
     barrier.wait();
     handle.join().expect("failed to join thread");
 }
+} // test_shutdown_client!
 
 /// Start a listener that accepts `n_connections` connections on the returned
 /// address. It echos back any data it reads from the connection before

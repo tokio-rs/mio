@@ -165,7 +165,8 @@ fn unix_datagram_pair() {
     assert!(datagram2.take_error().unwrap().is_none());
 }
 
-#[test]
+test_read_write_closed! {
+["event.is_read_closed() not supported"]
 fn unix_datagram_shutdown() {
     let (mut poll, mut events) = init_with_poll();
     let path1 = temp_file("unix_datagram_shutdown1");
@@ -222,6 +223,7 @@ fn unix_datagram_shutdown() {
 
     assert!(datagram1.take_error().unwrap().is_none());
 }
+} // test_read_write_closed!
 
 #[test]
 fn unix_datagram_register() {

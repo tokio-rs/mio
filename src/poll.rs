@@ -154,19 +154,22 @@ use std::{fmt, io};
 /// # Implementation notes
 ///
 /// `Poll` is backed by the selector provided by the operating system.
+/// On Unix like systems it's either [epoll](4) or [kqueue](2) if the system
+/// supports it and falls back to use [poll](2) system call otherwise.
+/// On Windows the backend is I/O completion ports.
 ///
-/// |      OS       |  Selector |
-/// |---------------|-----------|
-/// | Android       | [epoll]   |
-/// | DragonFly BSD | [kqueue]  |
-/// | FreeBSD       | [kqueue]  |
-/// | Linux         | [epoll]   |
-/// | NetBSD        | [kqueue]  |
-/// | OpenBSD       | [kqueue]  |
-/// | Solaris       | [epoll]   |
-/// | Windows       | [IOCP]    |
-/// | iOS           | [kqueue]  |
-/// | macOS         | [kqueue]  |
+/// |      OS       |  Selector    |
+/// |---------------|--------------|
+/// | Android       | [epoll]      |
+/// | DragonFly BSD | [kqueue]     |
+/// | FreeBSD       | [kqueue]     |
+/// | Linux         | [epoll]      |
+/// | NetBSD        | [kqueue]     |
+/// | OpenBSD       | [kqueue]     |
+/// | Windows       | [IOCP]       |
+/// | iOS           | [kqueue]     |
+/// | macOS         | [kqueue]     |
+/// | other Unix    | [poll]       |
 ///
 /// On all supported platforms, socket operations are handled by using the
 /// system selector. Platform specific extensions (e.g. [`SourceFd`]) allow
@@ -174,16 +177,22 @@ use std::{fmt, io};
 /// example, Linux's [`signalfd`] feature can be used by registering the FD with
 /// `Poll` via [`SourceFd`].
 ///
-/// On all platforms except windows, a call to [`Poll::poll`] is mostly just a
-/// direct call to the system selector. However, [IOCP] uses a completion model
-/// instead of a readiness model. In this case, `Poll` must adapt the completion
-/// model Mio's API. While non-trivial, the bridge layer is still quite
+/// On all platforms using [epoll](4) and [kqueue](2) interfaces, a call to
+/// [`Poll::poll`] is mostly just a direct call to the system selector.
+/// However, [IOCP] uses a completion model instead of a readiness model.
+/// In this case, `Poll` must adapt the completion
+/// model Mio's of API. While non-trivial, the bridge layer is still quite
 /// efficient. The most expensive part being calls to `read` and `write` require
 /// data to be copied into an intermediate buffer before it is passed to the
 /// kernel.
 ///
+/// In case of [poll](2) backend, `Poll` has to emulate edge triggered model of
+/// Mio's API using level triggered model of [poll](2) system call. The work,
+/// that done by [epoll](4) in the kernel is shifted to user space.
+///
 /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
 /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
+/// [poll]: https://docs.oracle.com/cd/E36784_01/html/E36872/poll-2.html
 /// [IOCP]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365198(v=vs.85).aspx
 /// [`signalfd`]: http://man7.org/linux/man-pages/man2/signalfd.2.html
 /// [`SourceFd`]: unix/struct.SourceFd.html
