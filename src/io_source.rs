@@ -168,13 +168,17 @@ cfg_epoll_or_kqueue! {
 
 cfg_neither_epoll_nor_kqueue! {
     #[cfg(not(windows))]
-    pub trait IoSourceTrait = AsRawFd;
+    pub trait AsRawFdOrSocket: AsRawFd {}
+    #[cfg(not(windows))]
+    impl<T: AsRawFd> AsRawFdOrSocket for T {}
     #[cfg(windows)]
-    pub trait IoSourceTrait = AsRawSocket;
+    pub trait AsRawFdOrSocket: AsRawSocket {}
+    #[cfg(windows)]
+    impl<T: AsRawSocket> AsRawFdOrSocket for T {}
 
     impl<T> event::Source for IoSource<T>
     where
-        T: IoSourceTrait,
+        T: AsRawFdOrSocket,
     {
         fn register(
             &mut self,
@@ -184,13 +188,13 @@ cfg_neither_epoll_nor_kqueue! {
         ) -> io::Result<()> {
             #[cfg(debug_assertions)]
             self.selector_id.associate(registry)?;
-#[cfg(windows)]
+            #[cfg(windows)]
             {
                 self.state
                     .register(registry, token, interests,
                         self.inner.as_raw_socket())
             }
-#[cfg(not(windows))]
+            #[cfg(not(windows))]
             {
             self.state
                 .register(registry, token, interests,

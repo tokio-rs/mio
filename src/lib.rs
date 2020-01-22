@@ -1,4 +1,3 @@
-#![feature(trait_alias)]
 #![doc(html_root_url = "https://docs.rs/mio/0.7.0-alpha.1")]
 #![deny(
     missing_docs,
