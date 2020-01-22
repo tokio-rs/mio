@@ -505,7 +505,6 @@ fn no_events_after_deregister() {
 }
 
 test_shutdown_client! {
-["client close events are not found"]
 fn tcp_shutdown_client_read_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -537,8 +536,7 @@ fn tcp_shutdown_client_read_close_event() {
 }
 } // test_shutdown_client!
 
-test_shutdown_client! {
-["client write closed events are not found"]
+test_shutdown_client_write! {
 fn tcp_shutdown_client_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -568,10 +566,9 @@ fn tcp_shutdown_client_write_close_event() {
     barrier.wait();
     handle.join().expect("failed to join thread");
 }
-} // test_shutdown_client!
+} // test_shutdown_client_write!
 
-test_read_write_closed! {
-["event.is_read_closed() not supported"]
+test_shutdown_server! {
 fn tcp_shutdown_server_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -600,10 +597,9 @@ fn tcp_shutdown_server_write_close_event() {
     barrier.wait();
     handle.join().expect("failed to join thread");
 }
-} // test_read_write_closed!
+} // test_shutdown_server!
 
 test_shutdown_client! {
-["client close events are not found"]
 fn tcp_shutdown_client_both_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));

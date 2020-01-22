@@ -321,10 +321,10 @@ macro_rules! expect_read {
     }};
 }
 
-/// tests READ_CLOSED or WRITE_CLOSED events, not supported using poll(2),
-/// but expected to work on Windows
-macro_rules! test_read_write_closed {
-    ([$msg:expr] $($item:item)*) => {
+/// tests READ_CLOSED event after shutdown on server side,
+/// not supported using poll(2)
+macro_rules! test_shutdown_server {
+    ($($item:item)*) => {
         $(
 	    #[test]
             #[cfg_attr(not(any(
@@ -338,16 +338,17 @@ macro_rules! test_read_write_closed {
                 target_os = "linux",
                 target_os = "android",
                 target_os = "illumos"
-            )), ignore = $msg)]
+            )), ignore = "read closed and write closed events not supported")]
             $item
         )*
     }
 }
 
-/// tests READ_CLOSED or WRITE_CLOSED events, after shutdown on client side,
-/// neither supported using poll(2) nor Windows
+/// tests READ_CLOSED  events after shutdown read on client side,
+///    or WRITE_CLOSED events after shutdown both on client side,
+/// neither supported using poll(2) nor on Windows
 macro_rules! test_shutdown_client {
-    ([$msg:expr] $($item:item)*) => {
+    ($($item:item)*) => {
         $(
 	    #[test]
             #[cfg_attr(not(any(
@@ -360,7 +361,27 @@ macro_rules! test_shutdown_client {
                 target_os = "linux",
                 target_os = "android",
                 target_os = "illumos"
-            )), ignore = $msg)]
+            )), ignore = "client close events are not found")]
+            $item
+        )*
+    }
+}
+
+/// tests WRITE_CLOSED event after shutdown write on client side,
+/// neither supported using poll(2) nor Windows nor Linux / Android 
+macro_rules! test_shutdown_client_write {
+    ($($item:item)*) => {
+        $(
+	    #[test]
+            #[cfg_attr(not(any(
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos",
+                target_os = "netbsd",
+                target_os = "openbsd",
+                target_os = "illumos"
+            )), ignore = "client write closed events are not found")]
             $item
         )*
     }

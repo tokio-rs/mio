@@ -634,8 +634,7 @@ macro_rules! wait {
     }};
 }
 
-test_read_write_closed! {
-["event.is_write_closed() not supported"]
+test_shutdown_server! {
 fn write_shutdown() {
     init();
 
@@ -672,7 +671,7 @@ fn write_shutdown() {
 
     wait!(poll, is_readable, true);
 }
-} // test_read_write_closed!
+} // test_shutdown_server!
 
 struct MyHandler {
     listener: TcpListener,

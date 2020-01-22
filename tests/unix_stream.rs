@@ -143,8 +143,7 @@ fn unix_stream_peer_addr() {
     handle.join().unwrap();
 }
 
-test_read_write_closed! {
-["event.is_read_closed() not supported"]
+test_shutdown_client! {
 fn unix_stream_shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_read");
@@ -197,7 +196,7 @@ fn unix_stream_shutdown_read() {
     drop(stream);
     handle.join().unwrap();
 }
-} // test_read_write_closed!
+} // test_shutdown_client
 
 #[test]
 fn unix_stream_shutdown_write() {
@@ -254,8 +253,7 @@ fn unix_stream_shutdown_write() {
     handle.join().unwrap();
 }
 
-test_read_write_closed! {
-["event.is_write_closed() not supported"]
+test_shutdown_client! {
 fn unix_stream_shutdown_both() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_both");
@@ -314,10 +312,9 @@ fn unix_stream_shutdown_both() {
     drop(stream);
     handle.join().unwrap();
 }
-} // test_read_write_closed!
+} // test_shutdown_client!
 
-test_read_write_closed! {
-["event.is_read_closed() not supported"]
+test_shutdown_server! {
 fn unix_stream_shutdown_listener_write() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -349,7 +346,7 @@ fn unix_stream_shutdown_listener_write() {
     barrier.wait();
     handle.join().unwrap();
 }
-} //test_read_write_closed!
+} // test_shutdown_server!
 
 #[test]
 fn unix_stream_register() {
