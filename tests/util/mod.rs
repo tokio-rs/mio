@@ -368,7 +368,7 @@ macro_rules! test_shutdown_client {
 }
 
 /// tests WRITE_CLOSED event after shutdown write on client side,
-/// neither supported using poll(2) nor Windows nor Linux / Android 
+/// neither supported using poll(2) nor Windows nor Linux / Android
 macro_rules! test_shutdown_client_write {
     ($($item:item)*) => {
         $(
