@@ -48,7 +48,7 @@ guide = []
 [dependencies]
 log = "0.4.8"
 
-[target.'cfg(macos)'.dependencies]
+[target.'cfg(target_os = "macos")'.dependencies]
 cvt = "0.1"
 
 [target.'cfg(unix)'.dependencies]
