@@ -25,11 +25,6 @@ cfg_uds! {
 
 cfg_net! {
     use std::io;
-    #[cfg(windows)]
-    use std::os::windows::io::RawSocket;
-
-    #[cfg(windows)]
-    use crate::{Registry, Token, Interest};
 
     pub(crate) struct IoSourceState;
 
@@ -48,14 +43,34 @@ cfg_net! {
         }
     }
 
+cfg_neither_epoll_nor_kqueue! {
+    use crate::{Registry, Token, Interest};
+
     #[cfg(windows)]
+    use std::os::windows::io::RawSocket;
+
+    #[cfg(not(windows))]
+    use std::os::unix::io::RawFd;
+
     impl IoSourceState {
-         pub fn register(
+        #[cfg(windows)]
+        pub fn register(
             &mut self,
             _: &Registry,
             _: Token,
             _: Interest,
             _: RawSocket,
+        ) -> io::Result<()> {
+            os_required!()
+        }
+
+        #[cfg(not(windows))]
+        pub fn register(
+            &mut self,
+            _: &Registry,
+            _: Token,
+            _: Interest,
+            _: RawFd,
         ) -> io::Result<()> {
             os_required!()
         }
@@ -73,4 +88,5 @@ cfg_net! {
             os_required!()
         }
     }
+} // cfg_neither_epoll_nor_kqueue!
 }
