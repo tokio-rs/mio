@@ -44,6 +44,18 @@
     not(feature = "extra-docs"),
     doc = "`guide` (only available when the `extra-docs` feature is enabled)."
 )]
+//!
+//! ## Available features
+//!
+//! The available features are described in the
+#![cfg_attr(
+    feature = "extra-docs",
+    doc = "[`features`](../mio/features/index.html) module."
+)]
+#![cfg_attr(
+    not(feature = "extra-docs"),
+    doc = "`features` (only available when the `extra-docs` feature is enabled)."
+)]
 
 // macros used internally
 #[macro_use]
@@ -74,6 +86,52 @@ pub use waker::Waker;
 pub mod unix {
     //! Unix only extensions.
     pub use crate::sys::SourceFd;
+}
+
+// Enable with `cargo doc --features extra-docs`.
+#[cfg(feature = "extra-docs")]
+pub mod features {
+    //! # Mio's optional features.
+    //!
+    //! This document describes the available features in Mio.
+    //!
+    #![cfg_attr(feature = "os-poll", doc = "## `os-poll` (enabled)")]
+    #![cfg_attr(not(feature = "os-poll"), doc = "## `os-poll` (disabled)")]
+    //!
+    //! Mio by default provides only a shell implementation, that `panic!`s the
+    //! moment it is actually run. To run it requires OS support, this is
+    //! enabled by activating the `os-poll` feature.
+    //!
+    //! This makes `Poll`, `Registry` and `Waker` functional.
+    //!
+    #![cfg_attr(feature = "os-util", doc = "## `os-util` (enabled)")]
+    #![cfg_attr(not(feature = "os-util"), doc = "## `os-util` (disabled)")]
+    //!
+    //! `os-util` enables additional OS specific facilities. Currently this
+    //! means the `unix` module (with `SourceFd`) becomes available.
+    //!
+    //! ## Network types
+    //!
+    //! Mio provide three features to enable network types:
+    //!
+    #![cfg_attr(feature = "tcp", doc = "* `tcp` (enabled)")]
+    #![cfg_attr(not(feature = "tcp"), doc = "* `tcp` (disabled)")]
+    //! : includes `TcpStream` and `TcpListener`,
+    #![cfg_attr(feature = "udp", doc = "* `udp` (enabled)")]
+    #![cfg_attr(not(feature = "udp"), doc = "* `udp` (disabled)")]
+    //! : includes `UdpSocket`, and
+    #![cfg_attr(feature = "uds", doc = "* `uds` (enabled)")]
+    #![cfg_attr(not(feature = "uds"), doc = "* `uds` (disabled)")]
+    //! : includes `UnixDatagram`, `UnixListener`, `UnixStream` and `SocketAddr`.
+    //!
+    //! All types can be found in the `net` module.
+    //!
+    #![cfg_attr(feature = "extra-docs", doc = "## `extra-docs` (enabled)")]
+    #![cfg_attr(not(feature = "extra-docs"), doc = "## `extra-docs` (disabled)")]
+    //!
+    //! This feature includes additional documentation such as this document and
+    //! the getting started guide. It adds nothing in terms of types (only
+    //! documentation).
 }
 
 // Enable with `cargo doc --features extra-docs`.
