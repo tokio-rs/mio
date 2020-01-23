@@ -26,6 +26,12 @@ publish = false
 default = []
 # Include implementations of I/O source readiness polling.
 os-poll = []
+# Enable epoll(7) backend for I/O source polling.
+os-epoll = ["os-poll"]
+# Enable kqueue(7) backend for I/O source polling.
+os-kqueue = ["os-poll"]
+# Enable epoll(7) or kqueue(7) backend for I/O source polling.
+os-poll-accel = ["os-epoll", "os-kqueue"]
 # Include adapters for underlying OS I/O sources.
 # Note: This is currently only supported on Unix and provides `SourceFd`
 os-util = []
@@ -61,8 +67,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [[example]]
 name = "tcp_server"
-required-features = ["os-poll", "tcp"]
+required-features = ["os-poll-accel", "tcp"]
 
 [[example]]
 name = "udp_server"
-required-features = ["os-poll", "udp"]
+required-features = ["os-poll-accel", "udp"]

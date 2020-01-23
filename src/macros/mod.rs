@@ -110,10 +110,13 @@ macro_rules! cfg_any_os_util {
 macro_rules! cfg_epoll {
     ($($item:item)*) => {
         $(
-            #[cfg(any(
-                target_os = "linux",
-                target_os = "android",
-                target_os = "illumos"
+            #[cfg(all(
+                any(
+                    target_os = "linux",
+                    target_os = "android",
+                    target_os = "illumos",
+                ),
+                feature = "os-epoll",
             ))]
             $item
         )*
@@ -124,13 +127,16 @@ macro_rules! cfg_epoll {
 macro_rules! cfg_kqueue {
     ($($item:item)*) => {
         $(
-            #[cfg(any(
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos",
-                target_os = "netbsd",
-                target_os = "openbsd"
+            #[cfg(all(
+                any(
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "netbsd",
+                    target_os = "openbsd",
+                ),
+                feature = "os-kqueue"
             ))]
             $item
         )*
@@ -142,15 +148,25 @@ macro_rules! cfg_epoll_or_kqueue {
     ($($item:item)*) => {
         $(
             #[cfg(any(
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos",
-                target_os = "netbsd",
-                target_os = "openbsd",
-                target_os = "linux",
-                target_os = "android",
-                target_os = "illumos"
+                all(
+                    any(
+                        target_os = "linux",
+                        target_os = "android",
+                        target_os = "illumos",
+                    ),
+                    feature = "os-epoll",
+                ),
+                all(
+                    any(
+                        target_os = "dragonfly",
+                        target_os = "freebsd",
+                        target_os = "ios",
+                        target_os = "macos",
+                        target_os = "netbsd",
+                        target_os = "openbsd",
+                    ),
+                    feature = "os-kqueue"
+                )
             ))]
             $item
         )*
@@ -162,15 +178,69 @@ macro_rules! cfg_neither_epoll_nor_kqueue {
     ($($item:item)*) => {
         $(
             #[cfg(not(any(
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos",
-                target_os = "netbsd",
-                target_os = "openbsd",
-                target_os = "linux",
-                target_os = "android",
-                target_os = "illumos"
+                all(
+                    any(
+                        target_os = "linux",
+                        target_os = "android",
+                        target_os = "illumos",
+                    ),
+                    feature = "os-epoll",
+                ),
+                all(
+                    any(
+                        target_os = "dragonfly",
+                        target_os = "freebsd",
+                        target_os = "ios",
+                        target_os = "macos",
+                        target_os = "netbsd",
+                        target_os = "openbsd",
+                    ),
+                    feature = "os-kqueue"
+                )
+            )))]
+            $item
+        )*
+    }
+}
+
+/// Enable Waker backed by kqueue(2) interface
+macro_rules! cfg_kqueue_waker {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                any(
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                ),
+                feature = "os-kqueue"
+            ))]
+            $item
+        )*
+    }
+}
+
+/// Enable Waker backed by pipe(2) interface
+macro_rules! cfg_pipe_waker {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(any(
+                all(
+                    any(
+                        target_os = "linux",
+                        target_os = "android",
+                        target_os = "illumos",
+                    ),
+                    feature = "os-epoll",
+                ),
+                all(
+                    any(
+                        target_os = "freebsd",
+                        target_os = "ios",
+                        target_os = "macos",
+                    ),
+                    feature = "os-kqueue"
+                )
             )))]
             $item
         )*

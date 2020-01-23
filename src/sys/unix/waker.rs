@@ -1,4 +1,4 @@
-#[cfg(any(target_os = "linux", target_os = "android"))]
+cfg_epoll! {
 mod eventfd {
     use crate::sys::Selector;
     use crate::{Interest, Token};
@@ -58,10 +58,10 @@ mod eventfd {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use self::eventfd::Waker;
+} // cfg_epoll!
 
-#[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
+cfg_kqueue_waker! {
 mod kqueue {
     use crate::sys::Selector;
     use crate::Token;
@@ -95,17 +95,11 @@ mod kqueue {
     }
 }
 
-#[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
 pub use self::kqueue::Waker;
+} // cfg_kqueue!
 
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "solaris"
-))]
+cfg_pipe_waker! {
 pub(crate) mod pipe {
-
     use crate::sys::unix::Selector;
     use crate::{Interest, Token};
 
@@ -184,10 +178,5 @@ pub(crate) mod pipe {
     }
 }
 
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "solaris"
-))]
 pub use self::pipe::Waker;
+} // cfg_pipe_waker!

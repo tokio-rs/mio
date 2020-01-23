@@ -21,6 +21,14 @@ jobs:
       displayName: Test --release
       cmd: test --release
 
+  # Stable --release (posix poll(2))
+  - template: ci/azure-test-stable.yml
+    parameters:
+      name: stable_release
+      displayName: Test --release
+      cmd: test --release
+      posix_poll: true
+
   # Nightly
   - template: ci/azure-test-stable.yml
     parameters:

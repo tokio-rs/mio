@@ -329,15 +329,25 @@ macro_rules! test_shutdown_server {
 	    #[test]
             #[cfg_attr(not(any(
                 windows,
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos",
-                target_os = "netbsd",
-                target_os = "openbsd",
-                target_os = "linux",
-                target_os = "android",
-                target_os = "illumos"
+                all(
+                    any(
+                        target_os = "dragonfly",
+                        target_os = "freebsd",
+                        target_os = "ios",
+                        target_os = "macos",
+                        target_os = "netbsd",
+                        target_os = "openbsd",
+                    ),
+                    feature = "os-kqueue"
+                ),
+                all(
+                    any(
+                        target_os = "linux",
+                        target_os = "android",
+                        target_os = "illumos"
+                    ),
+                    feature = "os-epoll",
+                )
             )), ignore = "read closed and write closed events not supported")]
             $item
         )*
@@ -352,15 +362,25 @@ macro_rules! test_shutdown_client {
         $(
 	    #[test]
             #[cfg_attr(not(any(
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos",
-                target_os = "netbsd",
-                target_os = "openbsd",
-                target_os = "linux",
-                target_os = "android",
-                target_os = "illumos"
+                all(
+                    any(
+                        target_os = "dragonfly",
+                        target_os = "freebsd",
+                        target_os = "ios",
+                        target_os = "macos",
+                        target_os = "netbsd",
+                        target_os = "openbsd",
+                    ),
+                    feature = "os-kqueue"
+                ),
+                all(
+                    any(
+                        target_os = "linux",
+                        target_os = "android",
+                        target_os = "illumos"
+                    ),
+                    feature = "os-epoll",
+                )
             )), ignore = "client close events are not found")]
             $item
         )*
@@ -374,13 +394,23 @@ macro_rules! test_shutdown_client_write {
         $(
 	    #[test]
             #[cfg_attr(not(any(
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos",
-                target_os = "netbsd",
-                target_os = "openbsd",
-                target_os = "illumos"
+                all(
+                    any(
+                        target_os = "dragonfly",
+                        target_os = "freebsd",
+                        target_os = "ios",
+                        target_os = "macos",
+                        target_os = "netbsd",
+                        target_os = "openbsd",
+                    ),
+                    feature = "os-kqueue"
+                ),
+                all(
+                    any(
+                        target_os = "illumos"
+                    ),
+                    feature = "os-epoll",
+                )
             )), ignore = "client write closed events are not found")]
             $item
         )*

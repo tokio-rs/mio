@@ -32,10 +32,17 @@ jobs:
               cargo hack check --feature-powerset --skip guide
             displayName: Check feature powerset
 
-      - script: cargo ${{ parameters.cmd }} --all-features
-        displayName: cargo ${{ parameters.cmd }} --all-features
-        env:
-          CI: "True"
+      - ${{ if eq(parameters.posix_poll, false) }}:
+          - script: cargo ${{ parameters.cmd }} --all-features
+            displayName: cargo ${{ parameters.cmd }} --all-features
+            env:
+              CI: "True"
+
+      - ${{ if eq(parameters.posix_poll, true) }}:
+          - script: cargo ${{ parameters.cmd }} --features "os-poll os-util tcp udp uds"
+            displayName: cargo ${{ parameters.cmd }} --features "os-poll os-util tcp udp uds"
+            env:
+              CI: "True"
 
       - ${{ if eq(parameters.cmd, 'test') }}:
           - script: cargo doc --no-deps
