@@ -70,12 +70,10 @@ pub use poll::{Poll, Registry};
 pub use token::Token;
 pub use waker::Waker;
 
-#[cfg(unix)]
-cfg_any_os_util! {
-    pub mod unix {
-        //! Unix only extensions.
-        pub use crate::sys::SourceFd;
-    }
+#[cfg(all(unix, feature = "os-util"))]
+pub mod unix {
+    //! Unix only extensions.
+    pub use crate::sys::SourceFd;
 }
 
 // Enable with `cargo doc --features extra-docs`.
