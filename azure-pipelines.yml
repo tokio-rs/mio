@@ -21,11 +21,11 @@ jobs:
       displayName: Test --release
       cmd: test --release
 
-  # Stable --release (posix poll(2))
+  # Stable --release (POSIX poll(2))
   - template: ci/azure-test-stable.yml
     parameters:
-      name: stable_release
-      displayName: Test --release
+      name: stable_release_posix_poll
+      displayName: Test --release (using POSIX poll(2) I/O Selector)
       cmd: test --release
       posix_poll: true
 
