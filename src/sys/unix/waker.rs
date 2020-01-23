@@ -120,11 +120,11 @@ pub(crate) mod pipe {
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             let mut fds = [-1; 2];
-            #[cfg(not(macos))]
+            #[cfg(not(target_os = "macos"))]
             syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
 
             // MacOS is missing pipe2 system-call.
-            #[cfg(macos)]
+            #[cfg(target_os = "macos")]
             {
                 use cvt::cvt;
                 use libc::{fcntl, F_SETFL, F_SETFD, O_NONBLOCK, FD_CLOEXEC};
