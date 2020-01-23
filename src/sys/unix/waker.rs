@@ -120,7 +120,23 @@ pub(crate) mod pipe {
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             let mut fds = [-1; 2];
+            #[cfg(not(macos))]
             syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
+
+            // MacOS is missing pipe2 system-call.
+            #[cfg(macos)]
+            {
+                use cvt::cvt;
+                use libc::{fcntl, F_SETFL, F_SETFD, O_NONBLOCK, FD_CLOEXEC};
+                syscall!(pipe(fds.as_mut_ptr()))?;
+                unsafe {
+                    cvt(fcntl(fds[0], F_SETFL, O_NONBLOCK))?;
+                    cvt(fcntl(fds[0], F_SETFD, FD_CLOEXEC))?;
+                    cvt(fcntl(fds[1], F_SETFL, O_NONBLOCK))?;
+                    cvt(fcntl(fds[1], F_SETFD, FD_CLOEXEC))?;
+                }
+            }
+
             // Turn the file descriptors into files first so we're ensured
             // they're closed when dropped, e.g. when register below fails.
             let sender = unsafe { File::from_raw_fd(fds[1]) };

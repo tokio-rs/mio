@@ -1,6 +1,7 @@
 use std::fmt;
 use std::os::raw::c_void;
 use std::os::unix::io::{AsRawFd, RawFd};
+#[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -13,6 +14,7 @@ use crate::token::Token;
 use libc::{c_int, c_short, nfds_t};
 use libc::{POLLIN, POLLNVAL, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM};
 
+#[cfg(debug_assertions)]
 static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Debug)]
@@ -28,6 +30,7 @@ enum Task {
         token: Token,
         interests: Interest,
     },
+    #[allow(dead_code)]
     Rearm {
         fd: RawFd,
         interests: Interest,
@@ -81,6 +84,7 @@ impl Task {
                 poll.fdarr[pos].events = interests_to_poll(*interests);
                 poll.fdmeta[pos].token = usize::from(*token);
             }
+            #[allow(dead_code)]
             Task::Rearm { fd, interests } => {
                 let pos = poll.fdhash[*fd as usize].unwrap();
                 poll.fdarr[pos].events = interests_to_poll(*interests);
@@ -149,8 +153,13 @@ impl Selector {
             waker: Mutex::new(None),
             as_fd: Mutex::new(-1),
         });
+        #[cfg(debug_assertions)]
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-        let sel = Selector { id, state };
+        let sel = Selector {
+            #[cfg(debug_assertions)]
+            id,
+            state,
+        };
         sel.add_waker()?;
         Ok(sel)
     }
@@ -168,7 +177,11 @@ impl Selector {
 
     pub fn try_clone(&self) -> io::Result<Selector> {
         let state = Arc::clone(&self.state);
-        Ok(Selector { id: self.id, state })
+        Ok(Selector {
+            #[cfg(debug_assertions)]
+            id: self.id,
+            state,
+        })
     }
 
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
@@ -281,6 +294,7 @@ impl Selector {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn rearm(&self, fd: RawFd, interests: Interest) -> io::Result<()> {
         self.add_task(Task::Rearm { fd, interests });
         Ok(())

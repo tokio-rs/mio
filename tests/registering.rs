@@ -10,7 +10,9 @@ use std::thread::sleep;
 use std::time::Duration;
 
 mod util;
-use util::{any_local_address, assert_error, init};
+#[cfg(debug_assertions)]
+use util::assert_error;
+use util::{any_local_address, init};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);

@@ -7,7 +7,7 @@ use std::os::windows::io::AsRawSocket;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{fmt, io};
 
-#[cfg(any(unix, debug_assertions))]
+#[cfg(debug_assertions)]
 use crate::poll;
 use crate::sys::IoSourceState;
 use crate::{event, Interest, Registry, Token};
@@ -130,6 +130,8 @@ impl<T> DerefMut for IoSource<T> {
 }
 
 cfg_epoll_or_kqueue! {
+    #[cfg(not(debug_assertions))]
+    use crate::poll;
     impl<T> event::Source for IoSource<T>
     where
         T: AsRawFd,
