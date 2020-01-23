@@ -36,8 +36,8 @@ udp = []
 # Include UDS primitives
 uds = []
 
-# Adds additional documentation in the form of a user guide.
-guide = []
+# Adds additional documentation.
+extra-docs = []
 
 [dependencies]
 log = "0.4.8"

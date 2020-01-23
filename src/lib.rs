@@ -36,10 +36,13 @@
 //! ## Guide
 //!
 //! A getting started guide is available in the
-#![cfg_attr(feature = "guide", doc = "[`guide`](../mio/guide/index.html) module.")]
 #![cfg_attr(
-    not(feature = "guide"),
-    doc = "`guide` (only available when the `guide` feature is enabled)."
+    feature = "extra-docs",
+    doc = "[`guide`](../mio/guide/index.html) module."
+)]
+#![cfg_attr(
+    not(feature = "extra-docs"),
+    doc = "`guide` (only available when the `extra-docs` feature is enabled)."
 )]
 
 // macros used internally
@@ -75,8 +78,8 @@ cfg_any_os_util! {
     }
 }
 
-// Enable with `cargo doc --features guide`.
-#[cfg(feature = "guide")]
+// Enable with `cargo doc --features extra-docs`.
+#[cfg(feature = "extra-docs")]
 pub mod guide {
     //! # Getting started guide.
     //!
