@@ -83,6 +83,7 @@ pub use token::Token;
 pub use waker::Waker;
 
 #[cfg(all(unix, feature = "os-util"))]
+#[cfg_attr(docsrs, doc(cfg(all(unix, feature = "os-util"))))]
 pub mod unix {
     //! Unix only extensions.
     pub use crate::sys::SourceFd;
