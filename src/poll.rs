@@ -151,6 +151,16 @@ use std::{fmt, io};
 /// # }
 /// ```
 ///
+/// ### Dropping `Poll`
+///
+/// When the `Poll` instance is dropped it may cancel in-flight operations for
+/// the registered [event sources], meaning that no further events for them may
+/// be received. It also means operations on the registered event sources may no
+/// longer work. It is up to the user to keep the `Poll` instance alive while
+/// registered event sources are being used.
+///
+/// [event sources]: ./event/trait.Source.html
+///
 /// # Implementation notes
 ///
 /// `Poll` is backed by the selector provided by the operating system.
