@@ -1,10 +1,64 @@
-# 0.7.0 alpha.1
+# 0.7.0
 
-Currently the changelog for v0.7.0 is incomplete, this tracked in issue #1217.
+Version 0.7 of Mio contains various major changes compared to version 0.6.
+Overall a large number of API changes have been made to reduce the complexity of
+the implementation and remove overhead where possible.
+
+Also the upgrade guide in docs/upgrade_guide.md.
+
+## Added
+
+* New `Interest` structure that replaces `Ready` in registering event sources.
+* `Registry` structure was added to separate registering and polling.
+* `Waker` was added to allow another thread to wake a thread polling `Poll`.
+* Added Unix Domain Socket (UDS) types: `UnixDatagram`, `UnixListener` and
+  `UnixStream`.
+
+## Removed
+
+* All code deprecated in 0.6 was removed in 0.7.
+* Support for Fuchsia was removed, the code was unmaintained.
+* Support for Bitrig was removed, rustc dropped support for it also.
+* `UnixReady` was merged into `Ready`.
+* Custom user-space readiness queue was removed, this includes the public
+  `Registration` and `SetReadiness` types.
+* `PollOpt` was removed, now all registrations use edge-triggers. See the
+  upgrade guide on how to process event using edge-triggers.
+* The network types (types in the `net` module) now support only the same API as
+  found in the standard library, various methods on the types were removed.
+* `TcpStream` now supports vectored I/O.
+* `Poll::poll_interruptible` was removed and instead `Poll::poll` doesn't hide
+  the interrupted error, or in other words `Poll::poll` was removed and
+  `Poll::poll_interruptible` renamed to `Poll::poll`.
+* `From<usize>` is removed from `Token`, the internal field is still public, so
+  `Token(my_token)` can still be used.
+
+## Changed
 
 * The `join_multicast_v4` and `leave_multicast_v4` methods now take their
   `Ipv4Addr` arguments by value rather than by reference.
-* Fix lazycell related compilation issues.
+* Various documentation improvements were made  around correct usage of `Poll`
+  and registered event sources. It is recommended to reread the documentation of
+  at least `event::Source` and `Poll`.
+* Mio now uses Rust 2018 and rustfmt for all code.
+* `Event` was changed to be a wrapper around the OS event. This means it can be
+  significantly larger on some OSes.
+* `Ready` was removed and replaced with various `is_*` methods on `Event`. For
+  example instead checking for readable readiness using
+  `Event::ready().is_readble()`, you would call `Event::is_readble()`.
+* `Ready::is_hup` was removed in favour of `Event::is_read_closed` and
+  `Event::is_write_closed`.
+* The Iterator implementation of `Events` was changed to return `&Event`.
+* `Evented` was renamed to `event::Source` and now takes mutable reference to
+  the source.
+* Minimum supported Rust version was increased to 1.39.
+* By default Mio now uses a shim implementation. To enable the full
+  implementation, that uses the OS, enable the `os-oll` feature. To enable the
+  network types use `tcp`, `udp` and/or `uds`. For more documentation on the
+  features see docs/features.md.
+* The entire Windows implementation was rewritten.
+* Various optimisation were made to reduce the number of system calls in
+  creating and using sockets, e.g. making use of `accept4(2)`.
 
 # 0.6.19 (May 28, 2018)
 
