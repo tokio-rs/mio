@@ -98,6 +98,11 @@ impl Events {
         }
     }
 
+    #[cfg(not(debug_assertions))]
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }

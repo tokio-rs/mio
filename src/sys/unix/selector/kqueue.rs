@@ -322,6 +322,11 @@ impl Events {
     pub fn with_capacity(capacity: usize) -> Events {
         Events(Vec::with_capacity(capacity))
     }
+
+    #[cfg(not(debug_assertions))]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl Deref for Events {

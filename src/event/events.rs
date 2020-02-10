@@ -208,7 +208,38 @@ impl<'a> Iterator for Iter<'a> {
         self.pos += 1;
         ret
     }
+
+    #[doc(hidden)]
+    #[cfg(not(debug_assertions))]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+
+    #[doc(hidden)]
+    #[cfg(not(debug_assertions))]
+    fn count(self) -> usize {
+        self.len()
+    }
 }
+
+/// Not part of the stable API.
+///
+/// This is only implemented as an optimisation on some platforms.
+#[doc(hidden)]
+#[cfg(not(debug_assertions))]
+impl<'a> ExactSizeIterator for Iter<'a> {
+    fn len(&self) -> usize {
+        self.inner.inner.len().saturating_sub(self.pos)
+    }
+}
+
+/// Not part of the stable API.
+///
+/// This is only implemented as an optimisation on some platforms.
+#[doc(hidden)]
+#[cfg(not(debug_assertions))]
+impl<'a> std::iter::FusedIterator for Iter<'a> {}
 
 impl fmt::Debug for Events {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
