@@ -4,32 +4,32 @@ Version 0.7 of Mio contains various major changes compared to version 0.6.
 Overall a large number of API changes have been made to reduce the complexity of
 the implementation and remove overhead where possible.
 
-Also the upgrade guide in docs/upgrade_guide.md.
+Please refer to the upgrade guide in docs/upgrade_guide.md for additional
+information.
 
 ## Added
 
-* New `Interest` structure that replaces `Ready` in registering event sources.
-* `Registry` structure was added to separate registering and polling.
-* `Waker` was added to allow another thread to wake a thread polling `Poll`.
-* Added Unix Domain Socket (UDS) types: `UnixDatagram`, `UnixListener` and
+* `Interest` structure that replaces `Ready` in registering event sources.
+* `Registry` structure that separates the registering and polling functionality.
+* `Waker` structure that allows another thread to wake a thread polling `Poll`.
+* Unix Domain Socket (UDS) types: `UnixDatagram`, `UnixListener` and
   `UnixStream`.
 
 ## Removed
 
 * All code deprecated in 0.6 was removed in 0.7.
-* Support for Fuchsia was removed, the code was unmaintained.
+* Support for Fuchsia was removed as the code was unmaintained.
 * Support for Bitrig was removed, rustc dropped support for it also.
 * `UnixReady` was merged into `Ready`.
 * Custom user-space readiness queue was removed, this includes the public
   `Registration` and `SetReadiness` types.
-* `PollOpt` was removed, now all registrations use edge-triggers. See the
-  upgrade guide on how to process event using edge-triggers.
+* `PollOpt` was removed and all registrations use edge-triggers. See the upgrade
+  guide on how to process event using edge-triggers.
 * The network types (types in the `net` module) now support only the same API as
   found in the standard library, various methods on the types were removed.
 * `TcpStream` now supports vectored I/O.
-* `Poll::poll_interruptible` was removed and instead `Poll::poll` doesn't hide
-  the interrupted error, or in other words `Poll::poll` was removed and
-  `Poll::poll_interruptible` renamed to `Poll::poll`.
+* `Poll::poll_interruptible` was removed. Instead `Poll::poll` will now return
+  an error if one occurs.
 * `From<usize>` is removed from `Token`, the internal field is still public, so
   `Token(my_token)` can still be used.
 
@@ -37,7 +37,7 @@ Also the upgrade guide in docs/upgrade_guide.md.
 
 * The `join_multicast_v4` and `leave_multicast_v4` methods now take their
   `Ipv4Addr` arguments by value rather than by reference.
-* Various documentation improvements were made  around correct usage of `Poll`
+* Various documentation improvements were made around correct usage of `Poll`
   and registered event sources. It is recommended to reread the documentation of
   at least `event::Source` and `Poll`.
 * Mio now uses Rust 2018 and rustfmt for all code.
