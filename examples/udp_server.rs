@@ -1,3 +1,5 @@
+// You can run this example from the root of the mio repo:
+// cargo run --example udp_server --features="os-poll udp"
 use log::warn;
 use mio::net::UdpSocket;
 use mio::{Events, Interest, Poll, Token};

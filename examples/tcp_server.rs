@@ -1,3 +1,5 @@
+// You can run this example from the root of the mio repo:
+// cargo run --example tcp_server --features="os-poll tcp"
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Registry, Token};
