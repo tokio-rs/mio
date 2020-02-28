@@ -933,12 +933,12 @@ pub fn multicast() {
     let mut rx = UdpSocket::bind(any_local_address()).unwrap();
 
     info!("Joining group 227.1.1.100");
-    let any = "0.0.0.0".parse().unwrap();
-    rx.join_multicast_v4("227.1.1.100".parse().unwrap(), any)
+    let any = &"0.0.0.0".parse().unwrap();
+    rx.join_multicast_v4(&"227.1.1.100".parse().unwrap(), any)
         .unwrap();
 
     info!("Joining group 227.1.1.101");
-    rx.join_multicast_v4("227.1.1.101".parse().unwrap(), any)
+    rx.join_multicast_v4(&"227.1.1.101".parse().unwrap(), any)
         .unwrap();
 
     info!("Registering SENDER");
