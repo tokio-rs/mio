@@ -465,7 +465,7 @@ impl UdpSocket {
     /// address of the local interface with which the system should join the
     /// multicast group. If it's equal to `INADDR_ANY` then an appropriate
     /// interface is chosen by the system.
-    #[allow(clippy::trivially-copy-pass-by-ref)]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
         self.inner.join_multicast_v4(multiaddr, interface)
     }
@@ -475,7 +475,7 @@ impl UdpSocket {
     /// This function specifies a new multicast group for this socket to join.
     /// The address must be a valid multicast address, and `interface` is the
     /// index of the interface to join/leave (or 0 to indicate any interface).
-    #[allow(clippy::trivially-copy-pass-by-ref)]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.inner.join_multicast_v6(multiaddr, interface)
     }
@@ -486,7 +486,7 @@ impl UdpSocket {
     /// [`join_multicast_v4`][link].
     ///
     /// [link]: #method.join_multicast_v4
-    #[allow(clippy::trivially-copy-pass-by-ref)]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
         self.inner.leave_multicast_v4(multiaddr, interface)
     }
@@ -497,7 +497,7 @@ impl UdpSocket {
     /// [`join_multicast_v6`][link].
     ///
     /// [link]: #method.join_multicast_v6
-    #[allow(clippy::trivially-copy-pass-by-ref)]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.inner.leave_multicast_v6(multiaddr, interface)
     }
