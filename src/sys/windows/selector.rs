@@ -128,7 +128,7 @@ impl SockState {
                  * events that the user is interested in. Therefore, cancel the pending
                  * poll operation; when we receive it's completion package, a new poll
                  * operation will be submitted with the correct event mask. */
-                 if let Err(e) = self.cancel() {
+                if let Err(e) = self.cancel() {
                     self.error = e.raw_os_error();
                     return Err(e);
                 }
@@ -475,14 +475,12 @@ impl SelectorInner {
         for sock in update_queue.iter_mut() {
             let mut sock_internal = sock.lock().unwrap();
             if !sock_internal.is_pending_deletion() {
-                let _ = sock_internal.update(&sock);
+                sock_internal.update(&sock)?;
             }
         }
 
         // remove all sock which do not have error, they have afd op pending
-        update_queue.retain(|sock| {
-            sock.lock().unwrap().has_error()
-        });
+        update_queue.retain(|sock| sock.lock().unwrap().has_error());
 
         self.afd_group.release_unused_afd();
         Ok(())
