@@ -238,13 +238,6 @@ impl Poll {
     /// granularity (usually 1ms), and kernel scheduling delays mean that
     /// the blocking interval may be overrun by a small amount.
     ///
-    /// `poll` returns the number of readiness events that have been pushed into
-    /// `events` or `Err` when an error has been encountered with the system
-    /// selector.  The value returned is deprecated and will be removed in 0.7.0.
-    /// Accessing the events by index is also deprecated.  Events can be
-    /// inserted by other events triggering, thus making sequential access
-    /// problematic.  Use the iterator API instead.  See [`iter`].
-    ///
     /// See the [struct] level documentation for a higher level discussion of
     /// polling.
     ///
