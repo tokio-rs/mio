@@ -35,8 +35,6 @@ information.
 
 ## Changed
 
-* The `join_multicast_v4` and `leave_multicast_v4` methods now take their
-  `Ipv4Addr` arguments by value rather than by reference.
 * Various documentation improvements were made around correct usage of `Poll`
   and registered event sources. It is recommended to reread the documentation of
   at least `event::Source` and `Poll`.
@@ -55,10 +53,13 @@ information.
 * By default Mio now uses a shim implementation. To enable the full
   implementation, that uses the OS, enable the `os-oll` feature. To enable the
   network types use `tcp`, `udp` and/or `uds`. For more documentation on the
-  features see docs/features.md.
+  features see the `feature` module in the API documentation (requires the
+  `extra-docs` feature).
 * The entire Windows implementation was rewritten.
 * Various optimisation were made to reduce the number of system calls in
   creating and using sockets, e.g. making use of `accept4(2)`.
+* The `fmt::Debug` implementation of `Events` is now actually useful as it
+  prints all `Event`s.
 
 # 0.6.19 (May 28, 2018)
 
