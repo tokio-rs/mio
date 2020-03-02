@@ -4,7 +4,8 @@ Version 0.7 of Mio contains various major changes compared to version 0.6.
 Overall a large number of API changes have been made to reduce the complexity of
 the implementation and remove overhead where possible.
 
-Please refer to the upgrade guide in docs/upgrade_guide.md for additional
+Please refer to the [blog post about
+0.7-alpha.1](https://tokio.rs/blog/2019-12-mio-v0.7-alpha.1/) for additional
 information.
 
 ## Added
