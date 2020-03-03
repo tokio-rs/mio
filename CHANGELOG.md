@@ -44,7 +44,7 @@ information.
   significantly larger on some OSes.
 * `Ready` was removed and replaced with various `is_*` methods on `Event`. For
   example instead checking for readable readiness using
-  `Event::ready().is_readble()`, you would call `Event::is_readble()`.
+  `Event::ready().is_readable()`, you would call `Event::is_readable()`.
 * `Ready::is_hup` was removed in favour of `Event::is_read_closed` and
   `Event::is_write_closed`.
 * The Iterator implementation of `Events` was changed to return `&Event`.
