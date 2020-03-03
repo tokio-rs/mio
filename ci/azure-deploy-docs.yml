@@ -14,7 +14,7 @@ jobs:
         parameters:
           rust_version: stable
       - script: |
-          cargo doc --no-deps
+          cargo doc --no-deps --all-features
           cp -R target/doc '$(Build.BinariesDirectory)'
         displayName: "Generate Documentation"
       - script: |
