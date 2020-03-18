@@ -106,6 +106,34 @@ fn waker_multiple_wakeups_different_thread() {
     handle2.join().unwrap();
 }
 
+#[test]
+fn multiple_wakers_same_thread() {
+    init();
+
+    let mut poll = Poll::new().expect("unable to create new Poll instance");
+    let mut events = Events::with_capacity(10);
+
+    let token1 = Token(10);
+    let token2 = Token(11);
+    let waker1 = Waker::new(poll.registry(), token1).expect("unable to create waker");
+    let waker2 = Waker::new(poll.registry(), token2).expect("unable to create waker");
+
+    waker1.wake().expect("unable to wake");
+    waker2.wake().expect("unable to wake");
+
+    let mut missing = vec![token1, token2];
+
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+    assert!(!events.is_empty());
+    for event in events.iter() {
+        assert!(event.is_readable());
+        assert!(missing.contains(&event.token()));
+        missing.retain(|tk| *tk != event.token());
+    }
+    assert!(missing.is_empty());
+}
+
 fn expect_waker_event(poll: &mut Poll, events: &mut Events, token: Token) {
     poll.poll(events, Some(Duration::from_millis(100))).unwrap();
     assert!(!events.is_empty());
