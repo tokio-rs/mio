@@ -55,6 +55,7 @@ impl AsRawFd for Selector {
     }
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 pub mod event {
     use crate::sys::Event;
     use crate::Token;
