@@ -43,10 +43,25 @@ fn main() -> io::Result<()> {
 
         for event in events.iter() {
             match event.token() {
-                SERVER => {
-                    // Received an event for the TCP server socket.
-                    // Accept an connection.
-                    let (mut connection, address) = server.accept()?;
+                SERVER => loop {
+                    // Received an event for the TCP server socket, which
+                    // indicates we can accept an connection.
+                    let (mut connection, address) = match server.accept() {
+                        Ok((connection, address)) => (connection, address),
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            // If we get a `WouldBlock` error we know our
+                            // listener has no more incoming connections queued,
+                            // so we can return to polling and wait for some
+                            // more.
+                            break;
+                        }
+                        Err(e) => {
+                            // If it was any other kind of error, something went
+                            // wrong and we terminate with an error.
+                            return Err(e);
+                        }
+                    };
+
                     println!("Accepted connection from: {}", address);
 
                     let token = next(&mut unique_token);
@@ -57,13 +72,13 @@ fn main() -> io::Result<()> {
                     )?;
 
                     connections.insert(token, connection);
-                }
+                },
                 token => {
-                    // (maybe) received an event for a TCP connection.
+                    // Maybe received an event for a TCP connection.
                     let done = if let Some(connection) = connections.get_mut(&token) {
                         handle_connection_event(poll.registry(), connection, event)?
                     } else {
-                        // Sporadic events happen.
+                        // Sporadic events happen, we can safely ignore them.
                         false
                     };
                     if done {
