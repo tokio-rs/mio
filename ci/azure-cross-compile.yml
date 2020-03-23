@@ -10,15 +10,11 @@ jobs:
           vmImage: macOS-10.13
           target: x86_64-apple-ios
 
-        iOS_32:
+        iOS_ARM64:
           vmImage: macOS-10.13
-          target: i386-apple-ios
+          target: aarch64-apple-ios
 
-        iOS_ARM:
-          vmImage: macOS-10.13
-          target: armv7s-apple-ios
-
-        Android:
+        Android_ARM:
           vmImage: ubuntu-16.04
           target: arm-linux-androideabi
 
