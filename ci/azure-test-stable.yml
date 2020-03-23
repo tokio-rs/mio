@@ -12,7 +12,7 @@ jobs:
 
         ${{ if parameters.cross }}:
           MacOS:
-            vmImage: macOS-10.13
+            vmImage: macOS-10.15
           Windows:
             vmImage: vs2017-win2016
     pool:
@@ -25,7 +25,7 @@ jobs:
       - template: azure-install-rust.yml
         parameters:
           rust_version: ${{ parameters.rust_version }}
-      
+
       - ${{ if eq(parameters.cmd, 'test') }}:
           - script: |
               cargo install cargo-hack
