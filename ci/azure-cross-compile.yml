@@ -7,11 +7,11 @@ jobs:
     strategy:
       matrix:
         iOS_64:
-          vmImage: macOS-10.13
+          vmImage: macOS-10.15
           target: x86_64-apple-ios
 
         iOS_ARM64:
-          vmImage: macOS-10.13
+          vmImage: macOS-10.15
           target: aarch64-apple-ios
 
         Android_ARM:
