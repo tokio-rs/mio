@@ -200,9 +200,16 @@ fn test_graceful_shutdown() {
     drop(socket);
 
     assert_ready!(poll, Token(0), Ready::readable());
-    #[cfg(not(any(target_os = "bitrig", target_os = "dragonfly",
-        target_os = "freebsd", target_os = "ios", target_os = "macos",
-        target_os = "netbsd", target_os = "openbsd")))]
+    #[cfg(not(any(
+        target_os = "bitrig",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "illumos",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    )))]
     assert_hup_ready!(poll);
 
     let mut buf = [0; 1024];
@@ -236,9 +243,16 @@ fn test_abrupt_shutdown() {
 
     drop(socket);
 
-    #[cfg(not(any(target_os = "bitrig", target_os = "dragonfly",
-        target_os = "freebsd", target_os = "ios", target_os = "macos",
-        target_os = "netbsd", target_os = "openbsd")))]
+    #[cfg(not(any(
+        target_os = "bitrig",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "illumos",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    )))]
     assert_hup_ready!(poll);
     assert_ready!(poll, Token(0), Ready::writable());
     assert_ready!(poll, Token(0), Ready::readable());
