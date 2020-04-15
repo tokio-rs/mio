@@ -61,6 +61,7 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
         target_os = "android",
         target_os = "dragonfly",
         target_os = "freebsd",
+        target_os = "illumos",
         target_os = "linux",
         target_os = "netbsd",
         target_os = "openbsd"

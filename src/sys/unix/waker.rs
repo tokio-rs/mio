@@ -100,6 +100,7 @@ pub use self::kqueue::Waker;
 
 #[cfg(any(
     target_os = "dragonfly",
+    target_os = "illumos",
     target_os = "netbsd",
     target_os = "openbsd",
     target_os = "solaris"
@@ -165,6 +166,7 @@ mod pipe {
 
 #[cfg(any(
     target_os = "dragonfly",
+    target_os = "illumos",
     target_os = "netbsd",
     target_os = "openbsd",
     target_os = "solaris"
