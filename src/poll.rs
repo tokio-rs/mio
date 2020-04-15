@@ -174,6 +174,7 @@ use std::{fmt, io};
 /// | NetBSD        | [kqueue]  |
 /// | OpenBSD       | [kqueue]  |
 /// | Solaris       | [epoll]   |
+/// | illumos       | [epoll]   |
 /// | Windows       | [IOCP]    |
 /// | iOS           | [kqueue]  |
 /// | macOS         | [kqueue]  |

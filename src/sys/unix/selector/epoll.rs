@@ -21,10 +21,15 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        // According to libuv `EPOLL_CLOEXEC` is not defined on Android API <
-        // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on all platforms,
-        // so we use that instead.
-        syscall!(epoll_create1(libc::O_CLOEXEC)).map(|ep| Selector {
+        // According to libuv, `EPOLL_CLOEXEC` is not defined on Android API <
+        // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on that platform,
+        // so we use it instead.
+        #[cfg(target_os = "android")]
+        let flag = libc::O_CLOEXEC;
+        #[cfg(not(target_os = "android"))]
+        let flag = libc::EPOLL_CLOEXEC;
+
+        syscall!(epoll_create1(flag)).map(|ep| Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             ep,
@@ -212,6 +217,7 @@ pub mod event {
     }
 }
 
+#[cfg(target_os = "android")]
 #[test]
 fn assert_close_on_exec_flag() {
     // This assertion need to be true for Selector::new.
