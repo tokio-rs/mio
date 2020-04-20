@@ -1,5 +1,5 @@
 freebsd_instance:
-  image: freebsd-11-3-snap
+  image_family: freebsd-11-3-snap
 
 task:
   name: FreeBSD 12.1 amd64
