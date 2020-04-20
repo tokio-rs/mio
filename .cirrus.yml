@@ -5,7 +5,7 @@ env:
   RUST_BACKTRACE: full
 
 task:
-  name: FreeBSD 12.1 amd64
+  name: FreeBSD
   setup_script:
     - pkg install -y curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
