@@ -1,8 +1,8 @@
 freebsd_instance:
-  image: freebsd-11-2-release-amd64
+  image_family: freebsd-11-3-snap
 
 task:
-  name: FreeBSD 11.2 amd64
+  name: FreeBSD
   setup_script:
     - pkg install -y curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
