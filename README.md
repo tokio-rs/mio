@@ -153,10 +153,10 @@ This uses the Windows AFD system to access socket readiness events.
 
 ## Community
 
-A group of Mio users hang out on [Gitter], this can be a good place to go for
+A group of Mio users hang out on [Discord], this can be a good place to go for
 questions.
 
-[Gitter]: https://gitter.im/tokio-rs/mio
+[Discord]: https://discord.gg/tokio
 
 ## Contributing
 
