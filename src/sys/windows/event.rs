@@ -29,7 +29,7 @@ pub fn is_error(event: &Event) -> bool {
 }
 
 pub fn is_read_closed(event: &Event) -> bool {
-    event.flags & afd::POLL_DISCONNECT != 0
+    event.flags & (afd::POLL_ABORT | afd::POLL_DISCONNECT) != 0
 }
 
 pub fn is_write_closed(event: &Event) -> bool {

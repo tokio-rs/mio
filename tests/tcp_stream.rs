@@ -609,6 +609,42 @@ fn tcp_shutdown_server_write_close_event() {
 }
 
 #[test]
+fn tcp_reset_close_event() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let listener = net::TcpListener::bind(any_local_address()).unwrap();
+    let sockaddr = listener.local_addr().unwrap();
+    let mut stream = TcpStream::connect(sockaddr).unwrap();
+
+    poll.registry()
+        .register(&mut stream, ID1, Interest::READABLE.add(Interest::WRITABLE))
+        .unwrap();
+
+    let server_stream = listener.accept().unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
+    );
+    checked_write!(stream.write(DATA1));
+
+    // Try to read something.
+    assert_would_block(stream.read(&mut [0]));
+
+    // Server goes away.
+    drop(server_stream);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READ_CLOSED)],
+    );
+
+    expect_no_events(&mut poll, &mut events);
+}
+
+#[test]
 #[cfg_attr(
     windows,
     ignore = "fails on Windows; client close events are not found"

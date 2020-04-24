@@ -720,11 +720,11 @@ fn interests_to_afd_flags(interests: Interest) -> u32 {
 
     if interests.is_readable() {
         // afd::POLL_DISCONNECT for is_read_hup()
-        flags |= afd::POLL_RECEIVE | afd::POLL_ACCEPT | afd::POLL_DISCONNECT;
+        flags |= afd::POLL_RECEIVE | afd::POLL_ACCEPT | afd::POLL_DISCONNECT | afd::POLL_ABORT;
     }
 
     if interests.is_writable() {
-        flags |= afd::POLL_SEND;
+        flags |= afd::POLL_SEND | afd::POLL_ABORT;
     }
 
     flags
