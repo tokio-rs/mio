@@ -1,6 +1,9 @@
 use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
+use crate::sys::event::{
+    ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
+};
 use crate::sys::Events;
 use crate::Interest;
 
@@ -719,12 +722,11 @@ fn interests_to_afd_flags(interests: Interest) -> u32 {
     let mut flags = 0;
 
     if interests.is_readable() {
-        // afd::POLL_DISCONNECT for is_read_hup()
-        flags |= afd::POLL_RECEIVE | afd::POLL_ACCEPT | afd::POLL_DISCONNECT | afd::POLL_ABORT;
+        flags |= READABLE_FLAGS | READ_CLOSED_FLAGS | ERROR_FLAGS;
     }
 
     if interests.is_writable() {
-        flags |= afd::POLL_SEND | afd::POLL_ABORT;
+        flags |= WRITABLE_FLAGS | WRITE_CLOSED_FLAGS | ERROR_FLAGS;
     }
 
     flags

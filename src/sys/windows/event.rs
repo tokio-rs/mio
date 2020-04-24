@@ -14,26 +14,35 @@ pub fn token(event: &Event) -> Token {
     Token(event.data as usize)
 }
 
+pub(crate) const READABLE_FLAGS: u32 = afd::POLL_RECEIVE
+    | afd::POLL_DISCONNECT
+    | afd::POLL_ACCEPT
+    | afd::POLL_ABORT
+    | afd::POLL_CONNECT_FAIL;
+pub(crate) const WRITABLE_FLAGS: u32 = afd::POLL_SEND | afd::POLL_ABORT | afd::POLL_CONNECT_FAIL;
+pub(crate) const ERROR_FLAGS: u32 = afd::POLL_CONNECT_FAIL;
+pub(crate) const READ_CLOSED_FLAGS: u32 =
+    afd::POLL_DISCONNECT | afd::POLL_ABORT | afd::POLL_CONNECT_FAIL;
+pub(crate) const WRITE_CLOSED_FLAGS: u32 = afd::POLL_ABORT | afd::POLL_CONNECT_FAIL;
+
 pub fn is_readable(event: &Event) -> bool {
-    event.flags
-        & (afd::POLL_RECEIVE | afd::POLL_DISCONNECT | afd::POLL_ACCEPT | afd::POLL_CONNECT_FAIL)
-        != 0
+    event.flags & READABLE_FLAGS != 0
 }
 
 pub fn is_writable(event: &Event) -> bool {
-    event.flags & (afd::POLL_SEND | afd::POLL_CONNECT_FAIL) != 0
+    event.flags & WRITABLE_FLAGS != 0
 }
 
 pub fn is_error(event: &Event) -> bool {
-    event.flags & afd::POLL_CONNECT_FAIL != 0
+    event.flags & ERROR_FLAGS != 0
 }
 
 pub fn is_read_closed(event: &Event) -> bool {
-    event.flags & (afd::POLL_ABORT | afd::POLL_DISCONNECT) != 0
+    event.flags & READ_CLOSED_FLAGS != 0
 }
 
 pub fn is_write_closed(event: &Event) -> bool {
-    event.flags & (afd::POLL_ABORT | afd::POLL_CONNECT_FAIL) != 0
+    event.flags & WRITE_CLOSED_FLAGS != 0
 }
 
 pub fn is_priority(event: &Event) -> bool {

@@ -574,6 +574,8 @@ fn connect_error() {
     }
 
     assert!(l.take_error().unwrap().is_some());
+
+    expect_no_events(&mut poll, &mut events);
 }
 
 #[test]
