@@ -232,41 +232,6 @@ where
     }
 }
 
-#[cfg(windows)]
-impl<T> event::Source for &IoSource<T>
-where
-    T: AsRawSocket,
-{
-    fn register(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.associate(registry)?;
-        self.state
-            .register(registry, token, interests, self.inner.as_raw_socket())
-    }
-
-    fn reregister(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.check_association(registry)?;
-        self.state.reregister(registry, token, interests)
-    }
-
-    fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
-        #[cfg(debug_assertions)]
-        self.selector_id.remove_association(_registry)?;
-        self.state.deregister()
-    }
-}
-
 impl<T> fmt::Debug for IoSource<T>
 where
     T: fmt::Debug,

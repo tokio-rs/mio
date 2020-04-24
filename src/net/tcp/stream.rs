@@ -241,6 +241,7 @@ impl event::Source for TcpStream {
     }
 }
 
+#[cfg(unix)]
 impl event::Source for &TcpStream {
     fn register(
         &mut self,
