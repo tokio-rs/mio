@@ -62,6 +62,7 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "linux",
+        target_os = "netbsd",
         target_os = "openbsd"
     ))]
     let stream = {
@@ -77,14 +78,7 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
     // But not all platforms have the `accept4(2)` call. Luckily BSD (derived)
     // OSes inherit the non-blocking flag from the listener, so we just have to
     // set `CLOEXEC`.
-    #[cfg(any(
-        target_os = "ios",
-        target_os = "macos",
-        // NetBSD 8.0 actually has `accept4(2)`, but libc doesn't expose it
-        // (yet). See https://github.com/rust-lang/libc/issues/1636.
-        target_os = "netbsd",
-        target_os = "solaris",
-    ))]
+    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
     let stream = {
         syscall!(accept(
             listener.as_raw_fd(),
