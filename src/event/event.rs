@@ -79,7 +79,7 @@ impl Event {
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
     /// | [epoll]       | `EPOLLHUP`, or  |
-    /// |               | `EPOLLIN` and EPOLLRDHUP` |
+    /// |               | `EPOLLIN` and `EPOLLRDHUP` |
     /// | [kqueue]      | `EV_EOF`        |
     ///
     /// [OS selector]: ../struct.Poll.html#implementation-notes
