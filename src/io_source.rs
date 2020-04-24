@@ -163,8 +163,77 @@ where
     }
 }
 
+#[cfg(unix)]
+impl<T> event::Source for &IoSource<T>
+where
+    T: AsRawFd,
+{
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        #[cfg(debug_assertions)]
+        self.selector_id.associate(registry)?;
+        poll::selector(registry).register(self.inner.as_raw_fd(), token, interests)
+    }
+
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        #[cfg(debug_assertions)]
+        self.selector_id.check_association(registry)?;
+        poll::selector(registry).reregister(self.inner.as_raw_fd(), token, interests)
+    }
+
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
+        #[cfg(debug_assertions)]
+        self.selector_id.remove_association(registry)?;
+        poll::selector(registry).deregister(self.inner.as_raw_fd())
+    }
+}
+
 #[cfg(windows)]
 impl<T> event::Source for IoSource<T>
+where
+    T: AsRawSocket,
+{
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        #[cfg(debug_assertions)]
+        self.selector_id.associate(registry)?;
+        self.state
+            .register(registry, token, interests, self.inner.as_raw_socket())
+    }
+
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        #[cfg(debug_assertions)]
+        self.selector_id.check_association(registry)?;
+        self.state.reregister(registry, token, interests)
+    }
+
+    fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
+        #[cfg(debug_assertions)]
+        self.selector_id.remove_association(_registry)?;
+        self.state.deregister()
+    }
+}
+
+#[cfg(windows)]
+impl<T> event::Source for &IoSource<T>
 where
     T: AsRawSocket,
 {
