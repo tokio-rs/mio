@@ -35,7 +35,7 @@ extra-docs = []
 log = "0.4.8"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.62"
+libc = "0.2.69"
 
 [target.'cfg(windows)'.dependencies]
 miow   = "0.3.3"
