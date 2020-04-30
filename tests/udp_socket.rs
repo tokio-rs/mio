@@ -334,6 +334,8 @@ fn smoke_test_connected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocke
     expect_read!(socket1.recv(&mut buf), DATA2);
     expect_read!(socket2.recv(&mut buf), DATA1);
 
+    assert_would_block(socket2.recv(&mut buf));
+
     checked_write!(socket1.send(DATA1));
     expect_events(
         &mut poll,
