@@ -17,8 +17,11 @@ readme        = "README.md"
 keywords      = ["io", "async", "non-blocking"]
 categories    = ["asynchronous"]
 exclude       = [
+  ".cirrus.yml",
   ".gitignore",
   ".travis.yml",
+  "azure-pipelines.yml",
+  "ci/"
 ]
 publish = false
 
