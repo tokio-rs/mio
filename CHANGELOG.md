@@ -1,3 +1,8 @@
+# 0.6.22 (May 01, 2020)
+
+### Added
+- Add support for illumos target (#1294)
+
 # 0.6.21 (November 27, 2019)
 
 ### Fixed
