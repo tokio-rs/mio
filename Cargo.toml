@@ -16,10 +16,12 @@ repository    = "https://github.com/tokio-rs/mio"
 readme        = "README.md"
 keywords      = ["io", "async", "non-blocking"]
 categories    = ["asynchronous"]
-exclude       = [
-  ".gitignore",
-  ".travis.yml",
-  "deploy.sh",
+include       = [
+  "Cargo.toml",
+  "LICENSE",
+  "README.md",
+  "CHANGELOG.md",
+  "src/**/*.rs"
 ]
 
 [features]
