@@ -165,6 +165,6 @@ bug fixes, just submit a PR with the fix and we can discuss the fix
 directly in the PR. If the fix is more complex, start with an issue.
 
 If you want to propose an API change, create an issue to start a
-discussion with the community. Also, feel free to talk with us in Gitter.
+discussion with the community. Also, feel free to talk with us in Discord.
 
 Finally, be kind. We support the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct).
