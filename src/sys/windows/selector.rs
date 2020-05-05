@@ -15,12 +15,14 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use std::{io, ptr};
+use std::{io, ptr, thread};
 use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
 use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, WAIT_TIMEOUT};
+use winapi::um::handleapi::CloseHandle;
 use winapi::um::minwinbase::OVERLAPPED;
+use winapi::um::synchapi::{CreateEventA, SetEvent};
 
 /// Overlapped value to indicate a `Waker` event.
 //
@@ -88,7 +90,7 @@ enum SockPollStatus {
 }
 
 #[derive(Debug)]
-pub struct SockState {
+pub struct AfdSockState {
     iosb: IoStatusBlock,
     poll_info: AfdPollInfo,
     afd: Arc<Afd>,
@@ -110,7 +112,7 @@ pub struct SockState {
     pinned: PhantomPinned,
 }
 
-impl SockState {
+impl AfdSockState {
     fn update(&mut self, self_arc: &Pin<Arc<Mutex<SockState>>>) -> io::Result<()> {
         assert!(!self.delete_pending);
 
@@ -262,17 +264,297 @@ impl SockState {
     fn has_error(&self) -> bool {
         self.error.is_some()
     }
+
+    /// True if need to be added on update queue, false otherwise.
+    fn set_event(&mut self, ev: Event) -> bool {
+        /* afd::POLL_CONNECT_FAIL and afd::POLL_ABORT are always reported, even when not requested by the caller. */
+        let events = ev.flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
+
+        self.user_evts = events;
+        self.user_data = ev.data;
+
+        (events & !self.pending_evts) != 0
+    }
+}
+
+#[derive(Debug)]
+struct Win32Event(HANDLE);
+
+unsafe impl Send for Win32Event {}
+unsafe impl Sync for Win32Event {}
+
+impl Win32Event {
+    fn new() -> io::Result<Win32Event> {
+        let event = unsafe {
+            CreateEventA(
+                ptr::null_mut(), /* no security attributes */
+                0,               /* not manual reset */
+                0,               /* initially unset */
+                ptr::null(),     /* unnamed */
+            )
+        };
+        if event.is_null() {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(Win32Event(event))
+        }
+    }
+
+    fn set(&self) -> io::Result<()> {
+        if unsafe { SetEvent(self.0) } == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl Drop for Win32Event {
+    fn drop(&mut self) {
+        // ignore error
+        unsafe { CloseHandle(self.0) };
+    }
+}
+
+#[derive(Debug)]
+pub struct FallbackSockState {
+    cp: Arc<CompletionPort>,
+    raw_socket: RawSocket,
+    token: Token,
+    interests: u32,
+    pending: u32,
+    /// Used to notify the thread to update its event flags, or possibly quit
+    notify_event: Arc<Win32Event>,
+    shutdown: bool,
+}
+
+cfg_net! {
+    use winapi::um::winsock2::{
+        ioctlsocket, WSACreateEvent, WSAEnumNetworkEvents, WSAEventSelect,
+        WSAWaitForMultipleEvents, FD_ACCEPT, FD_CLOSE, FD_CLOSE_BIT, FD_CONNECT, FD_CONNECT_BIT,
+        FD_READ, FD_WRITE, FIONBIO, SOCKET, WSANETWORKEVENTS, WSA_INFINITE, WSA_INVALID_EVENT,
+        WSA_WAIT_FAILED,
+    };
+
+    impl FallbackSockState {
+        fn new(
+            raw_socket: RawSocket,
+            token: Token,
+            interests: Interest,
+            cp: Arc<CompletionPort>,
+        ) -> io::Result<FallbackSockState> {
+            Ok(FallbackSockState {
+                cp,
+                raw_socket,
+                token,
+                interests: interests_to_afd_flags(interests),
+                pending: 0,
+                notify_event: Arc::new(Win32Event::new()?),
+                shutdown: false,
+            })
+        }
+
+        fn start_poll_thread(&mut self, self_arc: &Pin<Arc<Mutex<SockState>>>) -> io::Result<()> {
+            assert!(!self.shutdown);
+            let notify_event = self.notify_event.clone();
+            let socket_event = unsafe { WSACreateEvent() };
+            if socket_event == WSA_INVALID_EVENT {
+                return Err(io::Error::last_os_error());
+            }
+            let socket_event = Win32Event(socket_event);
+            let raw_socket = self.raw_socket;
+            let self_arc = self_arc.clone();
+            thread::spawn(move || {
+                let mut guard = self_arc.lock().unwrap();
+                if guard.expect_fallback_mut().shutdown {
+                    return;
+                }
+
+                loop {
+                    let interests = guard.expect_fallback_mut().interests;
+                    let mut event_flags = 0;
+                    if (interests & afd::POLL_SEND) != 0 {
+                        event_flags |= FD_WRITE;
+                    }
+                    if (interests & afd::POLL_RECEIVE) != 0 {
+                        event_flags |= FD_READ;
+                    }
+                    if (interests & afd::POLL_ACCEPT) != 0 {
+                        event_flags |= FD_ACCEPT;
+                    }
+                    if (interests & (afd::POLL_ABORT | afd::POLL_DISCONNECT)) != 0 {
+                        event_flags |= FD_CLOSE;
+                    }
+                    if (interests & (afd::POLL_SEND | afd::POLL_CONNECT_FAIL)) != 0 {
+                        event_flags |= FD_CONNECT;
+                    }
+                    if unsafe { WSAEventSelect(raw_socket as SOCKET, socket_event.0, event_flags) }
+                        == SOCKET_ERROR
+                    {
+                        log::error!("WSAEventSelect failed: {:?}", io::Error::last_os_error());
+                        return;
+                    }
+
+                    drop(guard);
+
+                    let events = [notify_event.0, socket_event.0];
+                    if unsafe {
+                        WSAWaitForMultipleEvents(
+                            events.len() as u32,
+                            &events as *const [_; 2] as *const _,
+                            0, /* fWaitAll */
+                            WSA_INFINITE,
+                            0, /* fAlertable */
+                        )
+                    } == WSA_WAIT_FAILED
+                    {
+                        log::error!(
+                            "WSAWaitForMultipleEvents failed: {:?}",
+                            io::Error::last_os_error()
+                        );
+                        return;
+                    }
+
+                    // Before doing anything else, check if we need to stop.
+                    guard = self_arc.lock().unwrap();
+                    let this = guard.expect_fallback_mut();
+                    if this.shutdown {
+                        return;
+                    }
+
+                    // Read events.
+                    let mut events: WSANETWORKEVENTS = unsafe { std::mem::zeroed() };
+                    if unsafe {
+                        WSAEnumNetworkEvents(
+                            raw_socket as SOCKET,
+                            socket_event.0,
+                            &mut events as *mut _,
+                        )
+                    } == SOCKET_ERROR
+                    {
+                        log::error!(
+                            "WSAEnumNetworkEvents failed: {:?}",
+                            io::Error::last_os_error()
+                        );
+                        return;
+                    }
+                    let mut translated_events = 0;
+                    if (events.lNetworkEvents & FD_WRITE) != 0 {
+                        translated_events |= afd::POLL_SEND;
+                    }
+                    if (events.lNetworkEvents & FD_READ) != 0 {
+                        translated_events |= afd::POLL_RECEIVE;
+                    }
+                    if (events.lNetworkEvents & FD_ACCEPT) != 0 {
+                        translated_events |= afd::POLL_ACCEPT;
+                    }
+                    if (events.lNetworkEvents & FD_CLOSE) != 0 {
+                        if events.iErrorCode[FD_CLOSE_BIT as usize] != 0 {
+                            translated_events |= afd::POLL_ABORT;
+                        } else {
+                            translated_events |= afd::POLL_DISCONNECT;
+                        }
+                    }
+                    if (events.lNetworkEvents & FD_CONNECT) != 0 {
+                        if events.iErrorCode[FD_CONNECT_BIT as usize] != 0 {
+                            translated_events |= afd::POLL_CONNECT_FAIL;
+                        } else {
+                            translated_events |= afd::POLL_SEND;
+                        }
+                    }
+
+                    // restrict our attention to events that are still requested
+                    translated_events &= this.interests;
+
+                    // clear interest for this event
+                    this.interests &= !translated_events;
+                    this.pending |= translated_events;
+
+                    // signal the main event loop
+                    let overlapped = into_overlapped(self_arc.clone()) as *mut _;
+                    if let Err(e) = this
+                        .cp
+                        .post(CompletionStatus::new(0, this.token.0, overlapped))
+                    {
+                        log::error!("CompletionPort::post error: {:?}", e);
+                        break;
+                    }
+                }
+            });
+            Ok(())
+        }
+
+        fn reregister(&mut self, token: Token, interests: Interest) -> io::Result<()> {
+            self.token = token;
+            let flags = interests_to_afd_flags(interests);
+            let old = self.interests;
+            self.interests = flags;
+            // If there are queued events that are no longer desired, discard them.
+            self.pending &= flags;
+            if self.interests != old {
+                self.notify_event.set()?;
+            }
+            Ok(())
+        }
+
+        fn feed_event(&mut self) -> Option<Event> {
+            if self.pending != 0 && !self.shutdown {
+                let flags = self.pending;
+                self.pending = 0;
+                Some(Event {
+                    flags,
+                    data: self.token.0 as u64,
+                })
+            } else {
+                None
+            }
+        }
+
+        fn mark_delete(&mut self) {
+            if !self.shutdown {
+                self.shutdown = true;
+                self.notify_event.set().expect("SetEvent failed");
+                // Detach the socket from the socket event.
+                if unsafe { WSAEventSelect(self.raw_socket as SOCKET, ptr::null_mut(), 0) }
+                    == SOCKET_ERROR
+                {
+                    log::error!("WSAEventSelect failed: {:?}", io::Error::last_os_error());
+                }
+                // Attempt to re-mark the socket non-blocking. This resets the
+                // cached edge triggers in case the socket is later registered
+                // again.
+                if let Err(e) = syscall!(
+                    ioctlsocket(self.raw_socket as SOCKET, FIONBIO, &mut 1),
+                    PartialEq::ne,
+                    0
+                ) {
+                    log::error!("ioctl(FIONBIO) failed: {:?}", e);
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum SockState {
+    Afd(AfdSockState),
+    Fallback(FallbackSockState),
 }
 
 cfg_net! {
     impl SockState {
-        fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
-            Ok(SockState {
+        fn new(
+            raw_socket: RawSocket,
+            base_socket: RawSocket,
+            afd: Arc<Afd>,
+            event: Event,
+        ) -> io::Result<SockState> {
+            let mut state = AfdSockState {
                 iosb: IoStatusBlock::zeroed(),
                 poll_info: AfdPollInfo::zeroed(),
                 afd,
                 raw_socket,
-                base_socket: get_base_socket(raw_socket)?,
+                base_socket,
                 user_evts: 0,
                 pending_evts: 0,
                 user_data: 0,
@@ -280,25 +562,62 @@ cfg_net! {
                 delete_pending: false,
                 error: None,
                 pinned: PhantomPinned,
-            })
+            };
+            state.set_event(event);
+            Ok(SockState::Afd(state))
         }
 
-        /// True if need to be added on update queue, false otherwise.
-        fn set_event(&mut self, ev: Event) -> bool {
-            /* afd::POLL_CONNECT_FAIL and afd::POLL_ABORT are always reported, even when not requested by the caller. */
-            let events = ev.flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
+        fn fallback(
+            raw_socket: RawSocket,
+            token: Token,
+            interests: Interest,
+            cp: Arc<CompletionPort>,
+        ) -> io::Result<SockState> {
+            Ok(SockState::Fallback(FallbackSockState::new(
+                raw_socket, token, interests, cp,
+            )?))
+        }
 
-            self.user_evts = events;
-            self.user_data = ev.data;
+        fn is_afd(&self) -> bool {
+            match self {
+                SockState::Afd(_) => true,
+                _ => false,
+            }
+        }
 
-            (events & !self.pending_evts) != 0
+        fn expect_afd_mut(&mut self) -> &mut AfdSockState {
+            match self {
+                SockState::Afd(afd) => afd,
+                SockState::Fallback(_) => panic!("Expected AFD sock state"),
+            }
+        }
+
+        fn expect_fallback_mut(&mut self) -> &mut FallbackSockState {
+            match self {
+                SockState::Afd(_) => panic!("Expected fallback sock state"),
+                SockState::Fallback(fallback) => fallback,
+            }
+        }
+
+        fn feed_event(&mut self) -> Option<Event> {
+            match self {
+                SockState::Afd(afd) => afd.feed_event(),
+                SockState::Fallback(fallback) => fallback.feed_event(),
+            }
+        }
+
+        pub(super) fn mark_delete(&mut self) {
+            match self {
+                SockState::Afd(afd) => afd.mark_delete(),
+                SockState::Fallback(fallback) => fallback.mark_delete(),
+            }
         }
     }
-}
 
-impl Drop for SockState {
-    fn drop(&mut self) {
-        self.mark_delete();
+    impl Drop for SockState {
+        fn drop(&mut self) {
+            self.mark_delete();
+        }
     }
 }
 
@@ -474,13 +793,14 @@ impl SelectorInner {
         let mut update_queue = self.update_queue.lock().unwrap();
         for sock in update_queue.iter_mut() {
             let mut sock_internal = sock.lock().unwrap();
+            let sock_internal = sock_internal.expect_afd_mut();
             if !sock_internal.is_pending_deletion() {
                 sock_internal.update(&sock)?;
             }
         }
 
         // remove all sock which do not have error, they have afd op pending
-        update_queue.retain(|sock| sock.lock().unwrap().has_error());
+        update_queue.retain(|sock| sock.lock().unwrap().expect_afd_mut().has_error());
 
         self.afd_group.release_unused_afd();
         Ok(())
@@ -515,8 +835,10 @@ impl SelectorInner {
                 None => {}
             }
 
-            if !sock_guard.is_pending_deletion() {
-                update_queue.push_back(sock_state.clone());
+            if let SockState::Afd(ref afd_sock) = *sock_guard {
+                if !afd_sock.is_pending_deletion() {
+                    update_queue.push_back(sock_state.clone());
+                }
             }
         }
         self.afd_group.release_unused_afd();
@@ -537,27 +859,47 @@ cfg_net! {
             token: Token,
             interests: Interest,
         ) -> io::Result<InternalState> {
-            let flags = interests_to_afd_flags(interests);
-
-            let sock = {
-                let sock = this._alloc_sock_for_rawsocket(socket)?;
-                let event = Event {
-                    flags,
-                    data: token.0 as u64,
-                };
-                sock.lock().unwrap().set_event(event);
-                sock
+            let sock_state = match get_base_socket(socket) {
+                Ok(base_socket) => {
+                    let afd = this.afd_group.acquire()?;
+                    let event = Event {
+                        flags: interests_to_afd_flags(interests),
+                        data: token.0 as u64,
+                    };
+                    let sock =
+                        Arc::pin(Mutex::new(SockState::new(socket, base_socket, afd, event)?));
+                    this.queue_state(sock.clone());
+                    unsafe {
+                        this.update_sockets_events_if_polling()?;
+                    }
+                    sock
+                }
+                Err(e) => {
+                    // This can happen when the socket is not a MSAFD socket,
+                    // often because there is some other stuff on the system
+                    // intercepting TCP connections. Fall back to using an
+                    // inefficient emulation.
+                    log::warn!("get_base_socket failed: {:?}", e);
+                    let sock = Arc::pin(Mutex::new(SockState::fallback(
+                        socket,
+                        token,
+                        interests,
+                        this.cp.clone(),
+                    )?));
+                    sock.lock()
+                        .unwrap()
+                        .expect_fallback_mut()
+                        .start_poll_thread(&sock)?;
+                    sock
+                }
             };
 
             let state = InternalState {
                 selector: this.clone(),
                 token,
                 interests,
-                sock_state: sock.clone(),
+                sock_state,
             };
-
-            this.queue_state(sock);
-            unsafe { this.update_sockets_events_if_polling()?; }
 
             Ok(state)
         }
@@ -569,19 +911,23 @@ cfg_net! {
             token: Token,
             interests: Interest,
         ) -> io::Result<()> {
-            {
-                let event = Event {
-                    flags: interests_to_afd_flags(interests),
-                    data: token.0 as u64,
-                };
+            let mut state_guard = state.lock().unwrap();
+            match *state_guard {
+                SockState::Afd(ref mut afd) => {
+                    afd.set_event(Event {
+                        flags: interests_to_afd_flags(interests),
+                        data: token.0 as u64,
+                    });
 
-                state.lock().unwrap().set_event(event);
+                    drop(state_guard);
+
+                    // FIXME: a sock which has_error true should not be re-added to
+                    // the update queue because it's already there.
+                    self.queue_state(state);
+                    unsafe { self.update_sockets_events_if_polling() }
+                }
+                SockState::Fallback(ref mut fallback) => fallback.reregister(token, interests),
             }
-
-            // FIXME: a sock which has_error true should not be re-added to
-            // the update queue because it's already there.
-            self.queue_state(state);
-            unsafe { self.update_sockets_events_if_polling() }
         }
 
         /// This function is called by register() and reregister() to start an
@@ -610,16 +956,9 @@ cfg_net! {
         }
 
         fn queue_state(&self, sock_state: Pin<Arc<Mutex<SockState>>>) {
+            debug_assert!(sock_state.lock().unwrap().is_afd());
             let mut update_queue = self.update_queue.lock().unwrap();
             update_queue.push_back(sock_state);
-        }
-
-        fn _alloc_sock_for_rawsocket(
-            &self,
-            raw_socket: RawSocket,
-        ) -> io::Result<Pin<Arc<Mutex<SockState>>>> {
-            let afd = self.afd_group.acquire()?;
-            Ok(Arc::pin(Mutex::new(SockState::new(raw_socket, afd)?)))
         }
     }
 

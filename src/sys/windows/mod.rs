@@ -4,9 +4,6 @@ mod io_status_block;
 pub mod event;
 pub use event::{Event, Events};
 
-mod selector;
-pub use selector::{Selector, SelectorInner, SockState};
-
 // Macros must be defined before the modules that use them
 cfg_net! {
     /// Helper macro to execute a system call that returns an `io::Result`.
@@ -23,6 +20,9 @@ cfg_net! {
         }};
     }
 }
+
+mod selector;
+pub use selector::{Selector, SelectorInner, SockState};
 
 cfg_tcp! {
     pub(crate) mod tcp;
