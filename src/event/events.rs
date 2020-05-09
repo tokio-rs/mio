@@ -208,6 +208,15 @@ impl<'a> Iterator for Iter<'a> {
         self.pos += 1;
         ret
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.inner.inner.len();
+        (size, Some(size))
+    }
+
+    fn count(self) -> usize {
+        self.inner.inner.len()
+    }
 }
 
 impl fmt::Debug for Events {
