@@ -527,7 +527,8 @@ impl SelectorInner {
 cfg_net! {
     use std::mem::size_of;
     use std::ptr::null_mut;
-    use winapi::um::mswsock::SIO_BASE_HANDLE;
+    use winapi::um::mswsock;
+    use winapi::um::winsock2::WSAGetLastError;
     use winapi::um::winsock2::{WSAIoctl, SOCKET_ERROR};
 
     impl SelectorInner {
@@ -557,7 +558,7 @@ cfg_net! {
             };
 
             this.queue_state(sock);
-            unsafe { this.update_sockets_events_if_polling()?; }
+            unsafe { this.update_sockets_events_if_polling()? };
 
             Ok(state)
         }
@@ -623,14 +624,13 @@ cfg_net! {
         }
     }
 
-    fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
+    fn try_get_base_socket(raw_socket: RawSocket, ioctl: u32) -> Result<RawSocket, i32> {
         let mut base_socket: RawSocket = 0;
         let mut bytes: u32 = 0;
-
         unsafe {
             if WSAIoctl(
                 raw_socket as usize,
-                SIO_BASE_HANDLE,
+                ioctl,
                 null_mut(),
                 0,
                 &mut base_socket as *mut _ as PVOID,
@@ -638,13 +638,45 @@ cfg_net! {
                 &mut bytes,
                 null_mut(),
                 None,
-            ) == SOCKET_ERROR
+            ) != SOCKET_ERROR
             {
-                Err(io::Error::last_os_error())
-            } else {
                 Ok(base_socket)
+            } else {
+                Err(WSAGetLastError())
             }
         }
+    }
+
+    fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
+        let res = try_get_base_socket(raw_socket, mswsock::SIO_BASE_HANDLE);
+        if let Ok(base_socket) = res {
+            return Ok(base_socket);
+        }
+
+        // The `SIO_BASE_HANDLE` should not be intercepted by LSPs, therefore
+        // it should not fail as long as `raw_socket` is a valid socket. See
+        // https://docs.microsoft.com/en-us/windows/win32/winsock/winsock-ioctls.
+        // However, at least one known LSP deliberately breaks it, so we try
+        // some alternative IOCTLs, starting with the most appropriate one.
+        for &ioctl in &[
+            mswsock::SIO_BSP_HANDLE_SELECT,
+            mswsock::SIO_BSP_HANDLE_POLL,
+            mswsock::SIO_BSP_HANDLE,
+        ] {
+            if let Ok(base_socket) = try_get_base_socket(raw_socket, ioctl) {
+                // Since we know now that we're dealing with an LSP (otherwise
+                // SIO_BASE_HANDLE would't have failed), only return any result
+                // when it is different from the original `raw_socket`.
+                if base_socket != raw_socket {
+                    return Ok(base_socket);
+                }
+            }
+        }
+
+        // If the alternative IOCTLs also failed, return the original error.
+        let os_error = res.unwrap_err();
+        let err = io::Error::from_raw_os_error(os_error);
+        Err(err)
     }
 }
 
