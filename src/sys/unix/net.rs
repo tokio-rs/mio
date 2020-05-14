@@ -38,6 +38,19 @@ pub(crate) fn new_socket(
     #[allow(clippy::let_and_return)]
     let socket = syscall!(socket(domain, socket_type, 0));
 
+    // Mimick `libstd` and set `SO_NOSIGPIPE` on apple systems.
+    #[cfg(target_vendor = "apple")]
+    let socket = socket.and_then(|socket| {
+        syscall!(setsockopt(
+            socket,
+            libc::SOL_SOCKET,
+            libc::SO_NOSIGPIPE,
+            &1 as *const libc::c_int as *const libc::c_void,
+            std::mem::size_of::<libc::c_int>() as libc::socklen_t
+        ))
+        .map(|_| socket)
+    });
+
     // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC. Not sure about
     // Solaris, couldn't find anything online.
     #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
