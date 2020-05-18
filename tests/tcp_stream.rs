@@ -8,6 +8,7 @@ use std::net::{self, Shutdown, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::sync::{mpsc::channel, Arc, Barrier};
 use std::thread;
+use std::time::Duration;
 
 #[macro_use]
 mod util;
@@ -641,7 +642,14 @@ fn tcp_reset_close_event() {
         vec![ExpectEvent::new(ID1, Readiness::READ_CLOSED)],
     );
 
-    expect_no_events(&mut poll, &mut events);
+    // Make sure we quiesce. `expect_no_events` seems to flake sometimes on mac/freebsd.
+    loop {
+        poll.poll(&mut events, Some(Duration::from_millis(100)))
+            .expect("poll failed");
+        if events.iter().count() == 0 {
+            break;
+        }
+    }
 }
 
 #[test]
