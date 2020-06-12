@@ -18,6 +18,11 @@ impl Selector {
     pub fn select(&self, _: &mut Events, _: Option<Duration>) -> io::Result<()> {
         os_required!();
     }
+
+    #[cfg(debug_assertions)]
+    pub fn register_waker(&self) -> bool {
+        os_required!();
+    }
 }
 
 #[cfg(unix)]

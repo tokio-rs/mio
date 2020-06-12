@@ -16,7 +16,7 @@ use std::io;
 /// `Waker` events are only guaranteed to be delivered while the `Waker` value
 /// is alive.
 ///
-/// Only a single `Waker` should active per [`Poll`], if multiple threads need
+/// Only a single `Waker` can be active per [`Poll`], if multiple threads need
 /// access to the `Waker` it can be shared via for example an `Arc`. What
 /// happens if multiple `Waker`s are registered with the same `Poll` is
 /// undefined.
@@ -81,6 +81,8 @@ pub struct Waker {
 impl Waker {
     /// Create a new `Waker`.
     pub fn new(registry: &Registry, token: Token) -> io::Result<Waker> {
+        #[cfg(debug_assertions)]
+        registry.register_waker();
         sys::Waker::new(poll::selector(&registry), token).map(|inner| Waker { inner })
     }
 
