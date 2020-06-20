@@ -3,7 +3,6 @@
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 #[cfg(unix)]
-use net2::TcpStreamExt;
 use std::io::{self, Read, Write};
 use std::net::{self, Shutdown};
 #[cfg(unix)]
@@ -469,14 +468,14 @@ fn connection_reset_by_peer() {
     let addr = l.local_addr().unwrap();
 
     // Connect client
-    let client = net2::TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap();
-
-    client.set_linger(Some(Duration::from_millis(0))).unwrap();
-    client.connect(&addr).unwrap();
+    let socket =
+        socket2::Socket::new(socket2::Domain::ipv4(), socket2::Type::stream(), None).unwrap();
+    socket.connect(&addr.into()).unwrap();
+    socket.set_linger(Some(Duration::from_millis(0))).unwrap();
 
     // Convert to Mio stream
     // FIXME: how to convert the stream on Windows?
-    let mut client = unsafe { TcpStream::from_raw_fd(client.into_raw_fd()) };
+    let mut client = unsafe { TcpStream::from_raw_fd(socket.into_raw_fd()) };
 
     // Register server
     poll.registry()
