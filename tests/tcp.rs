@@ -2,7 +2,6 @@
 
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
-#[cfg(unix)]
 use std::io::{self, Read, Write};
 use std::net::{self, Shutdown};
 #[cfg(unix)]
