@@ -70,6 +70,30 @@ impl Interest {
         Interest(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
     }
 
+    /// Removes `other` `Interest` from `self`.
+    ///
+    /// Returns `None` if the set would be empty after removing `other`.
+    ///
+    /// ```
+    /// use mio::Interest;
+    ///
+    /// const RW_INTERESTS: Interest = Interest::READABLE.add(Interest::WRITABLE);
+    ///
+    /// // As long a one interest remain this will return `Some`.
+    /// let w_interest = RW_INTERESTS.remove(Interest::READABLE).unwrap();
+    /// assert!(!w_interest.is_readable());
+    /// assert!(w_interest.is_writable());
+    ///
+    /// // Removing all interests from the set will return `None`.
+    /// assert_eq!(w_interest.remove(Interest::WRITABLE), None);
+    ///
+    /// // Its also possible to remove multiple interests at once.
+    /// assert_eq!(RW_INTERESTS.remove(RW_INTERESTS), None);
+    /// ```
+    pub fn remove(self, other: Interest) -> Option<Interest> {
+        NonZeroU8::new(self.0.get() & !other.0.get()).map(Interest)
+    }
+
     /// Returns true if the value includes readable readiness.
     pub const fn is_readable(self) -> bool {
         (self.0.get() & READABLE) != 0
