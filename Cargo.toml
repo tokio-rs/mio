@@ -41,7 +41,6 @@ libc = "0.2.69"
 miow   = "0.3.3"
 winapi = { version = "0.3", features = ["winsock2", "mswsock"] }
 ntapi  = "0.3"
-lazy_static = "1.4.0"
 
 [dev-dependencies]
 env_logger = { version = "0.6.2", default-features = false }
