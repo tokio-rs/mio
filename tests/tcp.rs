@@ -36,116 +36,120 @@ fn is_send_and_sync() {
 fn accept() {
     init();
 
-    struct H {
+    struct Data {
         hit: bool,
         listener: TcpListener,
         shutdown: bool,
     }
 
-    let mut l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
-    let addr = l.local_addr().unwrap();
+    let mut listener = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = listener.local_addr().unwrap();
 
-    let t = thread::spawn(move || {
+    let handle = thread::spawn(move || {
         net::TcpStream::connect(addr).unwrap();
     });
 
     let mut poll = Poll::new().unwrap();
 
     poll.registry()
-        .register(&mut l, Token(1), Interest::READABLE)
+        .register(&mut listener, Token(1), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
 
-    let mut h = H {
+    let mut data = Data {
         hit: false,
-        listener: l,
+        listener,
         shutdown: false,
     };
-    while !h.shutdown {
+    while !data.shutdown {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
-            h.hit = true;
+            data.hit = true;
             assert_eq!(event.token(), Token(1));
             assert!(event.is_readable());
-            assert!(h.listener.accept().is_ok());
-            h.shutdown = true;
+            assert!(data.listener.accept().is_ok());
+            data.shutdown = true;
         }
     }
-    assert!(h.hit);
-    assert!(h.listener.accept().unwrap_err().kind() == io::ErrorKind::WouldBlock);
-    t.join().unwrap();
+    assert!(data.hit);
+    assert!(data.listener.accept().unwrap_err().kind() == io::ErrorKind::WouldBlock);
+    handle.join().unwrap();
 }
 
 #[test]
 fn connect() {
     init();
 
-    struct H {
+    struct Data {
         hit: u32,
         shutdown: bool,
     }
 
-    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = l.local_addr().unwrap();
+    let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
 
     let (tx, rx) = channel();
     let (tx2, rx2) = channel();
-    let t = thread::spawn(move || {
-        let s = l.accept().unwrap();
+    let handle = thread::spawn(move || {
+        let stream = listener.accept().unwrap();
         rx.recv().unwrap();
-        drop(s);
+        drop(stream);
         tx2.send(()).unwrap();
     });
 
     let mut poll = Poll::new().unwrap();
-    let mut s = TcpStream::connect(addr).unwrap();
+    let mut stream = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&mut s, Token(1), Interest::READABLE | Interest::WRITABLE)
+        .register(
+            &mut stream,
+            Token(1),
+            Interest::READABLE | Interest::WRITABLE,
+        )
         .unwrap();
 
     let mut events = Events::with_capacity(128);
 
-    let mut h = H {
+    let mut data = Data {
         hit: 0,
         shutdown: false,
     };
-    while !h.shutdown {
+    while !data.shutdown {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
-            match h.hit {
+            match data.hit {
                 0 => assert!(event.is_writable()),
                 1 => assert!(event.is_readable()),
                 _ => panic!(),
             }
-            h.hit += 1;
-            h.shutdown = true;
+            data.hit += 1;
+            data.shutdown = true;
         }
     }
-    assert_eq!(h.hit, 1);
+    assert_eq!(data.hit, 1);
     tx.send(()).unwrap();
     rx2.recv().unwrap();
-    h.shutdown = false;
-    while !h.shutdown {
+    data.shutdown = false;
+    while !data.shutdown {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
-            match h.hit {
+            match data.hit {
                 0 => assert!(event.is_writable()),
                 1 => assert!(event.is_readable()),
                 _ => panic!(),
             }
-            h.hit += 1;
-            h.shutdown = true;
+            data.hit += 1;
+            data.shutdown = true;
         }
     }
-    assert_eq!(h.hit, 2);
-    t.join().unwrap();
+    assert_eq!(data.hit, 2);
+    handle.join().unwrap();
 }
 
 #[test]
@@ -153,58 +157,58 @@ fn read() {
     init();
 
     const N: usize = 16 * 1024 * 1024;
-    struct H {
+    struct Data {
         amt: usize,
         socket: TcpStream,
         shutdown: bool,
     }
 
-    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = l.local_addr().unwrap();
+    let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
 
-    let t = thread::spawn(move || {
-        let mut s = l.accept().unwrap().0;
-        let b = [0; 1024];
+    let handle = thread::spawn(move || {
+        let mut stream = listener.accept().unwrap().0;
+        let buf = [0; 1024];
         let mut amt = 0;
         while amt < N {
-            amt += s.write(&b).unwrap();
+            amt += stream.write(&buf).unwrap();
         }
     });
 
     let mut poll = Poll::new().unwrap();
-    let mut s = TcpStream::connect(addr).unwrap();
+    let mut stream = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&mut s, Token(1), Interest::READABLE)
+        .register(&mut stream, Token(1), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
 
-    let mut h = H {
+    let mut data = Data {
         amt: 0,
-        socket: s,
+        socket: stream,
         shutdown: false,
     };
-    while !h.shutdown {
+    while !data.shutdown {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
-            let mut b = [0; 1024];
+            let mut buf = [0; 1024];
             loop {
-                if let Ok(amt) = h.socket.read(&mut b) {
-                    h.amt += amt;
+                if let Ok(amt) = data.socket.read(&mut buf) {
+                    data.amt += amt;
                 } else {
                     break;
                 }
-                if h.amt >= N {
-                    h.shutdown = true;
+                if data.amt >= N {
+                    data.shutdown = true;
                     break;
                 }
             }
         }
     }
-    t.join().unwrap();
+    handle.join().unwrap();
 }
 
 #[test]
@@ -212,64 +216,64 @@ fn peek() {
     init();
 
     const N: usize = 16 * 1024 * 1024;
-    struct H {
+    struct Data {
         amt: usize,
         socket: TcpStream,
         shutdown: bool,
     }
 
-    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = l.local_addr().unwrap();
+    let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
 
-    let t = thread::spawn(move || {
-        let mut s = l.accept().unwrap().0;
-        let b = [0; 1024];
+    let handle = thread::spawn(move || {
+        let mut stream = listener.accept().unwrap().0;
+        let buf = [0; 1024];
         let mut amt = 0;
         while amt < N {
-            amt += s.write(&b).unwrap();
+            amt += stream.write(&buf).unwrap();
         }
     });
 
     let mut poll = Poll::new().unwrap();
-    let mut s = TcpStream::connect(addr).unwrap();
+    let mut stream = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&mut s, Token(1), Interest::READABLE)
+        .register(&mut stream, Token(1), Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
 
-    let mut h = H {
+    let mut data = Data {
         amt: 0,
-        socket: s,
+        socket: stream,
         shutdown: false,
     };
-    while !h.shutdown {
+    while !data.shutdown {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
-            let mut b = [0; 1024];
-            match h.socket.peek(&mut b) {
+            let mut buf = [0; 1024];
+            match data.socket.peek(&mut buf) {
                 Ok(_) => (),
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("unexpected error: {:?}", e),
+                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(err) => panic!("unexpected error: {}", err),
             }
 
             loop {
-                if let Ok(amt) = h.socket.read(&mut b) {
-                    h.amt += amt;
+                if let Ok(amt) = data.socket.read(&mut buf) {
+                    data.amt += amt;
                 } else {
                     break;
                 }
-                if h.amt >= N {
-                    h.shutdown = true;
+                if data.amt >= N {
+                    data.shutdown = true;
                     break;
                 }
             }
         }
     }
-    t.join().unwrap();
+    handle.join().unwrap();
 }
 
 #[test]
@@ -277,75 +281,75 @@ fn write() {
     init();
 
     const N: usize = 16 * 1024 * 1024;
-    struct H {
+    struct Data {
         amt: usize,
         socket: TcpStream,
         shutdown: bool,
     }
 
-    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = l.local_addr().unwrap();
+    let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
 
-    let t = thread::spawn(move || {
-        let mut s = l.accept().unwrap().0;
-        let mut b = [0; 1024];
+    let handle = thread::spawn(move || {
+        let mut stream = listener.accept().unwrap().0;
+        let mut buf = [0; 1024];
         let mut amt = 0;
         while amt < N {
-            amt += s.read(&mut b).unwrap();
+            amt += stream.read(&mut buf).unwrap();
         }
     });
 
     let mut poll = Poll::new().unwrap();
-    let mut s = TcpStream::connect(addr).unwrap();
+    let mut stream = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&mut s, Token(1), Interest::WRITABLE)
+        .register(&mut stream, Token(1), Interest::WRITABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(128);
 
-    let mut h = H {
+    let mut data = Data {
         amt: 0,
-        socket: s,
+        socket: stream,
         shutdown: false,
     };
-    while !h.shutdown {
+    while !data.shutdown {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
             assert_eq!(event.token(), Token(1));
-            let b = [0; 1024];
+            let buf = [0; 1024];
             loop {
-                if let Ok(amt) = h.socket.write(&b) {
-                    h.amt += amt;
+                if let Ok(amt) = data.socket.write(&buf) {
+                    data.amt += amt;
                 } else {
                     break;
                 }
-                if h.amt >= N {
-                    h.shutdown = true;
+                if data.amt >= N {
+                    data.shutdown = true;
                     break;
                 }
             }
         }
     }
-    t.join().unwrap();
+    handle.join().unwrap();
 }
 
 #[test]
 fn connect_then_close() {
     init();
 
-    struct H {
+    struct Data {
         listener: TcpListener,
         shutdown: bool,
     }
 
     let mut poll = Poll::new().unwrap();
-    let mut l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
-    let mut s = TcpStream::connect(l.local_addr().unwrap()).unwrap();
+    let mut listener = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let mut s = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
 
     poll.registry()
-        .register(&mut l, Token(1), Interest::READABLE)
+        .register(&mut listener, Token(1), Interest::READABLE)
         .unwrap();
     poll.registry()
         .register(&mut s, Token(2), Interest::READABLE)
@@ -353,22 +357,22 @@ fn connect_then_close() {
 
     let mut events = Events::with_capacity(128);
 
-    let mut h = H {
-        listener: l,
+    let mut data = Data {
+        listener,
         shutdown: false,
     };
-    while !h.shutdown {
+    while !data.shutdown {
         poll.poll(&mut events, None).unwrap();
 
         for event in &events {
             if event.token() == Token(1) {
-                let mut s = h.listener.accept().unwrap().0;
+                let mut s = data.listener.accept().unwrap().0;
                 poll.registry()
                     .register(&mut s, Token(3), Interest::READABLE | Interest::WRITABLE)
                     .unwrap();
                 drop(s);
             } else if event.token() == Token(2) {
-                h.shutdown = true;
+                data.shutdown = true;
             }
         }
     }
@@ -379,12 +383,12 @@ fn listen_then_close() {
     init();
 
     let mut poll = Poll::new().unwrap();
-    let mut l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let mut listener = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
 
     poll.registry()
-        .register(&mut l, Token(1), Interest::READABLE)
+        .register(&mut listener, Token(1), Interest::READABLE)
         .unwrap();
-    drop(l);
+    drop(listener);
 
     let mut events = Events::with_capacity(128);
 
@@ -412,11 +416,11 @@ fn multiple_writes_immediate_success() {
     init();
 
     const N: usize = 16;
-    let l = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = l.local_addr().unwrap();
+    let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
 
-    let t = thread::spawn(move || {
-        let mut s = l.accept().unwrap().0;
+    let handle = thread::spawn(move || {
+        let mut s = listener.accept().unwrap().0;
         let mut b = [0; 1024];
         let mut amt = 0;
         while amt < 1024 * N {
@@ -452,7 +456,7 @@ fn multiple_writes_immediate_success() {
         s.write_all(&[1; 1024]).unwrap();
     }
 
-    t.join().unwrap();
+    handle.join().unwrap();
 }
 
 #[cfg(unix)]
@@ -465,8 +469,8 @@ fn connection_reset_by_peer() {
     let mut buf = [0u8; 16];
 
     // Create listener
-    let mut l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
-    let addr = l.local_addr().unwrap();
+    let mut listener = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = listener.local_addr().unwrap();
 
     // Connect client
     let client = net2::TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap();
@@ -480,7 +484,7 @@ fn connection_reset_by_peer() {
 
     // Register server
     poll.registry()
-        .register(&mut l, Token(0), Interest::READABLE)
+        .register(&mut listener, Token(0), Interest::READABLE)
         .unwrap();
 
     // Register interest in the client
@@ -499,7 +503,7 @@ fn connection_reset_by_peer() {
 
         for event in &events {
             if event.token() == Token(0) {
-                match l.accept() {
+                match listener.accept() {
                     Ok((sock, _)) => {
                         server = sock;
                         break 'outer;
@@ -548,7 +552,7 @@ fn connect_error() {
     let mut events = Events::with_capacity(16);
 
     // Pick a "random" port that shouldn't be in use.
-    let mut l = match TcpStream::connect("127.0.0.1:38381".parse().unwrap()) {
+    let mut listener = match TcpStream::connect("127.0.0.1:38381".parse().unwrap()) {
         Ok(l) => l,
         Err(ref e) if e.kind() == io::ErrorKind::ConnectionRefused => {
             // Connection failed synchronously.  This is not a bug, but it
@@ -559,7 +563,7 @@ fn connect_error() {
     };
 
     poll.registry()
-        .register(&mut l, Token(0), Interest::WRITABLE)
+        .register(&mut listener, Token(0), Interest::WRITABLE)
         .unwrap();
 
     'outer: loop {
@@ -573,7 +577,7 @@ fn connect_error() {
         }
     }
 
-    assert!(l.take_error().unwrap().is_some());
+    assert!(listener.take_error().unwrap().is_some());
 
     expect_no_events(&mut poll, &mut events);
 }
@@ -588,7 +592,7 @@ fn write_error() {
 
     let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
-    let t = thread::spawn(move || {
+    let handle = thread::spawn(move || {
         let (conn, _addr) = listener.accept().unwrap();
         rx.recv().unwrap();
         drop(conn);
@@ -612,7 +616,7 @@ fn write_error() {
     wait_writable();
 
     tx.send(()).unwrap();
-    t.join().unwrap();
+    handle.join().unwrap();
 
     let buf = [0; 1024];
     loop {

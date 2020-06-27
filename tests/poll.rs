@@ -46,12 +46,16 @@ fn add_then_drop() {
     init();
 
     let mut events = Events::with_capacity(16);
-    let mut l = TcpListener::bind(any_local_address()).unwrap();
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
     let mut poll = Poll::new().unwrap();
     poll.registry()
-        .register(&mut l, Token(1), Interest::READABLE | Interest::WRITABLE)
+        .register(
+            &mut listener,
+            Token(1),
+            Interest::READABLE | Interest::WRITABLE,
+        )
         .unwrap();
-    drop(l);
+    drop(listener);
     poll.poll(&mut events, Some(Duration::from_millis(100)))
         .unwrap();
 }
@@ -116,29 +120,33 @@ fn drop_cancels_interest_and_shuts_down() {
     use std::net::TcpListener;
     use std::thread;
 
-    let l = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = l.local_addr().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
 
-    let t = thread::spawn(move || {
-        let mut s = l.incoming().next().unwrap().unwrap();
-        s.set_read_timeout(Some(Duration::from_secs(5)))
+    let handle = thread::spawn(move || {
+        let mut stream = listener.incoming().next().unwrap().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("set_read_timeout");
-        let r = s.read(&mut [0; 16]);
-        match r {
+        match stream.read(&mut [0; 16]) {
             Ok(_) => (),
-            Err(e) => {
-                if e.kind() != io::ErrorKind::UnexpectedEof {
-                    panic!(e);
+            Err(err) => {
+                if err.kind() != io::ErrorKind::UnexpectedEof {
+                    panic!(err);
                 }
             }
         }
     });
 
     let mut poll = Poll::new().unwrap();
-    let mut s = TcpStream::connect(addr).unwrap();
+    let mut stream = TcpStream::connect(addr).unwrap();
 
     poll.registry()
-        .register(&mut s, Token(1), Interest::READABLE | Interest::WRITABLE)
+        .register(
+            &mut stream,
+            Token(1),
+            Interest::READABLE | Interest::WRITABLE,
+        )
         .unwrap();
     let mut events = Events::with_capacity(16);
     'outer: loop {
@@ -151,15 +159,15 @@ fn drop_cancels_interest_and_shuts_down() {
         }
     }
 
-    let mut b = [0; 1024];
-    match s.read(&mut b) {
+    let mut buf = [0; 1024];
+    match stream.read(&mut buf) {
         Ok(_) => panic!("unexpected ok"),
-        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => (),
-        Err(e) => panic!("unexpected error: {:?}", e),
+        Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => (),
+        Err(err) => panic!("unexpected error: {}", err),
     }
 
-    drop(s);
-    t.join().unwrap();
+    drop(stream);
+    handle.join().unwrap();
 }
 
 #[test]
@@ -398,15 +406,15 @@ pub fn double_register_different_token() {
     init();
     let poll = Poll::new().unwrap();
 
-    let mut l = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let mut listener = TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
 
     poll.registry()
-        .register(&mut l, Token(0), Interest::READABLE)
+        .register(&mut listener, Token(0), Interest::READABLE)
         .unwrap();
 
     assert!(poll
         .registry()
-        .register(&mut l, Token(1), Interest::READABLE)
+        .register(&mut listener, Token(1), Interest::READABLE)
         .is_err());
 }
 
