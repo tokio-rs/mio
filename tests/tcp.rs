@@ -472,7 +472,8 @@ fn connection_reset_by_peer() {
     let addr = listener.local_addr().unwrap();
 
     // Connect client
-    let client = socket2::Socket::new(socket2::Domain::ipv4(), socket2::Type::stream(), None).unwrap();
+    let client =
+        socket2::Socket::new(socket2::Domain::ipv4(), socket2::Type::stream(), None).unwrap();
 
     client.set_linger(Some(Duration::from_millis(0))).unwrap();
     client.connect(&addr.into()).unwrap();
