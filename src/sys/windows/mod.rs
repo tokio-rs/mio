@@ -32,6 +32,7 @@ cfg_udp! {
     pub(crate) mod udp;
 }
 
+#[cfg(feature = "os-util")]
 pub(crate) mod named_pipe;
 
 mod waker;
