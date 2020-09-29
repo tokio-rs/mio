@@ -194,7 +194,8 @@ cfg_net! {
                     ));
                 }
                 let fd = File::from_raw_handle(afd_helper_handle as RawHandle);
-                let token = NEXT_TOKEN.fetch_add(1, Ordering::Relaxed) + 1;
+                // Increment by 2 to reserve space for other types of handles
+                let token = NEXT_TOKEN.fetch_add(2, Ordering::Relaxed) + 2;
                 let afd = Afd { fd };
                 cp.add_handle(token, &afd.fd)?;
                 match SetFileCompletionNotificationModes(

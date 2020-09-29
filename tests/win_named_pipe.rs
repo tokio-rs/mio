@@ -9,7 +9,7 @@ use std::time::Duration;
 
 // use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio::windows::NamedPipe;
-// use rand::Rng;
+use rand::Rng;
 use winapi::um::winbase::*;
 
 use futures_test::task::new_count_waker;
@@ -24,9 +24,9 @@ macro_rules! t {
 }
 
 fn server(registry: &mio::Registry) -> (NamedPipe, String) {
-    let num: u64 = 188923014239;
+    let num: u64 = rand::thread_rng().gen();
     let name = format!(r"\\.\pipe\my-pipe-{}", num);
-    let pipe = t!(NamedPipe::new(&name, registry, mio::Token(0)));
+    let pipe = t!(NamedPipe::new(&name, registry));
     (pipe, name)
 }
 
@@ -39,7 +39,6 @@ fn client(name: &str, registry: &mio::Registry) -> NamedPipe {
     t!(NamedPipe::from_raw_handle(
         file.into_raw_handle(),
         registry,
-        mio::Token(1)
     ))
 }
 
@@ -48,73 +47,83 @@ fn pipe(registry: &mio::Registry) -> (NamedPipe, NamedPipe) {
     (pipe, client(&name, registry))
 }
 
+static data: &[u8] = &[100; 4096];
+
 #[test]
 fn writable_after_register() {
+    println!("START");
     let mut poll = t!(mio::Poll::new());
+    println!("NEXT");
     let (mut server, mut client) = pipe(poll.registry());
     let mut events = mio::Events::with_capacity(128);
+    println!("prepoll");
 
-    t!(poll.poll(&mut events, None));
+    println!("one");
 
-    let events = events.iter().collect::<Vec<_>>();
-    let (waker, count) = new_count_waker();
-    let mut cx = Context::from_waker(&waker);
+    let (wk1, cnt1) = new_count_waker();
+    let mut cx1 = Context::from_waker(&wk1);
+    let (wk2, cnt2) = new_count_waker();
+    let mut cx2 = Context::from_waker(&wk2);
+
+    let mut dst = [0; 1024];
+
+    t!(server.connect());
+
+    println!("two");
 
     // Server is writable
-    let res = server.write(&mut cx, b"hello");
+    let res = server.write(&mut cx2, b"hello");
     assert!(res.is_ready());
 
+    // Server is **not** readable
+    assert!(server.read(&mut cx2, &mut dst).is_pending());
+
+    println!("three");
+
     // Client is writable
-    let res = client.write(&mut cx, b"hello");
+    let res = client.write(&mut cx1, b"hello");
+    println!("  -> 1");
     assert!(res.is_ready());
-}
 
-/*
-#[test]
-fn write_then_read() {
-    let mut poll = t!(mio::Poll::new());
-    let (mut server, mut client) = pipe(poll.registry());
-    let mut events = mio::Events::with_capacity(128);
-
-    t!(poll.poll(&mut events, None));
-
-    // Client is writable
-    block_on(poll_fn(|cx| {
-        let res = client.write(cx, b"1234");
-        assert!(res.is_ready());
-        res
-    })).unwrap();
-
+    // Saturate the client
     loop {
-        t!(poll.poll(&mut events, None));
-        let events = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
-            if event.readiness().is_readable() {
-                break;
-            }
+        println!("  -> 2");
+        if client.write(&mut cx1, data).is_pending() {
+            break;
         }
     }
 
-    let mut buf = [0; 10];
-    assert_eq!(t!(server.read(&mut buf)), 4);
-    assert_eq!(&buf[..4], b"1234");
+    println!(" => loop 2");
+
+    // Wait for readable
+    while cnt2.get() == 0 {
+        t!(poll.poll(&mut events, None));
+    }
+
+    // Read some data
+    let mut n = 0;
+
+    while server.read(&mut cx2, &mut dst).is_ready() {
+        n += 1;
+    }
+
+    assert!(n > 0);
+
+    // Wait for the write side to be notified
+    while cnt1.get() == 0 {
+        t!(poll.poll(&mut events, None));
+    }
 }
 
 #[test]
 fn connect_before_client() {
-    drop(env_logger::init());
+    let mut poll = t!(mio::Poll::new());
 
-    let (server, name) = server();
-    let poll = t!(Poll::new());
-    t!(poll.register(
-        &server,
-        Token(0),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
+    let (server, name) = server(poll.registry());
 
-    let mut events = Events::with_capacity(128);
+    let mut events = mio::Events::with_capacity(128);
     t!(poll.poll(&mut events, Some(Duration::new(0, 0))));
+    println!(" ~~~ done poll ");
     let e = events.iter().collect::<Vec<_>>();
     assert_eq!(e.len(), 0);
     assert_eq!(
@@ -122,99 +131,73 @@ fn connect_before_client() {
         io::ErrorKind::WouldBlock
     );
 
-    let client = client(&name);
-    t!(poll.register(
-        &client,
-        Token(1),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
-    loop {
-        t!(poll.poll(&mut events, None));
-        let e = events.iter().collect::<Vec<_>>();
-        if let Some(event) = e.iter().find(|e| e.token() == Token(0)) {
-            if event.readiness().is_writable() {
-                break;
-            }
-        }
-    }
+    let mut client = client(&name, poll.registry());    
+    let (wk, cnt) = new_count_waker();
+    let mut cx = Context::from_waker(&wk);
+
+    assert!(client.write(&mut cx, b"hello").is_ready());
 }
 
 #[test]
 fn connect_after_client() {
-    drop(env_logger::init());
+    let mut poll = t!(mio::Poll::new());
 
-    let (server, name) = server();
-    let poll = t!(Poll::new());
-    t!(poll.register(
-        &server,
-        Token(0),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
+    let (server, name) = server(poll.registry());
 
-    let mut events = Events::with_capacity(128);
+    let mut events = mio::Events::with_capacity(128);
     t!(poll.poll(&mut events, Some(Duration::new(0, 0))));
+    println!(" ~~~ done poll ");
     let e = events.iter().collect::<Vec<_>>();
     assert_eq!(e.len(), 0);
 
-    let client = client(&name);
-    t!(poll.register(
-        &client,
-        Token(1),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
-    t!(server.connect());
-    loop {
-        t!(poll.poll(&mut events, None));
-        let e = events.iter().collect::<Vec<_>>();
-        if let Some(event) = e.iter().find(|e| e.token() == Token(0)) {
-            if event.readiness().is_writable() {
-                break;
-            }
-        }
-    }
+    let mut client = client(&name, poll.registry());    
+    let (wk, cnt) = new_count_waker();
+    let mut cx = Context::from_waker(&wk);
+
+    assert!(server.connect().is_ok());
+
+    assert!(client.write(&mut cx, b"hello").is_ready());
 }
 
 #[test]
 fn write_then_drop() {
-    drop(env_logger::init());
+    let mut poll = t!(mio::Poll::new());
+    let (mut server, mut client) = pipe(poll.registry());
 
-    let (mut server, mut client) = pipe();
-    let poll = t!(Poll::new());
-    t!(poll.register(
-        &server,
-        Token(0),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
-    t!(poll.register(
-        &client,
-        Token(1),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
-    assert_eq!(t!(client.write(b"1234")), 4);
-    drop(client);
+    let (wk1, cnt1) = new_count_waker();
+    let mut cx1 = Context::from_waker(&wk1);
+    let (wk2, cnt2) = new_count_waker();
+    let mut cx2 = Context::from_waker(&wk2);
 
-    let mut events = Events::with_capacity(128);
+    t!(server.connect());
 
-    loop {
-        t!(poll.poll(&mut events, None));
-        let events = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
-            if event.readiness().is_readable() {
-                break;
-            }
-        }
+    let mut dst = [0; 1024];
+
+    assert!(server.read(&mut cx2, &mut dst).is_pending());
+
+    match client.write(&mut cx1, b"1234") {
+        Poll::Ready(res) => assert_eq!(t!(res), 4),
+        _ => panic!(),
     }
 
-    let mut buf = [0; 10];
-    assert_eq!(t!(server.read(&mut buf)), 4);
-    assert_eq!(&buf[..4], b"1234");
+    drop(client);
+
+    let mut events = mio::Events::with_capacity(128);
+
+    // Wait for readable
+    while cnt2.get() == 0 {
+        t!(poll.poll(&mut events, None));
+    }
+
+    match server.read(&mut cx2, &mut dst) {
+        Poll::Ready(res) => assert_eq!(t!(res), 4),
+        _ => panic!(),
+    }
+
+    assert_eq!(&dst[..4], b"1234");
 }
 
+/*
 #[test]
 fn connect_twice() {
     drop(env_logger::init());

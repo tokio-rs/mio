@@ -438,18 +438,8 @@ impl SelectorInner {
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
 
-        if timeout.is_none() {
-            loop {
-                let len = self.select2(&mut events.statuses, &mut events.events, None)?;
-                if len == 0 {
-                    continue;
-                }
-                return Ok(());
-            }
-        } else {
-            self.select2(&mut events.statuses, &mut events.events, timeout)?;
-            return Ok(());
-        }
+        self.select2(&mut events.statuses, &mut events.events, timeout)?;
+        return Ok(());
     }
 
     pub fn select2(
@@ -463,6 +453,7 @@ impl SelectorInner {
         unsafe { self.update_sockets_events() }?;
 
         let result = self.cp.get_many(statuses, timeout);
+        println!(" + post get_many");
 
         self.is_polling.store(false, Ordering::Relaxed);
 
@@ -498,6 +489,7 @@ impl SelectorInner {
         let mut n = 0;
         let mut update_queue = self.update_queue.lock().unwrap();
         for iocp_event in iocp_events.iter() {
+            println!(" IOCP TOKEN {}", iocp_event.token());
             if iocp_event.overlapped().is_null() {
                 // `Waker` event, we'll add a readable event to match the other platforms.
                 events.push(Event {
@@ -506,8 +498,15 @@ impl SelectorInner {
                 });
                 n += 1;
                 continue;
+            } else if iocp_event.token() % 2 == 1 {
+                // Handle is a named pipe. This could be extended to be any non-AFD event.
+                let callback = (*(iocp_event.overlapped() as *mut super::named_pipe::Overlapped)).callback;
+    
+                callback(iocp_event.entry());                
+                continue;
             }
 
+            println!(" + TRYING TO GET FROM EVENT");
             let sock_state = from_overlapped(iocp_event.overlapped());
             let mut sock_guard = sock_state.lock().unwrap();
             match sock_guard.feed_event() {
@@ -696,7 +695,16 @@ impl Drop for SelectorInner {
                 Ok(iocp_events) => {
                     events_num = iocp_events.iter().len();
                     for iocp_event in iocp_events.iter() {
-                        if !iocp_event.overlapped().is_null() {
+                        if iocp_event.overlapped().is_null() {
+                            // Waker
+                        } else if iocp_event.token() % 2 == 1 {
+                            // Named pipe, dispatch the event so it can release resources
+                            let callback = unsafe {
+                                (*(iocp_event.overlapped() as *mut super::named_pipe::Overlapped)).callback
+                            };
+                
+                            callback(iocp_event.entry());
+                        } else {
                             // drain sock state to release memory of Arc reference
                             let _sock_state = from_overlapped(iocp_event.overlapped());
                         }

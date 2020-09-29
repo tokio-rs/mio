@@ -47,7 +47,7 @@
 //! that can operate asynchronously. Don't forget to pass the
 //! `FILE_FLAG_OVERLAPPED` flag when opening the `File`.
 
-use crate::{poll, Registry, Token};
+use crate::{poll, Registry};
 
 use std::cell::UnsafeCell;
 use std::ffi::OsStr;
@@ -56,8 +56,8 @@ use std::io::{self, Read};
 use std::mem;
 use std::os::windows::io::*;
 use std::slice;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicUsize, AtomicBool};
+use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 
@@ -126,6 +126,9 @@ enum State {
     Err(io::Error),
 }
 
+// Odd tokens are for named pipes
+static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
+
 fn _assert_kinds() {
     fn _assert_send<T: Send>() {}
     fn _assert_sync<T: Sync>() {}
@@ -139,18 +142,19 @@ impl NamedPipe {
     pub fn new<A: AsRef<OsStr>>(
         addr: A,
         registry: &Registry,
-        token: Token,
     ) -> io::Result<NamedPipe> {
         let pipe = pipe::NamedPipe::new(addr)?;
-        NamedPipe::from_raw_handle(pipe.into_raw_handle(), registry, token)
+        NamedPipe::from_raw_handle(pipe.into_raw_handle(), registry)
     }
 
     /// TODO: Dox
     pub fn from_raw_handle(
         handle: RawHandle,
         registry: &Registry,
-        token: Token,
     ) -> io::Result<NamedPipe> {
+        // Generate a token
+        let token = NEXT_TOKEN.fetch_add(2, Relaxed) + 2;
+
         // Create the pipe
         let pipe = NamedPipe {
             inner: Arc::new(Inner {
@@ -282,6 +286,7 @@ impl NamedPipe {
             // In theory not possible with `ready_registration` checked above,
             // but return would block for now.
             State::None => {
+                println!("SET WAKER; {:p}", &*state);
                 state.read_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
@@ -289,6 +294,7 @@ impl NamedPipe {
             // A read is in flight, still waiting for it to finish
             State::Pending(buf, amt) => {
                 state.read = State::Pending(buf, amt);
+                println!("SET WAKER; {:p}", &*state);
                 state.read_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
@@ -325,7 +331,7 @@ impl NamedPipe {
     }
 
     /// TODO: dox
-    pub fn write(&mut self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    pub fn write(&mut self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {        
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
         match io.write {
@@ -358,6 +364,7 @@ impl fmt::Debug for NamedPipe {
 
 impl Drop for NamedPipe {
     fn drop(&mut self) {
+        println!("~~~ DROPPING");
         // Cancel pending reads/connects, but don't cancel writes to ensure that
         // everything is flushed out.
         unsafe {
@@ -374,6 +381,7 @@ impl Drop for NamedPipe {
                 _ => {}
             }
         }
+        println!(" done drop");
     }
 }
 
@@ -476,6 +484,7 @@ unsafe fn cancel<T: AsRawHandle>(handle: &T, overlapped: &Overlapped) -> io::Res
 }
 
 fn connect_done(status: &OVERLAPPED_ENTRY) {
+    println!(" + connect_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that
@@ -502,6 +511,7 @@ fn connect_done(status: &OVERLAPPED_ENTRY) {
 }
 
 fn read_done(status: &OVERLAPPED_ENTRY) {
+    println!(" + read_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `FromRawArc<Inner>`. Note that we should be guaranteed that
@@ -511,6 +521,7 @@ fn read_done(status: &OVERLAPPED_ENTRY) {
 
     // Move from the `Pending` to `Ok` state.
     let mut io = me.io.lock().unwrap();
+    println!("  -> state {:p}", &*io);
     let mut buf = match mem::replace(&mut io.read, State::None) {
         State::Pending(buf, _) => buf,
         _ => unreachable!(),
@@ -531,11 +542,13 @@ fn read_done(status: &OVERLAPPED_ENTRY) {
 
     // Flag our readiness that we've got data.
     if let Some(waker) = io.read_waker.take() {
+        println!("   -> wake");
         waker.wake();
     }
 }
 
 fn write_done(status: &OVERLAPPED_ENTRY) {
+    println!(" + write_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that
@@ -620,9 +633,9 @@ impl BufferPool {
 /// over `OVERLAPPED` pointers that have completed, and it will cast that
 /// pointer to a pointer to this structure and invoke the associated callback.
 #[repr(C)]
-pub struct Overlapped {
+pub(crate) struct Overlapped {
     inner: UnsafeCell<miow::Overlapped>,
-    callback: fn(&OVERLAPPED_ENTRY),
+    pub(crate) callback: fn(&OVERLAPPED_ENTRY),
 }
 
 impl Overlapped {

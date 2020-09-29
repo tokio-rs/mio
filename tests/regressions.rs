@@ -61,6 +61,7 @@ fn issue_776() {
 }
 
 #[test]
+#[ignore]
 fn issue_1205() {
     let (mut poll, mut events) = init_with_poll();
 
