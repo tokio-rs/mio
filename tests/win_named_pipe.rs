@@ -4,7 +4,7 @@ use std::fs::OpenOptions;
 use std::io;
 use std::os::windows::fs::*;
 use std::os::windows::io::*;
-use std::task::Poll;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 // use mio::{Events, Poll, PollOpt, Ready, Token};
@@ -12,8 +12,7 @@ use mio::windows::NamedPipe;
 // use rand::Rng;
 use winapi::um::winbase::*;
 
-use futures::executor::block_on;
-use futures::future::poll_fn;
+use futures_test::task::new_count_waker;
 
 macro_rules! t {
     ($e:expr) => {
@@ -58,22 +57,17 @@ fn writable_after_register() {
     t!(poll.poll(&mut events, None));
 
     let events = events.iter().collect::<Vec<_>>();
+    let (waker, count) = new_count_waker();
+    let mut cx = Context::from_waker(&waker);
+
 
     // Server is writable
-    block_on(poll_fn(|cx| {
-        let res = server.write(cx, b"hello");
-        assert!(res.is_ready());
-        res
-    }))
-    .unwrap();
+    let res = server.write(&mut cx, b"hello");
+    assert!(res.is_ready());
 
     // Client is writable
-    block_on(poll_fn(|cx| {
-        let res = client.write(cx, b"hello");
-        assert!(res.is_ready());
-        res
-    }))
-    .unwrap();
+    let res = client.write(&mut cx, b"hello");
+    assert!(res.is_ready());
 }
 
 /*
