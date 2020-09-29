@@ -77,7 +77,8 @@ cfg_os_poll! {
     }
 }
 
-cfg_any_os_util! {
+#[cfg(windows)]
+cfg_os_poll! {
     mod windows;
     pub use self::windows::*;
 }

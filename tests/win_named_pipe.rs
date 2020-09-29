@@ -60,7 +60,6 @@ fn writable_after_register() {
     let (waker, count) = new_count_waker();
     let mut cx = Context::from_waker(&waker);
 
-
     // Server is writable
     let res = server.write(&mut cx, b"hello");
     assert!(res.is_ready());
