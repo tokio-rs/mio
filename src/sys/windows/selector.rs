@@ -339,7 +339,7 @@ pub struct Selector {
     #[cfg(debug_assertions)]
     id: usize,
 
-    inner: Arc<SelectorInner>,
+    pub(super) inner: Arc<SelectorInner>,
 }
 
 impl Selector {
@@ -408,7 +408,7 @@ cfg_net! {
 
 #[derive(Debug)]
 pub struct SelectorInner {
-    cp: Arc<CompletionPort>,
+    pub(super) cp: Arc<CompletionPort>,
     update_queue: Mutex<VecDeque<Pin<Arc<Mutex<SockState>>>>>,
     afd_group: AfdGroup,
     is_polling: AtomicBool,

@@ -32,6 +32,8 @@ cfg_udp! {
     pub(crate) mod udp;
 }
 
+pub(crate) mod named_pipe;
+
 mod waker;
 pub(crate) use waker::Waker;
 

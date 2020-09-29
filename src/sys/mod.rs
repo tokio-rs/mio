@@ -80,7 +80,7 @@ cfg_os_poll! {
 #[cfg(windows)]
 cfg_os_poll! {
     mod windows;
-    pub(crate) use self::windows::*;
+    pub use self::windows::*;
 }
 
 cfg_not_os_poll! {
