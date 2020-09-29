@@ -2,15 +2,18 @@
 
 use std::fs::OpenOptions;
 use std::io;
-use std::io::prelude::*;
 use std::os::windows::fs::*;
 use std::os::windows::io::*;
+use std::task::Poll;
 use std::time::Duration;
 
 // use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio::windows::NamedPipe;
 // use rand::Rng;
 use winapi::um::winbase::*;
+
+use futures::executor::block_on;
+use futures::future::poll_fn;
 
 macro_rules! t {
     ($e:expr) => {
@@ -34,7 +37,11 @@ fn client(name: &str, registry: &mio::Registry) -> NamedPipe {
         .write(true)
         .custom_flags(FILE_FLAG_OVERLAPPED);
     let file = t!(opts.open(name));
-    t!(NamedPipe::from_raw_handle(file.into_raw_handle(), registry, mio::Token(1)))
+    t!(NamedPipe::from_raw_handle(
+        file.into_raw_handle(),
+        registry,
+        mio::Token(1)
+    ))
 }
 
 fn pipe(registry: &mio::Registry) -> (NamedPipe, NamedPipe) {
@@ -45,48 +52,45 @@ fn pipe(registry: &mio::Registry) -> (NamedPipe, NamedPipe) {
 #[test]
 fn writable_after_register() {
     let mut poll = t!(mio::Poll::new());
-    let (server, client) = pipe(poll.registry());
+    let (mut server, mut client) = pipe(poll.registry());
     let mut events = mio::Events::with_capacity(128);
 
     t!(poll.poll(&mut events, None));
 
     let events = events.iter().collect::<Vec<_>>();
 
-    /*
-    assert!(events
-        .iter()
-        .any(|e| { e.token() == Token(0) && e.readiness() == Ready::writable() }));
+    // Server is writable
+    block_on(poll_fn(|cx| {
+        let res = server.write(cx, b"hello");
+        assert!(res.is_ready());
+        res
+    }))
+    .unwrap();
 
-    assert!(events
-        .iter()
-        .any(|e| { e.token() == Token(1) && e.readiness() == Ready::writable() }));
-        */
+    // Client is writable
+    block_on(poll_fn(|cx| {
+        let res = client.write(cx, b"hello");
+        assert!(res.is_ready());
+        res
+    }))
+    .unwrap();
 }
 
 /*
 #[test]
 fn write_then_read() {
-    drop(env_logger::init());
+    let mut poll = t!(mio::Poll::new());
+    let (mut server, mut client) = pipe(poll.registry());
+    let mut events = mio::Events::with_capacity(128);
 
-    let (mut server, mut client) = pipe();
-    let poll = t!(Poll::new());
-    t!(poll.register(
-        &server,
-        Token(0),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
-    t!(poll.register(
-        &client,
-        Token(1),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
-
-    let mut events = Events::with_capacity(128);
     t!(poll.poll(&mut events, None));
 
-    assert_eq!(t!(client.write(b"1234")), 4);
+    // Client is writable
+    block_on(poll_fn(|cx| {
+        let res = client.write(cx, b"1234");
+        assert!(res.is_ready());
+        res
+    })).unwrap();
 
     loop {
         t!(poll.poll(&mut events, None));

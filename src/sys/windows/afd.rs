@@ -7,9 +7,7 @@ use std::io;
 use std::mem::size_of;
 use std::os::windows::io::AsRawHandle;
 use std::ptr::null_mut;
-use winapi::shared::ntdef::{
-    HANDLE, LARGE_INTEGER, NTSTATUS, PVOID, ULONG,
-};
+use winapi::shared::ntdef::{HANDLE, LARGE_INTEGER, NTSTATUS, PVOID, ULONG};
 use winapi::shared::ntstatus::{STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS};
 
 const IOCTL_AFD_POLL: ULONG = 0x00012024;

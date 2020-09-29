@@ -136,13 +136,21 @@ fn _assert_kinds() {
 impl NamedPipe {
     /// Creates a new named pipe at the specified `addr` given a "reasonable
     /// set" of initial configuration options.
-    pub fn new<A: AsRef<OsStr>>(addr: A, registry: &Registry, token: Token) -> io::Result<NamedPipe> {
+    pub fn new<A: AsRef<OsStr>>(
+        addr: A,
+        registry: &Registry,
+        token: Token,
+    ) -> io::Result<NamedPipe> {
         let pipe = pipe::NamedPipe::new(addr)?;
         NamedPipe::from_raw_handle(pipe.into_raw_handle(), registry, token)
     }
 
     /// TODO: Dox
-    pub fn from_raw_handle(handle: RawHandle, registry: &Registry, token: Token) -> io::Result<NamedPipe> {
+    pub fn from_raw_handle(
+        handle: RawHandle,
+        registry: &Registry,
+        token: Token,
+    ) -> io::Result<NamedPipe> {
         // Create the pipe
         let pipe = NamedPipe {
             inner: Arc::new(Inner {
@@ -166,10 +174,13 @@ impl NamedPipe {
         };
 
         // Register the handle w/ the IOCP handle
-        poll::selector(registry).inner.cp.add_handle(usize::from(token), &pipe.inner.handle)?;
+        poll::selector(registry)
+            .inner
+            .cp
+            .add_handle(usize::from(token), &pipe.inner.handle)?;
 
         // Queue the initial read
-        pipe.inner.post_register();
+        Inner::post_register(&pipe.inner);
 
         Ok(pipe)
     }
@@ -435,9 +446,9 @@ impl Inner {
         }
     }
 
-    fn post_register(self: &Arc<Inner>) {
-        let mut io = self.io.lock().unwrap();
-        if Inner::schedule_read(&self, &mut io) {
+    fn post_register(me: &Arc<Inner>) {
+        let mut io = me.io.lock().unwrap();
+        if Inner::schedule_read(&me, &mut io) {
             if let State::None = io.write {
                 if let Some(waker) = io.write_waker.take() {
                     waker.wake();
@@ -634,16 +645,13 @@ impl Overlapped {
     /// This can be useful when only a shared borrow is held and the overlapped
     /// pointer needs to be passed down to winapi.
     pub fn as_mut_ptr(&self) -> *mut OVERLAPPED {
-        unsafe {
-            (*self.inner.get()).raw()
-        }
+        unsafe { (*self.inner.get()).raw() }
     }
 }
 
 impl fmt::Debug for Overlapped {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Overlapped")
-            .finish()
+        f.debug_struct("Overlapped").finish()
     }
 }
 
