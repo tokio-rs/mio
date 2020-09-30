@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 
 pub struct IoStatusBlock(IO_STATUS_BLOCK);
 
-cfg_net! {
+cfg_io_source! {
     use ntapi::ntioapi::IO_STATUS_BLOCK_u;
 
     impl IoStatusBlock {

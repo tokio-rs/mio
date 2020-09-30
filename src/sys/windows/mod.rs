@@ -42,14 +42,16 @@ mod waker;
 pub(crate) use waker::Waker;
 
 cfg_net! {
+    mod net;
+}
+
+cfg_io_source! {
     use std::io;
     use std::os::windows::io::RawSocket;
     use std::pin::Pin;
     use std::sync::{Arc, Mutex};
 
     use crate::{poll, Interest, Registry, Token};
-
-    mod net;
 
     struct InternalState {
         selector: Arc<SelectorInner>,
