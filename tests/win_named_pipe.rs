@@ -36,10 +36,7 @@ fn client(name: &str, registry: &mio::Registry) -> NamedPipe {
         .write(true)
         .custom_flags(FILE_FLAG_OVERLAPPED);
     let file = t!(opts.open(name));
-    t!(NamedPipe::from_raw_handle(
-        file.into_raw_handle(),
-        registry,
-    ))
+    t!(NamedPipe::from_raw_handle(file.into_raw_handle(), registry,))
 }
 
 fn pipe(registry: &mio::Registry) -> (NamedPipe, NamedPipe) {
@@ -51,14 +48,9 @@ static data: &[u8] = &[100; 4096];
 
 #[test]
 fn writable_after_register() {
-    println!("START");
     let mut poll = t!(mio::Poll::new());
-    println!("NEXT");
     let (mut server, mut client) = pipe(poll.registry());
     let mut events = mio::Events::with_capacity(128);
-    println!("prepoll");
-
-    println!("one");
 
     let (wk1, cnt1) = new_count_waker();
     let mut cx1 = Context::from_waker(&wk1);
@@ -69,8 +61,6 @@ fn writable_after_register() {
 
     t!(server.connect());
 
-    println!("two");
-
     // Server is writable
     let res = server.write(&mut cx2, b"hello");
     assert!(res.is_ready());
@@ -78,22 +68,16 @@ fn writable_after_register() {
     // Server is **not** readable
     assert!(server.read(&mut cx2, &mut dst).is_pending());
 
-    println!("three");
-
     // Client is writable
     let res = client.write(&mut cx1, b"hello");
-    println!("  -> 1");
     assert!(res.is_ready());
 
     // Saturate the client
     loop {
-        println!("  -> 2");
         if client.write(&mut cx1, data).is_pending() {
             break;
         }
     }
-
-    println!(" => loop 2");
 
     // Wait for readable
     while cnt2.get() == 0 {
@@ -123,7 +107,7 @@ fn connect_before_client() {
 
     let mut events = mio::Events::with_capacity(128);
     t!(poll.poll(&mut events, Some(Duration::new(0, 0))));
-    println!(" ~~~ done poll ");
+
     let e = events.iter().collect::<Vec<_>>();
     assert_eq!(e.len(), 0);
     assert_eq!(
@@ -131,7 +115,7 @@ fn connect_before_client() {
         io::ErrorKind::WouldBlock
     );
 
-    let mut client = client(&name, poll.registry());    
+    let mut client = client(&name, poll.registry());
     let (wk, cnt) = new_count_waker();
     let mut cx = Context::from_waker(&wk);
 
@@ -146,11 +130,11 @@ fn connect_after_client() {
 
     let mut events = mio::Events::with_capacity(128);
     t!(poll.poll(&mut events, Some(Duration::new(0, 0))));
-    println!(" ~~~ done poll ");
+
     let e = events.iter().collect::<Vec<_>>();
     assert_eq!(e.len(), 0);
 
-    let mut client = client(&name, poll.registry());    
+    let mut client = client(&name, poll.registry());
     let (wk, cnt) = new_count_waker();
     let mut cx = Context::from_waker(&wk);
 

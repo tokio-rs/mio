@@ -287,7 +287,6 @@ impl NamedPipe {
             // In theory not possible with `ready_registration` checked above,
             // but return would block for now.
             State::None => {
-                println!("SET WAKER; {:p}", &*state);
                 state.read_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
@@ -295,7 +294,6 @@ impl NamedPipe {
             // A read is in flight, still waiting for it to finish
             State::Pending(buf, amt) => {
                 state.read = State::Pending(buf, amt);
-                println!("SET WAKER; {:p}", &*state);
                 state.read_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
@@ -365,7 +363,6 @@ impl fmt::Debug for NamedPipe {
 
 impl Drop for NamedPipe {
     fn drop(&mut self) {
-        println!("~~~ DROPPING");
         // Cancel pending reads/connects, but don't cancel writes to ensure that
         // everything is flushed out.
         unsafe {
@@ -382,7 +379,6 @@ impl Drop for NamedPipe {
                 _ => {}
             }
         }
-        println!(" done drop");
     }
 }
 
@@ -457,9 +453,6 @@ impl Inner {
 
     fn post_register(me: &Arc<Inner>) {
         let mut io = me.io.lock().unwrap();
-        println!(" ... post_register");
-        println!(" {:?}", io.read);
-        println!(" {:?}", io.write);
         if Inner::schedule_read(&me, &mut io) {
             if let State::None = io.write {
                 if let Some(waker) = io.write_waker.take() {
@@ -488,7 +481,6 @@ unsafe fn cancel<T: AsRawHandle>(handle: &T, overlapped: &Overlapped) -> io::Res
 }
 
 fn connect_done(status: &OVERLAPPED_ENTRY) {
-    println!(" + connect_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that
@@ -515,7 +507,6 @@ fn connect_done(status: &OVERLAPPED_ENTRY) {
 }
 
 fn read_done(status: &OVERLAPPED_ENTRY) {
-    println!(" + read_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `FromRawArc<Inner>`. Note that we should be guaranteed that
@@ -525,7 +516,6 @@ fn read_done(status: &OVERLAPPED_ENTRY) {
 
     // Move from the `Pending` to `Ok` state.
     let mut io = me.io.lock().unwrap();
-    println!("  -> state {:p}", &*io);
     let mut buf = match mem::replace(&mut io.read, State::None) {
         State::Pending(buf, _) => buf,
         _ => unreachable!(),
@@ -546,13 +536,11 @@ fn read_done(status: &OVERLAPPED_ENTRY) {
 
     // Flag our readiness that we've got data.
     if let Some(waker) = io.read_waker.take() {
-        println!("   -> wake");
         waker.wake();
     }
 }
 
 fn write_done(status: &OVERLAPPED_ENTRY) {
-    println!(" + write_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that

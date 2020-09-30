@@ -453,7 +453,6 @@ impl SelectorInner {
         unsafe { self.update_sockets_events() }?;
 
         let result = self.cp.get_many(statuses, timeout);
-        println!(" + post get_many");
 
         self.is_polling.store(false, Ordering::Relaxed);
 
@@ -489,7 +488,6 @@ impl SelectorInner {
         let mut n = 0;
         let mut update_queue = self.update_queue.lock().unwrap();
         for iocp_event in iocp_events.iter() {
-            println!(" IOCP TOKEN {}", iocp_event.token());
             if iocp_event.overlapped().is_null() {
                 // `Waker` event, we'll add a readable event to match the other platforms.
                 events.push(Event {
@@ -506,7 +504,6 @@ impl SelectorInner {
                 continue;
             }
 
-            println!(" + TRYING TO GET FROM EVENT");
             let sock_state = from_overlapped(iocp_event.overlapped());
             let mut sock_guard = sock_state.lock().unwrap();
             match sock_guard.feed_event() {
