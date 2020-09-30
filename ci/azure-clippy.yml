@@ -13,7 +13,5 @@ jobs:
     - script: rustup component add clippy
       displayName: "Add component"
 
-    # TODO: remove allowing `match-like-matches-macro`, once the minimum Rust
-    # version >= 1.42 (currently 1.39).
-    - script: cargo clippy --all-targets --all-features -- -D warnings -A clippy::cognitive-complexity -A clippy::match_like_matches_macro
+    - script: cargo clippy --all-targets --all-features -- -D warnings -A clippy::cognitive-complexity
       displayName: "Run Clippy"
