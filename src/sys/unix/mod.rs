@@ -59,6 +59,11 @@ cfg_os_poll! {
             }
         }
     }
+
+    cfg_pipe! {
+        pub(crate) mod pipe;
+        pub use self::pipe::{pipe, Receiver, Sender};
+    }
 }
 
 cfg_not_os_poll! {

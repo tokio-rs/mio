@@ -82,6 +82,18 @@ macro_rules! cfg_uds {
     }
 }
 
+/// Feature `pipe` enabled.
+#[cfg(unix)]
+macro_rules! cfg_pipe {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "pipe")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "pipe")))]
+            $item
+        )*
+    }
+}
+
 /// Feature `os-util` enabled, or one of the features that need `os-util`.
 #[cfg(unix)]
 macro_rules! cfg_any_os_util {

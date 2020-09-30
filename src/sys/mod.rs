@@ -72,6 +72,10 @@ cfg_os_poll! {
         pub(crate) use self::unix::uds;
     }
 
+    cfg_pipe! {
+        pub use self::unix::{pipe, Receiver, Sender};
+    }
+
     cfg_net! {
         pub(crate) use self::unix::IoSourceState;
     }
