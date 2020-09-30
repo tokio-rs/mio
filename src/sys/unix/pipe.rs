@@ -374,7 +374,7 @@ impl IntoRawFd for Receiver {
 fn set_nonblocking(fd: RawFd, nonblocking: bool) -> io::Result<()> {
     let value = nonblocking as libc::c_int;
     if unsafe { libc::ioctl(fd, libc::FIONBIO, &value) } == -1 {
-        return Err(io::Error::last_os_error());
+        Err(io::Error::last_os_error())
     } else {
         Ok(())
     }
