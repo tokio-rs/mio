@@ -1,3 +1,46 @@
+# 0.7.1
+
+## Reduced support for 32-bit Apple targets
+
+In January 2020 Rust reduced its support for 32-bit Apple targets
+(https://blog.rust-lang.org/2020/01/03/reducing-support-for-32-bit-apple-targets.html).
+Starting with v0.7.1 Mio will do the same as we're no longer checking 32 bit
+iOS/macOS on our CI.
+
+## Added
+
+* Support for illumos
+  (https://github.com/tokio-rs/mio/commit/976f2354d0e8fbbb64fba3bf017d7131f9c369a0).
+* Report `epoll(2)`'s `EPOLLERR` event as `Event::is_write_closed` if it's the
+  only event
+  (https://github.com/tokio-rs/mio/commit/0c77b5712d675eeb9bd43928b5dd7d22b2c7ac0c).
+* Optimised event::Iter::{size_hint, count}
+  (https://github.com/tokio-rs/mio/commit/40df934a11b05233a7796c4de19a4ee06bc4e03e).
+
+## Fixed
+
+* Work around Linux kernel < 2.6.37 bug on 32-bits making timeouts longer then
+  ~30 minutes effectively infinite
+  (https://github.com/tokio-rs/mio/commit/d555991f5ee81f6c1eec0fe481557d3d5b8d5ff4).
+* Set `SO_NOSIGPIPE` on all sockets (not just UDP) on for Apple targets
+  (https://github.com/tokio-rs/mio/commit/b8bbdcb0d3236f4c4acb257996d42a88dc9987d9).
+* Properly handle `POLL_ABORT` on Windows
+  (https://github.com/tokio-rs/mio/commit/a98da62b3ed1eeed1770aaca12f46d647e4fa749).
+* Improved error handling around failing `SIO_BASE_HANDLE` calls on Windows
+  (https://github.com/tokio-rs/mio/commit/b15fc18458a79ef8a51f73effa92548650f4e5dc).
+
+## Changed
+
+* On NetBSD we now use `accept4(2)`
+  (https://github.com/tokio-rs/mio/commit/4e306addc7144f2e02a7e8397c220b179a006a19).
+* The package uploaded to crates.io should be slightly smaller
+  (https://github.com/tokio-rs/mio/commit/eef8d3b9500bc0db957cd1ac68ee128ebc68351f).
+
+## Removed
+
+* Dependency on `lazy_static` on Windows
+  (https://github.com/tokio-rs/mio/commit/57e4c2a8ac153bc7bb87829e22cf0a21e3927e8a).
+
 # 0.7.0
 
 Version 0.7 of Mio contains various major changes compared to version 0.6.

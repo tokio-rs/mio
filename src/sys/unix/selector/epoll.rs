@@ -172,6 +172,8 @@ pub mod event {
             // Unix pipe write end has closed
             || (event.events as libc::c_int & libc::EPOLLOUT != 0
                 && event.events as libc::c_int & libc::EPOLLERR != 0)
+            // The other side (read end) of a Unix pipe has closed.
+            || event.events as libc::c_int == libc::EPOLLERR
     }
 
     pub fn is_priority(event: &Event) -> bool {
