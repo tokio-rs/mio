@@ -197,64 +197,44 @@ fn write_then_drop() {
     assert_eq!(&dst[..4], b"1234");
 }
 
-/*
 #[test]
 fn connect_twice() {
-    drop(env_logger::init());
+    let mut poll = t!(mio::Poll::new());
 
-    let (mut server, name) = server();
-    let c1 = client(&name);
-    let poll = t!(Poll::new());
-    t!(poll.register(
-        &server,
-        Token(0),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
-    t!(poll.register(
-        &c1,
-        Token(1),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
+    let (mut server, name) = server(poll.registry());
+    let mut c1 = client(&name, poll.registry());
+
+    let (wk1, cnt1) = new_count_waker();
+    let mut cx1 = Context::from_waker(&wk1);
+
+    let mut dst = [0; 1024];
+    assert!(server.read(&mut cx1, &mut dst).is_pending());
+
+    t!(server.connect());
+
     drop(c1);
+    let mut events = mio::Events::with_capacity(128);
 
-    let mut events = Events::with_capacity(128);
-
-    loop {
+    while cnt1.get() == 0 {
         t!(poll.poll(&mut events, None));
-        let events = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
-            if event.readiness().is_readable() {
-                break;
-            }
-        }
     }
 
-    let mut buf = [0; 10];
-    assert_eq!(t!(server.read(&mut buf)), 0);
+    match server.read(&mut cx1, &mut dst) {
+        Poll::Ready(Ok(0)) => {}
+        res => panic!("{:?}", res),
+    }
+
     t!(server.disconnect());
     assert_eq!(
         server.connect().err().unwrap().kind(),
         io::ErrorKind::WouldBlock
     );
 
-    let c2 = client(&name);
-    t!(poll.register(
-        &c2,
-        Token(2),
-        Ready::readable() | Ready::writable(),
-        PollOpt::edge()
-    ));
+    assert_eq!(
+        server.connect().err().unwrap().kind(),
+        io::ErrorKind::WouldBlock
+    );
 
-    loop {
-        t!(poll.poll(&mut events, None));
-        let events = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
-            if event.readiness().is_writable() {
-                break;
-            }
-        }
-    }
+    assert!(server.write(&mut cx1, b"hello").is_ready());
+    assert!(server.write(&mut cx1, b"hello").is_pending());
 }
-*/

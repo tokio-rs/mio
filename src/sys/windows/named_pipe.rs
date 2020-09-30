@@ -119,6 +119,7 @@ struct Io {
     connect_error: Option<io::Error>,
 }
 
+#[derive(Debug)]
 enum State {
     None,
     Pending(Vec<u8>, usize),
@@ -456,6 +457,9 @@ impl Inner {
 
     fn post_register(me: &Arc<Inner>) {
         let mut io = me.io.lock().unwrap();
+        println!(" ... post_register");
+        println!(" {:?}", io.read);
+        println!(" {:?}", io.write);
         if Inner::schedule_read(&me, &mut io) {
             if let State::None = io.write {
                 if let Some(waker) = io.write_waker.take() {
