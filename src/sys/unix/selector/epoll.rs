@@ -95,7 +95,7 @@ impl Selector {
     }
 }
 
-cfg_net! {
+cfg_io_source! {
     impl Selector {
         #[cfg(debug_assertions)]
         pub fn id(&self) -> usize {

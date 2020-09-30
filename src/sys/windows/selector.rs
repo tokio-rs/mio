@@ -370,7 +370,7 @@ impl Selector {
     }
 }
 
-cfg_net! {
+cfg_io_source! {
     use super::InternalState;
     use crate::Token;
 

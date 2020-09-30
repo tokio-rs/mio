@@ -36,6 +36,18 @@ macro_rules! cfg_net {
     }
 }
 
+/// One of the features enabled that needs `IoSource`.
+#[cfg(unix)]
+macro_rules! cfg_io_source {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(feature = "tcp", feature = "udp", feature = "uds", feature = "pipe"))]
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "tcp", feature = "udp", feature = "uds", feature = "pipe"))))]
+            $item
+        )*
+    }
+}
+
 /// One of the `tcp`, `udp` features enabled.
 #[cfg(windows)]
 macro_rules! cfg_net {

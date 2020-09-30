@@ -69,9 +69,11 @@ mod waker;
 
 pub mod event;
 
-cfg_net! {
+cfg_io_source! {
     mod io_source;
+}
 
+cfg_net! {
     pub mod net;
 }
 
