@@ -498,7 +498,7 @@ impl SelectorInner {
                 continue;
             } else if iocp_event.token() % 2 == 1 {
                 // Handle is a named pipe. This could be extended to be any non-AFD event.
-                let callback = (*(iocp_event.overlapped() as *mut super::named_pipe::Overlapped)).callback;
+                let callback = (*(iocp_event.overlapped() as *mut super::Overlapped)).callback;
     
                 callback(iocp_event.entry());                
                 continue;
@@ -697,7 +697,7 @@ impl Drop for SelectorInner {
                         } else if iocp_event.token() % 2 == 1 {
                             // Named pipe, dispatch the event so it can release resources
                             let callback = unsafe {
-                                (*(iocp_event.overlapped() as *mut super::named_pipe::Overlapped)).callback
+                                (*(iocp_event.overlapped() as *mut super::Overlapped)).callback
                             };
                 
                             callback(iocp_event.entry());

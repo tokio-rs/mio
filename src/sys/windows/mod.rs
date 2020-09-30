@@ -7,6 +7,9 @@ pub use event::{Event, Events};
 mod selector;
 pub use selector::{Selector, SelectorInner, SockState};
 
+mod overlapped;
+use overlapped::Overlapped;
+
 // Macros must be defined before the modules that use them
 cfg_net! {
     /// Helper macro to execute a system call that returns an `io::Result`.
