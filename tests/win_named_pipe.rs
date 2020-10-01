@@ -272,11 +272,10 @@ fn reregister_deregister_before_register() {
     let poll = t!(Poll::new());
 
     assert_eq!(
-        poll.registry().reregister(
-            &mut pipe,
-            Token(0),
-            Interest::READABLE,
-        ).unwrap_err().kind(),
+        poll.registry()
+            .reregister(&mut pipe, Token(0), Interest::READABLE,)
+            .unwrap_err()
+            .kind(),
         io::ErrorKind::NotFound,
     );
 
@@ -292,14 +291,16 @@ fn reregister_deregister_different_poll() {
     let poll2 = t!(Poll::new());
 
     // Register with 1
-    t!(poll1.registry().register(&mut pipe, Token(0), Interest::READABLE));
+    t!(poll1
+        .registry()
+        .register(&mut pipe, Token(0), Interest::READABLE));
 
     assert_eq!(
-        poll2.registry().reregister(
-            &mut pipe,
-            Token(0),
-            Interest::READABLE,
-        ).unwrap_err().kind(),
+        poll2
+            .registry()
+            .reregister(&mut pipe, Token(0), Interest::READABLE,)
+            .unwrap_err()
+            .kind(),
         io::ErrorKind::AlreadyExists,
     );
 
