@@ -22,7 +22,7 @@ use winapi::um::ioapiset::CancelIoEx;
 /// # Safety
 ///
 /// Only valid if the strict is annotated with `#[repr(C)]`. This is only used
-/// with `Overlapped`, which is correctly annotated.
+/// with `Overlapped` and `Inner`, which are correctly annotated.
 macro_rules! offset_of {
     ($t:ty, $($field:ident).+) => (
         &(*(0 as *const $t)).$($field).+ as *const _ as usize
@@ -83,6 +83,7 @@ pub struct NamedPipe {
     inner: Arc<Inner>,
 }
 
+#[repr(C)]
 struct Inner {
     handle: pipe::NamedPipe,
 
@@ -174,7 +175,7 @@ impl NamedPipe {
         // connection attempt. Afterwards interpret the return value and set
         // internal state accordingly.
         let res = unsafe {
-            let overlapped = self.inner.connect.as_mut_ptr() as *mut _;
+            let overlapped = self.inner.connect.as_ptr() as *mut _;
             self.inner.handle.connect_overlapped(overlapped)
         };
 
@@ -199,7 +200,6 @@ impl NamedPipe {
                 Err(would_block())
             }
 
-            // TODO: are we sure no IOCP notification comes in here?
             Err(e) => {
                 self.inner.connecting.store(false, SeqCst);
                 Err(e)
@@ -223,9 +223,7 @@ impl NamedPipe {
     /// Disconnects this named pipe from a connected client.
     ///
     /// This function will disconnect the pipe from a connected client, if any,
-    /// transitively calling the `DisconnectNamedPipe` function. If the
-    /// disconnection is successful then this object will no longer be readable
-    /// or writable.
+    /// transitively calling the `DisconnectNamedPipe` function.
     ///
     /// After a `disconnect` is issued, then a `connect` may be called again to
     /// connect to another client.
@@ -453,13 +451,13 @@ impl Inner {
         // Allocate a buffer and schedule the read.
         let mut buf = me.get_buffer();
         let e = unsafe {
-            let overlapped = me.read.as_mut_ptr() as *mut _;
+            let overlapped = me.read.as_ptr() as *mut _;
             let slice = slice::from_raw_parts_mut(buf.as_mut_ptr(), buf.capacity());
             me.handle.read_overlapped(slice, overlapped)
         };
 
         match e {
-            // See `connect` above for the rationale behind `forget`
+            // See `NamedPipe::connect` above for the rationale behind `forget`
             Ok(_) => {
                 io.read = State::Pending(buf, 0); // 0 is ignored on read side
                 mem::forget(me.clone());
@@ -483,7 +481,7 @@ impl Inner {
     fn schedule_write(me: &Arc<Inner>, buf: Vec<u8>, pos: usize, io: &mut Io, events: Option<&mut Vec<Event>>) {
         // Very similar to `schedule_read` above, just done for the write half.
         let e = unsafe {
-            let overlapped = me.write.as_mut_ptr() as *mut _;
+            let overlapped = me.write.as_ptr() as *mut _;
             me.handle.write_overlapped(&buf[pos..], overlapped)
         };
 
@@ -510,7 +508,7 @@ impl Inner {
     }
 
     fn get_buffer(&self) -> Vec<u8> {
-        self.pool.lock().unwrap().get(8 * 1024)
+        self.pool.lock().unwrap().get(4 * 1024)
     }
 
     fn put_buffer(&self, buf: Vec<u8>) {
@@ -519,7 +517,9 @@ impl Inner {
 }
 
 unsafe fn cancel<T: AsRawHandle>(handle: &T, overlapped: &Overlapped) -> io::Result<()> {
-    let ret = CancelIoEx(handle.as_raw_handle(), overlapped.as_mut_ptr() as *mut _);
+    let ret = CancelIoEx(handle.as_raw_handle(), overlapped.as_ptr() as *mut _);
+    // `CancelIoEx` returns 0 on error:
+    // https://docs.microsoft.com/en-us/windows/win32/fileio/cancelioex-func
     if ret == 0 {
         Err(io::Error::last_os_error())
     } else {
@@ -537,7 +537,7 @@ fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 
     // Flag ourselves as no longer using the `connect` overlapped instances.
     let prev = me.connecting.swap(false, SeqCst);
-    assert!(prev, "wasn't previously connecting");
+    assert!(prev, "NamedPipe was not previously connecting");
 
     // Stash away our connect error if one happened
     debug_assert_eq!(status.bytes_transferred(), 0);
