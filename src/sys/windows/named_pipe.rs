@@ -121,13 +121,6 @@ enum State {
 // Odd tokens are for named pipes
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
 
-fn _assert_kinds() {
-    fn _assert_send<T: Send>() {}
-    fn _assert_sync<T: Sync>() {}
-    _assert_send::<NamedPipe>();
-    _assert_sync::<NamedPipe>();
-}
-
 fn would_block() -> io::Error {
     io::ErrorKind::WouldBlock.into()
 }

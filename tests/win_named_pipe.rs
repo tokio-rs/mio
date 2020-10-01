@@ -11,6 +11,13 @@ use mio::{Events, Interest, Poll, Token};
 use rand::Rng;
 use winapi::um::winbase::FILE_FLAG_OVERLAPPED;
 
+fn _assert_kinds() {
+    fn _assert_send<T: Send>() {}
+    fn _assert_sync<T: Sync>() {}
+    _assert_send::<NamedPipe>();
+    _assert_sync::<NamedPipe>();
+}
+
 macro_rules! t {
     ($e:expr) => {
         match $e {
