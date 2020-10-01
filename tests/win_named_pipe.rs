@@ -196,8 +196,7 @@ fn write_then_drop() {
 
     let mut events = Events::with_capacity(128);
 
-    'outer:
-    loop {
+    'outer: loop {
         t!(poll.poll(&mut events, None));
         let events = events.iter().collect::<Vec<_>>();
 
@@ -257,11 +256,10 @@ fn connect_twice() {
         .registry()
         .register(&mut c2, Token(2), Interest::READABLE | Interest::WRITABLE,));
 
-    'outer:
-    loop {
+    'outer: loop {
         t!(poll.poll(&mut events, None));
         let events = events.iter().collect::<Vec<_>>();
-        
+
         for event in &events {
             if event.is_writable() && event.token() == Token(0) {
                 break 'outer;
