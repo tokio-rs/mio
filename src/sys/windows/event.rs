@@ -23,12 +23,12 @@ impl Event {
     }
 
     pub(super) fn set_readable(&mut self) {
-        self.flags |= READABLE_FLAGS
+        self.flags |= afd::POLL_RECEIVE
     }
 
     #[cfg(feature = "os-util")]
     pub(super) fn set_writable(&mut self) {
-        self.flags |= WRITABLE_FLAGS
+        self.flags |= afd::POLL_SEND;
     }
 
     pub(super) fn from_completion_status(status: &CompletionStatus) -> Event {
