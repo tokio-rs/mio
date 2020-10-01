@@ -432,8 +432,18 @@ impl SelectorInner {
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
 
-        self.select2(&mut events.statuses, &mut events.events, timeout)?;
-        return Ok(());
+        if timeout.is_none() {
+            loop {
+                let len = self.select2(&mut events.statuses, &mut events.events, None)?;
+                if len == 0 {
+                    continue;
+                }
+                return Ok(());
+            }
+        } else {
+            self.select2(&mut events.statuses, &mut events.events, timeout)?;
+            return Ok(());
+        }
     }
 
     pub fn select2(
