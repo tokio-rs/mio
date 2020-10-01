@@ -48,22 +48,21 @@
 //! `FILE_FLAG_OVERLAPPED` flag when opening the `File`.
 
 use crate::{poll, Registry};
-use crate::sys::windows::Overlapped;
+use crate::event::Source;
+use crate::sys::windows::{Event, Overlapped};
 
 use std::ffi::OsStr;
 use std::fmt;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::mem;
 use std::os::windows::io::*;
 use std::slice;
 use std::sync::atomic::{AtomicUsize, AtomicBool};
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll, Waker};
 
-// use mio::windows;
-// use mio::{Evented, Poll, PollOpt, Ready, Registration, SetReadiness, Token};
-use miow::iocp::CompletionStatus;
+use crate::{Interest, Token};
+use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::pipe;
 use winapi::shared::winerror::*;
 use winapi::um::ioapiset::*;
@@ -81,10 +80,6 @@ macro_rules! overlapped2arc {
         debug_assert!(offset < mem::size_of::<$t>());
         Arc::from_raw(($e as usize - offset) as *mut $t)
     })
-}
-
-fn would_block() -> io::Error {
-    io::ErrorKind::WouldBlock.into()
 }
 
 /// Representation of a named pipe on Windows.
@@ -112,10 +107,14 @@ struct Inner {
 }
 
 struct Io {
+    // Uniquely identifies the selector associated with this named pipe
+    cp: Option<Arc<CompletionPort>>,
+    // Token used to identify events
+    token: Option<Token>,
     read: State,
-    read_waker: Option<Waker>,
+    read_interest: bool,
     write: State,
-    write_waker: Option<Waker>,
+    write_interest: bool,
     connect_error: Option<io::Error>,
 }
 
@@ -137,27 +136,25 @@ fn _assert_kinds() {
     _assert_sync::<NamedPipe>();
 }
 
+fn would_block() -> io::Error {
+    io::ErrorKind::WouldBlock.into()
+}
+
 impl NamedPipe {
     /// Creates a new named pipe at the specified `addr` given a "reasonable
     /// set" of initial configuration options.
     pub fn new<A: AsRef<OsStr>>(
         addr: A,
-        registry: &Registry,
     ) -> io::Result<NamedPipe> {
         let pipe = pipe::NamedPipe::new(addr)?;
-        NamedPipe::from_raw_handle(pipe.into_raw_handle(), registry)
+       Ok(NamedPipe::from_raw_handle(pipe.into_raw_handle()))
     }
 
     /// TODO: Dox
     pub fn from_raw_handle(
         handle: RawHandle,
-        registry: &Registry,
-    ) -> io::Result<NamedPipe> {
-        // Generate a token
-        let token = NEXT_TOKEN.fetch_add(2, Relaxed) + 2;
-
-        // Create the pipe
-        let pipe = NamedPipe {
+    ) -> NamedPipe {
+        NamedPipe {
             inner: Arc::new(Inner {
                 // Safety: not really unsafe
                 handle: unsafe { pipe::NamedPipe::from_raw_handle(handle) },
@@ -168,26 +165,17 @@ impl NamedPipe {
                 read: Overlapped::new(read_done),
                 write: Overlapped::new(write_done),
                 io: Mutex::new(Io {
+                    cp: None,
+                    token: None,
                     read: State::None,
-                    read_waker: None,
+                    read_interest: false,
                     write: State::None,
-                    write_waker: None,
+                    write_interest: false,
                     connect_error: None,
                 }),
                 pool: Mutex::new(BufferPool::with_capacity(2)),
             }),
-        };
-
-        // Register the handle w/ the IOCP handle
-        poll::selector(registry)
-            .inner
-            .cp
-            .add_handle(usize::from(token), &pipe.inner.handle)?;
-
-        // Queue the initial read
-        Inner::post_register(&pipe.inner);
-
-        Ok(pipe)
+        }
     }
 
     /// Attempts to call `ConnectNamedPipe`, if possible.
@@ -230,7 +218,7 @@ impl NamedPipe {
             // reads/writes and such.
             Ok(true) => {
                 self.inner.connecting.store(false, SeqCst);
-                Inner::post_register(&self.inner);
+                Inner::post_register(&self.inner, None);
                 Ok(())
             }
 
@@ -279,23 +267,48 @@ impl NamedPipe {
     pub fn disconnect(&self) -> io::Result<()> {
         self.inner.handle.disconnect()
     }
+}
 
+impl Read for NamedPipe {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        <&NamedPipe as Read>::read(&mut &*self, buf)
+    }
+}
+
+impl Write for NamedPipe {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        <&NamedPipe as Write>::write(&mut &*self, buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        <&NamedPipe as Write>::flush(&mut &*self)
+    }
+}
+
+impl<'a> Read for &'a NamedPipe {
     /// TODO: dox
-    pub fn read(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        println!("~~~");
         let mut state = self.inner.io.lock().unwrap();
+
+        if state.token.is_none() {
+            println!("one");
+            return Err(would_block());
+        }
+
         match mem::replace(&mut state.read, State::None) {
-            // In theory not possible with `ready_registration` checked above,
+            // In theory not possible with `token` checked above,
             // but return would block for now.
             State::None => {
-                state.read_waker = Some(cx.waker().clone());
-                Poll::Pending
+                println!("two");
+                Err(would_block())
             }
 
             // A read is in flight, still waiting for it to finish
             State::Pending(buf, amt) => {
                 state.read = State::Pending(buf, amt);
-                state.read_waker = Some(cx.waker().clone());
-                Poll::Pending
+                println!("three");
+                Err(would_block())
             }
 
             // We previously read something into `data`, try to copy out some
@@ -311,41 +324,93 @@ impl NamedPipe {
                     state.read = State::Ok(data, next);
                 } else {
                     self.inner.put_buffer(data);
-                    Inner::schedule_read(&self.inner, &mut state);
+                    Inner::schedule_read(&self.inner, &mut state, None);
                 }
-                Poll::Ready(Ok(n))
+                Ok(n)
             }
 
             // Looks like an in-flight read hit an error, return that here while
             // we schedule a new one.
             State::Err(e) => {
-                Inner::schedule_read(&self.inner, &mut state);
+                Inner::schedule_read(&self.inner, &mut state, None);
                 if e.raw_os_error() == Some(ERROR_BROKEN_PIPE as i32) {
-                    Poll::Ready(Ok(0))
+                    Ok(0)
                 } else {
-                    Poll::Ready(Err(e))
+                    println!("four");
+                    Err(e)
                 }
             }
         }
     }
+}
 
-    /// TODO: dox
-    pub fn write(&mut self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {        
+impl<'a> Write for &'a NamedPipe {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {        
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
+
+        if io.token.is_none() {
+            return Err(would_block());
+        }
+
         match io.write {
             State::None => {}
             _ => {
-                io.write_waker = Some(cx.waker().clone());
-                return Poll::Pending;
+                return Err(would_block());
             }
         }
 
         // Move `buf` onto the heap and fire off the write
         let mut owned_buf = self.inner.get_buffer();
         owned_buf.extend(buf);
-        Inner::schedule_write(&self.inner, owned_buf, 0, &mut io);
-        Poll::Ready(Ok(buf.len()))
+        Inner::schedule_write(&self.inner, owned_buf, 0, &mut io, None);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {      
+        Ok(())  
+    }
+}
+
+impl Source for NamedPipe {
+    fn register(&mut self, registry: &Registry, token: Token, interest: Interest) -> io::Result<()> {
+        let mut io = self.inner.io.lock().unwrap();
+
+        if io.cp.is_none() {
+            io.cp = Some(poll::selector(registry).clone_port());
+
+            let inner_token = NEXT_TOKEN.fetch_add(2, Relaxed) + 2;
+            poll::selector(registry).inner.cp.add_handle(inner_token, &self.inner.handle)?;
+        }
+
+        io.token = Some(token);
+        io.read_interest = interest.is_readable();
+        io.write_interest = interest.is_writable();
+        drop(io);
+
+        Inner::post_register(&self.inner, None);
+
+        Ok(())
+    }
+
+    fn reregister(&mut self, _registry: &Registry, token: Token, interest: Interest) -> io::Result<()> { 
+        let mut io = self.inner.io.lock().unwrap();
+
+        io.token = Some(token);
+        io.read_interest = interest.is_readable();
+        io.write_interest = interest.is_writable();
+        drop(io);
+
+        Inner::post_register(&self.inner, None);
+
+        Ok(())
+    }
+
+    fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
+        let mut io = self.inner.io.lock().unwrap();
+
+        io.token = None;
+        Ok(())
     }
 }
 
@@ -390,7 +455,7 @@ impl Inner {
     /// is scheduled in the background. If the pipe is no longer connected
     /// (ERROR_PIPE_LISTENING) then `false` is returned and no read is
     /// scheduled.
-    fn schedule_read(me: &Arc<Inner>, io: &mut Io) -> bool {
+    fn schedule_read(me: &Arc<Inner>, io: &mut Io, events: Option<&mut Vec<Event>>) -> bool {
         // Check to see if a read is already scheduled/completed
         match io.read {
             State::None => {}
@@ -421,15 +486,13 @@ impl Inner {
             // out the error.
             Err(e) => {
                 io.read = State::Err(e);
-                if let Some(waker) = io.read_waker.take() {
-                    waker.wake();
-                }
+                io.notify_readable(events);
                 true
             }
         }
     }
 
-    fn schedule_write(me: &Arc<Inner>, buf: Vec<u8>, pos: usize, io: &mut Io) {
+    fn schedule_write(me: &Arc<Inner>, buf: Vec<u8>, pos: usize, io: &mut Io, events: Option<&mut Vec<Event>>) {
         // Very similar to `schedule_read` above, just done for the write half.
         let e = unsafe {
             let overlapped = me.write.as_mut_ptr() as *mut _;
@@ -444,20 +507,16 @@ impl Inner {
             }
             Err(e) => {
                 io.write = State::Err(e);
-                if let Some(waker) = io.write_waker.take() {
-                    waker.wake();
-                }
+                io.notify_writable(events);
             }
         }
     }
 
-    fn post_register(me: &Arc<Inner>) {
+    fn post_register(me: &Arc<Inner>, mut events: Option<&mut Vec<Event>>) {
         let mut io = me.io.lock().unwrap();
-        if Inner::schedule_read(&me, &mut io) {
+        if Inner::schedule_read(&me, &mut io, events.as_mut().map(|ptr| &mut **ptr)) {
             if let State::None = io.write {
-                if let Some(waker) = io.write_waker.take() {
-                    waker.wake();
-                }
+                io.notify_writable(events);
             }
         }
     }
@@ -480,7 +539,8 @@ unsafe fn cancel<T: AsRawHandle>(handle: &T, overlapped: &Overlapped) -> io::Res
     }
 }
 
-fn connect_done(status: &OVERLAPPED_ENTRY) {
+fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
+    println!(" + connect_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that
@@ -503,10 +563,11 @@ fn connect_done(status: &OVERLAPPED_ENTRY) {
 
     // We essentially just finished a registration, so kick off a
     // read and register write readiness.
-    Inner::post_register(&me);
+    Inner::post_register(&me, events);
 }
 
-fn read_done(status: &OVERLAPPED_ENTRY) {
+fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
+    println!(" + read_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `FromRawArc<Inner>`. Note that we should be guaranteed that
@@ -535,12 +596,11 @@ fn read_done(status: &OVERLAPPED_ENTRY) {
     }
 
     // Flag our readiness that we've got data.
-    if let Some(waker) = io.read_waker.take() {
-        waker.wake();
-    }
+    io.notify_readable(events);
 }
 
-fn write_done(status: &OVERLAPPED_ENTRY) {
+fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
+    println!(" + write_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that
@@ -563,19 +623,43 @@ fn write_done(status: &OVERLAPPED_ENTRY) {
                 let new_pos = pos + (status.bytes_transferred() as usize);
                 if new_pos == buf.len() {
                     me.put_buffer(buf);
-                    if let Some(waker) = io.write_waker.take() {
-                        waker.wake();
-                    }
+                    io.notify_writable(events);
                 } else {
-                    Inner::schedule_write(&me, buf, new_pos, &mut io);
+                    Inner::schedule_write(&me, buf, new_pos, &mut io, events);
                 }
             }
             Err(e) => {
                 debug_assert_eq!(status.bytes_transferred(), 0);
                 io.write = State::Err(e);
-                if let Some(waker) = io.write_waker.take() {
-                    waker.wake();
-                }
+                io.notify_writable(events);
+            }
+        }
+    }
+}
+
+impl Io {
+    fn notify_readable(&self, events: Option<&mut Vec<Event>>) {
+        if let Some(token) = self.token {
+            let mut ev = Event::new(token);
+            ev.set_readable();
+
+            if let Some(events) = events {
+                events.push(ev);
+            } else {
+                let _ = self.cp.as_ref().unwrap().post(ev.to_completion_status());
+            }
+        }
+    }
+
+    fn notify_writable(&self, events: Option<&mut Vec<Event>>) {
+        if let Some(token) = self.token {
+            let mut ev = Event::new(token);
+            ev.set_writable();
+
+            if let Some(events) = events {
+                events.push(ev);
+            } else {
+                let _ = self.cp.as_ref().unwrap().post(ev.to_completion_status());
             }
         }
     }

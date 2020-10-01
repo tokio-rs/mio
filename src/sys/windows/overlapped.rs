@@ -1,3 +1,5 @@
+use crate::sys::windows::Event;
+
 use std::cell::UnsafeCell;
 use std::fmt;
 
@@ -23,7 +25,7 @@ use winapi::um::minwinbase::OVERLAPPED;
 #[repr(C)]
 pub(crate) struct Overlapped {
     inner: UnsafeCell<miow::Overlapped>,
-    pub(crate) callback: fn(&OVERLAPPED_ENTRY),
+    pub(crate) callback: fn(&OVERLAPPED_ENTRY, Option<&mut Vec<Event>>),
 }
 
 #[cfg(feature = "os-util")]
@@ -35,7 +37,7 @@ impl Overlapped {
     /// I/O operations that are registered with mio's event loop. When the I/O
     /// operation associated with an `OVERLAPPED` pointer completes the event
     /// loop will invoke the function pointer provided by `cb`.
-    pub fn new(cb: fn(&OVERLAPPED_ENTRY)) -> Overlapped {
+    pub fn new(cb: fn(&OVERLAPPED_ENTRY, Option<&mut Vec<Event>>)) -> Overlapped {
         Overlapped {
             inner: UnsafeCell::new(miow::Overlapped::zero()),
             callback: cb,

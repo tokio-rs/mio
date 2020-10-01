@@ -8,7 +8,6 @@ use crate::sys::Events;
 use crate::Interest;
 
 use miow::iocp::{CompletionPort, CompletionStatus};
-use miow::Overlapped;
 use std::collections::VecDeque;
 use std::marker::PhantomPinned;
 use std::os::windows::io::RawSocket;
@@ -18,17 +17,12 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use std::{io, ptr};
+use std::io;
 use winapi::shared::ntdef::NT_SUCCESS;
 use winapi::shared::ntdef::{HANDLE, PVOID};
 use winapi::shared::ntstatus::STATUS_CANCELLED;
 use winapi::shared::winerror::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, WAIT_TIMEOUT};
 use winapi::um::minwinbase::OVERLAPPED;
-
-/// Overlapped value to indicate a `Waker` event.
-//
-// Note: this must be null, `SelectorInner::feed_events` depends on it.
-pub const WAKER_OVERLAPPED: *mut Overlapped = ptr::null_mut();
 
 #[derive(Debug)]
 struct AfdGroup {
@@ -489,18 +483,14 @@ impl SelectorInner {
         let mut update_queue = self.update_queue.lock().unwrap();
         for iocp_event in iocp_events.iter() {
             if iocp_event.overlapped().is_null() {
-                // `Waker` event, we'll add a readable event to match the other platforms.
-                events.push(Event {
-                    flags: afd::POLL_RECEIVE,
-                    data: iocp_event.token() as u64,
-                });
+                events.push(Event::from_completion_status(iocp_event));
                 n += 1;
                 continue;
             } else if iocp_event.token() % 2 == 1 {
                 // Handle is a named pipe. This could be extended to be any non-AFD event.
                 let callback = (*(iocp_event.overlapped() as *mut super::Overlapped)).callback;
     
-                callback(iocp_event.entry());                
+                callback(iocp_event.entry(), Some(events));                
                 continue;
             }
 
@@ -693,14 +683,14 @@ impl Drop for SelectorInner {
                     events_num = iocp_events.iter().len();
                     for iocp_event in iocp_events.iter() {
                         if iocp_event.overlapped().is_null() {
-                            // Waker
+                            // Custom event
                         } else if iocp_event.token() % 2 == 1 {
                             // Named pipe, dispatch the event so it can release resources
                             let callback = unsafe {
                                 (*(iocp_event.overlapped() as *mut super::Overlapped)).callback
                             };
                 
-                            callback(iocp_event.entry());
+                            callback(iocp_event.entry(), None);
                         } else {
                             // drain sock state to release memory of Arc reference
                             let _sock_state = from_overlapped(iocp_event.overlapped());

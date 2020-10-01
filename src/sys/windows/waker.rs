@@ -1,8 +1,8 @@
-use crate::sys::windows::selector::WAKER_OVERLAPPED;
+use crate::sys::windows::Event;
 use crate::sys::windows::Selector;
 use crate::Token;
 
-use miow::iocp::{CompletionPort, CompletionStatus};
+use miow::iocp::CompletionPort;
 use std::io;
 use std::sync::Arc;
 
@@ -21,8 +21,9 @@ impl Waker {
     }
 
     pub fn wake(&self) -> io::Result<()> {
-        // Keep NULL as Overlapped value to notify waking.
-        let status = CompletionStatus::new(0, self.token.0, WAKER_OVERLAPPED);
-        self.port.post(status)
+        let mut ev = Event::new(self.token);
+        ev.set_readable();
+
+        self.port.post(ev.to_completion_status())
     }
 }
