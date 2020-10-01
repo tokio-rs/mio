@@ -500,7 +500,9 @@ impl SelectorInner {
                 // Handle is a named pipe. This could be extended to be any non-AFD event.
                 let callback = (*(iocp_event.overlapped() as *mut super::Overlapped)).callback;
     
-                callback(iocp_event.entry(), Some(events));                
+                let len = events.len();
+                callback(iocp_event.entry(), Some(events));
+                n += events.len() - len;
                 continue;
             }
 
