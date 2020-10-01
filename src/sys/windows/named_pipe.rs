@@ -355,6 +355,15 @@ impl Source for NamedPipe {
     fn register(&mut self, registry: &Registry, token: Token, interest: Interest) -> io::Result<()> {
         let mut io = self.inner.io.lock().unwrap();
 
+        io.check_association(registry, false)?;
+
+        if io.token.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "I/O source already registered with a `Registry`",
+            ));
+        }
+
         if io.cp.is_none() {
             io.cp = Some(poll::selector(registry).clone_port());
 
@@ -372,8 +381,10 @@ impl Source for NamedPipe {
         Ok(())
     }
 
-    fn reregister(&mut self, _registry: &Registry, token: Token, interest: Interest) -> io::Result<()> { 
+    fn reregister(&mut self, registry: &Registry, token: Token, interest: Interest) -> io::Result<()> { 
         let mut io = self.inner.io.lock().unwrap();
+
+        io.check_association(registry, true)?;
 
         io.token = Some(token);
         io.read_interest = interest.is_readable();
@@ -385,8 +396,17 @@ impl Source for NamedPipe {
         Ok(())
     }
 
-    fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         let mut io = self.inner.io.lock().unwrap();
+
+        io.check_association(registry, true)?;
+
+        if io.token.is_none() {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "I/O source not registered with `Registry`",
+            ));
+        }
 
         io.token = None;
         Ok(())
@@ -616,6 +636,24 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 }
 
 impl Io {
+    fn check_association(&self, registry: &Registry, required: bool) -> io::Result<()> {
+        match self.cp {
+            Some(ref cp) if !poll::selector(registry).same_port(cp) => {
+                Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "I/O source already registered with a different `Registry`"
+                ))
+            }
+            None if required => {
+                Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "I/O source not registered with `Registry`"
+                ))
+            }
+            _ => Ok(()),
+        }
+    }
+
     fn notify_readable(&self, events: Option<&mut Vec<Event>>) {
         if let Some(token) = self.token {
             let mut ev = Event::new(token);

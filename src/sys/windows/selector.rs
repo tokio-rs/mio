@@ -368,6 +368,10 @@ impl Selector {
     pub(super) fn clone_port(&self) -> Arc<CompletionPort> {
         self.inner.cp.clone()
     }
+
+    pub(super) fn same_port(&self, other: &Arc<CompletionPort>) -> bool {
+        Arc::ptr_eq(&self.inner.cp, other)
+    }
 }
 
 cfg_net! {

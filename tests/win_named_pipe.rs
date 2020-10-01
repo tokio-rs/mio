@@ -265,3 +265,46 @@ fn connect_twice() {
         }
     }
 }
+
+#[test]
+fn reregister_deregister_before_register() {
+    let (mut pipe, _) = server();
+    let poll = t!(Poll::new());
+
+    assert_eq!(
+        poll.registry().reregister(
+            &mut pipe,
+            Token(0),
+            Interest::READABLE,
+        ).unwrap_err().kind(),
+        io::ErrorKind::NotFound,
+    );
+
+    assert_eq!(
+        poll.registry().deregister(&mut pipe).unwrap_err().kind(),
+        io::ErrorKind::NotFound,
+    );
+}
+
+fn reregister_deregister_different_poll() {
+    let (mut pipe, _) = server();
+    let poll1 = t!(Poll::new());
+    let poll2 = t!(Poll::new());
+
+    // Register with 1
+    t!(poll1.registry().register(&mut pipe, Token(0), Interest::READABLE));
+
+    assert_eq!(
+        poll2.registry().reregister(
+            &mut pipe,
+            Token(0),
+            Interest::READABLE,
+        ).unwrap_err().kind(),
+        io::ErrorKind::AlreadyExists,
+    );
+
+    assert_eq!(
+        poll2.registry().deregister(&mut pipe).unwrap_err().kind(),
+        io::ErrorKind::NotFound,
+    );
+}
