@@ -26,6 +26,7 @@ impl Event {
         self.flags |= READABLE_FLAGS
     }
 
+    #[cfg(feature = "os-util")]
     pub(super) fn set_writable(&mut self) {
         self.flags |= WRITABLE_FLAGS
     }

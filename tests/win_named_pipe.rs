@@ -6,8 +6,8 @@ use std::os::windows::fs::*;
 use std::os::windows::io::*;
 use std::time::Duration;
 
-use mio::{Events, Poll, Interest, Token};
 use mio::windows::NamedPipe;
+use mio::{Events, Interest, Poll, Token};
 use rand::Rng;
 use winapi::um::winbase::*;
 
@@ -54,7 +54,9 @@ fn writable_after_register() {
         Token(0),
         Interest::WRITABLE | Interest::READABLE,
     ));
-    t!(poll.registry().register(&mut client, Token(1), Interest::WRITABLE));
+    t!(poll
+        .registry()
+        .register(&mut client, Token(1), Interest::WRITABLE));
 
     let mut events = Events::with_capacity(128);
     t!(poll.poll(&mut events, None));
@@ -216,11 +218,9 @@ fn connect_twice() {
         Token(0),
         Interest::READABLE | Interest::WRITABLE,
     ));
-    t!(poll.registry().register(
-        &mut c1,
-        Token(1),
-        Interest::READABLE | Interest::WRITABLE,
-    ));
+    t!(poll
+        .registry()
+        .register(&mut c1, Token(1), Interest::READABLE | Interest::WRITABLE,));
     drop(c1);
 
     let mut events = Events::with_capacity(128);
@@ -248,11 +248,9 @@ fn connect_twice() {
     );
 
     let mut c2 = client(&name);
-    t!(poll.registry().register(
-        &mut c2,
-        Token(2),
-        Interest::READABLE | Interest::WRITABLE,
-    ));
+    t!(poll
+        .registry()
+        .register(&mut c2, Token(2), Interest::READABLE | Interest::WRITABLE,));
 
     loop {
         t!(poll.poll(&mut events, None));
