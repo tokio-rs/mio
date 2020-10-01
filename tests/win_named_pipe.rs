@@ -196,12 +196,14 @@ fn write_then_drop() {
 
     let mut events = Events::with_capacity(128);
 
+    'outer:
     loop {
         t!(poll.poll(&mut events, None));
         let events = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
-            if event.is_readable() {
-                break;
+
+        for event in &events {
+            if event.is_readable() && event.token() == Token(0) {
+                break 'outer;
             }
         }
     }
@@ -255,12 +257,14 @@ fn connect_twice() {
         .registry()
         .register(&mut c2, Token(2), Interest::READABLE | Interest::WRITABLE,));
 
+    'outer:
     loop {
         t!(poll.poll(&mut events, None));
         let events = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
-            if event.is_writable() {
-                break;
+        
+        for event in &events {
+            if event.is_writable() && event.token() == Token(0) {
+                break 'outer;
             }
         }
     }
@@ -285,6 +289,7 @@ fn reregister_deregister_before_register() {
     );
 }
 
+#[test]
 fn reregister_deregister_different_poll() {
     let (mut pipe, _) = server();
     let poll1 = t!(Poll::new());
@@ -306,6 +311,6 @@ fn reregister_deregister_different_poll() {
 
     assert_eq!(
         poll2.registry().deregister(&mut pipe).unwrap_err().kind(),
-        io::ErrorKind::NotFound,
+        io::ErrorKind::AlreadyExists,
     );
 }
