@@ -1,61 +1,13 @@
-//! Windows named pipes bindings for mio.
-//!
-//! This crate implements bindings for named pipes for the mio crate. This
-//! crate compiles on all platforms but only contains anything on Windows.
-//! Currently this crate requires mio 0.6.2.
-//!
-//! On Windows, mio is implemented with an IOCP object at the heart of its
-//! `Poll` implementation. For named pipes, this means that all I/O is done in
-//! an overlapped fashion and the named pipes themselves are registered with
-//! mio's internal IOCP object. Essentially, this crate is using IOCP for
-//! bindings with named pipes.
-//!
-//! Note, though, that IOCP is a *completion* based model whereas mio expects a
-//! *readiness* based model. As a result this crate, like with TCP objects in
-//! mio, has internal buffering to translate the completion model to a readiness
-//! model. This means that this crate is not a zero-cost binding over named
-//! pipes on Windows, but rather approximates the performance of mio's TCP
-//! implementation on Windows.
-//!
-//! # Trait implementations
-//!
-//! The `Read` and `Write` traits are implemented for `NamedPipe` and for
-//! `&NamedPipe`. This represents that a named pipe can be concurrently read and
-//! written to and also can be read and written to at all. Typically a named
-//! pipe needs to be connected to a client before it can be read or written,
-//! however.
-//!
-//! Note that for I/O operations on a named pipe to succeed then the named pipe
-//! needs to be associated with an event loop. Until this happens all I/O
-//! operations will return a "would block" error.
-//!
-//! # Managing connections
-//!
-//! The `NamedPipe` type supports a `connect` method to connect to a client and
-//! a `disconnect` method to disconnect from that client. These two methods only
-//! work once a named pipe is associated with an event loop.
-//!
-//! The `connect` method will succeed asynchronously and a completion can be
-//! detected once the object receives a writable notification.
-//!
-//! # Named pipe clients
-//!
-//! Currently to create a client of a named pipe server then you can use the
-//! `OpenOptions` type in the standard library to create a `File` that connects
-//! to a named pipe. Afterwards you can use the `into_raw_handle` method coupled
-//! with the `NamedPipe::from_raw_handle` method to convert that to a named pipe
-//! that can operate asynchronously. Don't forget to pass the
-//! `FILE_FLAG_OVERLAPPED` flag when opening the `File`.
-
 use crate::{poll, Registry};
 use crate::event::Source;
 use crate::sys::windows::{Event, Overlapped};
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 
 use std::ffi::OsStr;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::mem;
-use std::os::windows::io::*;
+use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle, RawHandle};
 use std::slice;
 use std::sync::atomic::{AtomicUsize, AtomicBool};
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
@@ -64,10 +16,13 @@ use std::sync::{Arc, Mutex};
 use crate::{Interest, Token};
 use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::pipe;
-use winapi::shared::winerror::*;
-use winapi::um::ioapiset::*;
-use winapi::um::minwinbase::*;
+use winapi::shared::winerror::{ERROR_BROKEN_PIPE, ERROR_PIPE_LISTENING};
+use winapi::um::ioapiset::CancelIoEx;
 
+/// # Safety
+///
+/// Only valid if the strict is annotated with `#[repr(C)]`. This is only used
+/// with `Overlapped`, which is correctly annotated.
 macro_rules! offset_of {
     ($t:ty, $($field:ident).+) => (
         &(*(0 as *const $t)).$($field).+ as *const _ as usize
@@ -82,12 +37,48 @@ macro_rules! overlapped2arc {
     })
 }
 
-/// Representation of a named pipe on Windows.
+/// Non-blocking windows named pipe.
 ///
 /// This structure internally contains a `HANDLE` which represents the named
 /// pipe, and also maintains state associated with the mio event loop and active
 /// I/O operations that have been scheduled to translate IOCP to a readiness
 /// model.
+///
+/// Note, IOCP is a *completion* based model whereas mio is a *readiness* based
+/// model. To bridge this, `NamedPipe` performs internal buffering. Writes are
+/// written to an internal buffer and the buffer is submitted to IOCP. IOCP
+/// reads are submitted using internal buffers and `NamedPipe::read` reads from
+/// this internal buffer.
+///
+/// # Trait implementations
+///
+/// The `Read` and `Write` traits are implemented for `NamedPipe` and for
+/// `&NamedPipe`. This represents that a named pipe can be concurrently read and
+/// written to and also can be read and written to at all. Typically a named
+/// pipe needs to be connected to a client before it can be read or written,
+/// however.
+///
+/// Note that for I/O operations on a named pipe to succeed then the named pipe
+/// needs to be associated with an event loop. Until this happens all I/O
+/// operations will return a "would block" error.
+///
+/// # Managing connections
+///
+/// The `NamedPipe` type supports a `connect` method to connect to a client and
+/// a `disconnect` method to disconnect from that client. These two methods only
+/// work once a named pipe is associated with an event loop.
+///
+/// The `connect` method will succeed asynchronously and a completion can be
+/// detected once the object receives a writable notification.
+///
+/// # Named pipe clients
+///
+/// Currently to create a client of a named pipe server then you can use the
+/// `OpenOptions` type in the standard library to create a `File` that connects
+/// to a named pipe. Afterwards you can use the `into_raw_handle` method coupled
+/// with the `NamedPipe::from_raw_handle` method to convert that to a named pipe
+/// that can operate asynchronously. Don't forget to pass the
+/// `FILE_FLAG_OVERLAPPED` flag when opening the `File`.
 pub struct NamedPipe {
     inner: Arc<Inner>,
 }
@@ -147,35 +138,9 @@ impl NamedPipe {
         addr: A,
     ) -> io::Result<NamedPipe> {
         let pipe = pipe::NamedPipe::new(addr)?;
-       Ok(NamedPipe::from_raw_handle(pipe.into_raw_handle()))
-    }
-
-    /// TODO: Dox
-    pub fn from_raw_handle(
-        handle: RawHandle,
-    ) -> NamedPipe {
-        NamedPipe {
-            inner: Arc::new(Inner {
-                // Safety: not really unsafe
-                handle: unsafe { pipe::NamedPipe::from_raw_handle(handle) },
-                // transmutes to straddle winapi versions (mio 0.6 is on an
-                // older winapi)
-                connect: Overlapped::new(connect_done),
-                connecting: AtomicBool::new(false),
-                read: Overlapped::new(read_done),
-                write: Overlapped::new(write_done),
-                io: Mutex::new(Io {
-                    cp: None,
-                    token: None,
-                    read: State::None,
-                    read_interest: false,
-                    write: State::None,
-                    write_interest: false,
-                    connect_error: None,
-                }),
-                pool: Mutex::new(BufferPool::with_capacity(2)),
-            }),
-        }
+        // Safety: nothing actually unsafe about this. The trait fn includes
+        // `unsafe`.
+        Ok(unsafe { NamedPipe::from_raw_handle(pipe.into_raw_handle()) })
     }
 
     /// Attempts to call `ConnectNamedPipe`, if possible.
@@ -269,6 +234,35 @@ impl NamedPipe {
     }
 }
 
+impl FromRawHandle for NamedPipe {
+    unsafe fn from_raw_handle(
+        handle: RawHandle,
+    ) -> NamedPipe {
+        NamedPipe {
+            inner: Arc::new(Inner {
+                // Safety: not really unsafe
+                handle: pipe::NamedPipe::from_raw_handle(handle),
+                // transmutes to straddle winapi versions (mio 0.6 is on an
+                // older winapi)
+                connect: Overlapped::new(connect_done),
+                connecting: AtomicBool::new(false),
+                read: Overlapped::new(read_done),
+                write: Overlapped::new(write_done),
+                io: Mutex::new(Io {
+                    cp: None,
+                    token: None,
+                    read: State::None,
+                    read_interest: false,
+                    write: State::None,
+                    write_interest: false,
+                    connect_error: None,
+                }),
+                pool: Mutex::new(BufferPool::with_capacity(2)),
+            }),
+        }
+    }
+}
+
 impl Read for NamedPipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         <&NamedPipe as Read>::read(&mut &*self, buf)
@@ -286,13 +280,10 @@ impl Write for NamedPipe {
 }
 
 impl<'a> Read for &'a NamedPipe {
-    /// TODO: dox
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        println!("~~~");
         let mut state = self.inner.io.lock().unwrap();
 
         if state.token.is_none() {
-            println!("one");
             return Err(would_block());
         }
 
@@ -300,14 +291,12 @@ impl<'a> Read for &'a NamedPipe {
             // In theory not possible with `token` checked above,
             // but return would block for now.
             State::None => {
-                println!("two");
                 Err(would_block())
             }
 
             // A read is in flight, still waiting for it to finish
             State::Pending(buf, amt) => {
                 state.read = State::Pending(buf, amt);
-                println!("three");
                 Err(would_block())
             }
 
@@ -336,7 +325,6 @@ impl<'a> Read for &'a NamedPipe {
                 if e.raw_os_error() == Some(ERROR_BROKEN_PIPE as i32) {
                     Ok(0)
                 } else {
-                    println!("four");
                     Err(e)
                 }
             }
@@ -540,7 +528,6 @@ unsafe fn cancel<T: AsRawHandle>(handle: &T, overlapped: &Overlapped) -> io::Res
 }
 
 fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
-    println!(" + connect_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that
@@ -567,7 +554,6 @@ fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 }
 
 fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
-    println!(" + read_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `FromRawArc<Inner>`. Note that we should be guaranteed that
@@ -600,7 +586,6 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 }
 
 fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
-    println!(" + write_done");
     let status = CompletionStatus::from_entry(status);
 
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that
@@ -665,7 +650,6 @@ impl Io {
     }
 }
 
-// Based on https://github.com/tokio-rs/mio/blob/13d5fc9/src/sys/windows/buffer_pool.rs
 struct BufferPool {
     pool: Vec<Vec<u8>>,
 }

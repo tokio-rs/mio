@@ -2,16 +2,14 @@
 
 use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
-use std::os::windows::fs::*;
-use std::os::windows::io::*;
+use std::os::windows::fs::OpenOptionsExt;
+use std::os::windows::io::{FromRawHandle, IntoRawHandle};
 use std::time::Duration;
 
 use mio::windows::NamedPipe;
 use mio::{Events, Interest, Poll, Token};
 use rand::Rng;
-use winapi::um::winbase::*;
-
-use futures_test::task::new_count_waker;
+use winapi::um::winbase::FILE_FLAG_OVERLAPPED;
 
 macro_rules! t {
     ($e:expr) => {
@@ -35,15 +33,13 @@ fn client(name: &str) -> NamedPipe {
         .write(true)
         .custom_flags(FILE_FLAG_OVERLAPPED);
     let file = t!(opts.open(name));
-    NamedPipe::from_raw_handle(file.into_raw_handle())
+    unsafe { NamedPipe::from_raw_handle(file.into_raw_handle()) }
 }
 
 fn pipe() -> (NamedPipe, NamedPipe) {
     let (pipe, name) = server();
     (pipe, client(&name))
 }
-
-static data: &[u8] = &[100; 4096];
 
 #[test]
 fn writable_after_register() {
