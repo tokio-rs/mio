@@ -89,6 +89,16 @@ pub mod unix {
     pub use crate::sys::SourceFd;
 }
 
+#[cfg(all(windows, feature = "os-util"))]
+#[cfg_attr(docsrs, doc(cfg(all(windows, feature = "os-util"))))]
+pub mod windows {
+    //! Windows only extensions.
+
+    cfg_os_poll! {
+        pub use crate::sys::named_pipe::NamedPipe;
+    }
+}
+
 // Enable with `cargo doc --features extra-docs`.
 #[cfg(feature = "extra-docs")]
 pub mod features {

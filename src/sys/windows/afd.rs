@@ -7,9 +7,7 @@ use std::io;
 use std::mem::size_of;
 use std::os::windows::io::AsRawHandle;
 use std::ptr::null_mut;
-use winapi::shared::ntdef::{
-    HANDLE, LARGE_INTEGER, NTSTATUS, PVOID, ULONG,
-};
+use winapi::shared::ntdef::{HANDLE, LARGE_INTEGER, NTSTATUS, PVOID, ULONG};
 use winapi::shared::ntstatus::{STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS};
 
 const IOCTL_AFD_POLL: ULONG = 0x00012024;
@@ -196,7 +194,11 @@ cfg_net! {
                     ));
                 }
                 let fd = File::from_raw_handle(afd_helper_handle as RawHandle);
-                let token = NEXT_TOKEN.fetch_add(1, Ordering::Relaxed) + 1;
+                // Increment by 2 to reserve space for other types of handles.
+                // Non-AFD types (currently only NamedPipe), use odd numbered
+                // tokens. This allows the selector to differentate between them
+                // and dispatch events accordingly.
+                let token = NEXT_TOKEN.fetch_add(2, Ordering::Relaxed) + 2;
                 let afd = Afd { fd };
                 cp.add_handle(token, &afd.fd)?;
                 match SetFileCompletionNotificationModes(

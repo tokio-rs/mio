@@ -14,6 +14,35 @@ pub fn token(event: &Event) -> Token {
     Token(event.data as usize)
 }
 
+impl Event {
+    pub(super) fn new(token: Token) -> Event {
+        Event {
+            flags: 0,
+            data: usize::from(token) as u64,
+        }
+    }
+
+    pub(super) fn set_readable(&mut self) {
+        self.flags |= afd::POLL_RECEIVE
+    }
+
+    #[cfg(feature = "os-util")]
+    pub(super) fn set_writable(&mut self) {
+        self.flags |= afd::POLL_SEND;
+    }
+
+    pub(super) fn from_completion_status(status: &CompletionStatus) -> Event {
+        Event {
+            flags: status.bytes_transferred(),
+            data: status.token() as u64,
+        }
+    }
+
+    pub(super) fn to_completion_status(&self) -> CompletionStatus {
+        CompletionStatus::new(self.flags, self.data as usize, std::ptr::null_mut())
+    }
+}
+
 pub(crate) const READABLE_FLAGS: u32 = afd::POLL_RECEIVE
     | afd::POLL_DISCONNECT
     | afd::POLL_ACCEPT

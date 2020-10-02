@@ -49,6 +49,7 @@ ntapi  = "0.3"
 [dev-dependencies]
 env_logger = { version = "0.6.2", default-features = false }
 net2       = "0.2.33"
+rand = "0.4"
 
 [package.metadata.docs.rs]
 all-features = true
