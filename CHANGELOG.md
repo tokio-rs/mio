@@ -1,3 +1,10 @@
+# 0.7.2
+
+## Added
+
+* Windows named pipe support.
+  (https://github.com/tokio-rs/mio/commit/52e8c2220e87696d20f13561402bcaabba4136ed)
+
 # 0.7.1
 
 ## Reduced support for 32-bit Apple targets
