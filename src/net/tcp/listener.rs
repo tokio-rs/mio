@@ -5,7 +5,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::{fmt, io};
 
-use super::TcpStream;
+use super::{TcpSocket, TcpStream};
 use crate::io_source::IoSource;
 use crate::{event, sys, Interest, Registry, Token};
 
@@ -49,7 +49,20 @@ impl TcpListener {
     /// 3. Bind the socket to the specified address.
     /// 4. Calls `listen` on the socket to prepare it to receive new connections.
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
-        sys::tcp::bind(addr).map(TcpListener::from_std)
+        let socket = TcpSocket::new_for_addr(addr)?;
+
+        // On platforms with Berkeley-derived sockets, this allows to quickly
+        // rebind a socket, without needing to wait for the OS to clean up the
+        // previous one.
+        //
+        // On Windows, this allows rebinding sockets which are actively in use,
+        // which allows “socket hijacking”, so we explicitly don't set it here.
+        // https://docs.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse
+        #[cfg(not(windows))]
+        socket.set_reuseaddr(true)?;
+
+        socket.bind(addr)?;
+        socket.listen(1024)
     }
 
     /// Creates a new `TcpListener` from a standard `net::TcpListener`.
