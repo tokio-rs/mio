@@ -1,8 +1,6 @@
 use std::io;
 use std::mem::size_of_val;
 use std::net::SocketAddr;
-#[cfg(all(feature = "os-poll", feature = "tcp"))]
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::sync::Once;
 
 use winapi::ctypes::c_int;
@@ -23,12 +21,16 @@ pub(crate) fn init() {
 }
 
 /// Create a new non-blocking socket.
-pub(crate) fn new_socket(addr: SocketAddr, socket_type: c_int) -> io::Result<SOCKET> {
+pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: c_int) -> io::Result<SOCKET> {
     let domain = match addr {
         SocketAddr::V4(..) => PF_INET,
         SocketAddr::V6(..) => PF_INET6,
     };
 
+    new_socket(domain, socket_type)
+}
+
+pub(crate) fn new_socket(domain: c_int, socket_type: c_int) -> io::Result<SOCKET> {
     syscall!(
         socket(domain, socket_type, 0),
         PartialEq::eq,
@@ -49,21 +51,5 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (*const SOCKADDR, c_int) {
             addr as *const _ as *const SOCKADDR,
             size_of_val(addr) as c_int,
         ),
-    }
-}
-
-#[cfg(all(feature = "os-poll", feature = "tcp"))]
-pub(crate) fn inaddr_any(other: SocketAddr) -> SocketAddr {
-    match other {
-        SocketAddr::V4(..) => {
-            let any = Ipv4Addr::new(0, 0, 0, 0);
-            let addr = SocketAddrV4::new(any, 0);
-            SocketAddr::V4(addr)
-        }
-        SocketAddr::V6(..) => {
-            let any = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0);
-            let addr = SocketAddrV6::new(any, 0, 0, 0);
-            SocketAddr::V6(addr)
-        }
     }
 }
