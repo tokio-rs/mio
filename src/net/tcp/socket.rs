@@ -7,21 +7,31 @@ use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd, FromRawFd};
 
-/// TODO: dox
+/// A non-blocking TCP socket used to configure a stream or listener.
+///
+/// The `TcpSocket` type wraps the operating-system's socket handle. This type
+/// is used to configure the socket before establishing a connection or start
+/// listening for inbound connections.
+///
+/// The socket will be closed when the value is dropped.
 #[derive(Debug)]
 pub struct TcpSocket {
     sys: sys::tcp::TcpSocket,
 }
 
 impl TcpSocket {
-    /// TODO: dox
+    /// Create a new IPv4 TCP socket.
+    ///
+    /// This calls `socket(2)`.
     pub fn new_v4() -> io::Result<TcpSocket> {
         sys::tcp::new_v4_socket().map(|sys| TcpSocket {
             sys
         })
     }
 
-    /// TODO: dox
+    /// Create a new IPv6 TCP socket.
+    ///
+    /// This calls `socket(2)`.
     pub fn new_v6() -> io::Result<TcpSocket> {
         sys::tcp::new_v6_socket().map(|sys| TcpSocket {
             sys
@@ -36,12 +46,16 @@ impl TcpSocket {
         }
     }
 
-    /// TODO: dox
+    /// Bind `addr` to the TCP socket.
     pub fn bind(&self, addr: SocketAddr) -> io::Result<()> {
         sys::tcp::bind(self.sys, addr)
     }
 
-    /// TODO: dox
+    /// Connect the socket to `addr`.
+    ///
+    /// This consumes the socket and performs the connect operation. Once the
+    /// connection completes, the socket is now a non-blocking `TcpStream` and
+    /// can be used as such.
     pub fn connect(self, addr: SocketAddr) -> io::Result<TcpStream> {
         let stream = sys::tcp::connect(self.sys, addr)?;
 
@@ -50,7 +64,8 @@ impl TcpSocket {
         Ok(TcpStream::from_std(stream))
     }
 
-    /// TODO: dox
+    /// Listen for inbound connections, converting the socket to a
+    /// `TcpListener`.
     pub fn listen(self, backlog: u32) -> io::Result<TcpListener> {
         let listener = sys::tcp::listen(self.sys, backlog)?;
 
