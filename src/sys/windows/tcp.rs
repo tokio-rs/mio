@@ -15,10 +15,12 @@ use crate::sys::windows::net::{init, new_socket, socket_addr};
 pub(crate) type TcpSocket = SOCKET;
 
 pub(crate) fn new_v4_socket() -> io::Result<TcpSocket> {
+    init();
     new_socket(PF_INET, SOCK_STREAM)
 }
 
 pub(crate) fn new_v6_socket() -> io::Result<TcpSocket> {
+    init();
     new_socket(PF_INET6, SOCK_STREAM)
 }
 
