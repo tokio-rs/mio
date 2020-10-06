@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 use std::io;
 use std::net::{self, SocketAddr};
 use std::os::windows::io::FromRawSocket;
@@ -68,6 +66,27 @@ pub(crate) fn listen(socket: TcpSocket, backlog: u32) -> io::Result<net::TcpList
 
 pub(crate) fn close(socket: TcpSocket) {
     let _ = unsafe { closesocket(socket) };
+}
+
+pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()> {
+    use winapi::ctypes::{c_char, c_int};
+    use winapi::shared::minwindef::BOOL;
+    use winapi::um::winsock2::{setsockopt, SOCKET_ERROR, SO_REUSEADDR, SOL_SOCKET};
+    use std::mem::size_of;
+
+    let val: BOOL = if reuseaddr { 1 } else { 0 };
+
+    match unsafe { setsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_REUSEADDR,
+        &val as *const _ as *const c_char,
+        size_of::<BOOL>() as c_int,
+    ) } {
+        0 => Ok(()),
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => panic!("unexpected return value"),
+    }
 }
 
 pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {

@@ -74,9 +74,8 @@ impl TcpSocket {
         Ok(TcpListener::from_std(listener))
     }
 
-    // Private for now, but this could be made public eventually
-    #[cfg(not(windows))]
-    pub(crate) fn set_reuseaddr(&self, reuseaddr: bool) -> io::Result<()> {
+    /// Sets the value of `SO_REUSEADDR` on this socket.
+    pub fn set_reuseaddr(&self, reuseaddr: bool) -> io::Result<()> {
         sys::tcp::set_reuseaddr(self.sys, reuseaddr)
     }
 }
