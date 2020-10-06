@@ -70,11 +70,11 @@ pub(crate) fn close(socket: TcpSocket) {
 
 pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()> {
     use winapi::ctypes::{c_char, c_int};
-    use winapi::shared::minwindef::BOOL;
+    use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
     use winapi::um::winsock2::{setsockopt, SOCKET_ERROR, SO_REUSEADDR, SOL_SOCKET};
     use std::mem::size_of;
 
-    let val: BOOL = if reuseaddr { 1 } else { 0 };
+    let val: BOOL = if reuseaddr { TRUE } else { FALSE };
 
     match unsafe { setsockopt(
         socket,
