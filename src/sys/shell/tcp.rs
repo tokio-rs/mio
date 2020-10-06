@@ -27,7 +27,6 @@ pub(crate) fn close(_: TcpSocket) {
     os_required!();
 }
 
-#[cfg(not(windows))]
 pub(crate) fn set_reuseaddr(_: TcpSocket, _: bool) -> io::Result<()> {
     os_required!();
 }
