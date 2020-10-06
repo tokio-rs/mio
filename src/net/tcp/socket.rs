@@ -97,7 +97,7 @@ impl AsRawFd for TcpSocket {
 
 #[cfg(unix)]
 impl FromRawFd for TcpSocket {
-    /// Converts a `RawFd` to a `TcpStream`.
+    /// Converts a `RawFd` to a `TcpSocket`.
     ///
     /// # Notes
     ///
@@ -133,7 +133,7 @@ impl AsRawSocket for TcpSocket {
 
 #[cfg(windows)]
 impl FromRawSocket for TcpSocket {
-    /// Converts a `RawSocket` to a `TcpStream`.
+    /// Converts a `RawSocket` to a `TcpSocket`.
     ///
     /// # Notes
     ///
