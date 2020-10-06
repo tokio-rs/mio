@@ -13,8 +13,11 @@ fn is_send_and_sync() {
 
 #[test]
 fn set_reuseaddr() {
+    let addr = "127.0.0.1:0".parse().unwrap();
+
     let socket = TcpSocket::new_v4().unwrap();
     socket.set_reuseaddr(true).unwrap();
+    socket.bind(addr).unwrap();
 
     let _ = socket.listen(128).unwrap();
 }
