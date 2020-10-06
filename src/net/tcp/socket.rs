@@ -6,6 +6,8 @@ use std::mem;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd, FromRawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 /// A non-blocking TCP socket used to configure a stream or listener.
 ///
@@ -103,5 +105,41 @@ impl FromRawFd for TcpSocket {
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
         TcpSocket { sys: fd }
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for TcpSocket {
+    fn into_raw_socket(self) -> RawSocket {
+        // The winapi crate defines `SOCKET` as `usize`. The Rust std
+        // conditionally defines `RawSocket` as a fixed size unsigned integer
+        // matching the pointer width. These end up bein gthe same type but we
+        // must cast between them.
+        let ret = self.sys as RawSocket;
+
+        // Avoid closing the socket
+        mem::forget(self);
+
+        ret
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for TcpSocket {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.sys as RawSocket
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for TcpSocket {
+    /// Converts a `RawSocket` to a `TcpStream`.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
+    unsafe fn from_raw_socket(socket: RawSocket) -> TcpSocket {
+        TcpSocket { sys: socket as sys::tcp::TcpSocket }
     }
 }
