@@ -3,52 +3,59 @@ use std::mem::{size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
-use crate::sys::unix::net::{new_ip_socket, socket_addr, to_socket_addr};
+use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
 
-pub fn connect(addr: SocketAddr) -> io::Result<net::TcpStream> {
-    new_ip_socket(addr, libc::SOCK_STREAM)
-        .and_then(|socket| {
-            let (raw_addr, raw_addr_length) = socket_addr(&addr);
-            syscall!(connect(socket, raw_addr, raw_addr_length))
-                .or_else(|err| match err {
-                    // Connect hasn't finished, but that is fine.
-                    ref err if err.raw_os_error() == Some(libc::EINPROGRESS) => Ok(0),
-                    err => Err(err),
-                })
-                .map(|_| socket)
-                .map_err(|err| {
-                    // Close the socket if we hit an error, ignoring the error
-                    // from closing since we can't pass back two errors.
-                    let _ = unsafe { libc::close(socket) };
-                    err
-                })
-        })
-        .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
+pub type TcpSocket = libc::c_int;
+
+pub(crate) fn new_v4_socket() -> io::Result<TcpSocket> {
+    new_socket(libc::AF_INET, libc::SOCK_STREAM)
 }
 
-pub fn bind(addr: SocketAddr) -> io::Result<net::TcpListener> {
-    new_ip_socket(addr, libc::SOCK_STREAM).and_then(|socket| {
-        // Set SO_REUSEADDR (mirrors what libstd does).
-        syscall!(setsockopt(
-            socket,
-            libc::SOL_SOCKET,
-            libc::SO_REUSEADDR,
-            &1 as *const libc::c_int as *const libc::c_void,
-            size_of::<libc::c_int>() as libc::socklen_t,
-        ))
-        .and_then(|_| {
-            let (raw_addr, raw_addr_length) = socket_addr(&addr);
-            syscall!(bind(socket, raw_addr, raw_addr_length))
-        })
-        .and_then(|_| syscall!(listen(socket, 1024)))
-        .map_err(|err| {
-            // Close the socket if we hit an error, ignoring the error
-            // from closing since we can't pass back two errors.
-            let _ = unsafe { libc::close(socket) };
-            err
-        })
-        .map(|_| unsafe { net::TcpListener::from_raw_fd(socket) })
-    })
+pub(crate) fn new_v6_socket() -> io::Result<TcpSocket> {
+    new_socket(libc::AF_INET6, libc::SOCK_STREAM)
+}
+
+pub(crate) fn bind(socket: TcpSocket, addr: SocketAddr) -> io::Result<()> {
+    let (raw_addr, raw_addr_length) = socket_addr(&addr);
+    syscall!(bind(socket, raw_addr, raw_addr_length))?;
+    Ok(())
+}
+
+pub(crate) fn connect(socket: TcpSocket, addr: SocketAddr) -> io::Result<net::TcpStream> {
+    let (raw_addr, raw_addr_length) = socket_addr(&addr);
+
+    match syscall!(connect(socket, raw_addr, raw_addr_length)) {
+        Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => {
+            Err(err)
+        }
+        _ => {
+            Ok(unsafe { net::TcpStream::from_raw_fd(socket) })
+        }
+    }
+}
+
+pub(crate) fn listen(socket: TcpSocket, backlog: u32) -> io::Result<net::TcpListener> {
+    use std::convert::TryInto;
+
+    let backlog = backlog.try_into().unwrap_or(i32::max_value());
+    syscall!(listen(socket, backlog))?;
+    Ok(unsafe { net::TcpListener::from_raw_fd(socket) })
+}
+
+pub(crate) fn close(socket: TcpSocket) {
+    let _ = unsafe { net::TcpStream::from_raw_fd(socket) };
+}
+
+pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()> {
+    let val: libc::c_int = if reuseaddr { 1 } else { 0 };
+    syscall!(setsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_REUSEADDR,
+        &val as *const libc::c_int as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t,
+    ))?;
+    Ok(())
 }
 
 pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {

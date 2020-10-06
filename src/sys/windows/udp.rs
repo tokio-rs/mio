@@ -5,11 +5,11 @@ use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib use
 
 use winapi::um::winsock2::{bind as win_bind, closesocket, SOCKET_ERROR, SOCK_DGRAM};
 
-use crate::sys::windows::net::{init, new_socket, socket_addr};
+use crate::sys::windows::net::{init, new_ip_socket, socket_addr};
 
 pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
     init();
-    new_socket(addr, SOCK_DGRAM).and_then(|socket| {
+    new_ip_socket(addr, SOCK_DGRAM).and_then(|socket| {
         let (raw_addr, raw_addr_length) = socket_addr(&addr);
         syscall!(
             win_bind(socket, raw_addr, raw_addr_length,),

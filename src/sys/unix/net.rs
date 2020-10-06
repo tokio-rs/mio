@@ -1,7 +1,7 @@
 #[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
 use std::net::SocketAddr;
 
-#[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
+#[cfg(all(feature = "os-poll", any(feature = "udp")))]
 pub(crate) fn new_ip_socket(
     addr: SocketAddr,
     socket_type: libc::c_int,
