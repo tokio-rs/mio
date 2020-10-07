@@ -401,7 +401,6 @@ fn reregister_interest_token_usage() {
 // On kqueue platforms registering twice (not *re*registering) works, but that
 // is not a test goal, so it is not tested.
 #[test]
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 pub fn double_register_different_token() {
     init();
     let poll = Poll::new().unwrap();
@@ -412,10 +411,11 @@ pub fn double_register_different_token() {
         .register(&mut listener, Token(0), Interest::READABLE)
         .unwrap();
 
-    assert!(poll
-        .registry()
-        .register(&mut listener, Token(1), Interest::READABLE)
-        .is_err());
+    assert_error(
+        poll.registry()
+            .register(&mut listener, Token(1), Interest::READABLE),
+        "already registered",
+    );
 }
 
 #[test]
@@ -492,18 +492,15 @@ fn poll_ok_after_cancelling_pending_ops() {
 // On kqueue platforms reregistering w/o registering works but that's not a
 // test goal, so it is not tested.
 #[test]
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 fn reregister_without_register() {
     let poll = Poll::new().expect("unable to create Poll instance");
 
     let mut listener = TcpListener::bind(any_local_address()).unwrap();
 
-    assert_eq!(
+    assert_error(
         poll.registry()
-            .reregister(&mut listener, ID1, Interest::READABLE)
-            .unwrap_err()
-            .kind(),
-        io::ErrorKind::NotFound
+            .reregister(&mut listener, ID1, Interest::READABLE),
+        "not registered",
     );
 }
 
@@ -518,19 +515,12 @@ fn reregister_without_register() {
 // On kqueue platforms deregistering w/o registering works but that's not a
 // test goal, so it is not tested.
 #[test]
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 fn deregister_without_register() {
     let poll = Poll::new().expect("unable to create Poll instance");
 
     let mut listener = TcpListener::bind(any_local_address()).unwrap();
 
-    assert_eq!(
-        poll.registry()
-            .deregister(&mut listener)
-            .unwrap_err()
-            .kind(),
-        io::ErrorKind::NotFound
-    );
+    assert_error(poll.registry().deregister(&mut listener), "not registered");
 }
 
 struct TestEventSource {
