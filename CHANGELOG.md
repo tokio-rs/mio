@@ -1,3 +1,10 @@
+# 0.7.3
+
+## Added
+
+* `TcpSocket` for configuring a TCP socket before connecting or listening.
+  (https://github.com/tokio-rs/mio/commit/5b09e60d0f64419b989bda88c86a3147334a03b3)
+
 # 0.7.2
 
 ## Added
