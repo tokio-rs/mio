@@ -113,7 +113,7 @@ impl IntoRawSocket for TcpSocket {
     fn into_raw_socket(self) -> RawSocket {
         // The winapi crate defines `SOCKET` as `usize`. The Rust std
         // conditionally defines `RawSocket` as a fixed size unsigned integer
-        // matching the pointer width. These end up bein gthe same type but we
+        // matching the pointer width. These end up being the same type but we
         // must cast between them.
         let ret = self.sys as RawSocket;
 
