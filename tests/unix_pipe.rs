@@ -1,3 +1,5 @@
+#![cfg(feature = "pipe")]
+
 use std::io::{self, Read, Write};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Barrier};
