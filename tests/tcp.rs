@@ -1,8 +1,6 @@
 #![cfg(all(feature = "os-poll", feature = "tcp"))]
 
-#[cfg(unix)]
-use mio::net::TcpSocket;
-use mio::net::{TcpListener, TcpStream};
+use mio::net::{TcpListener, TcpSocket, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use std::io::{self, Read, Write};
 use std::net::{self, Shutdown};
@@ -457,7 +455,6 @@ fn multiple_writes_immediate_success() {
     handle.join().unwrap();
 }
 
-#[cfg(unix)]
 #[test]
 fn connection_reset_by_peer() {
     init();
