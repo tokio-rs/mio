@@ -1,6 +1,7 @@
 use std::io;
 use std::mem::{size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
+use std::time::Duration;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
 use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
@@ -54,6 +55,21 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
         libc::SO_REUSEADDR,
         &val as *const libc::c_int as *const libc::c_void,
         size_of::<libc::c_int>() as libc::socklen_t,
+    ))?;
+    Ok(())
+}
+
+pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
+    let val: libc::linger = libc::linger {
+        l_onoff: if dur.is_some() { 1 } else { 0 },
+        l_linger: dur.map(|dur| dur.as_secs() as libc::c_int).unwrap_or_default(),
+    };
+    syscall!(setsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_LINGER,
+        &val as *const libc::linger as *const libc::c_void,
+        size_of::<libc::linger>() as libc::socklen_t,
     ))?;
     Ok(())
 }

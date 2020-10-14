@@ -4,6 +4,7 @@ use crate::sys;
 use std::io;
 use std::mem;
 use std::net::SocketAddr;
+use std::time::Duration;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd, FromRawFd};
 #[cfg(windows)]
@@ -79,6 +80,11 @@ impl TcpSocket {
     /// Sets the value of `SO_REUSEADDR` on this socket.
     pub fn set_reuseaddr(&self, reuseaddr: bool) -> io::Result<()> {
         sys::tcp::set_reuseaddr(self.sys, reuseaddr)
+    }
+
+    /// Sets the value of `SO_LINGER` on this socket.
+    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+        sys::tcp::set_linger(self.sys, dur)
     }
 }
 

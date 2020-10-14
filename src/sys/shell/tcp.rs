@@ -1,5 +1,6 @@
 use std::io;
 use std::net::{self, SocketAddr};
+use std::time::Duration;
 
 pub(crate) type TcpSocket = i32;
 
@@ -28,6 +29,10 @@ pub(crate) fn close(_: TcpSocket) {
 }
 
 pub(crate) fn set_reuseaddr(_: TcpSocket, _: bool) -> io::Result<()> {
+    os_required!();
+}
+
+pub(crate) fn set_linger(_: TcpSocket, _: Option<Duration>) -> io::Result<()> {
     os_required!();
 }
 

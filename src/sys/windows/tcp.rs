@@ -1,5 +1,6 @@
 use std::io;
 use std::net::{self, SocketAddr};
+use std::time::Duration;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
@@ -82,6 +83,29 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
         SO_REUSEADDR,
         &val as *const _ as *const c_char,
         size_of::<BOOL>() as c_int,
+    ) } {
+        0 => Ok(()),
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => panic!("unexpected return value"),
+    }
+}
+
+pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
+    use winapi::ctypes::{c_char, c_int, c_ushort};
+    use winapi::um::winsock2::{linger, setsockopt, SOCKET_ERROR, SO_LINGER, SOL_SOCKET};
+    use std::mem::size_of;
+
+    let val: linger = linger {
+        l_onoff: if dur.is_some() { 1 } else { 0 },
+        l_linger: dur.map(|dur| dur.as_secs() as c_ushort).unwrap_or_default(),
+    };
+
+    match unsafe { setsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_LINGER,
+        &val as *const _ as *const c_char,
+        size_of::<linger>() as c_int,
     ) } {
         0 => Ok(()),
         SOCKET_ERROR => Err(io::Error::last_os_error()),
