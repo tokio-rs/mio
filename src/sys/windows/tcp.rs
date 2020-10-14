@@ -1,12 +1,15 @@
 use std::io;
+use std::mem::size_of;
 use std::net::{self, SocketAddr};
 use std::time::Duration;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
+use winapi::ctypes::{c_char, c_int, c_ushort};
+use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
 use winapi::um::winsock2::{
-    self,
-    closesocket, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR, SOCK_STREAM,
+    self, closesocket, linger, setsockopt, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
+    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR,
 };
 
 use crate::sys::windows::net::{init, new_socket, socket_addr};
@@ -70,11 +73,6 @@ pub(crate) fn close(socket: TcpSocket) {
 }
 
 pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()> {
-    use winapi::ctypes::{c_char, c_int};
-    use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
-    use winapi::um::winsock2::{setsockopt, SOCKET_ERROR, SO_REUSEADDR, SOL_SOCKET};
-    use std::mem::size_of;
-
     let val: BOOL = if reuseaddr { TRUE } else { FALSE };
 
     match unsafe { setsockopt(
@@ -91,10 +89,6 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
 }
 
 pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
-    use winapi::ctypes::{c_char, c_int, c_ushort};
-    use winapi::um::winsock2::{linger, setsockopt, SOCKET_ERROR, SO_LINGER, SOL_SOCKET};
-    use std::mem::size_of;
-
     let val: linger = linger {
         l_onoff: if dur.is_some() { 1 } else { 0 },
         l_linger: dur.map(|dur| dur.as_secs() as c_ushort).unwrap_or_default(),
