@@ -82,9 +82,8 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
         &val as *const _ as *const c_char,
         size_of::<BOOL>() as c_int,
     ) } {
-        0 => Ok(()),
         SOCKET_ERROR => Err(io::Error::last_os_error()),
-        _ => panic!("unexpected return value"),
+        _ => Ok(()),
     }
 }
 
@@ -101,9 +100,8 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
         &val as *const _ as *const c_char,
         size_of::<linger>() as c_int,
     ) } {
-        0 => Ok(()),
         SOCKET_ERROR => Err(io::Error::last_os_error()),
-        _ => panic!("unexpected return value"),
+        _ => Ok(()),
     }
 }
 
