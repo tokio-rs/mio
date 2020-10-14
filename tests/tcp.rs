@@ -1,13 +1,11 @@
 #![cfg(all(feature = "os-poll", feature = "tcp"))]
 
+#[cfg(unix)]
+use mio::net::TcpSocket;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
-#[cfg(unix)]
-use net2::TcpStreamExt;
 use std::io::{self, Read, Write};
 use std::net::{self, Shutdown};
-#[cfg(unix)]
-use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::sync::mpsc::channel;
 use std::thread::{self, sleep};
 use std::time::Duration;
@@ -473,14 +471,9 @@ fn connection_reset_by_peer() {
     let addr = listener.local_addr().unwrap();
 
     // Connect client
-    let client = net2::TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap();
-
+    let client = TcpSocket::new_v4().unwrap();
     client.set_linger(Some(Duration::from_millis(0))).unwrap();
-    client.connect(&addr).unwrap();
-
-    // Convert to Mio stream
-    // FIXME: how to convert the stream on Windows?
-    let mut client = unsafe { TcpStream::from_raw_fd(client.into_raw_fd()) };
+    let mut client = client.connect(addr).unwrap();
 
     // Register server
     poll.registry()
