@@ -55,8 +55,7 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
         libc::SO_REUSEADDR,
         &val as *const libc::c_int as *const libc::c_void,
         size_of::<libc::c_int>() as libc::socklen_t,
-    ))?;
-    Ok(())
+    )).map(|_| ())
 }
 
 pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
@@ -70,8 +69,7 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
         libc::SO_LINGER,
         &val as *const libc::linger as *const libc::c_void,
         size_of::<libc::linger>() as libc::socklen_t,
-    ))?;
-    Ok(())
+    )).map(|_| ())
 }
 
 pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
