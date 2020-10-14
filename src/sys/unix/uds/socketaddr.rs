@@ -74,6 +74,8 @@ cfg_os_poll! {
         /// Documentation reflected in [`SocketAddr`]
         ///
         /// [`SocketAddr`]: std::os::unix::net::SocketAddr
+        // FIXME: The matches macro requires rust 1.42.0 and we still support 1.39.0
+        #[allow(clippy::match_like_matches_macro)]
         pub fn is_unnamed(&self) -> bool {
             if let AddressKind::Unnamed = self.address() {
                 true
