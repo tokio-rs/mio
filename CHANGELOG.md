@@ -1,3 +1,15 @@
+# 0.7.4
+
+## Fixes
+
+* lost "socket closed" events on windows
+  (https://github.com/tokio-rs/mio/commit/50c299aca56c4a26e5ed20c283007239fbe6a7a7)
+
+## Added
+
+* `TcpSocket::set_linger()` configures SO_LINGER
+  (https://github.com/tokio-rs/mio/commit/3b4096565c1a879f651b8f8282ecdcbdbd5c92d3)
+
 # 0.7.3
 
 ## Added
