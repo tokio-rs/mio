@@ -759,10 +759,18 @@ fn hup() {
 
     let mut listener = TcpListener::bind(addr).unwrap();
     let addr = listener.local_addr().unwrap();
-    poll.registry().register(&mut listener, Token(0), Interest::READABLE).unwrap();
+    poll.registry()
+        .register(&mut listener, Token(0), Interest::READABLE)
+        .unwrap();
 
     let mut stream = TcpStream::connect(addr).unwrap();
-    poll.registry().register(&mut stream, Token(1), Interest::READABLE | Interest::WRITABLE).unwrap();
+    poll.registry()
+        .register(
+            &mut stream,
+            Token(1),
+            Interest::READABLE | Interest::WRITABLE,
+        )
+        .unwrap();
 
     expect_events(
         &mut poll,
@@ -780,9 +788,7 @@ fn hup() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![
-            ExpectEvent::new(Token(1), Interest::READABLE),
-        ],
+        vec![ExpectEvent::new(Token(1), Interest::READABLE)],
     );
 }
 
