@@ -1,11 +1,14 @@
 use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
-use crate::sys::event::{
-    ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
-};
 use crate::sys::Events;
-use crate::Interest;
+
+cfg_net! {
+    use crate::sys::event::{
+        ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
+    };
+    use crate::Interest;
+}
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 use std::collections::VecDeque;
@@ -722,16 +725,18 @@ impl Drop for SelectorInner {
     }
 }
 
-fn interests_to_afd_flags(interests: Interest) -> u32 {
-    let mut flags = 0;
+cfg_net! {
+    fn interests_to_afd_flags(interests: Interest) -> u32 {
+        let mut flags = 0;
 
-    if interests.is_readable() {
-        flags |= READABLE_FLAGS | READ_CLOSED_FLAGS | ERROR_FLAGS;
+        if interests.is_readable() {
+            flags |= READABLE_FLAGS | READ_CLOSED_FLAGS | ERROR_FLAGS;
+        }
+
+        if interests.is_writable() {
+            flags |= WRITABLE_FLAGS | WRITE_CLOSED_FLAGS | ERROR_FLAGS;
+        }
+
+        flags
     }
-
-    if interests.is_writable() {
-        flags |= WRITABLE_FLAGS | WRITE_CLOSED_FLAGS | ERROR_FLAGS;
-    }
-
-    flags
 }
