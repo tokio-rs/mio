@@ -226,15 +226,7 @@ impl SockState {
         // In mio, we have to simulate Edge-triggered behavior to match API usage.
         // The strategy here is to intercept all read/write from user that could cause WouldBlock usage,
         // then reregister the socket to reset the interests.
-
-        // Reset readable event
-        if (afd_events & interests_to_afd_flags(Interest::READABLE)) != 0 {
-            self.user_evts &= !(interests_to_afd_flags(Interest::READABLE));
-        }
-        // Reset writable event
-        if (afd_events & interests_to_afd_flags(Interest::WRITABLE)) != 0 {
-            self.user_evts &= !interests_to_afd_flags(Interest::WRITABLE);
-        }
+        self.user_evts &= !afd_events;
 
         Some(Event {
             data: self.user_data,
