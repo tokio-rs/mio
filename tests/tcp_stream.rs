@@ -804,7 +804,6 @@ fn set_linger_zero(socket: &TcpStream) {
 #[cfg(unix)]
 fn set_linger_zero(socket: &TcpStream) {
     use socket2::Socket;
-    use std::os::unix::io::{AsRawFd, FromRawFd};
 
     let s = unsafe { Socket::from_raw_fd(socket.as_raw_fd()) };
     s.set_linger(Some(Duration::from_millis(0))).unwrap();
