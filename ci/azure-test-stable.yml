@@ -36,6 +36,7 @@ jobs:
         displayName: cargo ${{ parameters.cmd }} --all-features
         env:
           CI: "True"
+          RUST_TEST_THREADS: "1"
 
       - ${{ if eq(parameters.cmd, 'test') }}:
           - script: cargo doc --no-deps

@@ -1,11 +1,14 @@
 use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
-use crate::sys::event::{
-    ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
-};
 use crate::sys::Events;
-use crate::Interest;
+
+cfg_net! {
+    use crate::sys::event::{
+        ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
+    };
+    use crate::Interest;
+}
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 use std::collections::VecDeque;
@@ -226,15 +229,7 @@ impl SockState {
         // In mio, we have to simulate Edge-triggered behavior to match API usage.
         // The strategy here is to intercept all read/write from user that could cause WouldBlock usage,
         // then reregister the socket to reset the interests.
-
-        // Reset readable event
-        if (afd_events & interests_to_afd_flags(Interest::READABLE)) != 0 {
-            self.user_evts &= !(interests_to_afd_flags(Interest::READABLE));
-        }
-        // Reset writable event
-        if (afd_events & interests_to_afd_flags(Interest::WRITABLE)) != 0 {
-            self.user_evts &= !interests_to_afd_flags(Interest::WRITABLE);
-        }
+        self.user_evts &= !afd_events;
 
         Some(Event {
             data: self.user_data,
@@ -730,16 +725,18 @@ impl Drop for SelectorInner {
     }
 }
 
-fn interests_to_afd_flags(interests: Interest) -> u32 {
-    let mut flags = 0;
+cfg_net! {
+    fn interests_to_afd_flags(interests: Interest) -> u32 {
+        let mut flags = 0;
 
-    if interests.is_readable() {
-        flags |= READABLE_FLAGS | READ_CLOSED_FLAGS | ERROR_FLAGS;
+        if interests.is_readable() {
+            flags |= READABLE_FLAGS | READ_CLOSED_FLAGS | ERROR_FLAGS;
+        }
+
+        if interests.is_writable() {
+            flags |= WRITABLE_FLAGS | WRITE_CLOSED_FLAGS | ERROR_FLAGS;
+        }
+
+        flags
     }
-
-    if interests.is_writable() {
-        flags |= WRITABLE_FLAGS | WRITE_CLOSED_FLAGS | ERROR_FLAGS;
-    }
-
-    flags
 }
