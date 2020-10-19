@@ -759,10 +759,18 @@ fn hup() {
 
     let mut listener = TcpListener::bind(addr).unwrap();
     let addr = listener.local_addr().unwrap();
-    poll.registry().register(&mut listener, Token(0), Interest::READABLE).unwrap();
+    poll.registry()
+        .register(&mut listener, Token(0), Interest::READABLE)
+        .unwrap();
 
     let mut stream = TcpStream::connect(addr).unwrap();
-    poll.registry().register(&mut stream, Token(1), Interest::READABLE | Interest::WRITABLE).unwrap();
+    poll.registry()
+        .register(
+            &mut stream,
+            Token(1),
+            Interest::READABLE | Interest::WRITABLE,
+        )
+        .unwrap();
 
     expect_events(
         &mut poll,
@@ -780,9 +788,7 @@ fn hup() {
     expect_events(
         &mut poll,
         &mut events,
-        vec![
-            ExpectEvent::new(Token(1), Interest::READABLE),
-        ],
+        vec![ExpectEvent::new(Token(1), Interest::READABLE)],
     );
 }
 
@@ -791,9 +797,14 @@ fn set_linger_zero(socket: &TcpStream) {
     use socket2::Socket;
     use std::os::windows::io::{AsRawSocket, FromRawSocket};
 
-    unsafe {
-        let s = Socket::from_raw_socket(socket.as_raw_socket());
-        s.set_linger(Some(Duration::from_millis(0))).unwrap();
-        std::mem::forget(s);
-    }
+    let s = unsafe { Socket::from_raw_socket(socket.as_raw_socket()) };
+    s.set_linger(Some(Duration::from_millis(0))).unwrap();
+}
+
+#[cfg(unix)]
+fn set_linger_zero(socket: &TcpStream) {
+    use socket2::Socket;
+
+    let s = unsafe { Socket::from_raw_fd(socket.as_raw_fd()) };
+    s.set_linger(Some(Duration::from_millis(0))).unwrap();
 }
