@@ -791,9 +791,15 @@ fn set_linger_zero(socket: &TcpStream) {
     use socket2::Socket;
     use std::os::windows::io::{AsRawSocket, FromRawSocket};
 
-    unsafe {
-        let s = Socket::from_raw_socket(socket.as_raw_socket());
-        s.set_linger(Some(Duration::from_millis(0))).unwrap();
-        std::mem::forget(s);
-    }
+    let s = unsafe { Socket::from_raw_socket(socket.as_raw_socket()) };
+    s.set_linger(Some(Duration::from_millis(0))).unwrap();
+}
+
+#[cfg(unix)]
+fn set_linger_zero(socket: &TcpStream) {
+    use socket2::Socket;
+    use std::os::unix::io::{AsRawFd, FromRawFd};
+
+    let s = unsafe { Socket::from_raw_fd(socket.as_raw_fd()) };
+    s.set_linger(Some(Duration::from_millis(0))).unwrap();
 }
