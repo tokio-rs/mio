@@ -751,7 +751,7 @@ fn start_listener(
 }
 
 #[test]
-fn hup() {
+fn hup_event_on_disconnect() {
     use mio::net::TcpListener;
 
     let (mut poll, mut events) = init_with_poll();
@@ -782,7 +782,6 @@ fn hup() {
     );
 
     let (sock, _) = listener.accept().unwrap();
-    set_linger_zero(&sock);
     drop(sock);
 
     expect_events(
@@ -790,21 +789,4 @@ fn hup() {
         &mut events,
         vec![ExpectEvent::new(Token(1), Interest::READABLE)],
     );
-}
-
-#[cfg(windows)]
-fn set_linger_zero(socket: &TcpStream) {
-    use socket2::Socket;
-    use std::os::windows::io::{AsRawSocket, FromRawSocket};
-
-    let s = unsafe { Socket::from_raw_socket(socket.as_raw_socket()) };
-    s.set_linger(Some(Duration::from_millis(0))).unwrap();
-}
-
-#[cfg(unix)]
-fn set_linger_zero(socket: &TcpStream) {
-    use socket2::Socket;
-
-    let s = unsafe { Socket::from_raw_fd(socket.as_raw_fd()) };
-    s.set_linger(Some(Duration::from_millis(0))).unwrap();
 }
