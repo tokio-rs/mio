@@ -21,3 +21,15 @@ fn set_reuseaddr() {
 
     let _ = socket.listen(128).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn set_reuseport() {
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket.set_reuseport(true).unwrap();
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
