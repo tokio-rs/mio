@@ -751,7 +751,7 @@ fn start_listener(
 }
 
 #[test]
-fn hup() {
+fn hup_event_on_disconnect() {
     use mio::net::TcpListener;
 
     let (mut poll, mut events) = init_with_poll();
@@ -782,6 +782,7 @@ fn hup() {
     );
 
     let (sock, _) = listener.accept().unwrap();
+    // Prevent the OS from performing a graceful shutdown
     set_linger_zero(&sock);
     drop(sock);
 
