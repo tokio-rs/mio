@@ -6,6 +6,8 @@ use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket};
 use std::sync::{mpsc::channel, Arc, Barrier};
 use std::thread;
 use std::time::Duration;
@@ -793,19 +795,14 @@ fn hup_event_on_disconnect() {
     );
 }
 
-#[cfg(windows)]
 fn set_linger_zero(socket: &TcpStream) {
     use mio::net::TcpSocket;
-    use std::os::windows::io::{AsRawSocket, FromRawSocket};
 
+    #[cfg(windows)]
     let s = unsafe { TcpSocket::from_raw_socket(socket.as_raw_socket()) };
-    s.set_linger(Some(Duration::from_millis(0))).unwrap();
-}
-
-#[cfg(unix)]
-fn set_linger_zero(socket: &TcpStream) {
-    use mio::net::TcpSocket;
-
+    #[cfg(unix)]
     let s = unsafe { TcpSocket::from_raw_fd(socket.as_raw_fd()) };
+
     s.set_linger(Some(Duration::from_millis(0))).unwrap();
+    std::mem::drop(s);
 }
