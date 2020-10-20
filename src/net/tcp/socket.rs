@@ -82,6 +82,13 @@ impl TcpSocket {
         sys::tcp::set_reuseaddr(self.sys, reuseaddr)
     }
 
+    /// Sets the value of `SO_REUSEPORT` on this socket.
+    /// Only supported available in unix
+    #[cfg(unix)]
+    pub fn set_reuseport(&self, reuseport: bool) -> io::Result<()> {
+        sys::tcp::set_reuseport(self.sys, reuseport)
+    }
+
     /// Sets the value of `SO_LINGER` on this socket.
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         sys::tcp::set_linger(self.sys, dur)

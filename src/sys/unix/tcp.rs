@@ -58,6 +58,17 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
     )).map(|_| ())
 }
 
+pub(crate) fn set_reuseport(socket: TcpSocket, reuseport: bool) -> io::Result<()> {
+    let val: libc::c_int = if reuseport { 1 } else { 0 };
+    syscall!(setsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_REUSEPORT,
+        &val as *const libc::c_int as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t,
+    )).map(|_| ())
+}
+
 pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
     let val: libc::linger = libc::linger {
         l_onoff: if dur.is_some() { 1 } else { 0 },
