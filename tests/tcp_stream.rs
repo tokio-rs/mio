@@ -794,17 +794,17 @@ fn hup() {
 
 #[cfg(windows)]
 fn set_linger_zero(socket: &TcpStream) {
-    use socket2::Socket;
+    use mio::net::TcpSocket;
     use std::os::windows::io::{AsRawSocket, FromRawSocket};
 
-    let s = unsafe { Socket::from_raw_socket(socket.as_raw_socket()) };
+    let s = unsafe { TcpSocket::from_raw_socket(socket.as_raw_socket()) };
     s.set_linger(Some(Duration::from_millis(0))).unwrap();
 }
 
 #[cfg(unix)]
 fn set_linger_zero(socket: &TcpStream) {
-    use socket2::Socket;
+    use mio::net::TcpSocket;
 
-    let s = unsafe { Socket::from_raw_fd(socket.as_raw_fd()) };
+    let s = unsafe { TcpSocket::from_raw_fd(socket.as_raw_fd()) };
     s.set_linger(Some(Duration::from_millis(0))).unwrap();
 }
