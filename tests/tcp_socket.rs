@@ -22,7 +22,10 @@ fn set_reuseaddr() {
     let _ = socket.listen(128).unwrap();
 }
 
-#[cfg(unix)]
+#[cfg(all(
+    unix,
+    not(target_os = "solaris")
+))]
 #[test]
 fn set_reuseport() {
     let addr = "127.0.0.1:0".parse().unwrap();
