@@ -84,7 +84,10 @@ impl TcpSocket {
 
     /// Sets the value of `SO_REUSEPORT` on this socket.
     /// Only supported available in unix
-    #[cfg(unix)]
+    #[cfg(all(
+        unix,
+        not(target_os = "solaris")
+    ))]
     pub fn set_reuseport(&self, reuseport: bool) -> io::Result<()> {
         sys::tcp::set_reuseport(self.sys, reuseport)
     }

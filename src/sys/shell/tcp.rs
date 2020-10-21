@@ -32,7 +32,10 @@ pub(crate) fn set_reuseaddr(_: TcpSocket, _: bool) -> io::Result<()> {
     os_required!();
 }
 
-#[cfg(unix)]
+#[cfg(all(
+    unix,
+    not(target_os = "solaris")
+))]
 pub(crate) fn set_reuseport(_: TcpSocket, _: bool) -> io::Result<()> {
     os_required!();
 }

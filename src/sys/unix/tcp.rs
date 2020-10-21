@@ -58,7 +58,10 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
     )).map(|_| ())
 }
 
-#[cfg(unix)]
+#[cfg(all(
+    unix,
+    not(target_os = "solaris")
+))]
 pub(crate) fn set_reuseport(socket: TcpSocket, reuseport: bool) -> io::Result<()> {
     let val: libc::c_int = if reuseport { 1 } else { 0 };
     syscall!(setsockopt(
