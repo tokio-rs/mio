@@ -32,6 +32,11 @@ pub(crate) fn set_reuseaddr(_: TcpSocket, _: bool) -> io::Result<()> {
     os_required!();
 }
 
+#[cfg(unix)]
+pub(crate) fn set_reuseport(_: TcpSocket, _: bool) -> io::Result<()> {
+    os_required!();
+}
+
 pub(crate) fn set_linger(_: TcpSocket, _: Option<Duration>) -> io::Result<()> {
     os_required!();
 }
