@@ -56,9 +56,7 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
         libc::SO_REUSEADDR,
         &val as *const libc::c_int as *const libc::c_void,
         size_of::<libc::c_int>() as libc::socklen_t,
-    )).map(|_| {
-        ()
-    })
+    )).map(|_| ())
 }
 
 pub(crate) fn get_reuseaddr(socket: TcpSocket) -> io::Result<bool> {
@@ -84,9 +82,7 @@ pub(crate) fn set_reuseport(socket: TcpSocket, reuseport: bool) -> io::Result<()
         libc::SO_REUSEPORT,
         &val as *const libc::c_int as *const libc::c_void,
         size_of::<libc::c_int>() as libc::socklen_t,
-    )).map(|_| {
-        ()
-    })
+    )).map(|_| ())
 }
 
 #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
