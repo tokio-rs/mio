@@ -73,16 +73,14 @@ pub(crate) fn set_reuseport(socket: TcpSocket, reuseport: bool) -> io::Result<()
 
 #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
 pub(crate) fn get_reuseport(socket: TcpSocket) -> io::Result<bool> {
-    unsafe {
-        let mut optval: T = mem::zeroed();
-        let mut optlen = mem::size_of::<T>() as libc::socklen_t;
-    }
+    let mut optval: libc::c_int = unsafe { mem::zeroed() };
+    let mut optlen= mem::size_of::<libc::c_int>() as libc::socklen_t;
 
     syscall!(getsockopt(
         socket,
         libc::SOL_SOCKET,
         libc::SO_REUSEPORT,
-        &optval as *mut _ as *mut _,
+        &mut optval as *mut _ as *mut _,
         &mut optlen,
     )).map(|result| result != 0)
 }
