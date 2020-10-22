@@ -8,7 +8,7 @@ use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib use
 use winapi::ctypes::{c_char, c_int, c_ushort};
 use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
 use winapi::um::winsock2::{
-    self, closesocket, linger, setsockopt, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
+    self, closesocket, linger, setsockopt, getsockopt, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
     SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR,
 };
 
@@ -84,6 +84,22 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
     ) } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
         _ => Ok(()),
+    }
+}
+
+pub(crate) fn get_reuseaddr(socket: TcpSocket) -> io::Result<bool> {
+    let mut optval: libc::c_int = unsafe { mem::zeroed() };
+    let mut optlen= mem::size_of::<libc::c_int>() as libc::socklen_t;
+
+    match unsafe { getsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_REUSEADDR,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(optval != 0),
     }
 }
 
