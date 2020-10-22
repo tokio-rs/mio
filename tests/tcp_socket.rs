@@ -29,7 +29,7 @@ fn set_reuseport() {
 
     let socket = TcpSocket::new_v4().unwrap();
     socket.set_reuseport(true).unwrap();
-    assert!(socket.get_reuseport());
+    assert!(socket.get_reuseport().unwrap());
     socket.bind(addr).unwrap();
 
     let _ = socket.listen(128).unwrap();
