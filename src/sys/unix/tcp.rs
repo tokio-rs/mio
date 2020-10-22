@@ -69,7 +69,9 @@ pub(crate) fn get_reuseaddr(socket: TcpSocket) -> io::Result<bool> {
         libc::SO_REUSEADDR,
         &mut optval as *mut _ as *mut _,
         &mut optlen,
-    )).map(|result| result != 0)
+    ))?;
+
+    Ok(optval != 0)
 }
 
 #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
@@ -96,7 +98,9 @@ pub(crate) fn get_reuseport(socket: TcpSocket) -> io::Result<bool> {
         libc::SO_REUSEPORT,
         &mut optval as *mut _ as *mut _,
         &mut optlen,
-    )).map(|result| result != 0)
+    ))?;
+
+    Ok(optval != 0)
 }
 
 pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
