@@ -88,8 +88,8 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
 }
 
 pub(crate) fn get_reuseaddr(socket: TcpSocket) -> io::Result<bool> {
-    let mut optval: libc::c_int = unsafe { mem::zeroed() };
-    let mut optlen= mem::size_of::<libc::c_int>() as libc::socklen_t;
+    let mut optval: c_char = unsafe { std::mem::zeroed() };
+    let mut optlen = size_of::<BOOL>() as c_int;
 
     match unsafe { getsockopt(
         socket,
