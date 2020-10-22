@@ -84,12 +84,16 @@ impl TcpSocket {
 
     /// Sets the value of `SO_REUSEPORT` on this socket.
     /// Only supported available in unix
-    #[cfg(all(
-        unix,
-        not(target_os = "solaris")
-    ))]
+    #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
     pub fn set_reuseport(&self, reuseport: bool) -> io::Result<()> {
         sys::tcp::set_reuseport(self.sys, reuseport)
+    }
+
+    /// Get the value of `SO_REUSEPORT` on set for this socket.
+    /// Only supported available in unix
+    #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
+    pub fn get_reuseport(&self) -> io::Result<bool> {
+        sys::tcp::get_reuseport(self.sys)
     }
 
     /// Sets the value of `SO_LINGER` on this socket.

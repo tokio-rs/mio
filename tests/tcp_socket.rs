@@ -22,13 +22,14 @@ fn set_reuseaddr() {
     let _ = socket.listen(128).unwrap();
 }
 
-#[cfg(all(unix, not(target_os = "solaris")))]
+#[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
 #[test]
 fn set_reuseport() {
     let addr = "127.0.0.1:0".parse().unwrap();
 
     let socket = TcpSocket::new_v4().unwrap();
     socket.set_reuseport(true).unwrap();
+    assert!(socket.get_reuseport());
     socket.bind(addr).unwrap();
 
     let _ = socket.listen(128).unwrap();

@@ -32,11 +32,13 @@ pub(crate) fn set_reuseaddr(_: TcpSocket, _: bool) -> io::Result<()> {
     os_required!();
 }
 
-#[cfg(all(
-    unix,
-    not(target_os = "solaris")
-))]
+#[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
 pub(crate) fn set_reuseport(_: TcpSocket, _: bool) -> io::Result<()> {
+    os_required!();
+}
+
+#[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
+pub(crate) fn get_reuseport(_: TcpSocket) -> io::Result<bool> {
     os_required!();
 }
 

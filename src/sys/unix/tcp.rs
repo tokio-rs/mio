@@ -1,4 +1,5 @@
 use std::io;
+use std::mem;
 use std::mem::{size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
 use std::time::Duration;
@@ -58,10 +59,7 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
     )).map(|_| ())
 }
 
-#[cfg(all(
-    unix,
-    not(target_os = "solaris")
-))]
+#[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
 pub(crate) fn set_reuseport(socket: TcpSocket, reuseport: bool) -> io::Result<()> {
     let val: libc::c_int = if reuseport { 1 } else { 0 };
     syscall!(setsockopt(
@@ -71,6 +69,22 @@ pub(crate) fn set_reuseport(socket: TcpSocket, reuseport: bool) -> io::Result<()
         &val as *const libc::c_int as *const libc::c_void,
         size_of::<libc::c_int>() as libc::socklen_t,
     )).map(|_| ())
+}
+
+#[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
+pub(crate) fn get_reuseport(socket: TcpSocket) -> io::Result<bool> {
+    unsafe {
+        let mut optval: T = mem::zeroed();
+        let mut optlen = mem::size_of::<T>() as libc::socklen_t;
+    }
+
+    syscall!(getsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_REUSEPORT,
+        &optval as *mut _ as *mut _,
+        &mut optlen,
+    )).map(|result| result != 0)
 }
 
 pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
