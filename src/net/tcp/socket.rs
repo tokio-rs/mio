@@ -82,7 +82,7 @@ impl TcpSocket {
         sys::tcp::set_reuseaddr(self.sys, reuseaddr)
     }
 
-    /// something
+    /// Get the value of `SO_REUSEADDR` set on this socket.
     pub fn get_reuseaddr(&self) -> io::Result<bool> {
         sys::tcp::get_reuseaddr(self.sys)
     }
@@ -94,7 +94,7 @@ impl TcpSocket {
         sys::tcp::set_reuseport(self.sys, reuseport)
     }
 
-    /// Get the value of `SO_REUSEPORT` on set for this socket.
+    /// Get the value of `SO_REUSEPORT` set on this socket.
     /// Only supported available in unix
     #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
     pub fn get_reuseport(&self) -> io::Result<bool> {
