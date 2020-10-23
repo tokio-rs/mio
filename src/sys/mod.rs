@@ -73,7 +73,7 @@ cfg_os_poll! {
     }
 
     cfg_pipe! {
-        pub use self::unix::{pipe, Receiver, Sender};
+        pub(crate) use self::unix::pipe;
     }
 
     cfg_io_source! {

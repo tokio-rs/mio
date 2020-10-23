@@ -7,7 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 use mio::event::Event;
-use mio::unix::{self, Receiver, Sender};
+use mio::unix::pipe::{self, Receiver, Sender};
 use mio::{Events, Interest, Poll, Token};
 
 const RECEIVER: Token = Token(0);
@@ -20,7 +20,7 @@ fn smoke() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(8);
 
-    let (mut sender, mut receiver) = unix::pipe().unwrap();
+    let (mut sender, mut receiver) = pipe::new().unwrap();
 
     let mut buf = [0; 20];
     assert_would_block(receiver.read(&mut buf));
@@ -55,7 +55,7 @@ fn event_when_sender_is_dropped() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(8);
 
-    let (mut sender, mut receiver) = unix::pipe().unwrap();
+    let (mut sender, mut receiver) = pipe::new().unwrap();
     poll.registry()
         .register(&mut receiver, RECEIVER, Interest::READABLE)
         .unwrap();
@@ -93,7 +93,7 @@ fn event_when_receiver_is_dropped() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(8);
 
-    let (mut sender, receiver) = unix::pipe().unwrap();
+    let (mut sender, receiver) = pipe::new().unwrap();
     poll.registry()
         .register(&mut sender, SENDER, Interest::WRITABLE)
         .unwrap();

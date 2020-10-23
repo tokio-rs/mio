@@ -95,9 +95,16 @@ pub mod unix {
     #[cfg(feature = "os-util")]
     #[cfg_attr(docsrs, doc(cfg(all(unix, feature = "os-util"))))]
     pub use crate::sys::SourceFd;
-    #[cfg(all(feature = "pipe", feature = "os-poll"))]
-    #[cfg_attr(docsrs, doc(cfg(all(unix, feature = "pipe", feature = "os-poll"))))]
-    pub use crate::sys::{pipe, Receiver, Sender};
+
+    cfg_pipe! {
+        pub mod pipe {
+            //! Unix pipe.
+            //!
+            //! See the [`new`] function for documentation.
+
+            pub use crate::sys::pipe::{new, Receiver, Sender};
+        }
+    }
 }
 
 #[cfg(all(windows, feature = "os-util"))]

@@ -1,6 +1,6 @@
 //! Unix pipe.
 //!
-//! See the [`pipe`] documentation.
+//! See the [`new`] function for documentation.
 
 use std::fs::File;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
@@ -55,7 +55,8 @@ use crate::{event, Interest, Registry, Token};
 /// ```
 /// use std::io::{self, Read, Write};
 ///
-/// use mio::{unix, Poll, Events, Interest, Token};
+/// use mio::{Poll, Events, Interest, Token};
+/// use mio::unix::pipe;
 ///
 /// // Unique tokens for the two ends of the channel.
 /// const PIPE_RECV: Token = Token(0);
@@ -67,7 +68,7 @@ use crate::{event, Interest, Registry, Token};
 /// let mut events = Events::with_capacity(8);
 ///
 /// // Create a new pipe.
-/// let (mut sender, mut receiver) = unix::pipe()?;
+/// let (mut sender, mut receiver) = pipe::new()?;
 ///
 /// // Register both ends of the channel.
 /// poll.registry().register(&mut receiver, PIPE_RECV, Interest::READABLE)?;
@@ -109,7 +110,8 @@ use crate::{event, Interest, Registry, Token};
 /// ```
 /// # use std::io;
 /// #
-/// # use mio::{unix, Poll, Events, Interest, Token};
+/// # use mio::{Poll, Events, Interest, Token};
+/// # use mio::unix::pipe;
 /// #
 /// # const PIPE_RECV: Token = Token(0);
 /// # const PIPE_SEND: Token = Token(1);
@@ -119,7 +121,7 @@ use crate::{event, Interest, Registry, Token};
 /// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(8);
 ///
-/// let (mut sender, mut receiver) = unix::pipe()?;
+/// let (mut sender, mut receiver) = pipe::new()?;
 ///
 /// poll.registry().register(&mut receiver, PIPE_RECV, Interest::READABLE)?;
 /// poll.registry().register(&mut sender, PIPE_SEND, Interest::WRITABLE)?;
@@ -142,7 +144,7 @@ use crate::{event, Interest, Registry, Token};
 /// # unreachable!();
 /// # }
 /// ```
-pub fn pipe() -> io::Result<(Sender, Receiver)> {
+pub fn new() -> io::Result<(Sender, Receiver)> {
     let mut fds: [RawFd; 2] = [-1, -1];
 
     #[cfg(any(
@@ -201,7 +203,7 @@ pub fn pipe() -> io::Result<(Sender, Receiver)> {
 
 /// Sending end of an Unix pipe.
 ///
-/// See [`pipe`] for documentation, including examples.
+/// See [`new`] for documentation, including examples.
 #[derive(Debug)]
 pub struct Sender {
     inner: IoSource<File>,
@@ -284,7 +286,7 @@ impl IntoRawFd for Sender {
 
 /// Receiving end of an Unix pipe.
 ///
-/// See [`pipe`] for documentation, including examples.
+/// See [`new`] for documentation, including examples.
 #[derive(Debug)]
 pub struct Receiver {
     inner: IoSource<File>,
