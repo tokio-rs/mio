@@ -8,7 +8,7 @@ use std::{fmt, ops};
 /// registered with [readable] interests and the socket becomes writable, no
 /// event will be returned from a call to [`poll`].
 ///
-/// [registering]: struct.Registry.html#method.reregister
+/// [registering]: struct.Registry.html#method.register
 /// [`event::Source`]: ./event/trait.Source.html
 /// [`Poll`]: struct.Poll.html
 /// [readable]: struct.Interest.html#associatedconstant.READABLE
