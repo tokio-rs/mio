@@ -36,6 +36,18 @@ macro_rules! cfg_net {
     }
 }
 
+/// One of the features enabled that needs `IoSource`. That is `tcp`, or `udp`,
+/// or on Unix `uds` or `pipe`.
+macro_rules! cfg_io_source {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(feature = "tcp", feature = "udp", all(unix, any(feature = "uds",  feature = "pipe"))))]
+            #[cfg_attr(docsrs, doc(any(feature = "tcp", feature = "udp", all(unix, any(feature = "uds",  feature = "pipe")))))]
+            $item
+        )*
+    }
+}
+
 /// One of the `tcp`, `udp` features enabled.
 #[cfg(windows)]
 macro_rules! cfg_net {
@@ -82,13 +94,25 @@ macro_rules! cfg_uds {
     }
 }
 
+/// Feature `pipe` enabled.
+#[cfg(unix)]
+macro_rules! cfg_pipe {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "pipe")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "pipe")))]
+            $item
+        )*
+    }
+}
+
 /// Feature `os-util` enabled, or one of the features that need `os-util`.
 #[cfg(unix)]
 macro_rules! cfg_any_os_util {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "uds"))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "uds"))))]
+            #[cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "uds", feature = "pipe"))]
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "uds", feature = "pipe"))))]
             $item
         )*
     }
@@ -99,8 +123,8 @@ macro_rules! cfg_any_os_util {
 macro_rules! cfg_any_os_util {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "os-util", feature = "tcp", feature = "udp"))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "os-util", feature = "tcp", feature = "udp"))))]
+            #[cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "pipe"))]
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "pipe"))))]
             $item
         )*
     }

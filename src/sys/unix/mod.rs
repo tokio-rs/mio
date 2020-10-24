@@ -38,7 +38,7 @@ cfg_os_poll! {
         pub use self::uds::SocketAddr;
     }
 
-    cfg_net! {
+    cfg_io_source! {
         use std::io;
 
         // Both `kqueue` and `epoll` don't need to hold any user space state.
@@ -58,6 +58,10 @@ cfg_os_poll! {
                 f(io)
             }
         }
+    }
+
+    cfg_pipe! {
+        pub(crate) mod pipe;
     }
 }
 

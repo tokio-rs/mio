@@ -69,9 +69,11 @@ mod waker;
 
 pub mod event;
 
-cfg_net! {
+cfg_io_source! {
     mod io_source;
+}
 
+cfg_net! {
     pub mod net;
 }
 
@@ -82,11 +84,27 @@ pub use poll::{Poll, Registry};
 pub use token::Token;
 pub use waker::Waker;
 
-#[cfg(all(unix, feature = "os-util"))]
-#[cfg_attr(docsrs, doc(cfg(all(unix, feature = "os-util"))))]
+#[cfg(all(unix, any(feature = "os-util", feature = "pipe")))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(all(unix, any(feature = "os-util", feature = "pipe"))))
+)]
 pub mod unix {
     //! Unix only extensions.
+
+    #[cfg(feature = "os-util")]
+    #[cfg_attr(docsrs, doc(cfg(all(unix, feature = "os-util"))))]
     pub use crate::sys::SourceFd;
+
+    cfg_pipe! {
+        pub mod pipe {
+            //! Unix pipe.
+            //!
+            //! See the [`new`] function for documentation.
+
+            pub use crate::sys::pipe::{new, Receiver, Sender};
+        }
+    }
 }
 
 #[cfg(all(windows, feature = "os-util"))]
@@ -120,6 +138,12 @@ pub mod features {
     //!
     //! `os-util` enables additional OS specific facilities. Currently this
     //! means the `unix` module (with `SourceFd`) becomes available.
+    //!
+    #![cfg_attr(feature = "pipe", doc = "## `pipe` (enabled)")]
+    #![cfg_attr(not(feature = "pipe"), doc = "## `pipe` (disabled)")]
+    //!
+    //! The `pipe` feature adds `unix::pipe`, and related types, a non-blocking
+    //! wrapper around the `pipe(2)` system call.
     //!
     //! ## Network types
     //!

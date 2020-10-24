@@ -47,7 +47,7 @@ impl AfdGroup {
     }
 }
 
-cfg_net! {
+cfg_io_source! {
     const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
 
     impl AfdGroup {
@@ -256,7 +256,7 @@ impl SockState {
     }
 }
 
-cfg_net! {
+cfg_io_source! {
     impl SockState {
         fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
             Ok(SockState {
@@ -380,7 +380,7 @@ impl Selector {
     }
 }
 
-cfg_net! {
+cfg_io_source! {
     use super::InternalState;
     use crate::Token;
 
@@ -535,7 +535,7 @@ impl SelectorInner {
     }
 }
 
-cfg_net! {
+cfg_io_source! {
     use std::mem::size_of;
     use std::ptr::null_mut;
     use winapi::um::mswsock;

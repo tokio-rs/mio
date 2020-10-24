@@ -303,7 +303,7 @@ fn check_errors(events: &[libc::kevent], ignored_errors: &[Data]) -> io::Result<
     Ok(())
 }
 
-cfg_net! {
+cfg_io_source! {
     #[cfg(debug_assertions)]
     impl Selector {
         pub fn id(&self) -> usize {

@@ -29,6 +29,7 @@ include       = [
 default = []
 os-poll = []
 os-util = []
+pipe = ["os-poll"]
 tcp = []
 udp = []
 uds = []

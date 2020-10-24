@@ -23,7 +23,7 @@ cfg_uds! {
     pub(crate) mod uds;
 }
 
-cfg_net! {
+cfg_io_source! {
     use std::io;
     #[cfg(windows)]
     use std::os::windows::io::RawSocket;

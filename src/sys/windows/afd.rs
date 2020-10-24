@@ -111,7 +111,7 @@ impl Afd {
     }
 }
 
-cfg_net! {
+cfg_io_source! {
     use miow::iocp::CompletionPort;
     use ntapi::ntioapi::FILE_OPEN;
     use ntapi::ntioapi::NtCreateFile;
