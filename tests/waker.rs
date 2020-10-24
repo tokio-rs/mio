@@ -106,6 +106,27 @@ fn waker_multiple_wakeups_different_thread() {
     handle2.join().unwrap();
 }
 
+#[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "only works with debug_assertions enabled"
+)]
+#[should_panic = "Only a single `Waker` can be active per `Poll` instance"]
+fn using_multiple_wakers_panics() {
+    init();
+
+    let poll = Poll::new().expect("unable to create new Poll instance");
+    let token1 = Token(10);
+    let token2 = Token(11);
+
+    let waker1 = Waker::new(poll.registry(), token1).expect("unable to first waker");
+    // This should panic.
+    let waker2 = Waker::new(poll.registry(), token2).unwrap();
+
+    drop(waker1);
+    drop(waker2);
+}
+
 fn expect_waker_event(poll: &mut Poll, events: &mut Events, token: Token) {
     poll.poll(events, Some(Duration::from_millis(100))).unwrap();
     assert!(!events.is_empty());

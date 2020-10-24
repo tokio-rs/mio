@@ -613,6 +613,15 @@ impl Registry {
             .try_clone()
             .map(|selector| Registry { selector })
     }
+
+    /// Internal check to ensure only a single `Waker` is active per [`Poll`]
+    /// instance.
+    #[cfg(debug_assertions)]
+    pub(crate) fn register_waker(&self) {
+        if self.selector.register_waker() {
+            panic!("Only a single `Waker` can be active per `Poll` instance");
+        }
+    }
 }
 
 impl fmt::Debug for Registry {
