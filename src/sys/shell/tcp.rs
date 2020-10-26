@@ -53,3 +53,8 @@ pub(crate) fn set_linger(_: TcpSocket, _: Option<Duration>) -> io::Result<()> {
 pub fn accept(_: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
     os_required!();
 }
+
+pub(crate) fn get_localaddr(_: TcpSocket) -> io::Result<SocketAddr> {
+    os_required!();
+}
+
