@@ -43,8 +43,8 @@ fn get_localaddr() {
     let expected_addr = "127.0.0.1:0".parse().unwrap();
     let socket = TcpSocket::new_v4().unwrap();
 
+    //Windows doesn't support calling getsockname before calling `bind`
     #[cfg(not(windows))]
-    /// Windows doesn't support calling getsockname before calling `bind`
     assert_eq!("0.0.0.0:0", socket.get_localaddr().unwrap().to_string());
 
     socket.bind(expected_addr).unwrap();
