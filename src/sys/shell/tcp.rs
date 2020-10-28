@@ -57,4 +57,3 @@ pub fn accept(_: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> 
 pub(crate) fn get_localaddr(_: TcpSocket) -> io::Result<SocketAddr> {
     os_required!();
 }
-
