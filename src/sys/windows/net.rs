@@ -5,9 +5,7 @@ use std::sync::Once;
 
 use winapi::ctypes::c_int;
 use winapi::shared::ws2def::SOCKADDR;
-use winapi::um::winsock2::{
-    ioctlsocket, socket, FIONBIO, INVALID_SOCKET, SOCKET,
-};
+use winapi::um::winsock2::{ioctlsocket, socket, FIONBIO, INVALID_SOCKET, SOCKET};
 
 /// Initialise the network stack for Windows.
 pub(crate) fn init() {
@@ -21,7 +19,6 @@ pub(crate) fn init() {
 }
 
 /// Create a new non-blocking socket.
-#[cfg(feature = "udp")]
 pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: c_int) -> io::Result<SOCKET> {
     use winapi::um::winsock2::{PF_INET, PF_INET6};
 
