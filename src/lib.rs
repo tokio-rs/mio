@@ -35,27 +35,11 @@
 //!
 //! ## Guide
 //!
-//! A getting started guide is available in the
-#![cfg_attr(
-    feature = "extra-docs",
-    doc = "[`guide`](../mio/guide/index.html) module."
-)]
-#![cfg_attr(
-    not(feature = "extra-docs"),
-    doc = "`guide` (only available when the `extra-docs` feature is enabled)."
-)]
+//! A getting started guide is available in the [`guide`] module.
 //!
 //! ## Available features
 //!
-//! The available features are described in the
-#![cfg_attr(
-    feature = "extra-docs",
-    doc = "[`features`](../mio/features/index.html) module."
-)]
-#![cfg_attr(
-    not(feature = "extra-docs"),
-    doc = "`features` (only available when the `extra-docs` feature is enabled)."
-)]
+//! The available features are described in the [`features`] module.
 
 // macros used internally
 #[macro_use]
@@ -117,8 +101,6 @@ pub mod windows {
     }
 }
 
-// Enable with `cargo doc --features extra-docs`.
-#[cfg(feature = "extra-docs")]
 pub mod features {
     //! # Mio's optional features.
     //!
@@ -160,17 +142,8 @@ pub mod features {
     //! : includes `UnixDatagram`, `UnixListener`, `UnixStream` and `SocketAddr`.
     //!
     //! All types can be found in the `net` module.
-    //!
-    #![cfg_attr(feature = "extra-docs", doc = "## `extra-docs` (enabled)")]
-    #![cfg_attr(not(feature = "extra-docs"), doc = "## `extra-docs` (disabled)")]
-    //!
-    //! This feature includes additional documentation such as this document and
-    //! the getting started guide. It adds nothing in terms of types (only
-    //! documentation).
 }
 
-// Enable with `cargo doc --features extra-docs`.
-#[cfg(feature = "extra-docs")]
 pub mod guide {
     //! # Getting started guide.
     //!
