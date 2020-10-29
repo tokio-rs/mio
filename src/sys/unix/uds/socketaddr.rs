@@ -109,8 +109,6 @@ impl fmt::Debug for SocketAddr {
     }
 }
 
-// ===== impl AsciiEscaped =====
-
 impl<'a> fmt::Display for AsciiEscaped<'a> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "\"")?;
