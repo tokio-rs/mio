@@ -3,9 +3,9 @@ use crate::sys::windows::Event;
 use std::cell::UnsafeCell;
 use std::fmt;
 
-use winapi::um::minwinbase::OVERLAPPED_ENTRY;
-#[cfg(feature = "os-util")]
+#[cfg(feature = "os-ext")]
 use winapi::um::minwinbase::OVERLAPPED;
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 
 #[repr(C)]
 pub(crate) struct Overlapped {
@@ -13,7 +13,7 @@ pub(crate) struct Overlapped {
     pub(crate) callback: fn(&OVERLAPPED_ENTRY, Option<&mut Vec<Event>>),
 }
 
-#[cfg(feature = "os-util")]
+#[cfg(feature = "os-ext")]
 impl Overlapped {
     pub(crate) fn new(cb: fn(&OVERLAPPED_ENTRY, Option<&mut Vec<Event>>)) -> Overlapped {
         Overlapped {

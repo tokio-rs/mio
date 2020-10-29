@@ -68,7 +68,7 @@ cfg_not_os_poll! {
     pub(crate) use self::shell::*;
 
     #[cfg(unix)]
-    cfg_any_os_util! {
+    cfg_any_os_ext! {
         mod unix;
         pub use self::unix::SourceFd;
     }

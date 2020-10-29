@@ -68,37 +68,28 @@ pub use poll::{Poll, Registry};
 pub use token::Token;
 pub use waker::Waker;
 
-#[cfg(all(unix, any(feature = "os-util", feature = "pipe")))]
-#[cfg_attr(
-    docsrs,
-    doc(cfg(all(unix, any(feature = "os-util", feature = "pipe"))))
-)]
+#[cfg(all(unix, feature = "os-ext"))]
+#[cfg_attr(docsrs, doc(cfg(all(unix, feature = "os-ext"))))]
 pub mod unix {
     //! Unix only extensions.
 
-    #[cfg(feature = "os-util")]
-    #[cfg_attr(docsrs, doc(cfg(all(unix, feature = "os-util"))))]
-    pub use crate::sys::SourceFd;
+    pub mod pipe {
+        //! Unix pipe.
+        //!
+        //! See the [`new`] function for documentation.
 
-    cfg_pipe! {
-        pub mod pipe {
-            //! Unix pipe.
-            //!
-            //! See the [`new`] function for documentation.
-
-            pub use crate::sys::pipe::{new, Receiver, Sender};
-        }
+        pub use crate::sys::pipe::{new, Receiver, Sender};
     }
+
+    pub use crate::sys::SourceFd;
 }
 
-#[cfg(all(windows, feature = "os-util"))]
-#[cfg_attr(docsrs, doc(cfg(all(windows, feature = "os-util"))))]
+#[cfg(all(windows, feature = "os-ext"))]
+#[cfg_attr(docsrs, doc(cfg(all(windows, feature = "os-ext"))))]
 pub mod windows {
     //! Windows only extensions.
 
-    cfg_os_poll! {
-        pub use crate::sys::named_pipe::NamedPipe;
-    }
+    pub use crate::sys::named_pipe::NamedPipe;
 }
 
 pub mod features {
@@ -115,17 +106,11 @@ pub mod features {
     //!
     //! This makes `Poll`, `Registry` and `Waker` functional.
     //!
-    #![cfg_attr(feature = "os-util", doc = "## `os-util` (enabled)")]
-    #![cfg_attr(not(feature = "os-util"), doc = "## `os-util` (disabled)")]
+    #![cfg_attr(feature = "os-ext", doc = "## `os-ext` (enabled)")]
+    #![cfg_attr(not(feature = "os-ext"), doc = "## `os-ext` (disabled)")]
     //!
-    //! `os-util` enables additional OS specific facilities. Currently this
-    //! means the `unix` module (with `SourceFd`) becomes available.
-    //!
-    #![cfg_attr(feature = "pipe", doc = "## `pipe` (enabled)")]
-    #![cfg_attr(not(feature = "pipe"), doc = "## `pipe` (disabled)")]
-    //!
-    //! The `pipe` feature adds `unix::pipe`, and related types, a non-blocking
-    //! wrapper around the `pipe(2)` system call.
+    //! `os-ext` enables additional OS specific facilities. These facilities can
+    //! be found in the `unix` and `windows` module.
     //!
     #![cfg_attr(feature = "net", doc = "## Network types (enabled)")]
     #![cfg_attr(not(feature = "net"), doc = "## Network types (disabled)")]
