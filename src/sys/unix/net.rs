@@ -1,7 +1,5 @@
-#[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
 use std::net::SocketAddr;
 
-#[cfg(all(feature = "os-poll", any(feature = "udp")))]
 pub(crate) fn new_ip_socket(
     addr: SocketAddr,
     socket_type: libc::c_int,
@@ -15,10 +13,6 @@ pub(crate) fn new_ip_socket(
 }
 
 /// Create a new non-blocking socket.
-#[cfg(all(
-    feature = "os-poll",
-    any(feature = "tcp", feature = "udp", feature = "uds")
-))]
 pub(crate) fn new_socket(
     domain: libc::c_int,
     socket_type: libc::c_int,
@@ -70,7 +64,6 @@ pub(crate) fn new_socket(
     socket
 }
 
-#[cfg(all(feature = "os-poll", any(feature = "tcp", feature = "udp")))]
 pub(crate) fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::socklen_t) {
     use std::mem::size_of_val;
 
@@ -87,7 +80,6 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (*const libc::sockaddr, libc::so
 }
 
 /// `storage` must be initialised to `sockaddr_in` or `sockaddr_in6`.
-#[cfg(all(feature = "os-poll", feature = "tcp"))]
 pub(crate) unsafe fn to_socket_addr(
     storage: *const libc::sockaddr_storage,
 ) -> std::io::Result<SocketAddr> {

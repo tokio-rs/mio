@@ -25,13 +25,10 @@ cfg_net! {
             }
         }};
     }
-}
 
-cfg_tcp! {
+    mod net;
+
     pub(crate) mod tcp;
-}
-
-cfg_udp! {
     pub(crate) mod udp;
 }
 
@@ -40,10 +37,6 @@ pub(crate) mod named_pipe;
 
 mod waker;
 pub(crate) use waker::Waker;
-
-cfg_net! {
-    mod net;
-}
 
 cfg_io_source! {
     use std::io;

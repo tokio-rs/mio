@@ -127,21 +127,10 @@ pub mod features {
     //! The `pipe` feature adds `unix::pipe`, and related types, a non-blocking
     //! wrapper around the `pipe(2)` system call.
     //!
-    //! ## Network types
+    #![cfg_attr(feature = "net", doc = "## Network types (enabled)")]
+    #![cfg_attr(not(feature = "net"), doc = "## Network types (disabled)")]
     //!
-    //! Mio provide three features to enable network types:
-    //!
-    #![cfg_attr(feature = "tcp", doc = "* `tcp` (enabled)")]
-    #![cfg_attr(not(feature = "tcp"), doc = "* `tcp` (disabled)")]
-    //! : includes `TcpStream` and `TcpListener`,
-    #![cfg_attr(feature = "udp", doc = "* `udp` (enabled)")]
-    #![cfg_attr(not(feature = "udp"), doc = "* `udp` (disabled)")]
-    //! : includes `UdpSocket`, and
-    #![cfg_attr(feature = "uds", doc = "* `uds` (enabled)")]
-    #![cfg_attr(not(feature = "uds"), doc = "* `uds` (disabled)")]
-    //! : includes `UnixDatagram`, `UnixListener`, `UnixStream` and `SocketAddr`.
-    //!
-    //! All types can be found in the `net` module.
+    //! The `net` feature enables networking primitives in the `net` module.
 }
 
 pub mod guide {

@@ -24,71 +24,24 @@ macro_rules! cfg_not_os_poll {
     }
 }
 
-/// One of the `tcp`, `udp`, `uds` features enabled.
-#[cfg(unix)]
+/// The `net` feature is enabled.
 macro_rules! cfg_net {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "tcp", feature = "udp", feature = "uds"))))]
+            #[cfg(feature = "net")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
             $item
         )*
     }
 }
 
-/// One of the features enabled that needs `IoSource`. That is `tcp`, or `udp`,
-/// or on Unix `uds` or `pipe`.
+/// One of the features enabled that needs `IoSource`. That is `net` or `pipe`
+/// (on Unix).
 macro_rules! cfg_io_source {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "tcp", feature = "udp", all(unix, any(feature = "uds",  feature = "pipe"))))]
-            #[cfg_attr(docsrs, doc(any(feature = "tcp", feature = "udp", all(unix, any(feature = "uds",  feature = "pipe")))))]
-            $item
-        )*
-    }
-}
-
-/// One of the `tcp`, `udp` features enabled.
-#[cfg(windows)]
-macro_rules! cfg_net {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(feature = "tcp", feature = "udp"))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "tcp", feature = "udp"))))]
-            $item
-        )*
-    }
-}
-
-/// Feature `tcp` enabled.
-macro_rules! cfg_tcp {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "tcp")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "tcp")))]
-            $item
-        )*
-    }
-}
-
-/// Feature `udp` enabled.
-macro_rules! cfg_udp {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "udp")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "udp")))]
-            $item
-        )*
-    }
-}
-
-/// Feature `uds` enabled.
-#[cfg(unix)]
-macro_rules! cfg_uds {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "uds")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "uds")))]
+            #[cfg(any(feature = "net", all(unix, feature = "pipe")))]
+            #[cfg_attr(docsrs, doc(any(feature = "net", all(unix, feature = "pipe"))))]
             $item
         )*
     }
@@ -107,24 +60,11 @@ macro_rules! cfg_pipe {
 }
 
 /// Feature `os-util` enabled, or one of the features that need `os-util`.
-#[cfg(unix)]
 macro_rules! cfg_any_os_util {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "uds", feature = "pipe"))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "uds", feature = "pipe"))))]
-            $item
-        )*
-    }
-}
-
-/// Feature `os-util` enabled, or one of the features that need `os-util`.
-#[cfg(windows)]
-macro_rules! cfg_any_os_util {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "pipe"))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "os-util", feature = "tcp", feature = "udp", feature = "pipe"))))]
+            #[cfg(any(feature = "os-util", feature = "net", all(unix, feature = "pipe")))]
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "os-util", feature = "net", all(unix, feature = "pipe")))))]
             $item
         )*
     }
