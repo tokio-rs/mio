@@ -33,7 +33,9 @@ pipe = ["os-poll"]
 tcp = []
 udp = []
 uds = []
-extra-docs = []
+
+# Deprecated features, will be removed in a future version.
+extra-docs = [] # Docs are now always present.
 
 [dependencies]
 log = "0.4.8"
