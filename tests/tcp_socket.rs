@@ -37,3 +37,22 @@ fn set_reuseport() {
 
     let _ = socket.listen(128).unwrap();
 }
+
+#[test]
+fn get_localaddr() {
+    let expected_addr = "127.0.0.1:0".parse().unwrap();
+    let socket = TcpSocket::new_v4().unwrap();
+
+    //Windows doesn't support calling getsockname before calling `bind`
+    #[cfg(not(windows))]
+    assert_eq!("0.0.0.0:0", socket.get_localaddr().unwrap().to_string());
+
+    socket.bind(expected_addr).unwrap();
+
+    let actual_addr = socket.get_localaddr().unwrap();
+
+    assert_eq!(expected_addr.ip(), actual_addr.ip());
+    assert!(actual_addr.port() > 0);
+
+    let _ = socket.listen(128).unwrap();
+}

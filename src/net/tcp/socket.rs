@@ -105,6 +105,13 @@ impl TcpSocket {
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         sys::tcp::set_linger(self.sys, dur)
     }
+
+    /// Returns the local address of this socket
+    ///
+    /// Will return `Err` result in windows if called before calling `bind`
+    pub fn get_localaddr(&self) -> io::Result<SocketAddr> {
+        sys::tcp::get_localaddr(self.sys)
+    }
 }
 
 impl Drop for TcpSocket {

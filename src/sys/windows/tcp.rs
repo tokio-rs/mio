@@ -1,14 +1,17 @@
 use std::io;
 use std::mem::size_of;
-use std::net::{self, SocketAddr};
+use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
 use winapi::ctypes::{c_char, c_int, c_ushort};
+use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, SOCKADDR_IN};
+use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
+
 use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
 use winapi::um::winsock2::{
-    self, closesocket, linger, setsockopt, getsockopt, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
+    self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
     SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR,
 };
 
@@ -101,6 +104,31 @@ pub(crate) fn get_reuseaddr(socket: TcpSocket) -> io::Result<bool> {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
         _ => Ok(optval != 0),
     }
+}
+
+pub(crate) fn get_localaddr(socket: TcpSocket) -> io::Result<SocketAddr> {
+    let mut addr: SOCKADDR_STORAGE = unsafe { std::mem::zeroed() };
+    let mut length = std::mem::size_of_val(&addr) as c_int;
+
+    match unsafe { getsockname(
+        socket,
+        &mut addr as *mut _ as *mut _,
+        &mut length
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => {
+            let storage: *const SOCKADDR_STORAGE = (&addr) as *const _;
+            if addr.ss_family as c_int == AF_INET {
+                let sock_addr : SocketAddrV4 = unsafe { *(storage as *const SOCKADDR_IN as *const _) };
+                Ok(sock_addr.into())
+            } else {
+                let sock_addr : SocketAddrV6 = unsafe { *(storage as *const SOCKADDR_IN6_LH as *const _) };
+                Ok(sock_addr.into())
+            }
+        },
+    }
+
+
 }
 
 pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {

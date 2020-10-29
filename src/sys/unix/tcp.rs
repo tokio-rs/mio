@@ -103,6 +103,19 @@ pub(crate) fn get_reuseport(socket: TcpSocket) -> io::Result<bool> {
     Ok(optval != 0)
 }
 
+pub(crate) fn get_localaddr(socket: TcpSocket) -> io::Result<SocketAddr> {
+    let mut addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
+    let mut length = size_of::<libc::sockaddr_storage>() as libc::socklen_t;
+
+    syscall!(getsockname(
+        socket,
+        &mut addr as *mut _ as *mut _,
+        &mut length
+    ))?;
+
+    unsafe { to_socket_addr(&addr) }
+}
+
 pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
     let val: libc::linger = libc::linger {
         l_onoff: if dur.is_some() { 1 } else { 0 },
