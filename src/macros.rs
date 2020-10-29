@@ -3,7 +3,7 @@
 // Depending on the features not all macros are used.
 #![allow(unused_macros)]
 
-/// Feature `os-poll` enabled.
+/// The `os-poll` feature is enabled.
 macro_rules! cfg_os_poll {
     ($($item:item)*) => {
         $(
@@ -14,11 +14,22 @@ macro_rules! cfg_os_poll {
     }
 }
 
-/// Feature `os-poll` disabled.
+/// The `os-poll` feature is disabled.
 macro_rules! cfg_not_os_poll {
     ($($item:item)*) => {
         $(
             #[cfg(not(feature = "os-poll"))]
+            $item
+        )*
+    }
+}
+
+/// The `os-ext` feature is enabled.
+macro_rules! cfg_os_ext {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "os-ext")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "os-ext")))]
             $item
         )*
     }
@@ -35,36 +46,24 @@ macro_rules! cfg_net {
     }
 }
 
-/// One of the features enabled that needs `IoSource`. That is `net` or `pipe`
-/// (on Unix).
+/// One of the features enabled that needs `IoSource`. That is `net` or `os-ext`
+/// on Unix (for `pipe`).
 macro_rules! cfg_io_source {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "net", all(unix, feature = "pipe")))]
-            #[cfg_attr(docsrs, doc(any(feature = "net", all(unix, feature = "pipe"))))]
+            #[cfg(any(feature = "net", all(unix, feature = "os-ext")))]
+            #[cfg_attr(docsrs, doc(any(feature = "net", all(unix, feature = "os-ext"))))]
             $item
         )*
     }
 }
 
-/// Feature `pipe` enabled.
-#[cfg(unix)]
-macro_rules! cfg_pipe {
+/// The `os-ext` feature is enabled, or one of the features that need `os-ext`.
+macro_rules! cfg_any_os_ext {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "pipe")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "pipe")))]
-            $item
-        )*
-    }
-}
-
-/// Feature `os-util` enabled, or one of the features that need `os-util`.
-macro_rules! cfg_any_os_util {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(feature = "os-util", feature = "net", all(unix, feature = "pipe")))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "os-util", feature = "net", all(unix, feature = "pipe")))))]
+            #[cfg(any(feature = "os-ext", feature = "net"))]
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "os-ext", feature = "net"))))]
             $item
         )*
     }

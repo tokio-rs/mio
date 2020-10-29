@@ -54,7 +54,7 @@ cfg_os_poll! {
         }
     }
 
-    cfg_pipe! {
+    cfg_os_ext! {
         pub(crate) mod pipe;
     }
 }
@@ -65,7 +65,7 @@ cfg_not_os_poll! {
         pub use self::uds::SocketAddr;
     }
 
-    cfg_any_os_util! {
+    cfg_any_os_ext! {
         mod sourcefd;
         pub use self::sourcefd::SourceFd;
     }
