@@ -1,3 +1,18 @@
+# 0.7.5
+
+## Added
+
+* `TcpSocket::get_localaddr()` retrieves local address
+  (https://github.com/tokio-rs/mio/commit/b41a022b2242eef1969c70c8ba93e04c528dba47)
+* `TcpSocket::set_reuseport()` & `TcpSocket::get_reuseport()` configures and reads SO_REUSEPORT
+  (https://github.com/tokio-rs/mio/commit/183bbe409ab69cbf9db41d0263b41ec86202d9a0)
+* `unix:pipe()` a wrapper around pipe(2) sys call
+  (https://github.com/tokio-rs/mio/commit/2b7c0967a7362303946deb3d4ca2ae507af6c72d)
+* Add a check that a single Waker is active per Poll instance (only in debug mode)
+  (https://github.com/tokio-rs/mio/commit/f4874f28b32efcf4841691884c65a89734d96a56)
+* Added `Interest:remove()`
+  (https://github.com/tokio-rs/mio/commit/b8639c3d9ac07bb7e2e27685680c8a6510fa1357)
+
 # 0.7.4
 
 ## Fixes

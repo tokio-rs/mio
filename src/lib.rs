@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/mio/0.7.4")]
+#![doc(html_root_url = "https://docs.rs/mio/0.7.5")]
 #![deny(
     missing_docs,
     missing_debug_implementations,
