@@ -106,6 +106,16 @@ impl TcpSocket {
         sys::tcp::set_linger(self.sys, dur)
     }
 
+    /// Sets the value of `SO_RECVBUF` on this socket.
+    pub fn set_recv_buffer_size(&self, size: u32) -> io::Result<()> {
+        sys::tcp::set_recv_buffer_size(self.sys, size)
+    }
+
+    /// Sets the value of `SO_SNDBUF` on this socket.
+    pub fn set_send_buffer_size(&self, size: u32) -> io::Result<()> {
+        sys::tcp::set_send_buffer_size(self.sys, size)
+    }
+
     /// Returns the local address of this socket
     ///
     /// Will return `Err` result in windows if called before calling `bind`
