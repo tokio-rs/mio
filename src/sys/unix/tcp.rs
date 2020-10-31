@@ -8,6 +8,19 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 
 use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use libc::TCP_KEEPALIVE as KEEPALIVE;
+#[cfg(any(target_os = "openbsd", target_os = "netbsd", target_os = "haiku"))]
+use libc::SO_KEEPALIVE as KEEPALIVE;
+#[cfg(not(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "haiku"
+)))]
+use libc::TCP_KEEPIDLE as KEEPALIVE;
+
 pub type TcpSocket = libc::c_int;
 
 pub(crate) fn new_v4_socket() -> io::Result<TcpSocket> {
@@ -144,7 +157,6 @@ pub(crate) fn set_recv_buffer_size(socket: TcpSocket, size: u32) -> io::Result<(
 pub(crate) fn get_recv_buffer_size(socket: TcpSocket) -> io::Result<u32> {    
     let mut optval: libc::c_int = 0;
     let mut optlen = size_of::<libc::c_int>() as libc::socklen_t;
-
     syscall!(getsockopt(
         socket,
         libc::SOL_SOCKET,
@@ -181,6 +193,57 @@ pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {
     ))?;
 
     Ok(optval as u32)
+}
+
+pub(crate) fn set_keepalive(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
+    syscall!(setsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_KEEPALIVE,
+        &(dur.is_some() as libc::c_int) as *const _ as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t
+    ))
+    .map(|_| ())?;
+
+    if let Some(dur) = dur {
+        let dur_secs = dur.as_secs().try_into().ok().unwrap_or_else(i32::max_value);
+        syscall!(setsockopt(
+            socket,
+            libc::IPPROTO_TCP, 
+            KEEPALIVE,
+            &(dur_secs as libc::c_int)  as *const _ as *const libc::c_void,
+            size_of::<libc::c_int>() as libc::socklen_t
+        ))
+        .map(|_| ())?;
+    }
+    Ok(())
+}
+
+pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<Option<Duration>> {
+    let mut optval: libc::c_int = 0;
+    let mut optlen = mem::size_of::<libc::c_int>() as libc::socklen_t;
+
+    syscall!(getsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_KEEPALIVE,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ))?;
+
+    if optval == 0 {
+        return Ok(None);
+    }
+
+    syscall!(getsockopt(
+        socket,
+        libc::IPPROTO_TCP,
+        KEEPALIVE,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ))?;
+
+    Ok(Some(Duration::from_secs(optval as u64)))
 }
 
 pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {

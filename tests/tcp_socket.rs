@@ -2,6 +2,7 @@
 
 use mio::net::TcpSocket;
 use std::io;
+use std::time::Duration;
 
 #[test]
 fn is_send_and_sync() {
@@ -33,6 +34,36 @@ fn set_reuseport() {
     let socket = TcpSocket::new_v4().unwrap();
     socket.set_reuseport(true).unwrap();
     assert!(socket.get_reuseport().unwrap());
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
+
+
+
+#[test]
+fn set_keepalive() {
+    let dur = Duration::from_secs(4); // Chosen by fair dice roll, guaranteed to be random
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket.set_keepalive(Some(dur)).unwrap();
+    assert_eq!(Some(dur), socket.get_keepalive().unwrap());
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
+#[test]
+fn set_keepalive_none() {
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket.set_keepalive(None).unwrap();
+    assert_eq!(None, socket.get_keepalive().unwrap());
 
     socket.bind(addr).unwrap();
 

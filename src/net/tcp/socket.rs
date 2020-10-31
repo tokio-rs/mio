@@ -164,6 +164,33 @@ impl TcpSocket {
         sys::tcp::get_send_buffer_size(self.sys)
     }
     
+    /// Sets whether keepalive messages are enabled to be sent on this socket.
+    ///
+    /// On Unix, this option will set the `SO_KEEPALIVE` as well as the
+    /// `TCP_KEEPALIVE` or `TCP_KEEPIDLE` option (depending on your platform).
+    /// On Windows, this will set the `SIO_KEEPALIVE_VALS` option.
+    ///
+    /// If `None` is specified then keepalive messages are disabled, otherwise
+    /// the duration specified will be the time to remain idle before sending a
+    /// TCP keepalive probe.
+    ///
+    /// Some platforms specify this value in seconds, so sub-second
+    /// specifications may be omitted.
+    pub fn set_keepalive(&self, dur: Option<Duration>) -> io::Result<()> {
+        sys::tcp::set_keepalive(self.sys, dur)
+    }
+
+    /// Returns the duration after which TCP keepalive probes will be sent, if
+    /// keepalive messages are enabled to be sent on this socket.
+    ///
+    /// If `None`, then keepalive messages are disabled.
+    ///
+    /// Some platforms specify this value in seconds, so sub-second
+    /// specifications may be omitted.
+    pub fn get_keepalive(&self) -> io::Result<Option<Duration>> {
+        sys::tcp::get_keepalive(self.sys)
+    }
+
     /// Returns the local address of this socket
     ///
     /// Will return `Err` result in windows if called before calling `bind`

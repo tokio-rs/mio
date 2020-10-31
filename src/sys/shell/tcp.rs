@@ -65,6 +65,14 @@ pub(crate) fn set_send_buffer_size(_: TcpSocket, _: u32) -> io::Result<()> {
 pub(crate) fn get_send_buffer_size(_: TcpSocket) -> io::Result<u32> {
     os_required!();
 }
+pub(crate) fn set_keepalive(_: TcpSocket, _: Option<Duration>) -> io::Result<()> {
+    os_required!();
+}
+
+pub(crate) fn get_keepalive(_: TcpSocket) -> io::Result<Option<Duration>> {
+    os_required!();
+}
+
 
 pub fn accept(_: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
     os_required!();
