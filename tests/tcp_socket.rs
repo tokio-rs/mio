@@ -40,9 +40,6 @@ fn set_reuseport() {
     let _ = socket.listen(128).unwrap();
 }
 
-
-
-
 #[test]
 fn set_keepalive() {
     let dur = Duration::from_secs(4); // Chosen by fair dice roll, guaranteed to be random
