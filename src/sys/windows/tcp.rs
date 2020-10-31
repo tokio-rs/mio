@@ -2,6 +2,7 @@ use std::io;
 use std::mem::size_of;
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
+use std::convert::TryInto;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
@@ -171,8 +172,8 @@ pub(crate) fn get_recv_buffer_size(socket: TcpSocket) -> io::Result<u32> {
         socket,
         SOL_SOCKET,
         SO_RCVBUF,
-        &size as *const _ as *const c_char,
-        size_of::<c_int>() as c_int
+        &mut optval as *mut _,
+        &mut optlen as *mut _,
     ) } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
         _ => Ok(optval as u32),
@@ -200,8 +201,8 @@ pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {
         socket,
         SOL_SOCKET,
         SO_SNDBUF,
-        &size as *const _ as *const c_char,
-        size_of::<c_int>() as c_int
+        &mut optval as *mut _,
+        &mut optlen as *mut _,
     ) } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
         _ => Ok(optval as u32),
