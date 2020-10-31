@@ -106,12 +106,12 @@ impl TcpSocket {
         sys::tcp::set_linger(self.sys, dur)
     }
 
-    /// Sets the value of `SO_RECVBUF` on this socket.
+    /// Sets the value of `SO_RCVBUF` on this socket.
     pub fn set_recv_buffer_size(&self, size: u32) -> io::Result<()> {
         sys::tcp::set_recv_buffer_size(self.sys, size)
     }
 
-    /// Get the value of `SO_RECVBUF` set on this socket.
+    /// Get the value of `SO_RCVBUF` set on this socket.
     pub fn get_recv_buffer_size(&self) -> io::Result<u32> {
         sys::tcp::get_recv_buffer_size(self.sys)
     }

@@ -56,3 +56,39 @@ fn get_localaddr() {
 
     let _ = socket.listen(128).unwrap();
 }
+
+#[test]
+fn send_buffer_size_roundtrips() {
+    fn test(size: u32) {
+        println!("testing send buffer size: {}", size);
+        let socket = TcpSocket::new_v4().unwrap();
+        socket.set_send_buffer_size(size).unwrap();
+        // As per `man socket(7)`:
+        // > Sets or gets the maximum socket send buffer in bytes.  The
+        // > kernel doubles this value (to allow space for bookkeeping
+        // > overhead) when it is set using setsockopt(2), and this doubled
+        // > value is returned by getsockopt(2).
+        assert_eq!(size * 2, socket.get_send_buffer_size().unwrap());
+    }
+
+    test(4096);
+    test(65512);
+}
+
+#[test]
+fn recv_buffer_size_roundtrips() {
+    fn test(size: u32) {
+        println!("testing recv buffer size: {}", size);
+        let socket = TcpSocket::new_v4().unwrap();
+        socket.set_recv_buffer_size(size).unwrap();
+        // As per `man socket(7)`:
+        // > Sets or gets the maximum socket receive buffer in bytes.  The
+        // > kernel doubles this value (to allow space for bookkeeping
+        // > overhead) when it is set using setsockopt(2), and this doubled
+        // > value is returned by getsockopt(2).
+        assert_eq!(size * 2, socket.get_recv_buffer_size().unwrap());
+    }
+
+    test(4096);
+    test(65512);
+}

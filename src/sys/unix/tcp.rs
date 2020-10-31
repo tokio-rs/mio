@@ -130,11 +130,11 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
 }
 
 pub(crate) fn set_recv_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
-    let size = size.try_into().unwrap_or_else(i32::max_value);
+    let size = size.try_into().ok().unwrap_or_else(i32::max_value);
     syscall!(setsockopt(
         socket,
         libc::SOL_SOCKET,
-        libc::SO_RECVBUF,
+        libc::SO_RCVBUF,
         &size as *const _ as *const libc::c_void,
         size_of::<libc::c_int>() as libc::socklen_t
     ))
@@ -148,16 +148,16 @@ pub(crate) fn get_recv_buffer_size(socket: TcpSocket) -> io::Result<u32> {
     syscall!(getsockopt(
         socket,
         libc::SOL_SOCKET,
-        libc::SO_RECVBUF,
+        libc::SO_RCVBUF,
         &mut optval as *mut _ as *mut _,
         &mut optlen,
     ))?;
 
-    Ok(optval)
+    Ok(optval as u32)
 }
 
 pub(crate) fn set_send_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
-    let size = size.try_into().unwrap_or_else(i32::max_value);
+    let size = size.try_into().ok().unwrap_or_else(i32::max_value);
     syscall!(setsockopt(
         socket,
         libc::SOL_SOCKET,
@@ -180,7 +180,7 @@ pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {
         &mut optlen,
     ))?;
 
-    Ok(optval)
+    Ok(optval as u32)
 }
 
 pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {

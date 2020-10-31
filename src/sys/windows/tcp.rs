@@ -12,7 +12,7 @@ use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
 use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
 use winapi::um::winsock2::{
     self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
-    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RECVBUF, SO_SNDBUF,
+    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF,
 };
 
 use crate::sys::windows::net::{init, new_socket, socket_addr};
@@ -151,11 +151,11 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
 
 
 pub(crate) fn set_recv_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
-    let size = size.try_into().unwrap_or_else(i32::max_value);
+    let size = size.try_into().ok().unwrap_or_else(i32::max_value);
     match unsafe { setsockopt(
         socket,
         SOL_SOCKET,
-        SO_RECVBUF,
+        SO_RCVBUF,
         &size as *const _ as *const c_char,
         size_of::<c_int>() as c_int
     ) } {
@@ -170,17 +170,17 @@ pub(crate) fn get_recv_buffer_size(socket: TcpSocket) -> io::Result<u32> {
     match unsafe { getsockopt(
         socket,
         SOL_SOCKET,
-        SO_RECVBUF,
+        SO_RCVBUF,
         &size as *const _ as *const c_char,
         size_of::<c_int>() as c_int
     ) } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
-        _ => Ok(()),
+        _ => Ok(optval as u32),
     }
 }
 
 pub(crate) fn set_send_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
-    let size = size.try_into().unwrap_or_else(i32::max_value);
+    let size = size.try_into().ok().unwrap_or_else(i32::max_value);
     match unsafe { setsockopt(
         socket,
         SOL_SOCKET,
@@ -204,7 +204,7 @@ pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {
         size_of::<c_int>() as c_int
     ) } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
-        _ => Ok(()),
+        _ => Ok(optval as u32),
     }
 }
 
