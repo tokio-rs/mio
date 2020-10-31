@@ -12,7 +12,7 @@ use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
 use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
 use winapi::um::winsock2::{
     self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
-    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR,
+    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RECVBUF, SO_SNDBUF,
 };
 
 use crate::sys::windows::net::{init, new_socket, socket_addr};
@@ -148,6 +148,33 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
         _ => Ok(()),
     }
 }
+
+pub(crate) fn set_recv_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
+    let size = size.try_into().unwrap_or_else(i32::max_value);
+    match unsafe { setsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_RECVBUF,
+        &size as *const _ as *const c_char,
+        size_of::<c_int>() as c_int
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(()),
+    }
+}
+
+pub(crate) fn set_send_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
+    let size = size.try_into().unwrap_or_else(i32::max_value);
+    match unsafe { setsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_SNDBUF,
+        &size as *const _ as *const c_char,
+        size_of::<c_int>() as c_int
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(()),
+    }
 
 pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
     // The non-blocking state of `listener` is inherited. See
