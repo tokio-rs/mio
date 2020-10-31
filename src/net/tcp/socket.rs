@@ -111,11 +111,21 @@ impl TcpSocket {
         sys::tcp::set_recv_buffer_size(self.sys, size)
     }
 
+    /// Get the value of `SO_RECVBUF` set on this socket.
+    pub fn get_recv_buffer_size(&self) -> io::Result<u32> {
+        sys::tcp::get_recv_buffer_size(self.sys)
+    }
+
     /// Sets the value of `SO_SNDBUF` on this socket.
     pub fn set_send_buffer_size(&self, size: u32) -> io::Result<()> {
         sys::tcp::set_send_buffer_size(self.sys, size)
     }
 
+    /// Get the value of `SO_SNDBUF` set on this socket.
+    pub fn get_send_buffer_size(&self) -> io::Result<u32> {
+        sys::tcp::get_send_buffer_size(self.sys)
+    }
+    
     /// Returns the local address of this socket
     ///
     /// Will return `Err` result in windows if called before calling `bind`

@@ -54,7 +54,15 @@ pub(crate) fn set_recv_buffer_size(_: TcpSocket, _: u32) -> io::Result<()> {
     os_required!();
 }
 
+pub(crate) fn get_recv_buffer_size(_: TcpSocket) -> io::Result<u32> {
+    os_required!();
+}
+
 pub(crate) fn set_send_buffer_size(_: TcpSocket, _: u32) -> io::Result<()> {
+    os_required!();
+}
+
+pub(crate) fn get_send_buffer_size(_: TcpSocket) -> io::Result<u32> {
     os_required!();
 }
 
