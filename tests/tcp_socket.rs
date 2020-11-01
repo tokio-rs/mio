@@ -1,6 +1,7 @@
 #![cfg(all(feature = "os-poll", feature = "tcp"))]
 
 use mio::net::TcpSocket;
+use std::io;
 
 #[test]
 fn is_send_and_sync() {
@@ -59,36 +60,39 @@ fn get_localaddr() {
 
 #[test]
 fn send_buffer_size_roundtrips() {
-    fn test(size: u32) {
-        println!("testing send buffer size: {}", size);
+    test_buffer_sizes(TcpSocket::set_send_buffer_size, TcpSocket::get_send_buffer_size)
+}
+
+
+#[test]
+fn recv_buffer_size_roundtrips() {
+    test_buffer_sizes(TcpSocket::set_recv_buffer_size, TcpSocket::get_recv_buffer_size)
+}
+
+// Helper for testing send/recv buffer size.
+fn test_buffer_sizes(
+    set: impl Fn(&TcpSocket, u32) -> io::Result<()>,
+    get: impl Fn(&TcpSocket) -> io::Result<u32>
+) {
+    let test = |size: u32| {
+        println!("testing buffer size: {}", size);
         let socket = TcpSocket::new_v4().unwrap();
-        socket.set_send_buffer_size(size).unwrap();
-        // As per `man socket(7)`:
+        set(&socket, size).unwrap();
+        // Note that this doesn't assert that the values are equal: on Linux,
+        // the kernel doubles the requested buffer size, and returns the doubled
+        // value from `getsockopt`. As per `man socket(7)`:
         // > Sets or gets the maximum socket send buffer in bytes.  The
         // > kernel doubles this value (to allow space for bookkeeping
         // > overhead) when it is set using setsockopt(2), and this doubled
         // > value is returned by getsockopt(2).
-        assert_eq!(size * 2, socket.get_send_buffer_size().unwrap());
-    }
+        //
+        // Additionally, the buffer size may be clamped above a minimum value,
+        // and this minimum value is OS-dependent.
+        let actual = get(&socket).unwrap();
+        assert!(actual >= size, "\tactual: {}\n\texpected: {}", actual, size);
+    };
 
-    test(4096);
-    test(65512);
-}
-
-#[test]
-fn recv_buffer_size_roundtrips() {
-    fn test(size: u32) {
-        println!("testing recv buffer size: {}", size);
-        let socket = TcpSocket::new_v4().unwrap();
-        socket.set_recv_buffer_size(size).unwrap();
-        // As per `man socket(7)`:
-        // > Sets or gets the maximum socket receive buffer in bytes.  The
-        // > kernel doubles this value (to allow space for bookkeeping
-        // > overhead) when it is set using setsockopt(2), and this doubled
-        // > value is returned by getsockopt(2).
-        assert_eq!(size * 2, socket.get_recv_buffer_size().unwrap());
-    }
-
+    test(256);
     test(4096);
     test(65512);
 }
