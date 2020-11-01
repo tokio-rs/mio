@@ -172,7 +172,7 @@ pub(crate) fn get_recv_buffer_size(socket: TcpSocket) -> io::Result<u32> {
         socket,
         SOL_SOCKET,
         SO_RCVBUF,
-        &mut optval as *mut _,
+        &mut optval as *mut _ as *mut _,
         &mut optlen as *mut _,
     ) } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
@@ -201,7 +201,7 @@ pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {
         socket,
         SOL_SOCKET,
         SO_SNDBUF,
-        &mut optval as *mut _,
+        &mut optval as *mut _ as *mut _,
         &mut optlen as *mut _,
     ) } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
