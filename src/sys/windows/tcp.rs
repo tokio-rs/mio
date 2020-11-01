@@ -216,7 +216,7 @@ pub(crate) fn set_keepalive(socket: TcpSocket, dur: Option<Duration>) -> io::Res
     // Windows takes the keepalive timeout as a u32 of milliseconds.
     let dur_ms = dur.map(|dur| {
         let ms = dur.as_millis();
-        if ms > DWORD::max_value() as u128 {
+        if ms > i32::max_value() as u128 {
             winapi::um::winbase::INFINITE
         } else {
             ms as DWORD
