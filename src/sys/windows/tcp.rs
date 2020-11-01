@@ -1,4 +1,5 @@
 use std::io;
+use std::convert::TryInto;
 use std::mem::size_of;
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
@@ -7,12 +8,12 @@ use std::ptr;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
-use winapi::ctypes::{c_char, c_int, c_ushort};
+use winapi::ctypes::{c_char, c_int, c_ushort, c_ulong};
 use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, SOCKADDR_IN};
 use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
 use winapi::shared::mstcpip;
 
-use winapi::shared::minwindef::{BOOL, TRUE, FALSE, DWORD, LPVOID, LPDWORD,};
+use winapi::shared::minwindef::{BOOL, TRUE, FALSE, DWORD, LPVOID};
 use winapi::um::winsock2::{
     self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
     SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF, WSAIoctl, LPWSAOVERLAPPED
@@ -216,11 +217,7 @@ pub(crate) fn set_keepalive(socket: TcpSocket, dur: Option<Duration>) -> io::Res
     // Windows takes the keepalive timeout as a u32 of milliseconds.
     let dur_ms = dur.map(|dur| {
         let ms = dur.as_millis();
-        if ms > i32::max_value() as u128 {
-            winapi::um::winbase::INFINITE
-        } else {
-            ms as DWORD
-        }
+        ms.try_into().ok().unwrap_or_else(i32::max_value)
     }).unwrap_or(0);
 
     let keepalive = mstcpip::tcp_keepalive {
@@ -237,7 +234,7 @@ pub(crate) fn set_keepalive(socket: TcpSocket, dur: Option<Duration>) -> io::Res
         size_of::<mstcpip::tcp_keepalive> as DWORD,
         ptr::null_mut() as LPVOID,
         0 as DWORD,
-        &mut out as *mut _ as LPDVOID,
+        &mut out as *mut _ as LPVOID,
         ptr::null_mut() as LPWSAOVERLAPPED,
         None,
     ) } {
@@ -260,12 +257,12 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<Option<Duration>> {
         0,
         &mut keepalive as *mut _ as LPVOID,
         size_of::<mstcpip::tcp_keepalive>() as DWORD,
-        ptr::null_mut() as LPDVOID,
+        ptr::null_mut() as LPVOID,
         ptr::null_mut() as LPWSAOVERLAPPED,
         None,
     ) } {
         0 if keepalive.onoff == 0 || keepalive.keepaliveinterval == 0 => Ok(None),
-        0 => Ok(Some(Duration::from_millis(ka.keepaliveinterval as u64))),
+        0 => Ok(Some(Duration::from_millis(keepalive.keepaliveinterval as u64))),
         _ => Err(io::Error::last_os_error())
     }
 }
