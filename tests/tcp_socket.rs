@@ -60,19 +60,24 @@ fn get_localaddr() {
 
 #[test]
 fn send_buffer_size_roundtrips() {
-    test_buffer_sizes(TcpSocket::set_send_buffer_size, TcpSocket::get_send_buffer_size)
+    test_buffer_sizes(
+        TcpSocket::set_send_buffer_size,
+        TcpSocket::get_send_buffer_size,
+    )
 }
-
 
 #[test]
 fn recv_buffer_size_roundtrips() {
-    test_buffer_sizes(TcpSocket::set_recv_buffer_size, TcpSocket::get_recv_buffer_size)
+    test_buffer_sizes(
+        TcpSocket::set_recv_buffer_size,
+        TcpSocket::get_recv_buffer_size,
+    )
 }
 
 // Helper for testing send/recv buffer size.
 fn test_buffer_sizes(
     set: impl Fn(&TcpSocket, u32) -> io::Result<()>,
-    get: impl Fn(&TcpSocket) -> io::Result<u32>
+    get: impl Fn(&TcpSocket) -> io::Result<u32>,
 ) {
     let test = |size: u32| {
         println!("testing buffer size: {}", size);
