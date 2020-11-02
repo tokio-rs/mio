@@ -8,7 +8,7 @@ use std::ptr;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
-use winapi::ctypes::{c_char, c_int, c_ushort, c_ulong};
+use winapi::ctypes::{c_char, c_int, c_ushort, c_ulong, c_void};
 use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, SOCKADDR_IN};
 use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
 use winapi::shared::mstcpip;
@@ -234,7 +234,7 @@ pub(crate) fn set_keepalive(socket: TcpSocket, dur: Option<Duration>) -> io::Res
         size_of::<mstcpip::tcp_keepalive> as DWORD,
         ptr::null_mut() as LPVOID,
         0 as DWORD,
-        &mut out as *mut _ as LPVOID,
+        &mut out as *mut c_void as LPVOID,
         ptr::null_mut() as LPWSAOVERLAPPED,
         None,
     ) } {
@@ -257,7 +257,7 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<Option<Duration>> {
         0,
         &mut keepalive as *mut _ as LPVOID,
         size_of::<mstcpip::tcp_keepalive>() as DWORD,
-        ptr::null_mut() as LPVOID,
+        ptr::null_mut() as *mut c_void as LPVOID,
         ptr::null_mut() as LPWSAOVERLAPPED,
         None,
     ) } {
