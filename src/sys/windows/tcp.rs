@@ -3,17 +3,16 @@ use std::convert::TryInto;
 use std::mem::size_of;
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
-use std::convert::TryInto;
 use std::ptr;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
-use winapi::ctypes::{c_char, c_int, c_ushort, c_ulong, c_void};
+use winapi::ctypes::{c_char, c_int, c_ushort, c_ulong};
 use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, SOCKADDR_IN};
 use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
 use winapi::shared::mstcpip;
 
-use winapi::shared::minwindef::{BOOL, TRUE, FALSE, DWORD, LPVOID};
+use winapi::shared::minwindef::{BOOL, TRUE, FALSE, DWORD, LPVOID, LPDWORD};
 use winapi::um::winsock2::{
     self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
     SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF, WSAIoctl, LPWSAOVERLAPPED
@@ -230,11 +229,11 @@ pub(crate) fn set_keepalive(socket: TcpSocket, dur: Option<Duration>) -> io::Res
     match unsafe { WSAIoctl(
         socket,
         mstcpip::SIO_KEEPALIVE_VALS,
-        &keepalive as *const _ as *mut _ as LPVOID,
-        size_of::<mstcpip::tcp_keepalive> as DWORD,
+        &keepalive as *const _ as *mut mstcpip::tcp_keepalive as LPVOID,
+        size_of::<mstcpip::tcp_keepalive>() as DWORD,
         ptr::null_mut() as LPVOID,
         0 as DWORD,
-        &mut out as *mut c_void as LPVOID,
+        &mut out as *mut _ as LPDWORD,
         ptr::null_mut() as LPWSAOVERLAPPED,
         None,
     ) } {
@@ -257,7 +256,7 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<Option<Duration>> {
         0,
         &mut keepalive as *mut _ as LPVOID,
         size_of::<mstcpip::tcp_keepalive>() as DWORD,
-        ptr::null_mut() as *mut c_void as LPVOID,
+        ptr::null_mut() as LPDWORD,
         ptr::null_mut() as LPWSAOVERLAPPED,
         None,
     ) } {
