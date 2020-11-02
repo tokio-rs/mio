@@ -1,4 +1,5 @@
 use std::io;
+use std::convert::TryInto;
 use std::mem;
 use std::mem::{size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
@@ -37,8 +38,6 @@ pub(crate) fn connect(socket: TcpSocket, addr: SocketAddr) -> io::Result<net::Tc
 }
 
 pub(crate) fn listen(socket: TcpSocket, backlog: u32) -> io::Result<net::TcpListener> {
-    use std::convert::TryInto;
-
     let backlog = backlog.try_into().unwrap_or(i32::max_value());
     syscall!(listen(socket, backlog))?;
     Ok(unsafe { net::TcpListener::from_raw_fd(socket) })
@@ -128,6 +127,60 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
         &val as *const libc::linger as *const libc::c_void,
         size_of::<libc::linger>() as libc::socklen_t,
     )).map(|_| ())
+}
+
+pub(crate) fn set_recv_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
+    let size = size.try_into().ok().unwrap_or_else(i32::max_value);
+    syscall!(setsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_RCVBUF,
+        &size as *const _ as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t
+    ))
+    .map(|_| ())
+}
+
+pub(crate) fn get_recv_buffer_size(socket: TcpSocket) -> io::Result<u32> {    
+    let mut optval: libc::c_int = 0;
+    let mut optlen = size_of::<libc::c_int>() as libc::socklen_t;
+
+    syscall!(getsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_RCVBUF,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ))?;
+
+    Ok(optval as u32)
+}
+
+pub(crate) fn set_send_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
+    let size = size.try_into().ok().unwrap_or_else(i32::max_value);
+    syscall!(setsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_SNDBUF,
+        &size as *const _ as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t
+    ))
+    .map(|_| ())
+}
+
+pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {    
+    let mut optval: libc::c_int = 0;
+    let mut optlen = size_of::<libc::c_int>() as libc::socklen_t;
+
+    syscall!(getsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_SNDBUF,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ))?;
+
+    Ok(optval as u32)
 }
 
 pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {

@@ -2,6 +2,7 @@ use std::io;
 use std::mem::size_of;
 use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
+use std::convert::TryInto;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
@@ -12,7 +13,7 @@ use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
 use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
 use winapi::um::winsock2::{
     self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
-    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR,
+    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF,
 };
 
 use crate::sys::windows::net::{init, new_socket, socket_addr};
@@ -148,6 +149,66 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
         _ => Ok(()),
     }
 }
+
+
+pub(crate) fn set_recv_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
+    let size = size.try_into().ok().unwrap_or_else(i32::max_value);
+    match unsafe { setsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_RCVBUF,
+        &size as *const _ as *const c_char,
+        size_of::<c_int>() as c_int
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(()),
+    }
+}
+
+pub(crate) fn get_recv_buffer_size(socket: TcpSocket) -> io::Result<u32> {
+    let mut optval: c_int = 0;
+    let mut optlen = size_of::<c_int>() as c_int;
+    match unsafe { getsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_RCVBUF,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen as *mut _,
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(optval as u32),
+    }
+}
+
+pub(crate) fn set_send_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
+    let size = size.try_into().ok().unwrap_or_else(i32::max_value);
+    match unsafe { setsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_SNDBUF,
+        &size as *const _ as *const c_char,
+        size_of::<c_int>() as c_int
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(()),
+    }
+}
+
+pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {
+    let mut optval: c_int = 0;
+    let mut optlen = size_of::<c_int>() as c_int;
+    match unsafe { getsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_SNDBUF,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen as *mut _,
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(optval as u32),
+    }
+}
+
 
 pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
     // The non-blocking state of `listener` is inherited. See
