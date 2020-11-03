@@ -1,14 +1,14 @@
-use crate::net::{TcpListener, TcpStream};
+use crate::net::{TcpStream, TcpListener};
 use crate::sys;
 
 use std::io;
 use std::mem;
 use std::net::SocketAddr;
+use std::time::Duration;
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, RawFd, FromRawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-use std::time::Duration;
 
 /// A non-blocking TCP socket used to configure a stream or listener.
 ///
