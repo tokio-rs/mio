@@ -221,6 +221,12 @@ impl TcpSocket {
     ///
     /// The OS may return an error if TCP keepalive was not already enabled by
     /// calling `set_keepalive(true)` on this socket.
+    #[cfg_attr(docsrs, doc(cfg(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "windows"
+    ))))]
     #[cfg(any(
         target_os = "linux",
         target_os = "freebsd",
@@ -242,6 +248,12 @@ impl TcpSocket {
     ///
     /// Some platforms specify this value in seconds, so sub-second
     /// specifications may be omitted.
+    #[cfg_attr(docsrs, doc(cfg(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "windows"
+    ))))]
     #[cfg(any(
         target_os = "linux",
         target_os = "freebsd",
@@ -260,7 +272,12 @@ impl TcpSocket {
     ///
     /// The OS may return an error if TCP keepalive was not already enabled by
     /// calling `set_keepalive(true)` on this socket.
-    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd",))]
+    #[cfg_attr(docsrs, doc(cfg(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "netbsd",
+    ))))]
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
     pub fn set_keepalive_retries(&self, retries: u32) -> io::Result<()> {
         sys::tcp::set_keepalive_retries(self.sys, retries)
     }
@@ -272,7 +289,12 @@ impl TcpSocket {
     ///
     /// This returns the value of `TCP_KEEPCNT` on Unix operating systems that
     /// support this option.
-    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd",))]
+    #[cfg_attr(docsrs, doc(cfg(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "netbsd",
+    ))))]
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
     pub fn get_keepalive_retries(&self) -> io::Result<Option<u32>> {
         sys::tcp::get_keepalive_retries(self.sys)
     }
