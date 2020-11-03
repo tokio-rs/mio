@@ -1,14 +1,14 @@
-use crate::net::{TcpStream, TcpListener};
+use crate::net::{TcpListener, TcpStream};
 use crate::sys;
 
 use std::io;
 use std::mem;
 use std::net::SocketAddr;
-use std::time::Duration;
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, RawFd, FromRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::time::Duration;
 
 /// A non-blocking TCP socket used to configure a stream or listener.
 ///
@@ -27,8 +27,8 @@ impl TcpSocket {
     ///
     /// This calls `socket(2)`.
     pub fn new_v4() -> io::Result<TcpSocket> {
-        sys::tcp::new_v4_socket().map(|sys| TcpSocket {
-            sys
+        sys::tcp::new_v4_socket().map(|sys| {
+            TcpSocket { sys }
         })
     }
 
@@ -36,8 +36,8 @@ impl TcpSocket {
     ///
     /// This calls `socket(2)`.
     pub fn new_v6() -> io::Result<TcpSocket> {
-        sys::tcp::new_v6_socket().map(|sys| TcpSocket {
-            sys
+        sys::tcp::new_v6_socket().map(|sys| {
+            TcpSocket { sys }
         })
     }
 
@@ -163,32 +163,118 @@ impl TcpSocket {
     pub fn get_send_buffer_size(&self) -> io::Result<u32> {
         sys::tcp::get_send_buffer_size(self.sys)
     }
-    
+
     /// Sets whether keepalive messages are enabled to be sent on this socket.
     ///
-    /// On Unix, this option will set the `SO_KEEPALIVE` as well as the
-    /// `TCP_KEEPALIVE` or `TCP_KEEPIDLE` option (depending on your platform).
-    /// On Windows, this will set the `SIO_KEEPALIVE_VALS` option.
+    /// This will set the `SO_KEEPALIVE` option on this socket.
+    pub fn set_keepalive(&self, keepalive: bool) -> io::Result<()> {
+        sys::tcp::set_keepalive(self.sys, keepalive)
+    }
+
+    /// Returns whether or not TCP keepalive probes will be sent by this socket.
+    pub fn get_keepalive(&self) -> io::Result<bool> {
+        sys::tcp::get_keepalive(self.sys)
+    }
+
+    /// Sets the amount of time after which TCP keepalive probes will be sent
+    /// on idle connections, if TCP keepalive is enabled on this socket.
     ///
-    /// If `None` is specified then keepalive messages are disabled, otherwise
-    /// the duration specified will be the time to remain idle before sending a
-    /// TCP keepalive probe.
+    /// This sets the value of `SO_KEEPALIVE` + `IPPROTO_TCP` on OpenBSD,
+    /// NetBSD, and Haiku, `TCP_KEEPALIVE` on macOS and iOS, and `TCP_KEEPIDLE`
+    /// on all other Unix operating systems. On Windows, this sets the value of
+    /// the `tcp_keepalive` struct's `keepalivetime` field.
     ///
     /// Some platforms specify this value in seconds, so sub-second
     /// specifications may be omitted.
-    pub fn set_keepalive(&self, dur: Option<Duration>) -> io::Result<()> {
-        sys::tcp::set_keepalive(self.sys, dur)
+    ///
+    /// The OS may return an error if TCP keepalive was not already enabled by
+    /// calling `set_keepalive(true)` on this socket.
+    pub fn set_keepalive_time(&self, time: Duration) -> io::Result<()> {
+        sys::tcp::set_keepalive_time(self.sys, time)
     }
 
-    /// Returns the duration after which TCP keepalive probes will be sent, if
-    /// keepalive messages are enabled to be sent on this socket.
+    /// Returns the amount of time after which TCP keepalive probes will be sent
+    /// on idle connections.
     ///
     /// If `None`, then keepalive messages are disabled.
     ///
+    /// This returns the value of `SO_KEEPALIVE` + `IPPROTO_TCP` on OpenBSD,
+    /// NetBSD, and Haiku, `TCP_KEEPALIVE` on macOS and iOS, and `TCP_KEEPIDLE`
+    /// on all other Unix operating systems.  On Windows, this returns the value of
+    /// the `tcp_keepalive` struct's `keepalivetime` field.
+    ///
     /// Some platforms specify this value in seconds, so sub-second
     /// specifications may be omitted.
-    pub fn get_keepalive(&self) -> io::Result<Option<Duration>> {
-        sys::tcp::get_keepalive(self.sys)
+    pub fn get_keepalive_time(&self) -> io::Result<Option<Duration>> {
+        sys::tcp::get_keepalive_time(self.sys)
+    }
+
+    /// Sets the time interval between TCP keepalive probes, if TCP keepalive is
+    /// enabled on this socket.
+    ///
+    /// This sets the value of `TCP_KEEPINTVL` on supported Unix operating
+    /// systems. On Windows, this sets the value of the `tcp_keepalive` struct's
+    /// `keepaliveinterval` field.
+    ///
+    /// Some platforms specify this value in seconds, so sub-second
+    /// specifications may be omitted.
+    ///
+    /// The OS may return an error if TCP keepalive was not already enabled by
+    /// calling `set_keepalive(true)` on this socket.
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "windows"
+    ))]
+    pub fn set_keepalive_interval(&self, interval: Duration) -> io::Result<()> {
+        sys::tcp::set_keepalive_interval(self.sys, interval)
+    }
+
+    /// Returns the time interval between TCP keepalive probes, if TCP keepalive is
+    /// enabled on this socket.
+    ///
+    /// If `None`, then keepalive messages are disabled.
+    ///
+    /// This returns the value of `TCP_KEEPINTVL` on supported Unix operating
+    /// systems. On Windows, this sets the value of the `tcp_keepalive` struct's
+    /// `keepaliveinterval` field.
+    ///
+    /// Some platforms specify this value in seconds, so sub-second
+    /// specifications may be omitted.
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "windows"
+    ))]
+    pub fn get_keepalive_interval(&self) -> io::Result<Option<Duration>> {
+        sys::tcp::get_keepalive_interval(self.sys)
+    }
+
+    /// Sets the maximum number of TCP keepalive probes that will be sent before
+    /// dropping a connection, if TCP keepalive is enabled on this socket.
+    ///
+    /// This sets the value of `TCP_KEEPCNT` on Unix operating systems that
+    /// support this option.
+    ///
+    /// The OS may return an error if TCP keepalive was not already enabled by
+    /// calling `set_keepalive(true)` on this socket.
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd",))]
+    pub fn set_keepalive_retries(&self, retries: u32) -> io::Result<()> {
+        sys::tcp::set_keepalive_retries(self.sys, retries)
+    }
+
+    /// Returns the maximum number of TCP keepalive probes that will be sent before
+    /// dropping a connection, if TCP keepalive is enabled on this socket.
+    ///
+    /// If `None`, then keepalive messages are disabled.
+    ///
+    /// This returns the value of `TCP_KEEPCNT` on Unix operating systems that
+    /// support this option.
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd",))]
+    pub fn get_keepalive_retries(&self) -> io::Result<Option<u32>> {
+        sys::tcp::get_keepalive_retries(self.sys)
     }
 
     /// Returns the local address of this socket

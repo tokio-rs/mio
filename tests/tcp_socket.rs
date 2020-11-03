@@ -42,12 +42,14 @@ fn set_reuseport() {
 
 #[test]
 fn set_keepalive() {
-    let dur = Duration::from_secs(4); // Chosen by fair dice roll, guaranteed to be random
     let addr = "127.0.0.1:0".parse().unwrap();
 
     let socket = TcpSocket::new_v4().unwrap();
-    socket.set_keepalive(Some(dur)).unwrap();
-    assert_eq!(Some(dur), socket.get_keepalive().unwrap());
+    socket.set_keepalive(false).unwrap();
+    assert_eq!(false, socket.get_keepalive().unwrap());
+
+    socket.set_keepalive(true).unwrap();
+    assert_eq!(true, socket.get_keepalive().unwrap());
 
     socket.bind(addr).unwrap();
 
@@ -55,12 +57,50 @@ fn set_keepalive() {
 }
 
 #[test]
-fn set_keepalive_none() {
+fn set_keepalive_time() {
+    let dur = Duration::from_secs(4); // Chosen by fair dice roll, guaranteed to be random
     let addr = "127.0.0.1:0".parse().unwrap();
 
     let socket = TcpSocket::new_v4().unwrap();
-    socket.set_keepalive(None).unwrap();
-    assert_eq!(None, socket.get_keepalive().unwrap());
+    socket.set_keepalive(true).unwrap();
+    socket.set_keepalive_time(dur).unwrap();
+    assert_eq!(Some(dur), socket.get_keepalive_time().unwrap());
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
+#[cfg(any(
+    target_os = "linux",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "windows"
+))]
+#[test]
+fn set_keepalive_interval() {
+    let dur = Duration::from_secs(4); // Chosen by fair dice roll, guaranteed to be random
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket.set_keepalive(true).unwrap();
+    socket.set_keepalive_interval(dur).unwrap();
+    assert_eq!(Some(dur), socket.get_keepalive_interval().unwrap());
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd",))]
+#[test]
+fn set_keepalive_retries() {
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket.set_keepalive(true).unwrap();
+    socket.set_keepalive_retries(16).unwrap();
+    assert_eq!(Some(16), socket.get_keepalive_retries().unwrap());
 
     socket.bind(addr).unwrap();
 

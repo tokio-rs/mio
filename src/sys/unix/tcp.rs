@@ -1,17 +1,17 @@
-use std::io;
 use std::convert::TryInto;
+use std::io;
 use std::mem;
 use std::mem::{size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
-use std::time::Duration;
 use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::time::Duration;
 
 use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-use libc::TCP_KEEPALIVE as KEEPALIVE;
 #[cfg(any(target_os = "openbsd", target_os = "netbsd", target_os = "haiku"))]
-use libc::SO_KEEPALIVE as KEEPALIVE;
+use libc::SO_KEEPALIVE as KEEPALIVE_TIME;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use libc::TCP_KEEPALIVE as KEEPALIVE_TIME;
 #[cfg(not(any(
     target_os = "macos",
     target_os = "ios",
@@ -19,8 +19,7 @@ use libc::SO_KEEPALIVE as KEEPALIVE;
     target_os = "netbsd",
     target_os = "haiku"
 )))]
-use libc::TCP_KEEPIDLE as KEEPALIVE;
-
+use libc::TCP_KEEPIDLE as KEEPALIVE_TIME;
 pub type TcpSocket = libc::c_int;
 
 pub(crate) fn new_v4_socket() -> io::Result<TcpSocket> {
@@ -41,12 +40,8 @@ pub(crate) fn connect(socket: TcpSocket, addr: SocketAddr) -> io::Result<net::Tc
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
 
     match syscall!(connect(socket, raw_addr, raw_addr_length)) {
-        Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => {
-            Err(err)
-        }
-        _ => {
-            Ok(unsafe { net::TcpStream::from_raw_fd(socket) })
-        }
+        Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
+        _ => Ok(unsafe { net::TcpStream::from_raw_fd(socket) }),
     }
 }
 
@@ -68,7 +63,8 @@ pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()
         libc::SO_REUSEADDR,
         &val as *const libc::c_int as *const libc::c_void,
         size_of::<libc::c_int>() as libc::socklen_t,
-    )).map(|_| ())
+    ))
+    .map(|_| ())
 }
 
 pub(crate) fn get_reuseaddr(socket: TcpSocket) -> io::Result<bool> {
@@ -96,7 +92,8 @@ pub(crate) fn set_reuseport(socket: TcpSocket, reuseport: bool) -> io::Result<()
         libc::SO_REUSEPORT,
         &val as *const libc::c_int as *const libc::c_void,
         size_of::<libc::c_int>() as libc::socklen_t,
-    )).map(|_| ())
+    ))
+    .map(|_| ())
 }
 
 #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
@@ -131,7 +128,9 @@ pub(crate) fn get_localaddr(socket: TcpSocket) -> io::Result<SocketAddr> {
 pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
     let val: libc::linger = libc::linger {
         l_onoff: if dur.is_some() { 1 } else { 0 },
-        l_linger: dur.map(|dur| dur.as_secs() as libc::c_int).unwrap_or_default(),
+        l_linger: dur
+            .map(|dur| dur.as_secs() as libc::c_int)
+            .unwrap_or_default(),
     };
     syscall!(setsockopt(
         socket,
@@ -139,7 +138,8 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
         libc::SO_LINGER,
         &val as *const libc::linger as *const libc::c_void,
         size_of::<libc::linger>() as libc::socklen_t,
-    )).map(|_| ())
+    ))
+    .map(|_| ())
 }
 
 pub(crate) fn set_recv_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
@@ -154,7 +154,7 @@ pub(crate) fn set_recv_buffer_size(socket: TcpSocket, size: u32) -> io::Result<(
     .map(|_| ())
 }
 
-pub(crate) fn get_recv_buffer_size(socket: TcpSocket) -> io::Result<u32> {    
+pub(crate) fn get_recv_buffer_size(socket: TcpSocket) -> io::Result<u32> {
     let mut optval: libc::c_int = 0;
     let mut optlen = size_of::<libc::c_int>() as libc::socklen_t;
     syscall!(getsockopt(
@@ -180,7 +180,7 @@ pub(crate) fn set_send_buffer_size(socket: TcpSocket, size: u32) -> io::Result<(
     .map(|_| ())
 }
 
-pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {    
+pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {
     let mut optval: libc::c_int = 0;
     let mut optlen = size_of::<libc::c_int>() as libc::socklen_t;
 
@@ -195,31 +195,19 @@ pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {
     Ok(optval as u32)
 }
 
-pub(crate) fn set_keepalive(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
+pub(crate) fn set_keepalive(socket: TcpSocket, keepalive: bool) -> io::Result<()> {
+    let val: libc::c_int = if keepalive { 1 } else { 0 };
     syscall!(setsockopt(
         socket,
         libc::SOL_SOCKET,
         libc::SO_KEEPALIVE,
-        &(dur.is_some() as libc::c_int) as *const _ as *const libc::c_void,
+        &val as *const _ as *const libc::c_void,
         size_of::<libc::c_int>() as libc::socklen_t
     ))
-    .map(|_| ())?;
-
-    if let Some(dur) = dur {
-        let dur_secs = dur.as_secs().try_into().ok().unwrap_or_else(i32::max_value);
-        syscall!(setsockopt(
-            socket,
-            libc::IPPROTO_TCP, 
-            KEEPALIVE,
-            &(dur_secs as libc::c_int)  as *const _ as *const libc::c_void,
-            size_of::<libc::c_int>() as libc::socklen_t
-        ))
-        .map(|_| ())?;
-    }
-    Ok(())
+    .map(|_| ())
 }
 
-pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<Option<Duration>> {
+pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<bool> {
     let mut optval: libc::c_int = 0;
     let mut optlen = mem::size_of::<libc::c_int>() as libc::socklen_t;
 
@@ -231,19 +219,127 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<Option<Duration>> {
         &mut optlen,
     ))?;
 
-    if optval == 0 {
+    Ok(optval != 0)
+}
+
+pub(crate) fn set_keepalive_time(socket: TcpSocket, time: Duration) -> io::Result<()> {
+    let time_secs = time
+        .as_secs()
+        .try_into()
+        .ok()
+        .unwrap_or_else(i32::max_value);
+    syscall!(setsockopt(
+        socket,
+        libc::IPPROTO_TCP,
+        KEEPALIVE_TIME,
+        &(time_secs as libc::c_int) as *const _ as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t
+    ))
+    .map(|_| ())
+}
+
+pub(crate) fn get_keepalive_time(socket: TcpSocket) -> io::Result<Option<Duration>> {
+    if !get_keepalive(socket)? {
         return Ok(None);
     }
 
+    let mut optval: libc::c_int = 0;
+    let mut optlen = mem::size_of::<libc::c_int>() as libc::socklen_t;
     syscall!(getsockopt(
         socket,
         libc::IPPROTO_TCP,
-        KEEPALIVE,
+        KEEPALIVE_TIME,
         &mut optval as *mut _ as *mut _,
         &mut optlen,
     ))?;
 
     Ok(Some(Duration::from_secs(optval as u64)))
+}
+
+/// Linux, FreeBSD, and NetBSD support setting the keepalive interval via
+/// `TCP_KEEPINTVL`.
+/// See:
+/// - https://man7.org/linux/man-pages/man7/tcp.7.html
+/// - https://www.freebsd.org/cgi/man.cgi?query=tcp#end
+/// - http://man.netbsd.org/tcp.4#DESCRIPTION
+///
+/// OpenBSD does not:
+/// https://man.openbsd.org/tcp
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+pub(crate) fn set_keepalive_interval(socket: TcpSocket, interval: Duration) -> io::Result<()> {
+    let interval_secs = interval
+        .as_secs()
+        .try_into()
+        .ok()
+        .unwrap_or_else(i32::max_value);
+    syscall!(setsockopt(
+        socket,
+        libc::IPPROTO_TCP,
+        libc::TCP_KEEPINTVL,
+        &(interval_secs as libc::c_int) as *const _ as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t
+    ))
+    .map(|_| ())
+}
+
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+pub(crate) fn get_keepalive_interval(socket: TcpSocket) -> io::Result<Option<Duration>> {
+    if !get_keepalive(socket)? {
+        return Ok(None);
+    }
+
+    let mut optval: libc::c_int = 0;
+    let mut optlen = mem::size_of::<libc::c_int>() as libc::socklen_t;
+    syscall!(getsockopt(
+        socket,
+        libc::IPPROTO_TCP,
+        libc::TCP_KEEPINTVL,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ))?;
+
+    Ok(Some(Duration::from_secs(optval as u64)))
+}
+
+/// Linux, FreeBSD, and NetBSD support setting the number of TCP keepalive
+/// retries via `TCP_KEEPCNT`.
+/// See:
+/// - https://man7.org/linux/man-pages/man7/tcp.7.html
+/// - https://www.freebsd.org/cgi/man.cgi?query=tcp#end
+/// - http://man.netbsd.org/tcp.4#DESCRIPTION
+///
+/// OpenBSD does not:
+/// https://man.openbsd.org/tcp
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+pub(crate) fn set_keepalive_retries(socket: TcpSocket, retries: u32) -> io::Result<()> {
+    let retries = retries.try_into().ok().unwrap_or_else(i32::max_value);
+    syscall!(setsockopt(
+        socket,
+        libc::IPPROTO_TCP,
+        libc::TCP_KEEPCNT,
+        &(retries as libc::c_int) as *const _ as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t
+    ))
+    .map(|_| ())
+}
+
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+pub(crate) fn get_keepalive_retries(socket: TcpSocket) -> io::Result<Option<u32>> {
+    if !get_keepalive(socket)? {
+        return Ok(None);
+    }
+
+    let mut optval: libc::c_int = 0;
+    let mut optlen = mem::size_of::<libc::c_int>() as libc::socklen_t;
+    syscall!(getsockopt(
+        socket,
+        libc::IPPROTO_TCP,
+        libc::TCP_KEEPCNT,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ))?;
+
+    Ok(Some(optval as u32))
 }
 
 pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
