@@ -76,6 +76,8 @@ pub(crate) fn get_keepalive(_: TcpSocket) -> io::Result<bool> {
 
 #[cfg(any(
     target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
     target_os = "windows"
@@ -86,6 +88,8 @@ pub(crate) fn set_keepalive_time(_: TcpSocket, _: Duration) -> io::Result<()> {
 
 #[cfg(any(
     target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
     target_os = "windows"
