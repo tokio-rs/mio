@@ -341,7 +341,7 @@ fn set_keepalive_vals(socket: TcpSocket, vals: &mstcpip::tcp_keepalive) -> io::R
         ptr::null_mut() as LPVOID,
         0 as DWORD,
         &mut out as *mut _ as LPDWORD,
-        ptr::null_mut() as LPWSAOVERLAPPED,
+        0 as LPWSAOVERLAPPED,
         None,
     ) } {
         0 => Ok(()),
