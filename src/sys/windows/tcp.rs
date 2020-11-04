@@ -330,25 +330,34 @@ fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> i
         ptr::null_mut() as LPWSAOVERLAPPED,
         None,
     ) } {
-        0 => Ok(()),
+        0 => {
+            println!("GET KEEPALIVE OK");
+            Ok(())
+        }
         _ => Err(io::Error::last_os_error())
     }
 }
 
 fn set_keepalive_vals(socket: TcpSocket, vals: &mstcpip::tcp_keepalive) -> io::Result<()> {
     let mut out = 0;
+    let vals = vals as *const _ as *mut mstcpip::tcp_keepalive as LPVOID;
+    let sz = size_of::<mstcpip::tcp_keepalive>() as DWORD;
+    println!("SET KEEPALIVE: vals={:p}; sz={:?}", vals, sz);
     match unsafe { WSAIoctl(
         socket,
         mstcpip::SIO_KEEPALIVE_VALS,
-        vals as *const _ as *mut mstcpip::tcp_keepalive as LPVOID,
-        size_of::<mstcpip::tcp_keepalive>() as DWORD,
+        vals,
+        zs,
         ptr::null_mut() as LPVOID,
         0 as DWORD,
         &mut out as *mut _ as LPDWORD,
         0 as LPWSAOVERLAPPED,
         None,
     ) } {
-        0 => Ok(()),
+        0 => {
+            println!("SET KEEPALIVE OK");
+            Ok(())
+        }
         _ => Err(io::Error::last_os_error())
     }
 }
