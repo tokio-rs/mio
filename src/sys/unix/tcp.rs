@@ -301,8 +301,8 @@ pub(crate) fn get_keepalive_interval(socket: TcpSocket) -> io::Result<Option<Dur
     Ok(Some(Duration::from_secs(optval as u64)))
 }
 
-/// Linux, FreeBSD, and NetBSD support setting the number of TCP keepalive
-/// retries via `TCP_KEEPCNT`.
+/// Linux, macOS/iOS, FreeBSD, and NetBSD support setting the number of TCP
+/// keepalive retries via `TCP_KEEPCNT`.
 /// See:
 /// - https://man7.org/linux/man-pages/man7/tcp.7.html
 /// - https://www.freebsd.org/cgi/man.cgi?query=tcp#end
@@ -310,7 +310,13 @@ pub(crate) fn get_keepalive_interval(socket: TcpSocket) -> io::Result<Option<Dur
 ///
 /// OpenBSD does not:
 /// https://man.openbsd.org/tcp
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+))]
 pub(crate) fn set_keepalive_retries(socket: TcpSocket, retries: u32) -> io::Result<()> {
     let retries = retries.try_into().ok().unwrap_or_else(i32::max_value);
     syscall!(setsockopt(
@@ -323,7 +329,13 @@ pub(crate) fn set_keepalive_retries(socket: TcpSocket, retries: u32) -> io::Resu
     .map(|_| ())
 }
 
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+))]
 pub(crate) fn get_keepalive_retries(socket: TcpSocket) -> io::Result<Option<u32>> {
     if !get_keepalive(socket)? {
         return Ok(None);

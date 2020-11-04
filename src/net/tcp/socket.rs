@@ -223,12 +223,16 @@ impl TcpSocket {
     /// calling `set_keepalive(true)` on this socket.
     #[cfg_attr(docsrs, doc(cfg(any(
         target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
         target_os = "freebsd",
         target_os = "netbsd",
         target_os = "windows"
     ))))]
     #[cfg(any(
         target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
         target_os = "freebsd",
         target_os = "netbsd",
         target_os = "windows"
@@ -250,12 +254,16 @@ impl TcpSocket {
     /// specifications may be omitted.
     #[cfg_attr(docsrs, doc(cfg(any(
         target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
         target_os = "freebsd",
         target_os = "netbsd",
         target_os = "windows"
     ))))]
     #[cfg(any(
         target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
         target_os = "freebsd",
         target_os = "netbsd",
         target_os = "windows"
@@ -274,10 +282,18 @@ impl TcpSocket {
     /// calling `set_keepalive(true)` on this socket.
     #[cfg_attr(docsrs, doc(cfg(any(
         target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
         target_os = "freebsd",
         target_os = "netbsd",
     ))))]
-    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd",
+        target_os = "netbsd",
+    ))]
     pub fn set_keepalive_retries(&self, retries: u32) -> io::Result<()> {
         sys::tcp::set_keepalive_retries(self.sys, retries)
     }
@@ -291,10 +307,18 @@ impl TcpSocket {
     /// support this option.
     #[cfg_attr(docsrs, doc(cfg(any(
         target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
         target_os = "freebsd",
         target_os = "netbsd",
     ))))]
-    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+    #[cfg(any(
+        target_os = "linux", 
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd",
+        target_os = "netbsd",
+    ))]
     pub fn get_keepalive_retries(&self) -> io::Result<Option<u32>> {
         sys::tcp::get_keepalive_retries(self.sys)
     }

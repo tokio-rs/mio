@@ -73,6 +73,8 @@ fn set_keepalive_time() {
 
 #[cfg(any(
     target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
     target_os = "windows"
@@ -92,7 +94,13 @@ fn set_keepalive_interval() {
     let _ = socket.listen(128).unwrap();
 }
 
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd",))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+))]
 #[test]
 fn set_keepalive_retries() {
     let addr = "127.0.0.1:0".parse().unwrap();

@@ -96,9 +96,11 @@ pub(crate) fn get_keepalive_time(_: TcpSocket) -> io::Result<Option<Duration>> {
 
 #[cfg(any(
     target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "windows"
+    target_os = "windows",
 ))]
 pub(crate) fn set_keepalive_interval(_: TcpSocket, _: Duration) -> io::Result<()> {
     os_required!()
@@ -106,20 +108,34 @@ pub(crate) fn set_keepalive_interval(_: TcpSocket, _: Duration) -> io::Result<()
 
 #[cfg(any(
     target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "windows"
+    target_os = "windows",
 ))]
 pub(crate) fn get_keepalive_interval(_: TcpSocket) -> io::Result<Option<Duration>> {
     os_required!()
 }
 
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+))]
 pub(crate) fn set_keepalive_retries(_: TcpSocket, _: u32) -> io::Result<()> {
     os_required!()
 }
 
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+))]
 pub(crate) fn get_keepalive_retries(socket: TcpSocket) -> io::Result<Option<u32>> {
     os_required!()
 }
