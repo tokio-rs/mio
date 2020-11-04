@@ -332,11 +332,13 @@ fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> i
 }
 
 fn set_keepalive_vals(socket: TcpSocket, vals: &mstcpip::tcp_keepalive) -> io::Result<()> {
+    let vals = vals as *const _ as *mut mstcpip::tcp_keepalive;
+    println!("{:p}", vals);
     let mut out = 0;
     match unsafe { WSAIoctl(
         socket,
         mstcpip::SIO_KEEPALIVE_VALS,
-        vals as *const _ as *mut mstcpip::tcp_keepalive as LPVOID,
+        vals as LPVOID,
         size_of::<mstcpip::tcp_keepalive>() as DWORD,
         ptr::null_mut() as LPVOID,
         0 as DWORD,
