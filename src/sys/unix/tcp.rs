@@ -265,7 +265,13 @@ pub(crate) fn get_keepalive_time(socket: TcpSocket) -> io::Result<Option<Duratio
 ///
 /// OpenBSD does not:
 /// https://man.openbsd.org/tcp
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+))]
 pub(crate) fn set_keepalive_interval(socket: TcpSocket, interval: Duration) -> io::Result<()> {
     let interval_secs = interval
         .as_secs()
@@ -282,7 +288,13 @@ pub(crate) fn set_keepalive_interval(socket: TcpSocket, interval: Duration) -> i
     .map(|_| ())
 }
 
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+))]
 pub(crate) fn get_keepalive_interval(socket: TcpSocket) -> io::Result<Option<Duration>> {
     if !get_keepalive(socket)? {
         return Ok(None);
