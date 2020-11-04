@@ -315,6 +315,7 @@ pub(crate) fn get_keepalive_interval(socket: TcpSocket) -> io::Result<Option<Dur
 }
 
 fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> io::Result<()> {
+    let mut out = 0;
     match unsafe { WSAIoctl(
         socket,
         mstcpip::SIO_KEEPALIVE_VALS,
@@ -322,7 +323,7 @@ fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> i
         0,
         vals as *mut _ as LPVOID,
         size_of::<mstcpip::tcp_keepalive>() as DWORD,
-        ptr::null_mut() as LPDWORD,
+        &mut out as *mut _ as LPDWORD,
         ptr::null_mut() as LPWSAOVERLAPPED,
         None,
     ) } {
@@ -332,13 +333,11 @@ fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> i
 }
 
 fn set_keepalive_vals(socket: TcpSocket, vals: &mstcpip::tcp_keepalive) -> io::Result<()> {
-    let vals = vals as *const _ as *mut mstcpip::tcp_keepalive;
-    println!("{:p}", vals);
     let mut out = 0;
     match unsafe { WSAIoctl(
         socket,
         mstcpip::SIO_KEEPALIVE_VALS,
-        vals as LPVOID,
+        vals as *const _ as *mut mstcpip::tcp_keepalive as LPVOID,
         size_of::<mstcpip::tcp_keepalive>() as DWORD,
         ptr::null_mut() as LPVOID,
         0 as DWORD,
