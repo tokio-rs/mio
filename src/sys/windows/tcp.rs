@@ -15,7 +15,8 @@ use winapi::shared::mstcpip;
 use winapi::shared::minwindef::{BOOL, TRUE, FALSE, DWORD, LPVOID, LPDWORD};
 use winapi::um::winsock2::{
     self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
-    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF, SO_KEEPALIVE, WSAIoctl, LPWSAOVERLAPPED
+    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF, SO_KEEPALIVE, WSAIoctl, LPWSAOVERLAPPED,
+    IPPROTO_TCP,
 };
 
 use crate::sys::windows::net::{init, new_socket, socket_addr};
@@ -321,7 +322,7 @@ fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> i
     match unsafe { getsockopt(
         socket,
         IPPROTO_TCP,
-        mstcpip::SIO_KEEPALIVE_VALS,
+        mstcpip::SIO_KEEPALIVE_VALS as i32,
         optval,
         &mut optlen,
     ) } {
