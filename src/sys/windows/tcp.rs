@@ -7,8 +7,8 @@ use std::ptr;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
-use winapi::ctypes::{c_char, c_int, c_ushort, c_ulong};
-use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, SOCKADDR_IN};
+use winapi::ctypes::{c_char, c_int, c_ushort, c_ulong, c_void};
+use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, SOCKADDR_IN, IPPROTO_TCP};
 use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
 use winapi::shared::mstcpip;
 
@@ -16,7 +16,6 @@ use winapi::shared::minwindef::{BOOL, TRUE, FALSE, DWORD, LPVOID, LPDWORD};
 use winapi::um::winsock2::{
     self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
     SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF, SO_KEEPALIVE, WSAIoctl, LPWSAOVERLAPPED,
-    IPPROTO_TCP,
 };
 
 use crate::sys::windows::net::{init, new_socket, socket_addr};
@@ -316,7 +315,7 @@ pub(crate) fn get_keepalive_interval(socket: TcpSocket) -> io::Result<Option<Dur
 }
 
 fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> io::Result<()> {
-    let optval = vals as *mut mstcpip::tcp_keepalive as LPVOID;
+    let optval = vals as *mut mstcpip::tcp_keepalive as *mut c_void;
     let mut optlen = size_of::<mstcpip::tcp_keepalive>() as c_int;
 
     match unsafe { getsockopt(
