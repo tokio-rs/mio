@@ -1,6 +1,6 @@
 #![cfg(all(feature = "os-poll", feature = "tcp"))]
 
-use mio::net::TcpSocket;
+use mio::net::{TcpSocket, TcpKeepalive};
 use std::io;
 use std::time::Duration;
 
@@ -62,8 +62,10 @@ fn set_keepalive_time() {
     let addr = "127.0.0.1:0".parse().unwrap();
 
     let socket = TcpSocket::new_v4().unwrap();
-    socket.set_keepalive(true).unwrap();
-    socket.set_keepalive_time(dur).unwrap();
+    socket.set_keepalive_params(TcpKeepalive::default().with_time(dur)).unwrap();
+
+    // It's not possible to access keepalive parameters on Windows...
+    #[cfg(not(target_os = "windows"))]
     assert_eq!(Some(dur), socket.get_keepalive_time().unwrap());
 
     socket.bind(addr).unwrap();
@@ -85,8 +87,9 @@ fn set_keepalive_interval() {
     let addr = "127.0.0.1:0".parse().unwrap();
 
     let socket = TcpSocket::new_v4().unwrap();
-    socket.set_keepalive(true).unwrap();
-    socket.set_keepalive_interval(dur).unwrap();
+    socket.set_keepalive_params(TcpKeepalive::default().with_interval(dur)).unwrap();
+    // It's not possible to access keepalive parameters on Windows...
+    #[cfg(not(target_os = "windows"))]
     assert_eq!(Some(dur), socket.get_keepalive_interval().unwrap());
 
     socket.bind(addr).unwrap();
@@ -106,8 +109,7 @@ fn set_keepalive_retries() {
     let addr = "127.0.0.1:0".parse().unwrap();
 
     let socket = TcpSocket::new_v4().unwrap();
-    socket.set_keepalive(true).unwrap();
-    socket.set_keepalive_retries(16).unwrap();
+    socket.set_keepalive_params(TcpKeepalive::default().with_retries(16)).unwrap();
     assert_eq!(Some(16), socket.get_keepalive_retries().unwrap());
 
     socket.bind(addr).unwrap();

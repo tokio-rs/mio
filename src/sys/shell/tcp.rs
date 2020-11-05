@@ -1,6 +1,7 @@
 use std::io;
 use std::net::{self, SocketAddr};
 use std::time::Duration;
+use crate::net::TcpKeepalive;
 
 pub(crate) type TcpSocket = i32;
 
@@ -80,10 +81,10 @@ pub(crate) fn get_keepalive(_: TcpSocket) -> io::Result<bool> {
     target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "windows"
+    target_os = "windows",
 ))]
-pub(crate) fn set_keepalive_time(_: TcpSocket, _: Duration) -> io::Result<()> {
-    os_required!();
+pub(crate) set_keepalive_params(_: TcpSocket, _: TcpKeepalive) -> io::Result<()> {
+    os_required!()
 }
 
 #[cfg(any(
@@ -92,7 +93,6 @@ pub(crate) fn set_keepalive_time(_: TcpSocket, _: Duration) -> io::Result<()> {
     target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "windows"
 ))]
 pub(crate) fn get_keepalive_time(_: TcpSocket) -> io::Result<Option<Duration>> {
     os_required!()
@@ -104,32 +104,8 @@ pub(crate) fn get_keepalive_time(_: TcpSocket) -> io::Result<Option<Duration>> {
     target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "windows",
-))]
-pub(crate) fn set_keepalive_interval(_: TcpSocket, _: Duration) -> io::Result<()> {
-    os_required!()
-}
-
-#[cfg(any(
-    target_os = "linux",
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "windows",
 ))]
 pub(crate) fn get_keepalive_interval(_: TcpSocket) -> io::Result<Option<Duration>> {
-    os_required!()
-}
-
-#[cfg(any(
-    target_os = "linux",
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "freebsd",
-    target_os = "netbsd",
-))]
-pub(crate) fn set_keepalive_retries(_: TcpSocket, _: u32) -> io::Result<()> {
     os_required!()
 }
 

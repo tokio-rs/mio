@@ -7,6 +7,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::time::Duration;
 
 use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
+use crate::net::TcpKeepalive;
 
 #[cfg(any(target_os = "openbsd", target_os = "netbsd", target_os = "haiku"))]
 use libc::SO_KEEPALIVE as KEEPALIVE_TIME;
@@ -222,7 +223,60 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<bool> {
     Ok(optval != 0)
 }
 
-pub(crate) fn set_keepalive_time(socket: TcpSocket, time: Duration) -> io::Result<()> {
+pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -> io::Result<()> {
+    use std::{fmt, error::Error};
+    #[derive(Debug)]
+    struct TcpKeepaliveError {
+        msg: &'static str,
+        inner: io::Error,
+    }
+
+    impl std::fmt::Display for TcpKeepaliveError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}: {}", self.msg, self.inner)
+        }
+    }
+
+    impl Error for TcpKeepaliveError {
+        fn source(&self) -> Option<&(dyn Error + 'static)> {
+            Some(&self.inner)
+        }
+    }
+
+    fn error(msg: &'static str) -> impl Fn(io::Error) -> io::Error {
+        move |inner| io::Error::new(inner.kind(), TcpKeepaliveError { msg, inner })
+    }
+
+    if let Some(dur) = keepalive.time {
+        set_keepalive_time(socket, dur).map_err(error("failed to set keepalive time"))?;
+    }
+
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd",
+        target_os = "netbsd",
+    ))]
+    if let Some(dur) = keepalive.interval {
+        set_keepalive_interval(socket, dur).map_err(error("failed to set keepalive interval"))?;
+    }
+
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd",
+        target_os = "netbsd",
+    ))]
+    if let Some(retries) = keepalive.retries {
+        set_keepalive_retries(socket, retries).map_err(error("failed to set keepalive retries"))?;
+    }
+
+    Ok(())
+}
+
+fn set_keepalive_time(socket: TcpSocket, time: Duration) -> io::Result<()> {
     let time_secs = time
         .as_secs()
         .try_into()
@@ -272,7 +326,7 @@ pub(crate) fn get_keepalive_time(socket: TcpSocket) -> io::Result<Option<Duratio
     target_os = "freebsd",
     target_os = "netbsd",
 ))]
-pub(crate) fn set_keepalive_interval(socket: TcpSocket, interval: Duration) -> io::Result<()> {
+fn set_keepalive_interval(socket: TcpSocket, interval: Duration) -> io::Result<()> {
     let interval_secs = interval
         .as_secs()
         .try_into()
@@ -329,7 +383,7 @@ pub(crate) fn get_keepalive_interval(socket: TcpSocket) -> io::Result<Option<Dur
     target_os = "freebsd",
     target_os = "netbsd",
 ))]
-pub(crate) fn set_keepalive_retries(socket: TcpSocket, retries: u32) -> io::Result<()> {
+fn set_keepalive_retries(socket: TcpSocket, retries: u32) -> io::Result<()> {
     let retries = retries.try_into().ok().unwrap_or_else(i32::max_value);
     syscall!(setsockopt(
         socket,

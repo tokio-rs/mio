@@ -9,7 +9,7 @@
 
 cfg_tcp! {
     mod tcp;
-    pub use self::tcp::{TcpListener, TcpSocket, TcpStream};
+    pub use self::tcp::{TcpListener, TcpSocket, TcpStream, TcpKeepalive};
 }
 
 cfg_udp! {

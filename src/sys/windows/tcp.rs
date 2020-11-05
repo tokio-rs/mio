@@ -15,11 +15,11 @@ use winapi::shared::mstcpip;
 use winapi::shared::minwindef::{BOOL, TRUE, FALSE, DWORD, LPVOID, LPDWORD};
 use winapi::um::winsock2::{
     self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
-    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF, SO_KEEPALIVE, WSAIoctl, WSPIoctl,
-    LPWSAOVERLAPPED,
+    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF, SO_KEEPALIVE, WSAIoctl, LPWSAOVERLAPPED,
 };
 
 use crate::sys::windows::net::{init, new_socket, socket_addr};
+use crate::net::TcpKeepalive;
 
 pub(crate) type TcpSocket = SOCKET;
 
@@ -242,100 +242,36 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<bool> {
     }
 }
 
-pub(crate) fn set_keepalive_time(socket: TcpSocket, time: Duration) -> io::Result<()> {
-    let mut keepalive = mstcpip::tcp_keepalive {
-        onoff: 0,
-        keepalivetime: 0,
-        keepaliveinterval: 0,
-    };
-    // First, populate an empty keepalive structure with the current values.
-    // Otherwise, if we call `WSAIoctl` with fields other than the keepalive
-    // time set to 0, we'll clobber the existing values.
-    get_keepalive_vals(socket, &mut keepalive)?;
-
-    // Windows takes the keepalive time as a u32 of milliseconds.
-    let time_ms = time.as_millis().try_into().ok().unwrap_or_else(u32::max_value);
-    keepalive.keepalivetime = time_ms as c_ulong;
-    // XXX(eliza): if keepalive is disabled on the socket, do we want to turn it
-    // on here, or just propagate the OS error?
-    set_keepalive_vals(socket, &keepalive)
-}
-
-pub(crate) fn get_keepalive_time(socket: TcpSocket) -> io::Result<Option<Duration>> {
-    let mut keepalive = mstcpip::tcp_keepalive {
-        onoff: 0,
-        keepalivetime: 0,
-        keepaliveinterval: 0,
-    };
-
-    get_keepalive_vals(socket, &mut keepalive)?;
-
-    if keepalive.onoff == 0 {
-        // Keepalive is disabled on this socket.
-        return Ok(None);
+pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -> io::Result<()> {
+    /// Windows configures keepalive time/interval in a u32 of milliseconds.
+    fn dur_to_ulong(dur: Duration) -> c_ulong {
+        dur.as_millis().try_into().ok().unwrap_or_else(u32::max_value)
     }
 
-    Ok(Some(Duration::from_millis(keepalive.keepalivetime as u64)))
-}
+    // If any of the fields on the `tcp_keepalive` struct were not provided by
+    // the user, just leaving them zero will clobber any existing value.
+    // Unfortunately, we can't access the current value, so we will use the
+    // defaults if a value for the time or interval was not not provided.
+    let time = keepalive.time.unwrap_or_else(|| {
+        // The default value is two hours, as per
+        // https://docs.microsoft.com/en-us/windows/win32/winsock/sio-keepalive-vals
+        let two_hours = 2 * 60 * 60;
+        Duration::from_seconds(two_hours)
+    });
 
-pub(crate) fn set_keepalive_interval(socket: TcpSocket, interval: Duration) -> io::Result<()> {
+    let interval = keepalive.interval.unwrap_or_else(|| {
+        // The default value is one second, as per
+        // https://docs.microsoft.com/en-us/windows/win32/winsock/sio-keepalive-vals
+        Duration::from_seconds(1)
+    });
+
     let mut keepalive = mstcpip::tcp_keepalive {
-        onoff: 0,
-        keepalivetime: 0,
-        keepaliveinterval: 0,
+        // Enable keepalive
+        onoff: 1,
+        keepalivetime: dur_to_ulong_ms(time),
+        keepaliveinterval: dur_to_ulong_ms(interval),
     };
-
-    // First, populate an empty keepalive structure with the current values.
-    // Otherwise, if we call `WSAIoctl` with fields other than the keepalive
-    // interval set to 0, we'll clobber the existing values.
-    get_keepalive_vals(socket, &mut keepalive)?;
-
-    // Windows takes the keepalive interval as a u32 of milliseconds.
-    let interval_ms = interval.as_millis().try_into().ok().unwrap_or_else(u32::max_value);
-    keepalive.keepaliveinterval = interval_ms as c_ulong;
-    // XXX(eliza): if keepalive is disabled on the socket, do we want to turn it
-    // on here, or just propagate the OS error?
-    set_keepalive_vals(socket, &keepalive)
-}
-
-pub(crate) fn get_keepalive_interval(socket: TcpSocket) -> io::Result<Option<Duration>> {
-    let mut keepalive = mstcpip::tcp_keepalive {
-        onoff: 0,
-        keepalivetime: 0,
-        keepaliveinterval: 0,
-    };
-
-    get_keepalive_vals(socket, &mut keepalive)?;
-
-    if keepalive.onoff == 0 {
-        // Keepalive is disabled on this socket.
-        return Ok(None);
-    }
-
-    Ok(Some(Duration::from_millis(keepalive.keepaliveinterval as u64)))
-}
-
-fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> io::Result<()> {
-    let mut out = 0;
-    // The MS docs never mention using WSPIoctl to retrieve keepalive values,
-    // but...a microsoft employee suggested I try it, so let's see what happens.
-    match unsafe { WSPIoctl(
-        socket,
-        mstcpip::SIO_KEEPALIVE_VALS,
-        ptr::null_mut() as LPVOID,
-        0 as DWORD,
-        vals as *mut mstcpip::tcp_keepalive as LPVOID,
-        size_of::<mstcpip::tcp_keepalive>() as DWORD,
-        &mut out as *mut _ as LPDWORD,
-        0 as LPWSAOVERLAPPED,
-        None,
-    ) } {
-        0 => Ok(()),
-        _ => Err(io::Error::last_os_error())
-    }
-}
-
-fn set_keepalive_vals(socket: TcpSocket, vals: &mstcpip::tcp_keepalive) -> io::Result<()> {
+    
     let mut out = 0;
     match unsafe { WSAIoctl(
         socket,
