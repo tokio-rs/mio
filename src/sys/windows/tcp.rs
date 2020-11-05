@@ -320,8 +320,8 @@ fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> i
 
     match unsafe { getsockopt(
         socket,
-        IPPROTO_TCP as u32,
-        mstcpip::SIO_KEEPALIVE_VALS as i32,
+        IPPROTO_TCP as c_int,
+        mstcpip::SIO_KEEPALIVE_VALS as c_int,
         optval,
         &mut optlen,
     ) } {
