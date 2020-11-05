@@ -347,7 +347,7 @@ fn set_keepalive_vals(socket: TcpSocket, vals: &mstcpip::tcp_keepalive) -> io::R
         socket,
         mstcpip::SIO_KEEPALIVE_VALS,
         vals,
-        zs,
+        sz,
         ptr::null_mut() as LPVOID,
         0 as DWORD,
         &mut out as *mut _ as LPDWORD,
