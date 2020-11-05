@@ -129,6 +129,25 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
     )).map(|_| ())
 }
 
+pub(crate) fn get_linger(socket: TcpSocket) -> io::Result<Option<Duration>> {
+    let mut val: libc::linger =  unsafe { std::mem::zeroed() };
+    let mut len = mem::size_of::<libc::linger>() as libc::socklen_t;
+
+    syscall!(getsockopt(
+        socket,
+        libc::SOL_SOCKET,
+        libc::SO_LINGER,
+        &mut val as *mut _ as *mut _,
+        &mut len,
+    ))?;
+
+    if val.l_onoff == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(Duration::from_secs(val.l_linger as u64)))
+    }
+}
+
 pub(crate) fn set_recv_buffer_size(socket: TcpSocket, size: u32) -> io::Result<()> {
     let size = size.try_into().ok().unwrap_or_else(i32::max_value);
     syscall!(setsockopt(
