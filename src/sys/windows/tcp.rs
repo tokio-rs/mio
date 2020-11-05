@@ -315,20 +315,15 @@ pub(crate) fn get_keepalive_interval(socket: TcpSocket) -> io::Result<Option<Dur
 }
 
 fn get_keepalive_vals(socket: TcpSocket, vals: &mut mstcpip::tcp_keepalive) -> io::Result<()> {
-    let mut out = 0;
-    let vals = vals as *mut mstcpip::tcp_keepalive as LPVOID;
-    let sz = size_of::<mstcpip::tcp_keepalive>() as DWORD;
-    println!("GET KEEPALIVE: vals={:p}; sz={:?}", vals, sz);
-    match unsafe { WSAIoctl(
+    let optval = vals as *mut mstcpip::tcp_keepalive as LPVOID;
+    let mut optlen = size_of::<mstcpip::tcp_keepalive>() as c_int;
+
+    match unsafe { getsockopt(
         socket,
+        IPPROTO_TCP,
         mstcpip::SIO_KEEPALIVE_VALS,
-        ptr::null_mut() as LPVOID,
-        0,
-        vals,
-        sz,
-        &mut out as *mut _ as LPDWORD,
-        ptr::null_mut() as LPWSAOVERLAPPED,
-        None,
+        optval,
+        &mut optlen,
     ) } {
         0 => {
             println!("GET KEEPALIVE OK");
