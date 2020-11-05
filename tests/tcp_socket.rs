@@ -2,6 +2,7 @@
 
 use mio::net::TcpSocket;
 use std::io;
+use std::time::Duration;
 
 #[test]
 fn is_send_and_sync() {
@@ -54,6 +55,22 @@ fn get_localaddr() {
 
     assert_eq!(expected_addr.ip(), actual_addr.ip());
     assert!(actual_addr.port() > 0);
+
+    let _ = socket.listen(128).unwrap();
+}
+
+#[test]
+fn set_linger() {
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket.set_linger(Some(Duration::from_secs(1))).unwrap();
+    assert_eq!(socket.get_linger().unwrap().unwrap().as_secs(), 1);
+
+    let _ = socket.set_linger(None);
+    assert_eq!(socket.get_linger().unwrap(), None);
+
+    socket.bind(addr).unwrap();
 
     let _ = socket.listen(128).unwrap();
 }

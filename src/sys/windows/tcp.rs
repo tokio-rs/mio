@@ -128,8 +128,6 @@ pub(crate) fn get_localaddr(socket: TcpSocket) -> io::Result<SocketAddr> {
             }
         },
     }
-
-
 }
 
 pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result<()> {
@@ -147,6 +145,28 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
     ) } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
         _ => Ok(()),
+    }
+}
+
+pub(crate) fn get_linger(socket: TcpSocket) -> io::Result<Option<Duration>> {
+    let mut val: linger = unsafe { std::mem::zeroed() };
+    let mut len = size_of::<linger>() as c_int;
+
+    match unsafe { getsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_LINGER,
+        &mut val as *mut _ as *mut _,
+        &mut len,
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => {
+            if val.l_onoff == 0 {
+                Ok(None)
+            } else {
+                Ok(Some(Duration::from_secs(val.l_linger as u64)))
+            }
+        },
     }
 }
 
