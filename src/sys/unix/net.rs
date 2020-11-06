@@ -124,18 +124,24 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
 }
 
 /// Converts a `libc::sockaddr` compatible struct into a native Rust `SocketAddr`.
-/// SAFETY: `storage` must be initialised to `sockaddr_in` or `sockaddr_in6`.
+///
+/// # Safety
+///
+/// `storage` must have the `ss_family` field correctly initialized.
+/// `storage` must be initialised to a `sockaddr_in` or `sockaddr_in6`.
 pub(crate) unsafe fn to_socket_addr(
     storage: *const libc::sockaddr_storage,
 ) -> std::io::Result<SocketAddr> {
     match (*storage).ss_family as libc::c_int {
         libc::AF_INET => {
+            // Safety: if the ss_family field is AF_INET then storage must be a sockaddr_in.
             let addr: &libc::sockaddr_in = &*(storage as *const libc::sockaddr_in);
             let ip = Ipv4Addr::from(addr.sin_addr.s_addr.to_ne_bytes());
             let port = u16::from_be(addr.sin_port);
             Ok(SocketAddr::V4(SocketAddrV4::new(ip, port)))
         },
         libc::AF_INET6 => {
+            // Safety: if the ss_family field is AF_INET6 then storage must be a sockaddr_in6.
             let addr: &libc::sockaddr_in6 = &*(storage as *const libc::sockaddr_in6);
             let ip = Ipv6Addr::from(addr.sin6_addr.s6_addr);
             let port = u16::from_be(addr.sin6_port);
