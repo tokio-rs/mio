@@ -112,17 +112,16 @@ impl Afd {
 }
 
 cfg_io_source! {
-    use miow::iocp::CompletionPort;
-    use ntapi::ntioapi::FILE_OPEN;
-    use ntapi::ntioapi::NtCreateFile;
     use std::mem::zeroed;
     use std::os::windows::io::{FromRawHandle, RawHandle};
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use miow::iocp::CompletionPort;
+    use ntapi::ntioapi::{NtCreateFile, FILE_OPEN};
     use winapi::shared::ntdef::{OBJECT_ATTRIBUTES, UNICODE_STRING, USHORT, WCHAR};
     use winapi::um::handleapi::INVALID_HANDLE_VALUE;
     use winapi::um::winbase::{SetFileCompletionNotificationModes, FILE_SKIP_SET_EVENT_ON_HANDLE};
-    use winapi::um::winnt::SYNCHRONIZE;
-    use winapi::um::winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE};
+    use winapi::um::winnt::{SYNCHRONIZE, FILE_SHARE_READ, FILE_SHARE_WRITE};
 
     const AFD_HELPER_ATTRIBUTES: OBJECT_ATTRIBUTES = OBJECT_ATTRIBUTES {
         Length: size_of::<OBJECT_ATTRIBUTES>() as ULONG,

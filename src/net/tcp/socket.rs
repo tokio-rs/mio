@@ -129,6 +129,11 @@ impl TcpSocket {
         sys::tcp::set_linger(self.sys, dur)
     }
 
+    /// Gets the value of `SO_LINGER` on this socket
+    pub fn get_linger(&self) -> io::Result<Option<Duration>> {
+        sys::tcp::get_linger(self.sys)
+    }
+
     /// Sets the value of `SO_RCVBUF` on this socket.
     pub fn set_recv_buffer_size(&self, size: u32) -> io::Result<()> {
         sys::tcp::set_recv_buffer_size(self.sys, size)

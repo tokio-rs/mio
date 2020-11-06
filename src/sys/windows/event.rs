@@ -26,7 +26,7 @@ impl Event {
         self.flags |= afd::POLL_RECEIVE
     }
 
-    #[cfg(feature = "os-util")]
+    #[cfg(feature = "os-ext")]
     pub(super) fn set_writable(&mut self) {
         self.flags |= afd::POLL_SEND;
     }

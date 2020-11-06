@@ -25,15 +25,25 @@ include       = [
   "examples/**/*.rs",
 ]
 
+# For documentation of features see the `mio::features` module.
 [features]
+# By default Mio only provides a shell implementation.
 default = []
+
+# Enables the `Poll` and `Registry` types.
 os-poll = []
-os-util = []
-pipe = ["os-poll"]
-tcp = []
-udp = []
-uds = []
-extra-docs = []
+# Enables additional OS specific extensions, e.g. Unix `pipe(2)`.
+os-ext = ["os-poll"]
+# Enables `mio::net` module containing networking primitives.
+net = []
+
+# Deprecated features, will be removed in a future version.
+extra-docs = [] # Docs are now always present.
+tcp = ["net"] # Replaced with "net" feature.
+udp = ["net"] # Replaced with "net" feature.
+uds = ["net"] # Replaced with "net" feature.
+pipe = ["os-ext"] # Replaced with "os-ext" feature.
+os-util = ["os-ext"]# Replaced with "os-ext" feature.
 
 [dependencies]
 log = "0.4.8"

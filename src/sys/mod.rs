@@ -54,31 +54,7 @@ cfg_os_poll! {
 #[cfg(unix)]
 cfg_os_poll! {
     mod unix;
-    pub use self::unix::SourceFd;
-
-    pub(crate) use self::unix::{event, Event, Events, Selector, Waker};
-
-    cfg_tcp! {
-        pub(crate) use self::unix::tcp;
-    }
-
-    cfg_udp! {
-        pub(crate) use self::unix::udp;
-    }
-
-    cfg_uds! {
-        pub use self::unix::SocketAddr;
-
-        pub(crate) use self::unix::uds;
-    }
-
-    cfg_pipe! {
-        pub(crate) use self::unix::pipe;
-    }
-
-    cfg_io_source! {
-        pub(crate) use self::unix::IoSourceState;
-    }
+    pub use self::unix::*;
 }
 
 #[cfg(windows)]
@@ -92,13 +68,13 @@ cfg_not_os_poll! {
     pub(crate) use self::shell::*;
 
     #[cfg(unix)]
-    cfg_any_os_util! {
+    cfg_any_os_ext! {
         mod unix;
         pub use self::unix::SourceFd;
     }
 
     #[cfg(unix)]
-    cfg_uds! {
+    cfg_net! {
         pub use self::unix::SocketAddr;
     }
 }

@@ -137,6 +137,22 @@ fn get_localaddr() {
 }
 
 #[test]
+fn set_linger() {
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket.set_linger(Some(Duration::from_secs(1))).unwrap();
+    assert_eq!(socket.get_linger().unwrap().unwrap().as_secs(), 1);
+
+    let _ = socket.set_linger(None);
+    assert_eq!(socket.get_linger().unwrap(), None);
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
+#[test]
 fn send_buffer_size_roundtrips() {
     test_buffer_sizes(
         TcpSocket::set_send_buffer_size,

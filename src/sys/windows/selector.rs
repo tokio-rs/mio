@@ -374,7 +374,7 @@ impl Selector {
         self.inner.cp.clone()
     }
 
-    #[cfg(feature = "os-util")]
+    #[cfg(feature = "os-ext")]
     pub(super) fn same_port(&self, other: &Arc<CompletionPort>) -> bool {
         Arc::ptr_eq(&self.inner.cp, other)
     }

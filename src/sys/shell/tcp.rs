@@ -51,6 +51,10 @@ pub(crate) fn set_linger(_: TcpSocket, _: Option<Duration>) -> io::Result<()> {
     os_required!();
 }
 
+pub(crate) fn get_linger(_: TcpSocket) -> io::Result<Option<Duration>> {
+    os_required!();
+}
+
 pub(crate) fn set_recv_buffer_size(_: TcpSocket, _: u32) -> io::Result<()> {
     os_required!();
 }
