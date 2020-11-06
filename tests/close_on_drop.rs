@@ -1,12 +1,15 @@
-#![cfg(feature = "tcp")]
+#![cfg(all(feature = "os-poll", feature = "net"))]
+
+use std::io::Read;
 
 use log::debug;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
-use std::io::Read;
+
 mod util;
-use self::TestState::{AfterRead, Initial};
 use util::{any_local_address, init};
+
+use self::TestState::{AfterRead, Initial};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
