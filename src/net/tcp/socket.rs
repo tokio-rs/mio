@@ -211,7 +211,9 @@ impl TcpSocket {
     ///
     /// For example:
     /// ```
-    /// use mio::net::tcp::{TcpSocket, TcpKeepalive};
+    /// use mio::net::{TcpSocket, TcpKeepalive};
+    /// use std::time::Duration;
+    ///
     /// # fn main() -> Result<(), std::io::Error> {
     /// let socket = TcpSocket::new_v6()?;
     /// let keepalive = TcpKeepalive::default()
