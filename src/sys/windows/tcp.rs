@@ -8,7 +8,7 @@ use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
 use winapi::ctypes::{c_char, c_int, c_ushort, c_ulong};
-use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, SOCKADDR_IN, IPPROTO_TCP};
+use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, SOCKADDR_IN};
 use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
 use winapi::shared::mstcpip;
 
@@ -264,7 +264,7 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<bool> {
 
 pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -> io::Result<()> {
     /// Windows configures keepalive time/interval in a u32 of milliseconds.
-    fn dur_to_ulong(dur: Duration) -> c_ulong {
+    fn dur_to_ulong_ms(dur: Duration) -> c_ulong {
         dur.as_millis().try_into().ok().unwrap_or_else(u32::max_value)
     }
 
@@ -276,13 +276,13 @@ pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -
         // The default value is two hours, as per
         // https://docs.microsoft.com/en-us/windows/win32/winsock/sio-keepalive-vals
         let two_hours = 2 * 60 * 60;
-        Duration::from_seconds(two_hours)
+        Duration::from_secs(two_hours)
     });
 
     let interval = keepalive.interval.unwrap_or_else(|| {
         // The default value is one second, as per
         // https://docs.microsoft.com/en-us/windows/win32/winsock/sio-keepalive-vals
-        Duration::from_seconds(1)
+        Duration::from_secs(1)
     });
 
     let mut keepalive = mstcpip::tcp_keepalive {
@@ -291,12 +291,12 @@ pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -
         keepalivetime: dur_to_ulong_ms(time),
         keepaliveinterval: dur_to_ulong_ms(interval),
     };
-    
+
     let mut out = 0;
     match unsafe { WSAIoctl(
         socket,
         mstcpip::SIO_KEEPALIVE_VALS,
-        vals as *const _ as *mut mstcpip::tcp_keepalive as LPVOID,
+        &mut keepalive as *mut _ as LPVOID,
         size_of::<mstcpip::tcp_keepalive>() as DWORD,
         ptr::null_mut() as LPVOID,
         0 as DWORD,
