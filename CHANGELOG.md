@@ -1,3 +1,16 @@
+# 0.7.6
+
+## Added
+* `TcpSocket::get_linger` expose reading linger value on TcpSocket
+  (https://github.com/tokio-rs/mio/commit/13e82ced655bbb6e2729226e485a7de9f2c2ccd9)
+* Added os-ext feature
+  (https://github.com/tokio-rs/mio/commit/f5017fae8a3d3bb4b4cada25b01a2d76a406badc)
+* Deprecate tcp, udp and uds features
+  (https://github.com/tokio-rs/mio/commit/a301ba520a8479b459c4acdcefa4a7c5eea818c7)
+* Deprecate extra-docs feature
+* `TcpSocket::set_{send, recv}_buffer_size` configures buffer size
+  (https://github.com/tokio-rs/mio/commit/40c4af79bf5b32b8fbdbf6f2e5c16290e1d3d406)
+
 # 0.7.5
 
 ## Added
