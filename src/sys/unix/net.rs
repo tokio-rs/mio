@@ -94,6 +94,15 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                 sin_port: a.port().to_be(),
                 sin_addr,
                 sin_zero: [0; 8],
+                #[cfg(any(
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "netbsd",
+                    target_os = "openbsd"
+                ))]
+                sin_len: 0,
             };
 
             let sockaddr = SocketAddrCRepr { v4: sockaddr_in };
