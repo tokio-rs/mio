@@ -28,6 +28,17 @@ const ID1: Token = Token(2);
 const ID2: Token = Token(3);
 const ID3: Token = Token(4);
 
+#[cfg(all(unix, not(debug_assertions)))]
+fn assert_size() {
+    use mio::net::*;
+    use std::mem::size_of;
+
+    // Without debug assertions enabled `TcpListener`, `TcpStream` and
+    // `UdpSocket` should have the same size as the system specific socket, i.e.
+    // just a file descriptor on Unix platforms.
+    assert_eq!(size_of::<UdpSocket>(), size_of::<std::net::UdpSocket>());
+}
+
 #[test]
 fn empty_datagram() {
     const EMPTY: &[u8] = b"";
