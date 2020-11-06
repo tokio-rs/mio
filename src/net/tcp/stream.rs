@@ -16,7 +16,8 @@ use crate::net::TcpSocket;
 ///
 /// # Examples
 ///
-/// ```
+#[cfg_attr(feature = "os-poll", doc = "```")]
+#[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
 /// # use std::net::{TcpListener, SocketAddr};
 /// # use std::error::Error;
 /// #

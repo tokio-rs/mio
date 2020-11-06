@@ -30,7 +30,8 @@ use std::{fmt, io};
 ///
 /// A basic example -- establishing a `TcpStream` connection.
 ///
-/// ```
+#[cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
+#[cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Poll, Interest, Token};
@@ -126,7 +127,8 @@ use std::{fmt, io};
 ///
 /// For example:
 ///
-/// ```
+#[cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
+#[cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
 /// # use std::error::Error;
 /// # use std::net;
 /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -258,7 +260,8 @@ impl Poll {
     ///
     /// A basic example -- establishing a `TcpStream` connection.
     ///
-    /// ```
+    #[cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::{Events, Poll, Interest, Token};
@@ -422,7 +425,8 @@ impl Registry {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
     /// # use std::error::Error;
     /// # use std::net;
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -499,7 +503,8 @@ impl Registry {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
     /// # use std::error::Error;
     /// # use std::net;
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -565,7 +570,8 @@ impl Registry {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
     /// # use std::error::Error;
     /// # use std::net;
     /// # fn main() -> Result<(), Box<dyn Error>> {
