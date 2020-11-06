@@ -12,7 +12,7 @@ pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
     new_ip_socket(addr, SOCK_DGRAM).and_then(|socket| {
         let (raw_addr, raw_addr_length) = socket_addr(&addr);
         syscall!(
-            win_bind(socket, raw_addr, raw_addr_length,),
+            win_bind(socket, raw_addr.as_ptr(), raw_addr_length,),
             PartialEq::eq,
             SOCKET_ERROR
         )

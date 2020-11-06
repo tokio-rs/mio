@@ -35,7 +35,7 @@ pub(crate) fn bind(socket: TcpSocket, addr: SocketAddr) -> io::Result<()> {
 
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
     syscall!(
-        bind(socket, raw_addr, raw_addr_length),
+        bind(socket, raw_addr.as_ptr(), raw_addr_length),
         PartialEq::eq,
         SOCKET_ERROR
     )?;
@@ -48,7 +48,7 @@ pub(crate) fn connect(socket: TcpSocket, addr: SocketAddr) -> io::Result<net::Tc
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
 
     let res = syscall!(
-        connect(socket, raw_addr, raw_addr_length),
+        connect(socket, raw_addr.as_ptr(), raw_addr_length),
         PartialEq::eq,
         SOCKET_ERROR
     );
