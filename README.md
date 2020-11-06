@@ -37,7 +37,8 @@ mio = "0.7"
 ```
 
 Next we can start using Mio. The following is quick introduction using
-`TcpListener` and `TcpStream`. Note that `features = ["os-poll", "tcp"]` must be specified for this example.
+`TcpListener` and `TcpStream`. Note that `features = ["os-poll", "net"]` must be
+specified for this example.
 
 ```rust
 use std::error::Error;

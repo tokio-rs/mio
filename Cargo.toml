@@ -65,12 +65,12 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.playground]
-features = ["os-poll", "os-util", "tcp", "udp", "uds"]
+features = ["os-poll", "os-ext", "net"]
 
 [[example]]
 name = "tcp_server"
-required-features = ["os-poll", "tcp"]
+required-features = ["os-poll", "net"]
 
 [[example]]
 name = "udp_server"
-required-features = ["os-poll", "udp"]
+required-features = ["os-poll", "net"]
