@@ -1,16 +1,16 @@
-#![cfg(all(feature = "os-poll", feature = "tcp"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
-use mio::event::Source;
-use mio::net::{TcpListener, TcpStream, UdpSocket};
-use mio::{event, Events, Interest, Poll, Registry, Token};
 use std::net;
 use std::sync::{Arc, Barrier};
 use std::thread::{self, sleep};
 use std::time::Duration;
 use std::{fmt, io};
 
-mod util;
+use mio::event::Source;
+use mio::net::{TcpListener, TcpStream, UdpSocket};
+use mio::{event, Events, Interest, Poll, Registry, Token};
 
+mod util;
 use util::{
     any_local_address, assert_send, assert_sync, expect_events, init, init_with_poll, ExpectEvent,
 };

@@ -1,4 +1,4 @@
-#![cfg(all(feature = "os-poll", feature = "tcp"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::net::TcpStream;
 use mio::{Interest, Token};

@@ -1,4 +1,4 @@
-#![cfg(all(unix, feature = "os-poll", feature = "uds"))]
+#![cfg(all(unix, feature = "os-poll", feature = "net"))]
 
 use mio::net::UnixStream;
 use mio::{Interest, Token};

@@ -1,6 +1,6 @@
 // Not all functions are used by all tests.
 #![allow(dead_code, unused_macros)]
-#![cfg(any(feature = "os-poll", feature = "tcp", feature = "udp", feature = "uds"))]
+#![cfg(any(feature = "os-poll", feature = "net"))]
 
 use std::net::SocketAddr;
 use std::ops::BitOr;

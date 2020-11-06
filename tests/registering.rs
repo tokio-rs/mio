@@ -1,16 +1,19 @@
-#![cfg(all(feature = "os-poll", feature = "tcp", feature = "udp"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
+
+use std::io::{self, Write};
+use std::thread::sleep;
+use std::time::Duration;
 
 use log::{debug, info, trace};
 #[cfg(debug_assertions)]
 use mio::net::UdpSocket;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Registry, Token};
-use std::io::{self, Write};
-use std::thread::sleep;
-use std::time::Duration;
 
 mod util;
-use util::{any_local_address, assert_error, init};
+#[cfg(debug_assertions)]
+use util::assert_error;
+use util::{any_local_address, init};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);

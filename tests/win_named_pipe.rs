@@ -1,4 +1,4 @@
-#![cfg(windows)]
+#![cfg(all(windows, feature = "os-poll", feature = "os-ext"))]
 
 use std::fs::OpenOptions;
 use std::io::{self, Read, Write};

@@ -1,4 +1,4 @@
-#![cfg(all(feature = "os-poll", feature = "tcp"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::net::{TcpListener, TcpSocket, TcpStream};
 use mio::{Events, Interest, Poll, Token};
