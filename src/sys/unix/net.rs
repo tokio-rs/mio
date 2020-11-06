@@ -76,7 +76,7 @@ pub(crate) union SocketAddrCRepr {
 }
 
 impl SocketAddrCRepr {
-    pub fn as_ptr(&self) -> *const libc::sockaddr {
+    pub(crate) fn as_ptr(&self) -> *const libc::sockaddr {
         self as *const _ as *const libc::sockaddr
     }
 }
