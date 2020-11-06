@@ -277,20 +277,16 @@ pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -
         target_os = "freebsd",
         target_os = "netbsd",
     ))]
-    if let Some(dur) = keepalive.interval {
-        set_keepalive_interval(socket, dur).map_err(error("failed to set keepalive interval"))?;
+    {
+        if let Some(dur) = keepalive.interval {
+            set_keepalive_interval(socket, dur).map_err(error("failed to set keepalive interval"))?;
+        }
+    
+        if let Some(retries) = keepalive.retries {
+            set_keepalive_retries(socket, retries).map_err(error("failed to set keepalive retries"))?;
+        }
     }
 
-    #[cfg(any(
-        target_os = "linux",
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "freebsd",
-        target_os = "netbsd",
-    ))]
-    if let Some(retries) = keepalive.retries {
-        set_keepalive_retries(socket, retries).map_err(error("failed to set keepalive retries"))?;
-    }
 
     Ok(())
 }
