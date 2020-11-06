@@ -87,7 +87,7 @@ pub(crate) fn get_keepalive(_: TcpSocket) -> io::Result<bool> {
     target_os = "netbsd",
     target_os = "windows",
 ))]
-pub(crate) set_keepalive_params(_: TcpSocket, _: TcpKeepalive) -> io::Result<()> {
+pub(crate) fn set_keepalive_params(_: TcpSocket, _: TcpKeepalive) -> io::Result<()> {
     os_required!()
 }
 
