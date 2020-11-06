@@ -124,6 +124,8 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "openbsd"
                 ))]
                 sin6_len: 0,
+                #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+                __sin6_src_id: 0,
             };
 
             let sockaddr = SocketAddrCRepr { v6: sockaddr_in6 };
