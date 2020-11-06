@@ -94,7 +94,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                 sin_family: libc::AF_INET as libc::sa_family_t,
                 sin_port: a.port().to_be(),
                 sin_addr,
-                ..unsafe { mem::zeroed() }
+                sin_zero: [0; 8],
             };
 
             let sockaddr = SocketAddrCRepr { v4: sockaddr_in };
@@ -107,7 +107,15 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                 sin6_addr: libc::in6_addr { s6_addr: a.ip().octets() },
                 sin6_flowinfo: a.flowinfo(),
                 sin6_scope_id: a.scope_id(),
-                ..unsafe { mem::zeroed() }
+                #[cfg(any(
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "netbsd",
+                    target_os = "openbsd"
+                ))]
+                sin6_len: 0,
             };
 
             let sockaddr = SocketAddrCRepr { v6: sockaddr_in6 };
