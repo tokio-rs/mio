@@ -27,7 +27,8 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 ///
 /// # Examples
 ///
-/// ```
+#[cfg_attr(feature = "os-poll", doc = "```")]
+#[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
 /// # use std::error::Error;
 /// #
 /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -96,7 +97,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(feature = "os-poll", doc = "```")]
+    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -139,8 +141,11 @@ impl UdpSocket {
     // This assertion is almost, but not quite, universal.  It fails on
     // shared-IP FreeBSD jails.  It's hard for mio to know whether we're jailed,
     // so simply disable the test on FreeBSD.
-    #[cfg_attr(not(target_os = "freebsd"), doc = " ```")]
-    #[cfg_attr(target_os = "freebsd", doc = " ```no_run")]
+    #[cfg_attr(all(feature = "os-poll", not(target_os = "freebsd")), doc = "```")]
+    #[cfg_attr(
+        any(not(feature = "os-poll"), target_os = "freebsd"),
+        doc = "```ignore"
+    )]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -303,7 +308,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(feature = "os-poll", doc = "```")]
+    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -332,7 +338,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(feature = "os-poll", doc = "```")]
+    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -412,7 +419,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(feature = "os-poll", doc = "```")]
+    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -440,7 +448,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(feature = "os-poll", doc = "```")]
+    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {

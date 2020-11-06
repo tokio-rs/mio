@@ -139,7 +139,8 @@ pub mod guide {
     //! [`Poll`]: ../struct.Poll.html
     //! [`Events`]: ../event/struct.Events.html
     //!
-    //! ```
+    #![cfg_attr(feature = "os-poll", doc = "```")]
+    #![cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
     //! # use mio::{Poll, Events};
     //! # fn main() -> std::io::Result<()> {
     //! // `Poll` allows for polling of readiness events.
@@ -173,7 +174,8 @@ pub mod guide {
     //!
     //! [event source]: ../event/trait.Source.html
     //!
-    //! ```
+    #![cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
+    #![cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
     //! # use mio::net::TcpListener;
     //! # use mio::{Poll, Token, Interest};
     //! # fn main() -> std::io::Result<()> {
@@ -211,7 +213,8 @@ pub mod guide {
     //! [poll]: ../struct.Poll.html#method.poll
     //! [event sources]: ../event/trait.Source.html
     //!
-    //! ```
+    #![cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
+    #![cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
     //! # use std::io;
     //! # use std::time::Duration;
     //! # use mio::net::TcpListener;

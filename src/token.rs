@@ -17,7 +17,8 @@
 ///
 /// [`slab`]: https://crates.io/crates/slab
 ///
-/// ```
+#[cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
+#[cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Events, Interest, Poll, Token};

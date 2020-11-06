@@ -671,6 +671,7 @@ pub mod event {
 }
 
 #[test]
+#[cfg(feature = "os-ext")]
 fn does_not_register_rw() {
     use crate::unix::SourceFd;
     use crate::{Poll, Token};
