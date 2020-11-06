@@ -1,3 +1,4 @@
+use std::mem;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
 pub(crate) fn new_ip_socket(
@@ -82,8 +83,6 @@ impl SocketAddrCRepr {
 
 /// Converts a Rust `SocketAddr` into the system representation.
 pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_t) {
-    use std::mem;
-
     match addr {
         SocketAddr::V4(ref a) => {
             // `s_addr` is stored as BE on all machine and the array is in BE order.
