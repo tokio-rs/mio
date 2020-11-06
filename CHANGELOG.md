@@ -1,43 +1,79 @@
+# 0.7.6
+
+## Added
+
+* `net` feature, replaces `tcp`, `udp` and `uds` features
+  (https://github.com/tokio-rs/mio/commit/a301ba520a8479b459c4acdcefa4a7c5eea818c7).
+* `os-ext` feature, replaces `os-util` and `pipe` features
+  (https://github.com/tokio-rs/mio/commit/f5017fae8a3d3bb4b4cada25b01a2d76a406badc).
+* Added keepalive support to `TcpSocket`
+  (https://github.com/tokio-rs/mio/commit/290c43a96662d54ab7c4b8814e5a9f9a9e523fda).
+* `TcpSocket::set_{send, recv}_buffer_size`
+  (https://github.com/tokio-rs/mio/commit/40c4af79bf5b32b8fbdbf6f2e5c16290e1d3d406).
+* `TcpSocket::get_linger`
+  (https://github.com/tokio-rs/mio/commit/13e82ced655bbb6e2729226e485a7de9f2c2ccd9).
+* Implement `IntoRawFd` for `TcpSocket`
+  (https://github.com/tokio-rs/mio/commit/50548ed45d0b2c98f1f2e003e210d14195284ef4).
+
+## Deprecated
+
+* The `tcp`, `udp` and `uds` features, replaced by a new `net` feature.
+  (https://github.com/tokio-rs/mio/commit/a301ba520a8479b459c4acdcefa4a7c5eea818c7).
+* The `extra-docs` feature, now enabled by default.
+  (https://github.com/tokio-rs/mio/commit/25731e8688a2d91c5c700674a2c2d3841240ece1).
+* The `os-util` and `pipe` features, replaced by a new `os-ext` feature.
+  (https://github.com/tokio-rs/mio/commit/f5017fae8a3d3bb4b4cada25b01a2d76a406badc).
+
+## Fixes
+
+* Incorrect assumption of the layout of `std::net::SocketAddr`. Previously Mio
+  would assume that `SocketAddrV{4,6}` had the same layout as
+  `libc::sockaddr_in(6)`, however this is not guaranteed by the standard
+  library.
+  (https://github.com/tokio-rs/mio/commit/152e0751f0be1c9b0cbd6778645b76bcb0eba93c).
+* Also bumped the miow dependency to version 0.3.6 to solve the same problem as
+  above.
+
 # 0.7.5
 
 ## Added
 
 * `TcpSocket::get_localaddr()` retrieves local address
-  (https://github.com/tokio-rs/mio/commit/b41a022b2242eef1969c70c8ba93e04c528dba47)
-* `TcpSocket::set_reuseport()` & `TcpSocket::get_reuseport()` configures and reads SO_REUSEPORT
-  (https://github.com/tokio-rs/mio/commit/183bbe409ab69cbf9db41d0263b41ec86202d9a0)
+  (https://github.com/tokio-rs/mio/commit/b41a022b2242eef1969c70c8ba93e04c528dba47).
+* `TcpSocket::set_reuseport()` & `TcpSocket::get_reuseport()` configures and reads `SO_REUSEPORT`
+  (https://github.com/tokio-rs/mio/commit/183bbe409ab69cbf9db41d0263b41ec86202d9a0).
 * `unix:pipe()` a wrapper around pipe(2) sys call
-  (https://github.com/tokio-rs/mio/commit/2b7c0967a7362303946deb3d4ca2ae507af6c72d)
+  (https://github.com/tokio-rs/mio/commit/2b7c0967a7362303946deb3d4ca2ae507af6c72d).
 * Add a check that a single Waker is active per Poll instance (only in debug mode)
-  (https://github.com/tokio-rs/mio/commit/f4874f28b32efcf4841691884c65a89734d96a56)
+  (https://github.com/tokio-rs/mio/commit/f4874f28b32efcf4841691884c65a89734d96a56).
 * Added `Interest:remove()`
-  (https://github.com/tokio-rs/mio/commit/b8639c3d9ac07bb7e2e27685680c8a6510fa1357)
+  (https://github.com/tokio-rs/mio/commit/b8639c3d9ac07bb7e2e27685680c8a6510fa1357).
 
 # 0.7.4
 
 ## Fixes
 
 * lost "socket closed" events on windows
-  (https://github.com/tokio-rs/mio/commit/50c299aca56c4a26e5ed20c283007239fbe6a7a7)
+  (https://github.com/tokio-rs/mio/commit/50c299aca56c4a26e5ed20c283007239fbe6a7a7).
 
 ## Added
 
 * `TcpSocket::set_linger()` configures SO_LINGER
-  (https://github.com/tokio-rs/mio/commit/3b4096565c1a879f651b8f8282ecdcbdbd5c92d3)
+  (https://github.com/tokio-rs/mio/commit/3b4096565c1a879f651b8f8282ecdcbdbd5c92d3).
 
 # 0.7.3
 
 ## Added
 
-* `TcpSocket` for configuring a TCP socket before connecting or listening.
-  (https://github.com/tokio-rs/mio/commit/5b09e60d0f64419b989bda88c86a3147334a03b3)
+* `TcpSocket` for configuring a TCP socket before connecting or listening
+  (https://github.com/tokio-rs/mio/commit/5b09e60d0f64419b989bda88c86a3147334a03b3).
 
 # 0.7.2
 
 ## Added
 
 * Windows named pipe support.
-  (https://github.com/tokio-rs/mio/commit/52e8c2220e87696d20f13561402bcaabba4136ed)
+  (https://github.com/tokio-rs/mio/commit/52e8c2220e87696d20f13561402bcaabba4136ed).
 
 # 0.7.1
 
