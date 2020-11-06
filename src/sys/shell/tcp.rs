@@ -120,7 +120,7 @@ pub(crate) fn get_keepalive_interval(_: TcpSocket) -> io::Result<Option<Duration
     target_os = "freebsd",
     target_os = "netbsd",
 ))]
-pub(crate) fn get_keepalive_retries(socket: TcpSocket) -> io::Result<Option<u32>> {
+pub(crate) fn get_keepalive_retries(_: TcpSocket) -> io::Result<Option<u32>> {
     os_required!()
 }
 
