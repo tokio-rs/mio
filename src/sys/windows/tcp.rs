@@ -1,13 +1,13 @@
 use std::io;
 use std::mem::size_of;
-use std::net::{self, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
 use std::convert::TryInto;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
 use winapi::ctypes::{c_char, c_int, c_ushort};
-use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, SOCKADDR_IN};
+use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, AF_INET6, SOCKADDR_IN};
 use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
 
 use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
@@ -35,7 +35,7 @@ pub(crate) fn bind(socket: TcpSocket, addr: SocketAddr) -> io::Result<()> {
 
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
     syscall!(
-        bind(socket, raw_addr, raw_addr_length),
+        bind(socket, raw_addr.as_ptr(), raw_addr_length),
         PartialEq::eq,
         SOCKET_ERROR
     )?;
@@ -48,7 +48,7 @@ pub(crate) fn connect(socket: TcpSocket, addr: SocketAddr) -> io::Result<net::Tc
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
 
     let res = syscall!(
-        connect(socket, raw_addr, raw_addr_length),
+        connect(socket, raw_addr.as_ptr(), raw_addr_length),
         PartialEq::eq,
         SOCKET_ERROR
     );
@@ -108,23 +108,32 @@ pub(crate) fn get_reuseaddr(socket: TcpSocket) -> io::Result<bool> {
 }
 
 pub(crate) fn get_localaddr(socket: TcpSocket) -> io::Result<SocketAddr> {
-    let mut addr: SOCKADDR_STORAGE = unsafe { std::mem::zeroed() };
-    let mut length = std::mem::size_of_val(&addr) as c_int;
+    let mut storage: SOCKADDR_STORAGE = unsafe { std::mem::zeroed() };
+    let mut length = std::mem::size_of_val(&storage) as c_int;
 
     match unsafe { getsockname(
         socket,
-        &mut addr as *mut _ as *mut _,
+        &mut storage as *mut _ as *mut _,
         &mut length
     ) } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
         _ => {
-            let storage: *const SOCKADDR_STORAGE = (&addr) as *const _;
-            if addr.ss_family as c_int == AF_INET {
-                let sock_addr : SocketAddrV4 = unsafe { *(storage as *const SOCKADDR_IN as *const _) };
-                Ok(sock_addr.into())
+            if storage.ss_family as c_int == AF_INET {
+                // Safety: if the ss_family field is AF_INET then storage must be a sockaddr_in.
+                let addr: &SOCKADDR_IN = unsafe { &*(&storage as *const _ as *const SOCKADDR_IN) };
+                let ip_bytes = unsafe { addr.sin_addr.S_un.S_un_b() };
+                let ip = Ipv4Addr::from([ip_bytes.s_b1, ip_bytes.s_b2, ip_bytes.s_b3, ip_bytes.s_b4]);
+                let port = u16::from_be(addr.sin_port);
+                Ok(SocketAddr::V4(SocketAddrV4::new(ip, port)))
+            } else if storage.ss_family as c_int == AF_INET6 {
+                // Safety: if the ss_family field is AF_INET6 then storage must be a sockaddr_in6.
+                let addr: &SOCKADDR_IN6_LH = unsafe { &*(&storage as *const _ as *const SOCKADDR_IN6_LH) };
+                let ip = Ipv6Addr::from(*unsafe { addr.sin6_addr.u.Byte() });
+                let port = u16::from_be(addr.sin6_port);
+                let scope_id = unsafe { *addr.u.sin6_scope_id() };
+                Ok(SocketAddr::V6(SocketAddrV6::new(ip, port, addr.sin6_flowinfo, scope_id)))
             } else {
-                let sock_addr : SocketAddrV6 = unsafe { *(storage as *const SOCKADDR_IN6_LH as *const _) };
-                Ok(sock_addr.into())
+                Err(std::io::ErrorKind::InvalidInput.into())
             }
         },
     }
