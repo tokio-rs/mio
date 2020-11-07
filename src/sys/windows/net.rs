@@ -4,10 +4,10 @@ use std::net::SocketAddr;
 use std::sync::Once;
 
 use winapi::ctypes::c_int;
-use winapi::shared::inaddr::IN_ADDR;
-use winapi::shared::in6addr::IN6_ADDR;
+use winapi::shared::inaddr::{in_addr_S_un, IN_ADDR};
+use winapi::shared::in6addr::{in6_addr_u, IN6_ADDR};
 use winapi::shared::ws2def::{AF_INET, AF_INET6, ADDRESS_FAMILY, SOCKADDR, SOCKADDR_IN};
-use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
+use winapi::shared::ws2ipdef::{SOCKADDR_IN6_LH, SOCKADDR_IN6_LH_u};
 use winapi::um::winsock2::{ioctlsocket, socket, FIONBIO, INVALID_SOCKET, SOCKET};
 
 /// Initialise the network stack for Windows.
@@ -65,7 +65,11 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, c_int) {
         SocketAddr::V4(ref addr) => {
             // `s_addr` is stored as BE on all machine and the array is in BE order.
             // So the native endian conversion method is used so that it's never swapped.
-            let sin_addr = IN_ADDR { S_un: unsafe { mem::transmute(u32::from_ne_bytes(addr.ip().octets())) } };
+            let sin_addr = unsafe {
+                let mut s_un = mem::zeroed::<in_addr_S_un>();
+                *s_un.S_addr_mut() = u32::from_ne_bytes(addr.ip().octets());
+                IN_ADDR { S_un: s_un }
+            };
 
             let sockaddr_in = SOCKADDR_IN {
                 sin_family: AF_INET as ADDRESS_FAMILY,
@@ -78,12 +82,23 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, c_int) {
             (sockaddr, mem::size_of::<SOCKADDR_IN>() as c_int)
         },
         SocketAddr::V6(ref addr) => {
+            let sin6_addr = unsafe {
+                let mut u = mem::zeroed::<in6_addr_u>();
+                *u.Byte_mut() = addr.ip().octets();
+                IN6_ADDR { u }
+            };
+            let u = unsafe {
+                let mut u = mem::zeroed::<SOCKADDR_IN6_LH_u>();
+                *u.sin6_scope_id_mut() = addr.scope_id();
+                u
+            };
+
             let sockaddr_in6 = SOCKADDR_IN6_LH {
                 sin6_family: AF_INET6 as ADDRESS_FAMILY,
                 sin6_port: addr.port().to_be(),
-                sin6_addr: IN6_ADDR { u: unsafe { mem::transmute(addr.ip().octets()) } },
+                sin6_addr,
                 sin6_flowinfo: addr.flowinfo(),
-                u: unsafe { mem::transmute(addr.scope_id()) },
+                u,
             };
 
             let sockaddr = SocketAddrCRepr { v6: sockaddr_in6 };
