@@ -133,7 +133,7 @@ pub(crate) fn get_localaddr(socket: TcpSocket) -> io::Result<SocketAddr> {
                 let scope_id = unsafe { *addr.u.sin6_scope_id() };
                 Ok(SocketAddr::V6(SocketAddrV6::new(ip, port, addr.sin6_flowinfo, scope_id)))
             } else {
-                panic!("Invalid ss_family");
+                Err(std::io::ErrorKind::InvalidInput.into())
             }
         },
     }
