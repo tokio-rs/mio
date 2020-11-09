@@ -33,16 +33,20 @@ pub(crate) fn new_v6_socket() -> io::Result<TcpSocket> {
 
 pub(crate) fn bind(socket: TcpSocket, addr: SocketAddr) -> io::Result<()> {
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
-    syscall!(bind(socket, raw_addr, raw_addr_length))?;
+    syscall!(bind(socket, raw_addr.as_ptr(), raw_addr_length))?;
     Ok(())
 }
 
 pub(crate) fn connect(socket: TcpSocket, addr: SocketAddr) -> io::Result<net::TcpStream> {
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
 
-    match syscall!(connect(socket, raw_addr, raw_addr_length)) {
-        Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
-        _ => Ok(unsafe { net::TcpStream::from_raw_fd(socket) }),
+    match syscall!(connect(socket, raw_addr.as_ptr(), raw_addr_length)) {
+        Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => {
+            Err(err)
+        }
+        _ => {
+            Ok(unsafe { net::TcpStream::from_raw_fd(socket) })
+        }
     }
 }
 
