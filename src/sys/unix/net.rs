@@ -1,10 +1,8 @@
-use std::mem;
+use std::io;
+use std::mem::size_of;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
-pub(crate) fn new_ip_socket(
-    addr: SocketAddr,
-    socket_type: libc::c_int,
-) -> std::io::Result<libc::c_int> {
+pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> io::Result<libc::c_int> {
     let domain = match addr {
         SocketAddr::V4(..) => libc::AF_INET,
         SocketAddr::V6(..) => libc::AF_INET6,
@@ -14,10 +12,7 @@ pub(crate) fn new_ip_socket(
 }
 
 /// Create a new non-blocking socket.
-pub(crate) fn new_socket(
-    domain: libc::c_int,
-    socket_type: libc::c_int,
-) -> std::io::Result<libc::c_int> {
+pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::Result<libc::c_int> {
     #[cfg(any(
         target_os = "android",
         target_os = "dragonfly",
@@ -41,7 +36,7 @@ pub(crate) fn new_socket(
             libc::SOL_SOCKET,
             libc::SO_NOSIGPIPE,
             &1 as *const libc::c_int as *const libc::c_void,
-            std::mem::size_of::<libc::c_int>() as libc::socklen_t
+            size_of::<libc::c_int>() as libc::socklen_t
         ))
         .map(|_| socket)
     });
@@ -87,7 +82,9 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
         SocketAddr::V4(ref addr) => {
             // `s_addr` is stored as BE on all machine and the array is in BE order.
             // So the native endian conversion method is used so that it's never swapped.
-            let sin_addr = libc::in_addr { s_addr: u32::from_ne_bytes(addr.ip().octets()) };
+            let sin_addr = libc::in_addr {
+                s_addr: u32::from_ne_bytes(addr.ip().octets()),
+            };
 
             let sockaddr_in = libc::sockaddr_in {
                 sin_family: libc::AF_INET as libc::sa_family_t,
@@ -106,13 +103,16 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
             };
 
             let sockaddr = SocketAddrCRepr { v4: sockaddr_in };
-            (sockaddr, mem::size_of::<libc::sockaddr_in>() as libc::socklen_t)
+            let socklen = size_of::<libc::sockaddr_in>() as libc::socklen_t;
+            (sockaddr, socklen)
         }
         SocketAddr::V6(ref addr) => {
             let sockaddr_in6 = libc::sockaddr_in6 {
                 sin6_family: libc::AF_INET6 as libc::sa_family_t,
                 sin6_port: addr.port().to_be(),
-                sin6_addr: libc::in6_addr { s6_addr: addr.ip().octets() },
+                sin6_addr: libc::in6_addr {
+                    s6_addr: addr.ip().octets(),
+                },
                 sin6_flowinfo: addr.flowinfo(),
                 sin6_scope_id: addr.scope_id(),
                 #[cfg(any(
@@ -129,7 +129,8 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
             };
 
             let sockaddr = SocketAddrCRepr { v6: sockaddr_in6 };
-            (sockaddr, mem::size_of::<libc::sockaddr_in6>() as libc::socklen_t)
+            let socklen = size_of::<libc::sockaddr_in6>() as libc::socklen_t;
+            (sockaddr, socklen)
         }
     }
 }
@@ -142,7 +143,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
 /// `storage` must be initialised to a `sockaddr_in` or `sockaddr_in6`.
 pub(crate) unsafe fn to_socket_addr(
     storage: *const libc::sockaddr_storage,
-) -> std::io::Result<SocketAddr> {
+) -> io::Result<SocketAddr> {
     match (*storage).ss_family as libc::c_int {
         libc::AF_INET => {
             // Safety: if the ss_family field is AF_INET then storage must be a sockaddr_in.
@@ -150,14 +151,19 @@ pub(crate) unsafe fn to_socket_addr(
             let ip = Ipv4Addr::from(addr.sin_addr.s_addr.to_ne_bytes());
             let port = u16::from_be(addr.sin_port);
             Ok(SocketAddr::V4(SocketAddrV4::new(ip, port)))
-        },
+        }
         libc::AF_INET6 => {
             // Safety: if the ss_family field is AF_INET6 then storage must be a sockaddr_in6.
             let addr: &libc::sockaddr_in6 = &*(storage as *const libc::sockaddr_in6);
             let ip = Ipv6Addr::from(addr.sin6_addr.s6_addr);
             let port = u16::from_be(addr.sin6_port);
-            Ok(SocketAddr::V6(SocketAddrV6::new(ip, port, addr.sin6_flowinfo, addr.sin6_scope_id)))
-        },
-        _ => Err(std::io::ErrorKind::InvalidInput.into()),
+            Ok(SocketAddr::V6(SocketAddrV6::new(
+                ip,
+                port,
+                addr.sin6_flowinfo,
+                addr.sin6_scope_id,
+            )))
+        }
+        _ => Err(io::ErrorKind::InvalidInput.into()),
     }
 }
