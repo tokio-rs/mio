@@ -7,8 +7,8 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 use crate::io_source::IoSource;
-use crate::{event, Interest, Registry, Token};
 use crate::net::TcpSocket;
+use crate::{event, Interest, Registry, Token};
 
 /// A non-blocking TCP stream between a local socket and a remote socket.
 ///
