@@ -211,10 +211,17 @@ impl TcpSocket {
     /// support configuring the [keepalive time]: the time after which the OS
     /// will start sending keepalive messages on an idle connection.
     ///
-    /// Additionally, this will enable TCP keepalive on this socket, if it is
-    /// not already enabled.
+    /// # Notes
     ///
-    /// For example:
+    /// * This will enable TCP keepalive on this socket, if it is not already
+    ///   enabled.
+    /// * On some platforms, such as Windows, any keepalive parameters *not*
+    ///   configured by the `TcpKeepalive` struct passed to this function may be
+    ///   overwritten with their default values. Therefore, this function should
+    ///   either only be called once per socket, or the same parameters should
+    ///   be passed every time it is called.
+    ///
+    /// # Examples
     /// ```
     /// use mio::net::{TcpSocket, TcpKeepalive};
     /// use std::time::Duration;
