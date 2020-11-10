@@ -247,31 +247,8 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<bool> {
 }
 
 pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -> io::Result<()> {
-    use std::{fmt, error::Error};
-    #[derive(Debug)]
-    struct TcpKeepaliveError {
-        msg: &'static str,
-        inner: io::Error,
-    }
-
-    impl std::fmt::Display for TcpKeepaliveError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{}: {}", self.msg, self.inner)
-        }
-    }
-
-    impl Error for TcpKeepaliveError {
-        fn source(&self) -> Option<&(dyn Error + 'static)> {
-            Some(&self.inner)
-        }
-    }
-
-    fn error(msg: &'static str) -> impl Fn(io::Error) -> io::Error {
-        move |inner| io::Error::new(inner.kind(), TcpKeepaliveError { msg, inner })
-    }
-
     if let Some(dur) = keepalive.time {
-        set_keepalive_time(socket, dur).map_err(error("failed to set keepalive time"))?;
+        set_keepalive_time(socket, dur)?;
     }
 
     #[cfg(any(
@@ -283,11 +260,11 @@ pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -
     ))]
     {
         if let Some(dur) = keepalive.interval {
-            set_keepalive_interval(socket, dur).map_err(error("failed to set keepalive interval"))?;
+            set_keepalive_interval(socket, dur)?;
         }
     
         if let Some(retries) = keepalive.retries {
-            set_keepalive_retries(socket, retries).map_err(error("failed to set keepalive retries"))?;
+            set_keepalive_retries(socket, retries)?;
         }
     }
 
