@@ -1,6 +1,6 @@
 #![cfg(all(feature = "os-poll", feature = "tcp"))]
 
-use mio::net::TcpSocket;
+use mio::net::{TcpKeepalive, TcpSocket};
 use std::io;
 use std::time::Duration;
 
@@ -34,6 +34,89 @@ fn set_reuseport() {
     let socket = TcpSocket::new_v4().unwrap();
     socket.set_reuseport(true).unwrap();
     assert!(socket.get_reuseport().unwrap());
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
+#[test]
+fn set_keepalive() {
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket.set_keepalive(false).unwrap();
+    assert_eq!(false, socket.get_keepalive().unwrap());
+
+    socket.set_keepalive(true).unwrap();
+    assert_eq!(true, socket.get_keepalive().unwrap());
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
+#[test]
+fn set_keepalive_time() {
+    let dur = Duration::from_secs(4); // Chosen by fair dice roll, guaranteed to be random
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket
+        .set_keepalive_params(TcpKeepalive::default().with_time(dur))
+        .unwrap();
+
+    // It's not possible to access keepalive parameters on Windows...
+    #[cfg(not(target_os = "windows"))]
+    assert_eq!(Some(dur), socket.get_keepalive_time().unwrap());
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
+#[cfg(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "windows"
+))]
+#[test]
+fn set_keepalive_interval() {
+    let dur = Duration::from_secs(4); // Chosen by fair dice roll, guaranteed to be random
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket
+        .set_keepalive_params(TcpKeepalive::default().with_interval(dur))
+        .unwrap();
+    // It's not possible to access keepalive parameters on Windows...
+    #[cfg(not(target_os = "windows"))]
+    assert_eq!(Some(dur), socket.get_keepalive_interval().unwrap());
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
+#[cfg(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+))]
+#[test]
+fn set_keepalive_retries() {
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let socket = TcpSocket::new_v4().unwrap();
+    socket
+        .set_keepalive_params(TcpKeepalive::default().with_retries(16))
+        .unwrap();
+    assert_eq!(Some(16), socket.get_keepalive_retries().unwrap());
 
     socket.bind(addr).unwrap();
 

@@ -1,22 +1,25 @@
 use std::io;
+use std::convert::TryInto;
 use std::mem::size_of;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
-use std::convert::TryInto;
+use std::ptr;
 use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
-use winapi::ctypes::{c_char, c_int, c_ushort};
+use winapi::ctypes::{c_char, c_int, c_ushort, c_ulong};
 use winapi::shared::ws2def::{SOCKADDR_STORAGE, AF_INET, AF_INET6, SOCKADDR_IN};
 use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
+use winapi::shared::mstcpip;
 
-use winapi::shared::minwindef::{BOOL, TRUE, FALSE};
+use winapi::shared::minwindef::{BOOL, TRUE, FALSE, DWORD, LPVOID, LPDWORD};
 use winapi::um::winsock2::{
     self, closesocket, linger, setsockopt, getsockopt, getsockname, PF_INET, PF_INET6, SOCKET, SOCKET_ERROR,
-    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF,
+    SOCK_STREAM, SOL_SOCKET, SO_LINGER, SO_REUSEADDR, SO_RCVBUF, SO_SNDBUF, SO_KEEPALIVE, WSAIoctl, LPWSAOVERLAPPED,
 };
 
 use crate::sys::windows::net::{init, new_socket, socket_addr};
+use crate::net::TcpKeepalive;
 
 pub(crate) type TcpSocket = SOCKET;
 
@@ -238,6 +241,82 @@ pub(crate) fn get_send_buffer_size(socket: TcpSocket) -> io::Result<u32> {
     }
 }
 
+pub(crate) fn set_keepalive(socket: TcpSocket, keepalive: bool) -> io::Result<()> {
+    let val: BOOL = if keepalive { TRUE } else { FALSE };
+    match unsafe { setsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_KEEPALIVE,
+        &val as *const _ as *const c_char,
+        size_of::<BOOL>() as c_int
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(()),
+    }
+}
+
+pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<bool> {
+    let mut optval: c_char = 0;
+    let mut optlen = size_of::<BOOL>() as c_int;
+
+    match unsafe { getsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_KEEPALIVE,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ) } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(optval != FALSE as c_char),
+    }
+}
+
+pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -> io::Result<()> {
+    /// Windows configures keepalive time/interval in a u32 of milliseconds.
+    fn dur_to_ulong_ms(dur: Duration) -> c_ulong {
+        dur.as_millis().try_into().ok().unwrap_or_else(u32::max_value)
+    }
+
+    // If any of the fields on the `tcp_keepalive` struct were not provided by
+    // the user, just leaving them zero will clobber any existing value.
+    // Unfortunately, we can't access the current value, so we will use the
+    // defaults if a value for the time or interval was not not provided.
+    let time = keepalive.time.unwrap_or_else(|| {
+        // The default value is two hours, as per
+        // https://docs.microsoft.com/en-us/windows/win32/winsock/sio-keepalive-vals
+        let two_hours = 2 * 60 * 60;
+        Duration::from_secs(two_hours)
+    });
+
+    let interval = keepalive.interval.unwrap_or_else(|| {
+        // The default value is one second, as per
+        // https://docs.microsoft.com/en-us/windows/win32/winsock/sio-keepalive-vals
+        Duration::from_secs(1)
+    });
+
+    let mut keepalive = mstcpip::tcp_keepalive {
+        // Enable keepalive
+        onoff: 1,
+        keepalivetime: dur_to_ulong_ms(time),
+        keepaliveinterval: dur_to_ulong_ms(interval),
+    };
+
+    let mut out = 0;
+    match unsafe { WSAIoctl(
+        socket,
+        mstcpip::SIO_KEEPALIVE_VALS,
+        &mut keepalive as *mut _ as LPVOID,
+        size_of::<mstcpip::tcp_keepalive>() as DWORD,
+        ptr::null_mut() as LPVOID,
+        0 as DWORD,
+        &mut out as *mut _ as LPDWORD,
+        0 as LPWSAOVERLAPPED,
+        None,
+    ) } {
+        0 => Ok(()),
+        _ => Err(io::Error::last_os_error())
+    }
+}
 
 pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
     // The non-blocking state of `listener` is inherited. See
