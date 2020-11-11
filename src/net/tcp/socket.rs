@@ -1,14 +1,14 @@
-use crate::net::{TcpStream, TcpListener};
-use crate::sys;
-
 use std::io;
 use std::mem;
 use std::net::SocketAddr;
-use std::time::Duration;
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, RawFd, FromRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::time::Duration;
+
+use crate::net::{TcpListener, TcpStream};
+use crate::sys;
 
 /// A non-blocking TCP socket used to configure a stream or listener.
 ///
@@ -50,18 +50,14 @@ impl TcpSocket {
     ///
     /// This calls `socket(2)`.
     pub fn new_v4() -> io::Result<TcpSocket> {
-        sys::tcp::new_v4_socket().map(|sys| {
-            TcpSocket { sys }
-        })
+        sys::tcp::new_v4_socket().map(|sys| TcpSocket { sys })
     }
 
     /// Create a new IPv6 TCP socket.
     ///
     /// This calls `socket(2)`.
     pub fn new_v6() -> io::Result<TcpSocket> {
-        sys::tcp::new_v6_socket().map(|sys| {
-            TcpSocket { sys }
-        })
+        sys::tcp::new_v6_socket().map(|sys| TcpSocket { sys })
     }
 
     pub(crate) fn new_for_addr(addr: SocketAddr) -> io::Result<TcpSocket> {
@@ -230,7 +226,7 @@ impl TcpSocket {
     /// let socket = TcpSocket::new_v6()?;
     /// let keepalive = TcpKeepalive::default()
     ///     .with_time(Duration::from_secs(4));
-    ///     // Depending on the target operating system, we may also be able to 
+    ///     // Depending on the target operating system, we may also be able to
     ///     // configure the keepalive probe interval and/or the number of retries
     ///     // here as well.
     ///
@@ -274,13 +270,16 @@ impl TcpSocket {
     ///
     /// Some platforms specify this value in seconds, so sub-second
     /// specifications may be omitted.
-    #[cfg_attr(docsrs, doc(cfg(any(
-        target_os = "linux",
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "freebsd",
-        target_os = "netbsd",
-    ))))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "netbsd",
+        )))
+    )]
     #[cfg(any(
         target_os = "linux",
         target_os = "macos",
@@ -300,15 +299,18 @@ impl TcpSocket {
     /// This returns the value of `TCP_KEEPCNT` on Unix operating systems that
     /// support this option. On Windows, it is not possible to access the value
     /// of TCP keepalive parameters after they have been set.
-    #[cfg_attr(docsrs, doc(cfg(any(
-        target_os = "linux",
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "freebsd",
-        target_os = "netbsd",
-    ))))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "netbsd",
+        )))
+    )]
     #[cfg(any(
-        target_os = "linux", 
+        target_os = "linux",
         target_os = "macos",
         target_os = "ios",
         target_os = "freebsd",
@@ -329,6 +331,16 @@ impl TcpSocket {
 impl Drop for TcpSocket {
     fn drop(&mut self) {
         sys::tcp::close(self.sys);
+    }
+}
+
+#[cfg(unix)]
+impl IntoRawFd for TcpSocket {
+    fn into_raw_fd(self) -> RawFd {
+        let ret = self.sys;
+        // Avoid closing the socket
+        mem::forget(self);
+        ret
     }
 }
 
@@ -384,7 +396,9 @@ impl FromRawSocket for TcpSocket {
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpSocket {
-        TcpSocket { sys: socket as sys::tcp::TcpSocket }
+        TcpSocket {
+            sys: socket as sys::tcp::TcpSocket,
+        }
     }
 }
 
@@ -413,14 +427,17 @@ impl TcpKeepalive {
     ///
     /// Some platforms specify this value in seconds, so sub-second
     /// specifications may be omitted.
-    #[cfg_attr(docsrs, doc(cfg(any(
-        target_os = "linux",
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "windows"
-    ))))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "windows"
+        )))
+    )]
     #[cfg(any(
         target_os = "linux",
         target_os = "macos",
@@ -441,13 +458,16 @@ impl TcpKeepalive {
     ///
     /// This will set the value of `TCP_KEEPCNT` on Unix operating systems that
     /// support this option.
-    #[cfg_attr(docsrs, doc(cfg(any(
-        target_os = "linux",
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "freebsd",
-        target_os = "netbsd",
-    ))))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "netbsd",
+        )))
+    )]
     #[cfg(any(
         target_os = "linux",
         target_os = "macos",
