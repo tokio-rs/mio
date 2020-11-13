@@ -29,7 +29,7 @@ jobs:
       - ${{ if eq(parameters.cmd, 'test') }}:
           - script: |
               cargo install cargo-hack
-              cargo hack check --feature-powerset --skip guide,extra-docs
+              cargo hack check --feature-powerset --skip guide,extra-docs,tcp,udp,uds,pipe,os-util
             displayName: Check feature powerset
 
       - script: cargo ${{ parameters.cmd }} --all-features
