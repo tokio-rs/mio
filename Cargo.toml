@@ -52,7 +52,7 @@ log = "0.4.8"
 libc = "0.2.69"
 
 [target.'cfg(windows)'.dependencies]
-miow   = "0.3.3"
+miow   = "0.3.6"
 winapi = { version = "0.3", features = ["winsock2", "mswsock"] }
 ntapi  = "0.3"
 
