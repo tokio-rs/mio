@@ -1,6 +1,6 @@
 use crate::{Interest, Token};
 
-use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLRDHUP};
+use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLERR, EPOLLHUP, EPOLLRDHUP, EPOLLPRI};
 use log::error;
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
@@ -157,38 +157,38 @@ pub mod event {
     }
 
     pub fn is_readable(event: &Event) -> bool {
-        (event.events as libc::c_int & libc::EPOLLIN) != 0
-            || (event.events as libc::c_int & libc::EPOLLPRI) != 0
+        (event.events as libc::c_int & EPOLLIN) != 0
+            || (event.events as libc::c_int & EPOLLPRI) != 0
     }
 
     pub fn is_writable(event: &Event) -> bool {
-        (event.events as libc::c_int & libc::EPOLLOUT) != 0
+        (event.events as libc::c_int & EPOLLOUT) != 0
     }
 
     pub fn is_error(event: &Event) -> bool {
-        (event.events as libc::c_int & libc::EPOLLERR) != 0
+        (event.events as libc::c_int & EPOLLERR) != 0
     }
 
     pub fn is_read_closed(event: &Event) -> bool {
         // Both halves of the socket have closed
-        event.events as libc::c_int & libc::EPOLLHUP != 0
+        event.events as libc::c_int & EPOLLHUP != 0
             // Socket has received FIN or called shutdown(SHUT_RD)
-            || (event.events as libc::c_int & libc::EPOLLIN != 0
-                && event.events as libc::c_int & libc::EPOLLRDHUP != 0)
+            || (event.events as libc::c_int & EPOLLIN != 0
+                && event.events as libc::c_int & EPOLLRDHUP != 0)
     }
 
     pub fn is_write_closed(event: &Event) -> bool {
         // Both halves of the socket have closed
-        event.events as libc::c_int & libc::EPOLLHUP != 0
+        event.events as libc::c_int & EPOLLHUP != 0
             // Unix pipe write end has closed
-            || (event.events as libc::c_int & libc::EPOLLOUT != 0
-                && event.events as libc::c_int & libc::EPOLLERR != 0)
+            || (event.events as libc::c_int & EPOLLOUT != 0
+                && event.events as libc::c_int & EPOLLERR != 0)
             // The other side (read end) of a Unix pipe has closed.
-            || event.events as libc::c_int == libc::EPOLLERR
+            || event.events as libc::c_int == EPOLLERR
     }
 
     pub fn is_priority(event: &Event) -> bool {
-        (event.events as libc::c_int & libc::EPOLLPRI) != 0
+        (event.events as libc::c_int & EPOLLPRI) != 0
     }
 
     pub fn is_aio(_: &Event) -> bool {
