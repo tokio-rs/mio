@@ -5,6 +5,7 @@ use std::net::{self, Shutdown, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::time::Duration;
 
 use crate::io_source::IoSource;
 use crate::net::TcpSocket;
@@ -121,6 +122,40 @@ impl TcpStream {
     /// unconnected `TcpStream` is undefined behavior.
     pub fn nodelay(&self) -> io::Result<bool> {
         self.inner.nodelay()
+    }
+
+    /// Sets the value for the `SO_LINGER` option on this socket.
+    ///
+    /// When set, the closing/shutting down of the socket will not return
+    /// until all queued messages for the socket have been successfully
+    /// sent or the linger timeout has been reached.
+    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+        let sock = std::mem::ManuallyDrop::new(self.to_sock());
+
+        sock.set_linger(dur)
+    }
+
+    /// Gets the value of the `SO_LINGER` option on this socket.
+    ///
+    /// For more information about this option, see [`set_linger`][link].
+    ///
+    /// [link]: #method.set_linger
+    pub fn linger(&self) -> io::Result<Option<Duration>> {
+        let sock = std::mem::ManuallyDrop::new(self.to_sock());
+
+        sock.get_linger()
+    }
+
+    fn to_sock(&self) -> TcpSocket {
+        #[cfg(windows)]
+            {
+                unsafe { TcpSocket::from_raw_socket(self.as_raw_socket()) }
+            }
+
+        #[cfg(unix)]
+            {
+                unsafe { TcpSocket::from_raw_fd(self.as_raw_fd()) }
+            }
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
