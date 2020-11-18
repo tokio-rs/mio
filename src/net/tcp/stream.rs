@@ -130,7 +130,7 @@ impl TcpStream {
     /// until all queued messages for the socket have been successfully
     /// sent or the linger timeout has been reached.
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        let sock = std::mem::ManuallyDrop::new(self.to_sock());
+        let sock = std::mem::ManuallyDrop::new(TcpSocket::from(self));
 
         sock.set_linger(dur)
     }
@@ -141,21 +141,9 @@ impl TcpStream {
     ///
     /// [link]: #method.set_linger
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        let sock = std::mem::ManuallyDrop::new(self.to_sock());
+        let sock = std::mem::ManuallyDrop::new(TcpSocket::from(self));
 
         sock.get_linger()
-    }
-
-    fn to_sock(&self) -> TcpSocket {
-        #[cfg(windows)]
-            {
-                unsafe { TcpSocket::from_raw_socket(self.as_raw_socket()) }
-            }
-
-        #[cfg(unix)]
-            {
-                unsafe { TcpSocket::from_raw_fd(self.as_raw_fd()) }
-            }
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -309,6 +297,20 @@ impl FromRawFd for TcpStream {
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream::from_std(FromRawFd::from_raw_fd(fd))
+    }
+}
+
+impl From<&TcpSocket> for TcpStream {
+    fn from(socket: &TcpSocket) -> TcpStream {
+        #[cfg(unix)]
+            {
+                unsafe { TcpStream::from_raw_fd(socket.as_raw_fd()) }
+            }
+
+        #[cfg(windows)]
+            {
+               unsafe { TcpStream::from_raw_socket(socket.as_raw_socket())}
+            }
     }
 }
 
