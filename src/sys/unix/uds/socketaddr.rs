@@ -28,6 +28,10 @@ enum AddressKind<'a> {
 impl SocketAddr {
     fn address(&self) -> AddressKind<'_> {
         let offset = path_offset(&self.sockaddr);
+        // Don't underflow in `len` below.
+        if (self.socklen as usize) < offset {
+            return AddressKind::Unnamed;
+        }
         let len = self.socklen as usize - offset;
         let path = unsafe { &*(&self.sockaddr.sun_path as *const [libc::c_char] as *const [u8]) };
 

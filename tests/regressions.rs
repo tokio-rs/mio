@@ -1,14 +1,15 @@
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interest, Poll, Token, Waker};
 use std::io::{self, Read};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{net, thread};
 
+use mio::net::{TcpListener, TcpStream};
+use mio::{Events, Interest, Poll, Token, Waker};
+
 mod util;
-use util::{any_local_address, init, init_with_poll};
+use util::{any_local_address, init, init_with_poll, temp_file};
 
 const ID1: Token = Token(1);
 const WAKE_TOKEN: Token = Token(10);
@@ -102,4 +103,23 @@ fn issue_1205() {
     assert!(waker_event.is_readable());
     assert_eq!(waker_event.token(), WAKE_TOKEN);
     handle.join().unwrap();
+}
+
+#[test]
+#[cfg(unix)]
+fn issue_1403() {
+    use mio::net::UnixDatagram;
+
+    init();
+
+    let path = temp_file("issue_1403");
+    let datagram1 = UnixDatagram::bind(&path).unwrap();
+    let datagram2 = UnixDatagram::unbound().unwrap();
+
+    let mut buf = [1u8; 1024];
+    let n = datagram2.send_to(&buf, &path).unwrap();
+
+    let (got, addr) = datagram1.recv_from(&mut buf).unwrap();
+    assert_eq!(got, n);
+    assert_eq!(addr.as_pathname(), None);
 }
