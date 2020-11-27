@@ -32,7 +32,7 @@ jobs:
   parameters:
     name: minrust
     displayName: Min Rust
-    rust_version: 1.18.0
+    rust_version: 1.31.0
     cmd: check
     cross: true
 
