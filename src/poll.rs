@@ -528,7 +528,7 @@ impl Registry {
     /// // the token is the same it must be specified.
     /// poll.registry().reregister(
     ///     &mut socket,
-    ///     Token(2),
+    ///     Token(0),
     ///     Interest::WRITABLE)?;
     /// #     Ok(())
     /// # }
