@@ -1,14 +1,16 @@
 #![cfg(all(unix, feature = "os-poll", feature = "os-ext"))]
 
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 
-use mio::event::Event;
 use mio::unix::pipe::{self, Receiver, Sender};
 use mio::{Events, Interest, Poll, Token};
+
+mod util;
+use util::{assert_would_block, expect_events, ExpectEvent};
 
 const RECEIVER: Token = Token(0);
 const SENDER: Token = Token(1);
@@ -189,70 +191,6 @@ fn nonblocking_child_process_io() {
 
     drop(sender);
     child.wait().unwrap();
-}
-
-/// An event that is expected to show up when `Poll` is polled, see
-/// `expect_events`.
-#[derive(Debug)]
-pub struct ExpectEvent {
-    token: Token,
-    interests: Interest,
-}
-
-impl ExpectEvent {
-    pub const fn new(token: Token, interests: Interest) -> ExpectEvent {
-        ExpectEvent { token, interests }
-    }
-
-    fn matches(&self, event: &Event) -> bool {
-        event.token() == self.token &&
-            // If we expect a readiness then also match on the event.
-            // In maths terms that is p -> q, which is the same  as !p || q.
-            (!self.interests.is_readable() || event.is_readable()) &&
-            (!self.interests.is_writable() || event.is_writable()) &&
-            (!self.interests.is_aio() || event.is_aio()) &&
-            (!self.interests.is_lio() || event.is_lio())
-    }
-}
-
-pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<ExpectEvent>) {
-    // In a lot of calls we expect more then one event, but it could be that
-    // poll returns the first event only in a single call. To be a bit more
-    // lenient we'll poll a couple of times.
-    for _ in 0..3 {
-        poll.poll(events, Some(Duration::from_millis(500)))
-            .expect("unable to poll");
-
-        for event in events.iter() {
-            let index = expected.iter().position(|expected| expected.matches(event));
-
-            if let Some(index) = index {
-                expected.swap_remove(index);
-            } else {
-                // Must accept sporadic events.
-                println!("got unexpected event: {:?}", event);
-            }
-        }
-
-        if expected.is_empty() {
-            return;
-        }
-    }
-
-    assert!(
-        expected.is_empty(),
-        "the following expected events were not found: {:?}",
-        expected
-    );
-}
-
-/// Assert that the provided result is an `io::Error` with kind `WouldBlock`.
-pub fn assert_would_block<T>(result: io::Result<T>) {
-    match result {
-        Ok(_) => panic!("unexpected OK result, expected a `WouldBlock` error"),
-        Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {}
-        Err(err) => panic!("unexpected error result: {}", err),
-    }
 }
 
 /// Expected a closed event. If `read` is true is checks for `is_read_closed`,
