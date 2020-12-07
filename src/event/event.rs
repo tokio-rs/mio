@@ -79,6 +79,7 @@ impl Event {
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
     /// | [epoll]       | `EPOLLHUP`, or  |
+    /// |               | only `EPOLLERR`, or |
     /// |               | `EPOLLIN` and `EPOLLRDHUP` |
     /// | [kqueue]      | `EV_EOF`        |
     ///
