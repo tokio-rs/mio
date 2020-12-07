@@ -175,6 +175,8 @@ pub mod event {
             // Socket has received FIN or called shutdown(SHUT_RD)
             || (event.events as libc::c_int & libc::EPOLLIN != 0
                 && event.events as libc::c_int & libc::EPOLLRDHUP != 0)
+            // The peer end lost and the local end did not receive FIN.
+            || event.events as libc::c_int == libc::EPOLLERR
     }
 
     pub fn is_write_closed(event: &Event) -> bool {
