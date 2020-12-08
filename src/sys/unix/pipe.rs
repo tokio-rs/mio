@@ -154,6 +154,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         target_os = "linux",
         target_os = "netbsd",
         target_os = "openbsd",
+        target_os = "illumos",
     ))]
     unsafe {
         if libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0 {
@@ -192,6 +193,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         target_os = "ios",
         target_os = "macos",
         target_os = "solaris",
+        target_os = "illumos",
     )))]
     compile_error!("unsupported target for `mio::unix::pipe`");
 
@@ -397,6 +399,7 @@ impl IntoRawFd for Receiver {
     }
 }
 
+#[cfg(not(target_os = "illumos"))]
 fn set_nonblocking(fd: RawFd, nonblocking: bool) -> io::Result<()> {
     let value = nonblocking as libc::c_int;
     if unsafe { libc::ioctl(fd, libc::FIONBIO, &value) } == -1 {
@@ -404,4 +407,26 @@ fn set_nonblocking(fd: RawFd, nonblocking: bool) -> io::Result<()> {
     } else {
         Ok(())
     }
+}
+
+#[cfg(target_os = "illumos")]
+fn set_nonblocking(fd: RawFd, nonblocking: bool) -> io::Result<()> {
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    if flags < 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    let nflags = if nonblocking {
+        flags | libc::O_NONBLOCK
+    } else {
+        flags & !libc::O_NONBLOCK
+    };
+
+    if flags != nflags {
+        if unsafe { libc::fcntl(fd, libc::F_SETFL, nflags) } < 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    Ok(())
 }
