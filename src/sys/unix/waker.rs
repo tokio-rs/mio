@@ -137,6 +137,12 @@ mod pipe {
         }
 
         pub fn wake(&self) -> io::Result<()> {
+            // The epoll emulation on some illumos systems currently requires
+            // the pipe buffer to be completely empty for an edge-triggered
+            // wakeup on the pipe read side.
+            #[cfg(target_os = "illumos")]
+            self.empty();
+
             match (&self.sender).write(&[1]) {
                 Ok(_) => Ok(()),
                 Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
