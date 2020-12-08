@@ -659,6 +659,10 @@ fn tcp_reset_close_event() {
     windows,
     ignore = "fails on Windows; client close events are not found"
 )]
+#[cfg_attr(
+    any(target_os = "illumos"),
+    ignore = "fails; client write_closed events are not found"
+)]
 fn tcp_shutdown_client_both_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
