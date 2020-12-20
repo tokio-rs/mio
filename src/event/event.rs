@@ -66,9 +66,9 @@ impl Event {
     /// Read closed readiness can be expected after any of the following have
     /// occurred:
     /// * The local stream has shutdown the read half of its socket
-    /// * The local stream has shtudown both the read half and the write half
+    /// * The local stream has shutdown both the read half and the write half
     ///   of its socket
-    /// * The peer stream has shtudown the write half its socket; this sends a
+    /// * The peer stream has shutdown the write half its socket; this sends a
     ///   `FIN` packet that has been received by the local stream
     ///
     /// Method is a best effort implementation. While some platforms may not
