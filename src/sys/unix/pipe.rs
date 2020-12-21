@@ -43,7 +43,7 @@ use crate::{event, Interest, Registry, Token};
 /// # Deregistering
 ///
 /// Both `Sender` and `Receiver` will deregister themselves when dropped,
-/// **iff** the file descriptors are not duplicated (via [`dup(2)`]).
+/// **if** the file descriptors are not duplicated (via [`dup(2)`]).
 ///
 /// [`dup(2)`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/dup.html
 ///
