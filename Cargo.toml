@@ -8,7 +8,11 @@ name = "mio"
 # - Create git tag
 version       = "0.7.6"
 license       = "MIT"
-authors       = ["Carl Lerche <me@carllerche.com>"]
+authors       = [
+  "Carl Lerche <me@carllerche.com>",
+  "Thomas de Zeeuw <thomasdezeeuw@gmail.com>",
+  "Tokio Contributors <team@tokio.rs>",
+]
 description   = "Lightweight non-blocking IO"
 documentation = "https://docs.rs/mio/0.7.6"
 homepage      = "https://github.com/tokio-rs/mio"
