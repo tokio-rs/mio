@@ -90,6 +90,7 @@ pub(crate) fn set_keepalive_params(_: TcpSocket, _: TcpKeepalive) -> io::Result<
     target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
+    target_os = "solaris",
 ))]
 pub(crate) fn get_keepalive_time(_: TcpSocket) -> io::Result<Option<Duration>> {
     os_required!()
