@@ -555,7 +555,7 @@ fn connect_error() {
     let mut events = Events::with_capacity(16);
 
     // Pick a "random" port that shouldn't be in use.
-    let mut listener = match TcpStream::connect("127.0.0.1:38381".parse().unwrap()) {
+    let mut stream = match TcpStream::connect("127.0.0.1:38381".parse().unwrap()) {
         Ok(l) => l,
         Err(ref e) if e.kind() == io::ErrorKind::ConnectionRefused => {
             // Connection failed synchronously.  This is not a bug, but it
@@ -566,7 +566,7 @@ fn connect_error() {
     };
 
     poll.registry()
-        .register(&mut listener, Token(0), Interest::WRITABLE)
+        .register(&mut stream, Token(0), Interest::WRITABLE)
         .unwrap();
 
     'outer: loop {
@@ -580,9 +580,7 @@ fn connect_error() {
         }
     }
 
-    assert!(listener.take_error().unwrap().is_some());
-
-    expect_no_events(&mut poll, &mut events);
+    assert!(stream.take_error().unwrap().is_some());
 }
 
 #[test]
