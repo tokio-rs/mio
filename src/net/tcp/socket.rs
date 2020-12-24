@@ -218,7 +218,8 @@ impl TcpSocket {
     ///   be passed every time it is called.
     ///
     /// # Examples
-    /// ```
+    #[cfg_attr(feature = "os-poll", doc = "```")]
+    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
     /// use mio::net::{TcpSocket, TcpKeepalive};
     /// use std::time::Duration;
     ///
