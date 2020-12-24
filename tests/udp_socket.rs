@@ -28,6 +28,7 @@ const ID1: Token = Token(2);
 const ID2: Token = Token(3);
 const ID3: Token = Token(4);
 
+#[test]
 #[cfg(all(unix, not(debug_assertions)))]
 fn assert_size() {
     use mio::net::*;
