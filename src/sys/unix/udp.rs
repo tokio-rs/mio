@@ -1,8 +1,9 @@
 use crate::sys::unix::net::{new_ip_socket, socket_addr};
 
 use std::io;
+use std::mem;
 use std::net::{self, SocketAddr};
-use std::os::unix::io::FromRawFd;
+use std::os::unix::io::{AsRawFd, FromRawFd};
 
 pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
     // Gives a warning for non Apple platforms.
@@ -20,4 +21,19 @@ pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
             })
             .map(|_| unsafe { net::UdpSocket::from_raw_fd(socket) })
     })
+}
+
+pub(crate) fn only_v6(socket: &net::UdpSocket) -> io::Result<bool> {
+    let mut optval: libc::c_int = 0;
+    let mut optlen = mem::size_of::<libc::c_int>() as libc::socklen_t;
+
+    syscall!(getsockopt(
+        socket.as_raw_fd(),
+        libc::IPPROTO_IPV6,
+        libc::IPV6_V6ONLY,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ))?;
+
+    Ok(optval != 0)
 }
