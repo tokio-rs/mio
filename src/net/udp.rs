@@ -511,6 +511,12 @@ impl UdpSocket {
         self.inner.leave_multicast_v6(multiaddr, interface)
     }
 
+    /// Get the value of the `IPV6_V6ONLY` option on this socket.
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn only_v6(&self) -> io::Result<bool> {
+        sys::udp::only_v6(&self.inner)
+    }
+
     /// Get the value of the `SO_ERROR` option on this socket.
     ///
     /// This will retrieve the stored error in the underlying socket, clearing

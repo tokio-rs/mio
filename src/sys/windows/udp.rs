@@ -1,9 +1,13 @@
 use std::io;
+use std::mem::{self, MaybeUninit};
 use std::net::{self, SocketAddr};
-use std::os::windows::io::FromRawSocket;
+use std::os::windows::io::{AsRawSocket, FromRawSocket};
 use std::os::windows::raw::SOCKET as StdSocket; // winapi uses usize, stdlib uses u32/u64.
 
-use winapi::um::winsock2::{bind as win_bind, closesocket, SOCKET_ERROR, SOCK_DGRAM};
+use winapi::ctypes::c_int;
+use winapi::shared::ws2def::IPPROTO_IPV6;
+use winapi::shared::ws2ipdef::IPV6_V6ONLY;
+use winapi::um::winsock2::{bind as win_bind, closesocket, getsockopt, SOCKET_ERROR, SOCK_DGRAM};
 
 use crate::sys::windows::net::{init, new_ip_socket, socket_addr};
 
@@ -24,4 +28,26 @@ pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
         })
         .map(|_| unsafe { net::UdpSocket::from_raw_socket(socket as StdSocket) })
     })
+}
+
+pub(crate) fn only_v6(socket: &net::UdpSocket) -> io::Result<bool> {
+    let mut optval: MaybeUninit<c_int> = MaybeUninit::uninit();
+    let mut optlen = mem::size_of::<c_int>() as c_int;
+
+    syscall!(
+        getsockopt(
+            socket.as_raw_socket() as usize,
+            IPPROTO_IPV6 as c_int,
+            IPV6_V6ONLY as c_int,
+            optval.as_mut_ptr().cast(),
+            &mut optlen,
+        ),
+        PartialEq::eq,
+        SOCKET_ERROR
+    )?;
+
+    debug_assert_eq!(optlen as usize, mem::size_of::<c_int>());
+    // Safety: `getsockopt` initialised `optval` for us.
+    let optval = unsafe { optval.assume_init() };
+    Ok(optval != 0)
 }
