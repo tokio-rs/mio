@@ -1,3 +1,33 @@
+# 0.7.7
+
+## Added
+
+* `UdpSocket::only_v6`
+  (https://github.com/tokio-rs/mio/commit/0101e05a800f17fb88f4315d9b9fe0f08cca6e57).
+* `Clone` implementation for `Event`
+  (https://github.com/tokio-rs/mio/commit/26540ebbae89df6d4d08465c56f715d8f2addfc3).
+* `AsRawFd` implementation for `Registry`
+  (https://github.com/tokio-rs/mio/commit/f70daa72da0042b1880256164774c3286d315a02).
+* `Read` and `Write` implementation for `&unix::pipe::Sender` and `Receiver`,
+  that is on the reference to them, an implementation existed on the types
+  themselves already
+  (https://github.com/tokio-rs/mio/commit/1be481dcbbcb6906364008b5d61e7f53cddc3eb3).
+
+
+## Fixes
+
+* Underflow in `SocketAddr::address`
+  (https://github.com/tokio-rs/mio/commit/6d3fa69240cd4bb95e9d34605c660c30245a18bd).
+* Android build with the net feature enabled, but with os-poll disabled
+  (https://github.com/tokio-rs/mio/commit/49d8fd33e026ad6e2c055d05d6667180ba2af7be).
+* Solaris build with the net feature enabled, but with os-poll disabled
+  (https://github.com/tokio-rs/mio/commit/a6e025e9d9511639ec106ebedc0dd312bdc9be12).
+* Ensure that `Waker::wake` works on illumos systems with poor `pipe(2)` and
+  `epoll(2)` interaction using `EPOLLET`
+  (https://github.com/tokio-rs/mio/commit/943d4249dcc17cd8b4d2250c4fa19116097248fa).
+* Fix `unix::pipe` on illumos
+  (https://github.com/tokio-rs/mio/commit/0db49f6d5caf54b12176821363d154384357e70a).
+
 # 0.7.6
 
 ## Added
