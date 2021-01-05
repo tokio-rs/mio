@@ -42,14 +42,6 @@ os-ext = ["os-poll"]
 # Enables `mio::net` module containing networking primitives.
 net = []
 
-# Deprecated features, will be removed in a future version.
-extra-docs = [] # Docs are now always present.
-tcp = ["net"] # Replaced with "net" feature.
-udp = ["net"] # Replaced with "net" feature.
-uds = ["net"] # Replaced with "net" feature.
-pipe = ["os-ext"] # Replaced with "os-ext" feature.
-os-util = ["os-ext"]# Replaced with "os-ext" feature.
-
 [dependencies]
 log = "0.4.8"
 
@@ -80,7 +72,6 @@ targets = [
   "x86_64-unknown-netbsd",
   "x86_64-unknown-openbsd",
 ]
-
 
 [package.metadata.playground]
 features = ["os-poll", "os-ext", "net"]
