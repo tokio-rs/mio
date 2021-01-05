@@ -25,8 +25,8 @@ use std::os::unix::io::RawFd;
 ///
 /// Basic usage.
 ///
-#[cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
-#[cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
+#[cfg_attr(all(feature = "os-poll", feature = "net"), doc = "```")]
+#[cfg_attr(not(all(feature = "os-poll", feature = "net")), doc = "```ignore")]
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Interest, Poll, Token};
@@ -51,8 +51,8 @@ use std::os::unix::io::RawFd;
 ///
 /// Implementing [`event::Source`] for a custom type backed by a [`RawFd`].
 ///
-#[cfg_attr(all(feature = "os-poll", features = "os-ext"), doc = "```")]
-#[cfg_attr(not(all(feature = "os-poll", features = "os-ext")), doc = "```ignore")]
+#[cfg_attr(all(feature = "os-poll", feature = "os-ext"), doc = "```")]
+#[cfg_attr(not(all(feature = "os-poll", feature = "os-ext")), doc = "```ignore")]
 /// use mio::{event, Interest, Registry, Token};
 /// use mio::unix::SourceFd;
 ///

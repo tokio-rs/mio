@@ -38,8 +38,8 @@ use std::io;
 ///
 /// Implementing `Source` on a struct containing a socket:
 ///
-#[cfg_attr(all(feature = "os-poll", features = "net"), doc = "```")]
-#[cfg_attr(not(all(feature = "os-poll", features = "net")), doc = "```ignore")]
+#[cfg_attr(all(feature = "os-poll", feature = "net"), doc = "```")]
+#[cfg_attr(not(all(feature = "os-poll", feature = "net")), doc = "```ignore")]
 /// use mio::{Interest, Registry, Token};
 /// use mio::event::Source;
 /// use mio::net::TcpStream;
