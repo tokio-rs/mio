@@ -174,6 +174,17 @@ impl Event {
         sys::event::is_lio(&self.inner)
     }
 
+    /// Returns the OS specific event.
+    ///
+    /// The returned type depends on the OS and is thus not guaranteed. Portable
+    /// programs should not depends on this function and should only use the
+    /// addtional information store in the OS specific event as an optimisation.
+    #[cfg(all(unix, feature = "os-poll", feature = "os-ext"))]
+    #[cfg_attr(docsrs, doc(cfg(all(unix, feature = "os-poll", feature = "os-ext"))))]
+    pub fn as_raw_event(&self) -> &sys::Event {
+        &self.inner
+    }
+
     /// Create a reference to an `Event` from a platform specific event.
     pub(crate) fn from_sys_event_ref(sys_event: &sys::Event) -> &Event {
         unsafe {
