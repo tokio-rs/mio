@@ -66,14 +66,14 @@ impl ExpectEvent {
 #[derive(Debug)]
 pub struct Readiness(usize);
 
-const READABLE: usize = 0b00_000_001;
-const WRITABLE: usize = 0b00_000_010;
-const AIO: usize = 0b00_000_100;
-const LIO: usize = 0b00_001_000;
-const ERROR: usize = 0b00_010_000;
-const READ_CLOSED: usize = 0b00_100_000;
-const WRITE_CLOSED: usize = 0b01_000_000;
-const PRIORITY: usize = 0b10_000_000;
+const READABLE: usize = 0b0000_0001;
+const WRITABLE: usize = 0b0000_0010;
+const AIO: usize = 0b0000_0100;
+const LIO: usize = 0b0000_1000;
+const ERROR: usize = 0b00010000;
+const READ_CLOSED: usize = 0b0010_0000;
+const WRITE_CLOSED: usize = 0b0100_0000;
+const PRIORITY: usize = 0b1000_0000;
 
 impl Readiness {
     pub const READABLE: Readiness = Readiness(READABLE);
