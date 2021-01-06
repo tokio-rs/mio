@@ -161,6 +161,26 @@ impl UdpSocket {
         self.inner.local_addr()
     }
 
+    /// Returns the socket address of the remote peer this socket was connected to.
+    ///
+    /// # Examples
+    ///
+    #[cfg_attr(feature = "os-poll", doc = "```")]
+    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
+    /// # use std::error::Error;
+    /// #
+    /// # fn main() -> Result(), Box<dyn Error>> {
+    /// use mio::net::UdpSocket;
+    /// let addr = "127.0.0.1:0".parse()?;
+    /// let socket = UdpSocket::bind(addr)?;
+    /// assert_eq!(socket.peer_addr()?.ip(),addr.ip());
+    /// #    Ok(())
+    /// # }
+    /// ```
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.peer_addr()
+    }
+
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
