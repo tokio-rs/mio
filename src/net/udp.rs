@@ -165,15 +165,22 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    #[cfg_attr(feature = "os-poll", doc = "```")]
-    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
+    ///
+    #[cfg_attr(all(feature = "os-poll", not(target_os = "freebsd")), doc = "```")]
+    #[cfg_attr(
+        any(not(feature = "os-poll"), target_os = "freebsd"),
+        doc = "```ignore"
+    )]
     /// # use std::error::Error;
     /// #
-    /// # fn main() -> Result(), Box<dyn Error>> {
+    /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use mio::net::UdpSocket;
+    ///
     /// let addr = "127.0.0.1:0".parse()?;
+    /// let peer_addr = "127.0.0.1:11100".parse()?;
     /// let socket = UdpSocket::bind(addr)?;
-    /// assert_eq!(socket.peer_addr()?.ip(),addr.ip());
+    /// socket.connect(peer_addr)?;
+    /// assert_eq!(socket.peer_addr()?.ip(), peer_addr.ip());
     /// #    Ok(())
     /// # }
     /// ```
