@@ -165,12 +165,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    ///
-    #[cfg_attr(all(feature = "os-poll", not(target_os = "freebsd")), doc = "```")]
-    #[cfg_attr(
-        any(not(feature = "os-poll"), target_os = "freebsd"),
-        doc = "```ignore"
-    )]
+    #[cfg_attr(feature = "os-poll", doc = "```")]
+    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
