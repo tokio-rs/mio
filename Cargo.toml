@@ -53,7 +53,7 @@ os-util = ["os-ext"]# Replaced with "os-ext" feature.
 log = "0.4.8"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.69"
+libc = "0.2.82"
 
 [target.'cfg(windows)'.dependencies]
 miow   = "0.3.6"
