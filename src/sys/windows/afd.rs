@@ -188,9 +188,11 @@ cfg_io_source! {
                     0 as ULONG,
                 );
                 if status != STATUS_SUCCESS {
-                    return Err(io::Error::from_raw_os_error(
+                    let raw_err = io::Error::from_raw_os_error(
                         RtlNtStatusToDosError(status) as i32
-                    ));
+                    );
+                    let msg = format!("Failed to open \\Device\\Afd\\Mio: {}", raw_err);
+                    return Err(io::Error::new(raw_err.kind(), msg));
                 }
                 let fd = File::from_raw_handle(afd_helper_handle as RawHandle);
                 // Increment by 2 to reserve space for other types of handles.
