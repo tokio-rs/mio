@@ -80,7 +80,13 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
         // Ensure the socket is closed if either of the `fcntl` calls
         // error below.
         let s = unsafe { net::UnixStream::from_raw_fd(socket) };
-        syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| s)
+        syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC))?;
+
+        // See https://github.com/tokio-rs/mio/issues/1450
+        #[cfg(all(target_arch = "x86",target_os = "android"))]
+        syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))?;
+        
+        Ok(s)
     });
 
     socket
