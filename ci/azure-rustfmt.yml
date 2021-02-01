@@ -12,5 +12,8 @@ jobs:
           rustup component add rustfmt
         displayName: Install rustfmt
       - script: |
-          cargo fmt --all -- --check
+          # FIXME: for some reason this doesn't actually check all files.
+          # So instead we run `rustfmt` directly on each file.
+          #cargo fmt --all -- --check
+          find src tests examples -type f -iname "*.rs" | xargs rustfmt --check
         displayName: Check formatting
