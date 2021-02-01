@@ -104,9 +104,7 @@ struct Io {
     // Token used to identify events
     token: Option<Token>,
     read: State,
-    read_interest: bool,
     write: State,
-    write_interest: bool,
     connect_error: Option<io::Error>,
 }
 
@@ -239,9 +237,7 @@ impl FromRawHandle for NamedPipe {
                     cp: None,
                     token: None,
                     read: State::None,
-                    read_interest: false,
                     write: State::None,
-                    write_interest: false,
                     connect_error: None,
                 }),
                 pool: Mutex::new(BufferPool::with_capacity(2)),
@@ -346,12 +342,7 @@ impl<'a> Write for &'a NamedPipe {
 }
 
 impl Source for NamedPipe {
-    fn register(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interest: Interest,
-    ) -> io::Result<()> {
+    fn register(&mut self, registry: &Registry, token: Token, _: Interest) -> io::Result<()> {
         let mut io = self.inner.io.lock().unwrap();
 
         io.check_association(registry, false)?;
@@ -374,8 +365,6 @@ impl Source for NamedPipe {
         }
 
         io.token = Some(token);
-        io.read_interest = interest.is_readable();
-        io.write_interest = interest.is_writable();
         drop(io);
 
         Inner::post_register(&self.inner, None);
@@ -383,19 +372,12 @@ impl Source for NamedPipe {
         Ok(())
     }
 
-    fn reregister(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interest: Interest,
-    ) -> io::Result<()> {
+    fn reregister(&mut self, registry: &Registry, token: Token, _: Interest) -> io::Result<()> {
         let mut io = self.inner.io.lock().unwrap();
 
         io.check_association(registry, true)?;
 
         io.token = Some(token);
-        io.read_interest = interest.is_readable();
-        io.write_interest = interest.is_writable();
         drop(io);
 
         Inner::post_register(&self.inner, None);
