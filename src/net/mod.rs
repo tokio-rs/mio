@@ -8,7 +8,7 @@
 //! [portability guidelines]: ../struct.Poll.html#portability
 
 mod tcp;
-pub use self::tcp::{TcpListener, TcpSocket, TcpStream, TcpKeepalive};
+pub use self::tcp::{TcpKeepalive, TcpListener, TcpSocket, TcpStream};
 
 mod udp;
 pub use self::udp::UdpSocket;
