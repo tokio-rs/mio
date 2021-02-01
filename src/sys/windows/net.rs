@@ -4,10 +4,10 @@ use std::net::SocketAddr;
 use std::sync::Once;
 
 use winapi::ctypes::c_int;
-use winapi::shared::inaddr::{in_addr_S_un, IN_ADDR};
 use winapi::shared::in6addr::{in6_addr_u, IN6_ADDR};
-use winapi::shared::ws2def::{AF_INET, AF_INET6, ADDRESS_FAMILY, SOCKADDR, SOCKADDR_IN};
-use winapi::shared::ws2ipdef::{SOCKADDR_IN6_LH, SOCKADDR_IN6_LH_u};
+use winapi::shared::inaddr::{in_addr_S_un, IN_ADDR};
+use winapi::shared::ws2def::{ADDRESS_FAMILY, AF_INET, AF_INET6, SOCKADDR, SOCKADDR_IN};
+use winapi::shared::ws2ipdef::{SOCKADDR_IN6_LH_u, SOCKADDR_IN6_LH};
 use winapi::um::winsock2::{ioctlsocket, socket, FIONBIO, INVALID_SOCKET, SOCKET};
 
 /// Initialise the network stack for Windows.
@@ -80,7 +80,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, c_int) {
 
             let sockaddr = SocketAddrCRepr { v4: sockaddr_in };
             (sockaddr, mem::size_of::<SOCKADDR_IN>() as c_int)
-        },
+        }
         SocketAddr::V6(ref addr) => {
             let sin6_addr = unsafe {
                 let mut u = mem::zeroed::<in6_addr_u>();

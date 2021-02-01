@@ -1,6 +1,6 @@
-use crate::{poll, Registry};
 use crate::event::Source;
 use crate::sys::windows::{Event, Overlapped};
+use crate::{poll, Registry};
 use winapi::um::minwinbase::OVERLAPPED_ENTRY;
 
 use std::ffi::OsStr;
@@ -9,8 +9,8 @@ use std::io::{self, Read, Write};
 use std::mem;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle, RawHandle};
 use std::slice;
-use std::sync::atomic::{AtomicUsize, AtomicBool};
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
 
 use crate::{Interest, Token};
@@ -128,9 +128,7 @@ fn would_block() -> io::Error {
 impl NamedPipe {
     /// Creates a new named pipe at the specified `addr` given a "reasonable
     /// set" of initial configuration options.
-    pub fn new<A: AsRef<OsStr>>(
-        addr: A,
-    ) -> io::Result<NamedPipe> {
+    pub fn new<A: AsRef<OsStr>>(addr: A) -> io::Result<NamedPipe> {
         let pipe = pipe::NamedPipe::new(addr)?;
         // Safety: nothing actually unsafe about this. The trait fn includes
         // `unsafe`.
@@ -226,9 +224,7 @@ impl NamedPipe {
 }
 
 impl FromRawHandle for NamedPipe {
-    unsafe fn from_raw_handle(
-        handle: RawHandle,
-    ) -> NamedPipe {
+    unsafe fn from_raw_handle(handle: RawHandle) -> NamedPipe {
         NamedPipe {
             inner: Arc::new(Inner {
                 // Safety: not really unsafe
@@ -281,9 +277,7 @@ impl<'a> Read for &'a NamedPipe {
         match mem::replace(&mut state.read, State::None) {
             // In theory not possible with `token` checked above,
             // but return would block for now.
-            State::None => {
-                Err(would_block())
-            }
+            State::None => Err(would_block()),
 
             // A read is in flight, still waiting for it to finish
             State::Pending(buf, amt) => {
@@ -324,7 +318,7 @@ impl<'a> Read for &'a NamedPipe {
 }
 
 impl<'a> Write for &'a NamedPipe {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {        
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
 
@@ -346,13 +340,18 @@ impl<'a> Write for &'a NamedPipe {
         Ok(buf.len())
     }
 
-    fn flush(&mut self) -> io::Result<()> {      
-        Ok(())  
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
 impl Source for NamedPipe {
-    fn register(&mut self, registry: &Registry, token: Token, interest: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interest: Interest,
+    ) -> io::Result<()> {
         let mut io = self.inner.io.lock().unwrap();
 
         io.check_association(registry, false)?;
@@ -368,7 +367,10 @@ impl Source for NamedPipe {
             io.cp = Some(poll::selector(registry).clone_port());
 
             let inner_token = NEXT_TOKEN.fetch_add(2, Relaxed) + 2;
-            poll::selector(registry).inner.cp.add_handle(inner_token, &self.inner.handle)?;
+            poll::selector(registry)
+                .inner
+                .cp
+                .add_handle(inner_token, &self.inner.handle)?;
         }
 
         io.token = Some(token);
@@ -381,7 +383,12 @@ impl Source for NamedPipe {
         Ok(())
     }
 
-    fn reregister(&mut self, registry: &Registry, token: Token, interest: Interest) -> io::Result<()> { 
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interest: Interest,
+    ) -> io::Result<()> {
         let mut io = self.inner.io.lock().unwrap();
 
         io.check_association(registry, true)?;
@@ -491,7 +498,13 @@ impl Inner {
         }
     }
 
-    fn schedule_write(me: &Arc<Inner>, buf: Vec<u8>, pos: usize, io: &mut Io, events: Option<&mut Vec<Event>>) {
+    fn schedule_write(
+        me: &Arc<Inner>,
+        buf: Vec<u8>,
+        pos: usize,
+        io: &mut Io,
+        events: Option<&mut Vec<Event>>,
+    ) {
         // Very similar to `schedule_read` above, just done for the write half.
         let e = unsafe {
             let overlapped = me.write.as_ptr() as *mut _;
@@ -638,18 +651,14 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 impl Io {
     fn check_association(&self, registry: &Registry, required: bool) -> io::Result<()> {
         match self.cp {
-            Some(ref cp) if !poll::selector(registry).same_port(cp) => {
-                Err(io::Error::new(
-                    io::ErrorKind::AlreadyExists,
-                    "I/O source already registered with a different `Registry`"
-                ))
-            }
-            None if required => {
-                Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "I/O source not registered with `Registry`"
-                ))
-            }
+            Some(ref cp) if !poll::selector(registry).same_port(cp) => Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "I/O source already registered with a different `Registry`",
+            )),
+            None if required => Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "I/O source not registered with `Registry`",
+            )),
             _ => Ok(()),
         }
     }

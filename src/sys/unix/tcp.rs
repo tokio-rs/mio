@@ -6,8 +6,8 @@ use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::time::Duration;
 
-use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
 use crate::net::TcpKeepalive;
+use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
 
 #[cfg(any(target_os = "openbsd", target_os = "netbsd", target_os = "haiku"))]
 use libc::SO_KEEPALIVE as KEEPALIVE_TIME;
@@ -41,12 +41,8 @@ pub(crate) fn connect(socket: TcpSocket, addr: SocketAddr) -> io::Result<net::Tc
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
 
     match syscall!(connect(socket, raw_addr.as_ptr(), raw_addr_length)) {
-        Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => {
-            Err(err)
-        }
-        _ => {
-            Ok(unsafe { net::TcpStream::from_raw_fd(socket) })
-        }
+        Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
+        _ => Ok(unsafe { net::TcpStream::from_raw_fd(socket) }),
     }
 }
 
@@ -148,7 +144,7 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
 }
 
 pub(crate) fn get_linger(socket: TcpSocket) -> io::Result<Option<Duration>> {
-    let mut val: libc::linger =  unsafe { std::mem::zeroed() };
+    let mut val: libc::linger = unsafe { std::mem::zeroed() };
     let mut len = mem::size_of::<libc::linger>() as libc::socklen_t;
 
     syscall!(getsockopt(
@@ -262,12 +258,11 @@ pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -
         if let Some(dur) = keepalive.interval {
             set_keepalive_interval(socket, dur)?;
         }
-    
+
         if let Some(retries) = keepalive.retries {
             set_keepalive_retries(socket, retries)?;
         }
     }
-
 
     Ok(())
 }
@@ -450,12 +445,9 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
     // OSes inherit the non-blocking flag from the listener, so we just have to
     // set `CLOEXEC`.
     #[cfg(any(
-        all(
-            target_arch = "x86",
-            target_os = "android"
-        ),
-        target_os = "ios", 
-        target_os = "macos", 
+        all(target_arch = "x86", target_os = "android"),
+        target_os = "ios",
+        target_os = "macos",
         target_os = "solaris"
     ))]
     let stream = {
@@ -467,11 +459,11 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
         .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
         .and_then(|s| {
             syscall!(fcntl(s.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC))?;
-    
+
             // See https://github.com/tokio-rs/mio/issues/1450
-            #[cfg(all(target_arch = "x86",target_os = "android"))]
+            #[cfg(all(target_arch = "x86", target_os = "android"))]
             syscall!(fcntl(s.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK))?;
-            
+
             Ok(s)
         })
     }?;
