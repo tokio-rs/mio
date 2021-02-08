@@ -136,6 +136,9 @@ pub(crate) fn set_linger(socket: TcpSocket, dur: Option<Duration>) -> io::Result
     syscall!(setsockopt(
         socket,
         libc::SOL_SOCKET,
+        #[cfg(target_vendor = "apple")]
+        libc::SO_LINGER_SEC,
+        #[cfg(not(target_vendor = "apple"))]
         libc::SO_LINGER,
         &val as *const libc::linger as *const libc::c_void,
         size_of::<libc::linger>() as libc::socklen_t,
@@ -150,6 +153,9 @@ pub(crate) fn get_linger(socket: TcpSocket) -> io::Result<Option<Duration>> {
     syscall!(getsockopt(
         socket,
         libc::SOL_SOCKET,
+        #[cfg(target_vendor = "apple")]
+        libc::SO_LINGER_SEC,
+        #[cfg(not(target_vendor = "apple"))]
         libc::SO_LINGER,
         &mut val as *mut _ as *mut _,
         &mut len,
