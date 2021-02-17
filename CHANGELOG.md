@@ -1,3 +1,12 @@
+# 0.7.8
+
+## Fixes
+
+* Fix `TcpStream::set_linger` on macOS
+  (https://github.com/tokio-rs/mio/commit/175773ce02e85977db81224c782c8d140aba8543).
+* Fix compilation on DragonFlyBSD
+  (https://github.com/tokio-rs/mio/commit/b51af46b28871f8dd3233b490ee62237ffed6a26).
+
 # 0.7.7
 
 ## Added
