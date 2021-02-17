@@ -19,11 +19,7 @@ type Count = libc::c_int;
 type Count = libc::size_t;
 
 // Type of the `filter` field in the `kevent` structure.
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "openbsd"
-))]
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 type Filter = libc::c_short;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 type Filter = i16;
@@ -31,11 +27,7 @@ type Filter = i16;
 type Filter = u32;
 
 // Type of the `flags` field in the `kevent` structure.
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "openbsd"
-))]
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 type Flags = libc::c_ushort;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 type Flags = u16;
