@@ -324,6 +324,12 @@ impl<'a> Write for &'a NamedPipe {
 
         match io.write {
             State::None => {}
+            State::Err(_) => match mem::replace(&mut io.write, State::None) {
+                State::Err(e) => return Err(e),
+                // `io` is locked, so this branch is unreachable
+                _ => unreachable!(),
+            },
+            // any other state should be handled in `write_done`
             _ => {
                 return Err(would_block());
             }
@@ -332,8 +338,12 @@ impl<'a> Write for &'a NamedPipe {
         // Move `buf` onto the heap and fire off the write
         let mut owned_buf = self.inner.get_buffer();
         owned_buf.extend(buf);
-        Inner::schedule_write(&self.inner, owned_buf, 0, &mut io, None);
-        Ok(buf.len())
+        match Inner::maybe_schedule_write(&self.inner, owned_buf, 0, &mut io)? {
+            // Some bytes are written immediately
+            Some(n) => Ok(n),
+            // Write operation is anqueued for whole buffer
+            None => Ok(buf.len()),
+        }
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -480,6 +490,41 @@ impl Inner {
         }
     }
 
+    /// Maybe schedules overlapped write operation.
+    ///
+    /// * `None` means that overlapped operation was enqueued
+    /// * `Some(n)` means that `n` bytes was immediately written.
+    ///   Note, that `write_done` will fire anyway to clean up the state.
+    fn maybe_schedule_write(
+        me: &Arc<Inner>,
+        buf: Vec<u8>,
+        pos: usize,
+        io: &mut Io,
+    ) -> io::Result<Option<usize>> {
+        // Very similar to `schedule_read` above, just done for the write half.
+        let e = unsafe {
+            let overlapped = me.write.as_ptr() as *mut _;
+            me.handle.write_overlapped(&buf[pos..], overlapped)
+        };
+
+        // See `connect` above for the rationale behind `forget`
+        match e {
+            // `n` bytes are written immediately
+            Ok(Some(n)) => {
+                io.write = State::Ok(buf, pos);
+                mem::forget(me.clone());
+                Ok(Some(n))
+            }
+            // write operation is enqueued
+            Ok(None) => {
+                io.write = State::Pending(buf, pos);
+                mem::forget(me.clone());
+                Ok(None)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     fn schedule_write(
         me: &Arc<Inner>,
         buf: Vec<u8>,
@@ -487,18 +532,19 @@ impl Inner {
         io: &mut Io,
         events: Option<&mut Vec<Event>>,
     ) {
-        // Very similar to `schedule_read` above, just done for the write half.
-        let e = unsafe {
-            let overlapped = me.write.as_ptr() as *mut _;
-            me.handle.write_overlapped(&buf[pos..], overlapped)
-        };
-
-        match e {
-            // See `connect` above for the rationale behind `forget`
-            Ok(_) => {
-                io.write = State::Pending(buf, pos);
-                mem::forget(me.clone())
+        match Inner::maybe_schedule_write(me, buf, pos, io) {
+            Ok(Some(_)) => {
+                // immediate result will be handled in `write_done`,
+                // so we'll reinterpret the `Ok` state
+                let state = mem::replace(&mut io.write, State::None);
+                io.write = match state {
+                    State::Ok(buf, pos) => State::Pending(buf, pos),
+                    // io is locked, so this branch is unreachable
+                    _ => unreachable!(),
+                };
+                mem::forget(me.clone());
             }
+            Ok(None) => (),
             Err(e) => {
                 io.write = State::Err(e);
                 io.notify_writable(events);
@@ -605,6 +651,12 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     // then we're writable again and otherwise we schedule another write.
     let mut io = me.io.lock().unwrap();
     let (buf, pos) = match mem::replace(&mut io.write, State::None) {
+        // `Ok` here means, that the operation was completed immediately
+        // `bytes_transferred` is already reported to a client
+        State::Ok(..) => {
+            io.notify_writable(events);
+            return;
+        }
         State::Pending(buf, pos) => (buf, pos),
         _ => unreachable!(),
     };
