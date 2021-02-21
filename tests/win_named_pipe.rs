@@ -9,6 +9,7 @@ use std::time::Duration;
 use mio::windows::NamedPipe;
 use mio::{Events, Interest, Poll, Token};
 use rand::Rng;
+use winapi::shared::winerror::*;
 use winapi::um::winbase::FILE_FLAG_OVERLAPPED;
 
 fn _assert_kinds() {
@@ -173,6 +174,44 @@ fn connect_after_client() {
             if event.is_writable() {
                 break;
             }
+        }
+    }
+}
+
+#[test]
+fn write_disconnected() {
+    let mut poll = t!(Poll::new());
+    let (mut server, mut client) = pipe();
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    drop(client);
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+    assert!(events.iter().count() > 0);
+
+    // this should not hang
+    let mut i = 0;
+    loop {
+        i += 1;
+        assert!(i < 16, "too many iterations");
+
+        match server.write(&[0]) {
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                t!(poll.poll(&mut events, None));
+                assert!(events.iter().count() > 0);
+            }
+            Err(e) if e.raw_os_error() == Some(ERROR_NO_DATA as i32) => break,
+            e => panic!("{:?}", e),
         }
     }
 }
