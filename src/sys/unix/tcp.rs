@@ -421,6 +421,27 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
     let mut addr: MaybeUninit<libc::sockaddr_storage> = MaybeUninit::uninit();
     let mut length = size_of::<libc::sockaddr_storage>() as libc::socklen_t;
 
+    fn sys_accept(
+        listener: &net::TcpListener,
+        addr: &mut MaybeUninit<libc::sockaddr_storage>,
+        length: &mut libc::socklen_t,
+    ) -> io::Result<libc::c_int> {
+        syscall!(accept(
+            listener.as_raw_fd(),
+            addr.as_mut_ptr() as *mut _,
+            length
+        ))
+        .and_then(|s| {
+            syscall!(fcntl(s, libc::F_SETFD, libc::FD_CLOEXEC))?;
+
+            // See https://github.com/tokio-rs/mio/issues/1450
+            #[cfg(all(target_arch = "x86", target_os = "android"))]
+            syscall!(fcntl(s, libc::F_SETFL, libc::O_NONBLOCK))?;
+
+            Ok(s)
+        })
+    }
+
     // On platforms that support it we can use `accept4(2)` to set `NONBLOCK`
     // and `CLOEXEC` in the call to accept the connection.
     #[cfg(any(
@@ -438,12 +459,36 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
         target_os = "openbsd"
     ))]
     let stream = {
-        syscall!(accept4(
-            listener.as_raw_fd(),
-            addr.as_mut_ptr() as *mut _,
-            &mut length,
-            libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
-        ))
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        static ACCEPT4_AVAIL: AtomicBool = AtomicBool::new(true);
+
+        if ACCEPT4_AVAIL.load(Ordering::Relaxed) {
+            let result = syscall!(accept4(
+                listener.as_raw_fd(),
+                addr.as_mut_ptr() as *mut _,
+                &mut length,
+                libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
+            ));
+
+            match result {
+                Ok(s) => Ok(s),
+                Err(err) => {
+                    match err.raw_os_error() {
+                        Some(libc::ENOSYS) | Some(libc::EPERM) => {
+                            // accept4 is not available in the current platform
+                            ACCEPT4_AVAIL.store(false, Ordering::Relaxed);
+
+                            // Fallback to accept
+                            sys_accept(listener, &mut addr, &mut length)
+                        }
+                        _ => Err(err),
+                    }
+                }
+            }
+        } else {
+            sys_accept(listener, &mut addr, &mut length)
+        }
         .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
     }?;
 
@@ -457,21 +502,8 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
         target_os = "solaris"
     ))]
     let stream = {
-        syscall!(accept(
-            listener.as_raw_fd(),
-            addr.as_mut_ptr() as *mut _,
-            &mut length
-        ))
-        .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
-        .and_then(|s| {
-            syscall!(fcntl(s.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC))?;
-
-            // See https://github.com/tokio-rs/mio/issues/1450
-            #[cfg(all(target_arch = "x86", target_os = "android"))]
-            syscall!(fcntl(s.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK))?;
-
-            Ok(s)
-        })
+        sys_accept(listener, &mut addr, &mut length)
+            .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
     }?;
 
     // This is safe because `accept` calls above ensures the address
