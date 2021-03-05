@@ -424,12 +424,6 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
     // On platforms that support it we can use `accept4(2)` to set `NONBLOCK`
     // and `CLOEXEC` in the call to accept the connection.
     #[cfg(any(
-        // Android x86's seccomp profile forbids calls to `accept4(2)`
-        // See https://github.com/tokio-rs/mio/issues/1445 for details
-        all(
-            not(target_arch="x86"),
-            target_os = "android"
-        ),
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "illumos",
@@ -451,7 +445,7 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
     // OSes inherit the non-blocking flag from the listener, so we just have to
     // set `CLOEXEC`.
     #[cfg(any(
-        all(target_arch = "x86", target_os = "android"),
+        target_os = "android",
         target_os = "ios",
         target_os = "macos",
         target_os = "solaris"

@@ -43,12 +43,7 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
         target_os = "macos",
         target_os = "netbsd",
         target_os = "solaris",
-        // Android x86's seccomp profile forbids calls to `accept4(2)`
-        // See https://github.com/tokio-rs/mio/issues/1445 for details
-        all(
-            target_arch = "x86",
-            target_os = "android"
-        )
+        target_os = "android",
     )))]
     let socket = {
         let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
@@ -66,7 +61,7 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
         target_os = "macos",
         target_os = "netbsd",
         target_os = "solaris",
-        all(target_arch = "x86", target_os = "android")
+        target_os = "android",
     ))]
     let socket = syscall!(accept(
         listener.as_raw_fd(),
