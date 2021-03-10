@@ -129,7 +129,7 @@ or higher-level libraries.
 
 Currently supported platforms:
 
-* Android
+* Android (API level 21)
 * DragonFly BSD
 * FreeBSD
 * Linux
