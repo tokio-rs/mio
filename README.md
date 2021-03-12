@@ -136,7 +136,7 @@ Currently supported platforms:
 * NetBSD
 * OpenBSD
 * Solaris
-* Windows (running under Wine is not supported, see [issue #1444])
+* Windows
 * iOS
 * macOS
 
@@ -152,6 +152,13 @@ This uses the Windows AFD system to access socket readiness events.
 
 [wepoll]: https://github.com/piscisaureus/wepoll
 [issue #1444]: https://github.com/tokio-rs/mio/issues/1444
+
+### Unsupported
+
+* Haiku, see [issue #1472]
+* Wine, see [issue #1444]
+
+[issue #1472]: https://github.com/tokio-rs/mio/issues/1472
 
 ## Community
 
