@@ -9,7 +9,7 @@ use std::time::Duration;
 use crate::net::TcpKeepalive;
 use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
 
-#[cfg(any(target_os = "openbsd", target_os = "netbsd", target_os = "haiku"))]
+#[cfg(any(target_os = "openbsd", target_os = "netbsd"))]
 use libc::SO_KEEPALIVE as KEEPALIVE_TIME;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 use libc::TCP_KEEPALIVE as KEEPALIVE_TIME;
@@ -18,7 +18,6 @@ use libc::TCP_KEEPALIVE as KEEPALIVE_TIME;
     target_os = "ios",
     target_os = "openbsd",
     target_os = "netbsd",
-    target_os = "haiku"
 )))]
 use libc::TCP_KEEPIDLE as KEEPALIVE_TIME;
 pub type TcpSocket = libc::c_int;
