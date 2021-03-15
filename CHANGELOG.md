@@ -1,4 +1,9 @@
-# 0.7.9
+# 0.7.10
+
+## Fixes
+
+* Fix an instance of not doc(cfg(.*))
+  (https://github.com/tokio-rs/mio/commit/25e8f911357c740034f10a170dfa4ea1b28234ce).
 
 ## Fixes
 
