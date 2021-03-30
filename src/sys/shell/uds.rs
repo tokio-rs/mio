@@ -1,3 +1,6 @@
+#[cfg(unix)]
+pub use crate::sys::unix::uds::SocketAddr;
+
 pub(crate) mod datagram {
     use crate::net::SocketAddr;
     use std::io;

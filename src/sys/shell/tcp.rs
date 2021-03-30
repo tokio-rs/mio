@@ -1,7 +1,9 @@
 use crate::net::TcpKeepalive;
+use crate::sys::net::SocketAddr;
 use std::io;
-use std::net::{self, SocketAddr};
 use std::time::Duration;
+
+pub use std::net::{TcpListener, TcpStream};
 
 pub(crate) type TcpSocket = i32;
 
@@ -17,11 +19,11 @@ pub(crate) fn bind(_socket: TcpSocket, _addr: SocketAddr) -> io::Result<()> {
     os_required!();
 }
 
-pub(crate) fn connect(_: TcpSocket, _addr: SocketAddr) -> io::Result<net::TcpStream> {
+pub(crate) fn connect(_: TcpSocket, _addr: SocketAddr) -> io::Result<TcpStream> {
     os_required!();
 }
 
-pub(crate) fn listen(_: TcpSocket, _: u32) -> io::Result<net::TcpListener> {
+pub(crate) fn listen(_: TcpSocket, _: u32) -> io::Result<TcpListener> {
     os_required!();
 }
 
@@ -118,7 +120,7 @@ pub(crate) fn get_keepalive_retries(_: TcpSocket) -> io::Result<Option<u32>> {
     os_required!()
 }
 
-pub fn accept(_: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
+pub fn accept(_: &TcpListener) -> io::Result<(TcpStream, SocketAddr)> {
     os_required!();
 }
 

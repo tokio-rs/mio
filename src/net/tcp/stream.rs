@@ -1,6 +1,5 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
@@ -8,6 +7,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 
 use crate::io_source::IoSource;
 use crate::net::TcpSocket;
+use crate::sys;
 use crate::{event, Interest, Registry, Token};
 
 /// A non-blocking TCP stream between a local socket and a remote socket.
@@ -43,13 +43,13 @@ use crate::{event, Interest, Registry, Token};
 /// # }
 /// ```
 pub struct TcpStream {
-    inner: IoSource<net::TcpStream>,
+    inner: IoSource<sys::tcp::TcpStream>,
 }
 
 impl TcpStream {
     /// Create a new TCP stream and issue a non-blocking connect to the
     /// specified address.
-    pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
+    pub fn connect(addr: sys::net::SocketAddr) -> io::Result<Self> {
         let socket = TcpSocket::new_for_addr(addr)?;
         socket.connect(addr)
     }
@@ -66,19 +66,19 @@ impl TcpStream {
     /// The TCP stream here will not have `connect` called on it, so it
     /// should already be connected via some other means (be it manually, or
     /// the standard library).
-    pub fn from_std(stream: net::TcpStream) -> TcpStream {
-        TcpStream {
+    pub fn from_std(stream: sys::tcp::TcpStream) -> Self {
+        Self {
             inner: IoSource::new(stream),
         }
     }
 
     /// Returns the socket address of the remote peer of this TCP connection.
-    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<sys::net::SocketAddr> {
         self.inner.peer_addr()
     }
 
     /// Returns the socket address of the local half of this TCP connection.
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<sys::net::SocketAddr> {
         self.inner.local_addr()
     }
 
@@ -87,7 +87,7 @@ impl TcpStream {
     /// This function will cause all pending and future I/O on the specified
     /// portions to return immediately with an appropriate value (see the
     /// documentation of `Shutdown`).
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+    pub fn shutdown(&self, how: sys::net::Shutdown) -> io::Result<()> {
         self.inner.shutdown(how)
     }
 
@@ -272,8 +272,8 @@ impl FromRawFd for TcpStream {
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
-    unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
-        TcpStream::from_std(FromRawFd::from_raw_fd(fd))
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        Self::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
 
@@ -299,7 +299,7 @@ impl FromRawSocket for TcpStream {
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
-    unsafe fn from_raw_socket(socket: RawSocket) -> TcpStream {
-        TcpStream::from_std(FromRawSocket::from_raw_socket(socket))
+    unsafe fn from_raw_socket(socket: RawSocket) -> Self {
+        Self::from_std(FromRawSocket::from_raw_socket(socket))
     }
 }

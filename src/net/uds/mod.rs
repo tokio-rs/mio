@@ -7,4 +7,4 @@ pub use self::listener::UnixListener;
 mod stream;
 pub use self::stream::UnixStream;
 
-pub use crate::sys::SocketAddr;
+pub use crate::sys::uds::SocketAddr;

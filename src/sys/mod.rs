@@ -75,6 +75,6 @@ cfg_not_os_poll! {
 
     #[cfg(unix)]
     cfg_net! {
-        pub use self::unix::SocketAddr;
+        pub use self::unix::uds::SocketAddr;
     }
 }

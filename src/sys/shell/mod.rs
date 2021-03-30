@@ -11,6 +11,7 @@ mod waker;
 pub(crate) use self::waker::Waker;
 
 cfg_net! {
+    pub(crate) mod net;
     pub(crate) mod tcp;
     pub(crate) mod udp;
     #[cfg(unix)]

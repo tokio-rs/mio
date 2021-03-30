@@ -22,6 +22,8 @@ use winapi::um::winsock2::{
 use crate::net::TcpKeepalive;
 use crate::sys::windows::net::{init, new_socket, socket_addr};
 
+pub use std::net::{TcpListener, TcpStream};
+
 pub(crate) type TcpSocket = SOCKET;
 
 pub(crate) fn new_v4_socket() -> io::Result<TcpSocket> {

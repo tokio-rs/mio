@@ -1,4 +1,3 @@
-use std::net::{self, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
@@ -36,7 +35,7 @@ use crate::{event, sys, Interest, Registry, Token};
 /// # }
 /// ```
 pub struct TcpListener {
-    inner: IoSource<net::TcpListener>,
+    inner: IoSource<sys::tcp::TcpListener>,
 }
 
 impl TcpListener {
@@ -49,7 +48,7 @@ impl TcpListener {
     /// 2. Set the `SO_REUSEADDR` option on the socket on Unix.
     /// 3. Bind the socket to the specified address.
     /// 4. Calls `listen` on the socket to prepare it to receive new connections.
-    pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
+    pub fn bind(addr: sys::net::SocketAddr) -> io::Result<Self> {
         let socket = TcpSocket::new_for_addr(addr)?;
 
         // On platforms with Berkeley-derived sockets, this allows to quickly
@@ -72,8 +71,8 @@ impl TcpListener {
     /// standard library in the Mio equivalent. The conversion assumes nothing
     /// about the underlying listener; ; it is left up to the user to set it
     /// in non-blocking mode.
-    pub fn from_std(listener: net::TcpListener) -> TcpListener {
-        TcpListener {
+    pub fn from_std(listener: sys::tcp::TcpListener) -> Self {
+        Self {
             inner: IoSource::new(listener),
         }
     }
@@ -86,14 +85,14 @@ impl TcpListener {
     ///
     /// If an accepted stream is returned, the remote address of the peer is
     /// returned along with it.
-    pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+    pub fn accept(&self) -> io::Result<(TcpStream, sys::net::SocketAddr)> {
         self.inner.do_io(|inner| {
             sys::tcp::accept(inner).map(|(stream, addr)| (TcpStream::from_std(stream), addr))
         })
     }
 
     /// Returns the local socket address of this listener.
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<sys::net::SocketAddr> {
         self.inner.local_addr()
     }
 
@@ -176,8 +175,8 @@ impl FromRawFd for TcpListener {
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
-    unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
-        TcpListener::from_std(FromRawFd::from_raw_fd(fd))
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        Self::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
 
@@ -203,7 +202,7 @@ impl FromRawSocket for TcpListener {
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
-    unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
-        TcpListener::from_std(FromRawSocket::from_raw_socket(socket))
+    unsafe fn from_raw_socket(socket: RawSocket) -> Self {
+        Self::from_std(FromRawSocket::from_raw_socket(socket))
     }
 }

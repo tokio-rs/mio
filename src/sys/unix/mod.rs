@@ -13,6 +13,10 @@ macro_rules! syscall {
     }};
 }
 
+cfg_net! {
+    pub(crate) mod net;
+}
+
 cfg_os_poll! {
     mod selector;
     pub(crate) use self::selector::{event, Event, Events, Selector};
@@ -24,12 +28,9 @@ cfg_os_poll! {
     pub(crate) use self::waker::Waker;
 
     cfg_net! {
-        mod net;
-
         pub(crate) mod tcp;
         pub(crate) mod udp;
         pub(crate) mod uds;
-        pub use self::uds::SocketAddr;
     }
 
     cfg_io_source! {
@@ -61,8 +62,7 @@ cfg_os_poll! {
 
 cfg_not_os_poll! {
     cfg_net! {
-        mod uds;
-        pub use self::uds::SocketAddr;
+        pub(crate) mod uds;
     }
 
     cfg_any_os_ext! {

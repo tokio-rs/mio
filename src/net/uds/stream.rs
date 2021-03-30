@@ -3,20 +3,18 @@ use crate::{event, sys, Interest, Registry, Token};
 
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net;
 use std::path::Path;
 
 /// A non-blocking Unix stream socket.
 pub struct UnixStream {
-    inner: IoSource<net::UnixStream>,
+    inner: IoSource<sys::net::UnixStream>,
 }
 
 impl UnixStream {
     /// Connects to the socket named by `path`.
-    pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
-        sys::uds::stream::connect(path.as_ref()).map(UnixStream::from_std)
+    pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        sys::uds::stream::connect(path.as_ref()).map(Self::from_std)
     }
 
     /// Creates a new `UnixStream` from a standard `net::UnixStream`.
@@ -31,8 +29,8 @@ impl UnixStream {
     /// The Unix stream here will not have `connect` called on it, so it
     /// should already be connected via some other means (be it manually, or
     /// the standard library).
-    pub fn from_std(stream: net::UnixStream) -> UnixStream {
-        UnixStream {
+    pub fn from_std(stream: sys::net::UnixStream) -> Self {
+        Self {
             inner: IoSource::new(stream),
         }
     }
@@ -40,19 +38,18 @@ impl UnixStream {
     /// Creates an unnamed pair of connected sockets.
     ///
     /// Returns two `UnixStream`s which are connected to each other.
-    pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
-        sys::uds::stream::pair().map(|(stream1, stream2)| {
-            (UnixStream::from_std(stream1), UnixStream::from_std(stream2))
-        })
+    pub fn pair() -> io::Result<(Self, Self)> {
+        sys::uds::stream::pair()
+            .map(|(stream1, stream2)| (Self::from_std(stream1), Self::from_std(stream2)))
     }
 
     /// Returns the socket address of the local half of this connection.
-    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<sys::uds::SocketAddr> {
         sys::uds::stream::local_addr(&self.inner)
     }
 
     /// Returns the socket address of the remote half of this connection.
-    pub fn peer_addr(&self) -> io::Result<sys::SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<sys::uds::SocketAddr> {
         sys::uds::stream::peer_addr(&self.inner)
     }
 
@@ -66,7 +63,7 @@ impl UnixStream {
     /// This function will cause all pending and future I/O calls on the
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation of `Shutdown`).
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+    pub fn shutdown(&self, how: sys::net::Shutdown) -> io::Result<()> {
         self.inner.shutdown(how)
     }
 }
@@ -168,7 +165,7 @@ impl FromRawFd for UnixStream {
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
-    unsafe fn from_raw_fd(fd: RawFd) -> UnixStream {
-        UnixStream::from_std(FromRawFd::from_raw_fd(fd))
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        Self::from_std(FromRawFd::from_raw_fd(fd))
     }
 }

@@ -12,8 +12,6 @@ use crate::{event, sys, Interest, Registry, Token};
 
 use std::fmt;
 use std::io;
-use std::net;
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
@@ -89,7 +87,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 /// # }
 /// ```
 pub struct UdpSocket {
-    inner: IoSource<net::UdpSocket>,
+    inner: IoSource<sys::udp::UdpSocket>,
 }
 
 impl UdpSocket {
@@ -118,8 +116,8 @@ impl UdpSocket {
     /// #    Ok(())
     /// # }
     /// ```
-    pub fn bind(addr: SocketAddr) -> io::Result<UdpSocket> {
-        sys::udp::bind(addr).map(UdpSocket::from_std)
+    pub fn bind(addr: sys::net::SocketAddr) -> io::Result<Self> {
+        sys::udp::bind(addr).map(Self::from_std)
     }
 
     /// Creates a new `UdpSocket` from a standard `net::UdpSocket`.
@@ -128,8 +126,8 @@ impl UdpSocket {
     /// standard library in the Mio equivalent. The conversion assumes nothing
     /// about the underlying socket; it is left up to the user to set it in
     /// non-blocking mode.
-    pub fn from_std(socket: net::UdpSocket) -> UdpSocket {
-        UdpSocket {
+    pub fn from_std(socket: sys::udp::UdpSocket) -> Self {
+        Self {
             inner: IoSource::new(socket),
         }
     }
@@ -157,7 +155,7 @@ impl UdpSocket {
     /// #    Ok(())
     /// # }
     /// ```
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<sys::net::SocketAddr> {
         self.inner.local_addr()
     }
 
@@ -180,7 +178,7 @@ impl UdpSocket {
     /// #    Ok(())
     /// # }
     /// ```
-    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<sys::net::SocketAddr> {
         self.inner.peer_addr()
     }
 
@@ -208,7 +206,7 @@ impl UdpSocket {
     /// #    Ok(())
     /// # }
     /// ```
-    pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
+    pub fn send_to(&self, buf: &[u8], target: sys::net::SocketAddr) -> io::Result<usize> {
         self.inner.do_io(|inner| inner.send_to(buf, target))
     }
 
@@ -243,7 +241,7 @@ impl UdpSocket {
     /// #    Ok(())
     /// # }
     /// ```
-    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, sys::net::SocketAddr)> {
         self.inner.do_io(|inner| inner.recv_from(buf))
     }
 
@@ -279,7 +277,7 @@ impl UdpSocket {
     /// #    Ok(())
     /// # }
     /// ```
-    pub fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, sys::net::SocketAddr)> {
         self.inner.do_io(|inner| inner.peek_from(buf))
     }
 
@@ -320,7 +318,7 @@ impl UdpSocket {
     /// Connects the UDP socket setting the default destination for `send()`
     /// and limiting packets that are read via `recv` from the address specified
     /// in `addr`.
-    pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
+    pub fn connect(&self, addr: sys::net::SocketAddr) -> io::Result<()> {
         self.inner.connect(addr)
     }
 
@@ -498,7 +496,11 @@ impl UdpSocket {
     /// multicast group. If it's equal to `INADDR_ANY` then an appropriate
     /// interface is chosen by the system.
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+    pub fn join_multicast_v4(
+        &self,
+        multiaddr: &sys::net::Ipv4Addr,
+        interface: &sys::net::Ipv4Addr,
+    ) -> io::Result<()> {
         self.inner.join_multicast_v4(multiaddr, interface)
     }
 
@@ -508,7 +510,11 @@ impl UdpSocket {
     /// The address must be a valid multicast address, and `interface` is the
     /// index of the interface to join/leave (or 0 to indicate any interface).
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+    pub fn join_multicast_v6(
+        &self,
+        multiaddr: &sys::net::Ipv6Addr,
+        interface: u32,
+    ) -> io::Result<()> {
         self.inner.join_multicast_v6(multiaddr, interface)
     }
 
@@ -519,7 +525,11 @@ impl UdpSocket {
     ///
     /// [link]: #method.join_multicast_v4
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+    pub fn leave_multicast_v4(
+        &self,
+        multiaddr: &sys::net::Ipv4Addr,
+        interface: &sys::net::Ipv4Addr,
+    ) -> io::Result<()> {
         self.inner.leave_multicast_v4(multiaddr, interface)
     }
 
@@ -530,7 +540,11 @@ impl UdpSocket {
     ///
     /// [link]: #method.join_multicast_v6
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+    pub fn leave_multicast_v6(
+        &self,
+        multiaddr: &sys::net::Ipv6Addr,
+        interface: u32,
+    ) -> io::Result<()> {
         self.inner.leave_multicast_v6(multiaddr, interface)
     }
 
@@ -602,8 +616,8 @@ impl FromRawFd for UdpSocket {
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
-    unsafe fn from_raw_fd(fd: RawFd) -> UdpSocket {
-        UdpSocket::from_std(FromRawFd::from_raw_fd(fd))
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        Self::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
 

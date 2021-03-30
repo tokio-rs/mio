@@ -11,6 +11,8 @@ use winapi::um::winsock2::{bind as win_bind, closesocket, getsockopt, SOCKET_ERR
 
 use crate::sys::windows::net::{init, new_ip_socket, socket_addr};
 
+pub use std::net::UdpSocket;
+
 pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
     init();
     new_ip_socket(addr, SOCK_DGRAM).and_then(|socket| {

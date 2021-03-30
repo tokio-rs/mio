@@ -3,19 +3,18 @@ use crate::net::{SocketAddr, UnixStream};
 use crate::{event, sys, Interest, Registry, Token};
 
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net;
 use std::path::Path;
 use std::{fmt, io};
 
 /// A non-blocking Unix domain socket server.
 pub struct UnixListener {
-    inner: IoSource<net::UnixListener>,
+    inner: IoSource<sys::net::UnixListener>,
 }
 
 impl UnixListener {
     /// Creates a new `UnixListener` bound to the specified socket.
-    pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
-        sys::uds::listener::bind(path.as_ref()).map(UnixListener::from_std)
+    pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        sys::uds::listener::bind(path.as_ref()).map(Self::from_std)
     }
 
     /// Creates a new `UnixListener` from a standard `net::UnixListener`.
@@ -24,8 +23,8 @@ impl UnixListener {
     /// standard library in the Mio equivalent. The conversion assumes nothing
     /// about the underlying listener; it is left up to the user to set it in
     /// non-blocking mode.
-    pub fn from_std(listener: net::UnixListener) -> UnixListener {
-        UnixListener {
+    pub fn from_std(listener: sys::net::UnixListener) -> Self {
+        Self {
             inner: IoSource::new(listener),
         }
     }
@@ -39,7 +38,7 @@ impl UnixListener {
     }
 
     /// Returns the local socket address of this listener.
-    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<sys::uds::SocketAddr> {
         sys::uds::listener::local_addr(&self.inner)
     }
 
@@ -98,7 +97,7 @@ impl FromRawFd for UnixListener {
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
-    unsafe fn from_raw_fd(fd: RawFd) -> UnixListener {
-        UnixListener::from_std(FromRawFd::from_raw_fd(fd))
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        Self::from_std(FromRawFd::from_raw_fd(fd))
     }
 }

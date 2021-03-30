@@ -1,7 +1,8 @@
 use std::io;
 use std::mem;
-use std::net::SocketAddr;
 use std::sync::Once;
+
+pub use std::net::{Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr};
 
 use winapi::ctypes::c_int;
 use winapi::shared::in6addr::{in6_addr_u, IN6_ADDR};

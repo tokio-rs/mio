@@ -1,6 +1,5 @@
 use std::io;
 use std::mem;
-use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
@@ -49,27 +48,27 @@ impl TcpSocket {
     /// Create a new IPv4 TCP socket.
     ///
     /// This calls `socket(2)`.
-    pub fn new_v4() -> io::Result<TcpSocket> {
-        sys::tcp::new_v4_socket().map(|sys| TcpSocket { sys })
+    pub fn new_v4() -> io::Result<Self> {
+        sys::tcp::new_v4_socket().map(|sys| Self { sys })
     }
 
     /// Create a new IPv6 TCP socket.
     ///
     /// This calls `socket(2)`.
-    pub fn new_v6() -> io::Result<TcpSocket> {
-        sys::tcp::new_v6_socket().map(|sys| TcpSocket { sys })
+    pub fn new_v6() -> io::Result<Self> {
+        sys::tcp::new_v6_socket().map(|sys| Self { sys })
     }
 
-    pub(crate) fn new_for_addr(addr: SocketAddr) -> io::Result<TcpSocket> {
+    pub(crate) fn new_for_addr(addr: sys::net::SocketAddr) -> io::Result<Self> {
         if addr.is_ipv4() {
-            TcpSocket::new_v4()
+            Self::new_v4()
         } else {
-            TcpSocket::new_v6()
+            Self::new_v6()
         }
     }
 
     /// Bind `addr` to the TCP socket.
-    pub fn bind(&self, addr: SocketAddr) -> io::Result<()> {
+    pub fn bind(&self, addr: sys::net::SocketAddr) -> io::Result<()> {
         sys::tcp::bind(self.sys, addr)
     }
 
@@ -78,7 +77,7 @@ impl TcpSocket {
     /// This consumes the socket and performs the connect operation. Once the
     /// connection completes, the socket is now a non-blocking `TcpStream` and
     /// can be used as such.
-    pub fn connect(self, addr: SocketAddr) -> io::Result<TcpStream> {
+    pub fn connect(self, addr: sys::net::SocketAddr) -> io::Result<TcpStream> {
         let stream = sys::tcp::connect(self.sys, addr)?;
 
         // Don't close the socket
@@ -324,7 +323,7 @@ impl TcpSocket {
     /// Returns the local address of this socket
     ///
     /// Will return `Err` result in windows if called before calling `bind`
-    pub fn get_localaddr(&self) -> io::Result<SocketAddr> {
+    pub fn get_localaddr(&self) -> io::Result<sys::net::SocketAddr> {
         sys::tcp::get_localaddr(self.sys)
     }
 }
@@ -396,8 +395,8 @@ impl FromRawSocket for TcpSocket {
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
-    unsafe fn from_raw_socket(socket: RawSocket) -> TcpSocket {
-        TcpSocket {
+    unsafe fn from_raw_socket(socket: RawSocket) -> Self {
+        Self {
             sys: socket as sys::tcp::TcpSocket,
         }
     }

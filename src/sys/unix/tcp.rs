@@ -1,13 +1,13 @@
 use std::convert::TryInto;
 use std::io;
-use std::mem;
-use std::mem::{size_of, MaybeUninit};
-use std::net::{self, SocketAddr};
+use std::mem::{self, size_of, MaybeUninit};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::time::Duration;
 
 use crate::net::TcpKeepalive;
-use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
+use crate::sys::net::{new_socket, socket_addr, to_socket_addr, SocketAddr};
+
+pub use std::net::{TcpListener, TcpStream};
 
 #[cfg(any(target_os = "openbsd", target_os = "netbsd"))]
 use libc::SO_KEEPALIVE as KEEPALIVE_TIME;
@@ -36,23 +36,23 @@ pub(crate) fn bind(socket: TcpSocket, addr: SocketAddr) -> io::Result<()> {
     Ok(())
 }
 
-pub(crate) fn connect(socket: TcpSocket, addr: SocketAddr) -> io::Result<net::TcpStream> {
+pub(crate) fn connect(socket: TcpSocket, addr: SocketAddr) -> io::Result<TcpStream> {
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
 
     match syscall!(connect(socket, raw_addr.as_ptr(), raw_addr_length)) {
         Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
-        _ => Ok(unsafe { net::TcpStream::from_raw_fd(socket) }),
+        _ => Ok(unsafe { TcpStream::from_raw_fd(socket) }),
     }
 }
 
-pub(crate) fn listen(socket: TcpSocket, backlog: u32) -> io::Result<net::TcpListener> {
+pub(crate) fn listen(socket: TcpSocket, backlog: u32) -> io::Result<TcpListener> {
     let backlog = backlog.try_into().unwrap_or(i32::max_value());
     syscall!(listen(socket, backlog))?;
-    Ok(unsafe { net::TcpListener::from_raw_fd(socket) })
+    Ok(unsafe { TcpListener::from_raw_fd(socket) })
 }
 
 pub(crate) fn close(socket: TcpSocket) {
-    let _ = unsafe { net::TcpStream::from_raw_fd(socket) };
+    let _ = unsafe { TcpStream::from_raw_fd(socket) };
 }
 
 pub(crate) fn set_reuseaddr(socket: TcpSocket, reuseaddr: bool) -> io::Result<()> {
@@ -416,7 +416,7 @@ pub(crate) fn get_keepalive_retries(socket: TcpSocket) -> io::Result<Option<u32>
     Ok(Some(optval as u32))
 }
 
-pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
+pub fn accept(listener: &TcpListener) -> io::Result<(TcpStream, SocketAddr)> {
     let mut addr: MaybeUninit<libc::sockaddr_storage> = MaybeUninit::uninit();
     let mut length = size_of::<libc::sockaddr_storage>() as libc::socklen_t;
 
@@ -443,7 +443,7 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
             &mut length,
             libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
         ))
-        .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
+        .map(|socket| unsafe { TcpStream::from_raw_fd(socket) })
     }?;
 
     // But not all platforms have the `accept4(2)` call. Luckily BSD (derived)
@@ -461,7 +461,7 @@ pub fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, Socket
             addr.as_mut_ptr() as *mut _,
             &mut length
         ))
-        .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
+        .map(|socket| unsafe { TcpStream::from_raw_fd(socket) })
         .and_then(|s| {
             syscall!(fcntl(s.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC))?;
 

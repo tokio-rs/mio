@@ -1,21 +1,19 @@
 use crate::io_source::IoSource;
 use crate::{event, sys, Interest, Registry, Token};
 
-use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net;
 use std::path::Path;
 use std::{fmt, io};
 
 /// A Unix datagram socket.
 pub struct UnixDatagram {
-    inner: IoSource<net::UnixDatagram>,
+    inner: IoSource<sys::net::UnixDatagram>,
 }
 
 impl UnixDatagram {
     /// Creates a Unix datagram socket bound to the given path.
-    pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixDatagram> {
-        sys::uds::datagram::bind(path.as_ref()).map(UnixDatagram::from_std)
+    pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        sys::uds::datagram::bind(path.as_ref()).map(Self::from_std)
     }
 
     /// Creates a new `UnixDatagram` from a standard `net::UnixDatagram`.
@@ -24,8 +22,8 @@ impl UnixDatagram {
     /// standard library in the Mio equivalent. The conversion assumes nothing
     /// about the underlying datagram; ; it is left up to the user to set it
     /// in non-blocking mode.
-    pub fn from_std(socket: net::UnixDatagram) -> UnixDatagram {
-        UnixDatagram {
+    pub fn from_std(socket: sys::net::UnixDatagram) -> Self {
+        Self {
             inner: IoSource::new(socket),
         }
     }
@@ -36,29 +34,25 @@ impl UnixDatagram {
     }
 
     /// Creates a Unix Datagram socket which is not bound to any address.
-    pub fn unbound() -> io::Result<UnixDatagram> {
-        sys::uds::datagram::unbound().map(UnixDatagram::from_std)
+    pub fn unbound() -> io::Result<Self> {
+        sys::uds::datagram::unbound().map(Self::from_std)
     }
 
     /// Create an unnamed pair of connected sockets.
-    pub fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {
-        sys::uds::datagram::pair().map(|(socket1, socket2)| {
-            (
-                UnixDatagram::from_std(socket1),
-                UnixDatagram::from_std(socket2),
-            )
-        })
+    pub fn pair() -> io::Result<(Self, Self)> {
+        sys::uds::datagram::pair()
+            .map(|(socket1, socket2)| (Self::from_std(socket1), Self::from_std(socket2)))
     }
 
     /// Returns the address of this socket.
-    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<sys::uds::SocketAddr> {
         sys::uds::datagram::local_addr(&self.inner)
     }
 
     /// Returns the address of this socket's peer.
     ///
     /// The `connect` method will connect the socket to a peer.
-    pub fn peer_addr(&self) -> io::Result<sys::SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<sys::uds::SocketAddr> {
         sys::uds::datagram::peer_addr(&self.inner)
     }
 
@@ -66,7 +60,7 @@ impl UnixDatagram {
     ///
     /// On success, returns the number of bytes read and the address from
     /// whence the data came.
-    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, sys::SocketAddr)> {
+    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, sys::uds::SocketAddr)> {
         self.inner
             .do_io(|inner| sys::uds::datagram::recv_from(inner, buf))
     }
@@ -105,7 +99,7 @@ impl UnixDatagram {
     /// This function will cause all pending and future I/O calls on the
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation of `Shutdown`).
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+    pub fn shutdown(&self, how: sys::net::Shutdown) -> io::Result<()> {
         self.inner.shutdown(how)
     }
 }
@@ -159,7 +153,7 @@ impl FromRawFd for UnixDatagram {
     ///
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
-    unsafe fn from_raw_fd(fd: RawFd) -> UnixDatagram {
-        UnixDatagram::from_std(FromRawFd::from_raw_fd(fd))
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        Self::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
