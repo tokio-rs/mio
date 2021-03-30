@@ -27,7 +27,7 @@ jobs:
       name: nightly
       displayName: Nightly
       # Pin nightly to avoid being impacted by breakage
-      rust_version: nightly-2020-12-31
+      rust_version: nightly-2020-03-24
       benches: true
 
   # This represents the minimum Rust version supported by
