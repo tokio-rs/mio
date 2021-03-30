@@ -132,7 +132,7 @@ fn drop_cancels_interest_and_shuts_down() {
             Ok(_) => (),
             Err(err) => {
                 if err.kind() != io::ErrorKind::UnexpectedEof {
-                    panic!(err);
+                    panic!("{}", err);
                 }
             }
         }
