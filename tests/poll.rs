@@ -393,7 +393,7 @@ fn reregister_interest_token_usage() {
 
 // This test checks the following register constraint:
 // The event source must **not** have been previously registered with this
-// instance of `Poll`, otherwise the behavior is undefined.
+// instance of `Poll`, otherwise the behavior is unspecified.
 //
 // This test is done on Windows and epoll platforms where registering a
 // source twice is defined behavior that fail with an error code.
@@ -484,7 +484,7 @@ fn poll_ok_after_cancelling_pending_ops() {
 
 // This test checks the following reregister constraint:
 // The event source must have previously been registered with this instance
-// of `Poll`, otherwise the behavior is undefined.
+// of `Poll`, otherwise the behavior is unspecified.
 //
 // This test is done on Windows and epoll platforms where reregistering a
 // source without a previous register is defined behavior that fail with an
@@ -508,7 +508,7 @@ fn reregister_without_register() {
 
 // This test checks the following register/deregister constraint:
 // The event source must have previously been registered with this instance
-// of `Poll`, otherwise the behavior is undefined.
+// of `Poll`, otherwise the behavior is unspecified.
 //
 // This test is done on Windows and epoll platforms where deregistering a
 // source without a previous register is defined behavior that fail with an

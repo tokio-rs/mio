@@ -409,7 +409,7 @@ impl Registry {
     /// Callers must ensure that if a source being registered with a `Poll`
     /// instance was previously registered with that `Poll` instance, then a
     /// call to [`deregister`] has already occurred. Consecutive calls to
-    /// `register` is undefined behavior.
+    /// `register` is unspecified behavior.
     ///
     /// Unless otherwise specified, the caller should assume that once an event
     /// source is registered with a `Poll` instance, it is bound to that `Poll`
@@ -495,7 +495,7 @@ impl Registry {
     /// requested for the handle.
     ///
     /// The event source must have previously been registered with this instance
-    /// of `Poll`, otherwise the behavior is undefined.
+    /// of `Poll`, otherwise the behavior is unspecified.
     ///
     /// See the [`register`] documentation for details about the function
     /// arguments and see the [`struct`] docs for a high level overview of
@@ -562,11 +562,11 @@ impl Registry {
     /// the poll.
     ///
     /// The event source must have previously been registered with this instance
-    /// of `Poll`, otherwise the behavior is undefined.
+    /// of `Poll`, otherwise the behavior is unspecified.
     ///
     /// A handle can be passed back to `register` after it has been
     /// deregistered; however, it must be passed back to the **same** `Poll`
-    /// instance, otherwise the behavior is undefined.
+    /// instance, otherwise the behavior is unspecified.
     ///
     /// # Examples
     ///
