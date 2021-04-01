@@ -19,7 +19,7 @@ use std::io;
 /// Only a single `Waker` can be active per [`Poll`], if multiple threads need
 /// access to the `Waker` it can be shared via for example an `Arc`. What
 /// happens if multiple `Waker`s are registered with the same `Poll` is
-/// undefined.
+/// unspecified.
 ///
 /// # Implementation notes
 ///

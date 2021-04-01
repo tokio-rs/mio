@@ -146,7 +146,7 @@ fn set_get_ttl() {
     let mut stream = TcpStream::connect(address).unwrap();
 
     // on Windows: the stream must be connected before setting the ttl, otherwise
-    // it is undefined behavior, register and expect a WRITABLE here to make sure
+    // it is unspecified behavior, register and expect a WRITABLE here to make sure
     // the stream is connected
     poll.registry()
         .register(&mut stream, ID1, Interest::WRITABLE)
@@ -178,7 +178,7 @@ fn get_ttl_without_previous_set() {
     let mut stream = TcpStream::connect(address).unwrap();
 
     // on Windows: the stream must be connected before getting the ttl, otherwise
-    // it is undefined behavior, register and expect a WRITABLE here to make sure
+    // it is unspecified behavior, register and expect a WRITABLE here to make sure
     // the stream is connected
     poll.registry()
         .register(&mut stream, ID1, Interest::WRITABLE)
@@ -208,7 +208,7 @@ fn set_get_nodelay() {
     let mut stream = TcpStream::connect(address).unwrap();
 
     // on Windows: the stream must be connected before setting the nodelay, otherwise
-    // it is undefined behavior, register and expect a WRITABLE here to make sure
+    // it is unspecified behavior, register and expect a WRITABLE here to make sure
     // the stream is connected
     poll.registry()
         .register(&mut stream, ID1, Interest::WRITABLE)
@@ -240,7 +240,7 @@ fn get_nodelay_without_previous_set() {
     let mut stream = TcpStream::connect(address).unwrap();
 
     // on Windows: the stream must be connected before setting the nodelay, otherwise
-    // it is undefined behavior, register and expect a WRITABLE here to make sure
+    // it is unspecified behavior, register and expect a WRITABLE here to make sure
     // the stream is connected
     poll.registry()
         .register(&mut stream, ID1, Interest::WRITABLE)

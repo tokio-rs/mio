@@ -103,7 +103,7 @@ impl TcpStream {
     ///
     /// On Windows make sure the stream is connected before calling this method,
     /// by receiving an (writable) event. Trying to set `nodelay` on an
-    /// unconnected `TcpStream` is undefined behavior.
+    /// unconnected `TcpStream` is unspecified behavior.
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
         self.inner.set_nodelay(nodelay)
     }
@@ -118,7 +118,7 @@ impl TcpStream {
     ///
     /// On Windows make sure the stream is connected before calling this method,
     /// by receiving an (writable) event. Trying to get `nodelay` on an
-    /// unconnected `TcpStream` is undefined behavior.
+    /// unconnected `TcpStream` is unspecified behavior.
     pub fn nodelay(&self) -> io::Result<bool> {
         self.inner.nodelay()
     }
@@ -132,7 +132,7 @@ impl TcpStream {
     ///
     /// On Windows make sure the stream is connected before calling this method,
     /// by receiving an (writable) event. Trying to set `ttl` on an
-    /// unconnected `TcpStream` is undefined behavior.
+    /// unconnected `TcpStream` is unspecified behavior.
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.set_ttl(ttl)
     }
@@ -145,7 +145,7 @@ impl TcpStream {
     ///
     /// On Windows make sure the stream is connected before calling this method,
     /// by receiving an (writable) event. Trying to get `ttl` on an
-    /// unconnected `TcpStream` is undefined behavior.
+    /// unconnected `TcpStream` is unspecified behavior.
     ///
     /// [link]: #method.set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
