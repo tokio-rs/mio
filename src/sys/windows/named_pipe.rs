@@ -70,23 +70,19 @@ pub struct NamedPipe {
 /// constants depend on it, see the `offset_constants` test.
 #[repr(C)]
 struct Inner {
-    handle: pipe::NamedPipe,
-
     connect: Overlapped,
-    connecting: AtomicBool,
-
     read: Overlapped,
     write: Overlapped,
-
+    handle: pipe::NamedPipe,
+    connecting: AtomicBool,
     io: Mutex<Io>,
-
     pool: Mutex<BufferPool>,
 }
 
 /// Offsets from a pointer to `Inner` to the `connect`, `read` and `write`
 /// fields.
-const CONNECT_OFFSET: usize = size_of::<pipe::NamedPipe>(); // `handle` field.
-const READ_OFFSET: usize = CONNECT_OFFSET + size_of::<Overlapped>() + size_of::<usize>(); // `connect`, `connecting` (`bool` + padding) fields.
+const CONNECT_OFFSET: usize = 0;
+const READ_OFFSET: usize = CONNECT_OFFSET + size_of::<Overlapped>(); // `connect` fields.
 const WRITE_OFFSET: usize = READ_OFFSET + size_of::<Overlapped>(); // `read` fields.
 
 #[test]
