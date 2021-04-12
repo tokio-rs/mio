@@ -9,7 +9,7 @@ use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token, Waker};
 
 mod util;
-use util::{any_local_address, init, init_with_poll, temp_file};
+use util::{any_local_address, init, init_with_poll};
 
 const ID1: Token = Token(1);
 const WAKE_TOKEN: Token = Token(10);
@@ -109,6 +109,7 @@ fn issue_1205() {
 #[cfg(unix)]
 fn issue_1403() {
     use mio::net::UnixDatagram;
+    use util::temp_file;
 
     init();
 
