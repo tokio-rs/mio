@@ -11,7 +11,7 @@ use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::pipe;
 use winapi::shared::winerror::{ERROR_BROKEN_PIPE, ERROR_PIPE_LISTENING};
 use winapi::um::ioapiset::CancelIoEx;
-use winapi::um::minwinbase::OVERLAPPED_ENTRY;
+use winapi::um::minwinbase::{OVERLAPPED, OVERLAPPED_ENTRY};
 
 use crate::event::Source;
 use crate::sys::windows::{Event, Overlapped};
@@ -70,35 +70,64 @@ pub struct NamedPipe {
 /// constants depend on it, see the `offset_constants` test.
 #[repr(C)]
 struct Inner {
+    // NOTE: careful modifying the order of these three fields, the `ptr_from_*`
+    // methods depend on the layout!
     connect: Overlapped,
     read: Overlapped,
     write: Overlapped,
+    // END NOTE.
     handle: pipe::NamedPipe,
     connecting: AtomicBool,
     io: Mutex<Io>,
     pool: Mutex<BufferPool>,
 }
 
-/// Offsets from a pointer to `Inner` to the `connect`, `read` and `write`
-/// fields.
-const CONNECT_OFFSET: usize = 0;
-const READ_OFFSET: usize = CONNECT_OFFSET + size_of::<Overlapped>(); // `connect` fields.
-const WRITE_OFFSET: usize = READ_OFFSET + size_of::<Overlapped>(); // `read` fields.
+impl Inner {
+    /// Converts a pointer to `Inner.connect` to a pointer to `Inner`.
+    ///
+    /// # Unsafety
+    ///
+    /// Caller must ensure `ptr` is pointing to `Inner.connect`.
+    unsafe fn ptr_from_conn_overlapped(ptr: *mut OVERLAPPED) -> *const Inner {
+        // `connect` is the first field, so the pointer are the same.
+        ptr.cast()
+    }
+
+    /// Same as [`ptr_from_conn_overlapped`] but for `Inner.read`.
+    unsafe fn ptr_from_read_overlapped(ptr: *mut OVERLAPPED) -> *const Inner {
+        // `read` is after `connect: Overlapped`.
+        (ptr as usize + size_of::<Overlapped>()) as *const Inner
+    }
+
+    /// Same as [`ptr_from_conn_overlapped`] but for `Inner.write`.
+    unsafe fn ptr_from_write_overlapped(ptr: *mut OVERLAPPED) -> *const Inner {
+        // `read` is after `connect: Overlapped` and `read: Overlapped`.
+        (ptr as usize + (2 * size_of::<Overlapped>())) as *const Inner
+    }
+}
 
 #[test]
-fn offset_constants() {
+fn ptr_from() {
     use std::mem::ManuallyDrop;
     use std::ptr;
 
     let pipe = unsafe { ManuallyDrop::new(NamedPipe::from_raw_handle(ptr::null_mut())) };
     let inner: &Inner = &pipe.inner;
-    let base = inner as *const Inner as usize;
-    let connect = &inner.connect as *const Overlapped as usize;
-    assert_eq!(base + CONNECT_OFFSET, connect);
-    let read = &inner.read as *const Overlapped as usize;
-    assert_eq!(base + READ_OFFSET, read);
-    let write = &inner.write as *const Overlapped as usize;
-    assert_eq!(base + WRITE_OFFSET, write);
+    assert_eq!(
+        inner as *const Inner,
+        unsafe { Inner::ptr_from_conn_overlapped(&inner.connect as *const _ as *mut OVERLAPPED) },
+        "`ptr_from_conn_overlapped` incorrect"
+    );
+    assert_eq!(
+        inner as *const Inner,
+        unsafe { Inner::ptr_from_read_overlapped(&inner.read as *const _ as *mut OVERLAPPED) },
+        "`ptr_from_read_overlapped` incorrect"
+    );
+    assert_eq!(
+        inner as *const Inner,
+        unsafe { Inner::ptr_from_write_overlapped(&inner.write as *const _ as *mut OVERLAPPED) },
+        "`ptr_from_write_overlapped` incorrect"
+    );
 }
 
 struct Io {
@@ -590,8 +619,7 @@ fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that
     // the refcount is available to us due to the `mem::forget` in
     // `connect` above.
-    let me =
-        unsafe { Arc::from_raw((status.overlapped() as usize - CONNECT_OFFSET) as *mut Inner) };
+    let me = unsafe { Arc::from_raw(Inner::ptr_from_conn_overlapped(status.overlapped())) };
 
     // Flag ourselves as no longer using the `connect` overlapped instances.
     let prev = me.connecting.swap(false, SeqCst);
@@ -617,7 +645,7 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     // Acquire the `FromRawArc<Inner>`. Note that we should be guaranteed that
     // the refcount is available to us due to the `mem::forget` in
     // `schedule_read` above.
-    let me = unsafe { Arc::from_raw((status.overlapped() as usize - READ_OFFSET) as *mut Inner) };
+    let me = unsafe { Arc::from_raw(Inner::ptr_from_read_overlapped(status.overlapped())) };
 
     // Move from the `Pending` to `Ok` state.
     let mut io = me.io.lock().unwrap();
@@ -649,7 +677,7 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     // Acquire the `Arc<Inner>`. Note that we should be guaranteed that
     // the refcount is available to us due to the `mem::forget` in
     // `schedule_write` above.
-    let me = unsafe { Arc::from_raw((status.overlapped() as usize - WRITE_OFFSET) as *mut Inner) };
+    let me = unsafe { Arc::from_raw(Inner::ptr_from_write_overlapped(status.overlapped())) };
 
     // Make the state change out of `Pending`. If we wrote the entire buffer
     // then we're writable again and otherwise we schedule another write.
