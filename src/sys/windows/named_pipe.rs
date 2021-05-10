@@ -1,11 +1,10 @@
 use std::ffi::OsStr;
 use std::io::{self, Read, Write};
-use std::mem::{self, size_of};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle, RawHandle};
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
-use std::{fmt, slice};
+use std::{fmt, mem, slice};
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::pipe;
@@ -96,13 +95,13 @@ impl Inner {
     /// Same as [`ptr_from_conn_overlapped`] but for `Inner.read`.
     unsafe fn ptr_from_read_overlapped(ptr: *mut OVERLAPPED) -> *const Inner {
         // `read` is after `connect: Overlapped`.
-        (ptr as usize + size_of::<Overlapped>()) as *const Inner
+        (ptr as *mut Overlapped).wrapping_sub(1) as *const Inner
     }
 
     /// Same as [`ptr_from_conn_overlapped`] but for `Inner.write`.
     unsafe fn ptr_from_write_overlapped(ptr: *mut OVERLAPPED) -> *const Inner {
         // `read` is after `connect: Overlapped` and `read: Overlapped`.
-        (ptr as usize + (2 * size_of::<Overlapped>())) as *const Inner
+        (ptr as *mut Overlapped).wrapping_sub(2) as *const Inner
     }
 }
 
