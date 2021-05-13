@@ -65,8 +65,8 @@ pub struct NamedPipe {
 
 /// # Notes
 ///
-/// The memory layout of this structure must be fixed as the `*_OFFSET`
-/// constants depend on it, see the `offset_constants` test.
+/// The memory layout of this structure must be fixed as the
+/// `ptr_from_*_overlapped` methods depend on it, see the `ptr_from` test.
 #[repr(C)]
 struct Inner {
     // NOTE: careful modifying the order of these three fields, the `ptr_from_*`
