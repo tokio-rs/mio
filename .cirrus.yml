@@ -3,6 +3,8 @@ freebsd_instance:
 
 env:
   RUST_BACKTRACE: full
+  # Workaround for https://github.com/rust-lang/rustup/issues/2774.
+  RUSTUP_IO_THREADS: "1"
 
 task:
   name: FreeBSD
