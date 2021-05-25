@@ -41,7 +41,7 @@ impl Selector {
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
-        syscall!(dup(self.ep)).map(|ep| Selector {
+        syscall!(fcntl(self.ep, libc::F_DUPFD_CLOEXEC)).map(|ep| Selector {
             // It's the same selector, so we use the same id.
             #[cfg(debug_assertions)]
             id: self.id,
