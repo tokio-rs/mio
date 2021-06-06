@@ -36,7 +36,7 @@ fn main() -> io::Result<()> {
 
     println!("You can connect to the server using `nc`:");
     println!(" $ nc 127.0.0.1 9000");
-    println!("You'll see our welcome message and anything you type we'll be printed here.");
+    println!("You'll see our welcome message and anything you type will be printed here.");
 
     loop {
         poll.poll(&mut events, None)?;
