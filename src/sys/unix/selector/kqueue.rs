@@ -87,7 +87,7 @@ impl Selector {
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
-        syscall!(fcntl(self.kq, libc::F_DUPFD_CLOEXEC)).map(|kq| Selector {
+        syscall!(fcntl(self.kq, libc::F_DUPFD_CLOEXEC, super::LOWEST_FD)).map(|kq| Selector {
             // It's the same selector, so we use the same id.
             #[cfg(debug_assertions)]
             id: self.id,
