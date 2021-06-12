@@ -1,3 +1,11 @@
+# 0.7.12
+
+## Fixes
+
+* Set `FD_CLOEXEC` when calling `Registry::try_clone`
+  (https://github.com/tokio-rs/mio/commit/d1617b567ff6bc669d71e367d22e0e93ff7e2e24 for epoll and
+  (https://github.com/tokio-rs/mio/commit/b367a05e408ca90a26383c3aa16d8a16f019dc59 for kqueue).
+
 # 0.7.11
 
 ## Fixes
