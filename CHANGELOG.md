@@ -1,4 +1,11 @@
-# 0.7.12
+# 0.7.13
+
+## Fixes
+
+* Fix `Registry::try_clone` invalid usage of `F_DUPFD_CLOEXEC` (#1497,
+  https://github.com/tokio-rs/mio/commit/2883f5c1f35bf1a59682c5ffc4afe6b97d7d6e68).
+
+# 0.7.12 (yanked)
 
 ## Fixes
 
