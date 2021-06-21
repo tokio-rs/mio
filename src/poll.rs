@@ -628,6 +628,11 @@ impl Registry {
             panic!("Only a single `Waker` can be active per `Poll` instance");
         }
     }
+
+    /// Get access to the `sys::Selector`.
+    pub(crate) fn selector(&self) -> &sys::Selector {
+        &self.selector
+    }
 }
 
 impl fmt::Debug for Registry {
@@ -641,11 +646,6 @@ impl AsRawFd for Registry {
     fn as_raw_fd(&self) -> RawFd {
         self.selector.as_raw_fd()
     }
-}
-
-/// Get access to the `sys::Selector` from `Registry`.
-pub(crate) fn selector(registry: &Registry) -> &sys::Selector {
-    &registry.selector
 }
 
 cfg_os_poll! {

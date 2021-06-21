@@ -14,7 +14,7 @@ use winapi::um::minwinbase::{OVERLAPPED, OVERLAPPED_ENTRY};
 
 use crate::event::Source;
 use crate::sys::windows::{Event, Overlapped};
-use crate::{poll, Registry};
+use crate::Registry;
 use crate::{Interest, Token};
 
 /// Non-blocking windows named pipe.
@@ -396,10 +396,12 @@ impl Source for NamedPipe {
         }
 
         if io.cp.is_none() {
-            io.cp = Some(poll::selector(registry).clone_port());
+            let selector = registry.selector();
+
+            io.cp = Some(selector.clone_port());
 
             let inner_token = NEXT_TOKEN.fetch_add(2, Relaxed) + 2;
-            poll::selector(registry)
+            selector
                 .inner
                 .cp
                 .add_handle(inner_token, &self.inner.handle)?;
@@ -716,7 +718,7 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 impl Io {
     fn check_association(&self, registry: &Registry, required: bool) -> io::Result<()> {
         match self.cp {
-            Some(ref cp) if !poll::selector(registry).same_port(cp) => Err(io::Error::new(
+            Some(ref cp) if !registry.selector().same_port(cp) => Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
                 "I/O source already registered with a different `Registry`",
             )),
