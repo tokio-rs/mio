@@ -46,10 +46,10 @@ fn set_keepalive() {
 
     let socket = TcpSocket::new_v4().unwrap();
     socket.set_keepalive(false).unwrap();
-    assert_eq!(false, socket.get_keepalive().unwrap());
+    assert!(!socket.get_keepalive().unwrap());
 
     socket.set_keepalive(true).unwrap();
-    assert_eq!(true, socket.get_keepalive().unwrap());
+    assert!(socket.get_keepalive().unwrap());
 
     socket.bind(addr).unwrap();
 
