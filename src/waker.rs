@@ -1,4 +1,4 @@
-use crate::{poll, sys, Registry, Token};
+use crate::{sys, Registry, Token};
 
 use std::io;
 
@@ -84,7 +84,7 @@ impl Waker {
     pub fn new(registry: &Registry, token: Token) -> io::Result<Waker> {
         #[cfg(debug_assertions)]
         registry.register_waker();
-        sys::Waker::new(poll::selector(&registry), token).map(|inner| Waker { inner })
+        sys::Waker::new(registry.selector(), token).map(|inner| Waker { inner })
     }
 
     /// Wake up the [`Poll`] associated with this `Waker`.
