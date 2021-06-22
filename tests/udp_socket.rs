@@ -193,10 +193,10 @@ fn set_get_broadcast() {
     let socket1 = UdpSocket::bind(any_local_address()).unwrap();
 
     socket1.set_broadcast(true).unwrap();
-    assert_eq!(socket1.broadcast().unwrap(), true);
+    assert!(socket1.broadcast().unwrap());
 
     socket1.set_broadcast(false).unwrap();
-    assert_eq!(socket1.broadcast().unwrap(), false);
+    assert!(!socket1.broadcast().unwrap());
 
     assert!(socket1.take_error().unwrap().is_none());
 }
@@ -215,10 +215,10 @@ fn set_get_multicast_loop_v4() {
     let socket1 = UdpSocket::bind(any_local_address()).unwrap();
 
     socket1.set_multicast_loop_v4(true).unwrap();
-    assert_eq!(socket1.multicast_loop_v4().unwrap(), true);
+    assert!(socket1.multicast_loop_v4().unwrap());
 
     socket1.set_multicast_loop_v4(false).unwrap();
-    assert_eq!(socket1.multicast_loop_v4().unwrap(), false);
+    assert!(!socket1.multicast_loop_v4().unwrap());
 
     assert!(socket1.take_error().unwrap().is_none());
 }
@@ -257,10 +257,10 @@ fn set_get_multicast_loop_v6() {
     let socket1 = UdpSocket::bind(any_local_ipv6_address()).unwrap();
 
     socket1.set_multicast_loop_v6(true).unwrap();
-    assert_eq!(socket1.multicast_loop_v6().unwrap(), true);
+    assert!(socket1.multicast_loop_v6().unwrap());
 
     socket1.set_multicast_loop_v6(false).unwrap();
-    assert_eq!(socket1.multicast_loop_v6().unwrap(), false);
+    assert!(!socket1.multicast_loop_v6().unwrap());
 
     assert!(socket1.take_error().unwrap().is_none());
 }
