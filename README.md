@@ -139,6 +139,7 @@ Currently supported platforms:
 * Windows
 * iOS
 * macOS
+* Wine (version 6.11+, see [issue #1444])
 
 There are potentially others. If you find that Mio works on another
 platform, submit a PR to update the list!
@@ -156,7 +157,6 @@ This uses the Windows AFD system to access socket readiness events.
 ### Unsupported
 
 * Haiku, see [issue #1472]
-* Wine, see [issue #1444]
 
 [issue #1472]: https://github.com/tokio-rs/mio/issues/1472
 
