@@ -549,13 +549,10 @@ fn connection_reset_by_peer() {
 
 #[test]
 fn connect_error() {
-    init();
-
-    let mut poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(16);
+    let (mut poll, mut events) = init_with_poll();
 
     // Pick a "random" port that shouldn't be in use.
-    let mut stream = match TcpStream::connect("127.0.0.1:38381".parse().unwrap()) {
+    let mut stream = match TcpStream::connect("127.0.0.1:58381".parse().unwrap()) {
         Ok(l) => l,
         Err(ref e) if e.kind() == io::ErrorKind::ConnectionRefused => {
             // Connection failed synchronously.  This is not a bug, but it
@@ -575,6 +572,7 @@ fn connect_error() {
         for event in &events {
             if event.token() == Token(0) {
                 assert!(event.is_writable());
+                assert!(event.is_write_closed());
                 break 'outer;
             }
         }
