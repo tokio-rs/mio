@@ -200,6 +200,31 @@ impl TcpSocket {
         sys::tcp::get_keepalive(self.sys)
     }
 
+    /// Sets the value of `IP_TOS` of this socket.
+    ///
+    /// **Note**: This will not work on all versions of Windows,
+    /// see more: <https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options>
+    #[cfg(not(any(
+        target_os = "fuschia",
+        target_os = "redox",
+        target_os = "solaris",
+        target_os = "illumos",
+    )))]
+    pub fn set_tos(&self, tos: u32) -> io::Result<()> {
+        sys::tcp::set_tos(self.sys, tos)
+    }
+
+    /// Gets the value of `IP_TOS` on this socket
+    #[cfg(not(any(
+        target_os = "fuschia",
+        target_os = "redox",
+        target_os = "solaris",
+        target_os = "illumos",
+    )))]
+    pub fn get_tos(&self) -> io::Result<u32> {
+        sys::tcp::get_tos(self.sys)
+    }
+
     /// Sets parameters configuring TCP keepalive probes for this socket.
     ///
     /// The supported parameters depend on the operating system, and are
