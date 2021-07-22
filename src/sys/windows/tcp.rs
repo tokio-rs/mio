@@ -9,8 +9,8 @@ use std::time::Duration; // winapi uses usize, stdlib uses u32/u64.
 
 use winapi::ctypes::{c_char, c_int, c_ulong, c_ushort};
 use winapi::shared::mstcpip;
-use winapi::shared::ws2def::{AF_INET, AF_INET6, SOCKADDR_IN, SOCKADDR_STORAGE};
-use winapi::shared::ws2ipdef::SOCKADDR_IN6_LH;
+use winapi::shared::ws2def::{AF_INET, AF_INET6, IPPROTO_IP, SOCKADDR_IN, SOCKADDR_STORAGE};
+use winapi::shared::ws2ipdef::{IP_TOS, SOCKADDR_IN6_LH};
 
 use winapi::shared::minwindef::{BOOL, DWORD, FALSE, LPDWORD, LPVOID, TRUE};
 use winapi::um::winsock2::{
@@ -287,6 +287,39 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<bool> {
     } {
         SOCKET_ERROR => Err(io::Error::last_os_error()),
         _ => Ok(optval != FALSE as c_char),
+    }
+}
+
+pub(crate) fn set_tos(socket: TcpSocket, tos: u32) -> io::Result<()> {
+    match unsafe {
+        setsockopt(
+            socket,
+            IPPROTO_IP,
+            IP_TOS,
+            &tos as *const _ as *const c_char,
+            size_of::<c_ulong>() as c_int,
+        )
+    } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(()),
+    }
+}
+
+pub(crate) fn get_tos(socket: TcpSocket) -> io::Result<u32> {
+    let mut optval: c_ulong = 0;
+    let mut optlen = size_of::<c_ulong>() as c_int;
+
+    match unsafe {
+        getsockopt(
+            socket,
+            IPPROTO_IP,
+            IP_TOS,
+            &mut optval as *mut _ as *mut _,
+            &mut optlen,
+        )
+    } {
+        SOCKET_ERROR => Err(io::Error::last_os_error()),
+        _ => Ok(optval),
     }
 }
 
