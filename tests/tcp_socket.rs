@@ -56,6 +56,26 @@ fn set_keepalive() {
     let _ = socket.listen(128).unwrap();
 }
 
+#[cfg(not(any(
+    target_os = "fuschia",
+    target_os = "redox",
+    target_os = "solaris",
+    target_os = "illumos",
+)))]
+#[test]
+fn set_tos() {
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let tos = 0x10;
+    let socket = TcpSocket::new_v4().unwrap();
+    socket.set_tos(tos).unwrap();
+    assert!(socket.get_tos().unwrap() == tos);
+
+    socket.bind(addr).unwrap();
+
+    let _ = socket.listen(128).unwrap();
+}
+
 #[test]
 fn set_keepalive_time() {
     let dur = Duration::from_secs(4); // Chosen by fair dice roll, guaranteed to be random
