@@ -79,6 +79,26 @@ pub(crate) fn get_keepalive(_: TcpSocket) -> io::Result<bool> {
     os_required!();
 }
 
+#[cfg(not(any(
+    target_os = "fuschia",
+    target_os = "redox",
+    target_os = "solaris",
+    target_os = "illumos",
+)))]
+pub(crate) fn set_tos(_: TcpSocket, _: u32) -> io::Result<()> {
+    os_required!();
+}
+
+#[cfg(not(any(
+    target_os = "fuschia",
+    target_os = "redox",
+    target_os = "solaris",
+    target_os = "illumos",
+)))]
+pub(crate) fn get_tos(_: TcpSocket) -> io::Result<u32> {
+    os_required!();
+}
+
 pub(crate) fn set_keepalive_params(_: TcpSocket, _: TcpKeepalive) -> io::Result<()> {
     os_required!()
 }
