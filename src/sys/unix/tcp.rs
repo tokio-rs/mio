@@ -247,6 +247,44 @@ pub(crate) fn get_keepalive(socket: TcpSocket) -> io::Result<bool> {
     Ok(optval != 0)
 }
 
+#[cfg(not(any(
+    target_os = "fuschia",
+    target_os = "redox",
+    target_os = "solaris",
+    target_os = "illumos",
+)))]
+pub(crate) fn set_tos(socket: TcpSocket, tos: u32) -> io::Result<()> {
+    syscall!(setsockopt(
+        socket,
+        libc::IPPROTO_IP,
+        libc::IP_TOS,
+        &tos as *const _ as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t
+    ))
+    .map(|_| ())
+}
+
+#[cfg(not(any(
+    target_os = "fuschia",
+    target_os = "redox",
+    target_os = "solaris",
+    target_os = "illumos",
+)))]
+pub(crate) fn get_tos(socket: TcpSocket) -> io::Result<u32> {
+    let mut optval: libc::c_int = 0;
+    let mut optlen = size_of::<libc::c_int>() as libc::socklen_t;
+
+    syscall!(getsockopt(
+        socket,
+        libc::IPPROTO_IP,
+        libc::IP_TOS,
+        &mut optval as *mut _ as *mut _,
+        &mut optlen,
+    ))?;
+
+    Ok(optval as u32)
+}
+
 pub(crate) fn set_keepalive_params(socket: TcpSocket, keepalive: TcpKeepalive) -> io::Result<()> {
     if let Some(dur) = keepalive.time {
         set_keepalive_time(socket, dur)?;
