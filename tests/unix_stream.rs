@@ -111,13 +111,13 @@ fn unix_stream_pair() {
     let mut buf = [0; DEFAULT_BUF_SIZE];
     assert_would_block(s1.read(&mut buf));
 
-    checked_write!(s1.write(&DATA1));
+    checked_write!(s1.write(DATA1));
     s1.flush().unwrap();
 
     expect_read!(s2.read(&mut buf), DATA1);
     assert_would_block(s2.read(&mut buf));
 
-    checked_write!(s2.write(&DATA2));
+    checked_write!(s2.write(DATA2));
     s2.flush().unwrap();
 
     expect_read!(s1.read(&mut buf), DATA2);
@@ -163,7 +163,7 @@ fn unix_stream_shutdown_read() {
         vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
-    checked_write!(stream.write(&DATA1));
+    checked_write!(stream.write(DATA1));
     expect_events(
         &mut poll,
         &mut events,
@@ -217,7 +217,7 @@ fn unix_stream_shutdown_write() {
         vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
-    checked_write!(stream.write(&DATA1));
+    checked_write!(stream.write(DATA1));
     expect_events(
         &mut poll,
         &mut events,
@@ -272,7 +272,7 @@ fn unix_stream_shutdown_both() {
         vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
-    checked_write!(stream.write(&DATA1));
+    checked_write!(stream.write(DATA1));
     expect_events(
         &mut poll,
         &mut events,
@@ -433,7 +433,7 @@ where
     let mut buf = [0; DEFAULT_BUF_SIZE];
     assert_would_block(stream.read(&mut buf));
 
-    checked_write!(stream.write(&DATA1));
+    checked_write!(stream.write(DATA1));
     stream.flush().unwrap();
     expect_events(
         &mut poll,
@@ -445,7 +445,7 @@ where
 
     assert!(stream.take_error().unwrap().is_none());
 
-    let bufs = [IoSlice::new(&DATA1), IoSlice::new(&DATA2)];
+    let bufs = [IoSlice::new(DATA1), IoSlice::new(DATA2)];
     let wrote = stream.write_vectored(&bufs).unwrap();
     assert_eq!(wrote, DATA1_LEN + DATA2_LEN);
     expect_events(
