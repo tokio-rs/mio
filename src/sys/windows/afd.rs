@@ -180,12 +180,12 @@ cfg_io_source! {
                     &AFD_HELPER_ATTRIBUTES as *const _ as *mut _,
                     &mut iosb,
                     null_mut(),
-                    0 as ULONG,
+                    0,
                     FILE_SHARE_READ | FILE_SHARE_WRITE,
                     FILE_OPEN,
-                    0 as ULONG,
+                    0,
                     null_mut(),
-                    0 as ULONG,
+                    0,
                 );
                 if status != STATUS_SUCCESS {
                     let raw_err = io::Error::from_raw_os_error(
@@ -214,18 +214,18 @@ cfg_io_source! {
     }
 }
 
-pub const POLL_RECEIVE: u32 = 0b000_000_001;
-pub const POLL_RECEIVE_EXPEDITED: u32 = 0b000_000_010;
-pub const POLL_SEND: u32 = 0b000_000_100;
-pub const POLL_DISCONNECT: u32 = 0b000_001_000;
-pub const POLL_ABORT: u32 = 0b000_010_000;
-pub const POLL_LOCAL_CLOSE: u32 = 0b000_100_000;
+pub const POLL_RECEIVE: u32 = 0b0_0000_0001;
+pub const POLL_RECEIVE_EXPEDITED: u32 = 0b0_0000_0010;
+pub const POLL_SEND: u32 = 0b0_0000_0100;
+pub const POLL_DISCONNECT: u32 = 0b0_0000_1000;
+pub const POLL_ABORT: u32 = 0b0_0001_0000;
+pub const POLL_LOCAL_CLOSE: u32 = 0b0_0010_0000;
 // Not used as it indicated in each event where a connection is connected, not
 // just the first time a connection is established.
 // Also see https://github.com/piscisaureus/wepoll/commit/8b7b340610f88af3d83f40fb728e7b850b090ece.
-pub const POLL_CONNECT: u32 = 0b001_000_000;
-pub const POLL_ACCEPT: u32 = 0b010_000_000;
-pub const POLL_CONNECT_FAIL: u32 = 0b100_000_000;
+pub const POLL_CONNECT: u32 = 0b0_0100_0000;
+pub const POLL_ACCEPT: u32 = 0b0_1000_0000;
+pub const POLL_CONNECT_FAIL: u32 = 0b1_0000_0000;
 
 pub const KNOWN_EVENTS: u32 = POLL_RECEIVE
     | POLL_RECEIVE_EXPEDITED

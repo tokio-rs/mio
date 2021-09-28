@@ -121,8 +121,7 @@ fn connect_before_client() {
 
     let mut events = Events::with_capacity(128);
     t!(poll.poll(&mut events, Some(Duration::new(0, 0))));
-    let e = events.iter().collect::<Vec<_>>();
-    assert_eq!(e.len(), 0);
+    assert_eq!(events.iter().count(), 0);
     assert_eq!(
         server.connect().err().unwrap().kind(),
         io::ErrorKind::WouldBlock
@@ -157,8 +156,7 @@ fn connect_after_client() {
 
     let mut events = Events::with_capacity(128);
     t!(poll.poll(&mut events, Some(Duration::new(0, 0))));
-    let e = events.iter().collect::<Vec<_>>();
-    assert_eq!(e.len(), 0);
+    assert_eq!(events.iter().count(), 0);
 
     let mut client = client(&name);
     t!(poll.registry().register(

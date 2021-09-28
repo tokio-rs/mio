@@ -269,7 +269,7 @@ pub fn set_linger_zero(socket: &TcpStream) {
         l_linger: 0,
     };
 
-    match unsafe {
+    let res = unsafe {
         setsockopt(
             socket.as_raw_socket() as _,
             SOL_SOCKET,
@@ -277,10 +277,12 @@ pub fn set_linger_zero(socket: &TcpStream) {
             &val as *const _ as *const _,
             size_of::<linger>() as _,
         )
-    } {
-        SOCKET_ERROR => panic!("error setting linger: {}", io::Error::last_os_error()),
-        _ => {}
-    }
+    };
+    assert!(
+        res != SOCKET_ERROR,
+        "error setting linger: {}",
+        io::Error::last_os_error()
+    );
 }
 
 /// Returns a path to a temporary file using `name` as filename.
