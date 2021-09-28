@@ -1,3 +1,53 @@
+# 0.7.13
+
+## Fixes
+
+* Fix `Registry::try_clone` invalid usage of `F_DUPFD_CLOEXEC` (#1497,
+  https://github.com/tokio-rs/mio/commit/2883f5c1f35bf1a59682c5ffc4afe6b97d7d6e68).
+
+# 0.7.12 (yanked)
+
+## Fixes
+
+* Set `FD_CLOEXEC` when calling `Registry::try_clone`
+  (https://github.com/tokio-rs/mio/commit/d1617b567ff6bc669d71e367d22e0e93ff7e2e24 for epoll and
+  (https://github.com/tokio-rs/mio/commit/b367a05e408ca90a26383c3aa16d8a16f019dc59 for kqueue).
+
+# 0.7.11
+
+## Fixes
+
+* Fix missing feature of winapi.
+  (https://github.com/tokio-rs/mio/commit/a7e61db9e3c2b929ef1a33532bfcc22045d163ce).
+
+# 0.7.10
+
+## Fixes
+
+* Fix an instance of not doc(cfg(.*))
+  (https://github.com/tokio-rs/mio/commit/25e8f911357c740034f10a170dfa4ea1b28234ce).
+
+# 0.7.9
+
+## Fixes
+
+* Fix error handling in `NamedPipe::write`
+  (https://github.com/tokio-rs/mio/commit/aec872be9732e5c6685100674278be27f54a271b).
+* Use `accept(2)` on x86 Android instead of `accept4(2)`
+  (https://github.com/tokio-rs/mio/commit/6f86b925d3e48f30905d5cfa54348acf3f1fa036,
+  https://github.com/tokio-rs/mio/commit/8d5414880ab82178305ac1d2c16d715e58633d3e).
+* Improve error message when opening AFD device
+  (https://github.com/tokio-rs/mio/commit/139f7c4422321eb4a17b14ae2c296fddd19a8804).
+
+# 0.7.8
+
+## Fixes
+
+* Fix `TcpStream::set_linger` on macOS
+  (https://github.com/tokio-rs/mio/commit/175773ce02e85977db81224c782c8d140aba8543).
+* Fix compilation on DragonFlyBSD
+  (https://github.com/tokio-rs/mio/commit/b51af46b28871f8dd3233b490ee62237ffed6a26).
+
 # 0.7.7
 
 ## Added
@@ -12,7 +62,6 @@
   that is on the reference to them, an implementation existed on the types
   themselves already
   (https://github.com/tokio-rs/mio/commit/1be481dcbbcb6906364008b5d61e7f53cddc3eb3).
-
 
 ## Fixes
 
