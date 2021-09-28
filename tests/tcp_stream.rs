@@ -88,7 +88,7 @@ where
     assert_eq!(stream.peer_addr().unwrap(), addr);
     assert!(stream.local_addr().unwrap().ip().is_loopback());
 
-    checked_write!(stream.write(&DATA1));
+    checked_write!(stream.write(DATA1));
 
     stream.flush().unwrap();
 
@@ -105,7 +105,7 @@ where
 
     assert_would_block(stream.read(&mut buf));
 
-    let bufs = [IoSlice::new(&DATA1), IoSlice::new(&DATA2)];
+    let bufs = [IoSlice::new(DATA1), IoSlice::new(DATA2)];
     let n = stream
         .write_vectored(&bufs)
         .expect("unable to write vectored to stream");
@@ -277,7 +277,7 @@ fn shutdown_read() {
         vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
     );
 
-    checked_write!(stream.write(&DATA2));
+    checked_write!(stream.write(DATA2));
 
     expect_events(
         &mut poll,
@@ -325,7 +325,7 @@ fn shutdown_write() {
         vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
     );
 
-    checked_write!(stream.write(&DATA1));
+    checked_write!(stream.write(DATA1));
 
     stream.shutdown(Shutdown::Write).unwrap();
 
@@ -365,7 +365,7 @@ fn shutdown_both() {
         vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
     );
 
-    checked_write!(stream.write(&DATA1));
+    checked_write!(stream.write(DATA1));
 
     expect_events(
         &mut poll,
@@ -495,7 +495,7 @@ fn no_events_after_deregister() {
     assert_would_block(stream.peek(&mut buf));
     assert_would_block(stream.read(&mut buf));
 
-    checked_write!(stream.write(&DATA1));
+    checked_write!(stream.write(DATA1));
     stream.flush().unwrap();
 
     expect_no_events(&mut poll, &mut events);
