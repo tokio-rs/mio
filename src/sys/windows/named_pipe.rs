@@ -467,12 +467,8 @@ impl Drop for NamedPipe {
             }
 
             let io = self.inner.io.lock().unwrap();
-
-            match io.read {
-                State::Pending(..) => {
-                    drop(cancel(&self.inner.handle, &self.inner.read));
-                }
-                _ => {}
+            if let State::Pending(..) = io.read {
+                drop(cancel(&self.inner.handle, &self.inner.read));
             }
         }
     }
@@ -587,7 +583,8 @@ impl Inner {
 
     fn post_register(me: &Arc<Inner>, mut events: Option<&mut Vec<Event>>) {
         let mut io = me.io.lock().unwrap();
-        if Inner::schedule_read(&me, &mut io, events.as_mut().map(|ptr| &mut **ptr)) {
+        #[allow(clippy::needless_option_as_deref)]
+        if Inner::schedule_read(me, &mut io, events.as_deref_mut()) {
             if let State::None = io.write {
                 io.notify_writable(events);
             }

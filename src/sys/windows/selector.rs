@@ -44,7 +44,7 @@ impl AfdGroup {
 
     pub fn release_unused_afd(&self) {
         let mut afd_group = self.afd_group.lock().unwrap();
-        afd_group.retain(|g| Arc::strong_count(&g) > 1);
+        afd_group.retain(|g| Arc::strong_count(g) > 1);
     }
 }
 
@@ -58,7 +58,7 @@ cfg_io_source! {
                 self._alloc_afd_group(&mut afd_group)?;
             } else {
                 // + 1 reference in Vec
-                if Arc::strong_count(afd_group.last().unwrap()) >= POLL_GROUP__MAX_GROUP_SIZE + 1 {
+                if Arc::strong_count(afd_group.last().unwrap()) > POLL_GROUP__MAX_GROUP_SIZE  {
                     self._alloc_afd_group(&mut afd_group)?;
                 }
             }
@@ -447,11 +447,11 @@ impl SelectorInner {
                 if len == 0 {
                     continue;
                 }
-                return Ok(());
+                break Ok(());
             }
         } else {
             self.select2(&mut events.statuses, &mut events.events, timeout)?;
-            return Ok(());
+            Ok(())
         }
     }
 
@@ -461,7 +461,7 @@ impl SelectorInner {
         events: &mut Vec<Event>,
         timeout: Option<Duration>,
     ) -> io::Result<usize> {
-        assert_eq!(self.is_polling.swap(true, Ordering::AcqRel), false);
+        assert!(!self.is_polling.swap(true, Ordering::AcqRel));
 
         unsafe { self.update_sockets_events() }?;
 
@@ -481,7 +481,7 @@ impl SelectorInner {
         for sock in update_queue.iter_mut() {
             let mut sock_internal = sock.lock().unwrap();
             if !sock_internal.is_pending_deletion() {
-                sock_internal.update(&sock)?;
+                sock_internal.update(sock)?;
             }
         }
 
@@ -517,12 +517,9 @@ impl SelectorInner {
 
             let sock_state = from_overlapped(iocp_event.overlapped());
             let mut sock_guard = sock_state.lock().unwrap();
-            match sock_guard.feed_event() {
-                Some(e) => {
-                    events.push(e);
-                    n += 1;
-                }
-                None => {}
+            if let Some(e) = sock_guard.feed_event() {
+                events.push(e);
+                n += 1;
             }
 
             if !sock_guard.is_pending_deletion() {
