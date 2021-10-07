@@ -28,6 +28,8 @@ jobs:
 
       - ${{ if eq(parameters.cmd, 'test') }}:
           - script: |
+              # Cargo-hack's dependency bitflags has a higher MSVR then us.
+              rustup install nightly
               rustup run nightly cargo install cargo-hack
               cargo hack check --feature-powerset
             displayName: Check feature powerset
