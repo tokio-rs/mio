@@ -100,6 +100,18 @@ cfg_os_poll! {
                 None
             }
         }
+
+        /// Returns the contents of this address if it is an abstract namespace
+        /// without the leading null byte.
+        // Link to std::os::unix::net::SocketAddr pending
+        // https://github.com/rust-lang/rust/issues/85410.
+        pub fn as_abstract_namespace(&self) -> Option<&[u8]> {
+            if let AddressKind::Abstract(path) = self.address() {
+                Some(path)
+            } else {
+                None
+            }
+        }
     }
 }
 
