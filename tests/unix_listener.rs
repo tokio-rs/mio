@@ -133,6 +133,19 @@ fn unix_listener_deregister() {
     handle.join().unwrap();
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn unix_listener_abstract_namesapce() {
+    use rand::Rng;
+    let num: u64 = rand::thread_rng().gen();
+    let name = format!("\u{0000}-mio-abstract-uds-{}", num);
+    let listener = UnixListener::bind(&name).unwrap();
+    assert_eq!(
+        listener.local_addr().unwrap().as_abstract_namespace(),
+        Some(&name.as_bytes()[1..]),
+    );
+}
+
 fn smoke_test<F>(new_listener: F, test_name: &'static str)
 where
     F: FnOnce(&Path) -> io::Result<UnixListener>,
