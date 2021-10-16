@@ -6,7 +6,7 @@ name = "mio"
 # - Update CHANGELOG.md.
 # - Update doc URL.
 # - Create git tag
-version       = "0.7.13"
+version       = "0.7.14"
 license       = "MIT"
 authors       = [
   "Carl Lerche <me@carllerche.com>",
@@ -14,7 +14,7 @@ authors       = [
   "Tokio Contributors <team@tokio.rs>",
 ]
 description   = "Lightweight non-blocking IO"
-documentation = "https://docs.rs/mio/0.7.13"
+documentation = "https://docs.rs/mio/0.7.14"
 homepage      = "https://github.com/tokio-rs/mio"
 repository    = "https://github.com/tokio-rs/mio"
 readme        = "README.md"
