@@ -82,7 +82,9 @@ fn main() -> io::Result<()> {
                         false
                     };
                     if done {
-                        connections.remove(&token);
+                        if let Some(mut connection) = connections.remove(&token) {
+                            poll.registry().deregister(&mut connection)?;
+                        }
                     }
                 }
             }
