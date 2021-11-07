@@ -1,4 +1,4 @@
-#![cfg(feature = "os-poll")]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::{Events, Poll, Token, Waker};
 use std::sync::{Arc, Barrier};

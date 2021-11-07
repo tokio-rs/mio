@@ -1,6 +1,6 @@
 // Not all functions are used by all tests.
 #![allow(dead_code, unused_macros)]
-#![cfg(any(feature = "os-poll", feature = "net"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
 use std::mem::size_of;
 use std::net::SocketAddr;
