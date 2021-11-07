@@ -30,9 +30,9 @@ jobs:
           vmImage: ubuntu-18.04
           target: x86_64-unknown-netbsd
 
-        Solaris:
+        illumos:
           vmImage: ubuntu-18.04
-          target: x86_64-pc-solaris
+          target: x86_64-unknown-illumos
 
     pool:
       vmImage: $(vmImage)

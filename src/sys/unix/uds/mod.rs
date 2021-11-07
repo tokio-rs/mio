@@ -77,20 +77,20 @@ cfg_os_poll! {
     fn pair<T>(flags: libc::c_int) -> io::Result<(T, T)>
         where T: FromRawFd,
     {
-        #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "solaris")))]
+        #[cfg(not(any(target_os = "ios", target_os = "macos")))]
         let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
         let mut fds = [-1; 2];
         syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
         let pair = unsafe { (T::from_raw_fd(fds[0]), T::from_raw_fd(fds[1])) };
 
-        // Darwin and Solaris do not have SOCK_NONBLOCK or SOCK_CLOEXEC.
+        // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
         //
         // In order to set those flags, additional `fcntl` sys calls must be
         // performed. If a `fnctl` fails after the sockets have been created,
         // the file descriptors will leak. Creating `pair` above ensures that if
         // there is an error, the file descriptors are closed.
-        #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
+        #[cfg(any(target_os = "ios", target_os = "macos"))]
         {
             syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
             syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
