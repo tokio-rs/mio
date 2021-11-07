@@ -1,4 +1,4 @@
-#![cfg(all(unix, feature = "os-poll", feature = "os-ext"))]
+#![cfg(all(unix, feature = "os-poll", feature = "os-ext", feature = "net"))]
 
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};

@@ -1,5 +1,5 @@
-#![cfg(feature = "os-poll")]
 #![cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::{event::Source, Events, Interest, Poll, Registry, Token};
 use std::{
