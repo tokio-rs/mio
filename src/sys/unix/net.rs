@@ -41,9 +41,8 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
         .map(|_| socket)
     });
 
-    // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC. Not sure about
-    // Solaris, couldn't find anything online.
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "solaris"))]
+    // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
     let socket = socket.and_then(|socket| {
         // For platforms that don't support flags in socket, we need to
         // set the flags ourselves.
@@ -124,7 +123,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "openbsd"
                 ))]
                 sin6_len: 0,
-                #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+                #[cfg(target_os = "illumos")]
                 __sin6_src_id: 0,
             };
 

@@ -172,13 +172,12 @@ use std::{fmt, io};
 /// | Android       | [epoll]   |
 /// | DragonFly BSD | [kqueue]  |
 /// | FreeBSD       | [kqueue]  |
+/// | iOS           | [kqueue]  |
+/// | illumos       | [epoll]   |
 /// | Linux         | [epoll]   |
 /// | NetBSD        | [kqueue]  |
 /// | OpenBSD       | [kqueue]  |
-/// | Solaris       | [epoll]   |
-/// | illumos       | [epoll]   |
 /// | Windows       | [IOCP]    |
-/// | iOS           | [kqueue]  |
 /// | macOS         | [kqueue]  |
 ///
 /// On all supported platforms, socket operations are handled by using the
@@ -382,7 +381,7 @@ impl Registry {
     ///
     /// # Arguments
     ///
-    /// `source: &S: event::Source`: This is the source of events that the
+    /// `source: &mut S: event::Source`: This is the source of events that the
     /// `Poll` instance should monitor for readiness state changes.
     ///
     /// `token: Token`: The caller picks a token to associate with the socket.
