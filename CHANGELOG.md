@@ -1,3 +1,29 @@
+# 0.8.0
+
+## Removed
+
+* Deprecated features (https://github.com/tokio-rs/mio/commit/105f8f2afb57b01ddea716a0aa9720f226c520e3):
+  * extra-docs (always enabled)
+  * tcp (replaced with "net" feature).
+  * udp (replaced with "net" feature).
+  * uds (replaced with "net" feature).
+  * pipe (replaced with "os-ext" feature).
+* `TcpSocket` type
+  (https://github.com/tokio-rs/mio/commit/02e9be41f27daf822575444fdd2b3067433a5996).
+  The socket2 crate provide all the functionality and more.
+* Support for Solaris, it never really worked anyway
+  (https://github.com/tokio-rs/mio/pull/1528).
+
+## Changes
+
+* Update minimum Rustc version (MSVR) to 1.46.0
+  (https://github.com/tokio-rs/mio/commit/5c577efecd23750a9a3e0f6ad080ab98f14a255d).
+
+## Added
+
+* `UdpSocket::peer_addr`
+  (https://github.com/tokio-rs/mio/commit/5fc104d08e0e74c8a19247f7cba0f058699fc438).
+
 # 0.7.14
 
 ## Fixes
