@@ -163,6 +163,30 @@ use std::{fmt, io};
 ///
 /// [event sources]: ./event/trait.Source.html
 ///
+/// ### Accessing raw fd/socket/handle
+///
+/// Mio makes it possible for many types to be converted into a raw file
+/// descriptor (fd, Unix), socket (Windows) or handle (Windows). This makes it
+/// possible to support more operations on the type than Mio supports, for
+/// example it makes [mio-aio] possible. However accessing the raw fd is not
+/// without it's pitfalls.
+///
+/// Specifically performing I/O operations outside of Mio on these types (via
+/// the raw fd) has unspecified behaviour. It could cause no more events to be
+/// generated for the type even though it returned `WouldBlock` (in an operation
+/// directly accessing the fd). The behaviour is OS specific and Mio can only
+/// guarantee cross-platform behaviour if it can control the I/O.
+///
+/// [mio-aio]: https://github.com/asomers/mio-aio
+///
+/// *The following is **not** guaranteed, just a description of the current
+/// situation!* Mio is allowed to change the following without it being considered
+/// a breaking change, don't depend on this, it's just here to inform the user.
+/// Currently the kqueue and epoll implementation support direct I/O operations
+/// on the fd without Mio's knowledge. Windows however needs **all** I/O
+/// operations to go through Mio otherwise it is not able to update it's
+/// internal state properly and won't generate events.
+///
 /// # Implementation notes
 ///
 /// `Poll` is backed by the selector provided by the operating system.
