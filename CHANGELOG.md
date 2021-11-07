@@ -1,3 +1,13 @@
+# 0.7.14
+
+## Fixes
+
+* Remove use unsound internal macro (#1519).
+
+## Added
+
+* `sys::unix::SocketAddr::as_abstract_namespace()` (#1520).
+
 # 0.7.13
 
 ## Fixes
