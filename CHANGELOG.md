@@ -10,7 +10,7 @@
   * pipe (replaced with "os-ext" feature).
 * `TcpSocket` type
   (https://github.com/tokio-rs/mio/commit/02e9be41f27daf822575444fdd2b3067433a5996).
-  The socket2 crate provide all the functionality and more.
+  The socket2 crate provides all the functionality and more.
 * Support for Solaris, it never really worked anyway
   (https://github.com/tokio-rs/mio/pull/1528).
 
