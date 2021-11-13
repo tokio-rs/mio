@@ -647,9 +647,10 @@ impl Registry {
     /// instance.
     #[cfg(debug_assertions)]
     pub(crate) fn register_waker(&self) {
-        if self.selector.register_waker() {
-            panic!("Only a single `Waker` can be active per `Poll` instance");
-        }
+        assert!(
+            !self.selector.register_waker(),
+            "Only a single `Waker` can be active per `Poll` instance"
+        );
     }
 
     /// Get access to the `sys::Selector`.
