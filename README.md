@@ -21,6 +21,7 @@ overhead as possible over the OS abstractions.
 **API documentation**
 
 * [master](https://tokio-rs.github.io/mio/doc/mio/)
+* [v0.8](https://docs.rs/mio/^0.8)
 * [v0.7](https://docs.rs/mio/^0.7)
 * [v0.6](https://docs.rs/mio/^0.6)
 
@@ -33,7 +34,7 @@ To use `mio`, first add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mio = "0.7"
+mio = "0.8"
 ```
 
 Next we can start using Mio. The following is quick introduction using
