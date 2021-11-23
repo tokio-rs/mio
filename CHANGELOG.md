@@ -8,6 +8,7 @@
   * udp (replaced with "net" feature).
   * uds (replaced with "net" feature).
   * pipe (replaced with "os-ext" feature).
+  * os-util (replaced with "os-ext" feature).
 * `TcpSocket` type
   (https://github.com/tokio-rs/mio/commit/02e9be41f27daf822575444fdd2b3067433a5996).
   The socket2 crate provides all the functionality and more.
