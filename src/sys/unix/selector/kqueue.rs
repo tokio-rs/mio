@@ -1,6 +1,6 @@
 use crate::{Interest, Token};
 use log::error;
-use std::mem::MaybeUninit;
+use std::mem::{self, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
@@ -60,6 +60,7 @@ macro_rules! kevent {
             fflags: 0,
             data: 0,
             udata: $data as UData,
+            ..unsafe { mem::zeroed() }
         }
     };
 }
