@@ -135,7 +135,6 @@ Currently supported platforms:
 * Linux
 * NetBSD
 * OpenBSD
-* Solaris
 * Windows
 * iOS
 * macOS
@@ -157,8 +156,10 @@ This uses the Windows AFD system to access socket readiness events.
 ### Unsupported
 
 * Haiku, see [issue #1472]
+* Solaris, see [issue #1152]
 
 [issue #1472]: https://github.com/tokio-rs/mio/issues/1472
+[issue #1152]: https://github.com/tokio-rs/mio/issues/1152
 
 ## Community
 
