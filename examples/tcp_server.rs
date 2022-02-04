@@ -22,8 +22,32 @@ fn main() -> io::Result<()> {
     let mut events = Events::with_capacity(128);
 
     // Setup the TCP server socket.
-    let addr = "127.0.0.1:9000".parse().unwrap();
-    let mut server = TcpListener::bind(addr)?;
+    let mut server = {
+        if std::env::var("LISTEN_FDS").is_ok() {
+            #[cfg(unix)]
+            use std::os::unix::io::FromRawFd;
+            #[cfg(target_os = "wasi")]
+            use std::os::wasi::io::FromRawFd;
+
+            let stdlistener = unsafe { std::net::TcpListener::from_raw_fd(3) };
+            stdlistener.set_nonblocking(true).unwrap();
+            println!("Using preopened socket FD 3");
+            println!("You can connect to the server using `nc`:");
+            match stdlistener.local_addr() {
+                Ok(a) => println!(" $ nc {} {}", a.ip().to_string(), a.port()),
+                Err(_) => println!(" $ nc <IP> <PORT>"),
+            }
+            println!("You'll see our welcome message and anything you type will be printed here.");
+            TcpListener::from_std(stdlistener)
+        } else {
+            let addr = "127.0.0.1:9000".parse().unwrap();
+            let listener = TcpListener::bind(addr)?;
+            println!("You can connect to the server using `nc`:");
+            println!(" $ nc 127.0.0.1 9000");
+            println!("You'll see our welcome message and anything you type will be printed here.");
+            listener
+        }
+    };
 
     // Register the server with poll we can receive events for it.
     poll.registry()
@@ -33,10 +57,6 @@ fn main() -> io::Result<()> {
     let mut connections = HashMap::new();
     // Unique token for each incoming connection.
     let mut unique_token = Token(SERVER.0 + 1);
-
-    println!("You can connect to the server using `nc`:");
-    println!(" $ nc 127.0.0.1 9000");
-    println!("You'll see our welcome message and anything you type will be printed here.");
 
     loop {
         poll.poll(&mut events, None)?;
@@ -65,11 +85,8 @@ fn main() -> io::Result<()> {
                     println!("Accepted connection from: {}", address);
 
                     let token = next(&mut unique_token);
-                    poll.registry().register(
-                        &mut connection,
-                        token,
-                        Interest::READABLE.add(Interest::WRITABLE),
-                    )?;
+                    poll.registry()
+                        .register(&mut connection, token, Interest::WRITABLE)?;
 
                     connections.insert(token, connection);
                 },
