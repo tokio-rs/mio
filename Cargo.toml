@@ -81,5 +81,9 @@ name = "tcp_server"
 required-features = ["os-poll", "net"]
 
 [[example]]
+name = "tcp_listenfd_server"
+required-features = ["os-poll", "net"]
+
+[[example]]
 name = "udp_server"
 required-features = ["os-poll", "net"]
