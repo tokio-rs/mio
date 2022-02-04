@@ -22,6 +22,12 @@ use std::time::Duration;
 
 use crate::{Interest, Token};
 
+cfg_net! {
+    mod net;
+
+    pub(crate) use net::{tcp, udp};
+}
+
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
 static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
