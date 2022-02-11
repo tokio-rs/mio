@@ -99,7 +99,7 @@ pub mod features {
     #![cfg_attr(feature = "os-poll", doc = "## `os-poll` (enabled)")]
     #![cfg_attr(not(feature = "os-poll"), doc = "## `os-poll` (disabled)")]
     //!
-    //! Mio by default provides only a shell implementation, that `panic!`s the
+    //! Mio by default provides only a shell implementation that `panic!`s the
     //! moment it is actually run. To run it requires OS support, this is
     //! enabled by activating the `os-poll` feature.
     //!
