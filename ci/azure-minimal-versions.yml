@@ -9,7 +9,7 @@ jobs:
         Linux:
           vmImage: ubuntu-18.04
         Windows:
-          vmImage: vs2017-win2016
+          vmImage: windows-latest
     pool:
       vmImage: $(vmImage)
 
