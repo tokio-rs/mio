@@ -1,3 +1,4 @@
+#![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::net::{TcpListener, TcpStream};

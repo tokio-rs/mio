@@ -1,5 +1,6 @@
 // Not all functions are used by all tests.
 #![allow(dead_code, unused_macros)]
+#![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
 use std::mem::size_of;
