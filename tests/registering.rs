@@ -1,3 +1,4 @@
+#![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
 use std::io::{self, Write};
