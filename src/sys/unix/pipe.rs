@@ -237,7 +237,7 @@ impl Sender {
     /// use std::os::unix::io::AsRawFd;
     /// use mio::unix::pipe;
     ///
-    /// let (mut sender, mut receiver) = pipe::new()?;
+    /// let (sender, receiver) = pipe::new()?;
     ///
     /// // Wait until the sender is writable...
     ///
@@ -398,7 +398,7 @@ impl Receiver {
     /// use std::os::unix::io::AsRawFd;
     /// use mio::unix::pipe;
     ///
-    /// let (mut sender, mut receiver) = pipe::new()?;
+    /// let (sender, receiver) = pipe::new()?;
     ///
     /// // Wait until the sender is writable...
     ///

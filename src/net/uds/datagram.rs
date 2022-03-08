@@ -130,7 +130,7 @@ impl UnixDatagram {
     /// use std::os::unix::io::AsRawFd;
     /// use mio::net::UnixDatagram;
     ///
-    /// let (mut dgram1, mut dgram2) = UnixDatagram::pair()?;
+    /// let (dgram1, dgram2) = UnixDatagram::pair()?;
     ///
     /// // Wait until the dgram is writable...
     ///

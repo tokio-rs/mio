@@ -91,7 +91,7 @@ impl UnixStream {
     /// use std::os::unix::io::AsRawFd;
     /// use mio::net::UnixStream;
     ///
-    /// let (mut stream1, mut stream2) = UnixStream::pair()?;
+    /// let (stream1, stream2) = UnixStream::pair()?;
     ///
     /// // Wait until the stream is writable...
     ///
