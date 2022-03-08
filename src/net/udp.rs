@@ -548,6 +548,55 @@ impl UdpSocket {
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.inner.take_error()
     }
+
+    /// Execute an I/O operation ensuring that the socket receives more events
+    /// if it hits a [`WouldBlock`] error.
+    ///
+    /// # Notes
+    ///
+    /// This method is required to be called for **all** I/O operations to
+    /// ensure the user will receive events once the socket is ready again after
+    /// returning a [`WouldBlock`] error.
+    ///
+    /// [`WouldBlock`]: io::ErrorKind::WouldBlock
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// use std::io;
+    /// use std::os::unix::io::AsRawFd;
+    /// use mio::net::UdpSocket;
+    ///
+    /// let address = "127.0.0.1:8080".parse().unwrap();
+    /// let dgram = UdpSocket::bind(address)?;
+    ///
+    /// // Wait until the dgram is readable...
+    ///
+    /// // Read from the dgram using a direct libc call, of course the
+    /// // `io::Read` implementation would be easier to use.
+    /// let mut buf = [0; 512];
+    /// let n = dgram.try_io(|| {
+    ///     let buf_ptr = &mut buf as *mut _ as *mut _;
+    ///     let res = unsafe { libc::recv(dgram.as_raw_fd(), buf_ptr, buf.len(), 0) };
+    ///     if res != -1 {
+    ///         Ok(res as usize)
+    ///     } else {
+    ///         Err(io::Error::last_os_error())
+    ///     }
+    /// })?;
+    /// eprintln!("read {} bytes", n);
+    /// # Ok(())
+    /// }
+    /// ```
+    pub fn try_io<F, T>(&self, f: F) -> io::Result<T>
+    where
+        F: FnOnce() -> io::Result<T>,
+    {
+        self.inner.do_io(|_| f())
+    }
 }
 
 impl event::Source for UdpSocket {
