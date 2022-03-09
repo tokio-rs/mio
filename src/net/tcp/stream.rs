@@ -224,7 +224,7 @@ impl TcpStream {
     /// let address = "127.0.0.1:8080".parse().unwrap();
     /// let stream = TcpStream::connect(address)?;
     ///
-    /// // Wait until the steram is readable...
+    /// // Wait until the stream is readable...
     ///
     /// // Read from the stream using a direct libc call, of course the
     /// // `io::Read` implementation would be easier to use.
