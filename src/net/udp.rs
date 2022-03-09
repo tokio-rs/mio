@@ -567,7 +567,10 @@ impl UdpSocket {
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use std::io;
+    /// #[cfg(unix)]
     /// use std::os::unix::io::AsRawFd;
+    /// #[cfg(windows)]
+    /// use std::os::windows::io::AsRawSocket;
     /// use mio::net::UdpSocket;
     ///
     /// let address = "127.0.0.1:8080".parse().unwrap();
@@ -580,7 +583,10 @@ impl UdpSocket {
     /// let mut buf = [0; 512];
     /// let n = dgram.try_io(|| {
     ///     let buf_ptr = &mut buf as *mut _ as *mut _;
+    ///     #[cfg(unix)]
     ///     let res = unsafe { libc::recv(dgram.as_raw_fd(), buf_ptr, buf.len(), 0) };
+    ///     #[cfg(windows)]
+    ///     let res = unsafe { libc::recvfrom(dgram.as_raw_socket() as usize, buf_ptr, buf.len() as i32, 0, std::ptr::null_mut(), std::ptr::null_mut()) };
     ///     if res != -1 {
     ///         Ok(res as usize)
     ///     } else {
