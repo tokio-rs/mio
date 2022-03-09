@@ -213,7 +213,7 @@ impl TcpStream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -235,6 +235,8 @@ impl TcpStream {
     ///     if res != -1 {
     ///         Ok(res as usize)
     ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::recv, the closure
+    ///         // should return `WouldBlock` error.
     ///         Err(io::Error::last_os_error())
     ///     }
     /// })?;

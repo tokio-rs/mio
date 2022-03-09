@@ -104,6 +104,8 @@ impl UnixStream {
     ///     if res != -1 {
     ///         Ok(res as usize)
     ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::send, the closure
+    ///         // should return `WouldBlock` error.
     ///         Err(io::Error::last_os_error())
     ///     }
     /// })?;
@@ -120,6 +122,8 @@ impl UnixStream {
     ///     if res != -1 {
     ///         Ok(res as usize)
     ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::recv, the closure
+    ///         // should return `WouldBlock` error.
     ///         Err(io::Error::last_os_error())
     ///     }
     /// })?;

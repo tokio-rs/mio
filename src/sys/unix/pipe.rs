@@ -250,6 +250,8 @@ impl Sender {
     ///     if res != -1 {
     ///         Ok(res as usize)
     ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::write, the closure
+    ///         // should return `WouldBlock` error.
     ///         Err(io::Error::last_os_error())
     ///     }
     /// })?;
@@ -266,6 +268,8 @@ impl Sender {
     ///     if res != -1 {
     ///         Ok(res as usize)
     ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::read, the closure
+    ///         // should return `WouldBlock` error.
     ///         Err(io::Error::last_os_error())
     ///     }
     /// })?;
@@ -411,6 +415,8 @@ impl Receiver {
     ///     if res != -1 {
     ///         Ok(res as usize)
     ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::write, the closure
+    ///         // should return `WouldBlock` error.
     ///         Err(io::Error::last_os_error())
     ///     }
     /// })?;
@@ -427,6 +433,8 @@ impl Receiver {
     ///     if res != -1 {
     ///         Ok(res as usize)
     ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::read, the closure
+    ///         // should return `WouldBlock` error.
     ///         Err(io::Error::last_os_error())
     ///     }
     /// })?;
