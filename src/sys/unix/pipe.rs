@@ -275,7 +275,7 @@ impl Sender {
     /// })?;
     /// eprintln!("read {} bytes", n);
     /// # Ok(())
-    /// }
+    /// # }
     /// ```
     pub fn try_io<F, T>(&self, f: F) -> io::Result<T>
     where
@@ -440,7 +440,7 @@ impl Receiver {
     /// })?;
     /// eprintln!("read {} bytes", n);
     /// # Ok(())
-    /// }
+    /// # }
     /// ```
     pub fn try_io<F, T>(&self, f: F) -> io::Result<T>
     where
