@@ -562,7 +562,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    #[cfg_attr(unix, doc = "```no_run")]
+    #[cfg_attr(windows, doc = "```ignore")]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
