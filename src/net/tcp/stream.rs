@@ -203,6 +203,64 @@ impl TcpStream {
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.peek(buf)
     }
+
+    /// Execute an I/O operation ensuring that the socket receives more events
+    /// if it hits a [`WouldBlock`] error.
+    ///
+    /// # Notes
+    ///
+    /// This method is required to be called for **all** I/O operations to
+    /// ensure the user will receive events once the socket is ready again after
+    /// returning a [`WouldBlock`] error.
+    ///
+    /// [`WouldBlock`]: io::ErrorKind::WouldBlock
+    ///
+    /// # Examples
+    ///
+    #[cfg_attr(unix, doc = "```no_run")]
+    #[cfg_attr(windows, doc = "```ignore")]
+    /// # use std::error::Error;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// use std::io;
+    /// #[cfg(unix)]
+    /// use std::os::unix::io::AsRawFd;
+    /// #[cfg(windows)]
+    /// use std::os::windows::io::AsRawSocket;
+    /// use mio::net::TcpStream;
+    ///
+    /// let address = "127.0.0.1:8080".parse().unwrap();
+    /// let stream = TcpStream::connect(address)?;
+    ///
+    /// // Wait until the stream is readable...
+    ///
+    /// // Read from the stream using a direct libc call, of course the
+    /// // `io::Read` implementation would be easier to use.
+    /// let mut buf = [0; 512];
+    /// let n = stream.try_io(|| {
+    ///     let buf_ptr = &mut buf as *mut _ as *mut _;
+    ///     #[cfg(unix)]
+    ///     let res = unsafe { libc::recv(stream.as_raw_fd(), buf_ptr, buf.len(), 0) };
+    ///     #[cfg(windows)]
+    ///     let res = unsafe { libc::recvfrom(stream.as_raw_socket() as usize, buf_ptr, buf.len() as i32, 0, std::ptr::null_mut(), std::ptr::null_mut()) };
+    ///     if res != -1 {
+    ///         Ok(res as usize)
+    ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::recv, the closure
+    ///         // should return `WouldBlock` error.
+    ///         Err(io::Error::last_os_error())
+    ///     }
+    /// })?;
+    /// eprintln!("read {} bytes", n);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_io<F, T>(&self, f: F) -> io::Result<T>
+    where
+        F: FnOnce() -> io::Result<T>,
+    {
+        self.inner.do_io(|_| f())
+    }
 }
 
 impl Read for TcpStream {

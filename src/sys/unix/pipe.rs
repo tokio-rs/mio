@@ -215,6 +215,74 @@ impl Sender {
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         set_nonblocking(self.inner.as_raw_fd(), nonblocking)
     }
+
+    /// Execute an I/O operation ensuring that the socket receives more events
+    /// if it hits a [`WouldBlock`] error.
+    ///
+    /// # Notes
+    ///
+    /// This method is required to be called for **all** I/O operations to
+    /// ensure the user will receive events once the socket is ready again after
+    /// returning a [`WouldBlock`] error.
+    ///
+    /// [`WouldBlock`]: io::ErrorKind::WouldBlock
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// use std::io;
+    /// use std::os::unix::io::AsRawFd;
+    /// use mio::unix::pipe;
+    ///
+    /// let (sender, receiver) = pipe::new()?;
+    ///
+    /// // Wait until the sender is writable...
+    ///
+    /// // Write to the sender using a direct libc call, of course the
+    /// // `io::Write` implementation would be easier to use.
+    /// let buf = b"hello";
+    /// let n = sender.try_io(|| {
+    ///     let buf_ptr = &buf as *const _ as *const _;
+    ///     let res = unsafe { libc::write(sender.as_raw_fd(), buf_ptr, buf.len()) };
+    ///     if res != -1 {
+    ///         Ok(res as usize)
+    ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::write, the closure
+    ///         // should return `WouldBlock` error.
+    ///         Err(io::Error::last_os_error())
+    ///     }
+    /// })?;
+    /// eprintln!("write {} bytes", n);
+    ///
+    /// // Wait until the receiver is readable...
+    ///
+    /// // Read from the receiver using a direct libc call, of course the
+    /// // `io::Read` implementation would be easier to use.
+    /// let mut buf = [0; 512];
+    /// let n = receiver.try_io(|| {
+    ///     let buf_ptr = &mut buf as *mut _ as *mut _;
+    ///     let res = unsafe { libc::read(receiver.as_raw_fd(), buf_ptr, buf.len()) };
+    ///     if res != -1 {
+    ///         Ok(res as usize)
+    ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::read, the closure
+    ///         // should return `WouldBlock` error.
+    ///         Err(io::Error::last_os_error())
+    ///     }
+    /// })?;
+    /// eprintln!("read {} bytes", n);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_io<F, T>(&self, f: F) -> io::Result<T>
+    where
+        F: FnOnce() -> io::Result<T>,
+    {
+        self.inner.do_io(|_| f())
+    }
 }
 
 impl event::Source for Sender {
@@ -311,6 +379,74 @@ impl Receiver {
     /// Set the `Receiver` into or out of non-blocking mode.
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         set_nonblocking(self.inner.as_raw_fd(), nonblocking)
+    }
+
+    /// Execute an I/O operation ensuring that the socket receives more events
+    /// if it hits a [`WouldBlock`] error.
+    ///
+    /// # Notes
+    ///
+    /// This method is required to be called for **all** I/O operations to
+    /// ensure the user will receive events once the socket is ready again after
+    /// returning a [`WouldBlock`] error.
+    ///
+    /// [`WouldBlock`]: io::ErrorKind::WouldBlock
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error::Error;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// use std::io;
+    /// use std::os::unix::io::AsRawFd;
+    /// use mio::unix::pipe;
+    ///
+    /// let (sender, receiver) = pipe::new()?;
+    ///
+    /// // Wait until the sender is writable...
+    ///
+    /// // Write to the sender using a direct libc call, of course the
+    /// // `io::Write` implementation would be easier to use.
+    /// let buf = b"hello";
+    /// let n = sender.try_io(|| {
+    ///     let buf_ptr = &buf as *const _ as *const _;
+    ///     let res = unsafe { libc::write(sender.as_raw_fd(), buf_ptr, buf.len()) };
+    ///     if res != -1 {
+    ///         Ok(res as usize)
+    ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::write, the closure
+    ///         // should return `WouldBlock` error.
+    ///         Err(io::Error::last_os_error())
+    ///     }
+    /// })?;
+    /// eprintln!("write {} bytes", n);
+    ///
+    /// // Wait until the receiver is readable...
+    ///
+    /// // Read from the receiver using a direct libc call, of course the
+    /// // `io::Read` implementation would be easier to use.
+    /// let mut buf = [0; 512];
+    /// let n = receiver.try_io(|| {
+    ///     let buf_ptr = &mut buf as *mut _ as *mut _;
+    ///     let res = unsafe { libc::read(receiver.as_raw_fd(), buf_ptr, buf.len()) };
+    ///     if res != -1 {
+    ///         Ok(res as usize)
+    ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by libc::read, the closure
+    ///         // should return `WouldBlock` error.
+    ///         Err(io::Error::last_os_error())
+    ///     }
+    /// })?;
+    /// eprintln!("read {} bytes", n);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_io<F, T>(&self, f: F) -> io::Result<T>
+    where
+        F: FnOnce() -> io::Result<T>,
+    {
+        self.inner.do_io(|_| f())
     }
 }
 
