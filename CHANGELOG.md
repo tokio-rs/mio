@@ -1,3 +1,9 @@
+# 0.8.2
+
+## Added
+
+* Experimental support for Redox.
+
 # 0.8.1
 
 ## Added
