@@ -103,6 +103,7 @@ pub use self::kqueue::Waker;
     target_os = "illumos",
     target_os = "netbsd",
     target_os = "openbsd",
+    target_os = "redox",
 ))]
 mod pipe {
     use crate::sys::unix::Selector;
@@ -174,5 +175,6 @@ mod pipe {
     target_os = "illumos",
     target_os = "netbsd",
     target_os = "openbsd",
+    target_os = "redox",
 ))]
 pub use self::pipe::Waker;

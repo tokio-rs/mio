@@ -1,7 +1,17 @@
-#[cfg(any(target_os = "android", target_os = "illumos", target_os = "linux"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "illumos",
+    target_os = "linux",
+    target_os = "redox",
+))]
 mod epoll;
 
-#[cfg(any(target_os = "android", target_os = "illumos", target_os = "linux"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "illumos",
+    target_os = "linux",
+    target_os = "redox",
+))]
 pub(crate) use self::epoll::{event, Event, Events, Selector};
 
 #[cfg(any(

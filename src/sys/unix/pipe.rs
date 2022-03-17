@@ -155,6 +155,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         target_os = "netbsd",
         target_os = "openbsd",
         target_os = "illumos",
+        target_os = "redox",
     ))]
     unsafe {
         if libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0 {
@@ -193,6 +194,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         target_os = "ios",
         target_os = "macos",
         target_os = "illumos",
+        target_os = "redox",
     )))]
     compile_error!("unsupported target for `mio::unix::pipe`");
 
