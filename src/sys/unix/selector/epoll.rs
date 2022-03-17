@@ -82,6 +82,8 @@ impl Selector {
         let mut event = libc::epoll_event {
             events: interests_to_epoll(interests),
             u64: usize::from(token) as u64,
+            #[cfg(target_os = "redox")]
+            _pad: 0,
         };
 
         syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
@@ -91,6 +93,8 @@ impl Selector {
         let mut event = libc::epoll_event {
             events: interests_to_epoll(interests),
             u64: usize::from(token) as u64,
+            #[cfg(target_os = "redox")]
+            _pad: 0,
         };
 
         syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_MOD, fd, &mut event)).map(|_| ())
