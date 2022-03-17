@@ -34,6 +34,10 @@ jobs:
           vmImage: ubuntu-18.04
           target: x86_64-unknown-illumos
 
+        redox:
+          vmImage: ubuntu-18.04
+          target: x86_64-unknown-redox
+
     pool:
       vmImage: $(vmImage)
 
