@@ -14,7 +14,7 @@ use windows_sys::Win32::{
 
 const IOCTL_AFD_POLL: u32 = 0x00012024;
 
-/// <https://processhacker.sourceforge.io/doc/ntioapi_8h.html#a0d4d550cad4d62d75b76961e25f6550c>
+// <https://processhacker.sourceforge.io/doc/ntioapi_8h.html#a0d4d550cad4d62d75b76961e25f6550c>
 #[link(name = "ntdll")]
 extern "system" {
     fn NtCancelIoFileEx(
