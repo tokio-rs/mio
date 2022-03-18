@@ -34,7 +34,7 @@ default = []
 # Enables the `Poll` and `Registry` types.
 os-poll = []
 # Enables additional OS specific extensions, e.g. Unix `pipe(2)`.
-os-ext = ["os-poll"]
+os-ext = ["os-poll", "windows-sys/Win32_System_Pipes"]
 # Enables `mio::net` module containing networking primitives.
 net = []
 
@@ -45,9 +45,17 @@ log = "0.4.8"
 libc = "0.2.121"
 
 [target.'cfg(windows)'.dependencies]
-miow   = "0.3.6"
-winapi = { version = "0.3", features = ["winsock2", "mswsock"] }
-ntapi  = "0.3"
+miow = "0.4"
+
+[target.'cfg(windows)'.dependencies.windows-sys]
+version = "0.28" # This matches the version in miow, but it's fairly outdated
+features = [
+  "Win32_Storage_FileSystem",        # Enables NtCreateFile
+  "Win32_Foundation",                # Basic types eg HANDLE
+  "Win32_Networking_WinSock",        # winsock2 types/functions
+  "Win32_System_IO",                 # IO types like OVERLAPPED etc
+  "Win32_System_WindowsProgramming", # General future used for various types/funcs
+]
 
 [target.'cfg(target_os = "wasi")'.dependencies]
 wasi = "0.11.0"

@@ -263,9 +263,11 @@ pub fn set_linger_zero(socket: &TcpStream) {
 #[cfg(windows)]
 pub fn set_linger_zero(socket: &TcpStream) {
     use std::os::windows::io::AsRawSocket;
-    use winapi::um::winsock2::{linger, setsockopt, SOCKET_ERROR, SOL_SOCKET, SO_LINGER};
+    use windows_sys::Win32::Networking::WinSock::{
+        linger, setsockopt, SOCKET_ERROR, SOL_SOCKET, SO_LINGER,
+    };
 
-    let val = linger {
+    let mut val = linger {
         l_onoff: 1,
         l_linger: 0,
     };
@@ -273,9 +275,9 @@ pub fn set_linger_zero(socket: &TcpStream) {
     let res = unsafe {
         setsockopt(
             socket.as_raw_socket() as _,
-            SOL_SOCKET,
-            SO_LINGER,
-            &val as *const _ as *const _,
+            SOL_SOCKET as i32,
+            SO_LINGER as i32,
+            &mut val as *mut _ as *mut _,
             size_of::<linger>() as _,
         )
     };

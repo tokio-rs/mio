@@ -4,8 +4,8 @@ use std::cell::UnsafeCell;
 use std::fmt;
 
 #[cfg(feature = "os-ext")]
-use winapi::um::minwinbase::OVERLAPPED;
-use winapi::um::minwinbase::OVERLAPPED_ENTRY;
+use windows_sys::Win32::System::IO::OVERLAPPED;
+use windows_sys::Win32::System::IO::OVERLAPPED_ENTRY;
 
 #[repr(C)]
 pub(crate) struct Overlapped {
