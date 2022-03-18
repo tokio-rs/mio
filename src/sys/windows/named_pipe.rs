@@ -8,9 +8,10 @@ use std::{fmt, mem, slice};
 
 use miow::iocp::{CompletionPort, CompletionStatus};
 use miow::pipe;
-use winapi::shared::winerror::{ERROR_BROKEN_PIPE, ERROR_PIPE_LISTENING};
-use winapi::um::ioapiset::CancelIoEx;
-use winapi::um::minwinbase::{OVERLAPPED, OVERLAPPED_ENTRY};
+use windows_sys::Win32::{
+    Foundation::{ERROR_BROKEN_PIPE, ERROR_PIPE_LISTENING},
+    System::IO::{CancelIoEx, OVERLAPPED, OVERLAPPED_ENTRY},
+};
 
 use crate::event::Source;
 use crate::sys::windows::{Event, Overlapped};
