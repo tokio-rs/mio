@@ -180,6 +180,7 @@ impl CompletionStatus {
     ///
     /// This method will wrap the `OVERLAPPED_ENTRY` in a `CompletionStatus`,
     /// returning the wrapped structure.
+    #[cfg(feature = "os-ext")]
     pub fn from_entry(entry: &OVERLAPPED_ENTRY) -> &Self {
         // Safety: CompletionStatus is repr(transparent) w/ OVERLAPPED_ENTRY, so
         // a reference to one is guaranteed to be layout compatible with the
