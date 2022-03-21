@@ -538,6 +538,9 @@ cfg_io_source! {
 
     use windows_sys::Win32::Networking::WinSock::{WSAGetLastError, SOCKET_ERROR, WSAIoctl, IOC_OUT, IOC_WS2};
 
+    // These constants were part of winapi but are not yet in windows-sys
+    //
+    // https://github.com/microsoft/win32metadata/issues/844
     const SIO_BSP_HANDLE: u32 = IOC_OUT | IOC_WS2 | 27; // 1_207_959_579u32
     const SIO_BSP_HANDLE_SELECT: u32 = IOC_OUT | IOC_WS2 | 28; // 1_207_959_580u32
     const SIO_BSP_HANDLE_POLL: u32 = IOC_OUT | IOC_WS2 | 29; // 1_207_959_581u32
