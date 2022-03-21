@@ -1,6 +1,6 @@
 use std::fmt;
 
-use miow::iocp::CompletionStatus;
+use super::iocp::CompletionStatus;
 
 use super::afd;
 use crate::Token;

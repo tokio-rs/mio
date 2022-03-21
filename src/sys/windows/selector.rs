@@ -10,7 +10,7 @@ cfg_net! {
     use crate::Interest;
 }
 
-use miow::iocp::{CompletionPort, CompletionStatus};
+use super::iocp::{CompletionPort, CompletionStatus};
 use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::io;

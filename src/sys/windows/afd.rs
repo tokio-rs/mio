@@ -74,8 +74,8 @@ impl Afd {
         let info_ptr = info as *mut _ as *mut c_void;
         (*iosb).Anonymous.Status = STATUS_PENDING;
         let status = NtDeviceIoControlFile(
-            self.fd.as_raw_handle(),
-            null_mut(),
+            self.fd.as_raw_handle() as HANDLE,
+            0,
             None,
             overlapped,
             iosb,
@@ -112,7 +112,7 @@ impl Afd {
             Anonymous: IO_STATUS_BLOCK_0 { Status: 0 },
             Information: 0,
         };
-        let status = NtCancelIoFileEx(self.fd.as_raw_handle(), iosb, &mut cancel_iosb);
+        let status = NtCancelIoFileEx(self.fd.as_raw_handle() as HANDLE, iosb, &mut cancel_iosb);
         if status == STATUS_SUCCESS || status == STATUS_NOT_FOUND {
             return Ok(());
         }
@@ -127,7 +127,7 @@ cfg_io_source! {
     use std::os::windows::io::{FromRawHandle, RawHandle};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use miow::iocp::CompletionPort;
+    use super::iocp::CompletionPort;
     use windows_sys::Win32::{
         Foundation::{UNICODE_STRING, INVALID_HANDLE_VALUE},
         System::WindowsProgramming::{
@@ -138,7 +138,7 @@ cfg_io_source! {
 
     const AFD_HELPER_ATTRIBUTES: OBJECT_ATTRIBUTES = OBJECT_ATTRIBUTES {
         Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
-        RootDirectory: null_mut(),
+        RootDirectory: 0,
         ObjectName: &AFD_OBJ_NAME as *const _ as *mut _,
         Attributes: 0,
         SecurityDescriptor: null_mut(),
@@ -179,7 +179,7 @@ cfg_io_source! {
 
     impl Afd {
         /// Create new Afd instance.
-        pub fn new(cp: &CompletionPort) -> io::Result<Afd> {
+        pub(crate) fn new(cp: &CompletionPort) -> io::Result<Afd> {
             let mut afd_helper_handle: HANDLE = INVALID_HANDLE_VALUE;
             let mut iosb = IO_STATUS_BLOCK {
                 Anonymous: IO_STATUS_BLOCK_0 { Status: 0 },

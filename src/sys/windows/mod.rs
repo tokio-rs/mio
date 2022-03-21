@@ -10,6 +10,8 @@ pub use selector::{Selector, SelectorInner, SockState};
 mod overlapped;
 use overlapped::Overlapped;
 
+mod iocp;
+
 // Macros must be defined before the modules that use them
 cfg_net! {
     /// Helper macro to execute a system call that returns an `io::Result`.
