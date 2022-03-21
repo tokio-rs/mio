@@ -9,7 +9,7 @@ use std::os::windows::io::*;
 use std::time::Duration;
 
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
-use windows_sys::Win32System::IO::{
+use windows_sys::Win32::System::IO::{
     CreateIoCompletionPort, GetQueuedCompletionStatusEx, PostQueuedCompletionStatus, OVERLAPPED,
     OVERLAPPED_ENTRY,
 };
