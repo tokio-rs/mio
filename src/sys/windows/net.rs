@@ -7,12 +7,11 @@ use windows_sys::Win32::Networking::WinSock::{
     ioctlsocket, socket, FIONBIO, IN6_ADDR, IN6_ADDR_0, INVALID_SOCKET, IN_ADDR, IN_ADDR_0,
     SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0, SOCKET,
 };
-
-// AF_INET/6 are in the Win32_NetworkManagement_IpHelper feature for some reason,
-// so just directly define them here rather than import that whole feature set
-// these constants won't ever change
-pub(crate) const AF_INET: u16 = 2;
-pub(crate) const AF_INET6: u16 = 23;
+// We need to import a giant feature set for these 2 constants, they will hopefully
+// be moved to `Win32::Networking::WinSock` in the future, since this needlessly
+// increases compile times for all downstream users
+// <https://github.com/microsoft/win32metadata/issues/845>
+pub(crate) use windows_sys::Win32::NetworkManagement::IpHelper::{AF_INET, AF_INET6};
 
 /// Initialise the network stack for Windows.
 pub(crate) fn init() {
@@ -35,7 +34,7 @@ pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: u16) -> io::Result<SO
     new_socket(domain, socket_type)
 }
 
-pub(crate) fn new_socket(domain: u16, socket_type: u16) -> io::Result<SOCKET> {
+pub(crate) fn new_socket(domain: u32, socket_type: u16) -> io::Result<SOCKET> {
     syscall!(
         socket(domain as i32, socket_type as i32, 0),
         PartialEq::eq,
@@ -74,7 +73,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, i32) {
             };
 
             let sockaddr_in = SOCKADDR_IN {
-                sin_family: AF_INET,
+                sin_family: AF_INET as u16, // 1
                 sin_port: addr.port().to_be(),
                 sin_addr,
                 sin_zero: [0; 8],
@@ -96,7 +95,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, i32) {
             };
 
             let sockaddr_in6 = SOCKADDR_IN6 {
-                sin6_family: AF_INET6,
+                sin6_family: AF_INET6 as u16, // 23
                 sin6_port: addr.port().to_be(),
                 sin6_addr,
                 sin6_flowinfo: addr.flowinfo(),
