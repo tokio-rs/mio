@@ -34,7 +34,11 @@ default = []
 # Enables the `Poll` and `Registry` types.
 os-poll = []
 # Enables additional OS specific extensions, e.g. Unix `pipe(2)`.
-os-ext = ["os-poll", "windows-sys/Win32_System_Pipes"]
+os-ext = [
+  "os-poll",
+  "windows-sys/Win32_System_Pipes",
+  "windows-sys/Win32_Security",
+]
 # Enables `mio::net` module containing networking primitives.
 net = []
 
@@ -44,11 +48,8 @@ log = "0.4.8"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.121"
 
-[target.'cfg(windows)'.dependencies]
-miow = "0.4"
-
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.28" # This matches the version in miow, but it's fairly outdated
+version = "0.34"
 features = [
   "Win32_Storage_FileSystem",        # Enables NtCreateFile
   "Win32_Foundation",                # Basic types eg HANDLE
