@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io;
 use std::mem::size_of;
 use std::os::windows::io::AsRawHandle;
-use std::ptr::null_mut;
+
 use windows_sys::Win32::{
     Foundation::{
         RtlNtStatusToDosError, HANDLE, NTSTATUS, STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS,
@@ -125,6 +125,7 @@ impl Afd {
 cfg_io_source! {
     use std::mem::zeroed;
     use std::os::windows::io::{FromRawHandle, RawHandle};
+    use std::ptr::null_mut;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::iocp::CompletionPort;
