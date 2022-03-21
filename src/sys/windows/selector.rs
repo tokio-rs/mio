@@ -23,10 +23,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use windows_sys::Win32::{
-    Foundation::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, HANDLE, STATUS_CANCELLED, WAIT_TIMEOUT},
-    System::IO::OVERLAPPED,
+use windows_sys::Win32::Foundation::{
+    ERROR_INVALID_HANDLE, ERROR_IO_PENDING, HANDLE, STATUS_CANCELLED, WAIT_TIMEOUT,
 };
+use windows_sys::Win32::System::IO::OVERLAPPED;
 
 #[derive(Debug)]
 struct AfdGroup {

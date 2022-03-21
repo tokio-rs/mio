@@ -5,11 +5,11 @@ use std::io;
 use std::mem::size_of;
 use std::os::windows::io::AsRawHandle;
 
-use windows_sys::Win32::{
-    Foundation::{
-        RtlNtStatusToDosError, HANDLE, NTSTATUS, STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS,
-    },
-    System::WindowsProgramming::{NtDeviceIoControlFile, IO_STATUS_BLOCK, IO_STATUS_BLOCK_0},
+use windows_sys::Win32::Foundation::{
+    RtlNtStatusToDosError, HANDLE, NTSTATUS, STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS,
+};
+use windows_sys::Win32::System::WindowsProgramming::{
+    NtDeviceIoControlFile, IO_STATUS_BLOCK, IO_STATUS_BLOCK_0,
 };
 
 const IOCTL_AFD_POLL: u32 = 0x00012024;

@@ -6,29 +6,24 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
 use std::{fmt, mem, slice};
 
-use windows_sys::Win32::{
-    Foundation::{
-        ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_NO_DATA,
-        ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
-    },
-    Storage::FileSystem::{
-        ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED,
-        PIPE_ACCESS_DUPLEX,
-    },
-    System::{
-        Pipes::{
-            ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_TYPE_BYTE,
-            PIPE_UNLIMITED_INSTANCES,
-        },
-        IO::{CancelIoEx, GetOverlappedResult, OVERLAPPED, OVERLAPPED_ENTRY},
-    },
+use windows_sys::Win32::Foundation::{
+    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_NO_DATA, ERROR_PIPE_CONNECTED,
+    ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
+};
+use windows_sys::Win32::Storage::FileSystem::{
+    ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
+};
+use windows_sys::Win32::System::Pipes::{
+    ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_TYPE_BYTE,
+    PIPE_UNLIMITED_INSTANCES,
+};
+use windows_sys::Win32::System::IO::{
+    CancelIoEx, GetOverlappedResult, OVERLAPPED, OVERLAPPED_ENTRY,
 };
 
 use crate::event::Source;
-use crate::sys::windows::{
-    iocp::{CompletionPort, CompletionStatus},
-    Event, Handle, Overlapped,
-};
+use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
+use crate::sys::windows::{Event, Handle, Overlapped};
 use crate::Registry;
 use crate::{Interest, Token};
 
