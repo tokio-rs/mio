@@ -14,9 +14,13 @@ use windows_sys::Win32::{
 
 const IOCTL_AFD_POLL: u32 = 0x00012024;
 
-// <https://processhacker.sourceforge.io/doc/ntioapi_8h.html#a0d4d550cad4d62d75b76961e25f6550c>
 #[link(name = "ntdll")]
 extern "system" {
+    /// See <https://processhacker.sourceforge.io/doc/ntioapi_8h.html#a0d4d550cad4d62d75b76961e25f6550c>
+    ///
+    /// This is an undocumented API and as such not part of <https://github.com/microsoft/win32metadata>
+    /// from which `windows-sys` is generated, and also unlikely to be added, so
+    /// we manually declare it here
     fn NtCancelIoFileEx(
         FileHandle: HANDLE,
         IoRequestToCancel: *mut IO_STATUS_BLOCK,
