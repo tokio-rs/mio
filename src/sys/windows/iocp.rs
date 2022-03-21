@@ -1,6 +1,6 @@
 //! Bindings to IOCP, I/O Completion Ports
 
-use crate::sys::windows::Overlapped;
+use super::{Handle, Overlapped};
 use std::cmp;
 use std::fmt;
 use std::io;
@@ -19,7 +19,7 @@ use windows_sys::Win32::{
 /// A handle to an Windows I/O Completion Port.
 #[derive(Debug)]
 pub(crate) struct CompletionPort {
-    handle: HANDLE,
+    handle: Handle,
 }
 
 /// A status message received from an I/O completion port.
@@ -51,7 +51,9 @@ impl CompletionPort {
         if ret == 0 {
             Err(io::Error::last_os_error())
         } else {
-            Ok(CompletionPort { handle: ret })
+            Ok(CompletionPort {
+                handle: Handle::new(ret),
+            })
         }
     }
 
@@ -64,30 +66,14 @@ impl CompletionPort {
     /// Any object which is convertible to a `HANDLE` via the `AsRawHandle`
     /// trait can be provided to this function, such as `std::fs::File` and
     /// friends.
+    #[cfg(any(feature = "net", feature = "os-ext"))]
     pub fn add_handle<T: AsRawHandle + ?Sized>(&self, token: usize, t: &T) -> io::Result<()> {
-        self._add(token, t.as_raw_handle() as HANDLE)
-    }
-
-    // /// Associates a new `SOCKET` to this I/O completion port.
-    // ///
-    // /// This function will associate the given socket to this port with the
-    // /// given `token` to be returned in status messages whenever it receives a
-    // /// notification.
-    // ///
-    // /// Any object which is convertible to a `SOCKET` via the `AsRawSocket`
-    // /// trait can be provided to this function, such as `std::net::TcpStream`
-    // /// and friends.
-    // pub fn add_socket<T: AsRawSocket + ?Sized>(&self, token: usize, t: &T) -> io::Result<()> {
-    //     self._add(token, t.as_raw_socket() as HANDLE)
-    // }
-
-    fn _add(&self, token: usize, handle: HANDLE) -> io::Result<()> {
-        assert_eq!(mem::size_of_val(&token), mem::size_of::<usize>());
-        let ret = unsafe { CreateIoCompletionPort(handle, self.handle, token as usize, 0) };
+        let ret = unsafe {
+            CreateIoCompletionPort(t.as_raw_handle() as HANDLE, self.handle.raw(), token, 0)
+        };
         if ret == 0 {
             Err(io::Error::last_os_error())
         } else {
-            debug_assert_eq!(ret, self.handle);
             Ok(())
         }
     }
@@ -115,7 +101,7 @@ impl CompletionPort {
         let len = cmp::min(list.len(), <u32>::max_value() as usize) as u32;
         let ret = unsafe {
             GetQueuedCompletionStatusEx(
-                self.handle,
+                self.handle.raw(),
                 list.as_ptr() as *mut _,
                 len,
                 &mut removed,
@@ -139,7 +125,7 @@ impl CompletionPort {
     pub fn post(&self, status: CompletionStatus) -> io::Result<()> {
         let ret = unsafe {
             PostQueuedCompletionStatus(
-                self.handle,
+                self.handle.raw(),
                 status.0.dwNumberOfBytesTransferred,
                 status.0.lpCompletionKey,
                 status.0.lpOverlapped,
@@ -156,21 +142,21 @@ impl CompletionPort {
 
 impl AsRawHandle for CompletionPort {
     fn as_raw_handle(&self) -> RawHandle {
-        self.handle as RawHandle
+        self.handle.raw() as RawHandle
     }
 }
 
 impl FromRawHandle for CompletionPort {
     unsafe fn from_raw_handle(handle: RawHandle) -> CompletionPort {
         CompletionPort {
-            handle: handle as HANDLE,
+            handle: Handle::new(handle as HANDLE),
         }
     }
 }
 
 impl IntoRawHandle for CompletionPort {
     fn into_raw_handle(self) -> RawHandle {
-        self.handle as RawHandle
+        self.handle.into_raw()
     }
 }
 

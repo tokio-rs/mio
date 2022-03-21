@@ -27,7 +27,7 @@ use windows_sys::Win32::{
 use crate::event::Source;
 use crate::sys::windows::{
     iocp::{CompletionPort, CompletionStatus},
-    Event, Overlapped,
+    Event, Handle, Overlapped,
 };
 use crate::Registry;
 use crate::{Interest, Token};
@@ -90,7 +90,7 @@ struct Inner {
     read: Overlapped,
     write: Overlapped,
     // END NOTE.
-    handle: HANDLE,
+    handle: Handle,
     connecting: AtomicBool,
     io: Mutex<Io>,
     pool: Mutex<BufferPool>,
@@ -139,7 +139,7 @@ impl Inner {
     /// valid until the I/O operation is completed, typically via completion
     /// ports and waiting to receive the completion notification on the port.
     pub unsafe fn connect_overlapped(&self, overlapped: *mut OVERLAPPED) -> io::Result<bool> {
-        if ConnectNamedPipe(self.handle, overlapped) != 0 {
+        if ConnectNamedPipe(self.handle.raw(), overlapped) != 0 {
             return Ok(true);
         }
 
@@ -155,7 +155,7 @@ impl Inner {
 
     /// Disconnects this named pipe from any connected client.
     pub fn disconnect(&self) -> io::Result<()> {
-        if unsafe { DisconnectNamedPipe(self.handle) } == 0 {
+        if unsafe { DisconnectNamedPipe(self.handle.raw()) } == 0 {
             Err(io::Error::last_os_error())
         } else {
             Ok(())
@@ -195,7 +195,7 @@ impl Inner {
     ) -> io::Result<Option<usize>> {
         let len = std::cmp::min(buf.len(), u32::MAX as usize) as u32;
         let res = ReadFile(
-            self.handle,
+            self.handle.raw(),
             buf.as_mut_ptr() as *mut _,
             len,
             std::ptr::null_mut(),
@@ -209,7 +209,7 @@ impl Inner {
         }
 
         let mut bytes = 0;
-        let res = GetOverlappedResult(self.handle, overlapped, &mut bytes, 0);
+        let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
         if res == 0 {
             let err = io::Error::last_os_error();
             if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
@@ -255,7 +255,7 @@ impl Inner {
     ) -> io::Result<Option<usize>> {
         let len = std::cmp::min(buf.len(), u32::MAX as usize) as u32;
         let res = WriteFile(
-            self.handle,
+            self.handle.raw(),
             buf.as_ptr() as *const _,
             len,
             std::ptr::null_mut(),
@@ -269,7 +269,7 @@ impl Inner {
         }
 
         let mut bytes = 0;
-        let res = GetOverlappedResult(self.handle, overlapped, &mut bytes, 0);
+        let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
         if res == 0 {
             let err = io::Error::last_os_error();
             if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
@@ -298,7 +298,7 @@ impl Inner {
     #[inline]
     unsafe fn result(&self, overlapped: *mut OVERLAPPED) -> io::Result<usize> {
         let mut transferred = 0;
-        let r = GetOverlappedResult(self.handle, overlapped, &mut transferred, 0);
+        let r = GetOverlappedResult(self.handle.raw(), overlapped, &mut transferred, 0);
         if r == 0 {
             Err(io::Error::last_os_error())
         } else {
@@ -478,7 +478,7 @@ impl FromRawHandle for NamedPipe {
     unsafe fn from_raw_handle(handle: RawHandle) -> NamedPipe {
         NamedPipe {
             inner: Arc::new(Inner {
-                handle: handle as HANDLE,
+                handle: Handle::new(handle as HANDLE),
                 connect: Overlapped::new(connect_done),
                 connecting: AtomicBool::new(false),
                 read: Overlapped::new(read_done),
@@ -663,7 +663,7 @@ impl Source for NamedPipe {
 
 impl AsRawHandle for NamedPipe {
     fn as_raw_handle(&self) -> RawHandle {
-        self.inner.handle as RawHandle
+        self.inner.handle.raw() as RawHandle
     }
 }
 
@@ -679,12 +679,12 @@ impl Drop for NamedPipe {
         // everything is flushed out.
         unsafe {
             if self.inner.connecting.load(SeqCst) {
-                drop(cancel(self, &self.inner.connect));
+                drop(cancel(&self.inner.handle, &self.inner.connect));
             }
 
             let io = self.inner.io.lock().unwrap();
             if let State::Pending(..) = io.read {
-                drop(cancel(self, &self.inner.read));
+                drop(cancel(&self.inner.handle, &self.inner.read));
             }
         }
     }
@@ -816,11 +816,8 @@ impl Inner {
     }
 }
 
-unsafe fn cancel<T: AsRawHandle>(handle: &T, overlapped: &Overlapped) -> io::Result<()> {
-    let ret = CancelIoEx(
-        handle.as_raw_handle() as windows_sys::Win32::Foundation::HANDLE,
-        overlapped.as_ptr() as *mut _,
-    );
+unsafe fn cancel(handle: &Handle, overlapped: &Overlapped) -> io::Result<()> {
+    let ret = CancelIoEx(handle.raw(), overlapped.as_ptr());
     // `CancelIoEx` returns 0 on error:
     // https://docs.microsoft.com/en-us/windows/win32/fileio/cancelioex-func
     if ret == 0 {
