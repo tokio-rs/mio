@@ -39,7 +39,7 @@ os-ext = ["os-poll"]
 net = []
 
 [dependencies]
-log = "0.4.8"
+log = { version = "0.4.16", default-features = false, features = ["kv_unstable"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.86"

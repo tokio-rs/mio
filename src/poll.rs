@@ -1,5 +1,5 @@
 use crate::{event, sys, Events, Interest, Token};
-use log::trace;
+use log::{as_debug, trace};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::Duration;
@@ -497,9 +497,8 @@ impl Registry {
         S: event::Source + ?Sized,
     {
         trace!(
-            "registering event source with poller: token={:?}, interests={:?}",
-            token,
-            interests
+            token = token.0, interests = as_debug!(interests);
+            "registering event source with poller",
         );
         source.register(self, token, interests)
     }
@@ -565,9 +564,8 @@ impl Registry {
         S: event::Source + ?Sized,
     {
         trace!(
-            "reregistering event source with poller: token={:?}, interests={:?}",
-            token,
-            interests
+            token = token.0, interests = as_debug!(interests);
+            "reregistering event source with poller",
         );
         source.reregister(self, token, interests)
     }
