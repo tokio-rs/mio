@@ -320,6 +320,10 @@ impl UdpSocket {
     /// Connects the UDP socket setting the default destination for `send()`
     /// and limiting packets that are read via `recv` from the address specified
     /// in `addr`.
+    ///
+    /// This may return a `WouldBlock` in which case the socket connection
+    /// cannot be completed immediately, it usually means there are insufficient
+    /// entries in the routing cache.
     pub fn connect(&self, addr: SocketAddr) -> io::Result<()> {
         self.inner.connect(addr)
     }

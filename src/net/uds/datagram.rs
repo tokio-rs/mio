@@ -31,6 +31,10 @@ impl UnixDatagram {
     }
 
     /// Connects the socket to the specified address.
+    ///
+    /// This may return a `WouldBlock` in which case the socket connection
+    /// cannot be completed immediately, it usually means there are insufficient
+    /// entries in the routing cache.
     pub fn connect<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
         self.inner.connect(path)
     }
