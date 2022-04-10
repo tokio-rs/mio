@@ -75,6 +75,10 @@ impl TcpStream {
     ///     whent wrong.
     ///  5. Now the stream can be used.
     ///
+    /// This may return a `WouldBlock` in which case the socket connection
+    /// cannot be completed immediately, it usually means there are insufficient
+    /// entries in the routing cache.
+    ///
     /// [write interest]: Interest::WRITABLE
     #[cfg(not(target_os = "wasi"))]
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {

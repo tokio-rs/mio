@@ -15,6 +15,9 @@ pub struct UnixStream {
 
 impl UnixStream {
     /// Connects to the socket named by `path`.
+    ///
+    /// This may return a `WouldBlock` in which case the socket connection
+    /// cannot be completed immediately.
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
         sys::uds::stream::connect(path.as_ref()).map(UnixStream::from_std)
     }
