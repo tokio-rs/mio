@@ -13,7 +13,7 @@ pub(crate) fn connect(path: &Path) -> io::Result<net::UnixStream> {
 
     match syscall!(connect(socket, sockaddr, socklen)) {
         Ok(_) => {}
-        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+        Err(ref err) if err.raw_os_error() == Some(libc::EINPROGRESS) => {}
         Err(e) => {
             // Close the socket if we hit an error, ignoring the error
             // from closing since we can't pass back two errors.
