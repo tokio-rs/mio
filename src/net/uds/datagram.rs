@@ -22,8 +22,8 @@ impl UnixDatagram {
     ///
     /// This function is intended to be used to wrap a Unix datagram from the
     /// standard library in the Mio equivalent. The conversion assumes nothing
-    /// about the underlying datagram; ; it is left up to the user to set it
-    /// in non-blocking mode.
+    /// about the underlying datagram; it is left up to the user to set it in
+    /// non-blocking mode.
     pub fn from_std(socket: net::UnixDatagram) -> UnixDatagram {
         UnixDatagram {
             inner: IoSource::new(socket),
@@ -33,8 +33,7 @@ impl UnixDatagram {
     /// Connects the socket to the specified address.
     ///
     /// This may return a `WouldBlock` in which case the socket connection
-    /// cannot be completed immediately, it usually means there are insufficient
-    /// entries in the routing cache.
+    /// cannot be completed immediately.
     pub fn connect<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
         self.inner.connect(path)
     }
