@@ -455,7 +455,6 @@ pub mod event {
         }
     }
 
-
     pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
         debug_detail!(
             FilterDetails(Filter),
