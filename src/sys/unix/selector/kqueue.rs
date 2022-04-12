@@ -443,6 +443,19 @@ pub mod event {
         }
     }
 
+    #[allow(unused_variables)] // `event` is only used on MacOS.
+    pub fn is_mach_port(event: &Event) -> bool {
+        #[cfg(target_os = "macos")]
+        {
+            event.filter == libc::EVFILT_MACHPORT
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            false
+        }
+    }
+
+
     pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
         debug_detail!(
             FilterDetails(Filter),

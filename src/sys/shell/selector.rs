@@ -122,6 +122,10 @@ pub mod event {
         os_required!();
     }
 
+    pub fn is_mach_port(_: &Event) -> bool {
+        os_required!();
+    }
+
     pub fn debug_details(_: &mut fmt::Formatter<'_>, _: &Event) -> fmt::Result {
         os_required!();
     }

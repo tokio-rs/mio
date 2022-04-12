@@ -200,6 +200,11 @@ pub mod event {
         false
     }
 
+    pub fn is_mach_port(_: &Event) -> bool {
+        // not supported
+        false
+    }
+
     pub fn is_lio(_: &Event) -> bool {
         // Not supported.
         false

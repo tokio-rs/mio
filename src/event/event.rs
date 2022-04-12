@@ -173,6 +173,28 @@ impl Event {
         sys::event::is_aio(&self.inner)
     }
 
+    /// Returns true if the event contains mach port readiness.
+    ///
+    /// # Notes
+    ///
+    /// Method is available on all platforms, but not all platforms support mach ports.
+    ///
+    /// The table below shows what flags are checked on what OS.
+    ///
+    /// | [OS selector] | Flag(s) checked |
+    /// |---------------|-----------------|
+    /// | [epoll]       | *Not supported* |
+    /// | [kqueue]<sup>1</sup> | `EVFILT_MACHPORT` |
+    ///
+    /// 1: Only supported on MacOS.
+    ///
+    /// [OS selector]: ../struct.Poll.html#implementation-notes
+    /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
+    /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
+    pub fn is_mach_port(&self) -> bool {
+        sys::event::is_mach_port(&self.inner)
+    }
+
     /// Returns true if the event contains LIO readiness.
     ///
     /// # Notes
@@ -211,7 +233,8 @@ impl fmt::Debug for Event {
             .field("write_closed", &self.is_write_closed())
             .field("priority", &self.is_priority())
             .field("aio", &self.is_aio())
-            .field("lio", &self.is_lio());
+            .field("lio", &self.is_lio())
+            .field("mach", &self.is_mach_port());
 
         if alternate {
             struct EventDetails<'a>(&'a sys::Event);

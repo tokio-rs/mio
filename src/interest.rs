@@ -17,8 +17,8 @@ use std::{fmt, ops};
 pub struct Interest(NonZeroU8);
 
 // These must be unique.
-const READABLE: u8 = 0b0001;
-const WRITABLE: u8 = 0b0010;
+const READABLE: u8 = 0b00001;
+const WRITABLE: u8 = 0b00010;
 // The following are not available on all platforms.
 #[cfg_attr(
     not(any(
@@ -29,9 +29,11 @@ const WRITABLE: u8 = 0b0010;
     )),
     allow(dead_code)
 )]
-const AIO: u8 = 0b0100;
+const AIO: u8 = 0b00100;
 #[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
-const LIO: u8 = 0b1000;
+const LIO: u8 = 0b01000;
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+const MACH: u8 = 0b10000;
 
 impl Interest {
     /// Returns a `Interest` set representing readable interests.
@@ -52,6 +54,10 @@ impl Interest {
     /// Returns a `Interest` set representing LIO completion interests.
     #[cfg(target_os = "freebsd")]
     pub const LIO: Interest = Interest(unsafe { NonZeroU8::new_unchecked(LIO) });
+
+    /// Returns a `Interest` set representing LIO completion interests.
+    #[cfg(target_os = "macos")]
+    pub const MACH: Interest = Interest(unsafe { NonZeroU8::new_unchecked(MACH) });
 
     /// Add together two `Interest`.
     ///
@@ -113,6 +119,11 @@ impl Interest {
     pub const fn is_lio(self) -> bool {
         (self.0.get() & LIO) != 0
     }
+
+    /// Returns true if `Interest` contains Mach readiness
+    pub const fn is_mach(self) -> bool {
+        (self.0.get() & MACH) != 0
+    }
 }
 
 impl ops::BitOr for Interest {
@@ -170,6 +181,16 @@ impl fmt::Debug for Interest {
                     write!(fmt, " | ")?
                 }
                 write!(fmt, "LIO")?;
+                one = true
+            }
+        }
+        #[cfg(any(target_os = "macos"))]
+        {
+            if self.is_mach() {
+                if one {
+                    write!(fmt, " | ")?
+                }
+                write!(fmt, "MACH")?;
                 one = true
             }
         }

@@ -83,6 +83,11 @@ pub fn is_aio(_: &Event) -> bool {
     false
 }
 
+pub fn is_mach_port(_: &Event) -> bool {
+    // not supported
+    false
+}
+
 pub fn is_lio(_: &Event) -> bool {
     // Not supported.
     false

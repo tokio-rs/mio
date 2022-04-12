@@ -295,6 +295,11 @@ pub(crate) mod event {
         false
     }
 
+    pub(crate) fn is_mach_port(_: &Event) -> bool {
+        // Not supported.
+        false
+    }
+
     pub(crate) fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
         debug_detail!(
             TypeDetails(wasi::Eventtype),
