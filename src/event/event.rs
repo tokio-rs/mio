@@ -184,9 +184,9 @@ impl Event {
     /// | [OS selector] | Flag(s) checked |
     /// |---------------|-----------------|
     /// | [epoll]       | *Not supported* |
-    /// | [kqueue]<sup>1</sup> | `EVFILT_MACHPORT` |
+    /// | [kqueue][^1] | `EVFILT_MACHPORT` |
     ///
-    /// 1: Only supported on MacOS.
+    /// [^1]: Only supported on MacOS.
     ///
     /// [OS selector]: ../struct.Poll.html#implementation-notes
     /// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
