@@ -49,12 +49,11 @@ log = "0.4.8"
 libc = "0.2.121"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = ">=0.32, <=0.34"
+version = "=0.36"
 features = [
   "Win32_Storage_FileSystem",         # Enables NtCreateFile
   "Win32_Foundation",                 # Basic types eg HANDLE
   "Win32_Networking_WinSock",         # winsock2 types/functions
-  "Win32_NetworkManagement_IpHelper", # AF_INET and AF_INET6 constants
   "Win32_System_IO",                  # IO types like OVERLAPPED etc
   "Win32_System_WindowsProgramming",  # General future used for various types/funcs
 ]
