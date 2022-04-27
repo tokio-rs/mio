@@ -4,14 +4,9 @@ use std::net::SocketAddr;
 use std::sync::Once;
 
 use windows_sys::Win32::Networking::WinSock::{
-    ioctlsocket, socket, FIONBIO, IN6_ADDR, IN6_ADDR_0, INVALID_SOCKET, IN_ADDR, IN_ADDR_0,
-    SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0, SOCKET,
+    ioctlsocket, socket, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0, INVALID_SOCKET, IN_ADDR,
+    IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0, SOCKET,
 };
-// We need to import a giant feature set for these 2 constants, they will hopefully
-// be moved to `Win32::Networking::WinSock` in the future, since this needlessly
-// increases compile times for all downstream users
-// <https://github.com/microsoft/win32metadata/issues/845>
-pub(crate) use windows_sys::Win32::NetworkManagement::IpHelper::{AF_INET, AF_INET6};
 
 /// Initialise the network stack for Windows.
 pub(crate) fn init() {
