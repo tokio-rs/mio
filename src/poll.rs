@@ -218,10 +218,10 @@ use std::{fmt, io};
 /// data to be copied into an intermediate buffer before it is passed to the
 /// kernel.
 ///
-/// [epoll]: http://man7.org/linux/man-pages/man7/epoll.7.html
+/// [epoll]: https://man7.org/linux/man-pages/man7/epoll.7.html
 /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
-/// [IOCP]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365198(v=vs.85).aspx
-/// [`signalfd`]: http://man7.org/linux/man-pages/man2/signalfd.2.html
+/// [IOCP]: https://docs.microsoft.com/en-us/windows/win32/fileio/i-o-completion-ports
+/// [`signalfd`]: https://man7.org/linux/man-pages/man2/signalfd.2.html
 /// [`SourceFd`]: unix/struct.SourceFd.html
 /// [`Poll::poll`]: struct.Poll.html#method.poll
 pub struct Poll {
