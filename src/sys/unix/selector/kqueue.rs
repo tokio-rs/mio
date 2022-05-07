@@ -1,6 +1,6 @@
 use crate::{Interest, Token};
 use log::error;
-use std::mem::MaybeUninit;
+use std::mem::{self, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
@@ -34,17 +34,6 @@ type Flags = u16;
 #[cfg(target_os = "netbsd")]
 type Flags = u32;
 
-// Type of the `data` field in the `kevent` structure.
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "ios",
-    target_os = "macos"
-))]
-type Data = libc::intptr_t;
-#[cfg(any(target_os = "netbsd", target_os = "openbsd"))]
-type Data = i64;
-
 // Type of the `udata` field in the `kevent` structure.
 #[cfg(not(target_os = "netbsd"))]
 type UData = *mut libc::c_void;
@@ -60,6 +49,7 @@ macro_rules! kevent {
             fflags: 0,
             data: 0,
             udata: $data as UData,
+            ..unsafe { mem::zeroed() }
         }
     };
 }
@@ -163,7 +153,7 @@ impl Selector {
             // the array.
             slice::from_raw_parts_mut(changes[0].as_mut_ptr(), n_changes)
         };
-        kevent_register(self.kq, changes, &[libc::EPIPE as Data])
+        kevent_register(self.kq, changes, &[libc::EPIPE as i64])
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
@@ -195,7 +185,7 @@ impl Selector {
         kevent_register(
             self.kq,
             &mut changes,
-            &[libc::ENOENT as Data, libc::EPIPE as Data],
+            &[libc::ENOENT as i64, libc::EPIPE as i64],
         )
     }
 
@@ -211,7 +201,7 @@ impl Selector {
         // the ENOENT error when it comes up. The ENOENT error informs us that
         // the filter wasn't there in first place, but we don't really care
         // about that since our goal is to remove it.
-        kevent_register(self.kq, &mut changes, &[libc::ENOENT as Data])
+        kevent_register(self.kq, &mut changes, &[libc::ENOENT as i64])
     }
 
     #[cfg(debug_assertions)]
@@ -264,7 +254,7 @@ impl Selector {
 fn kevent_register(
     kq: RawFd,
     changes: &mut [libc::kevent],
-    ignored_errors: &[Data],
+    ignored_errors: &[i64],
 ) -> io::Result<()> {
     syscall!(kevent(
         kq,
@@ -289,11 +279,11 @@ fn kevent_register(
 }
 
 /// Check all events for possible errors, it returns the first error found.
-fn check_errors(events: &[libc::kevent], ignored_errors: &[Data]) -> io::Result<()> {
+fn check_errors(events: &[libc::kevent], ignored_errors: &[i64]) -> io::Result<()> {
     for event in events {
         // We can't use references to packed structures (in checking the ignored
         // errors), so we need copy the data out before use.
-        let data = event.data;
+        let data = event.data as _;
         // Check for the error flag, the actual error will be in the `data`
         // field.
         if (event.flags & libc::EV_ERROR != 0) && data != 0 && !ignored_errors.contains(&data) {
