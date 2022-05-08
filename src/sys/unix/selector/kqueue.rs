@@ -46,8 +46,6 @@ macro_rules! kevent {
             ident: $id as libc::uintptr_t,
             filter: $filter as Filter,
             flags: $flags,
-            fflags: 0,
-            data: 0,
             udata: $data as UData,
             ..unsafe { mem::zeroed() }
         }
