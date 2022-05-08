@@ -1,3 +1,21 @@
+# 0.8.3
+
+## Changed
+
+* Replace `winapi` dependency with `windows-sys`.
+  (https://github.com/tokio-rs/mio/pull/1556).
+* Future proofed the kevent ABI for FreeBSD
+  (https://github.com/tokio-rs/mio/pull/1572).
+
+## Fixed
+
+* Improved support for Redox, making it possible to run on stable Rust
+  (https://github.com/tokio-rs/mio/pull/1555).
+* Don't ignore EAGAIN in UDS connect call
+  (https://github.com/tokio-rs/mio/pull/)1564.
+* Documentation of `TcpStream::connect`
+  (https://github.com/tokio-rs/mio/pull/1565).
+
 # 0.8.2
 
 ## Added
