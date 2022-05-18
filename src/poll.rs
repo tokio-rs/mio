@@ -635,7 +635,6 @@ impl Registry {
     ///
     /// Event sources registered with this `Registry` will be registered with
     /// the original `Registry` and `Poll` instance.
-    #[cfg(not(target_os = "wasi"))]
     pub fn try_clone(&self) -> io::Result<Registry> {
         self.selector
             .try_clone()
