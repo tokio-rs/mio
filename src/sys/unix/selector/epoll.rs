@@ -31,13 +31,26 @@ impl Selector {
         #[cfg(not(target_os = "android"))]
         let flag = libc::EPOLL_CLOEXEC;
 
-        syscall!(epoll_create1(flag)).map(|ep| Selector {
-            #[cfg(debug_assertions)]
-            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-            ep,
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(false),
-        })
+        syscall!(epoll_create1(flag))
+            .or_else(|e| match e.raw_os_error() {
+                Some(libc::ENOSYS) => {
+                    let ep = syscall!(epoll_create(1024))?;
+
+                    if let Ok(flags) = syscall!(fcntl(ep, libc::F_GETFD)) {
+                        let _ = syscall!(fcntl(ep, libc::F_SETFD, flags | libc::FD_CLOEXEC));
+                    }
+
+                    Ok(ep)
+                }
+                _ => Err(e),
+            })
+            .map(|ep| Selector {
+                #[cfg(debug_assertions)]
+                id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+                ep,
+                #[cfg(debug_assertions)]
+                has_waker: AtomicBool::new(false),
+            })
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
