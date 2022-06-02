@@ -12,7 +12,7 @@
 * Improved support for Redox, making it possible to run on stable Rust
   (https://github.com/tokio-rs/mio/pull/1555).
 * Don't ignore EAGAIN in UDS connect call
-  (https://github.com/tokio-rs/mio/pull/)1564.
+  (https://github.com/tokio-rs/mio/pull/1564).
 * Documentation of `TcpStream::connect`
   (https://github.com/tokio-rs/mio/pull/1565).
 
