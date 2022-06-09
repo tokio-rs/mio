@@ -2,7 +2,7 @@
 // cargo run --example tcp_listenfd_server --features="os-poll net"
 // or with wasi:
 // cargo +nightly build --target wasm32-wasi  --example tcp_listenfd_server --features="os-poll net"
-// wasmtime run --tcplisten 127.0.0.1:9000 --env 'LISTEN_FDS=1' target/wasm32-wasi/debug/examples/tcp_server.wasm
+// wasmtime run --tcplisten 127.0.0.1:9000 --env 'LISTEN_FDS=1' target/wasm32-wasi/debug/examples/tcp_listenfd_server.wasm
 
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
