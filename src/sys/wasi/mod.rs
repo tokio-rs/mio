@@ -72,6 +72,10 @@ impl Selector {
             subscriptions.push(timeout_subscription(timeout));
         }
 
+        if subscriptions.is_empty() {
+            return Ok(());
+        }
+
         // `poll_oneoff` needs the same number of events as subscriptions.
         let length = subscriptions.len();
         events.reserve(length);
