@@ -112,6 +112,7 @@ impl Selector {
 
     pub(crate) fn try_clone(&self) -> io::Result<Selector> {
         Ok(Selector {
+            #[cfg(all(debug_assertions, feature = "net"))]
             id: self.id,
             subscriptions: self.subscriptions.clone(),
         })
