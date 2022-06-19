@@ -187,6 +187,28 @@ use std::{fmt, io};
 /// operations to go through Mio otherwise it is not able to update it's
 /// internal state properly and won't generate events.
 ///
+/// ### Polling without registering event sources
+///
+///
+/// *The following is **not** guaranteed, just a description of the current
+/// situation!* Mio is allowed to change the following without it being
+/// considered a breaking change, don't depend on this, it's just here to inform
+/// the user. On platforms that use epoll, kqueue or IOCP (see implementation
+/// notes below) polling without previously registering [event sources] will
+/// result in sleeping forever, only a process signal will be able to wake up
+/// the thread.
+///
+/// On WASM/WASI this is different as it doesn't support process signals,
+/// furthermore the WASI specification doesn't specify a behaviour in this
+/// situation, thus it's up to the implementation what to do here. As an
+/// example, the wasmtime runtime will return `EINVAL` in this situation, but
+/// different runtimes may return different results. If you have further
+/// insights or thoughts about this situation (and/or how Mio should handle it)
+/// please add you comment to [pull request#1580].
+///
+/// [event sources]: crate::event::Source
+/// [pull request#1580]: https://github.com/tokio-rs/mio/pull/1580
+///
 /// # Implementation notes
 ///
 /// `Poll` is backed by the selector provided by the operating system.
