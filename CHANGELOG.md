@@ -1,3 +1,12 @@
+# 0.8.4
+
+## Added
+
+* Support `Registery::try_clone` on `wasm32-wasi`
+  (https://github.com/tokio-rs/mio/pull/1576).
+* Add docs about polling without registering event sources
+  (https://github.com/tokio-rs/mio/pull/1585).
+
 # 0.8.3
 
 ## Changed
