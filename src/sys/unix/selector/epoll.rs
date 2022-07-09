@@ -31,7 +31,13 @@ impl Selector {
         #[cfg(not(target_os = "android"))]
         let flag = libc::EPOLL_CLOEXEC;
 
-        syscall!(syscall(libc::SYS_epoll_create1, flag))
+        // Illumos has epoll_create1() function, but no epoll syscalls.
+        #[cfg(target_os = "illumos")]
+        let ep = syscall!(epoll_create1(flag))?;
+
+        // Try epoll_create1 syscall with an epoll_create fallback.
+        #[cfg(not(target_os = "illumos"))]
+        let ep = syscall!(syscall(libc::SYS_epoll_create1, flag))
             .map(|fd| fd as libc::c_int)
             .or_else(|e| {
                 match e.raw_os_error() {
@@ -44,14 +50,15 @@ impl Selector {
                     }
                     _ => Err(e),
                 }
-            })
-            .map(|ep| Selector {
-                #[cfg(debug_assertions)]
-                id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-                ep,
-                #[cfg(debug_assertions)]
-                has_waker: AtomicBool::new(false),
-            })
+            })?;
+
+        Ok(Selector {
+            #[cfg(debug_assertions)]
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            ep,
+            #[cfg(debug_assertions)]
+            has_waker: AtomicBool::new(false),
+        })
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
