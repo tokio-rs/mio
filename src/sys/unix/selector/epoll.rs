@@ -31,12 +31,12 @@ impl Selector {
         #[cfg(not(target_os = "android"))]
         let flag = libc::EPOLL_CLOEXEC;
 
-        // Illumos has epoll_create1() function, but no epoll syscalls.
-        #[cfg(target_os = "illumos")]
+        // Illumos and Redox have epoll_create1() function, but no epoll syscalls.
+        #[cfg(any(target_os = "illumos", target_os = "redox"))]
         let ep = syscall!(epoll_create1(flag))?;
 
         // Try epoll_create1 syscall with an epoll_create fallback.
-        #[cfg(not(target_os = "illumos"))]
+        #[cfg(not(any(target_os = "illumos", target_os = "redox")))]
         let ep = syscall!(syscall(libc::SYS_epoll_create1, flag))
             .map(|fd| fd as libc::c_int)
             .or_else(|e| {
