@@ -263,6 +263,13 @@ impl Poll {
         /// the system selector. If this syscall fails, `Poll::new` will return
         /// with the error.
         ///
+        /// close-on-exec flag is set on the file descriptors used by the selector to prevent
+        /// leaking it to executed processes. However, on some systems such as
+        /// old Linux systems that don't support `epoll_create1` syscall it is done
+        /// non-atomically, so a separate thread executing in parallel to this
+        /// function may accidentally leak the file descriptor if it executes a
+        /// new process before this function returns.
+        ///
         /// See [struct] level docs for more details.
         ///
         /// [struct]: struct.Poll.html
