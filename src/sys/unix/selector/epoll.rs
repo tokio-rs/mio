@@ -139,12 +139,12 @@ fn new_epoll_fd() -> io::Result<libc::c_int> {
     #[cfg(not(target_os = "android"))]
     let flag = libc::EPOLL_CLOEXEC;
 
-    // Illumos and Redox have epoll_create1() function, but no epoll syscalls.
-    #[cfg(any(target_os = "illumos", target_os = "redox"))]
+    #[cfg(not(target_os = "android"))]
     let ep = syscall!(epoll_create1(flag))?;
 
-    // Try epoll_create1 syscall with an epoll_create fallback.
-    #[cfg(not(any(target_os = "illumos", target_os = "redox")))]
+    // On Android try to use epoll_create1 syscall with an epoll_create fallback
+    // to support Android API level 16 which does not define epoll_create1 function.
+    #[cfg(target_os = "android")]
     let ep = syscall!(syscall(libc::SYS_epoll_create1, flag))
         .map(|fd| fd as libc::c_int)
         .or_else(|e| {
