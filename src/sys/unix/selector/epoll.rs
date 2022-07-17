@@ -23,15 +23,8 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        // According to libuv, `EPOLL_CLOEXEC` is not defined on Android API <
-        // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on that platform,
-        // so we use it instead.
-        #[cfg(target_os = "android")]
-        let flag = libc::O_CLOEXEC;
-        #[cfg(not(target_os = "android"))]
-        let flag = libc::EPOLL_CLOEXEC;
-
-        syscall!(epoll_create1(flag)).map(|ep| Selector {
+        let ep = new_epoll_fd()?;
+        Ok(Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             ep,
@@ -131,6 +124,43 @@ impl Drop for Selector {
             error!("error closing epoll: {}", err);
         }
     }
+}
+
+/// Creates a new epoll file descriptor with close-on-exec flag set.
+///
+/// close-on-exec is set atomically with `epoll_create1()` if possible,
+/// otherwise `epoll_create()` and `fcntl()` calls are used as a fallback.
+fn new_epoll_fd() -> io::Result<libc::c_int> {
+    // According to libuv, `EPOLL_CLOEXEC` is not defined on Android API <
+    // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on that platform,
+    // so we use it instead.
+    #[cfg(target_os = "android")]
+    let flag = libc::O_CLOEXEC;
+    #[cfg(not(target_os = "android"))]
+    let flag = libc::EPOLL_CLOEXEC;
+
+    #[cfg(not(target_os = "android"))]
+    let ep = syscall!(epoll_create1(flag))?;
+
+    // On Android try to use epoll_create1 syscall with an epoll_create fallback
+    // to support Android API level 16 which does not define epoll_create1 function.
+    #[cfg(target_os = "android")]
+    let ep = syscall!(syscall(libc::SYS_epoll_create1, flag))
+        .map(|fd| fd as libc::c_int)
+        .or_else(|e| {
+            match e.raw_os_error() {
+                Some(libc::ENOSYS) => {
+                    // Using epoll_create() followed by fcntl() instead of epoll_create1() with EPOLL_CLOEXEC
+                    // flag for backwards compatibility.
+                    let ep = syscall!(epoll_create(1024))?;
+
+                    syscall!(fcntl(ep, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| ep)
+                }
+                _ => Err(e),
+            }
+        })?;
+
+    Ok(ep)
 }
 
 fn interests_to_epoll(interests: Interest) -> u32 {
