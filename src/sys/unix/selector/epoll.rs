@@ -24,7 +24,7 @@ pub struct Selector {
 impl Selector {
     pub fn new() -> io::Result<Selector> {
         #[cfg(not(target_os = "android"))]
-        let res = syscall!(epoll_create1(libc::O_CLOEXEC));
+        let res = syscall!(epoll_create1(libc::EPOLL_CLOEXEC));
 
         // On Android < API level 16 `epoll_create1` is not defined, so use a
         // raw system call.
@@ -32,7 +32,7 @@ impl Selector {
         // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on that platform,
         // so we use it instead.
         #[cfg(target_os = "android")]
-        let res = syscall!(syscall(libc::SYS_epoll_create1, libc::EPOLL_CLOEXEC));
+        let res = syscall!(syscall(libc::SYS_epoll_create1, libc::O_CLOEXEC));
 
         let ep = match res {
             Ok(ep) => ep as RawFd,
