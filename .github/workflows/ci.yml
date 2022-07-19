@@ -29,6 +29,8 @@ jobs:
       run: cargo hack check --feature-powerset
     - name: Tests
       run: cargo test --all-features
+    - name: Tests release build
+      run: cargo test --release --all-features
   MinimalVersions:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
