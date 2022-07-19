@@ -101,5 +101,7 @@ jobs:
         components: clippy
     - name: Install all targets
       run: make install_targets
+    - name: Install Cargo-hack
+      run: cargo install cargo-hack
     - name: Check all targets
       run: make check_all_targets
