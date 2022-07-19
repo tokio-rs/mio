@@ -62,6 +62,18 @@ jobs:
     - name: Check
       # We only run check allowing us to use newer features in tests.
       run: cargo check --all-features
+  Nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly
+        override: true
+    - name: Tests
+      run: cargo test --all-features
   Clippy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
