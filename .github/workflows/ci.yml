@@ -132,3 +132,17 @@ jobs:
       run: cargo install --debug cargo-hack
     - name: Check all targets
       run: make check_all_targets
+  # Single job required to merge the pr.
+  Passed:
+    runs-on: ubuntu-latest
+    needs:
+      - Test
+      - MinimalVersions
+      - MSRV
+      - Nightly
+      - Clippy
+      - Docs
+      - Rustfmt
+      - CheckTargets
+    steps:
+      - run: exit 0
