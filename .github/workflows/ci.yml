@@ -49,6 +49,19 @@ jobs:
       run: cargo update -Zminimal-versions
     - name: Tests
       run: cargo test --all-features
+  MSRV:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: 1.46.0
+        override: true
+    - name: Check
+      # We only run check allowing us to use newer features in tests.
+      run: cargo check --all-features
   Clippy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
