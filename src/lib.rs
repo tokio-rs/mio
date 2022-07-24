@@ -155,7 +155,7 @@ pub mod guide {
     //! ```
     //!
     //! For example if we're using a [`TcpListener`],  we'll only want to
-    //! attempt to accept an incoming connection *iff* any connections are
+    //! attempt to accept an incoming connection *if* any connections are
     //! queued and ready to be accepted. We don't want to waste our time if no
     //! connections are ready.
     //!
