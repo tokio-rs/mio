@@ -211,22 +211,10 @@ impl SelectorState {
             ))?;
         }
 
-        log::trace!(
-            "new: notify_read={}, notify_write={}",
-            notify_fd[0],
-            notify_fd[1]
-        );
-
         Ok(notify_fd)
     }
 
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
-        log::trace!(
-            "select: notify_read={}, timeout={:?}",
-            self.notify_read,
-            timeout
-        );
-
         let deadline = timeout.map(|t| Instant::now() + t);
 
         events.clear();
@@ -246,11 +234,6 @@ impl SelectorState {
         let num_events = poll(&mut fds.poll_fds, deadline)?;
         let notified = fds.poll_fds[0].0.revents != 0;
         let num_fd_events = if notified { num_events - 1 } else { num_events };
-        log::trace!(
-            "new events: notify_read={}, num={}",
-            self.notify_read,
-            num_events
-        );
 
         // Read all notifications.
         if notified {
@@ -296,14 +279,6 @@ impl SelectorState {
             return Err(io::Error::from(io::ErrorKind::InvalidInput));
         }
 
-        log::trace!(
-            "register: notify_read={}, fd={}, token={:?}, interests={:?}",
-            self.notify_read,
-            fd,
-            token,
-            interests
-        );
-
         self.modify_fds(|fds| {
             if fds.fd_data.contains_key(&fd) {
                 return Err(io::Error::new(
@@ -335,14 +310,6 @@ impl SelectorState {
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        log::trace!(
-            "reregister: notify_read={}, fd={}, token={:?}, interests={:?}",
-            self.notify_read,
-            fd,
-            token,
-            interests
-        );
-
         self.modify_fds(|fds| {
             let data = fds.fd_data.get_mut(&fd).ok_or(io::ErrorKind::NotFound)?;
             data.token = token;
@@ -354,8 +321,6 @@ impl SelectorState {
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        log::trace!("deregister: notify_read={}, fd={}", self.notify_read, fd);
-
         self.modify_fds(|fds| {
             let data = fds.fd_data.remove(&fd).ok_or(io::ErrorKind::NotFound)?;
             fds.poll_fds.swap_remove(data.poll_fds_index);
@@ -449,13 +414,11 @@ fn poll(fds: &mut [PollFd], deadline: Option<Instant>) -> io::Result<usize> {
             })
             .unwrap_or(-1);
 
-        log::trace!("Polling on {:?}", fds);
         let res = syscall!(poll(
             fds.as_mut_ptr() as *mut libc::pollfd,
             fds.len() as libc::nfds_t,
             timeout_ms,
         ));
-        log::trace!("Polling finished: {:?} = {:?}", res, fds);
 
         match res {
             Ok(num_events) => break Ok(num_events as usize),
