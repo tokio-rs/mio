@@ -71,7 +71,9 @@ use std::io;
 /// assert!(waker_event.is_readable());
 /// assert_eq!(waker_event.token(), WAKE_TOKEN);
 ///
-/// // If we were to use the waker again, we need
+/// // We need to tell the waker that we woke up, us otherwise
+/// // it might wake us again when polling
+/// waker.did_wake();
 /// # handle.join().unwrap();
 /// #     Ok(())
 /// # }
