@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 use std::{fmt, io};
 
@@ -18,9 +18,69 @@ type NotifyType = u64;
 #[cfg(not(target_os = "espidf"))]
 type NotifyType = u8;
 
-/// Interface to poll.
 #[derive(Debug)]
 pub struct Selector {
+    state: Arc<SelectorState>,
+    /// Whether this selector currently has an associated waker.
+    #[cfg(debug_assertions)]
+    has_waker: AtomicBool,
+}
+
+impl Selector {
+    pub fn new() -> io::Result<Selector> {
+        let state = SelectorState::new()?;
+
+        Ok(Selector {
+            state: Arc::new(state),
+            #[cfg(debug_assertions)]
+            has_waker: AtomicBool::new(false),
+        })
+    }
+
+    pub fn try_clone(&self) -> io::Result<Selector> {
+        let state = self.state.clone();
+
+        Ok(Selector {
+            state,
+            #[cfg(debug_assertions)]
+            has_waker: AtomicBool::new(false),
+        })
+    }
+
+    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+        self.state.select(events, timeout)
+    }
+
+    pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
+        self.state.register(fd, token, interests)
+    }
+
+    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
+        self.state.reregister(fd, token, interests)
+    }
+
+    pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
+        self.state.deregister(fd)
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn register_waker(&self) -> bool {
+        self.has_waker.swap(true, Ordering::AcqRel)
+    }
+}
+
+cfg_io_source! {
+    impl Selector {
+        #[cfg(debug_assertions)]
+        pub fn id(&self) -> usize {
+            self.state.id
+        }
+    }
+}
+
+/// Interface to poll.
+#[derive(Debug)]
+struct SelectorState {
     /// File descriptors to poll.
     fds: Mutex<Fds>,
 
@@ -47,10 +107,6 @@ pub struct Selector {
     /// This selectors id.
     #[cfg(debug_assertions)]
     id: usize,
-
-    /// Whether this selector currently has an associated waker.
-    #[cfg(debug_assertions)]
-    has_waker: AtomicBool,
 }
 
 /// The file descriptors to poll in a `Poller`.
@@ -91,8 +147,8 @@ struct FdData {
     token: Token,
 }
 
-impl Selector {
-    pub fn new() -> io::Result<Selector> {
+impl SelectorState {
+    pub fn new() -> io::Result<SelectorState> {
         let notify_fds = Self::create_notify_fds()?;
 
         Ok(Self {
@@ -110,8 +166,6 @@ impl Selector {
             operations_complete: Condvar::new(),
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(false),
         })
     }
 
@@ -166,30 +220,6 @@ impl Selector {
         Ok(notify_fd)
     }
 
-    pub fn try_clone(&self) -> io::Result<Selector> {
-        let mut fds = self.modify_fds(|fds| Ok(fds.clone()))?;
-
-        let notify_fds = Self::create_notify_fds()?;
-
-        fds.poll_fds[0] = PollFd(libc::pollfd {
-            fd: notify_fds[0],
-            events: libc::POLLRDNORM,
-            revents: 0,
-        });
-
-        Ok(Self {
-            fds: Mutex::new(fds),
-            notify_read: notify_fds[0],
-            notify_write: notify_fds[1],
-            waiting_operations: AtomicUsize::new(0),
-            operations_complete: Condvar::new(),
-            #[cfg(debug_assertions)]
-            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(false),
-        })
-    }
-
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         log::trace!(
             "select: notify_read={}, timeout={:?}",
@@ -221,7 +251,6 @@ impl Selector {
             self.notify_read,
             num_events
         );
-        log::trace!("fds = {:?}", fds);
 
         // Read all notifications.
         if notified {
@@ -383,32 +412,21 @@ impl Selector {
         ))?;
         Ok(())
     }
-
-    #[cfg(debug_assertions)]
-    pub fn register_waker(&self) -> bool {
-        self.has_waker.swap(true, Ordering::AcqRel)
-    }
 }
 
-cfg_io_source! {
-    impl Selector {
-        #[cfg(debug_assertions)]
-        pub fn id(&self) -> usize {
-            self.id
-        }
-    }
-}
+const READ_EVENTS: libc::c_short = libc::POLLIN | libc::POLLRDHUP;
+const WRITE_EVENTS: libc::c_short = libc::POLLOUT;
 
 /// Get the input poll events for the given event.
 fn interests_to_poll(interest: Interest) -> libc::c_short {
     let mut kind = 0;
 
     if interest.is_readable() {
-        kind |= libc::POLLIN | libc::POLLPRI | libc::POLLHUP;
+        kind |= READ_EVENTS;
     }
 
     if interest.is_writable() {
-        kind |= libc::POLLOUT | libc::POLLWRBAND;
+        kind |= WRITE_EVENTS;
     }
 
     kind

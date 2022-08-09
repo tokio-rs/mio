@@ -44,6 +44,10 @@ mod eventfd {
             }
         }
 
+        pub fn did_wake(&self) {
+            let _ = self.reset();
+        }
+
         /// Reset the eventfd object, only need to call this if `wake` fails.
         fn reset(&self) -> io::Result<()> {
             let mut buf: [u8; 8] = 0u64.to_ne_bytes();
@@ -92,6 +96,8 @@ mod kqueue {
         pub fn wake(&self) -> io::Result<()> {
             self.selector.wake(self.token)
         }
+
+        pub fn did_wake(&self) {}
     }
 }
 
@@ -154,6 +160,10 @@ mod pipe {
                 Err(ref err) if err.kind() == io::ErrorKind::Interrupted => self.wake(),
                 Err(err) => Err(err),
             }
+        }
+
+        pub fn did_wake(&self) {
+            self.empty();
         }
 
         /// Empty the pipe's buffer, only need to call this if `wake` fails.

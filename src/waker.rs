@@ -93,4 +93,11 @@ impl Waker {
     pub fn wake(&self) -> io::Result<()> {
         self.inner.wake()
     }
+
+    /// Notifies the waker that it was actually woken.
+    ///
+    /// This is required when using a level triggered polling api.
+    pub fn did_wake(&self) {
+        self.inner.did_wake()
+    }
 }
