@@ -70,6 +70,8 @@ use std::io;
 /// let waker_event = events.iter().next().unwrap();
 /// assert!(waker_event.is_readable());
 /// assert_eq!(waker_event.token(), WAKE_TOKEN);
+///
+/// // If we were to use the waker again, we need
 /// # handle.join().unwrap();
 /// #     Ok(())
 /// # }
@@ -96,7 +98,9 @@ impl Waker {
 
     /// Notifies the waker that it was actually woken.
     ///
-    /// This is required when using a level triggered polling api.
+    /// This is required when using a level triggered polling api,
+    /// as otherwise the waker will not loose its woken status and keep
+    /// waking.
     pub fn did_wake(&self) {
         self.inner.did_wake()
     }

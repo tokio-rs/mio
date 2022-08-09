@@ -5,7 +5,7 @@ mod eventfd {
 
     use std::fs::File;
     use std::io::{self, Read, Write};
-    use std::os::unix::io::FromRawFd;
+    use std::os::unix::io::{AsRawFd, FromRawFd};
 
     /// Waker backed by `eventfd`.
     ///
@@ -16,17 +16,20 @@ mod eventfd {
     #[derive(Debug)]
     pub struct Waker {
         fd: File,
+        selector: Selector,
     }
 
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+            let selector = selector.try_clone()?;
+
             syscall!(eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK)).and_then(|fd| {
                 // Turn the file descriptor into a file first so we're ensured
                 // it's closed when dropped, e.g. when register below fails.
                 let file = unsafe { File::from_raw_fd(fd) };
                 selector
                     .register(fd, token, Interest::READABLE)
-                    .map(|()| Waker { fd: file })
+                    .map(|()| Waker { fd: file, selector })
             })
         }
 
@@ -58,6 +61,12 @@ mod eventfd {
                 Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => Ok(()),
                 Err(err) => Err(err),
             }
+        }
+    }
+
+    impl Drop for Waker {
+        fn drop(&mut self) {
+            let _ = self.selector.deregister(self.fd.as_raw_fd());
         }
     }
 }
@@ -117,7 +126,7 @@ mod pipe {
 
     use std::fs::File;
     use std::io::{self, Read, Write};
-    use std::os::unix::io::FromRawFd;
+    use std::os::unix::io::{AsRawFd, FromRawFd};
 
     /// Waker backed by a unix pipe.
     ///
@@ -127,10 +136,13 @@ mod pipe {
     pub struct Waker {
         sender: File,
         receiver: File,
+        selector: Selector,
     }
 
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+            let selector = selector.try_clone()?;
+
             let mut fds = [-1; 2];
             syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
             // Turn the file descriptors into files first so we're ensured
@@ -139,7 +151,11 @@ mod pipe {
             let receiver = unsafe { File::from_raw_fd(fds[0]) };
             selector
                 .register(fds[0], token, Interest::READABLE)
-                .map(|()| Waker { sender, receiver })
+                .map(|()| Waker {
+                    sender,
+                    receiver,
+                    selector,
+                })
         }
 
         pub fn wake(&self) -> io::Result<()> {
@@ -176,6 +192,12 @@ mod pipe {
                     _ => return,
                 }
             }
+        }
+    }
+
+    impl Drop for Waker {
+        fn drop(&mut self) {
+            let _ = self.selector.deregister(self.receiver.as_raw_fd());
         }
     }
 }
