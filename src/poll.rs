@@ -1,9 +1,25 @@
 use crate::{event, sys, Events, Interest, Token};
 use log::trace;
-// #[cfg(unix)]
-// use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::Duration;
 use std::{fmt, io};
+
+#[cfg(all(
+    unix,
+    any(
+        target_os = "android",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "redox",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ),
+    not(feature = "force-old-poll")
+))]
+use std::os::unix::io::{AsRawFd, RawFd};
 
 /// Polls for readiness events on all registered values.
 ///
@@ -412,12 +428,27 @@ impl Poll {
     }
 }
 
-/* #[cfg(unix)]
+#[cfg(all(
+    unix,
+    any(
+        target_os = "android",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "redox",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ),
+    not(feature = "force-old-poll")
+))]
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
         self.registry.as_raw_fd()
     }
-} */
+}
 
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -697,15 +728,45 @@ impl fmt::Debug for Registry {
     }
 }
 
-/* #[cfg(unix)]
+#[cfg(all(
+    unix,
+    any(
+        target_os = "android",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "redox",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ),
+    not(feature = "force-old-poll")
+))]
 impl AsRawFd for Registry {
     fn as_raw_fd(&self) -> RawFd {
         self.selector.as_raw_fd()
     }
-} */
+}
 
 cfg_os_poll! {
-    #[cfg(unix)]
+    #[cfg(all(
+        unix,
+        any(
+            target_os = "android",
+            target_os = "illumos",
+            target_os = "linux",
+            target_os = "redox",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ),
+        not(feature = "force-old-poll")
+    ))]
     #[test]
     pub fn as_raw_fd() {
         let poll = Poll::new().unwrap();

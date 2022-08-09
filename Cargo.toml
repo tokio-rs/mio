@@ -42,6 +42,10 @@ os-ext = [
 # Enables `mio::net` module containing networking primitives.
 net = []
 
+# Forces the use of the poll system call instead of epoll on systems
+# where both are available
+force-old-poll = ["os-poll"]
+
 [dependencies]
 log = "0.4.8"
 
