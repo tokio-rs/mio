@@ -1,4 +1,5 @@
-.cargo
+.idea/
+cargo
 Cargo.lock
 target*
 libs
