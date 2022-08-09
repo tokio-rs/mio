@@ -107,9 +107,11 @@
 ///             token => {
 ///                 // Always operate in a loop
 ///                 loop {
-///                     match sockets.get_mut(&token).unwrap().read(&mut buf) {
+///                     let socket = sockets.get_mut(&token).unwrap();
+///                     match socket.read(&mut buf) {
 ///                         Ok(0) => {
 ///                             // Socket is closed, remove it from the map
+///                             poll.registry().deregister(socket)?;
 ///                             sockets.remove(&token);
 ///                             break;
 ///                         }

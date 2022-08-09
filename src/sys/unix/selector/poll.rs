@@ -277,7 +277,13 @@ impl Selector {
 
         self.modify_fds(|fds| {
             if fds.fd_data.contains_key(&fd) {
-                return Err(io::Error::from(io::ErrorKind::AlreadyExists));
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "\
+                    same file descriptor registered twice for polling \
+                    (an old file descriptor might have been closed without deregistration)\
+                    ",
+                ));
             }
 
             let poll_fds_index = fds.poll_fds.len();
