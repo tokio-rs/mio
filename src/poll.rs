@@ -349,6 +349,10 @@ impl Poll {
     /// of Mio would automatically retry the poll call if it was interrupted
     /// (if `EINTR` was returned).
     ///
+    /// Currently if the `timeout` elapses without any readiness events
+    /// triggering this will return `Ok(())`. However we're not guaranteeing
+    /// this behaviour as this depends on the OS.
+    ///
     /// # Examples
     ///
     /// A basic example -- establishing a `TcpStream` connection.
