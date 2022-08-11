@@ -5,6 +5,8 @@ use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(feature = "io_safety")]
+use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 use std::os::unix::net;
 use std::path::Path;
 
@@ -241,5 +243,26 @@ impl FromRawFd for UnixStream {
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixStream {
         UnixStream::from_std(FromRawFd::from_raw_fd(fd))
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl AsFd for UnixStream {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<OwnedFd> for UnixStream {
+    fn from(fd: OwnedFd) -> UnixStream {
+        UnixStream::from_std(fd.into())
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<UnixStream> for OwnedFd {
+    fn from(ts: UnixStream) -> Self {
+        ts.inner.into_inner().into()
     }
 }

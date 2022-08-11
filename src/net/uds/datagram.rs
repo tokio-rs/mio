@@ -3,6 +3,8 @@ use crate::{event, sys, Interest, Registry, Token};
 
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(feature = "io_safety")]
+use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::{fmt, io};
@@ -232,5 +234,26 @@ impl FromRawFd for UnixDatagram {
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixDatagram {
         UnixDatagram::from_std(FromRawFd::from_raw_fd(fd))
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl AsFd for UnixDatagram {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<OwnedFd> for UnixDatagram {
+    fn from(fd: OwnedFd) -> UnixDatagram {
+        UnixDatagram::from_std(fd.into())
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<UnixDatagram> for OwnedFd {
+    fn from(ts: UnixDatagram) -> Self {
+        ts.inner.into_inner().into()
     }
 }

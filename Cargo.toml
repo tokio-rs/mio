@@ -41,6 +41,9 @@ os-ext = [
 ]
 # Enables `mio::net` module containing networking primitives.
 net = []
+# Implement I/O-safe traits on `mio` objects, like `AsFd`
+# Requires Rust 1.63.0
+io_safety = []
 
 [dependencies]
 log = "0.4.8"

@@ -61,7 +61,8 @@ jobs:
         override: true
     - name: Check
       # We only run check allowing us to use newer features in tests.
-      run: cargo check --all-features
+      # notgull: exclude the io_safety feature since that requires 1.63
+      run: cargo check --features "os-ext,net"
   Nightly:
     runs-on: ubuntu-latest
     timeout-minutes: 10

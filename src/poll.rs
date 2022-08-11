@@ -2,6 +2,8 @@ use crate::{event, sys, Events, Interest, Token};
 use log::trace;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
+#[cfg(all(feature = "io_safety", unix))]
+use std::os::unix::io::{AsFd, BorrowedFd};
 use std::time::Duration;
 use std::{fmt, io};
 
@@ -419,6 +421,13 @@ impl AsRawFd for Poll {
     }
 }
 
+#[cfg(all(feature = "io_safety", unix))]
+impl AsFd for Poll {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.registry.as_fd()
+    }
+}
+
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Poll").finish()
@@ -701,6 +710,13 @@ impl fmt::Debug for Registry {
 impl AsRawFd for Registry {
     fn as_raw_fd(&self) -> RawFd {
         self.selector.as_raw_fd()
+    }
+}
+
+#[cfg(all(feature = "io_safety", unix))]
+impl AsFd for Registry {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.selector.as_fd()
     }
 }
 

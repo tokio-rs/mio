@@ -3,6 +3,8 @@ use crate::{Interest, Token};
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLRDHUP};
 use log::error;
 use std::os::unix::io::{AsRawFd, RawFd};
+#[cfg(feature = "io_safety")]
+use std::os::unix::io::{AsFd, BorrowedFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
@@ -148,6 +150,14 @@ cfg_io_source! {
 impl AsRawFd for Selector {
     fn as_raw_fd(&self) -> RawFd {
         self.ep
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl AsFd for Selector {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        // SAFETY: the lifetime is bound to the lifetime on "self"
+        unsafe { BorrowedFd::borrow_raw(self.ep) }
     }
 }
 

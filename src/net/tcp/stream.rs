@@ -7,6 +7,12 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::wasi::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+#[cfg(all(feature = "io_safety", unix))]
+use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
+#[cfg(all(feature = "io_safety", windows))]
+use std::os::windows::io::{AsSocket, BorrowedSocket, OwnedSocket};
+#[cfg(all(feature = "io_safety", target_os = "wasi"))]
+use std::os::wasi::io::{AsFd, BorrowedFd, OwnedFd};
 
 use crate::io_source::IoSource;
 #[cfg(not(target_os = "wasi"))]
@@ -372,6 +378,27 @@ impl FromRawFd for TcpStream {
     }
 }
 
+#[cfg(all(feature = "io_safety", unix))]
+impl AsFd for TcpStream {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
+#[cfg(all(feature = "io_safety", unix))]
+impl From<OwnedFd> for TcpStream {
+    fn from(fd: OwnedFd) -> TcpStream {
+        TcpStream::from_std(fd.into())
+    }
+}
+
+#[cfg(all(feature = "io_safety", unix))]
+impl From<TcpStream> for OwnedFd {
+    fn from(ts: TcpStream) -> Self {
+        ts.inner.into_inner().into()
+    }
+}
+
 #[cfg(windows)]
 impl IntoRawSocket for TcpStream {
     fn into_raw_socket(self) -> RawSocket {
@@ -399,6 +426,27 @@ impl FromRawSocket for TcpStream {
     }
 }
 
+#[cfg(all(feature = "io_safety", windows))]
+impl AsSocket for TcpStream {
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        self.as_socket()
+    }
+}
+
+#[cfg(all(feature = "io_safety", windows))]
+impl From<OwnedSocket> for TcpStream {
+    fn from(fd: OwnedSocket) -> TcpStream {
+        TcpStream::from_std(fd.into())
+    }
+}
+
+#[cfg(all(feature = "io_safety", windows))]
+impl From<TcpStream> for OwnedSocket {
+    fn from(ts: TcpStream) -> Self {
+        ts.inner.into_inner().into()
+    }
+}
+
 #[cfg(target_os = "wasi")]
 impl IntoRawFd for TcpStream {
     fn into_raw_fd(self) -> RawFd {
@@ -423,5 +471,26 @@ impl FromRawFd for TcpStream {
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> TcpStream {
         TcpStream::from_std(FromRawFd::from_raw_fd(fd))
+    }
+}
+
+#[cfg(all(feature = "io_safety", target_os = "wasi"))]
+impl AsFd for TcpStream {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.as_fd()
+    }
+}
+
+#[cfg(all(feature = "io_safety", target_os = "wasi"))]
+impl From<OwnedFd> for TcpStream {
+    fn from(fd: OwnedFd) -> TcpStream {
+        TcpStream::from_std(fd.into())
+    }
+}
+
+#[cfg(all(feature = "io_safety", target_os = "wasi"))]
+impl From<TcpStream> for OwnedFd {
+    fn from(ts: TcpStream) -> Self {
+        ts.inner.into_inner().into()
     }
 }

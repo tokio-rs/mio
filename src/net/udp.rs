@@ -18,6 +18,10 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+#[cfg(all(feature = "io_safety", unix))]
+use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
+#[cfg(all(feature = "io_safety", windows))]
+use std::os::windows::io::{AsRawSocket, BorrowedSocket, OwnedSocket};
 
 /// A User Datagram Protocol socket.
 ///
@@ -669,6 +673,27 @@ impl FromRawFd for UdpSocket {
     }
 }
 
+#[cfg(all(feature = "io_safety", unix))]
+impl AsFd for UdpSocket {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
+#[cfg(all(feature = "io_safety", unix))]
+impl From<OwnedFd> for UdpSocket {
+    fn from(fd: OwnedFd) -> Self {
+        UdpSocket::from_std(fd.into())
+    }
+}
+
+#[cfg(all(feature = "io_safety", unix))]
+impl From<UdpSocket> for OwnedFd {
+    fn from(s: UdpSocket) -> Self {
+        s.inner.into_inner().into()
+    }
+}
+
 #[cfg(windows)]
 impl IntoRawSocket for UdpSocket {
     fn into_raw_socket(self) -> RawSocket {
@@ -693,5 +718,26 @@ impl FromRawSocket for UdpSocket {
     /// non-blocking mode.
     unsafe fn from_raw_socket(socket: RawSocket) -> UdpSocket {
         UdpSocket::from_std(FromRawSocket::from_raw_socket(socket))
+    }
+}
+
+#[cfg(all(feature = "io_safety", windows))]
+impl AsSocket for UdpSocket {
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        self.inner.as_socket()
+    }
+}
+
+#[cfg(all(feature = "io_safety", windows))]
+impl From<OwnedSocket> for UdpSocket {
+    fn from(socket: OwnedSocket) -> Self {
+        UdpSocket::from_std(socket.into())
+    }
+}
+
+#[cfg(all(feature = "io_safety", windows))]
+impl From<UdpSocket> for OwnedSocket {
+    fn from(s: UdpSocket) -> Self {
+        s.inner.into_inner().into()
     }
 }

@@ -5,6 +5,8 @@
 use std::fs::File;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(feature = "io_safety")]
+use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 use std::process::{ChildStderr, ChildStdin, ChildStdout};
 
 use crate::io_source::IoSource;
@@ -369,6 +371,29 @@ impl IntoRawFd for Sender {
     }
 }
 
+#[cfg(feature = "io_safety")]
+impl AsFd for Sender {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<OwnedFd> for Sender {
+    fn from(fd: OwnedFd) -> Sender {
+        Sender {
+            inner: IoSource::new(fd.into()),
+        }
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<Sender> for OwnedFd {
+    fn from(ts: Sender) -> Self {
+        ts.inner.into_inner().into()
+    }
+}
+
 /// Receiving end of an Unix pipe.
 ///
 /// See [`new`] for documentation, including examples.
@@ -533,6 +558,29 @@ impl AsRawFd for Receiver {
 impl IntoRawFd for Receiver {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl AsFd for Receiver {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<OwnedFd> for Receiver {
+    fn from(fd: OwnedFd) -> Receiver {
+        Receiver {
+            inner: IoSource::new(fd.into())
+        }
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<Receiver> for OwnedFd {
+    fn from(ts: Receiver) -> Self {
+        ts.inner.into_inner().into()
     }
 }
 
