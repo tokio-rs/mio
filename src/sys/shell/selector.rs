@@ -83,7 +83,7 @@ impl AsRawFd for Selector {
 
 #[cfg(all(feature = "io_safety", unix))]
 impl AsFd for Selector {
-    fn as_fd(&self) -> BorrowedFd {
+    fn as_fd(&self) -> BorrowedFd<'_> {
         os_required!()
     }
 }
