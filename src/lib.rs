@@ -117,6 +117,14 @@ pub mod features {
     #![cfg_attr(not(feature = "net"), doc = "## Network types (disabled)")]
     //!
     //! The `net` feature enables networking primitives in the `net` module.
+    //! 
+    #![cfg_attr(feature = "io_safety", doc = "## I/O Safety (enabled)")]
+    #![cfg_attr(not(feature = "io_safety"), doc = "## I/O Safety (disabled)")]
+    //! 
+    //! The `io_safety` feature adds the [`AsFd`] and [`AsSocket`] traits to
+    //! Mio types. These traits allow you to use Mio types using these I/O safe
+    //! traits. In addition, `From<OwnedFd> for ...` and `From<...> for OwnedFd`
+    //! is implemented for Mio types.
 }
 
 pub mod guide {
