@@ -48,6 +48,7 @@ cfg_os_poll! {
                     "path must be no longer than libc::sockaddr_un.sun_path",
                 ));
             }
+            (Some(&0), _) => {}
             (_, Ordering::Greater) | (_, Ordering::Equal) => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
