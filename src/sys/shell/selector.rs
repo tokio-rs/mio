@@ -1,8 +1,8 @@
 use std::io;
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(all(feature = "io_safety", unix))]
 use std::os::unix::io::{AsFd, BorrowedFd};
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::Duration;
 
 pub type Event = usize;

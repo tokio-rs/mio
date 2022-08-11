@@ -1,16 +1,16 @@
 use std::net::{self, SocketAddr};
+#[cfg(all(feature = "io_safety", unix))]
+use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(all(feature = "io_safety", target_os = "wasi"))]
+use std::os::wasi::io::{AsFd, BorrowedFd, OwnedFd};
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-#[cfg(all(feature = "io_safety", unix))]
-use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 #[cfg(all(feature = "io_safety", windows))]
 use std::os::windows::io::{AsSocket, BorrowedSocket, OwnedSocket};
-#[cfg(all(feature = "io_safety", target_os = "wasi"))]
-use std::os::wasi::io::{AsFd, BorrowedFd, OwnedFd};
 use std::{fmt, io};
 
 use crate::io_source::IoSource;

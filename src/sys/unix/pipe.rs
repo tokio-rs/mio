@@ -4,9 +4,9 @@
 
 use std::fs::File;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(feature = "io_safety")]
 use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::process::{ChildStderr, ChildStdin, ChildStdout};
 
 use crate::io_source::IoSource;
@@ -572,7 +572,7 @@ impl AsFd for Receiver {
 impl From<OwnedFd> for Receiver {
     fn from(fd: OwnedFd) -> Receiver {
         Receiver {
-            inner: IoSource::new(fd.into())
+            inner: IoSource::new(fd.into()),
         }
     }
 }

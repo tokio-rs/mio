@@ -2,9 +2,9 @@ use crate::io_source::IoSource;
 use crate::{event, sys, Interest, Registry, Token};
 
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(feature = "io_safety")]
 use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::{fmt, io};

@@ -2,9 +2,9 @@ use crate::{Interest, Token};
 use log::error;
 use std::mem::{self, MaybeUninit};
 use std::ops::{Deref, DerefMut};
-use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(feature = "io_safety")]
 use std::os::unix::io::{AsFd, BorrowedFd};
+use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
@@ -313,7 +313,7 @@ impl AsFd for Selector {
     fn as_fd(&self) -> BorrowedFd<'_> {
         // SAFETY: the lifetime is bound by "self"
         unsafe { BorrowedFd::borrow_raw(self.kq) }
-    }   
+    }
 }
 
 impl Drop for Selector {

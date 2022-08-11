@@ -2,9 +2,9 @@ use crate::{Interest, Token};
 
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLRDHUP};
 use log::error;
-use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(feature = "io_safety")]
 use std::os::unix::io::{AsFd, BorrowedFd};
+use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;

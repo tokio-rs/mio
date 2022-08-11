@@ -14,12 +14,12 @@ use std::fmt;
 use std::io;
 use std::net;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+#[cfg(all(feature = "io_safety", unix))]
+use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-#[cfg(all(feature = "io_safety", unix))]
-use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 #[cfg(all(feature = "io_safety", windows))]
 use std::os::windows::io::{AsSocket, BorrowedSocket, OwnedSocket};
 
