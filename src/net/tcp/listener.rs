@@ -8,7 +8,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 #[cfg(all(feature = "io_safety", unix))]
 use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 #[cfg(all(feature = "io_safety", windows))]
-use std::os::windows::io::{AsRawSocket, BorrowedSocket, OwnedSocket};
+use std::os::windows::io::{AsSocket, BorrowedSocket, OwnedSocket};
 #[cfg(all(feature = "io_safety", target_os = "wasi"))]
 use std::os::wasi::io::{AsFd, BorrowedFd, OwnedFd};
 use std::{fmt, io};

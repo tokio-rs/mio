@@ -429,7 +429,7 @@ impl FromRawSocket for TcpStream {
 #[cfg(all(feature = "io_safety", windows))]
 impl AsSocket for TcpStream {
     fn as_socket(&self) -> BorrowedSocket<'_> {
-        self.as_socket()
+        self.inner.as_socket()
     }
 }
 
