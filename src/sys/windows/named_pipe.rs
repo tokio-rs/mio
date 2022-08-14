@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 use std::io::{self, Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
-use std::sync::atomic::Ordering::{Relaxed, SeqCst};
+use std::sync::atomic::Ordering::{Relaxed, Release, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
 use std::{fmt, mem, slice};
@@ -89,6 +89,7 @@ struct Inner {
     connecting: AtomicBool,
     io: Mutex<Io>,
     pool: Mutex<BufferPool>,
+    default_buf_size: AtomicUsize,
 }
 
 impl Inner {
@@ -381,6 +382,13 @@ impl NamedPipe {
         }
     }
 
+    /// Set the buffer size.
+    ///
+    /// The default is *currently* 4kB (4096 bytes).
+    pub fn set_buffer_size(&mut self, capacity: usize) {
+        self.inner.default_buf_size.store(capacity, Release)
+    }
+
     /// Attempts to call `ConnectNamedPipe`, if possible.
     ///
     /// This function will attempt to connect this pipe to a client in an
@@ -486,6 +494,7 @@ impl FromRawHandle for NamedPipe {
                     connect_error: None,
                 }),
                 pool: Mutex::new(BufferPool::with_capacity(2)),
+                default_buf_size: AtomicUsize::new(4 * 1024),
             }),
         }
     }
@@ -803,7 +812,10 @@ impl Inner {
     }
 
     fn get_buffer(&self) -> Vec<u8> {
-        self.pool.lock().unwrap().get(4 * 1024)
+        self.pool
+            .lock()
+            .unwrap()
+            .get(self.default_buf_size.load(Relaxed))
     }
 
     fn put_buffer(&self, buf: Vec<u8>) {
