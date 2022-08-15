@@ -1,5 +1,5 @@
 mod socketaddr;
-pub use self::socketaddr::SocketAddr;
+pub(crate) use self::socketaddr::SocketAddr;
 
 /// Get the `sun_path` field offset of `sockaddr_un` for the target OS.
 ///
@@ -61,7 +61,7 @@ cfg_os_poll! {
         let offset = path_offset(&sockaddr);
         let mut socklen = offset + bytes.len();
 
-        match bytes.first() {
+        match bytes.get(0) {
             // The struct has already been zeroes so the null byte for pathname
             // addresses is already there.
             Some(&0) | None => {}

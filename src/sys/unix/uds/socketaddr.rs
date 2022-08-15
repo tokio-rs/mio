@@ -1,32 +1,15 @@
 use super::path_offset;
+use crate::net::AddressKind;
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
-use std::path::Path;
-use std::{ascii, fmt};
 
-/// An address associated with a `mio` specific Unix socket.
-///
-/// This is implemented instead of imported from [`net::SocketAddr`] because
-/// there is no way to create a [`net::SocketAddr`]. One must be returned by
-/// [`accept`], so this is returned instead.
-///
-/// [`net::SocketAddr`]: std::os::unix::net::SocketAddr
-/// [`accept`]: #method.accept
-pub struct SocketAddr {
+pub(crate) struct SocketAddr {
     sockaddr: libc::sockaddr_un,
     socklen: libc::socklen_t,
 }
 
-struct AsciiEscaped<'a>(&'a [u8]);
-
-enum AddressKind<'a> {
-    Unnamed,
-    Pathname(&'a Path),
-    Abstract(&'a [u8]),
-}
-
 impl SocketAddr {
-    fn address(&self) -> AddressKind<'_> {
+    pub(crate) fn address(&self) -> AddressKind<'_> {
         let offset = path_offset(&self.sockaddr);
         // Don't underflow in `len` below.
         if (self.socklen as usize) < offset {

@@ -32,8 +32,13 @@ pub use self::tcp::{TcpListener, TcpStream};
 mod udp;
 #[cfg(not(target_os = "wasi"))]
 pub use self::udp::UdpSocket;
+#[cfg(not(target_os = "wasi"))]
+mod uds;
+#[cfg(not(target_os = "wasi"))]
+pub use self::uds::{SocketAddr, UnixListener, UnixStream};
+
+#[cfg(not(target_os = "wasi"))]
+pub(crate) use self::uds::AddressKind;
 
 #[cfg(unix)]
-mod uds;
-#[cfg(unix)]
-pub use self::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
+pub use self::uds::UnixDatagram;

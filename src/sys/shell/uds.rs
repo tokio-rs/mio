@@ -1,5 +1,6 @@
+#[cfg(unix)]
 pub(crate) mod datagram {
-    use crate::net::SocketAddr;
+    use crate::sys::SocketAddr;
     use std::io;
     use std::os::unix::net;
     use std::path::Path;
@@ -33,8 +34,12 @@ pub(crate) mod datagram {
 }
 
 pub(crate) mod listener {
-    use crate::net::{SocketAddr, UnixStream};
+    use crate::net::UnixStream;
+    #[cfg(windows)]
+    use crate::sys::windows::stdnet as net;
+    use crate::sys::SocketAddr;
     use std::io;
+    #[cfg(unix)]
     use std::os::unix::net;
     use std::path::Path;
 
@@ -56,8 +61,11 @@ pub(crate) mod listener {
 }
 
 pub(crate) mod stream {
-    use crate::net::SocketAddr;
+    #[cfg(windows)]
+    use crate::sys::windows::stdnet as net;
+    use crate::sys::SocketAddr;
     use std::io;
+    #[cfg(unix)]
     use std::os::unix::net;
     use std::path::Path;
 
@@ -69,6 +77,7 @@ pub(crate) mod stream {
         os_required!()
     }
 
+    #[cfg(unix)]
     pub(crate) fn pair() -> io::Result<(net::UnixStream, net::UnixStream)> {
         os_required!()
     }

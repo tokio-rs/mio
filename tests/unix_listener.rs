@@ -1,8 +1,11 @@
-#![cfg(all(unix, feature = "os-poll", feature = "net"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
+#[cfg(windows)]
+use mio::net;
 use mio::net::UnixListener;
 use mio::{Interest, Token};
 use std::io::{self, Read};
+#[cfg(unix)]
 use std::os::unix::net;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
@@ -30,6 +33,7 @@ fn unix_listener_smoke() {
     smoke_test(|path| UnixListener::bind(path), "unix_listener_smoke");
 }
 
+#[cfg(unix)]
 #[test]
 fn unix_listener_from_std() {
     smoke_test(
@@ -135,7 +139,7 @@ fn unix_listener_deregister() {
 
 #[cfg(target_os = "linux")]
 #[test]
-fn unix_listener_abstract_namespace() {
+fn unix_listener_abstract_namesapce() {
     use rand::Rng;
     let num: u64 = rand::thread_rng().gen();
     let name = format!("\u{0000}-mio-abstract-uds-{}", num);
