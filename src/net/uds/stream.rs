@@ -4,8 +4,14 @@ use crate::{event, sys, Interest, Registry, Token};
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
+#[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(unix)]
 use std::os::unix::net;
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+#[cfg(windows)]
+use crate::sys::windows::uds::{stdnet as net};
 use std::path::Path;
 
 /// A non-blocking Unix stream socket.
@@ -220,18 +226,21 @@ impl fmt::Debug for UnixStream {
     }
 }
 
+#[cfg(unix)]
 impl IntoRawFd for UnixStream {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl AsRawFd for UnixStream {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl FromRawFd for UnixStream {
     /// Converts a `RawFd` to a `UnixStream`.
     ///
@@ -241,5 +250,26 @@ impl FromRawFd for UnixStream {
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixStream {
         UnixStream::from_std(FromRawFd::from_raw_fd(fd))
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for UnixStream {
+    fn into_raw_socket(self) -> RawSocket {
+        self.inner.into_inner().into_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for UnixStream {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for UnixStream {
+    unsafe fn from_raw_socket(sock: RawSocket) -> Self {
+        UnixStream::from_std(FromRawSocket::from_raw_socket(sock))
     }
 }

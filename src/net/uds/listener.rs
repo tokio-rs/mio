@@ -2,8 +2,14 @@ use crate::io_source::IoSource;
 use crate::net::{SocketAddr, UnixStream};
 use crate::{event, sys, Interest, Registry, Token};
 
+#[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(unix)]
 use std::os::unix::net;
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+#[cfg(windows)]
+use crate::sys::windows::uds::{stdnet as net};
 use std::path::Path;
 use std::{fmt, io};
 
@@ -79,18 +85,21 @@ impl fmt::Debug for UnixListener {
     }
 }
 
+#[cfg(unix)]
 impl IntoRawFd for UnixListener {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl FromRawFd for UnixListener {
     /// Converts a `RawFd` to a `UnixListener`.
     ///
@@ -100,5 +109,26 @@ impl FromRawFd for UnixListener {
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixListener {
         UnixListener::from_std(FromRawFd::from_raw_fd(fd))
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for UnixListener {
+    fn into_raw_socket(self) -> RawSocket {
+        self.inner.into_inner().into_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for UnixListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for UnixListener {
+    unsafe fn from_raw_socket(sock: RawSocket) -> Self {
+        UnixListener::from_std(FromRawSocket::from_raw_socket(sock))
     }
 }
