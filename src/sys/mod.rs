@@ -59,7 +59,7 @@ cfg_os_poll! {
 
 #[cfg(windows)]
 cfg_os_poll! {
-    mod windows;
+    pub mod windows;
     pub use self::windows::*;
 }
 
@@ -82,5 +82,10 @@ cfg_not_os_poll! {
     #[cfg(unix)]
     cfg_net! {
         pub use self::unix::SocketAddr;
+    }
+
+    #[cfg(windows)]
+    cfg_net! {
+        pub use self::windows::SocketAddr;
     }
 }

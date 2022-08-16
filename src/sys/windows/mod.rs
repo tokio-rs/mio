@@ -49,6 +49,10 @@ cfg_net! {
 
     pub(crate) mod tcp;
     pub(crate) mod udp;
+    pub mod uds;
+    pub use self::uds::SocketAddr;
+    #[cfg(all(windows, test))]
+    pub use self::uds::stdnet;
 }
 
 cfg_os_ext! {

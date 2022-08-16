@@ -11,7 +11,7 @@ use std::os::unix::net;
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 #[cfg(windows)]
-use crate::sys::windows::uds::{stdnet as net};
+use crate::sys::uds::{stdnet as net};
 use std::path::Path;
 
 /// A non-blocking Unix stream socket.

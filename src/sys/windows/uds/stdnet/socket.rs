@@ -1,12 +1,10 @@
-#![allow(non_camel_case_types)]
-
-use std::io;
+use std::io::{self, IoSlice, IoSliceMut};
+use std::convert::TryInto;
 use std::mem;
 use std::net::Shutdown;
 use std::os::raw::{c_int, c_ulong};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::ptr;
-use std::sync::Once;
 use std::time::Duration;
 
 use windows_sys::Win32::Foundation::{
@@ -17,25 +15,32 @@ use windows_sys::Win32::Foundation::{
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 use windows_sys::Win32::System::WindowsProgramming::INFINITE;
 use windows_sys::Win32::Networking::WinSock::{
-    self,
-    SOCKET_ERROR,
+    WSABUF,
     AF_UNIX,
+    FIONBIO,
+    INVALID_SOCKET,
+    SD_BOTH,
+    SD_RECEIVE,
+    SD_SEND,
     SOCKADDR,
+    SOCKET,
+    SOCKET_ERROR,
     SOCK_STREAM,
     SOL_SOCKET,
     SO_ERROR,
-    accept, closesocket, ioctlsocket, recv, send,
-    setsockopt, shutdown, WSADuplicateSocketW, WSASocketW, FIONBIO,
-    INVALID_SOCKET, SOCKET, WSADATA, WSAPROTOCOL_INFOW,
+    WSADuplicateSocketW,
+    WSAPROTOCOL_INFOW,
+    WSASocketW,
     WSA_FLAG_OVERLAPPED,
-    SD_RECEIVE,
-    SD_SEND,
-    SD_BOTH
+    accept,
+    closesocket,
+    getsockopt as c_getsockopt,
+    ioctlsocket,
+    recv,
+    send,
+    setsockopt as c_setsockopt,
+    shutdown,
 };
-
-// TODO
-type socklen_t = i32;
-type DWORD = u32;
 
 #[derive(Debug)]
 pub struct Socket(SOCKET);
@@ -44,16 +49,17 @@ impl Socket {
     pub fn new() -> io::Result<Socket> {
         let socket = wsa_syscall!(
             WSASocketW(
-                AF_UNIX,
-                SOCK_STREAM,
+                AF_UNIX.into(),
+                SOCK_STREAM.into(),
                 0,
                 ptr::null_mut(),
                 0,
                 WSA_FLAG_OVERLAPPED,
-            )
+            ),
             PartialEq::eq,
             INVALID_SOCKET
         )?;
+        let socket = Socket(socket);
         socket.set_no_inherit()?;
         Ok(socket)
     }
@@ -64,36 +70,35 @@ impl Socket {
             PartialEq::eq,
             INVALID_SOCKET
         )?;
+        let socket = Socket(socket);
         socket.set_no_inherit()?;
         Ok(socket)
     }
 
     pub fn duplicate(&self) -> io::Result<Socket> {
-        let socket = unsafe {
-            let mut info: WSAPROTOCOL_INFOW = mem::zeroed();
-            wsa_syscall!(
-                WSADuplicateSocketW(
-                    self.0,
-                    GetCurrentProcessId(),
-                    &mut info,
-                ),
-                PartialEq::eq,
-                SOCKET_ERROR
-            )?;
-            let n = wsa_syscall!(
-                WSASocketW(
-                    info.iAddressFamily,
-                    info.iSocketType,
-                    info.iProtocol,
-                    &mut info,
-                    0,
-                    WSA_FLAG_OVERLAPPED,
-                )
-                PartialEq::eq,
-                INVALID_SOCKET
-            )?;
-            Socket(n)
-        };
+        let mut info: WSAPROTOCOL_INFOW = unsafe { mem::zeroed() };
+        wsa_syscall!(
+            WSADuplicateSocketW(
+                self.0,
+                GetCurrentProcessId(),
+                &mut info,
+            ),
+            PartialEq::eq,
+            SOCKET_ERROR
+        )?;
+        let n = wsa_syscall!(
+            WSASocketW(
+                info.iAddressFamily,
+                info.iSocketType,
+                info.iProtocol,
+                &mut info,
+                0,
+                WSA_FLAG_OVERLAPPED,
+            ),
+            PartialEq::eq,
+            INVALID_SOCKET
+        )?;
+        let socket = Socket(n);
         socket.set_no_inherit()?;
         Ok(socket)
     }
@@ -116,6 +121,18 @@ impl Socket {
         self.recv_with_flags(buf, 0)
     }
 
+    pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        let mut total = 0;
+        for slice in &mut *bufs {
+            let wsa_buf = unsafe { *(slice as *const _ as *const WSABUF) };
+            let len = wsa_buf.len;
+            let buf = unsafe { std::slice::from_raw_parts_mut(wsa_buf.buf, len.try_into().unwrap()) };
+            total += self.recv_with_flags(buf, 0)?;
+        }
+        println!("Wrote vectored: {total:?}, {bufs:?}");
+        Ok(total as usize)
+    }
+
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let ret = wsa_syscall!(
             send(self.0, buf as *const _ as *const _, buf.len() as c_int, 0),
@@ -125,21 +142,41 @@ impl Socket {
         Ok(ret as usize)
     }
 
+    pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        let mut total = 0;
+        for slice in bufs {
+            let wsa_buf = unsafe { *(slice as *const _ as *const WSABUF) };
+            let len = wsa_buf.len;
+            let buf = unsafe { std::slice::from_raw_parts(wsa_buf.buf, len.try_into().unwrap()) };
+            dbg!(buf);
+            let ret = wsa_syscall!(
+                send(self.0, buf as *const _ as *const _, len as c_int, 0),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )?;
+            total += ret;
+        }
+        println!("Wrote vectored: {total:?}, {bufs:?}");
+        Ok(total as usize)
+    }
+
     fn set_no_inherit(&self) -> io::Result<()> {
         syscall!(
             SetHandleInformation(self.0 as HANDLE, HANDLE_FLAG_INHERIT, 0),
             PartialEq::eq,
             0
-        )
+        )?;
+        Ok(())
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        let mut nonblocking = nonblocking as c_ulong;
+        let mut nonblocking: c_ulong = if nonblocking { 1 } else { 0 };
         wsa_syscall!(
-            ioctlsocket(self.0, FIONBIO as c_int, &mut nonblocking),
+            ioctlsocket(self.0, FIONBIO, &mut nonblocking),
             PartialEq::eq,
             SOCKET_ERROR
-        )
+        )?;
+        Ok(())
     }
 
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
@@ -149,7 +186,7 @@ impl Socket {
             Shutdown::Both => SD_BOTH,
         };
         wsa_syscall!(
-            shutdown(self.0, how),
+            shutdown(self.0, how.try_into().unwrap()),
             PartialEq::eq,
             SOCKET_ERROR
         )?;
@@ -157,7 +194,11 @@ impl Socket {
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        let raw: c_int = getsockopt(self, SOL_SOCKET, SO_ERROR)?;
+        let raw = getsockopt::<c_int>(
+            self,
+            SOL_SOCKET.try_into().unwrap(),
+            SO_ERROR.try_into().unwrap()
+        )?;
         if raw == 0 {
             Ok(None)
         } else {
@@ -179,11 +220,11 @@ impl Socket {
             }
             None => 0,
         };
-        setsockopt(self, SOL_SOCKET, kind, timeout)
+        setsockopt(self, SOL_SOCKET.try_into().unwrap(), kind, timeout)
     }
 
     pub fn timeout(&self, kind: c_int) -> io::Result<Option<Duration>> {
-        let raw: DWORD = getsockopt(self, SOL_SOCKET, kind)?;
+        let raw: u32 = getsockopt(self, SOL_SOCKET.try_into().unwrap(), kind)?;
         if raw == 0 {
             Ok(None)
         } else {
@@ -195,44 +236,40 @@ impl Socket {
 }
 
 pub fn setsockopt<T>(sock: &Socket, opt: c_int, val: c_int, payload: T) -> io::Result<()> {
-    unsafe {
-        let payload = &payload as *const T as *const _;
-        wsa_syscall!(
-            WinSock::setsockopt(
-                sock.as_raw_socket() as usize,
-                opt,
-                val,
-                payload,
-                mem::size_of::<T>() as socklen_t,
-            ),
-            PartialEq::eq,
-            SOCKET_ERROR
-        )?;
-        Ok(())
-    }
+    let payload = &payload as *const T as *const _;
+    wsa_syscall!(
+        c_setsockopt(
+            sock.as_raw_socket() as usize,
+            opt,
+            val,
+            payload,
+            mem::size_of::<T>() as i32,
+        ),
+        PartialEq::eq,
+        SOCKET_ERROR
+    )?;
+    Ok(())
 }
 
 pub fn getsockopt<T: Copy>(sock: &Socket, opt: c_int, val: c_int) -> io::Result<T> {
-    unsafe {
-        let mut slot: T = mem::zeroed();
-        let mut len = mem::size_of::<T>() as socklen_t;
-        wsa_syscall!(
-            WinSock::getsockopt(
-                sock.as_raw_socket() as _,
-                opt,
-                val,
-                &mut slot as *mut _ as *mut _,
-                &mut len,
-            ),
-            PartialEq::eq,
-            SOCKET_ERROR
-        )?;
-        assert_eq!(len as usize, mem::size_of::<T>());
-        Ok(slot)
-    }
+    let mut slot: T = unsafe { mem::zeroed() };
+    let mut len = mem::size_of::<T>() as i32;
+    wsa_syscall!(
+        c_getsockopt(
+            sock.as_raw_socket() as _,
+            opt,
+            val,
+            &mut slot as *mut _ as *mut _,
+            &mut len,
+        ),
+        PartialEq::eq,
+        SOCKET_ERROR
+    )?;
+    assert_eq!(len as usize, mem::size_of::<T>());
+    Ok(slot)
 }
 
-fn dur2timeout(dur: Duration) -> DWORD {
+fn dur2timeout(dur: Duration) -> u32 {
     // Note that a duration is a (u64, u32) (seconds, nanoseconds) pair, and the
     // timeouts in windows APIs are typically u32 milliseconds. To translate, we
     // have two pieces to take care of:
@@ -251,10 +288,10 @@ fn dur2timeout(dur: Duration) -> DWORD {
             })
         })
         .map(|ms| {
-            if ms > <DWORD>::max_value() as u64 {
+            if ms > <u32>::max_value() as u64 {
                 INFINITE
             } else {
-                ms as DWORD
+                ms as u32
             }
         })
         .unwrap_or(INFINITE)

@@ -39,3 +39,5 @@ mod uds;
 pub use self::uds::{SocketAddr, UnixListener, UnixStream};
 #[cfg(unix)]
 pub use self::uds::UnixDatagram;
+#[cfg(windows)]
+pub use self::uds::stdnet;

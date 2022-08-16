@@ -48,6 +48,9 @@ log = "0.4.8"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.121"
 
+[target.'cfg(windows)'.dependencies]
+tempfile = "3"
+
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.36"
 features = [
@@ -55,6 +58,7 @@ features = [
   "Win32_Foundation",                 # Basic types eg HANDLE
   "Win32_Networking_WinSock",         # winsock2 types/functions
   "Win32_System_IO",                  # IO types like OVERLAPPED etc
+  "Win32_System_Threading",           # Process utilities
   "Win32_System_WindowsProgramming",  # General future used for various types/funcs
 ]
 

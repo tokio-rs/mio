@@ -1,5 +1,6 @@
 use std::fmt;
-use std::io;
+use std::io::{self, IoSlice, IoSliceMut};
+use std::convert::TryInto;
 use std::mem;
 use std::net::Shutdown;
 use std::os::raw::c_int;
@@ -9,7 +10,14 @@ use std::time::Duration;
 
 use windows_sys::Win32::Networking::WinSock::{
     self,
-    bind, connect, getpeername, getsockname, listen, SO_RCVTIMEO, SO_SNDTIMEO,
+    bind,
+    connect,
+    getpeername,
+    getsockname,
+    listen,
+    SO_RCVTIMEO,
+    SOCKET_ERROR,
+    SO_SNDTIMEO
 };
 
 use crate::sys::windows::net::init;
@@ -20,7 +28,7 @@ use super::{socket_addr, SocketAddr};
 pub struct UnixStream(Socket);
 
 impl fmt::Debug for UnixStream {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut builder = fmt.debug_struct("UnixStream");
         builder.field("socket", &self.0.as_raw_socket());
         if let Ok(addr) = self.local_addr() {
@@ -38,21 +46,19 @@ impl UnixStream {
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
         init();
         fn inner(path: &Path) -> io::Result<UnixStream> {
-            unsafe {
-                let inner = Socket::new()?;
-                let (addr, len) = socket_addr(path)?;
+            let inner = Socket::new()?;
+            let (addr, len) = socket_addr(path)?;
 
-                wsa_syscall!(
-                    connect(
-                        inner.as_raw_socket() as _,
-                        &addr as *const _ as *const _,
-                        len as i32,
-                    ),
-                    PartialEq::eq,
-                    SOCKET_ERROR
-                )?;
-                Ok(UnixStream(inner))
-            }
+            wsa_syscall!(
+                connect(
+                    inner.as_raw_socket() as _,
+                    &addr as *const _ as *const _,
+                    len as i32,
+                ),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )?;
+            Ok(UnixStream(inner))
         }
         inner(path.as_ref())
     }
@@ -69,12 +75,24 @@ impl UnixStream {
 
     /// Returns the socket address of the local half of this connection.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        SocketAddr::new(|addr, len| unsafe { getsockname(self.0.as_raw_socket() as _, addr, len) })
+        SocketAddr::new(|addr, len| {
+            wsa_syscall!(
+                getsockname(self.0.as_raw_socket() as _, addr, len),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )
+        })
     }
 
     /// Returns the socket address of the remote half of this connection.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        SocketAddr::new(|addr, len| unsafe { getpeername(self.0.as_raw_socket() as _, addr, len) })
+        SocketAddr::new(|addr, len| {
+            wsa_syscall!(
+                getpeername(self.0.as_raw_socket() as _, addr, len),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )
+        })
     }
 
     /// Moves the socket into or out of nonblocking mode.
@@ -104,6 +122,7 @@ impl UnixStream {
         let file_path = dir.path().join("socket");
         let a: Arc<RwLock<Option<io::Result<UnixStream>>>> = Arc::new(RwLock::new(None));
         let ul = UnixListener::bind(&file_path).unwrap();
+        ul.set_nonblocking(true)?;
         let server = {
             let a = a.clone();
             spawn(move || {
@@ -113,6 +132,7 @@ impl UnixStream {
             })
         };
         let stream1 = UnixStream::connect(&file_path)?;
+        stream1.set_nonblocking(true)?;
         server
             .join()
             .map_err(|_| io::Error::from(io::ErrorKind::ConnectionRefused))?;
@@ -126,7 +146,7 @@ impl UnixStream {
     /// indefinitely. An `Err` is returned if the zero `Duration` is
     /// passed to this method.
     pub fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.0.set_timeout(dur, SO_RCVTIMEO)
+        self.0.set_timeout(dur, SO_RCVTIMEO.try_into().unwrap())
     }
 
     /// Sets the write timeout to the timeout specified.
@@ -135,17 +155,17 @@ impl UnixStream {
     /// indefinitely. An `Err` is returned if the zero `Duration` is
     /// passed to this method.
     pub fn set_write_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.0.set_timeout(dur, SO_SNDTIMEO)
+        self.0.set_timeout(dur, SO_SNDTIMEO.try_into().unwrap())
     }
 
     /// Returns the read timeout of this socket.
     pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
-        self.0.timeout(SO_RCVTIMEO)
+        self.0.timeout(SO_RCVTIMEO.try_into().unwrap())
     }
 
     /// Returns the write timeout of this socket.
     pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
-        self.0.timeout(SO_SNDTIMEO)
+        self.0.timeout(SO_SNDTIMEO.try_into().unwrap())
     }
 }
 
@@ -153,17 +173,29 @@ impl io::Read for UnixStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         io::Read::read(&mut &*self, buf)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        io::Read::read_vectored(&mut &*self, bufs)
+    }
 }
 
 impl<'a> io::Read for &'a UnixStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(buf)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        self.0.read_vectored(bufs)
+    }
 }
 
 impl io::Write for UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         io::Write::write(&mut &*self, buf)
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        io::Write::write_vectored(&mut &*self, bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -174,6 +206,11 @@ impl io::Write for UnixStream {
 impl<'a> io::Write for &'a UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf)
+    }
+
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        self.0.write_vectored(bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -205,7 +242,7 @@ impl IntoRawSocket for UnixStream {
 pub struct UnixListener(Socket);
 
 impl fmt::Debug for UnixListener {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut builder = fmt.debug_struct("UnixListener");
         builder.field("socket", &self.0.as_raw_socket());
         if let Ok(addr) = self.local_addr() {
@@ -220,27 +257,25 @@ impl UnixListener {
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
         init();
         fn inner(path: &Path) -> io::Result<UnixListener> {
-            unsafe {
-                let inner = Socket::new()?;
-                let (addr, len) = socket_addr(path)?;
+            let inner = Socket::new()?;
+            let (addr, len) = socket_addr(path)?;
 
-                wsa_syscall!(
-                    bind(
-                        inner.as_raw_socket() as _,
-                        &addr as *const _ as *const _,
-                        len as _,
-                    ),
-                    PartialEq::eq,
-                    SOCKET_ERROR
-                )?;
-                wsa_syscall!(
-                    listen(inner.as_raw_socket() as _, 128),
-                    PartialEq::eq,
-                    SOCKET_ERROR
-                )?;
+            wsa_syscall!(
+                bind(
+                    inner.as_raw_socket() as _,
+                    &addr as *const _ as *const _,
+                    len as _,
+                ),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )?;
+            wsa_syscall!(
+                listen(inner.as_raw_socket() as _, 128),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )?;
 
-                Ok(UnixListener(inner))
-            }
+            Ok(UnixListener(inner))
         }
         inner(path.as_ref())
     }
@@ -271,7 +306,13 @@ impl UnixListener {
 
     /// Returns the local socket address of this listener.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        SocketAddr::new(|addr, len| unsafe { getsockname(self.0.as_raw_socket() as _, addr, len) })
+        SocketAddr::new(|addr, len| {
+            wsa_syscall!(
+                getsockname(self.0.as_raw_socket() as _, addr, len),
+                PartialEq::eq,
+                SOCKET_ERROR
+            )
+        })
     }
 
     /// Moves the socket into or out of nonblocking mode.
@@ -348,7 +389,7 @@ impl<'a> Iterator for Incoming<'a> {
 
 #[cfg(test)]
 mod test {
-    extern crate tempfile;
+    use tempfile;
 
     use std::io::{self, Read, Write};
     use std::path::PathBuf;

@@ -1,9 +1,12 @@
-#![cfg(all(unix, feature = "os-poll", feature = "net"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::net::UnixStream;
 use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
+#[cfg(windows)]
+use mio::net::{stdnet as net};
+#[cfg(unix)]
 use std::os::unix::net;
 use std::path::Path;
 use std::sync::mpsc::channel;
@@ -217,6 +220,11 @@ fn unix_stream_shutdown_write() {
         vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
+    // TODO: have to re-register here to reset user_events
+    poll.registry()
+        .reregister(&mut stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
+        .unwrap();
+
     checked_write!(stream.write(DATA1));
     expect_events(
         &mut poll,
@@ -241,7 +249,13 @@ fn unix_stream_shutdown_write() {
     );
 
     let err = stream.write(DATA2).unwrap_err();
+    #[cfg(unix)]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Networking::WinSock::WSAESHUTDOWN;
+        assert_eq!(err.raw_os_error(), Some(WSAESHUTDOWN));
+    }
 
     // Read should be ok
     let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -444,6 +458,10 @@ where
     expect_read!(stream.read(&mut buf), DATA1);
 
     assert!(stream.take_error().unwrap().is_none());
+    // TODO: have to re-register here to reset user_events
+    poll.registry()
+        .reregister(&mut stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
+        .unwrap();
 
     let bufs = [IoSlice::new(DATA1), IoSlice::new(DATA2)];
     let wrote = stream.write_vectored(&bufs).unwrap();
