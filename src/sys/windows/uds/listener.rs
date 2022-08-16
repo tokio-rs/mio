@@ -12,7 +12,7 @@ use windows_sys::Win32::Networking::WinSock::{
     accept as sys_accept
 };
 
-use super::{stdnet as net, socket_addr};
+use super::stdnet::{self as net, socket_addr};
 use crate::net::{SocketAddr, UnixStream};
 use crate::sys::windows::net::{init, new_socket};
 

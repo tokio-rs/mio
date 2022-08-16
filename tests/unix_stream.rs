@@ -1,11 +1,11 @@
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
+#[cfg(windows)]
+use mio::net::stdnet as net;
 use mio::net::UnixStream;
 use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
-#[cfg(windows)]
-use mio::net::{stdnet as net};
 #[cfg(unix)]
 use std::os::unix::net;
 use std::path::Path;
@@ -222,7 +222,11 @@ fn unix_stream_shutdown_write() {
 
     // TODO: have to re-register here to reset user_events
     poll.registry()
-        .reregister(&mut stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
+        .reregister(
+            &mut stream,
+            TOKEN_1,
+            Interest::WRITABLE.add(Interest::READABLE),
+        )
         .unwrap();
 
     checked_write!(stream.write(DATA1));
@@ -318,8 +322,8 @@ fn unix_stream_shutdown_both() {
     let err = stream.write(DATA2).unwrap_err();
     #[cfg(unix)]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
-    #[cfg(window)]
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionAbroted);
+    #[cfg(windows)]
+    assert_eq!(err.kind(), io::ErrorKind::ConnectionAborted);
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
@@ -460,7 +464,11 @@ where
     assert!(stream.take_error().unwrap().is_none());
     // TODO: have to re-register here to reset user_events
     poll.registry()
-        .reregister(&mut stream, TOKEN_1, Interest::WRITABLE.add(Interest::READABLE))
+        .reregister(
+            &mut stream,
+            TOKEN_1,
+            Interest::WRITABLE.add(Interest::READABLE),
+        )
         .unwrap();
 
     let bufs = [IoSlice::new(DATA1), IoSlice::new(DATA2)];

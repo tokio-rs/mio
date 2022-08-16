@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use std::path::Path;
 use windows_sys::Win32::Networking::WinSock::{self, SOCKET_ERROR, connect as sys_connect, ioctlsocket, FIONBIO};
 
-use super::{stdnet::{self as net}, socket_addr};
+use super::stdnet::{self as net, socket_addr};
 use crate::net::SocketAddr;
 use crate::sys::windows::net::{init, new_socket};
 

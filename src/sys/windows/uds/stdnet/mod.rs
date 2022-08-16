@@ -1,3 +1,5 @@
+//! Windows specific networking functionality
+
 use std::ascii;
 use std::fmt;
 use std::io;
@@ -10,14 +12,14 @@ use windows_sys::Win32::Networking::WinSock::{self, SOCKADDR};
 mod net;
 mod socket;
 
-pub fn path_offset(addr: &WinSock::sockaddr_un) -> usize {
+pub(crate) fn path_offset(addr: &WinSock::sockaddr_un) -> usize {
     // Work with an actual instance of the type since using a null pointer is UB
     let base = addr as *const _ as usize;
     let path = &addr.sun_path as *const _ as usize;
     path - base
 }
 
-fn socket_addr(path: &Path) -> io::Result<(WinSock::sockaddr_un, c_int)> {
+pub(crate) fn socket_addr(path: &Path) -> io::Result<(WinSock::sockaddr_un, c_int)> {
     let sockaddr = mem::MaybeUninit::<WinSock::sockaddr_un>::zeroed();
 
     // This is safe to assume because a `WinSock::sockaddr_un` filled with `0`
@@ -178,4 +180,3 @@ impl<'a> fmt::Display for AsciiEscaped<'a> {
 }
 
 pub use self::net::{UnixListener, UnixStream};
-pub use self::socket::Socket;

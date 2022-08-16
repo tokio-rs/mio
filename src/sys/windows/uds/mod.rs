@@ -1,5 +1,5 @@
 pub mod stdnet;
-pub use self::stdnet::{path_offset, SocketAddr};
+pub use self::stdnet::SocketAddr;
 
 cfg_os_poll! {
     use std::convert::TryInto;
@@ -13,8 +13,6 @@ cfg_os_poll! {
 
     pub(crate) mod listener;
     pub(crate) mod stream;
-
-    pub use self::stdnet::socket_addr;
 
     pub(crate) fn local_addr(socket: RawSocket) -> io::Result<SocketAddr> {
         SocketAddr::new(|sockaddr, socklen| {

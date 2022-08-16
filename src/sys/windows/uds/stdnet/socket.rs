@@ -14,7 +14,7 @@ use windows_sys::Win32::Foundation::{
 };
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 use windows_sys::Win32::System::WindowsProgramming::INFINITE;
-use windows_sys::Win32::Networking::WinSock::{INVALID_SOCKET, SOCKADDR, SOCKET, SOCKET_ERROR, SOCK_STREAM, SOL_SOCKET, SO_ERROR, WSADuplicateSocketW, WSAPROTOCOL_INFOW, WSASocketW, accept, closesocket, getsockopt as c_getsockopt, ioctlsocket, recv, send, setsockopt as c_setsockopt, shutdown};
+use windows_sys::Win32::Networking::WinSock::{self, INVALID_SOCKET, SOCKADDR, SOCKET, SOCKET_ERROR, SOL_SOCKET, SO_ERROR, WSADuplicateSocketW, WSAPROTOCOL_INFOW, WSASocketW, accept, closesocket, getsockopt as c_getsockopt, ioctlsocket, recv, send, setsockopt as c_setsockopt, shutdown};
 
 #[derive(Debug)]
 pub struct Socket(SOCKET);
@@ -67,7 +67,7 @@ impl Socket {
                 info.iProtocol,
                 &mut info,
                 0,
-                WSA_FLAG_OVERLAPPED,
+                WinSock::WSA_FLAG_OVERLAPPED,
             ),
             PartialEq::eq,
             INVALID_SOCKET

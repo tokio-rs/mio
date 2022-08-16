@@ -187,6 +187,23 @@ impl UnixStream {
         self.0.shutdown(how)
     }
 
+    /// Creates an unnamed pair of connected sockets.
+    ///
+    /// Returns two `UnixStream`s which are connected to each other.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let (sock1, sock2) = match UnixStream::pair() {
+    ///     Ok((sock1, sock2)) => (sock1, sock2),
+    ///     Err(e) => {
+    ///         println!("Couldn't create a pair of sockets: {e:?}");
+    ///         return
+    ///     }
+    /// }
+    /// ```
     pub fn pair() -> io::Result<(Self, Self)> {
         use std::sync::{Arc, RwLock};
         use std::thread::spawn;
