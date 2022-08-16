@@ -260,12 +260,11 @@ impl SockState {
 cfg_io_source! {
     impl SockState {
         fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
-            let base = get_base_socket(raw_socket)?;
             Ok(SockState {
                 iosb: IoStatusBlock::zeroed(),
                 poll_info: AfdPollInfo::zeroed(),
                 afd,
-                base_socket: base,
+                base_socket: get_base_socket(raw_socket)?,
                 user_evts: 0,
                 pending_evts: 0,
                 user_data: 0,
@@ -659,7 +658,6 @@ cfg_io_source! {
         }
     }
 
-    #[allow(dead_code)]
     fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
         let res = try_get_base_socket(raw_socket, SIO_BASE_HANDLE);
         if let Ok(base_socket) = res {
@@ -676,8 +674,7 @@ cfg_io_source! {
             SIO_BSP_HANDLE_POLL,
             SIO_BSP_HANDLE,
         ] {
-            let r = try_get_base_socket(raw_socket, ioctl);
-            if let Ok(base_socket) = r {
+            if let Ok(base_socket) = try_get_base_socket(raw_socket, ioctl) {
                 // Since we know now that we're dealing with an LSP (otherwise
                 // SIO_BASE_HANDLE would't have failed), only return any result
                 // when it is different from the original `raw_socket`.
