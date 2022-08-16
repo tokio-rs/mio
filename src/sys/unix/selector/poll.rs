@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 use std::os::unix::io::RawFd;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
+#[cfg(debug_assertions)]
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 use std::{fmt, io};
@@ -379,7 +381,11 @@ impl SelectorState {
     }
 }
 
+#[cfg(not(target_os = "haiku"))]
 const READ_EVENTS: libc::c_short = libc::POLLIN | libc::POLLRDHUP;
+#[cfg(target_os = "haiku")]
+const READ_EVENTS: libc::c_short = libc::POLLIN;
+
 const WRITE_EVENTS: libc::c_short = libc::POLLOUT;
 
 /// Get the input poll events for the given event.
@@ -458,11 +464,16 @@ pub mod event {
         (event.events & libc::POLLERR) != 0
     }
 
+    #[cfg(not(target_os = "haiku"))]
     pub fn is_read_closed(event: &Event) -> bool {
         // Both halves of the socket have closed
         (event.events & libc::POLLHUP) != 0
             // Socket has received FIN or called shutdown(SHUT_RD)
             || ((event.events & libc::POLLIN) != 0 && (event.events & libc::POLLRDHUP) != 0)
+    }
+
+    pub fn is_read_closed(event: &Event) -> bool {
+        event.events & libc::POLLHUP != 0
     }
 
     pub fn is_write_closed(event: &Event) -> bool {
@@ -505,6 +516,7 @@ pub mod event {
             libc::POLLWRBAND,
             libc::POLLERR,
             libc::POLLHUP,
+            #[cfg(not(target_os = "haiku"))]
             libc::POLLRDHUP,
         );
 

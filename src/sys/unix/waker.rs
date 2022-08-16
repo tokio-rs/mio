@@ -119,6 +119,7 @@ pub use self::kqueue::Waker;
     target_os = "netbsd",
     target_os = "openbsd",
     target_os = "redox",
+    target_os = "haiku",
 ))]
 mod pipe {
     use crate::sys::unix::Selector;
@@ -144,7 +145,30 @@ mod pipe {
             let selector = selector.try_clone()?;
 
             let mut fds = [-1; 2];
-            syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
+
+            #[cfg(not(target_os = "haiku"))]
+            {
+                syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
+            }
+
+            #[cfg(target_os = "haiku")]
+            {
+                // Haiku does not have `pipe2(2)`, manually set nonblocking
+                syscall!(pipe(fds.as_mut_ptr()))?;
+
+                for fd in &fds {
+                    unsafe {
+                        if libc::fcntl(*fd, libc::F_SETFL, libc::O_NONBLOCK) != 0 ||
+                            libc::fcntl(*fd, libc::F_SETFL, libc::FD_CLOEXEC) != 0
+                        {
+                            let err = io::Error::last_os_error();
+                            let _ = libc::close(fds[0]);
+                            let _ = libc::close(fds[1]);
+                            return Err(err);
+                        }
+                    }
+                }
+            }
             // Turn the file descriptors into files first so we're ensured
             // they're closed when dropped, e.g. when register below fails.
             let sender = unsafe { File::from_raw_fd(fds[1]) };
@@ -208,5 +232,6 @@ mod pipe {
     target_os = "netbsd",
     target_os = "openbsd",
     target_os = "redox",
+    target_os = "haiku",
 ))]
 pub use self::pipe::Waker;

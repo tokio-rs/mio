@@ -89,14 +89,18 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                 sin_family: libc::AF_INET as libc::sa_family_t,
                 sin_port: addr.port().to_be(),
                 sin_addr,
+                #[cfg(not(target_os = "haiku"))]
                 sin_zero: [0; 8],
+                #[cfg(target_os = "haiku")]
+                sin_zero: [0; 24],
                 #[cfg(any(
                     target_os = "dragonfly",
                     target_os = "freebsd",
                     target_os = "ios",
                     target_os = "macos",
                     target_os = "netbsd",
-                    target_os = "openbsd"
+                    target_os = "openbsd",
+                    target_os = "haiku",
                 ))]
                 sin_len: 0,
             };
@@ -120,7 +124,8 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "ios",
                     target_os = "macos",
                     target_os = "netbsd",
-                    target_os = "openbsd"
+                    target_os = "openbsd",
+                    target_os = "haiku",
                 ))]
                 sin6_len: 0,
                 #[cfg(target_os = "illumos")]
