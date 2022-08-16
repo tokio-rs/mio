@@ -197,7 +197,6 @@ impl SockState {
 
     // This is the function called from the overlapped using as Arc<Mutex<SockState>>. Watch out for reference counting.
     fn feed_event(&mut self) -> Option<Event> {
-        println!("Feed event...");
         self.poll_status = SockPollStatus::Idle;
         self.pending_evts = 0;
 
@@ -261,9 +260,7 @@ impl SockState {
 cfg_io_source! {
     impl SockState {
         fn new(raw_socket: RawSocket, afd: Arc<Afd>) -> io::Result<SockState> {
-            println!("init state: {raw_socket:?}");
             let base = get_base_socket(raw_socket)?;
-            println!("init state:bas  {base:?}");
             Ok(SockState {
                 iosb: IoStatusBlock::zeroed(),
                 poll_info: AfdPollInfo::zeroed(),
@@ -618,9 +615,7 @@ cfg_io_source! {
         /// GetQueuedCompletionStatusEx() we tell the kernel about the registered
         /// socket event(s) immediately.
         unsafe fn update_sockets_events_if_polling(&self) -> io::Result<()> {
-            println!("POLLING");
             if self.is_polling.load(Ordering::Acquire) {
-                println!("POLLING IMMEDIATELY");
                 self.update_sockets_events()
             } else {
                 Ok(())
@@ -667,7 +662,6 @@ cfg_io_source! {
     #[allow(dead_code)]
     fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
         let res = try_get_base_socket(raw_socket, SIO_BASE_HANDLE);
-        println!("FIRST {res:?}");
         if let Ok(base_socket) = res {
             return Ok(base_socket);
         }
@@ -683,7 +677,6 @@ cfg_io_source! {
             SIO_BSP_HANDLE,
         ] {
             let r = try_get_base_socket(raw_socket, ioctl);
-            println!("OTHER {r:?}");
             if let Ok(base_socket) = r {
                 // Since we know now that we're dealing with an LSP (otherwise
                 // SIO_BASE_HANDLE would't have failed), only return any result
