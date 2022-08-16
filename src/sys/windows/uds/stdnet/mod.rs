@@ -17,7 +17,7 @@ pub fn path_offset(addr: &WinSock::sockaddr_un) -> usize {
     path - base
 }
 
-pub fn socket_addr(path: &Path) -> io::Result<(WinSock::sockaddr_un, c_int)> {
+fn socket_addr(path: &Path) -> io::Result<(WinSock::sockaddr_un, c_int)> {
     let sockaddr = mem::MaybeUninit::<WinSock::sockaddr_un>::zeroed();
 
     // This is safe to assume because a `WinSock::sockaddr_un` filled with `0`

@@ -14,33 +14,7 @@ use windows_sys::Win32::Foundation::{
 };
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 use windows_sys::Win32::System::WindowsProgramming::INFINITE;
-use windows_sys::Win32::Networking::WinSock::{
-    WSABUF,
-    AF_UNIX,
-    FIONBIO,
-    INVALID_SOCKET,
-    SD_BOTH,
-    SD_RECEIVE,
-    SD_SEND,
-    SOCKADDR,
-    SOCKET,
-    SOCKET_ERROR,
-    SOCK_STREAM,
-    SOL_SOCKET,
-    SO_ERROR,
-    WSADuplicateSocketW,
-    WSAPROTOCOL_INFOW,
-    WSASocketW,
-    WSA_FLAG_OVERLAPPED,
-    accept,
-    closesocket,
-    getsockopt as c_getsockopt,
-    ioctlsocket,
-    recv,
-    send,
-    setsockopt as c_setsockopt,
-    shutdown,
-};
+use windows_sys::Win32::Networking::WinSock::{INVALID_SOCKET, SOCKADDR, SOCKET, SOCKET_ERROR, SOCK_STREAM, SOL_SOCKET, SO_ERROR, WSADuplicateSocketW, WSAPROTOCOL_INFOW, WSASocketW, accept, closesocket, getsockopt as c_getsockopt, ioctlsocket, recv, send, setsockopt as c_setsockopt, shutdown};
 
 #[derive(Debug)]
 pub struct Socket(SOCKET);
@@ -49,12 +23,12 @@ impl Socket {
     pub fn new() -> io::Result<Socket> {
         let socket = wsa_syscall!(
             WSASocketW(
-                AF_UNIX.into(),
-                SOCK_STREAM.into(),
+                WinSock::AF_UNIX.into(),
+                WinSock::SOCK_STREAM.into(),
                 0,
                 ptr::null_mut(),
                 0,
-                WSA_FLAG_OVERLAPPED,
+                WinSock::WSA_FLAG_OVERLAPPED,
             ),
             PartialEq::eq,
             INVALID_SOCKET
@@ -124,7 +98,7 @@ impl Socket {
     pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let mut total = 0;
         for slice in &mut *bufs {
-            let wsa_buf = unsafe { *(slice as *const _ as *const WSABUF) };
+            let wsa_buf = unsafe { *(slice as *const _ as *const WinSock::WSABUF) };
             let len = wsa_buf.len;
             let buf = unsafe { std::slice::from_raw_parts_mut(wsa_buf.buf, len.try_into().unwrap()) };
             total += self.recv_with_flags(buf, 0)?;
@@ -145,7 +119,7 @@ impl Socket {
     pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         let mut total = 0;
         for slice in bufs {
-            let wsa_buf = unsafe { *(slice as *const _ as *const WSABUF) };
+            let wsa_buf = unsafe { *(slice as *const _ as *const WinSock::WSABUF) };
             let len = wsa_buf.len;
             let buf = unsafe { std::slice::from_raw_parts(wsa_buf.buf, len.try_into().unwrap()) };
             dbg!(buf);
@@ -172,7 +146,7 @@ impl Socket {
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         let mut nonblocking: c_ulong = if nonblocking { 1 } else { 0 };
         wsa_syscall!(
-            ioctlsocket(self.0, FIONBIO, &mut nonblocking),
+            ioctlsocket(self.0, WinSock::FIONBIO, &mut nonblocking),
             PartialEq::eq,
             SOCKET_ERROR
         )?;
@@ -181,9 +155,9 @@ impl Socket {
 
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         let how = match how {
-            Shutdown::Write => SD_SEND,
-            Shutdown::Read => SD_RECEIVE,
-            Shutdown::Both => SD_BOTH,
+            Shutdown::Write => WinSock::SD_SEND,
+            Shutdown::Read => WinSock::SD_RECEIVE,
+            Shutdown::Both => WinSock::SD_BOTH,
         };
         wsa_syscall!(
             shutdown(self.0, how.try_into().unwrap()),

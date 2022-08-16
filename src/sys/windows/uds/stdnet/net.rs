@@ -8,23 +8,26 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 use std::path::Path;
 use std::time::Duration;
 
-use windows_sys::Win32::Networking::WinSock::{
-    self,
-    bind,
-    connect,
-    getpeername,
-    getsockname,
-    listen,
-    SO_RCVTIMEO,
-    SOCKET_ERROR,
-    SO_SNDTIMEO
-};
+use windows_sys::Win32::Networking::WinSock::{self, bind, connect, getpeername, getsockname, listen, SO_RCVTIMEO, SOCKET_ERROR, SO_SNDTIMEO};
 
 use crate::sys::windows::net::init;
 use super::socket::Socket;
 use super::{socket_addr, SocketAddr};
 
 /// A Unix stream socket
+///
+/// # Examples
+///
+/// ```no_run
+/// use mio::net::stdnet::UnixStream;
+/// use std::io::prelude::*;
+///
+/// let mut stream = UnixStream::connect("/path/to/my/socket").unwrap();
+/// stream.write_all(b"hello world").unwrap();
+/// let mut response = String::new();
+/// stream.read_to_string(&mut response).unwrap();
+/// println!("{}", response);
+/// ```
 pub struct UnixStream(Socket);
 
 impl fmt::Debug for UnixStream {
@@ -43,6 +46,20 @@ impl fmt::Debug for UnixStream {
 
 impl UnixStream {
     /// Connects to the socket named by `path`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = match UnixStream::connect("/tmp/sock") {
+    ///     Ok(sock) => sock,
+    ///     Err(e) => {
+    ///         println!("Couldn't connect: {:?}", e);
+    ///         return
+    ///     }
+    /// };
+    /// ```
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
         init();
         fn inner(path: &Path) -> io::Result<UnixStream> {
@@ -69,11 +86,28 @@ impl UnixStream {
     /// object references. Both handles will read and write the same stream of
     /// data, and options set on one stream will be propagated to the other
     /// stream.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// let sock_copy = socket.try_clone().expect("Couldn't clone socket");
+    /// ```
     pub fn try_clone(&self) -> io::Result<UnixStream> {
         self.0.duplicate().map(UnixStream)
     }
 
     /// Returns the socket address of the local half of this connection.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// let addr = socket.local_addr().expect("Couldn't get local address");
+    /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|addr, len| {
             wsa_syscall!(
@@ -85,6 +119,15 @@ impl UnixStream {
     }
 
     /// Returns the socket address of the remote half of this connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// let addr = socket.peer_addr().expect("Couldn't get peer address");
+    /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|addr, len| {
             wsa_syscall!(
@@ -96,11 +139,31 @@ impl UnixStream {
     }
 
     /// Moves the socket into or out of nonblocking mode.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// socket.set_nonblocking(true).expect("Couldn't set nonblocking");
+    /// ```
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
 
     /// Returns the value of the `SO_ERROR` option.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// if let Ok(Some(err)) = socket.take_error() {
+    ///     println!("Got error: {:?}", err);
+    /// }
+    /// ```
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.0.take_error()
     }
@@ -110,6 +173,16 @@ impl UnixStream {
     /// This function will cause all pending and future I/O calls on the
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation for `Shutdown`).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    /// use std::net::Shutdown;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// socket.shutdown(Shutdown::Both).expect("shutdown function failed");
+    /// ```
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.0.shutdown(how)
     }
@@ -145,6 +218,15 @@ impl UnixStream {
     /// If the value specified is `None`, then `read` calls will block
     /// indefinitely. An `Err` is returned if the zero `Duration` is
     /// passed to this method.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// socket.set_read_timeout(None).expect("Couldn't set read timeout");
+    /// ```
     pub fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
         self.0.set_timeout(dur, SO_RCVTIMEO.try_into().unwrap())
     }
@@ -154,16 +236,44 @@ impl UnixStream {
     /// If the value specified is `None`, then `write` calls will block
     /// indefinitely. An `Err` is returned if the zero `Duration` is
     /// passed to this method.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// socket.set_write_timeout(None).expect("Couldn't set write timeout");
+    /// ```
     pub fn set_write_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
         self.0.set_timeout(dur, SO_SNDTIMEO.try_into().unwrap())
     }
 
     /// Returns the read timeout of this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// socket.set_read_timeout(None).expect("Couldn't set read timeout");
+    /// assert_eq!(socket.read_timeout().unwrap(), None);
+    /// ```
     pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
         self.0.timeout(SO_RCVTIMEO.try_into().unwrap())
     }
 
     /// Returns the write timeout of this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixStream;
+    ///
+    /// let socket = UnixStream::connect("/tmp/sock").unwrap();
+    /// socket.set_write_timeout(None).expect("Couldn't set write timeout");
+    /// assert_eq!(socket.write_timeout().unwrap(), None);
+    /// ```
     pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
         self.0.timeout(SO_SNDTIMEO.try_into().unwrap())
     }
@@ -239,6 +349,33 @@ impl IntoRawSocket for UnixStream {
 }
 
 /// A Unix domain socket server
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::thread;
+/// use mio::net::stdnet::{UnixStream, UnixListener};
+///
+/// fn handle_client(stream: UnixStream) {
+///     // ...
+/// }
+///
+/// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
+///
+/// // accept connections and process them, spawning a new thread for each one
+/// for stream in listener.incoming() {
+///     match stream {
+///         Ok(stream) => {
+///             /* connection succeeded */
+///             thread::spawn(|| handle_client(stream));
+///         }
+///         Err(err) => {
+///             /* connection failed */
+///             break;
+///         }
+///     }
+/// }
+/// ```
 pub struct UnixListener(Socket);
 
 impl fmt::Debug for UnixListener {
@@ -254,6 +391,20 @@ impl fmt::Debug for UnixListener {
 
 impl UnixListener {
     /// Creates a new `UnixListener` bound to the specified socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixListener;
+    ///
+    /// let listener = match UnixListener::bind("/path/to/the/socket") {
+    ///     Ok(sock) => sock,
+    ///     Err(e) => {
+    ///         println!("Couldn't connect: {:?}", e);
+    ///         return
+    ///     }
+    /// };
+    /// ```
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
         init();
         fn inner(path: &Path) -> io::Result<UnixListener> {
@@ -287,6 +438,19 @@ impl UnixListener {
     /// the remote peer's address will be returned.
     ///
     /// [`UnixStream`]: struct.UnixStream.html
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixListener;
+    ///
+    /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
+    ///
+    /// match listener.accept() {
+    ///     Ok((socket, addr)) => println!("Got a client: {:?}", addr),
+    ///     Err(e) => println!("accept function failed: {:?}", e),
+    /// }
+    /// ```
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
         let mut storage: WinSock::sockaddr_un = unsafe { mem::zeroed() };
         let mut len = mem::size_of_val(&storage) as c_int;
@@ -300,11 +464,31 @@ impl UnixListener {
     /// The returned `UnixListener` is a reference to the same socket that this
     /// object references. Both handles can be used to accept incoming
     /// connections and options set on one listener will affect the other.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixListener;
+    ///
+    /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
+    ///
+    /// let listener_copy = listener.try_clone().expect("Couldn't clone socket");
+    /// ```
     pub fn try_clone(&self) -> io::Result<UnixListener> {
         self.0.duplicate().map(UnixListener)
     }
 
     /// Returns the local socket address of this listener.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixListener;
+    ///
+    /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
+    ///
+    /// let addr = listener.local_addr().expect("Couldn't get local address");
+    /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|addr, len| {
             wsa_syscall!(
@@ -316,11 +500,33 @@ impl UnixListener {
     }
 
     /// Moves the socket into or out of nonblocking mode.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixListener;
+    ///
+    /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
+    ///
+    /// listener.set_nonblocking(true).expect("Couldn't set nonblocking");
+    /// ```
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
 
     /// Returns the value of the `SO_ERROR` option.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mio::net::stdnet::UnixListener;
+    ///
+    /// let listener = UnixListener::bind("/tmp/sock").unwrap();
+    ///
+    /// if let Ok(Some(err)) = listener.take_error() {
+    ///     println!("Got error: {:?}", err);
+    /// }
+    /// ```
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.0.take_error()
     }
@@ -331,6 +537,30 @@ impl UnixListener {
     /// peer's [`SocketAddr`] structure.
     ///
     /// [`SocketAddr`]: struct.SocketAddr.html
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::thread;
+    /// use mio::net::stdnet::{UnixStream, UnixListener};
+    ///
+    /// fn handle_client(stream: UnixStream) {
+    ///     // ...
+    /// }
+    ///
+    /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
+    ///
+    /// for stream in listener.incoming() {
+    ///     match stream {
+    ///         Ok(stream) => {
+    ///             thread::spawn(|| handle_client(stream));
+    ///         }
+    ///         Err(err) => {
+    ///             break;
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn incoming<'a>(&'a self) -> Incoming<'a> {
         Incoming { listener: self }
     }
@@ -370,6 +600,30 @@ impl<'a> IntoIterator for &'a UnixListener {
 /// It will never return `None`.
 ///
 /// [`UnixListener`]: struct.UnixListener.html
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::thread;
+/// use mio::net::stdnet::{UnixStream, UnixListener};
+///
+/// fn handle_client(stream: UnixStream) {
+///     // ...
+/// }
+///
+/// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
+///
+/// for stream in listener.incoming() {
+///     match stream {
+///         Ok(stream) => {
+///             thread::spawn(|| handle_client(stream));
+///         }
+///         Err(err) => {
+///             break;
+///         }
+///     }
+/// }
+/// ```
 #[derive(Debug)]
 pub struct Incoming<'a> {
     listener: &'a UnixListener,
