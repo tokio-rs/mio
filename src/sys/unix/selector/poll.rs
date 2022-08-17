@@ -233,7 +233,9 @@ impl SelectorState {
         }
 
         // Perform the poll.
+        log::trace!("POLLing on {:?}", fds);
         let num_events = poll(&mut fds.poll_fds, deadline)?;
+        log::trace!("Poll finished: {:?}", fds);
         let notified = fds.poll_fds[0].0.revents != 0;
         let num_fd_events = if notified { num_events - 1 } else { num_events };
 

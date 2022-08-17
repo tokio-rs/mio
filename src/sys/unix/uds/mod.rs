@@ -93,10 +93,8 @@ cfg_os_poll! {
         // there is an error, the file descriptors are closed.
         #[cfg(any(target_os = "ios", target_os = "macos", target_os = "haiku"))]
         {
-            syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
-            syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
-            syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
-            syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
+            syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC | libc::O_NONBLOCK))?;
+            syscall!(fcntl(fds[1], libc::F_SETFL, libc::FD_CLOEXEC | libc::O_NONBLOCK))?;
         }
         Ok(pair)
     }

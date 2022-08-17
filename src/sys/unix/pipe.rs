@@ -180,8 +180,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         }
 
         for fd in &fds {
-            if libc::fcntl(*fd, libc::F_SETFL, libc::O_NONBLOCK) != 0
-                || libc::fcntl(*fd, libc::F_SETFD, libc::FD_CLOEXEC) != 0
+            if libc::fcntl(*fd, libc::F_SETFL, libc::O_NONBLOCK | libc::FD_CLOEXEC) != 0
             {
                 let err = io::Error::last_os_error();
                 // Don't leak file descriptors. Can't handle error though.

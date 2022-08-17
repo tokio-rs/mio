@@ -1,39 +1,39 @@
-use std::io;
-
-use mio::{Poll, Events, Interest, Token};
-use mio::unix::pipe;
-use std::io::Read;
-
-const PIPE_RECV: Token = Token(0);
-
-fn main() -> io::Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use std::thread;
+    use std::time::Duration;
+    use std::sync::Arc;
+    use mio::{Events, Token, Poll, Waker};
     env_logger::init();
 
-// Same setup as in the example above.
+    const WAKE_TOKEN: Token = Token(10);
     let mut poll = Poll::new()?;
-    let mut events = Events::with_capacity(8);
-    let (sender, mut receiver) = pipe::new()?;
-    poll.registry().register(&mut receiver, PIPE_RECV, Interest::READABLE)?;
-// Drop the sender.
-    drop(sender);
+    let mut events = Events::with_capacity(2);
+    let waker = Arc::new(Waker::new(poll.registry(), WAKE_TOKEN)?);
+// We need to keep the Waker alive, so we'll create a clone for the
+// thread we create below.
+    let waker1 = waker.clone();
+    let handle = thread::spawn(move || {
+        // Working hard, or hardly working?
+        thread::sleep(Duration::from_millis(500));
+        log::trace!("WAKING!");
+        // Now we'll wake the queue on the other thread.
+        waker1.wake().expect("unable to wake");
+    });
+// On our current thread we'll poll for events, without a timeout.
     poll.poll(&mut events, None)?;
-    for event in events.iter() {
-        log::info!("Got event {:?}", event);
-        match event.token() {
-            PIPE_RECV if event.is_read_closed() => {
-                // Detected that the sender was dropped.
-                println!("Sender dropped!");
-                return Ok(());
-            },
-            PIPE_RECV => {
-                // Some platforms don't support detecting that the write end has been closed
-                println!("Receiving end is readable, but doesn't know the write has been closed!");
-                let mut buf = [0u8; 1];
-                assert_eq!(receiver.read(&mut buf).ok(), Some(0));
-                return Ok(());
-            }
-            _ => unreachable!(),
-        }
-    }
-    unreachable!();
-    }
+// After about 500 milliseconds we should be awoken by the other thread and
+// get a single event.
+    assert!(!events.is_empty());
+    let waker_event = events.iter().next().unwrap();
+    assert!(waker_event.is_readable());
+    assert_eq!(waker_event.token(), WAKE_TOKEN);
+// We need to tell the waker that we woke up, us otherwise
+// it might wake us again when polling
+    log::trace!("Signalling waker it did wake!");
+    waker.did_wake();
+
+    log::trace!("About to join thread!");
+handle.join().unwrap();
+    log::trace!("Thread joined!");
+    Ok(())
+}
