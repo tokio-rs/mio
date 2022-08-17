@@ -223,55 +223,59 @@ impl SelectorState {
 
         let mut fds = self.fds.lock().unwrap();
 
-        // Complete all current operations.
         loop {
-            if self.waiting_operations.load(Ordering::SeqCst) == 0 {
-                break;
-            }
-
-            fds = self.operations_complete.wait(fds).unwrap();
-        }
-
-        // Perform the poll.
-        log::trace!("POLLing on {:?}", fds);
-        let num_events = poll(&mut fds.poll_fds, deadline)?;
-        log::trace!("Poll finished: {:?}", fds);
-        let notified = fds.poll_fds[0].0.revents != 0;
-        let num_fd_events = if notified { num_events - 1 } else { num_events };
-
-        // Read all notifications.
-        if notified {
-            if self.notify_read != self.notify_write {
-                // When using the `pipe` syscall, we have to read all accumulated notifications in the pipe.
-                while syscall!(read(self.notify_read, &mut [0; 64] as *mut _ as *mut _, 64)).is_ok()
-                {
+            // Complete all current operations.
+            loop {
+                if self.waiting_operations.load(Ordering::SeqCst) == 0 {
+                    break;
                 }
-            } else {
-                // When using the `eventfd` syscall, it is OK to read just once, so as to clear the counter.
-                // In fact, reading in a loop will result in an endless loop on the ESP-IDF
-                // which is not following the specification strictly.
-                let _ = self.pop_notification();
+
+                fds = self.operations_complete.wait(fds).unwrap();
             }
-        }
 
-        // Store the events if there were any.
-        if num_fd_events > 0 {
-            let fds = &mut *fds;
+            // Perform the poll.
+            log::trace!("POLLing on {:?}", fds);
+            let num_events = poll(&mut fds.poll_fds, deadline)?;
+            log::trace!("Poll finished: {:?}", fds);
+            let notified = fds.poll_fds[0].0.revents != 0;
+            let num_fd_events = if notified { num_events - 1 } else { num_events };
 
-            events.reserve(num_fd_events);
-            for fd_data in fds.fd_data.values_mut() {
-                let PollFd(poll_fd) = &mut fds.poll_fds[fd_data.poll_fds_index];
-                if poll_fd.revents != 0 {
-                    // Store event
-                    events.push(Event {
-                        token: fd_data.token,
-                        events: poll_fd.revents,
-                    });
+            // Read all notifications.
+            if notified {
+                if self.notify_read != self.notify_write {
+                    // When using the `pipe` syscall, we have to read all accumulated notifications in the pipe.
+                    while syscall!(read(self.notify_read, &mut [0; 64] as *mut _ as *mut _, 64))
+                        .is_ok()
+                    {}
+                } else {
+                    // When using the `eventfd` syscall, it is OK to read just once, so as to clear the counter.
+                    // In fact, reading in a loop will result in an endless loop on the ESP-IDF
+                    // which is not following the specification strictly.
+                    let _ = self.pop_notification();
+                }
+            }
 
-                    if events.len() == num_fd_events {
-                        break;
+            // Store the events if there were any.
+            if num_fd_events > 0 {
+                let fds = &mut *fds;
+
+                events.reserve(num_fd_events);
+                for fd_data in fds.fd_data.values_mut() {
+                    let PollFd(poll_fd) = &mut fds.poll_fds[fd_data.poll_fds_index];
+                    if poll_fd.revents != 0 {
+                        // Store event
+                        events.push(Event {
+                            token: fd_data.token,
+                            events: poll_fd.revents,
+                        });
+
+                        if events.len() == num_fd_events {
+                            break;
+                        }
                     }
                 }
+
+                break;
             }
         }
 
