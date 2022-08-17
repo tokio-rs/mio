@@ -1,4 +1,4 @@
-#![cfg(all(unix, feature = "os-poll", feature = "net"))]
+#![cfg(all(unix, not(target_os = "haiku"), feature = "os-poll", feature = "net"))]
 
 use mio::net::UnixDatagram;
 use mio::{Interest, Token};

@@ -107,7 +107,7 @@ fn issue_1205() {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "haiku")))]
 fn issue_1403() {
     use mio::net::UnixDatagram;
     use util::temp_file;

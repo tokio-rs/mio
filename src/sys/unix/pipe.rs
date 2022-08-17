@@ -109,22 +109,21 @@ use crate::{event, Interest, Registry, Token};
 ///
 /// ```
 /// # use std::io;
+/// # use std::io::Read;
 /// #
 /// # use mio::{Poll, Events, Interest, Token};
 /// # use mio::unix::pipe;
 /// #
 /// # const PIPE_RECV: Token = Token(0);
-/// # const PIPE_SEND: Token = Token(1);
 /// #
 /// # fn main() -> io::Result<()> {
 /// // Same setup as in the example above.
 /// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(8);
 ///
-/// let (mut sender, mut receiver) = pipe::new()?;
+/// let (sender, mut receiver) = pipe::new()?;
 ///
 /// poll.registry().register(&mut receiver, PIPE_RECV, Interest::READABLE)?;
-/// poll.registry().register(&mut sender, PIPE_SEND, Interest::WRITABLE)?;
 ///
 /// // Drop the sender.
 /// drop(sender);
@@ -138,6 +137,15 @@ use crate::{event, Interest, Registry, Token};
 ///             println!("Sender dropped!");
 ///             return Ok(());
 ///         },
+///         PIPE_RECV => {
+///             // Some platforms only signal a read readines event
+///             println!("Pipe is readable due to dropped sender!");
+///
+///             // Reading from a closed pipe always returns Ok(0)
+///             let mut buf = [0; 1];
+///             assert_eq!(receiver.read(&mut buf).ok(), Some(0));
+///             return Ok(());
+///         }
 ///         _ => unreachable!(),
 ///     }
 /// }
