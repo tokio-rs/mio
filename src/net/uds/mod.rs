@@ -1,4 +1,6 @@
+#[cfg(not(target_os = "haiku"))]
 mod datagram;
+#[cfg(not(target_os = "haiku"))]
 pub use self::datagram::UnixDatagram;
 
 mod listener;

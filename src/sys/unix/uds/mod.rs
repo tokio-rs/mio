@@ -20,6 +20,7 @@ cfg_os_poll! {
     use std::path::Path;
     use std::{io, mem};
 
+    #[cfg(not(target_os = "haiku"))]
     pub(crate) mod datagram;
     pub(crate) mod listener;
     pub(crate) mod stream;

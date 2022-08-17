@@ -36,4 +36,6 @@ pub use self::udp::UdpSocket;
 #[cfg(unix)]
 mod uds;
 #[cfg(unix)]
-pub use self::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
+pub use self::uds::{SocketAddr, UnixListener, UnixStream};
+#[cfg(all(unix, not(target_os = "haiku")))]
+pub use self::uds::UnixDatagram;
