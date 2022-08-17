@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 use std::os::unix::io::RawFd;
-use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 use std::{fmt, io};
@@ -380,6 +380,16 @@ impl SelectorState {
             std::mem::size_of::<NotifyType>()
         ))?;
         Ok(())
+    }
+}
+
+impl Drop for SelectorState {
+    fn drop(&mut self) {
+        let _ = syscall!(close(self.notify_read));
+
+        if self.notify_read != self.notify_write {
+            let _ = syscall!(close(self.notify_write));
+        }
     }
 }
 
