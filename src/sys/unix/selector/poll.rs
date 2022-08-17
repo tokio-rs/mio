@@ -472,6 +472,7 @@ pub mod event {
             || ((event.events & libc::POLLIN) != 0 && (event.events & libc::POLLRDHUP) != 0)
     }
 
+    #[cfg(target_os = "haiku")]
     pub fn is_read_closed(event: &Event) -> bool {
         event.events & libc::POLLHUP != 0
     }
