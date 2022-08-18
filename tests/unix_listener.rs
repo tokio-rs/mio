@@ -138,7 +138,7 @@ fn unix_listener_deregister() {
 
 #[cfg(target_os = "linux")]
 #[test]
-fn unix_listener_abstract_namesapce() {
+fn unix_listener_abstract_namespace() {
     use rand::Rng;
     let num: u64 = rand::thread_rng().gen();
     let name = format!("\u{0000}-mio-abstract-uds-{}", num);
@@ -187,6 +187,57 @@ where
     assert!(listener.take_error().unwrap().is_none());
 
     barrier.wait();
+    handle.join().unwrap();
+}
+
+#[test]
+fn unix_listener_multiple_accepts() {
+    let (mut poll, mut events) = init_with_poll();
+    let barrier = Arc::new(Barrier::new(2));
+    let path = temp_file("unix_listener_multiple_accepts");
+    let mut buf = [0; DEFAULT_BUF_SIZE];
+
+    let mut listener = UnixListener::bind(&path).unwrap();
+
+    assert_socket_non_blocking(&listener);
+    assert_socket_close_on_exec(&listener);
+
+    poll.registry()
+        .register(
+            &mut listener,
+            TOKEN_1,
+            Interest::WRITABLE.add(Interest::READABLE),
+        )
+        .unwrap();
+    expect_no_events(&mut poll, &mut events);
+
+    let handle = open_connections(path, 2, barrier.clone());
+
+    // First connection is opened, try to accept and read.
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+    );
+
+    let (mut stream1, _) = listener.accept().unwrap();
+    assert_would_block(stream1.read(&mut buf));
+    barrier.wait();
+
+    // Second connection is opened, try to accept and read.
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+    );
+
+    let (mut stream1, _) = listener.accept().unwrap();
+    assert_would_block(stream1.read(&mut buf));
+    barrier.wait();
+
+    // We don't expect any more connections.
+    assert_would_block(listener.accept());
+    assert!(listener.take_error().unwrap().is_none());
     handle.join().unwrap();
 }
 
