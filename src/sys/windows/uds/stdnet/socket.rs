@@ -16,11 +16,14 @@ use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 use windows_sys::Win32::System::WindowsProgramming::INFINITE;
 use windows_sys::Win32::Networking::WinSock::{self, INVALID_SOCKET, SOCKADDR, SOCKET, SOCKET_ERROR, SOL_SOCKET, SO_ERROR, WSADuplicateSocketW, WSAPROTOCOL_INFOW, WSASocketW, accept, closesocket, getsockopt as c_getsockopt, ioctlsocket, recv, send, setsockopt as c_setsockopt, shutdown};
 
+use crate::sys::windows::net::init;
+
 #[derive(Debug)]
 pub struct Socket(SOCKET);
 
 impl Socket {
     pub fn new() -> io::Result<Socket> {
+        init();
         let socket = wsa_syscall!(
             WSASocketW(
                 WinSock::AF_UNIX.into(),
@@ -28,14 +31,12 @@ impl Socket {
                 0,
                 ptr::null_mut(),
                 0,
-                WinSock::WSA_FLAG_OVERLAPPED,
+                WinSock::WSA_FLAG_OVERLAPPED | WinSock::WSA_FLAG_NO_HANDLE_INHERIT,
             ),
             PartialEq::eq,
             INVALID_SOCKET
         )?;
-        let socket = Socket(socket);
-        socket.set_no_inherit()?;
-        Ok(socket)
+        Ok(Socket(socket))
     }
 
     pub fn accept(&self, storage: *mut SOCKADDR, len: *mut c_int) -> io::Result<Socket> {
@@ -60,21 +61,19 @@ impl Socket {
             PartialEq::eq,
             SOCKET_ERROR
         )?;
-        let n = wsa_syscall!(
+        let socket = wsa_syscall!(
             WSASocketW(
                 info.iAddressFamily,
                 info.iSocketType,
                 info.iProtocol,
                 &mut info,
                 0,
-                WinSock::WSA_FLAG_OVERLAPPED,
+                WinSock::WSA_FLAG_OVERLAPPED | WinSock::WSA_FLAG_NO_HANDLE_INHERIT,
             ),
             PartialEq::eq,
             INVALID_SOCKET
         )?;
-        let socket = Socket(n);
-        socket.set_no_inherit()?;
-        Ok(socket)
+        Ok(Socket(socket))
     }
 
     fn recv_with_flags(&self, buf: &mut [u8], flags: c_int) -> io::Result<usize> {
@@ -103,7 +102,6 @@ impl Socket {
             let buf = unsafe { std::slice::from_raw_parts_mut(wsa_buf.buf, len.try_into().unwrap()) };
             total += self.recv_with_flags(buf, 0)?;
         }
-        println!("Wrote vectored: {total:?}, {bufs:?}");
         Ok(total as usize)
     }
 
@@ -122,7 +120,6 @@ impl Socket {
             let wsa_buf = unsafe { *(slice as *const _ as *const WinSock::WSABUF) };
             let len = wsa_buf.len;
             let buf = unsafe { std::slice::from_raw_parts(wsa_buf.buf, len.try_into().unwrap()) };
-            dbg!(buf);
             let ret = wsa_syscall!(
                 send(self.0, buf as *const _ as *const _, len as c_int, 0),
                 PartialEq::eq,
@@ -130,7 +127,6 @@ impl Socket {
             )?;
             total += ret;
         }
-        println!("Wrote vectored: {total:?}, {bufs:?}");
         Ok(total as usize)
     }
 

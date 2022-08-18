@@ -10,7 +10,6 @@ use std::time::Duration;
 
 use windows_sys::Win32::Networking::WinSock::{self, bind, connect, getpeername, getsockname, listen, SO_RCVTIMEO, SOCKET_ERROR, SO_SNDTIMEO};
 
-use crate::sys::windows::net::init;
 use super::socket::Socket;
 use super::{socket_addr, SocketAddr};
 
@@ -61,23 +60,23 @@ impl UnixStream {
     /// };
     /// ```
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
-        init();
-        fn inner(path: &Path) -> io::Result<UnixStream> {
-            let inner = Socket::new()?;
-            let (addr, len) = socket_addr(path)?;
+        let inner = Socket::new()?;
+        let (addr, len) = socket_addr(path.as_ref())?;
 
-            wsa_syscall!(
-                connect(
-                    inner.as_raw_socket() as _,
-                    &addr as *const _ as *const _,
-                    len as i32,
-                ),
-                PartialEq::eq,
-                SOCKET_ERROR
-            )?;
-            Ok(UnixStream(inner))
+        match wsa_syscall!(
+            connect(
+                inner.as_raw_socket() as _,
+                &addr as *const _ as *const _,
+                len as i32,
+            ),
+            PartialEq::eq,
+            SOCKET_ERROR
+        ) {
+            Ok(_) => {},
+            Err(ref err) if err.raw_os_error() == Some(WinSock::WSAEINPROGRESS) => {},
+            Err(e) => return Err(e)
         }
-        inner(path.as_ref())
+        Ok(UnixStream(inner))
     }
 
     /// Creates a new independently owned handle to the underlying socket.
@@ -212,7 +211,6 @@ impl UnixStream {
         let file_path = dir.path().join("socket");
         let a: Arc<RwLock<Option<io::Result<UnixStream>>>> = Arc::new(RwLock::new(None));
         let ul = UnixListener::bind(&file_path).unwrap();
-        ul.set_nonblocking(true)?;
         let server = {
             let a = a.clone();
             spawn(move || {
@@ -222,7 +220,6 @@ impl UnixStream {
             })
         };
         let stream1 = UnixStream::connect(&file_path)?;
-        stream1.set_nonblocking(true)?;
         server
             .join()
             .map_err(|_| io::Error::from(io::ErrorKind::ConnectionRefused))?;
@@ -423,29 +420,24 @@ impl UnixListener {
     /// };
     /// ```
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
-        init();
-        fn inner(path: &Path) -> io::Result<UnixListener> {
-            let inner = Socket::new()?;
-            let (addr, len) = socket_addr(path)?;
+        let inner = Socket::new()?;
+        let (addr, len) = socket_addr(path.as_ref())?;
 
-            wsa_syscall!(
-                bind(
-                    inner.as_raw_socket() as _,
-                    &addr as *const _ as *const _,
-                    len as _,
-                ),
-                PartialEq::eq,
-                SOCKET_ERROR
-            )?;
-            wsa_syscall!(
-                listen(inner.as_raw_socket() as _, 128),
-                PartialEq::eq,
-                SOCKET_ERROR
-            )?;
-
-            Ok(UnixListener(inner))
-        }
-        inner(path.as_ref())
+        wsa_syscall!(
+            bind(
+                inner.as_raw_socket() as _,
+                &addr as *const _ as *const _,
+                len as _,
+            ),
+            PartialEq::eq,
+            SOCKET_ERROR
+        )?;
+        wsa_syscall!(
+            listen(inner.as_raw_socket() as _, 128),
+            PartialEq::eq,
+            SOCKET_ERROR
+        )?;
+        Ok(UnixListener(inner))
     }
 
     /// Accepts a new incoming connection to this listener.
@@ -469,10 +461,23 @@ impl UnixListener {
     /// }
     /// ```
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        let mut storage: WinSock::sockaddr_un = unsafe { mem::zeroed() };
-        let mut len = mem::size_of_val(&storage) as c_int;
-        let sock = self.0.accept(&mut storage as *mut _ as *mut _, &mut len)?;
-        let addr = SocketAddr::from_parts(storage, len);
+        let sockaddr = mem::MaybeUninit::<WinSock::sockaddr_un>::zeroed();
+
+        // This is safe to assume because a `WinSock::sockaddr_un` filled with `0`
+        // bytes is properly initialized.
+        //
+        // `0` is a valid value for `sockaddr_un::sun_family`; it is
+        // `WinSock::AF_UNSPEC`.
+        //
+        // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
+        // abstract path.
+        let mut sockaddr = unsafe { sockaddr.assume_init() };
+
+        sockaddr.sun_family = WinSock::AF_UNIX;
+        let mut socklen = mem::size_of_val(&sockaddr) as c_int;
+
+        let sock = self.0.accept(&mut sockaddr as *mut _ as *mut _, &mut socklen)?;
+        let addr = SocketAddr::from_parts(sockaddr, socklen);
         Ok((UnixStream(sock), addr))
     }
 
