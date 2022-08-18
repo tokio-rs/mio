@@ -220,15 +220,6 @@ fn unix_stream_shutdown_write() {
         vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
     );
 
-    // TODO: have to re-register here to reset user_events
-    poll.registry()
-        .reregister(
-            &mut stream,
-            TOKEN_1,
-            Interest::WRITABLE.add(Interest::READABLE),
-        )
-        .unwrap();
-
     checked_write!(stream.write(DATA1));
     expect_events(
         &mut poll,
@@ -462,14 +453,6 @@ where
     expect_read!(stream.read(&mut buf), DATA1);
 
     assert!(stream.take_error().unwrap().is_none());
-    // TODO: have to re-register here to reset user_events
-    poll.registry()
-        .reregister(
-            &mut stream,
-            TOKEN_1,
-            Interest::WRITABLE.add(Interest::READABLE),
-        )
-        .unwrap();
 
     let bufs = [IoSlice::new(DATA1), IoSlice::new(DATA2)];
     let wrote = stream.write_vectored(&bufs).unwrap();
