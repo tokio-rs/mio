@@ -92,7 +92,8 @@ impl UnixStream {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(unix, doc = "```")]
+    #[cfg_attr(windows, doc = "```ignore")]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -132,6 +133,73 @@ impl UnixStream {
     ///         Ok(res as usize)
     ///     } else {
     ///         // If EAGAIN or EWOULDBLOCK is set by libc::recv, the closure
+    ///         // should return `WouldBlock` error.
+    ///         Err(io::Error::last_os_error())
+    ///     }
+    /// })?;
+    /// eprintln!("read {} bytes", n);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    #[cfg_attr(windows, doc = "```")]
+    #[cfg_attr(unix, doc = "```ignore")]
+    /// # use std::error::Error;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// use std::io;
+    /// use std::os::windows::io::AsRawSocket;
+    /// use std::os::raw::c_int;
+    /// use mio::net::UnixStream;
+    /// use windows_sys::Win32::Networking::WinSock;
+    /// use std::convert::TryInto;
+    ///
+    /// let (stream1, stream2) = UnixStream::pair()?;
+    ///
+    /// // Wait until the stream is writable...
+    ///
+    /// // Write to the stream using a direct WinSock call, of course the
+    /// // `io::Write` implementation would be easier to use.
+    /// let buf = b"hello";
+    /// let n = stream1.try_io(|| {
+    ///     let res = unsafe {
+    ///         WinSock::send(
+    ///             stream1.as_raw_socket().try_into().unwrap(),
+    ///             &buf as *const _ as *const _,
+    ///             buf.len() as c_int,
+    ///             0
+    ///         )
+    ///     };
+    ///     if res != WinSock::SOCKET_ERROR {
+    ///         Ok(res as usize)
+    ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by WinSock::send, the closure
+    ///         // should return `WouldBlock` error.
+    ///         Err(io::Error::from_raw_os_error(unsafe {
+    ///             WinSock::WSAGetLastError()
+    ///         }))
+    ///     }
+    /// })?;
+    /// eprintln!("write {} bytes", n);
+    ///
+    /// // Wait until the stream is readable...
+    ///
+    /// // Read from the stream using a direct WinSock call, of course the
+    /// // `io::Read` implementation would be easier to use.
+    /// let mut buf = [0; 512];
+    /// let n = stream2.try_io(|| {
+    ///     let res = unsafe {
+    ///         WinSock::recv(
+    ///             stream2.as_raw_socket().try_into().unwrap(),
+    ///             &mut buf as *mut _ as *mut _,
+    ///             buf.len() as c_int,
+    ///             0
+    ///         )
+    ///     };
+    ///     if res != WinSock::SOCKET_ERROR {
+    ///         Ok(res as usize)
+    ///     } else {
+    ///         // If EAGAIN or EWOULDBLOCK is set by WinSock::recv, the closure
     ///         // should return `WouldBlock` error.
     ///         Err(io::Error::last_os_error())
     ///     }

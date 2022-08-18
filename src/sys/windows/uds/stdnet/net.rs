@@ -5,13 +5,59 @@ use std::mem;
 use std::net::Shutdown;
 use std::os::raw::c_int;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use windows_sys::Win32::Networking::WinSock::{self, bind, connect, getpeername, getsockname, listen, SO_RCVTIMEO, SOCKET_ERROR, SO_SNDTIMEO};
 
 use super::socket::Socket;
 use super::{socket_addr, SocketAddr};
+use rand::{distributions::Alphanumeric, Rng};
+
+struct TempPath(PathBuf);
+
+impl TempPath {
+    fn new(random_len: usize) -> io::Result<Self> {
+        let dir = std::env::temp_dir();
+        // Retry a few times in case of collisions
+        for _ in 0..10 {
+            let rand_str: String = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(random_len)
+                .map(char::from)
+                .collect();
+            let filename = format!(".tmp-{rand_str}.socket");
+            let path = dir.join(filename);
+            if !path.exists() {
+                return Ok(Self(path));
+            }
+        }
+
+        Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "too many temporary files exist",
+        ))
+    }
+}
+
+impl Drop for TempPath {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+impl AsRef<Path> for TempPath {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl std::ops::Deref for TempPath {
+    type Target = Path;
+    fn deref(&self) -> &Path {
+        Path::new(&self.0)
+    }
+}
 
 /// A Unix stream socket
 ///
@@ -58,6 +104,7 @@ impl UnixStream {
     ///         return
     ///     }
     /// };
+    /// # drop(socket); // Silence unused variable warning.
     /// ```
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
         let inner = Socket::new()?;
@@ -93,6 +140,7 @@ impl UnixStream {
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// let sock_copy = socket.try_clone().expect("Couldn't clone socket");
+    /// # drop(sock_copy); // Silence unused variable warning.
     /// ```
     pub fn try_clone(&self) -> io::Result<UnixStream> {
         self.0.duplicate().map(UnixStream)
@@ -106,6 +154,7 @@ impl UnixStream {
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// let addr = socket.local_addr().expect("Couldn't get local address");
+    /// # drop(addr); // Silence unused variable warning.
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|addr, len| {
@@ -126,6 +175,7 @@ impl UnixStream {
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// let addr = socket.peer_addr().expect("Couldn't get peer address");
+    /// # drop(addr); // Silence unused variable warning.
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|addr, len| {
@@ -201,14 +251,15 @@ impl UnixStream {
     ///         println!("Couldn't create a pair of sockets: {e:?}");
     ///         return
     ///     }
-    /// }
+    /// };
+    /// # drop(sock1); // Silence unused variable warning.
+    /// # drop(sock2); // Silence unused variable warning.
     /// ```
     pub fn pair() -> io::Result<(Self, Self)> {
         use std::sync::{Arc, RwLock};
         use std::thread::spawn;
 
-        let dir = tempfile::tempdir()?;
-        let file_path = dir.path().join("socket");
+        let file_path = TempPath::new(10)?;
         let a: Arc<RwLock<Option<io::Result<UnixStream>>>> = Arc::new(RwLock::new(None));
         let ul = UnixListener::bind(&file_path).unwrap();
         let server = {
@@ -372,6 +423,7 @@ impl IntoRawSocket for UnixStream {
 ///
 /// fn handle_client(stream: UnixStream) {
 ///     // ...
+/// #   drop(stream); // Silence unused variable warning.
 /// }
 ///
 /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
@@ -385,6 +437,7 @@ impl IntoRawSocket for UnixStream {
 ///         }
 ///         Err(err) => {
 ///             /* connection failed */
+///             eprintln!("connection failed: {err}");
 ///             break;
 ///         }
 ///     }
@@ -418,6 +471,7 @@ impl UnixListener {
     ///         return
     ///     }
     /// };
+    /// # drop(listener); // Silence unused variable warning.
     /// ```
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
         let inner = Socket::new()?;
@@ -456,7 +510,7 @@ impl UnixListener {
     /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
     ///
     /// match listener.accept() {
-    ///     Ok((socket, addr)) => println!("Got a client: {:?}", addr),
+    ///     Ok((_socket, addr)) => println!("Got a client: {:?}", addr),
     ///     Err(e) => println!("accept function failed: {:?}", e),
     /// }
     /// ```
@@ -495,6 +549,7 @@ impl UnixListener {
     /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
     ///
     /// let listener_copy = listener.try_clone().expect("Couldn't clone socket");
+    /// # drop(listener_copy); // Silence unused variable warning.
     /// ```
     pub fn try_clone(&self) -> io::Result<UnixListener> {
         self.0.duplicate().map(UnixListener)
@@ -510,6 +565,7 @@ impl UnixListener {
     /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
     ///
     /// let addr = listener.local_addr().expect("Couldn't get local address");
+    /// # drop(addr); // Silence unused variable warning.
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|addr, len| {
@@ -568,6 +624,7 @@ impl UnixListener {
     ///
     /// fn handle_client(stream: UnixStream) {
     ///     // ...
+    /// #   drop(stream); // Silence unused variable warning.
     /// }
     ///
     /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
@@ -578,6 +635,7 @@ impl UnixListener {
     ///             thread::spawn(|| handle_client(stream));
     ///         }
     ///         Err(err) => {
+    ///             eprintln!("connection failed: {err}");
     ///             break;
     ///         }
     ///     }
@@ -631,6 +689,7 @@ impl<'a> IntoIterator for &'a UnixListener {
 ///
 /// fn handle_client(stream: UnixStream) {
 ///     // ...
+/// #   drop(stream); // Silence unused variable warning.
 /// }
 ///
 /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
@@ -641,6 +700,7 @@ impl<'a> IntoIterator for &'a UnixListener {
 ///             thread::spawn(|| handle_client(stream));
 ///         }
 ///         Err(err) => {
+///             eprintln!("connection failed: {err}");
 ///             break;
 ///         }
 ///     }
@@ -665,13 +725,8 @@ impl<'a> Iterator for Incoming<'a> {
 
 #[cfg(test)]
 mod test {
-    use tempfile;
-
     use std::io::{self, Read, Write};
-    use std::path::PathBuf;
     use std::thread;
-
-    use self::tempfile::TempDir;
 
     use super::*;
 
@@ -684,15 +739,9 @@ mod test {
         };
     }
 
-    fn tmpdir() -> Result<(TempDir, PathBuf), io::Error> {
-        let dir = tempfile::tempdir()?;
-        let path = dir.path().join("sock");
-        Ok((dir, path))
-    }
-
     #[test]
     fn basic() {
-        let (_dir, socket_path) = or_panic!(tmpdir());
+        let socket_path = TempPath::new(10).unwrap();
         let msg1 = b"hello";
         let msg2 = b"world!";
 
@@ -721,7 +770,7 @@ mod test {
 
     #[test]
     fn try_clone() {
-        let (_dir, socket_path) = or_panic!(tmpdir());
+        let socket_path = TempPath::new(10).unwrap();
         let msg1 = b"hello";
         let msg2 = b"world";
 
@@ -751,7 +800,7 @@ mod test {
 
     #[test]
     fn iter() {
-        let (_dir, socket_path) = or_panic!(tmpdir());
+        let socket_path = TempPath::new(10).unwrap();
 
         let listener = or_panic!(UnixListener::bind(&socket_path));
         let thread = thread::spawn(move || {
@@ -772,11 +821,7 @@ mod test {
 
     #[test]
     fn long_path() {
-        let dir = or_panic!(tempfile::tempdir());
-        let socket_path = dir.path().join(
-            "asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfa\
-             sasdfasdfasdasdfasdfasdfadfasdfasdfasdfasdfasdf",
-        );
+        let socket_path = TempPath::new(100).unwrap();
         match UnixStream::connect(&socket_path) {
             Err(ref e) if e.kind() == io::ErrorKind::InvalidInput => {}
             Err(e) => panic!("unexpected error {}", e),
