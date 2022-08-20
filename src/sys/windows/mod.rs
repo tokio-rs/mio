@@ -102,11 +102,15 @@ cfg_io_source! {
             F: FnOnce(&T) -> io::Result<R>,
         {
             let result = f(io);
-            self.inner.as_ref().map_or(Ok(()), |state| {
-                state
-                    .selector
-                    .reregister(state.sock_state.clone(), state.token, state.interests)
-            })?;
+            if let Err(ref e) = result {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.inner.as_ref().map_or(Ok(()), |state| {
+                        state
+                            .selector
+                            .reregister(state.sock_state.clone(), state.token, state.interests)
+                    })?;
+                }
+            }
             result
         }
 

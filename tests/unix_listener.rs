@@ -222,6 +222,7 @@ fn unix_listener_multiple_accepts() {
 
     let (mut stream1, _) = listener.accept().unwrap();
     assert_would_block(stream1.read(&mut buf));
+    assert_would_block(listener.accept());
     barrier.wait();
 
     // Second connection is opened, try to accept and read.
