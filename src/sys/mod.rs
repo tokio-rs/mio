@@ -59,7 +59,7 @@ cfg_os_poll! {
 
 #[cfg(windows)]
 cfg_os_poll! {
-    pub mod windows;
+    mod windows;
     pub use self::windows::*;
 }
 

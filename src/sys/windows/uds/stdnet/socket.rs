@@ -14,7 +14,7 @@ use windows_sys::Win32::Foundation::{
 };
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 use windows_sys::Win32::System::WindowsProgramming::INFINITE;
-use windows_sys::Win32::Networking::WinSock::{self, INVALID_SOCKET, SOCKADDR, SOCKET, SOCKET_ERROR, SOL_SOCKET, SO_ERROR, WSADuplicateSocketW, WSAPROTOCOL_INFOW, WSASocketW, accept, closesocket, getsockopt as c_getsockopt, ioctlsocket, recv, send, setsockopt as c_setsockopt, shutdown};
+use windows_sys::Win32::Networking::WinSock::{self, INVALID_SOCKET, SOCKADDR, SOCKET, SOCKET_ERROR, SOL_SOCKET, SO_ERROR, closesocket};
 
 use crate::sys::windows::net::init;
 
@@ -51,7 +51,7 @@ impl Socket {
     }
 
     pub fn duplicate(&self) -> io::Result<Socket> {
-        let mut info: WSAPROTOCOL_INFOW = unsafe { mem::zeroed() };
+        let mut info: WinSock::WSAPROTOCOL_INFOW = unsafe { mem::zeroed() };
         wsa_syscall!(
             WSADuplicateSocketW(
                 self.0,
@@ -205,14 +205,13 @@ impl Socket {
     }
 }
 
-pub fn setsockopt<T>(sock: &Socket, opt: c_int, val: c_int, payload: T) -> io::Result<()> {
-    let payload = &payload as *const T as *const _;
+fn setsockopt<T>(sock: &Socket, opt: c_int, val: c_int, payload: T) -> io::Result<()> {
     wsa_syscall!(
-        c_setsockopt(
+        setsockopt(
             sock.as_raw_socket() as usize,
             opt,
             val,
-            payload,
+            &payload as *const T as *const _,
             mem::size_of::<T>() as i32,
         ),
         PartialEq::eq,
@@ -221,11 +220,11 @@ pub fn setsockopt<T>(sock: &Socket, opt: c_int, val: c_int, payload: T) -> io::R
     Ok(())
 }
 
-pub fn getsockopt<T: Copy>(sock: &Socket, opt: c_int, val: c_int) -> io::Result<T> {
+fn getsockopt<T: Copy>(sock: &Socket, opt: c_int, val: c_int) -> io::Result<T> {
     let mut slot: T = unsafe { mem::zeroed() };
     let mut len = mem::size_of::<T>() as i32;
     wsa_syscall!(
-        c_getsockopt(
+        getsockopt(
             sock.as_raw_socket() as _,
             opt,
             val,

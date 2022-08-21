@@ -3,11 +3,7 @@ pub use self::stdnet::SocketAddr;
 
 cfg_os_poll! {
     use std::convert::TryInto;
-    use windows_sys::Win32::Networking::WinSock::{
-        getsockname,
-        getpeername,
-        SOCKET_ERROR
-    };
+    use windows_sys::Win32::Networking::WinSock::SOCKET_ERROR;
     use std::os::windows::io::RawSocket;
     use std::io;
 

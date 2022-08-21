@@ -32,12 +32,13 @@ pub use self::tcp::{TcpListener, TcpStream};
 mod udp;
 #[cfg(not(target_os = "wasi"))]
 pub use self::udp::UdpSocket;
-
-#[cfg(any(unix, windows))]
+#[cfg(not(target_os = "wasi"))]
 mod uds;
-#[cfg(any(unix, windows))]
+#[cfg(not(target_os = "wasi"))]
 pub use self::uds::{SocketAddr, UnixListener, UnixStream};
+
 #[cfg(unix)]
 pub use self::uds::UnixDatagram;
+
 #[cfg(windows)]
-pub use self::uds::stdnet;
+pub use crate::sys::uds::stdnet;

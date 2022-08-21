@@ -33,11 +33,10 @@ cfg_net! {
 
     macro_rules! wsa_syscall {
         ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
-            let res = unsafe { $fn($($arg, )*) };
+            let res = unsafe { windows_sys::Win32::Networking::WinSock::$fn($($arg, )*) };
             if $err_test(&res, &$err_value) {
-                use windows_sys::Win32::Networking::WinSock::WSAGetLastError;
                 Err(io::Error::from_raw_os_error(unsafe {
-                    WSAGetLastError()
+                    windows_sys::Win32::Networking::WinSock::WSAGetLastError()
                 }))
             } else {
                 Ok(res)
