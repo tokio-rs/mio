@@ -6,7 +6,8 @@ use windows_sys::Win32::Networking::WinSock::{
     self, AF_INET, AF_INET6, SOCKET, SOCKET_ERROR, SOCK_STREAM,
 };
 
-use crate::sys::windows::net::{init, new_socket, socket_addr};
+use crate::sys::windows::net::{new_socket, socket_addr};
+use crate::sys::windows::std::net::init;
 
 pub(crate) fn new_for_addr(address: SocketAddr) -> io::Result<SOCKET> {
     init();

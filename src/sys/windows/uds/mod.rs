@@ -1,5 +1,4 @@
-pub mod stdnet;
-pub use self::stdnet::SocketAddr;
+pub use super::stdnet::SocketAddr;
 
 cfg_os_poll! {
     use std::convert::TryInto;

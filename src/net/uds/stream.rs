@@ -1,6 +1,8 @@
 use crate::io_source::IoSource;
 use crate::{event, sys, Interest, Registry, Token};
 
+#[cfg(windows)]
+use crate::sys::windows::std::net;
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
@@ -10,8 +12,6 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-#[cfg(windows)]
-use crate::sys::uds::{stdnet as net};
 use std::path::Path;
 
 /// A non-blocking Unix stream socket.

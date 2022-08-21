@@ -10,6 +10,3 @@ mod stream;
 pub use self::stream::UnixStream;
 
 pub use crate::sys::SocketAddr;
-
-#[cfg(windows)]
-pub use crate::sys::uds::stdnet;

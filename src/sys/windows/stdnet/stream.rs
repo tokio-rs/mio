@@ -1,14 +1,16 @@
-use std::{fmt, mem};
-use std::io::{self, IoSlice, IoSliceMut};
 use std::convert::TryInto;
+use std::io::{self, IoSlice, IoSliceMut};
 use std::net::Shutdown;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use std::{fmt, mem};
 
-use windows_sys::Win32::Networking::WinSock::{WSAEINPROGRESS, SO_RCVTIMEO, SOCKET_ERROR, SO_SNDTIMEO};
+use windows_sys::Win32::Networking::WinSock::{
+    SOCKET_ERROR, SO_RCVTIMEO, SO_SNDTIMEO, WSAEINPROGRESS,
+};
 
-use super::{socket_addr, SocketAddr, socket::Socket, UnixListener};
+use super::{socket::Socket, socket_addr, SocketAddr, UnixListener};
 use rand::{distributions::Alphanumeric, Rng};
 
 /// A Unix stream socket
@@ -71,9 +73,9 @@ impl UnixStream {
             PartialEq::eq,
             SOCKET_ERROR
         ) {
-            Ok(_) => {},
-            Err(ref err) if err.raw_os_error() == Some(WSAEINPROGRESS) => {},
-            Err(e) => return Err(e)
+            Ok(_) => {}
+            Err(ref err) if err.raw_os_error() == Some(WSAEINPROGRESS) => {}
+            Err(e) => return Err(e),
         }
         Ok(UnixStream(inner))
     }
@@ -227,7 +229,7 @@ impl UnixStream {
             .join()
             .map_err(|_| io::Error::from(io::ErrorKind::ConnectionRefused))?;
         let stream0 = (*(a.write().unwrap())).take().unwrap()?;
-        return Ok((stream0, stream1));
+        Ok((stream0, stream1))
     }
 
     /// Sets the read timeout to the timeout specified.
@@ -334,7 +336,6 @@ impl<'a> io::Write for &'a UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.send(buf)
     }
-
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.0.send_vectored(bufs)

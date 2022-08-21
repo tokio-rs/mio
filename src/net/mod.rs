@@ -39,6 +39,3 @@ pub use self::uds::{SocketAddr, UnixListener, UnixStream};
 
 #[cfg(unix)]
 pub use self::uds::UnixDatagram;
-
-#[cfg(windows)]
-pub use crate::sys::uds::stdnet;

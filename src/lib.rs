@@ -91,6 +91,8 @@ pub mod windows {
     //! Windows only extensions.
 
     pub use crate::sys::named_pipe::NamedPipe;
+
+    pub use crate::sys::windows::std;
 }
 
 pub mod features {

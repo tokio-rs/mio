@@ -2,8 +2,8 @@ use std::io;
 use std::os::windows::io::AsRawSocket;
 use std::path::Path;
 
-use super::{stdnet as net};
 use crate::net::{SocketAddr, UnixStream};
+use crate::sys::windows::std::net;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
     let listener = net::UnixListener::bind(path)?;
@@ -13,7 +13,9 @@ pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
 
 pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
     listener.set_nonblocking(true)?;
-    listener.accept().map(|(stream, addr)| (UnixStream::from_std(stream), addr))
+    listener
+        .accept()
+        .map(|(stream, addr)| (UnixStream::from_std(stream), addr))
 }
 
 pub(crate) fn local_addr(listener: &net::UnixListener) -> io::Result<SocketAddr> {

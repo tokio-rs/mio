@@ -2,14 +2,14 @@ use crate::io_source::IoSource;
 use crate::net::{SocketAddr, UnixStream};
 use crate::{event, sys, Interest, Registry, Token};
 
+#[cfg(windows)]
+use crate::sys::windows::std::net;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(unix)]
 use std::os::unix::net;
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-#[cfg(windows)]
-use crate::sys::uds::{stdnet as net};
 use std::path::Path;
 use std::{fmt, io};
 
@@ -41,9 +41,8 @@ impl UnixListener {
     /// The call is responsible for ensuring that the listening socket is in
     /// non-blocking mode.
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        self.inner.do_io(|inner| {
-            sys::uds::listener::accept(&*inner)
-        })
+        self.inner
+            .do_io(|inner| sys::uds::listener::accept(&*inner))
     }
 
     /// Returns the local socket address of this listener.

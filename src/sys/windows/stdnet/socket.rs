@@ -1,6 +1,6 @@
-use std::io::{self, IoSlice, IoSliceMut};
 use std::cmp::min;
 use std::convert::TryInto;
+use std::io::{self, IoSlice, IoSliceMut};
 use std::mem;
 use std::net::Shutdown;
 use std::os::raw::{c_int, c_ulong};
@@ -8,27 +8,14 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 use std::ptr;
 use std::time::Duration;
 
-use windows_sys::Win32::Foundation::{
-    HANDLE,
-    SetHandleInformation,
-    HANDLE_FLAG_INHERIT
+use super::init;
+use windows_sys::Win32::Foundation::{SetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT};
+use windows_sys::Win32::Networking::WinSock::{
+    self, closesocket, INVALID_SOCKET, SOCKADDR, SOCKET, SOCKET_ERROR, SOL_SOCKET, SO_ERROR,
+    WSABUF, WSAESHUTDOWN,
 };
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 use windows_sys::Win32::System::WindowsProgramming::INFINITE;
-use windows_sys::Win32::Networking::WinSock::{
-    self,
-    WSABUF,
-    INVALID_SOCKET,
-    SOCKADDR,
-    SOCKET,
-    SOCKET_ERROR,
-    SOL_SOCKET,
-    SO_ERROR,
-    closesocket,
-    WSAESHUTDOWN
-};
-
-use crate::sys::windows::net::init;
 
 /// Maximum size of a buffer passed to system call like `recv` and `send`.
 const MAX_BUF_LEN: usize = c_int::MAX as usize;
@@ -55,11 +42,7 @@ impl Socket {
     }
 
     pub fn accept(&self, storage: *mut SOCKADDR, len: *mut c_int) -> io::Result<Socket> {
-        let socket = wsa_syscall!(
-            accept(self.0, storage, len),
-            PartialEq::eq,
-            INVALID_SOCKET
-        )?;
+        let socket = wsa_syscall!(accept(self.0, storage, len), PartialEq::eq, INVALID_SOCKET)?;
         let socket = Socket(socket);
         socket.set_no_inherit()?;
         Ok(socket)
@@ -68,11 +51,7 @@ impl Socket {
     pub fn duplicate(&self) -> io::Result<Socket> {
         let mut info: WinSock::WSAPROTOCOL_INFOW = unsafe { mem::zeroed() };
         wsa_syscall!(
-            WSADuplicateSocketW(
-                self.0,
-                GetCurrentProcessId(),
-                &mut info,
-            ),
+            WSADuplicateSocketW(self.0, GetCurrentProcessId(), &mut info,),
             PartialEq::eq,
             SOCKET_ERROR
         )?;
@@ -81,7 +60,7 @@ impl Socket {
                 info.iAddressFamily,
                 info.iSocketType,
                 info.iProtocol,
-                &mut info,
+                &info,
                 0,
                 WinSock::WSA_FLAG_OVERLAPPED | WinSock::WSA_FLAG_NO_HANDLE_INHERIT,
             ),
@@ -93,12 +72,7 @@ impl Socket {
 
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         let ret = wsa_syscall!(
-            recv(
-                self.0,
-                buf.as_mut_ptr() as *mut _,
-                buf.len() as c_int,
-                0,
-            ),
+            recv(self.0, buf.as_mut_ptr() as *mut _, buf.len() as c_int, 0,),
             PartialEq::eq,
             SOCKET_ERROR
         )?;
@@ -209,7 +183,7 @@ impl Socket {
         let raw = getsockopt::<c_int>(
             self,
             SOL_SOCKET.try_into().unwrap(),
-            SO_ERROR.try_into().unwrap()
+            SO_ERROR.try_into().unwrap(),
         )?;
         if raw == 0 {
             Ok(None)

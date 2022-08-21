@@ -1,7 +1,7 @@
+use crate::sys::windows::std::net;
 use std::io;
-use std::os::windows::io::{AsRawSocket};
+use std::os::windows::io::AsRawSocket;
 use std::path::Path;
-use super::stdnet::{self as net};
 
 pub(crate) fn connect(path: &Path) -> io::Result<net::UnixStream> {
     let socket = net::UnixStream::connect(path)?;

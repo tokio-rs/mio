@@ -1,23 +1,11 @@
 use std::io;
 use std::mem;
 use std::net::SocketAddr;
-use std::sync::Once;
 
 use windows_sys::Win32::Networking::WinSock::{
     ioctlsocket, socket, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0, INVALID_SOCKET, IN_ADDR,
     IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0, SOCKET,
 };
-
-/// Initialise the network stack for Windows.
-pub(crate) fn init() {
-    static INIT: Once = Once::new();
-    INIT.call_once(|| {
-        // Let standard library call `WSAStartup` for us, we can't do it
-        // ourselves because otherwise using any type in `std::net` would panic
-        // when it tries to call `WSAStartup` a second time.
-        drop(std::net::UdpSocket::bind("127.0.0.1:0"));
-    });
-}
 
 /// Create a new non-blocking socket.
 pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: u16) -> io::Result<SOCKET> {

@@ -29,10 +29,12 @@ pub(super) fn socket_addr(path: &Path) -> io::Result<(sockaddr_un, c_int)> {
     sockaddr.sun_family = AF_UNIX;
 
     // Winsock2 expects 'sun_path' to be a Win32 UTF-8 file system path
-    let bytes = path.to_str().map(|s| s.as_bytes()).ok_or(io::Error::new(
-        io::ErrorKind::InvalidInput,
-        "path contains invalid characters",
-    ))?;
+    let bytes = path.to_str().map(|s| s.as_bytes()).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "path contains invalid characters",
+        )
+    })?;
 
     if bytes.contains(&0) {
         return Err(io::Error::new(
@@ -124,7 +126,11 @@ impl SocketAddr {
 
     /// Returns the contents of this address if it is a `pathname` address.
     pub fn as_pathname(&self) -> Option<&Path> {
-        if let AddressKind::Pathname(path) = self.address() { Some(path) } else { None }
+        if let AddressKind::Pathname(path) = self.address() {
+            Some(path)
+        } else {
+            None
+        }
     }
 
     fn address(&self) -> AddressKind<'_> {
@@ -138,7 +144,8 @@ impl SocketAddr {
             AddressKind::Abstract(&self.addr.sun_path[1..len])
         } else {
             use std::ffi::CStr;
-            let pathname = unsafe { CStr::from_bytes_with_nul_unchecked(&self.addr.sun_path[..len]) };
+            let pathname =
+                unsafe { CStr::from_bytes_with_nul_unchecked(&self.addr.sun_path[..len]) };
             AddressKind::Pathname(Path::new(pathname.to_str().unwrap()))
         }
     }

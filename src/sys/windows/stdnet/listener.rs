@@ -1,11 +1,11 @@
-use std::{mem, io, fmt};
 use std::os::raw::c_int;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::path::Path;
+use std::{fmt, io, mem};
 
 use windows_sys::Win32::Networking::WinSock::{sockaddr_un, AF_UNIX, SOCKET_ERROR};
 
-use super::{socket_addr, SocketAddr, socket::Socket, UnixStream};
+use super::{socket::Socket, socket_addr, SocketAddr, UnixStream};
 
 /// A Unix domain socket server
 ///
@@ -124,7 +124,9 @@ impl UnixListener {
         sockaddr.sun_family = AF_UNIX;
         let mut socklen = mem::size_of_val(&sockaddr) as c_int;
 
-        let sock = self.0.accept(&mut sockaddr as *mut _ as *mut _, &mut socklen)?;
+        let sock = self
+            .0
+            .accept(&mut sockaddr as *mut _ as *mut _, &mut socklen)?;
         let addr = SocketAddr::from_parts(sockaddr, socklen);
         Ok((UnixStream(sock), addr))
     }
@@ -235,7 +237,7 @@ impl UnixListener {
     ///     }
     /// }
     /// ```
-    pub fn incoming<'a>(&'a self) -> Incoming<'a> {
+    pub fn incoming(&self) -> Incoming<'_> {
         Incoming { listener: self }
     }
 }
