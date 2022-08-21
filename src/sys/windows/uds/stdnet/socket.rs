@@ -1,4 +1,5 @@
 use std::io::{self, IoSlice, IoSliceMut};
+use std::cmp::min;
 use std::convert::TryInto;
 use std::mem;
 use std::net::Shutdown;
@@ -14,9 +15,23 @@ use windows_sys::Win32::Foundation::{
 };
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 use windows_sys::Win32::System::WindowsProgramming::INFINITE;
-use windows_sys::Win32::Networking::WinSock::{self, INVALID_SOCKET, SOCKADDR, SOCKET, SOCKET_ERROR, SOL_SOCKET, SO_ERROR, closesocket};
+use windows_sys::Win32::Networking::WinSock::{
+    self,
+    WSABUF,
+    INVALID_SOCKET,
+    SOCKADDR,
+    SOCKET,
+    SOCKET_ERROR,
+    SOL_SOCKET,
+    SO_ERROR,
+    closesocket,
+    WSAESHUTDOWN
+};
 
 use crate::sys::windows::net::init;
+
+/// Maximum size of a buffer passed to system call like `recv` and `send`.
+const MAX_BUF_LEN: usize = c_int::MAX as usize;
 
 #[derive(Debug)]
 pub struct Socket(SOCKET);
@@ -76,13 +91,13 @@ impl Socket {
         Ok(Socket(socket))
     }
 
-    fn recv_with_flags(&self, buf: &mut [u8], flags: c_int) -> io::Result<usize> {
+    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         let ret = wsa_syscall!(
             recv(
                 self.0,
                 buf.as_mut_ptr() as *mut _,
                 buf.len() as c_int,
-                flags,
+                0,
             ),
             PartialEq::eq,
             SOCKET_ERROR
@@ -90,44 +105,71 @@ impl Socket {
         Ok(ret as usize)
     }
 
-    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.recv_with_flags(buf, 0)
-    }
-
-    pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+    pub fn recv_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let mut total = 0;
-        for slice in &mut *bufs {
-            let wsa_buf = unsafe { *(slice as *const _ as *const WinSock::WSABUF) };
-            let len = wsa_buf.len;
-            let buf = unsafe { std::slice::from_raw_parts_mut(wsa_buf.buf, len.try_into().unwrap()) };
-            total += self.recv_with_flags(buf, 0)?;
-        }
-        Ok(total as usize)
-    }
-
-    pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        let ret = wsa_syscall!(
-            send(self.0, buf as *const _ as *const _, buf.len() as c_int, 0),
+        let mut flags: u32 = 0;
+        let bufs = unsafe { &mut *(bufs as *mut [IoSliceMut<'_>] as *mut [WSABUF]) };
+        let res = wsa_syscall!(
+            WSARecv(
+                self.0,
+                bufs.as_mut_ptr().cast(),
+                min(bufs.len(), u32::MAX as usize) as u32,
+                &mut total,
+                &mut flags,
+                ptr::null_mut(),
+                None,
+            ),
             PartialEq::eq,
             SOCKET_ERROR
-        )?;
-        Ok(ret as usize)
+        );
+        match res {
+            Ok(_) => Ok(total as usize),
+            Err(ref err) if err.raw_os_error() == Some(WSAESHUTDOWN as i32) => Ok(0),
+            Err(err) => Err(err),
+        }
     }
 
-    pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
+        wsa_syscall!(
+            send(
+                self.0,
+                buf.as_ptr().cast(),
+                min(buf.len(), MAX_BUF_LEN) as c_int,
+                0,
+            ),
+            PartialEq::eq,
+            SOCKET_ERROR
+        )
+        .map(|n| n as usize)
+    }
+
+    pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         let mut total = 0;
-        for slice in bufs {
-            let wsa_buf = unsafe { *(slice as *const _ as *const WinSock::WSABUF) };
-            let len = wsa_buf.len;
-            let buf = unsafe { std::slice::from_raw_parts(wsa_buf.buf, len.try_into().unwrap()) };
-            let ret = wsa_syscall!(
-                send(self.0, buf as *const _ as *const _, len as c_int, 0),
-                PartialEq::eq,
-                SOCKET_ERROR
-            )?;
-            total += ret;
-        }
-        Ok(total as usize)
+        wsa_syscall!(
+            WSASend(
+                self.0,
+                // FIXME: From the `WSASend` docs [1]:
+                // > For a Winsock application, once the WSASend function is called,
+                // > the system owns these buffers and the application may not
+                // > access them.
+                //
+                // So what we're doing is actually UB as `bufs` needs to be `&mut
+                // [IoSlice<'_>]`.
+                //
+                // See: https://github.com/rust-lang/socket2-rs/issues/129.
+                //
+                // [1] https://docs.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasend
+                bufs.as_ptr() as *mut _,
+                min(bufs.len(), u32::MAX as usize) as u32,
+                &mut total,
+                0,
+                std::ptr::null_mut(),
+                None,
+            ),
+            PartialEq::eq,
+            SOCKET_ERROR
+        )
+        .map(|_| total as usize)
     }
 
     fn set_no_inherit(&self) -> io::Result<()> {

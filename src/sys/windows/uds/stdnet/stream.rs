@@ -308,11 +308,11 @@ impl io::Read for UnixStream {
 
 impl<'a> io::Read for &'a UnixStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
+        self.0.recv(buf)
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.0.read_vectored(bufs)
+        self.0.recv_vectored(bufs)
     }
 }
 
@@ -332,12 +332,12 @@ impl io::Write for UnixStream {
 
 impl<'a> io::Write for &'a UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.write(buf)
+        self.0.send(buf)
     }
 
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.0.write_vectored(bufs)
+        self.0.send_vectored(bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
