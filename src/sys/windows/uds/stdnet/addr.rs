@@ -1,6 +1,3 @@
-
-//! Windows specific networking functionality
-
 use std::ascii;
 use std::fmt;
 use std::io;
