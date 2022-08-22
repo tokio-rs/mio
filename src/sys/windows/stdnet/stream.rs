@@ -373,31 +373,25 @@ impl IntoRawSocket for UnixStream {
 struct TempPath(PathBuf);
 
 fn sample_ascii_string(len: usize) -> io::Result<String> {
-    const RANGE: u32 = 26 + 26 + 10;
     const GEN_ASCII_STR_CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
             abcdefghijklmnopqrstuvwxyz\
-            0123456789";
+            0123456789-_";
     let mut result = String::with_capacity(len);
+    let mut buf = [0; 4];
     for _ in 0..len {
-        // We pick from 62 characters. This is so close to a power of 2, 64,
-        // that we can efficiently use a simple bitshift and rejection sampling.
-        let mut var = RANGE;
-        while var >= RANGE {
-            let mut buf = [0; 4];
-            syscall!(
-                BCryptGenRandom(
-                    0,
-                    &mut buf as *mut _,
-                    buf.len() as u32,
-                    BCRYPT_USE_SYSTEM_PREFERRED_RNG,
-                ),
-                PartialEq::ne,
-                STATUS_SUCCESS
-            )?;
-            var = u32::from_le_bytes(buf) >> (32 - 6);
-        }
-        let c = char::from(GEN_ASCII_STR_CHARSET[var as usize]);
-        result.push(c);
+        syscall!(
+            BCryptGenRandom(
+                0,
+                &mut buf as *mut _,
+                buf.len() as u32,
+                BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+            ),
+            PartialEq::ne,
+            STATUS_SUCCESS
+        )?;
+        // We pick from 64=2^6 characters so we can use a simple bitshift.
+        let var = u32::from_le_bytes(buf) >> (32 - 6);
+        result.push(char::from(GEN_ASCII_STR_CHARSET[var as usize]));
     }
     Ok(result)
 }
