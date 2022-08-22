@@ -376,23 +376,27 @@ fn sample_ascii_string(len: usize) -> io::Result<String> {
     const GEN_ASCII_STR_CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
             abcdefghijklmnopqrstuvwxyz\
             0123456789-_";
-    let mut result = String::with_capacity(len);
-    let mut buf = [0; 4];
-    for _ in 0..len {
+    let mut buf: Vec<u8> = vec![0; len];
+    for chunk in buf.chunks_mut(u32::max_value() as usize) {
         syscall!(
             BCryptGenRandom(
                 0,
-                &mut buf as *mut _,
-                buf.len() as u32,
+                chunk.as_mut_ptr(),
+                chunk.len() as u32,
                 BCRYPT_USE_SYSTEM_PREFERRED_RNG,
             ),
             PartialEq::ne,
             STATUS_SUCCESS
         )?;
-        // We pick from 64=2^6 characters so we can use a simple bitshift.
-        let var = u32::from_le_bytes(buf) >> (32 - 6);
-        result.push(char::from(GEN_ASCII_STR_CHARSET[var as usize]));
     }
+    let result: String = buf
+        .into_iter()
+        .map(|r| {
+            // We pick from 64=2^6 characters so we can use a simple bitshift.
+            let idx = r >> (8 - 6);
+            char::from(GEN_ASCII_STR_CHARSET[idx as usize])
+        })
+        .collect();
     Ok(result)
 }
 
