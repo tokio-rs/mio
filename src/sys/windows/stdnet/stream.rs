@@ -18,7 +18,7 @@ use rand::{distributions::Alphanumeric, Rng};
 /// # Examples
 ///
 /// ```no_run
-/// use mio::net::stdnet::UnixStream;
+/// use mio::windows::std::net::UnixStream;
 /// use std::io::prelude::*;
 ///
 /// let mut stream = UnixStream::connect("/path/to/my/socket").unwrap();
@@ -49,7 +49,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = match UnixStream::connect("/tmp/sock") {
     ///     Ok(sock) => sock,
@@ -90,7 +90,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// let sock_copy = socket.try_clone().expect("Couldn't clone socket");
@@ -104,7 +104,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// let addr = socket.local_addr().expect("Couldn't get local address");
@@ -125,7 +125,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// let addr = socket.peer_addr().expect("Couldn't get peer address");
@@ -146,7 +146,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// socket.set_nonblocking(true).expect("Couldn't set nonblocking");
@@ -160,7 +160,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// if let Ok(Some(err)) = socket.take_error() {
@@ -180,7 +180,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     /// use std::net::Shutdown;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
@@ -197,7 +197,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let (sock1, sock2) = match UnixStream::pair() {
     ///     Ok((sock1, sock2)) => (sock1, sock2),
@@ -241,7 +241,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// socket.set_read_timeout(None).expect("Couldn't set read timeout");
@@ -258,7 +258,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// socket.set_write_timeout(None).expect("Couldn't set write timeout");
@@ -272,7 +272,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// socket.set_read_timeout(None).expect("Couldn't set read timeout");
@@ -287,7 +287,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixStream;
+    /// use mio::windows::std::net::UnixStream;
     ///
     /// let socket = UnixStream::connect("/tmp/sock").unwrap();
     /// socket.set_write_timeout(None).expect("Couldn't set write timeout");

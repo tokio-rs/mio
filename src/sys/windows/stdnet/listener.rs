@@ -13,7 +13,7 @@ use super::{socket::Socket, socket_addr, SocketAddr, UnixStream};
 ///
 /// ```no_run
 /// use std::thread;
-/// use mio::net::stdnet::{UnixStream, UnixListener};
+/// use mio::windows::std::net::{UnixStream, UnixListener};
 ///
 /// fn handle_client(stream: UnixStream) {
 ///     // ...
@@ -56,7 +56,7 @@ impl UnixListener {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixListener;
+    /// use mio::windows::std::net::UnixListener;
     ///
     /// let listener = match UnixListener::bind("/path/to/the/socket") {
     ///     Ok(sock) => sock,
@@ -99,7 +99,7 @@ impl UnixListener {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixListener;
+    /// use mio::windows::std::net::UnixListener;
     ///
     /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
     ///
@@ -140,7 +140,7 @@ impl UnixListener {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixListener;
+    /// use mio::windows::std::net::UnixListener;
     ///
     /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
     ///
@@ -156,7 +156,7 @@ impl UnixListener {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixListener;
+    /// use mio::windows::std::net::UnixListener;
     ///
     /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
     ///
@@ -178,7 +178,7 @@ impl UnixListener {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixListener;
+    /// use mio::windows::std::net::UnixListener;
     ///
     /// let listener = UnixListener::bind("/path/to/the/socket").unwrap();
     ///
@@ -193,7 +193,7 @@ impl UnixListener {
     /// # Examples
     ///
     /// ```no_run
-    /// use mio::net::stdnet::UnixListener;
+    /// use mio::windows::std::net::UnixListener;
     ///
     /// let listener = UnixListener::bind("/tmp/sock").unwrap();
     ///
@@ -216,7 +216,7 @@ impl UnixListener {
     ///
     /// ```no_run
     /// use std::thread;
-    /// use mio::net::stdnet::{UnixStream, UnixListener};
+    /// use mio::windows::std::net::{UnixStream, UnixListener};
     ///
     /// fn handle_client(stream: UnixStream) {
     ///     // ...
@@ -281,7 +281,7 @@ impl<'a> IntoIterator for &'a UnixListener {
 ///
 /// ```no_run
 /// use std::thread;
-/// use mio::net::stdnet::{UnixStream, UnixListener};
+/// use mio::windows::std::net::{UnixStream, UnixListener};
 ///
 /// fn handle_client(stream: UnixStream) {
 ///     // ...

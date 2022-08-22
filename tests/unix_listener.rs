@@ -1,7 +1,7 @@
 #![cfg(all(feature = "os-poll", feature = "net", any(unix, feature = "os-ext")))]
 
 #[cfg(windows)]
-use mio::net::windows::std::net;
+use mio::windows::std::net;
 use mio::net::UnixListener;
 use mio::{Interest, Token};
 use std::io::{self, Read};
