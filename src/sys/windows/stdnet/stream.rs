@@ -9,9 +9,13 @@ use std::{fmt, mem};
 use windows_sys::Win32::Networking::WinSock::{
     SOCKET_ERROR, SO_RCVTIMEO, SO_SNDTIMEO, WSAEINPROGRESS,
 };
+use windows_sys::Win32::Security::Cryptography::{
+    BCryptGenRandom,
+    BCRYPT_USE_SYSTEM_PREFERRED_RNG
+};
+use windows_sys::Win32::Foundation::STATUS_SUCCESS;
 
 use super::{socket::Socket, socket_addr, SocketAddr, UnixListener};
-use rand::{distributions::Alphanumeric, Rng};
 
 /// A Unix stream socket
 ///
@@ -368,16 +372,42 @@ impl IntoRawSocket for UnixStream {
 
 struct TempPath(PathBuf);
 
+fn sample_ascii_string(len: usize) -> io::Result<String> {
+    const RANGE: u32 = 26 + 26 + 10;
+    const GEN_ASCII_STR_CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+            abcdefghijklmnopqrstuvwxyz\
+            0123456789";
+    let mut result = String::with_capacity(len);
+    for _ in 0..len {
+        // We pick from 62 characters. This is so close to a power of 2, 64,
+        // that we can efficiently use a simple bitshift and rejection sampling.
+        let mut var = RANGE;
+        while var >= RANGE {
+            let mut buf = [0; 4];
+            syscall!(
+                BCryptGenRandom(
+                    0,
+                    &mut buf as *mut _,
+                    buf.len() as u32,
+                    BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+                ),
+                PartialEq::ne,
+                STATUS_SUCCESS
+            )?;
+            var = u32::from_le_bytes(buf) >> (32 - 6);
+        }
+        let c = char::from(GEN_ASCII_STR_CHARSET[var as usize]);
+        result.push(c);
+    }
+    Ok(result)
+}
+
 impl TempPath {
     fn new(random_len: usize) -> io::Result<Self> {
         let dir = std::env::temp_dir();
         // Retry a few times in case of collisions
         for _ in 0..10 {
-            let rand_str: String = rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(random_len)
-                .map(char::from)
-                .collect();
+            let rand_str = sample_ascii_string(random_len)?;
             let filename = format!(".tmp-{rand_str}.socket");
             let path = dir.join(filename);
             if !path.exists() {
