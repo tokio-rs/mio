@@ -260,6 +260,6 @@ mod tests {
         }
         assert_eq!(s[2].bytes_transferred(), 0);
         assert_eq!(s[2].token(), 0);
-        assert_eq!(s[2].overlapped(), 0 as *mut _);
+        assert_eq!(s[2].overlapped(), std::ptr::null_mut());
     }
 }

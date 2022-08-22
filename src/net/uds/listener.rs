@@ -41,8 +41,7 @@ impl UnixListener {
     /// The call is responsible for ensuring that the listening socket is in
     /// non-blocking mode.
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        self.inner
-            .do_io(|inner| sys::uds::listener::accept(&*inner))
+        self.inner.do_io(sys::uds::listener::accept)
     }
 
     /// Returns the local socket address of this listener.

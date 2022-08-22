@@ -6,14 +6,13 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{fmt, mem};
 
+use windows_sys::Win32::Foundation::STATUS_SUCCESS;
 use windows_sys::Win32::Networking::WinSock::{
     SOCKET_ERROR, SO_RCVTIMEO, SO_SNDTIMEO, WSAEINPROGRESS,
 };
 use windows_sys::Win32::Security::Cryptography::{
-    BCryptGenRandom,
-    BCRYPT_USE_SYSTEM_PREFERRED_RNG
+    BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
 };
-use windows_sys::Win32::Foundation::STATUS_SUCCESS;
 
 use super::{socket::Socket, socket_addr, SocketAddr, UnixListener};
 

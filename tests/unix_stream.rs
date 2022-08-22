@@ -1,8 +1,8 @@
 #![cfg(all(feature = "os-poll", feature = "net", any(unix, feature = "os-ext")))]
 
+use mio::net::UnixStream;
 #[cfg(windows)]
 use mio::windows::std::net;
-use mio::net::UnixStream;
 use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
