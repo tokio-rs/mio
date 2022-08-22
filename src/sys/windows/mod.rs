@@ -16,9 +16,9 @@ macro_rules! syscall {
 /// Helper macro to execute a WinSock system call that returns an `io::Result`.
 #[allow(unused_macros)]
 macro_rules! wsa_syscall {
-    ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
+    ($fn: ident ( $($arg: expr),* $(,)* ), $err_value: expr) => {{
         let res = unsafe { windows_sys::Win32::Networking::WinSock::$fn($($arg, )*) };
-        if $err_test(&res, &$err_value) {
+        if PartialEq::eq(&res, &$err_value) {
             Err(io::Error::from_raw_os_error(unsafe {
                 windows_sys::Win32::Networking::WinSock::WSAGetLastError()
             }))
@@ -28,14 +28,14 @@ macro_rules! wsa_syscall {
     }};
 }
 
-cfg_any_os_ext! {
+cfg_net! {
     mod stdnet;
 
-    pub mod std {
+    pub(crate) mod std {
         //! Windows only std lib modules that cannot be upstreamed.
-        pub mod net {
+        pub(crate) mod net {
             //! Internal Windows std net implementation.
-            pub use crate::sys::windows::stdnet::*;
+            pub(crate) use crate::sys::windows::stdnet::*;
         }
     }
 }

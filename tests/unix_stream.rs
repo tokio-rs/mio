@@ -1,8 +1,8 @@
-#![cfg(all(feature = "os-poll", feature = "net", any(unix, feature = "os-ext")))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
-use mio::net::UnixStream;
 #[cfg(windows)]
-use mio::windows::std::net;
+use mio::net;
+use mio::net::UnixStream;
 use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
@@ -12,6 +12,8 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Barrier};
 use std::thread;
+#[cfg(windows)]
+use std::time::Duration;
 
 #[macro_use]
 mod util;
@@ -80,6 +82,7 @@ fn unix_stream_connect() {
     handle.join().unwrap();
 }
 
+#[cfg(unix)]
 #[test]
 fn unix_stream_from_std() {
     smoke_test(
@@ -488,12 +491,24 @@ fn new_echo_listener(
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
         let path = temp_file(test_name);
-        let listener = net::UnixListener::bind(path).unwrap();
+        // We use mio's non-blocking listener here for windows, since there is no listener in std
+        // yet. We must be sure to poll before listener I/O.
+        let mut listener = net::UnixListener::bind(path).unwrap();
+        #[cfg(windows)]
+        let (mut poll, mut events) = init_with_poll();
+        #[cfg(windows)]
+        poll.registry()
+            .register(&mut listener, TOKEN_1, Interest::READABLE)
+            .unwrap();
         let local_addr = listener.local_addr().unwrap();
         addr_sender.send(local_addr).unwrap();
 
         for _ in 0..connections {
+            #[cfg(windows)]
+            poll.poll(&mut events, Some(Duration::from_millis(500))).unwrap();
             let (mut stream, _) = listener.accept().unwrap();
+            #[cfg(windows)]
+            assert_would_block(listener.accept());
 
             // On Linux based system it will cause a connection reset
             // error when the reading side of the peer connection is
@@ -534,12 +549,24 @@ fn new_noop_listener(
     let (sender, receiver) = channel();
     let handle = thread::spawn(move || {
         let path = temp_file(test_name);
-        let listener = net::UnixListener::bind(path).unwrap();
+        // We use mio's non-blocking listener here for windows, since there is no listener in std
+        // yet. We must be sure to poll before listener I/O.
+        let mut listener = net::UnixListener::bind(path).unwrap();
+        #[cfg(windows)]
+        let (mut poll, mut events) = init_with_poll();
+        #[cfg(windows)]
+        poll.registry()
+            .register(&mut listener, TOKEN_1, Interest::READABLE)
+            .unwrap();
         let local_addr = listener.local_addr().unwrap();
         sender.send(local_addr).unwrap();
 
         for _ in 0..connections {
+            #[cfg(windows)]
+            poll.poll(&mut events, Some(Duration::from_millis(500))).unwrap();
             let (stream, _) = listener.accept().unwrap();
+            #[cfg(windows)]
+            assert_would_block(listener.accept());
             barrier.wait();
             stream.shutdown(Shutdown::Write).unwrap();
             barrier.wait();

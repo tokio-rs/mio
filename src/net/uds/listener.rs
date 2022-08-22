@@ -30,7 +30,15 @@ impl UnixListener {
     /// standard library in the Mio equivalent. The conversion assumes nothing
     /// about the underlying listener; it is left up to the user to set it in
     /// non-blocking mode.
+    #[cfg(unix)]
     pub fn from_std(listener: net::UnixListener) -> UnixListener {
+        UnixListener {
+            inner: IoSource::new(listener),
+        }
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn from_std(listener: net::UnixListener) -> UnixListener {
         UnixListener {
             inner: IoSource::new(listener),
         }

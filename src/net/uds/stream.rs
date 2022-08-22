@@ -40,7 +40,15 @@ impl UnixStream {
     /// The Unix stream here will not have `connect` called on it, so it
     /// should already be connected via some other means (be it manually, or
     /// the standard library).
+    #[cfg(unix)]
     pub fn from_std(stream: net::UnixStream) -> UnixStream {
+        UnixStream {
+            inner: IoSource::new(stream),
+        }
+    }
+    
+    #[cfg(windows)]
+    pub(crate) fn from_std(stream: net::UnixStream) -> UnixStream {
         UnixStream {
             inner: IoSource::new(stream),
         }

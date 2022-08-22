@@ -1,13 +1,14 @@
-//! Windows specific networking functionality. Mirrors std::os::unix::net.
-
 mod addr;
 mod listener;
 mod socket;
 mod stream;
 
-pub use self::addr::*;
-pub use self::listener::*;
-pub use self::stream::*;
+pub use self::addr::SocketAddr;
+pub(crate) use self::listener::UnixListener;
+pub(crate) use self::stream::UnixStream;
+
+cfg_os_poll! {
+pub(self) use self::addr::socket_addr;
 
 use std::sync::Once;
 
@@ -20,4 +21,5 @@ pub(crate) fn init() {
         // when it tries to call `WSAStartup` a second time.
         drop(std::net::UdpSocket::bind("127.0.0.1:0"));
     });
+}
 }

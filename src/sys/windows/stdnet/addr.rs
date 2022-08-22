@@ -5,14 +5,17 @@ use std::mem;
 use std::os::raw::c_int;
 use std::path::Path;
 
-use windows_sys::Win32::Networking::WinSock::{sockaddr_un, AF_UNIX, SOCKADDR};
+use windows_sys::Win32::Networking::WinSock::{sockaddr_un, SOCKADDR};
 
-pub(super) fn path_offset(addr: &sockaddr_un) -> usize {
+fn path_offset(addr: &sockaddr_un) -> usize {
     // Work with an actual instance of the type since using a null pointer is UB
     let base = addr as *const _ as usize;
     let path = &addr.sun_path as *const _ as usize;
     path - base
 }
+
+cfg_os_poll! {
+use windows_sys::Win32::Networking::WinSock::AF_UNIX;
 
 pub(super) fn socket_addr(path: &Path) -> io::Result<(sockaddr_un, c_int)> {
     let sockaddr = mem::MaybeUninit::<sockaddr_un>::zeroed();
@@ -52,8 +55,6 @@ pub(super) fn socket_addr(path: &Path) -> io::Result<(sockaddr_un, c_int)> {
     for (dst, src) in sockaddr.sun_path.iter_mut().zip(bytes.iter()) {
         *dst = *src as u8;
     }
-    // null byte for pathname addresses is already there because we zeroed the
-    // struct
 
     let offset = path_offset(&sockaddr);
     let mut socklen = offset + bytes.len();
@@ -66,6 +67,7 @@ pub(super) fn socket_addr(path: &Path) -> io::Result<(sockaddr_un, c_int)> {
     }
 
     Ok((sockaddr, socklen as c_int))
+}
 }
 
 enum AddressKind<'a> {
@@ -96,9 +98,9 @@ pub struct SocketAddr {
 }
 
 impl SocketAddr {
-    pub(crate) fn new<F>(f: F) -> io::Result<SocketAddr>
+    pub(crate) fn init<F, T>(f: F) -> io::Result<(T, SocketAddr)>
     where
-        F: FnOnce(*mut SOCKADDR, *mut c_int) -> io::Result<c_int>,
+        F: FnOnce(*mut SOCKADDR, *mut c_int) -> io::Result<T>,
     {
         let mut sockaddr = {
             let sockaddr = mem::MaybeUninit::<sockaddr_un>::zeroed();
@@ -106,8 +108,15 @@ impl SocketAddr {
         };
 
         let mut len = mem::size_of::<sockaddr_un>() as c_int;
-        f(&mut sockaddr as *mut _ as *mut _, &mut len)?;
-        Ok(SocketAddr::from_parts(sockaddr, len))
+        let result = f(&mut sockaddr as *mut _ as *mut _, &mut len)?;
+        Ok((result, SocketAddr::from_parts(sockaddr, len)))
+    }
+
+    pub(crate) fn new<F>(f: F) -> io::Result<SocketAddr>
+    where
+        F: FnOnce(*mut SOCKADDR, *mut c_int) -> io::Result<c_int>,
+    {
+        SocketAddr::init(f).map(|(_, addr)| addr)
     }
 
     pub(crate) fn from_parts(addr: sockaddr_un, mut len: c_int) -> SocketAddr {

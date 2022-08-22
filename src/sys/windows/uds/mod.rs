@@ -13,7 +13,6 @@ cfg_os_poll! {
         SocketAddr::new(|sockaddr, socklen| {
             wsa_syscall!(
                 getsockname(socket.try_into().unwrap(), sockaddr, socklen),
-                PartialEq::eq,
                 SOCKET_ERROR
             )
         })
@@ -23,7 +22,6 @@ cfg_os_poll! {
         SocketAddr::new(|sockaddr, socklen| {
             wsa_syscall!(
                 getpeername(socket.try_into().unwrap(), sockaddr, socklen),
-                PartialEq::eq,
                 SOCKET_ERROR
             )
         })

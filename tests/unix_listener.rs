@@ -2,7 +2,7 @@
 
 use mio::net::UnixListener;
 #[cfg(windows)]
-use mio::windows::std::net;
+use mio::net;
 use mio::{Interest, Token};
 use std::io::{self, Read};
 #[cfg(unix)]
@@ -33,6 +33,7 @@ fn unix_listener_smoke() {
     smoke_test(|path| UnixListener::bind(path), "unix_listener_smoke");
 }
 
+#[cfg(unix)]
 #[test]
 fn unix_listener_from_std() {
     smoke_test(

@@ -56,7 +56,6 @@ features = [
   "Win32_Networking_WinSock",         # winsock2 types/functions
   "Win32_Security_Cryptography",      # Random number generation
   "Win32_System_IO",                  # IO types like OVERLAPPED etc
-  "Win32_System_Threading",           # Process utilities
   "Win32_System_WindowsProgramming",  # General future used for various types/funcs
 ]
 
