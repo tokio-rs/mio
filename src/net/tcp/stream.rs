@@ -98,7 +98,7 @@ impl TcpStream {
         let stream = unsafe { TcpStream::from_raw_fd(socket) };
         #[cfg(windows)]
         let stream = unsafe { TcpStream::from_raw_socket(socket as _) };
-        bind_for_addr(stream.as_raw_fd(), source_addr)?;
+        bind_for_addr(&stream, source_addr)?;
         connect(&stream.inner, addr)?;
         Ok(stream)        
     }
