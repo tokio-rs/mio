@@ -9,8 +9,8 @@ use std::os::wasi::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 use crate::io_source::IoSource;
-#[cfg(not(target_os = "wasi"))]
-use crate::sys::tcp::{connect, new_for_addr};
+#[cfg(not(any(target_os = "wasi", target_os = "windows")))]
+use crate::sys::tcp::{connect, new_for_addr, bind_for_addr};
 use crate::{event, Interest, Registry, Token};
 
 /// A non-blocking TCP stream between a local socket and a remote socket.
@@ -91,14 +91,15 @@ impl TcpStream {
         Ok(stream)
     }
 
-    #[cfg(not(any(target_os = "wasi", target_os = 'windows')))]
+    /// Create a new `TcpStream` with source and target ip addresses
+    #[cfg(not(any(target_os = "wasi", target_os = "windows")))]
     pub fn bind_connect(source_addr: SocketAddr, addr: SocketAddr) -> io::Result<TcpStream> {
         let socket = new_for_addr(addr)?;
         #[cfg(unix)]
         let stream = unsafe { TcpStream::from_raw_fd(socket) };
         #[cfg(windows)]
         let stream = unsafe { TcpStream::from_raw_socket(socket as _) };
-        bind_for_addr(&stream, source_addr)?;
+        bind_for_addr(stream.as_raw_fd(), source_addr)?;
         connect(&stream.inner, addr)?;
         Ok(stream)        
     }

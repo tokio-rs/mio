@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::io;
 use std::mem::{size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
 use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
 
@@ -14,9 +14,9 @@ pub(crate) fn new_for_addr(address: SocketAddr) -> io::Result<libc::c_int> {
     new_socket(domain, libc::SOCK_STREAM)
 }
 
-pub(crate) fn bind_for_addr(socket: &net::TcpStream, addr: SocketAddr) -> io::Result<()> {
+pub(crate) fn bind_for_addr(socket: RawFd, addr: SocketAddr) -> io::Result<()> {
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
-    syscall!(bind(socket.as_raw_fd(), raw_addr.as_ptr(), raw_addr_length))?;
+    syscall!(bind(socket, raw_addr.as_ptr(), raw_addr_length))?;
     Ok(())
 }
 
