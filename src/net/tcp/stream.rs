@@ -91,6 +91,18 @@ impl TcpStream {
         Ok(stream)
     }
 
+    #[cfg(not(any(target_os = "wasi", target_os = 'windows')))]
+    pub fn bind_connect(source_addr: SocketAddr, addr: SocketAddr) -> io::Result<TcpStream> {
+        let socket = new_for_addr(addr)?;
+        #[cfg(unix)]
+        let stream = unsafe { TcpStream::from_raw_fd(socket) };
+        #[cfg(windows)]
+        let stream = unsafe { TcpStream::from_raw_socket(socket as _) };
+        bind_for_addr(stream.as_raw_fd(), source_addr)?;
+        connect(&stream.inner, addr)?;
+        Ok(stream)        
+    }
+
     /// Creates a new `TcpStream` from a standard `net::TcpStream`.
     ///
     /// This function is intended to be used to wrap a TCP stream from the

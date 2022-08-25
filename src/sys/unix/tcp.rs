@@ -14,6 +14,12 @@ pub(crate) fn new_for_addr(address: SocketAddr) -> io::Result<libc::c_int> {
     new_socket(domain, libc::SOCK_STREAM)
 }
 
+pub(crate) fn bind_for_addr(socket: RawFd, addr: SocketAddr) -> io::Result<()> {
+    let (raw_addr, raw_addr_length) = socket_addr(&addr);
+    syscall!(bind(socket, raw_addr.as_ptr(), raw_addr_length))?;
+    Ok(())
+}
+
 pub(crate) fn bind(socket: &net::TcpListener, addr: SocketAddr) -> io::Result<()> {
     let (raw_addr, raw_addr_length) = socket_addr(&addr);
     syscall!(bind(socket.as_raw_fd(), raw_addr.as_ptr(), raw_addr_length))?;

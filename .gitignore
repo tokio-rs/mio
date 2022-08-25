@@ -1,4 +1,3 @@
-.cargo
+.vscode
 Cargo.lock
-target*
-libs
+target
