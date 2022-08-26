@@ -484,33 +484,72 @@ where
     handle.join().unwrap();
 }
 
-fn new_echo_listener(
+#[cfg(windows)]
+fn new_listener<F>(
     connections: usize,
     test_name: &'static str,
-) -> (thread::JoinHandle<()>, net::SocketAddr) {
+    handle_stream: F
+) -> (thread::JoinHandle<()>, net::SocketAddr)
+where
+    F: Fn(&net::UnixStream) + std::marker::Send + 'static
+{
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
         let path = temp_file(test_name);
         // We use mio's non-blocking listener here for windows, since there is no listener in std
         // yet. We must be sure to poll before listener I/O.
         let mut listener = net::UnixListener::bind(path).unwrap();
-        #[cfg(windows)]
         let (mut poll, mut events) = init_with_poll();
-        #[cfg(windows)]
         poll.registry()
             .register(&mut listener, TOKEN_1, Interest::READABLE)
             .unwrap();
+
         let local_addr = listener.local_addr().unwrap();
         addr_sender.send(local_addr).unwrap();
 
         for _ in 0..connections {
-            #[cfg(windows)]
             poll.poll(&mut events, Some(Duration::from_millis(500)))
                 .unwrap();
-            let (mut stream, _) = listener.accept().unwrap();
-            #[cfg(windows)]
+            let (stream, _) = listener.accept().unwrap();
             assert_would_block(listener.accept());
+            handle_stream(&stream);
+        }
+    });
+    (handle, addr_receiver.recv().unwrap())
+}
 
+#[cfg(unix)]
+fn new_listener<F>(
+    connections: usize,
+    test_name: &'static str,
+    handle_stream: F
+) -> (thread::JoinHandle<()>, net::SocketAddr)
+where
+    F: Fn(&net::UnixStream) + std::marker::Send + 'static
+{
+    let (addr_sender, addr_receiver) = channel();
+    let handle = thread::spawn(move || {
+        let path = temp_file(test_name);
+        let listener = net::UnixListener::bind(path).unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        addr_sender.send(local_addr).unwrap();
+
+        for _ in 0..connections {
+            let (stream, _) = listener.accept().unwrap();
+            handle_stream(stream);
+        }
+    });
+    (handle, addr_receiver.recv().unwrap())
+}
+
+fn new_echo_listener(
+    connections: usize,
+    test_name: &'static str,
+) -> (thread::JoinHandle<()>, net::SocketAddr) {
+    new_listener(
+        connections,
+        test_name,
+        |mut stream| {
             // On Linux based system it will cause a connection reset
             // error when the reading side of the peer connection is
             // shutdown, we don't consider it an actual here.
@@ -538,8 +577,7 @@ fn new_echo_listener(
             }
             assert_eq!(read, written, "unequal reads and writes");
         }
-    });
-    (handle, addr_receiver.recv().unwrap())
+    )
 }
 
 fn new_noop_listener(
@@ -547,33 +585,14 @@ fn new_noop_listener(
     barrier: Arc<Barrier>,
     test_name: &'static str,
 ) -> (thread::JoinHandle<()>, net::SocketAddr) {
-    let (sender, receiver) = channel();
-    let handle = thread::spawn(move || {
-        let path = temp_file(test_name);
-        // We use mio's non-blocking listener here for windows, since there is no listener in std
-        // yet. We must be sure to poll before listener I/O.
-        let mut listener = net::UnixListener::bind(path).unwrap();
-        #[cfg(windows)]
-        let (mut poll, mut events) = init_with_poll();
-        #[cfg(windows)]
-        poll.registry()
-            .register(&mut listener, TOKEN_1, Interest::READABLE)
-            .unwrap();
-        let local_addr = listener.local_addr().unwrap();
-        sender.send(local_addr).unwrap();
-
-        for _ in 0..connections {
-            #[cfg(windows)]
-            poll.poll(&mut events, Some(Duration::from_millis(500)))
-                .unwrap();
-            let (stream, _) = listener.accept().unwrap();
-            #[cfg(windows)]
-            assert_would_block(listener.accept());
+    new_listener(
+        connections,
+        test_name,
+        move |stream| {
             barrier.wait();
             stream.shutdown(Shutdown::Write).unwrap();
             barrier.wait();
             drop(stream);
         }
-    });
-    (handle, receiver.recv().unwrap())
+    )
 }
