@@ -488,10 +488,10 @@ where
 fn new_listener<F>(
     connections: usize,
     test_name: &'static str,
-    handle_stream: F
+    handle_stream: F,
 ) -> (thread::JoinHandle<()>, net::SocketAddr)
 where
-    F: Fn(net::UnixStream) + std::marker::Send + 'static
+    F: Fn(net::UnixStream) + std::marker::Send + 'static,
 {
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
@@ -522,10 +522,10 @@ where
 fn new_listener<F>(
     connections: usize,
     test_name: &'static str,
-    handle_stream: F
+    handle_stream: F,
 ) -> (thread::JoinHandle<()>, net::SocketAddr)
 where
-    F: Fn(net::UnixStream) + std::marker::Send + 'static
+    F: Fn(net::UnixStream) + std::marker::Send + 'static,
 {
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
@@ -546,38 +546,34 @@ fn new_echo_listener(
     connections: usize,
     test_name: &'static str,
 ) -> (thread::JoinHandle<()>, net::SocketAddr) {
-    new_listener(
-        connections,
-        test_name,
-        |mut stream| {
-            // On Linux based system it will cause a connection reset
-            // error when the reading side of the peer connection is
-            // shutdown, we don't consider it an actual here.
-            let (mut read, mut written) = (0, 0);
-            let mut buf = [0; DEFAULT_BUF_SIZE];
-            loop {
-                let n = match stream.read(&mut buf) {
-                    Ok(amount) => {
-                        read += amount;
-                        amount
-                    }
-                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                    Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
-                    Err(err) => panic!("{}", err),
-                };
-                if n == 0 {
-                    break;
+    new_listener(connections, test_name, |mut stream| {
+        // On Linux based system it will cause a connection reset
+        // error when the reading side of the peer connection is
+        // shutdown, we don't consider it an actual here.
+        let (mut read, mut written) = (0, 0);
+        let mut buf = [0; DEFAULT_BUF_SIZE];
+        loop {
+            let n = match stream.read(&mut buf) {
+                Ok(amount) => {
+                    read += amount;
+                    amount
                 }
-                match stream.write(&buf[..n]) {
-                    Ok(amount) => written += amount,
-                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                    Err(ref err) if err.kind() == io::ErrorKind::BrokenPipe => break,
-                    Err(err) => panic!("{}", err),
-                };
+                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
+                Err(err) => panic!("{}", err),
+            };
+            if n == 0 {
+                break;
             }
-            assert_eq!(read, written, "unequal reads and writes");
+            match stream.write(&buf[..n]) {
+                Ok(amount) => written += amount,
+                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(ref err) if err.kind() == io::ErrorKind::BrokenPipe => break,
+                Err(err) => panic!("{}", err),
+            };
         }
-    )
+        assert_eq!(read, written, "unequal reads and writes");
+    })
 }
 
 fn new_noop_listener(
@@ -585,14 +581,10 @@ fn new_noop_listener(
     barrier: Arc<Barrier>,
     test_name: &'static str,
 ) -> (thread::JoinHandle<()>, net::SocketAddr) {
-    new_listener(
-        connections,
-        test_name,
-        move |stream| {
-            barrier.wait();
-            stream.shutdown(Shutdown::Write).unwrap();
-            barrier.wait();
-            drop(stream);
-        }
-    )
+    new_listener(connections, test_name, move |stream| {
+        barrier.wait();
+        stream.shutdown(Shutdown::Write).unwrap();
+        barrier.wait();
+        drop(stream);
+    })
 }
