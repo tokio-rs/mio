@@ -16,7 +16,6 @@ fn path_offset(addr: &sockaddr_un) -> usize {
 
 cfg_os_poll! {
 use windows_sys::Win32::Networking::WinSock::AF_UNIX;
-
 pub(super) fn socket_addr(path: &Path) -> io::Result<(sockaddr_un, c_int)> {
     let sockaddr = mem::MaybeUninit::<sockaddr_un>::zeroed();
 

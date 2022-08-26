@@ -5,7 +5,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket};
 use std::os::windows::raw::SOCKET as StdSocket; // windows-sys uses usize, stdlib uses u32/u64.
 
 use crate::sys::windows::net::{new_ip_socket, socket_addr};
-use crate::sys::windows::std::net::init;
+use crate::sys::windows::stdnet::init;
 use windows_sys::Win32::Networking::WinSock::{
     bind as win_bind, closesocket, getsockopt, IPPROTO_IPV6, IPV6_V6ONLY, SOCKET_ERROR, SOCK_DGRAM,
 };

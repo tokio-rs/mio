@@ -3,7 +3,7 @@ use std::os::windows::io::AsRawSocket;
 use std::path::Path;
 
 use crate::net::{SocketAddr, UnixStream};
-use crate::sys::windows::std::net;
+use crate::sys::windows::stdnet as net;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
     let listener = net::UnixListener::bind(path)?;

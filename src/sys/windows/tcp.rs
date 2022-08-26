@@ -7,7 +7,7 @@ use windows_sys::Win32::Networking::WinSock::{
 };
 
 use crate::sys::windows::net::{new_socket, socket_addr};
-use crate::sys::windows::std::net::init;
+use crate::sys::windows::stdnet::init;
 
 pub(crate) fn new_for_addr(address: SocketAddr) -> io::Result<SOCKET> {
     init();

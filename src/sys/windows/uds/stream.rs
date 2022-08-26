@@ -1,4 +1,4 @@
-use crate::sys::windows::std::net;
+use crate::sys::windows::stdnet as net;
 use std::io;
 use std::os::windows::io::AsRawSocket;
 use std::path::Path;

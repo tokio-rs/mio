@@ -2,7 +2,7 @@ use crate::io_source::IoSource;
 use crate::{event, sys, Interest, Registry, Token};
 
 #[cfg(windows)]
-use crate::sys::windows::std::net;
+use crate::sys::windows::stdnet as net;
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;

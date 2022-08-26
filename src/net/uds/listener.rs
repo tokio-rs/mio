@@ -3,7 +3,7 @@ use crate::net::{SocketAddr, UnixStream};
 use crate::{event, sys, Interest, Registry, Token};
 
 #[cfg(windows)]
-use crate::sys::windows::std::net;
+use crate::sys::windows::stdnet as net;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(unix)]
