@@ -505,7 +505,8 @@ fn new_echo_listener(
 
         for _ in 0..connections {
             #[cfg(windows)]
-            poll.poll(&mut events, Some(Duration::from_millis(500))).unwrap();
+            poll.poll(&mut events, Some(Duration::from_millis(500)))
+                .unwrap();
             let (mut stream, _) = listener.accept().unwrap();
             #[cfg(windows)]
             assert_would_block(listener.accept());
@@ -563,7 +564,8 @@ fn new_noop_listener(
 
         for _ in 0..connections {
             #[cfg(windows)]
-            poll.poll(&mut events, Some(Duration::from_millis(500))).unwrap();
+            poll.poll(&mut events, Some(Duration::from_millis(500)))
+                .unwrap();
             let (stream, _) = listener.accept().unwrap();
             #[cfg(windows)]
             assert_would_block(listener.accept());

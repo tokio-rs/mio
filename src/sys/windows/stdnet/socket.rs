@@ -7,9 +7,7 @@ use std::os::raw::c_int;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::ptr;
 
-use windows_sys::Win32::Networking::WinSock::{
-    self, closesocket, SOCKET, SOCKET_ERROR, WSABUF,
-};
+use windows_sys::Win32::Networking::WinSock::{self, closesocket, SOCKET, SOCKET_ERROR, WSABUF};
 
 /// Maximum size of a buffer passed to system call like `recv` and `send`.
 const MAX_BUF_LEN: usize = c_int::MAX as usize;
@@ -18,7 +16,6 @@ const MAX_BUF_LEN: usize = c_int::MAX as usize;
 pub(crate) struct Socket(SOCKET);
 
 impl Socket {
-
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         let ret = wsa_syscall!(
             recv(self.0, buf.as_mut_ptr() as *mut _, buf.len() as c_int, 0,),
@@ -97,10 +94,7 @@ impl Socket {
             Shutdown::Read => WinSock::SD_RECEIVE,
             Shutdown::Both => WinSock::SD_BOTH,
         };
-        wsa_syscall!(
-            shutdown(self.0, how.try_into().unwrap()),
-            SOCKET_ERROR
-        )?;
+        wsa_syscall!(shutdown(self.0, how.try_into().unwrap()), SOCKET_ERROR)?;
         Ok(())
     }
 

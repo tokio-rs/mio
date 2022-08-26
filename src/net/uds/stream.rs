@@ -46,7 +46,7 @@ impl UnixStream {
             inner: IoSource::new(stream),
         }
     }
-    
+
     #[cfg(windows)]
     pub(crate) fn from_std(stream: net::UnixStream) -> UnixStream {
         UnixStream {
