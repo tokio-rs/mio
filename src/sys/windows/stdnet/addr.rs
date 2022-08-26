@@ -15,58 +15,58 @@ fn path_offset(addr: &sockaddr_un) -> usize {
 }
 
 cfg_os_poll! {
-use windows_sys::Win32::Networking::WinSock::AF_UNIX;
-pub(super) fn socket_addr(path: &Path) -> io::Result<(sockaddr_un, c_int)> {
-    let sockaddr = mem::MaybeUninit::<sockaddr_un>::zeroed();
+    use windows_sys::Win32::Networking::WinSock::AF_UNIX;
+    pub(super) fn socket_addr(path: &Path) -> io::Result<(sockaddr_un, c_int)> {
+        let sockaddr = mem::MaybeUninit::<sockaddr_un>::zeroed();
 
-    // This is safe to assume because a `sockaddr_un` filled with `0`
-    // bytes is properly initialized.
-    //
-    // `0` is a valid value for `sockaddr_un::sun_family`; it is
-    // `WinSock::AF_UNSPEC`.
-    //
-    // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
-    // abstract path.
-    let mut sockaddr = unsafe { sockaddr.assume_init() };
-    sockaddr.sun_family = AF_UNIX;
+        // This is safe to assume because a `sockaddr_un` filled with `0`
+        // bytes is properly initialized.
+        //
+        // `0` is a valid value for `sockaddr_un::sun_family`; it is
+        // `WinSock::AF_UNSPEC`.
+        //
+        // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
+        // abstract path.
+        let mut sockaddr = unsafe { sockaddr.assume_init() };
+        sockaddr.sun_family = AF_UNIX;
 
-    // Winsock2 expects 'sun_path' to be a Win32 UTF-8 file system path
-    let bytes = path.to_str().map(|s| s.as_bytes()).ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "path contains invalid characters",
-        )
-    })?;
+        // Winsock2 expects 'sun_path' to be a Win32 UTF-8 file system path
+        let bytes = path.to_str().map(|s| s.as_bytes()).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "path contains invalid characters",
+            )
+        })?;
 
-    if bytes.contains(&0) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "paths may not contain interior null bytes",
-        ));
+        if bytes.contains(&0) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "paths may not contain interior null bytes",
+            ));
+        }
+
+        if bytes.len() >= sockaddr.sun_path.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "path must be shorter than SUN_LEN",
+            ));
+        }
+        for (dst, src) in sockaddr.sun_path.iter_mut().zip(bytes.iter()) {
+            *dst = *src as u8;
+        }
+
+        let offset = path_offset(&sockaddr);
+        let mut socklen = offset + bytes.len();
+
+        match bytes.get(0) {
+            // The struct has already been zeroes so the null byte for pathname
+            // addresses is already there.
+            Some(&0) | None => {}
+            Some(_) => socklen += 1,
+        }
+
+        Ok((sockaddr, socklen as c_int))
     }
-
-    if bytes.len() >= sockaddr.sun_path.len() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "path must be shorter than SUN_LEN",
-        ));
-    }
-    for (dst, src) in sockaddr.sun_path.iter_mut().zip(bytes.iter()) {
-        *dst = *src as u8;
-    }
-
-    let offset = path_offset(&sockaddr);
-    let mut socklen = offset + bytes.len();
-
-    match bytes.get(0) {
-        // The struct has already been zeroes so the null byte for pathname
-        // addresses is already there.
-        Some(&0) | None => {}
-        Some(_) => socklen += 1,
-    }
-
-    Ok((sockaddr, socklen as c_int))
-}
 }
 
 enum AddressKind<'a> {

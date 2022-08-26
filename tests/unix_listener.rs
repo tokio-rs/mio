@@ -1,4 +1,4 @@
-#![cfg(all(feature = "os-poll", feature = "net", any(unix, feature = "os-ext")))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
 #[cfg(windows)]
 use mio::net;

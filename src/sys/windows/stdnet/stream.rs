@@ -120,107 +120,107 @@ impl IntoRawSocket for UnixStream {
 }
 
 cfg_os_poll! {
-use std::path::{Path, PathBuf};
-use windows_sys::Win32::Foundation::STATUS_SUCCESS;
-use windows_sys::Win32::Networking::WinSock::WSAEINPROGRESS;
-use windows_sys::Win32::Security::Cryptography::{
-    BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
-};
+    use std::path::{Path, PathBuf};
+    use windows_sys::Win32::Foundation::STATUS_SUCCESS;
+    use windows_sys::Win32::Networking::WinSock::WSAEINPROGRESS;
+    use windows_sys::Win32::Security::Cryptography::{
+        BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+    };
 
-use super::{socket_addr, UnixListener};
+    use super::{socket_addr, UnixListener};
 
-impl UnixStream {
-    pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
-        let inner = Socket::new()?;
-        let (addr, len) = socket_addr(path.as_ref())?;
+    impl UnixStream {
+        pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
+            let inner = Socket::new()?;
+            let (addr, len) = socket_addr(path.as_ref())?;
 
-        match wsa_syscall!(
-            connect(
-                inner.as_raw_socket() as _,
-                &addr as *const _ as *const _,
-                len as i32,
-            ),
-            SOCKET_ERROR
-        ) {
-            Ok(_) => {}
-            Err(ref err) if err.raw_os_error() == Some(WSAEINPROGRESS) => {}
-            Err(e) => return Err(e),
+            match wsa_syscall!(
+                connect(
+                    inner.as_raw_socket() as _,
+                    &addr as *const _ as *const _,
+                    len as i32,
+                ),
+                SOCKET_ERROR
+            ) {
+                Ok(_) => {}
+                Err(ref err) if err.raw_os_error() == Some(WSAEINPROGRESS) => {}
+                Err(e) => return Err(e),
+            }
+            Ok(UnixStream(inner))
         }
-        Ok(UnixStream(inner))
+
+        pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+            self.0.set_nonblocking(nonblocking)
+        }
+
+        pub fn pair() -> io::Result<(Self, Self)> {
+            use std::sync::{Arc, RwLock};
+            use std::thread::spawn;
+
+            let file_path = temp_path(10)?;
+            let a: Arc<RwLock<Option<io::Result<UnixStream>>>> = Arc::new(RwLock::new(None));
+            let ul = UnixListener::bind(&file_path).unwrap();
+            let server = {
+                let a = a.clone();
+                spawn(move || {
+                    let mut store = a.write().unwrap();
+                    let stream0 = ul.accept().map(|s| s.0);
+                    *store = Some(stream0);
+                })
+            };
+            let stream1 = UnixStream::connect(&file_path)?;
+            server
+                .join()
+                .map_err(|_| io::Error::from(io::ErrorKind::ConnectionRefused))?;
+            let stream0 = (*(a.write().unwrap())).take().unwrap()?;
+            let _ = std::fs::remove_file(&file_path);
+            Ok((stream0, stream1))
+        }
     }
 
-    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.0.set_nonblocking(nonblocking)
-    }
-
-    pub fn pair() -> io::Result<(Self, Self)> {
-        use std::sync::{Arc, RwLock};
-        use std::thread::spawn;
-
-        let file_path = temp_path(10)?;
-        let a: Arc<RwLock<Option<io::Result<UnixStream>>>> = Arc::new(RwLock::new(None));
-        let ul = UnixListener::bind(&file_path).unwrap();
-        let server = {
-            let a = a.clone();
-            spawn(move || {
-                let mut store = a.write().unwrap();
-                let stream0 = ul.accept().map(|s| s.0);
-                *store = Some(stream0);
+    fn sample_ascii_string(len: usize) -> io::Result<String> {
+        const GEN_ASCII_STR_CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+                abcdefghijklmnopqrstuvwxyz\
+                0123456789-_";
+        let mut buf: Vec<u8> = vec![0; len];
+        for chunk in buf.chunks_mut(u32::max_value() as usize) {
+            syscall!(
+                BCryptGenRandom(
+                    0,
+                    chunk.as_mut_ptr(),
+                    chunk.len() as u32,
+                    BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+                ),
+                PartialEq::ne,
+                STATUS_SUCCESS
+            )?;
+        }
+        let result: String = buf
+            .into_iter()
+            .map(|r| {
+                // We pick from 64=2^6 characters so we can use a simple bitshift.
+                let idx = r >> (8 - 6);
+                char::from(GEN_ASCII_STR_CHARSET[idx as usize])
             })
-        };
-        let stream1 = UnixStream::connect(&file_path)?;
-        server
-            .join()
-            .map_err(|_| io::Error::from(io::ErrorKind::ConnectionRefused))?;
-        let stream0 = (*(a.write().unwrap())).take().unwrap()?;
-        let _ = std::fs::remove_file(&file_path);
-        Ok((stream0, stream1))
+            .collect();
+        Ok(result)
     }
-}
 
-fn sample_ascii_string(len: usize) -> io::Result<String> {
-    const GEN_ASCII_STR_CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-            abcdefghijklmnopqrstuvwxyz\
-            0123456789-_";
-    let mut buf: Vec<u8> = vec![0; len];
-    for chunk in buf.chunks_mut(u32::max_value() as usize) {
-        syscall!(
-            BCryptGenRandom(
-                0,
-                chunk.as_mut_ptr(),
-                chunk.len() as u32,
-                BCRYPT_USE_SYSTEM_PREFERRED_RNG,
-            ),
-            PartialEq::ne,
-            STATUS_SUCCESS
-        )?;
-    }
-    let result: String = buf
-        .into_iter()
-        .map(|r| {
-            // We pick from 64=2^6 characters so we can use a simple bitshift.
-            let idx = r >> (8 - 6);
-            char::from(GEN_ASCII_STR_CHARSET[idx as usize])
-        })
-        .collect();
-    Ok(result)
-}
-
-fn temp_path(len: usize) -> io::Result<PathBuf> {
-    let dir = std::env::temp_dir();
-    // Retry a few times in case of collisions
-    for _ in 0..10 {
-        let rand_str = sample_ascii_string(len)?;
-        let filename = format!(".tmp-{rand_str}.socket");
-        let path = dir.join(filename);
-        if !path.exists() {
-            return Ok(path);
+    fn temp_path(len: usize) -> io::Result<PathBuf> {
+        let dir = std::env::temp_dir();
+        // Retry a few times in case of collisions
+        for _ in 0..10 {
+            let rand_str = sample_ascii_string(len)?;
+            let filename = format!(".tmp-{rand_str}.socket");
+            let path = dir.join(filename);
+            if !path.exists() {
+                return Ok(path);
+            }
         }
-    }
 
-    Err(io::Error::new(
-        io::ErrorKind::AlreadyExists,
-        "too many temporary files exist",
-    ))
-}
+        Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "too many temporary files exist",
+        ))
+    }
 }

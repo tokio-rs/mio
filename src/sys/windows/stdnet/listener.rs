@@ -54,30 +54,30 @@ impl IntoRawSocket for UnixListener {
 }
 
 cfg_os_poll! {
-use std::path::Path;
+    use std::path::Path;
 
-use super::{socket_addr, UnixStream};
+    use super::{socket_addr, UnixStream};
 
-impl UnixListener {
-    pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
-        let inner = Socket::new()?;
-        let (addr, len) = socket_addr(path.as_ref())?;
+    impl UnixListener {
+        pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
+            let inner = Socket::new()?;
+            let (addr, len) = socket_addr(path.as_ref())?;
 
-        wsa_syscall!(
-            bind(inner.as_raw_socket() as _, &addr as *const _ as *const _, len as _),
-            SOCKET_ERROR
-        )?;
-        wsa_syscall!(listen(inner.as_raw_socket() as _, 128), SOCKET_ERROR)?;
-        Ok(UnixListener(inner))
+            wsa_syscall!(
+                bind(inner.as_raw_socket() as _, &addr as *const _ as *const _, len as _),
+                SOCKET_ERROR
+            )?;
+            wsa_syscall!(listen(inner.as_raw_socket() as _, 128), SOCKET_ERROR)?;
+            Ok(UnixListener(inner))
+        }
+
+        pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
+            SocketAddr::init(|addr, len| self.0.accept(addr, len))
+                .map(|(sock, addr)| (UnixStream(sock), addr))
+        }
+
+        pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+            self.0.set_nonblocking(nonblocking)
+        }
     }
-
-    pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        SocketAddr::init(|addr, len| self.0.accept(addr, len))
-            .map(|(sock, addr)| (UnixStream(sock), addr))
-    }
-
-    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.0.set_nonblocking(nonblocking)
-    }
-}
 }

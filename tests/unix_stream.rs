@@ -491,7 +491,7 @@ fn new_listener<F>(
     handle_stream: F
 ) -> (thread::JoinHandle<()>, net::SocketAddr)
 where
-    F: Fn(&net::UnixStream) + std::marker::Send + 'static
+    F: Fn(net::UnixStream) + std::marker::Send + 'static
 {
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
@@ -512,7 +512,7 @@ where
                 .unwrap();
             let (stream, _) = listener.accept().unwrap();
             assert_would_block(listener.accept());
-            handle_stream(&stream);
+            handle_stream(stream);
         }
     });
     (handle, addr_receiver.recv().unwrap())
@@ -525,7 +525,7 @@ fn new_listener<F>(
     handle_stream: F
 ) -> (thread::JoinHandle<()>, net::SocketAddr)
 where
-    F: Fn(&net::UnixStream) + std::marker::Send + 'static
+    F: Fn(net::UnixStream) + std::marker::Send + 'static
 {
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
