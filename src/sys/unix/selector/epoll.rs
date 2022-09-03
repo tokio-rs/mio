@@ -87,18 +87,21 @@ impl Selector {
         const MAX_SAFE_TIMEOUT: u128 = libc::c_int::max_value() as u128;
 
         let timeout = timeout
-            // as_millis() truncates, so round up to the nearest millisecond as the documentation
-            // says can happen.  This avoids turning submillisecond timeouts into immediate returns
-            // unless the caller explicitly requests that by specifying a zero timeout.
             .map(|to| {
-                to.as_millis()
-                    + if to.subsec_nanos() % 1_000_000 == 0 {
-                        0
-                    } else {
-                        1
-                    }
+                cmp::min(
+                    MAX_SAFE_TIMEOUT,
+                    to.as_millis()
+                        // as_millis() truncates, so round up to the nearest millisecond as the
+                        // documentation says can happen.  This avoids turning submillisecond
+                        // timeouts into immediate returns unless the caller explicitly requests
+                        // that by specifying a zero timeout.
+			+ if to.subsec_nanos() % 1_000_000 == 0 {
+			    0
+			} else {
+			    1
+			},
+                ) as libc::c_int
             })
-            .map(|to| cmp::min(to, MAX_SAFE_TIMEOUT) as libc::c_int)
             .unwrap_or(-1);
 
         events.clear();
