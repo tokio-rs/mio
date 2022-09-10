@@ -113,6 +113,7 @@ impl TcpListener {
     ///
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
+    #[cfg(not(feature = "mptcp"))]
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.set_ttl(ttl)
     }
@@ -122,6 +123,7 @@ impl TcpListener {
     /// For more information about this option, see [`set_ttl`][link].
     ///
     /// [link]: #method.set_ttl
+    #[cfg(not(feature = "mptcp"))]
     pub fn ttl(&self) -> io::Result<u32> {
         self.inner.ttl()
     }

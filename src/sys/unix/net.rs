@@ -13,6 +13,7 @@ pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: libc::c_int) -> io::R
 
 /// Create a new non-blocking socket.
 pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::Result<libc::c_int> {
+    let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
     #[cfg(any(
         target_os = "android",
         target_os = "dragonfly",
@@ -22,11 +23,20 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
         target_os = "netbsd",
         target_os = "openbsd"
     ))]
-    let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+    let socket_type = socket_type | flags;
+
+    let mut protocol = 0;
+    #[cfg(feature = "mptcp")]
+    // Only enable MPTCP Protocol if we're in a TCP context
+    if (domain == libc::AF_INET || domain == libc::AF_INET6)
+        && socket_type ^ (flags) == libc::SOCK_STREAM
+    {
+        protocol = libc::IPPROTO_MPTCP;
+    }
 
     // Gives a warning for platforms without SOCK_NONBLOCK.
     #[allow(clippy::let_and_return)]
-    let socket = syscall!(socket(domain, socket_type, 0));
+    let socket = syscall!(socket(domain, socket_type, protocol));
 
     // Mimick `libstd` and set `SO_NOSIGPIPE` on apple systems.
     #[cfg(target_vendor = "apple")]

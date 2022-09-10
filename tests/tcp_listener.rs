@@ -92,6 +92,7 @@ where
 }
 
 #[test]
+#[cfg(not(feature = "mptcp"))]
 fn set_get_ttl() {
     init();
 
@@ -105,6 +106,7 @@ fn set_get_ttl() {
 }
 
 #[test]
+#[cfg(not(feature = "mptcp"))]
 fn get_ttl_without_previous_set() {
     init();
 

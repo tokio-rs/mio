@@ -42,6 +42,8 @@ os-ext = [
 # Enables `mio::net` module containing networking primitives.
 net = []
 
+mptcp = []
+
 [dependencies]
 log = "0.4.8"
 
