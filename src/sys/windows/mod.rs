@@ -1,3 +1,17 @@
+// Macro must be defined before any modules that uses them.
+/// Helper macro to execute a system call that returns an `io::Result`.
+#[allow(unused_macros)]
+macro_rules! syscall {
+    ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
+        let res = unsafe { $fn($($arg, )*) };
+        if $err_test(&res, &$err_value) {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(res)
+        }
+    }};
+}
+
 /// Helper macro to execute a WinSock system call that returns an `io::Result`.
 #[allow(unused_macros)]
 macro_rules! wsa_syscall {
@@ -11,6 +25,12 @@ macro_rules! wsa_syscall {
             Ok(res)
         }
     }};
+}
+
+cfg_net! {
+    pub(crate) mod stdnet;
+    pub(crate) mod uds;
+    pub use self::uds::SocketAddr;
 }
 
 cfg_os_poll! {
@@ -33,27 +53,10 @@ cfg_os_poll! {
 
     // Macros must be defined before the modules that use them
     cfg_net! {
-        /// Helper macro to execute a system call that returns an `io::Result`.
-        //
-        // Macro must be defined before any modules that uses them.
-        macro_rules! syscall {
-            ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
-                let res = unsafe { $fn($($arg, )*) };
-                if $err_test(&res, &$err_value) {
-                    Err(io::Error::last_os_error())
-                } else {
-                    Ok(res)
-                }
-            }};
-        }
-
         mod net;
 
-        pub(crate) mod stdnet;
         pub(crate) mod tcp;
         pub(crate) mod udp;
-        pub(crate) mod uds;
-        pub use self::uds::SocketAddr;
     }
 
     cfg_os_ext! {
@@ -168,13 +171,5 @@ cfg_os_poll! {
                 }
             }
         }
-    }
-}
-
-cfg_not_os_poll! {
-    cfg_net! {
-        pub(crate) mod stdnet;
-        pub(crate) mod uds;
-        pub use self::uds::SocketAddr;
     }
 }

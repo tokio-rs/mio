@@ -12,7 +12,6 @@ pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
 }
 
 pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
-    listener.set_nonblocking(true)?;
     listener
         .accept()
         .map(|(stream, addr)| (UnixStream::from_std(stream), addr))

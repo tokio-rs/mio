@@ -121,32 +121,6 @@ impl Socket {
     }
 }
 
-impl Drop for Socket {
-    fn drop(&mut self) {
-        let _ = unsafe { closesocket(self.0) };
-    }
-}
-
-impl AsRawSocket for Socket {
-    fn as_raw_socket(&self) -> RawSocket {
-        self.0 as RawSocket
-    }
-}
-
-impl FromRawSocket for Socket {
-    unsafe fn from_raw_socket(sock: RawSocket) -> Self {
-        Socket(sock as SOCKET)
-    }
-}
-
-impl IntoRawSocket for Socket {
-    fn into_raw_socket(self) -> RawSocket {
-        let ret = self.0 as RawSocket;
-        mem::forget(self);
-        ret
-    }
-}
-
 cfg_os_poll! {
     use windows_sys::Win32::Networking::WinSock::{INVALID_SOCKET, SOCKADDR};
     use windows_sys::Win32::Foundation::{SetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT};
@@ -193,5 +167,31 @@ cfg_os_poll! {
             )?;
             Ok(())
         }
+    }
+}
+
+impl Drop for Socket {
+    fn drop(&mut self) {
+        let _ = unsafe { closesocket(self.0) };
+    }
+}
+
+impl AsRawSocket for Socket {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.0 as RawSocket
+    }
+}
+
+impl FromRawSocket for Socket {
+    unsafe fn from_raw_socket(sock: RawSocket) -> Self {
+        Socket(sock as SOCKET)
+    }
+}
+
+impl IntoRawSocket for Socket {
+    fn into_raw_socket(self) -> RawSocket {
+        let ret = self.0 as RawSocket;
+        mem::forget(self);
+        ret
     }
 }

@@ -1,6 +1,7 @@
 #[cfg(unix)]
 mod datagram;
 #[cfg(unix)]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 pub use self::datagram::UnixDatagram;
 
 mod listener;

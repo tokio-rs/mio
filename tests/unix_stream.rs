@@ -29,6 +29,7 @@ const DATA1_LEN: usize = 16;
 const DATA2_LEN: usize = 14;
 const DEFAULT_BUF_SIZE: usize = 64;
 const TOKEN_1: Token = Token(0);
+#[cfg(unix)]
 const TOKEN_2: Token = Token(1);
 
 #[test]
@@ -97,6 +98,7 @@ fn unix_stream_from_std() {
     )
 }
 
+#[cfg(unix)]
 #[test]
 fn unix_stream_pair() {
     let (mut poll, mut events) = init_with_poll();

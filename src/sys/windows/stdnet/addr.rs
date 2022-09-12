@@ -51,14 +51,13 @@ cfg_os_poll! {
                 "path must be shorter than SUN_LEN",
             ));
         }
-        for (dst, src) in sockaddr.sun_path.iter_mut().zip(bytes.iter()) {
-            *dst = *src as u8;
-        }
+
+        sockaddr.sun_path[..bytes.len()].copy_from_slice(bytes);
 
         let offset = path_offset(&sockaddr);
         let mut socklen = offset + bytes.len();
 
-        match bytes.get(0) {
+        match bytes.first() {
             // The struct has already been zeroes so the null byte for pathname
             // addresses is already there.
             Some(&0) | None => {}
@@ -90,7 +89,6 @@ impl<'a> fmt::Display for AsciiEscaped<'a> {
 }
 
 /// An address associated with a Unix socket
-#[derive(Copy, Clone)]
 pub struct SocketAddr {
     addr: sockaddr_un,
     len: c_int,
@@ -108,7 +106,13 @@ impl SocketAddr {
 
         let mut len = mem::size_of::<sockaddr_un>() as c_int;
         let result = f(&mut sockaddr as *mut _ as *mut _, &mut len)?;
-        Ok((result, SocketAddr::from_parts(sockaddr, len)))
+        Ok((
+            result,
+            SocketAddr {
+                addr: sockaddr,
+                len,
+            },
+        ))
     }
 
     pub(crate) fn new<F>(f: F) -> io::Result<SocketAddr>
@@ -116,15 +120,6 @@ impl SocketAddr {
         F: FnOnce(*mut SOCKADDR, *mut c_int) -> io::Result<c_int>,
     {
         SocketAddr::init(f).map(|(_, addr)| addr)
-    }
-
-    pub(crate) fn from_parts(addr: sockaddr_un, mut len: c_int) -> SocketAddr {
-        if len == 0 {
-            // When there is a datagram from unnamed unix socket
-            // linux returns zero bytes of address
-            len = path_offset(&addr) as c_int; // i.e. zero-length address
-        }
-        SocketAddr { addr, len }
     }
 
     /// Returns true if and only if the address is unnamed.

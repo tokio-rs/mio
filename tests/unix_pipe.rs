@@ -49,7 +49,7 @@ fn smoke() {
     );
     let n = receiver.read(&mut buf).unwrap();
     assert_eq!(n, DATA1.len());
-    assert_eq!(&buf[..n], DATA1);
+    assert_eq!(&buf[..n], &*DATA1);
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn from_child_process_io() {
     let mut buf = [0; 20];
     let n = receiver.read(&mut buf).unwrap();
     assert_eq!(n, DATA1.len());
-    assert_eq!(&buf[..n], DATA1);
+    assert_eq!(&buf[..n], &*DATA1);
 
     drop(sender);
 

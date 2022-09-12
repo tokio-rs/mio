@@ -31,6 +31,7 @@ impl UnixListener {
     /// about the underlying listener; it is left up to the user to set it in
     /// non-blocking mode.
     #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn from_std(listener: net::UnixListener) -> UnixListener {
         UnixListener {
             inner: IoSource::new(listener),
@@ -94,6 +95,7 @@ impl fmt::Debug for UnixListener {
 }
 
 #[cfg(unix)]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 impl IntoRawFd for UnixListener {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
@@ -101,6 +103,7 @@ impl IntoRawFd for UnixListener {
 }
 
 #[cfg(unix)]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
@@ -108,6 +111,7 @@ impl AsRawFd for UnixListener {
 }
 
 #[cfg(unix)]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 impl FromRawFd for UnixListener {
     /// Converts a `RawFd` to a `UnixListener`.
     ///
@@ -121,6 +125,7 @@ impl FromRawFd for UnixListener {
 }
 
 #[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
 impl IntoRawSocket for UnixListener {
     fn into_raw_socket(self) -> RawSocket {
         self.inner.into_inner().into_raw_socket()
@@ -128,6 +133,7 @@ impl IntoRawSocket for UnixListener {
 }
 
 #[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
 impl AsRawSocket for UnixListener {
     fn as_raw_socket(&self) -> RawSocket {
         self.inner.as_raw_socket()
@@ -135,6 +141,7 @@ impl AsRawSocket for UnixListener {
 }
 
 #[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
 impl FromRawSocket for UnixListener {
     unsafe fn from_raw_socket(sock: RawSocket) -> Self {
         UnixListener::from_std(FromRawSocket::from_raw_socket(sock))

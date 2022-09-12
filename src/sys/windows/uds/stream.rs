@@ -9,13 +9,6 @@ pub(crate) fn connect(path: &Path) -> io::Result<net::UnixStream> {
     Ok(socket)
 }
 
-pub(crate) fn pair() -> io::Result<(net::UnixStream, net::UnixStream)> {
-    let (stream0, stream1) = net::UnixStream::pair()?;
-    stream0.set_nonblocking(true)?;
-    stream1.set_nonblocking(true)?;
-    Ok((stream0, stream1))
-}
-
 pub(crate) fn local_addr(socket: &net::UnixStream) -> io::Result<net::SocketAddr> {
     super::local_addr(socket.as_raw_socket())
 }
