@@ -68,6 +68,7 @@ pub(crate) mod stream {
         os_required!()
     }
 
+    #[cfg(unix)]
     pub(crate) fn pair() -> io::Result<(net::UnixStream, net::UnixStream)> {
         os_required!()
     }
