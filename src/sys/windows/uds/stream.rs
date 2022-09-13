@@ -1,5 +1,5 @@
-use crate::sys::windows::stdnet as net;
 use super::SocketAddr;
+use crate::sys::windows::stdnet as net;
 use std::io;
 use std::os::windows::io::AsRawSocket;
 use std::path::Path;

@@ -1,7 +1,7 @@
-use std::{fmt, io, mem};
+use crate::net::AddressKind;
 use std::os::raw::c_int;
 use std::path::Path;
-use crate::net::AddressKind;
+use std::{fmt, io, mem};
 
 use windows_sys::Win32::Networking::WinSock::{sockaddr_un, SOCKADDR};
 

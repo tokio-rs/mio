@@ -1,6 +1,6 @@
+use crate::sys;
 use std::path::Path;
 use std::{ascii, fmt};
-use crate::sys;
 
 /// An address associated with a `mio` specific Unix socket.
 ///
@@ -11,7 +11,7 @@ use crate::sys;
 /// [`net::SocketAddr`]: std::os::unix::net::SocketAddr
 /// [`accept`]: #method.accept
 pub struct SocketAddr {
-    inner: sys::SocketAddr
+    inner: sys::SocketAddr,
 }
 
 struct AsciiEscaped<'a>(&'a [u8]);

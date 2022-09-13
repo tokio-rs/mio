@@ -11,5 +11,5 @@ mod stream;
 pub use self::stream::UnixStream;
 
 mod addr;
-pub use self::addr::SocketAddr;
 pub(crate) use self::addr::AddressKind;
+pub use self::addr::SocketAddr;

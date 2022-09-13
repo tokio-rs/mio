@@ -69,12 +69,12 @@ impl UnixStream {
 
     /// Returns the socket address of the local half of this connection.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        sys::uds::stream::local_addr(&self.inner).map(|addr| SocketAddr::new(addr))
+        sys::uds::stream::local_addr(&self.inner).map(SocketAddr::new)
     }
 
     /// Returns the socket address of the remote half of this connection.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        sys::uds::stream::peer_addr(&self.inner).map(|addr| SocketAddr::new(addr))
+        sys::uds::stream::peer_addr(&self.inner).map(SocketAddr::new)
     }
 
     /// Returns the value of the `SO_ERROR` option.

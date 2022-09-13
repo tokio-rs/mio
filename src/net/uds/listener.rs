@@ -50,13 +50,14 @@ impl UnixListener {
     /// The call is responsible for ensuring that the listening socket is in
     /// non-blocking mode.
     pub fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        self.inner.do_io(sys::uds::listener::accept)
+        self.inner
+            .do_io(sys::uds::listener::accept)
             .map(|(stream, addr)| (stream, SocketAddr::new(addr)))
     }
 
     /// Returns the local socket address of this listener.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        sys::uds::listener::local_addr(&self.inner).map(|addr| SocketAddr::new(addr))
+        sys::uds::listener::local_addr(&self.inner).map(SocketAddr::new)
     }
 
     /// Returns the value of the `SO_ERROR` option.
