@@ -123,13 +123,12 @@ impl Socket {
 
 cfg_os_poll! {
     use windows_sys::Win32::Networking::WinSock::{INVALID_SOCKET, SOCKADDR};
-    use windows_sys::Win32::Foundation::{SetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT};
     use super::init;
 
     impl Socket {
         pub fn new() -> io::Result<Socket> {
             init();
-            let socket = wsa_syscall!(
+            wsa_syscall!(
                 WSASocketW(
                     WinSock::AF_UNIX.into(),
                     WinSock::SOCK_STREAM.into(),
@@ -139,24 +138,11 @@ cfg_os_poll! {
                     WinSock::WSA_FLAG_OVERLAPPED | WinSock::WSA_FLAG_NO_HANDLE_INHERIT,
                 ),
                 INVALID_SOCKET
-            )?;
-            Ok(Socket(socket))
+            ).map(Socket)
         }
 
         pub fn accept(&self, storage: *mut SOCKADDR, len: *mut c_int) -> io::Result<Socket> {
-            let socket = wsa_syscall!(accept(self.0, storage, len), INVALID_SOCKET)?;
-            let socket = Socket(socket);
-            socket.set_no_inherit()?;
-            Ok(socket)
-        }
-
-        fn set_no_inherit(&self) -> io::Result<()> {
-            syscall!(
-                SetHandleInformation(self.0 as HANDLE, HANDLE_FLAG_INHERIT, 0),
-                PartialEq::eq,
-                0
-            )?;
-            Ok(())
+            wsa_syscall!(accept(self.0, storage, len), INVALID_SOCKET).map(Socket)
         }
 
         pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
