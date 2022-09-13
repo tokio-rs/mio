@@ -1,9 +1,7 @@
-use std::ascii;
-use std::fmt;
-use std::io;
-use std::mem;
+use std::{fmt, io, mem};
 use std::os::raw::c_int;
 use std::path::Path;
+use crate::net::AddressKind;
 
 use windows_sys::Win32::Networking::WinSock::{sockaddr_un, SOCKADDR};
 
@@ -68,28 +66,7 @@ cfg_os_poll! {
     }
 }
 
-enum AddressKind<'a> {
-    Unnamed,
-    Pathname(&'a Path),
-    // Note: Windows does not support Abstract addresses
-    // https://github.com/microsoft/WSL/issues/4240#issuecomment-620805115/
-    Abstract(&'a [u8]),
-}
-
-struct AsciiEscaped<'a>(&'a [u8]);
-
-impl<'a> fmt::Display for AsciiEscaped<'a> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "\"")?;
-        for byte in self.0.iter().cloned().flat_map(ascii::escape_default) {
-            write!(fmt, "{}", byte as char)?;
-        }
-        write!(fmt, "\"")
-    }
-}
-
-/// An address associated with a Unix socket
-pub struct SocketAddr {
+pub(crate) struct SocketAddr {
     addr: sockaddr_un,
     len: c_int,
 }
@@ -122,21 +99,7 @@ impl SocketAddr {
         SocketAddr::init(f).map(|(_, addr)| addr)
     }
 
-    /// Returns true if and only if the address is unnamed.
-    pub fn is_unnamed(&self) -> bool {
-        matches!(self.address(), AddressKind::Unnamed)
-    }
-
-    /// Returns the contents of this address if it is a `pathname` address.
-    pub fn as_pathname(&self) -> Option<&Path> {
-        if let AddressKind::Pathname(path) = self.address() {
-            Some(path)
-        } else {
-            None
-        }
-    }
-
-    fn address(&self) -> AddressKind<'_> {
+    pub(crate) fn address(&self) -> AddressKind<'_> {
         let len = self.len as usize - path_offset(&self.addr);
         // sockaddr_un::sun_path on Windows is a Win32 UTF-8 file system path
 
@@ -156,10 +119,6 @@ impl SocketAddr {
 
 impl fmt::Debug for SocketAddr {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.address() {
-            AddressKind::Unnamed => write!(fmt, "(unnamed)"),
-            AddressKind::Abstract(name) => write!(fmt, "{} (abstract)", AsciiEscaped(name)),
-            AddressKind::Pathname(path) => write!(fmt, "{:?} (pathname)", path),
-        }
+        write!(fmt, "{:?}", self.address())
     }
 }

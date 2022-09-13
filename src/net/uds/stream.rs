@@ -1,4 +1,5 @@
 use crate::io_source::IoSource;
+use crate::net::SocketAddr;
 use crate::{event, sys, Interest, Registry, Token};
 
 #[cfg(windows)]
@@ -67,13 +68,13 @@ impl UnixStream {
     }
 
     /// Returns the socket address of the local half of this connection.
-    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
-        sys::uds::stream::local_addr(&self.inner)
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        sys::uds::stream::local_addr(&self.inner).map(|addr| SocketAddr::new(addr))
     }
 
     /// Returns the socket address of the remote half of this connection.
-    pub fn peer_addr(&self) -> io::Result<sys::SocketAddr> {
-        sys::uds::stream::peer_addr(&self.inner)
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        sys::uds::stream::peer_addr(&self.inner).map(|addr| SocketAddr::new(addr))
     }
 
     /// Returns the value of the `SO_ERROR` option.

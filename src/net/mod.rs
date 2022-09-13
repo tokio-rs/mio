@@ -37,5 +37,8 @@ mod uds;
 #[cfg(not(target_os = "wasi"))]
 pub use self::uds::{SocketAddr, UnixListener, UnixStream};
 
+#[cfg(not(target_os = "wasi"))]
+pub(crate) use self::uds::AddressKind;
+
 #[cfg(unix)]
 pub use self::uds::UnixDatagram;

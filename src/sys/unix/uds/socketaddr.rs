@@ -1,32 +1,15 @@
 use super::path_offset;
+use crate::net::AddressKind;
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
-use std::path::Path;
-use std::{ascii, fmt};
 
-/// An address associated with a `mio` specific Unix socket.
-///
-/// This is implemented instead of imported from [`net::SocketAddr`] because
-/// there is no way to create a [`net::SocketAddr`]. One must be returned by
-/// [`accept`], so this is returned instead.
-///
-/// [`net::SocketAddr`]: std::os::unix::net::SocketAddr
-/// [`accept`]: #method.accept
-pub struct SocketAddr {
+pub(crate) struct SocketAddr {
     sockaddr: libc::sockaddr_un,
     socklen: libc::socklen_t,
 }
 
-struct AsciiEscaped<'a>(&'a [u8]);
-
-enum AddressKind<'a> {
-    Unnamed,
-    Pathname(&'a Path),
-    Abstract(&'a [u8]),
-}
-
 impl SocketAddr {
-    fn address(&self) -> AddressKind<'_> {
+    pub(crate) fn address(&self) -> AddressKind<'_> {
         let offset = path_offset(&self.sockaddr);
         // Don't underflow in `len` below.
         if (self.socklen as usize) < offset {
@@ -72,59 +55,5 @@ cfg_os_poll! {
         pub(crate) fn from_parts(sockaddr: libc::sockaddr_un, socklen: libc::socklen_t) -> SocketAddr {
             SocketAddr { sockaddr, socklen }
         }
-
-        /// Returns `true` if the address is unnamed.
-        ///
-        /// Documentation reflected in [`SocketAddr`]
-        ///
-        /// [`SocketAddr`]: std::os::unix::net::SocketAddr
-        pub fn is_unnamed(&self) -> bool {
-            matches!(self.address(), AddressKind::Unnamed)
-        }
-
-        /// Returns the contents of this address if it is a `pathname` address.
-        ///
-        /// Documentation reflected in [`SocketAddr`]
-        ///
-        /// [`SocketAddr`]: std::os::unix::net::SocketAddr
-        pub fn as_pathname(&self) -> Option<&Path> {
-            if let AddressKind::Pathname(path) = self.address() {
-                Some(path)
-            } else {
-                None
-            }
-        }
-
-        /// Returns the contents of this address if it is an abstract namespace
-        /// without the leading null byte.
-        // Link to std::os::unix::net::SocketAddr pending
-        // https://github.com/rust-lang/rust/issues/85410.
-        pub fn as_abstract_namespace(&self) -> Option<&[u8]> {
-            if let AddressKind::Abstract(path) = self.address() {
-                Some(path)
-            } else {
-                None
-            }
-        }
-    }
-}
-
-impl fmt::Debug for SocketAddr {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.address() {
-            AddressKind::Unnamed => write!(fmt, "(unnamed)"),
-            AddressKind::Abstract(name) => write!(fmt, "{} (abstract)", AsciiEscaped(name)),
-            AddressKind::Pathname(path) => write!(fmt, "{:?} (pathname)", path),
-        }
-    }
-}
-
-impl<'a> fmt::Display for AsciiEscaped<'a> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "\"")?;
-        for byte in self.0.iter().cloned().flat_map(ascii::escape_default) {
-            write!(fmt, "{}", byte as char)?;
-        }
-        write!(fmt, "\"")
     }
 }

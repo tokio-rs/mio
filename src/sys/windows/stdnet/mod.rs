@@ -4,7 +4,7 @@ mod listener;
 mod socket;
 mod stream;
 
-pub use self::addr::SocketAddr;
+pub(crate) use self::addr::SocketAddr;
 pub(crate) use self::listener::UnixListener;
 pub(crate) use self::stream::UnixStream;
 

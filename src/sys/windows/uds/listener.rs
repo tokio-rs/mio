@@ -2,7 +2,8 @@ use std::io;
 use std::os::windows::io::AsRawSocket;
 use std::path::Path;
 
-use crate::net::{SocketAddr, UnixStream};
+use super::SocketAddr;
+use crate::net::UnixStream;
 use crate::sys::windows::stdnet as net;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {

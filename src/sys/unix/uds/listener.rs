@@ -1,5 +1,6 @@
 use super::socket_addr;
-use crate::net::{SocketAddr, UnixStream};
+use crate::net::UnixStream;
+use super::SocketAddr;
 use crate::sys::unix::net::new_socket;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::os::unix::net;

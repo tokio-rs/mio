@@ -1,5 +1,6 @@
 use crate::io_source::IoSource;
 use crate::{event, sys, Interest, Registry, Token};
+use crate::net::SocketAddr;
 
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -54,24 +55,27 @@ impl UnixDatagram {
     }
 
     /// Returns the address of this socket.
-    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
         sys::uds::datagram::local_addr(&self.inner)
+            .map(|addr| SocketAddr::new(addr))
     }
 
     /// Returns the address of this socket's peer.
     ///
     /// The `connect` method will connect the socket to a peer.
-    pub fn peer_addr(&self) -> io::Result<sys::SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         sys::uds::datagram::peer_addr(&self.inner)
+            .map(|addr| SocketAddr::new(addr))
     }
 
     /// Receives data from the socket.
     ///
     /// On success, returns the number of bytes read and the address from
     /// whence the data came.
-    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, sys::SocketAddr)> {
+    pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.inner
             .do_io(|inner| sys::uds::datagram::recv_from(inner, buf))
+            .map(|(nread, addr)| (nread, SocketAddr::new(addr)))
     }
 
     /// Receives data from the socket.

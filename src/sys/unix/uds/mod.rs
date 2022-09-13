@@ -1,5 +1,5 @@
 mod socketaddr;
-pub use self::socketaddr::SocketAddr;
+pub(crate) use self::socketaddr::SocketAddr;
 
 /// Get the `sun_path` field offset of `sockaddr_un` for the target OS.
 ///

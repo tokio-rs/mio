@@ -10,4 +10,6 @@ pub use self::listener::UnixListener;
 mod stream;
 pub use self::stream::UnixStream;
 
-pub use crate::sys::SocketAddr;
+mod addr;
+pub use self::addr::SocketAddr;
+pub(crate) use self::addr::AddressKind;

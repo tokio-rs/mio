@@ -1,4 +1,4 @@
-pub use super::stdnet::SocketAddr;
+pub(crate) use super::stdnet::SocketAddr;
 
 cfg_os_poll! {
     use std::convert::TryInto;

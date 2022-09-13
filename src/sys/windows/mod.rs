@@ -30,7 +30,7 @@ macro_rules! wsa_syscall {
 cfg_net! {
     pub(crate) mod stdnet;
     pub(crate) mod uds;
-    pub use self::uds::SocketAddr;
+    pub(crate) use self::uds::SocketAddr;
 }
 
 cfg_os_poll! {

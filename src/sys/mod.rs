@@ -81,7 +81,7 @@ cfg_not_os_poll! {
 
     #[cfg(unix)]
     cfg_net! {
-        pub use self::unix::SocketAddr;
+        pub(crate) use self::unix::SocketAddr;
     }
 
     #[cfg(windows)]
@@ -91,6 +91,6 @@ cfg_not_os_poll! {
 
     #[cfg(windows)]
     cfg_net! {
-        pub use self::windows::SocketAddr;
+        pub(crate) use self::windows::SocketAddr;
     }
 }
