@@ -104,6 +104,7 @@ pub use self::kqueue::Waker;
     target_os = "netbsd",
     target_os = "openbsd",
     target_os = "redox",
+    target_os = "aix",
 ))]
 mod pipe {
     use crate::sys::unix::Selector;
@@ -126,7 +127,10 @@ mod pipe {
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             let mut fds = [-1; 2];
+            #[cfg(not(target_os = "aix"))]
             syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
+            #[cfg(target_os = "aix")]
+            syscall!(pipe(fds.as_mut_ptr()))?;
             // Turn the file descriptors into files first so we're ensured
             // they're closed when dropped, e.g. when register below fails.
             let sender = unsafe { File::from_raw_fd(fds[1]) };
@@ -176,5 +180,6 @@ mod pipe {
     target_os = "netbsd",
     target_os = "openbsd",
     target_os = "redox",
+    target_os = "aix",
 ))]
 pub use self::pipe::Waker;

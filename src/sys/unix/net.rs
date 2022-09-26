@@ -96,7 +96,8 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "ios",
                     target_os = "macos",
                     target_os = "netbsd",
-                    target_os = "openbsd"
+                    target_os = "openbsd",
+                    target_os = "aix"
                 ))]
                 sin_len: 0,
             };
@@ -120,7 +121,8 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "ios",
                     target_os = "macos",
                     target_os = "netbsd",
-                    target_os = "openbsd"
+                    target_os = "openbsd",
+                    target_os = "aix"
                 ))]
                 sin6_len: 0,
                 #[cfg(target_os = "illumos")]

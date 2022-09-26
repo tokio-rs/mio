@@ -34,6 +34,12 @@ mod kqueue;
 ))]
 pub(crate) use self::kqueue::{event, Event, Events, Selector};
 
+#[cfg(target_os = "aix")]
+mod pollset;
+
+#[cfg(target_os = "aix")]
+pub(crate) use self::pollset::{event, Event, Events, Selector};
+
 /// Lowest file descriptor used in `Selector::try_clone`.
 ///
 /// # Notes
@@ -42,4 +48,5 @@ pub(crate) use self::kqueue::{event, Event, Events, Selector};
 /// blindly assume this to be true, which means using any one of those a select
 /// could result in some interesting and unexpected errors. Avoid that by using
 /// an fd that doesn't have a pre-determined usage.
+#[warn(unused)]
 const LOWEST_FD: libc::c_int = 3;

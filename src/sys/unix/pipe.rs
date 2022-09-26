@@ -195,6 +195,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         target_os = "macos",
         target_os = "illumos",
         target_os = "redox",
+        target_os = "aix",
     )))]
     compile_error!("unsupported target for `mio::unix::pipe`");
 
