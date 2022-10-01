@@ -639,7 +639,7 @@ fn tcp_reset_close_event() {
         vec![ExpectEvent::new(ID1, Readiness::READ_CLOSED)],
     );
 
-    // Something weird is going on here. Linux keeps emitting HUP, so event though everything is
+    // Something weird is going on here. Linux keeps emitting HUP, so even though everything is
     // closed down you still get events. In the linux kernel source there is a comment stating
     // that EPOLLHUP is not done correctly (see net/ipv4/tcp.c, v6.0-rc7 tcp_poll) and other flaky
     // things are going on.
