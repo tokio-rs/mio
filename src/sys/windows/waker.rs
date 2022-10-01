@@ -26,6 +26,4 @@ impl Waker {
 
         self.port.post(ev.to_completion_status())
     }
-
-    pub fn did_wake(&self) {}
 }

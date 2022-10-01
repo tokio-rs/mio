@@ -70,10 +70,6 @@ use std::io;
 /// let waker_event = events.iter().next().unwrap();
 /// assert!(waker_event.is_readable());
 /// assert_eq!(waker_event.token(), WAKE_TOKEN);
-///
-/// // We need to tell the waker that we woke up, us otherwise
-/// // it might wake us again when polling
-/// waker.did_wake();
 /// # handle.join().unwrap();
 /// #     Ok(())
 /// # }
@@ -96,14 +92,5 @@ impl Waker {
     /// [`Poll`]: struct.Poll.html
     pub fn wake(&self) -> io::Result<()> {
         self.inner.wake()
-    }
-
-    /// Notifies the waker that it was actually woken.
-    ///
-    /// This is required when using a level triggered polling api,
-    /// as otherwise the waker will not loose its woken status and keep
-    /// waking.
-    pub fn did_wake(&self) {
-        self.inner.did_wake()
     }
 }

@@ -53,6 +53,10 @@ impl Selector {
         self.state.select(events, timeout)
     }
 
+    pub fn register_waker_fd(&self, fd: RawFd, token: Token) -> io::Result<()> {
+        self.state.register_waker_fd(fd, token)
+    }
+
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         self.state.register(fd, token, interests)
     }
@@ -153,6 +157,8 @@ struct FdData {
     poll_fds_index: usize,
     /// The key of the `Event` associated with this file descriptor.
     token: Token,
+    /// Indicates whether this is a waker fd which needs to be reset after becoming ready
+    is_waker: bool,
 }
 
 impl SelectorState {
@@ -286,6 +292,15 @@ impl SelectorState {
                         continue;
                     }
 
+                    if poll_fd.events == 0 {
+                        // We can get events even when we didn't ask for them.
+                        // This mainly happens when we have a HUP but did not ask for read nor for
+                        // write readiness.
+                        //
+                        // TODO: Can this cause busy loops?
+                        continue;
+                    }
+
                     if poll_fd.revents != 0 {
                         // Store event
                         events.push(Event {
@@ -293,10 +308,15 @@ impl SelectorState {
                             events: poll_fd.revents,
                         });
 
-                        // Remove the interest which just got triggered
-                        // the IoSourceState used with this selector will add back the interest
-                        // as soon as an WouldBlock I/O error occurred
-                        poll_fd.events &= !poll_fd.revents;
+                        if fd_data.is_waker {
+                            // Don't remove interests, instead tell the waker to reset itself
+                            crate::sys::Waker::reset_by_fd(poll_fd.fd)?;
+                        } else {
+                            // Remove the interest which just got triggered
+                            // the IoSourceState used with this selector will add back the interest
+                            // as soon as an WouldBlock I/O error occurred
+                            poll_fd.events &= !poll_fd.revents;
+                        }
 
                         if events.len() == num_fd_events {
                             break;
@@ -311,7 +331,21 @@ impl SelectorState {
         Ok(())
     }
 
+    pub(crate) fn register_waker_fd(&self, fd: RawFd, token: Token) -> io::Result<()> {
+        self.register_internal(fd, token, Interest::READABLE, true)
+    }
+
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
+        self.register_internal(fd, token, interests, false)
+    }
+
+    pub fn register_internal(
+        &self,
+        fd: RawFd,
+        token: Token,
+        interests: Interest,
+        is_waker: bool,
+    ) -> io::Result<()> {
         if fd == self.notify_read || fd == self.notify_write {
             return Err(io::Error::from(io::ErrorKind::InvalidInput));
         }
@@ -351,6 +385,7 @@ impl SelectorState {
                 FdData {
                     poll_fds_index,
                     token,
+                    is_waker,
                 },
             );
 
@@ -536,7 +571,7 @@ pub mod event {
         // Both halves of the socket have closed
         (event.events & libc::POLLHUP) != 0
             // Socket has received FIN or called shutdown(SHUT_RD)
-            || ((event.events & libc::POLLIN) != 0 && (event.events & libc::POLLRDHUP) != 0)
+            || (event.events & libc::POLLRDHUP) != 0
     }
 
     #[cfg(target_os = "haiku")]

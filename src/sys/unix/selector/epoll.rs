@@ -116,6 +116,11 @@ impl Selector {
         })
     }
 
+    pub(crate) fn register_waker_fd(&self, fd: RawFd, token: Token) -> io::Result<()> {
+        // No special handling required for epoll
+        self.register(fd, token, Interest::READABLE)
+    }
+
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let mut event = libc::epoll_event {
             events: interests_to_epoll(interests),

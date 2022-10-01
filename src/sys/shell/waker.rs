@@ -13,8 +13,4 @@ impl Waker {
     pub fn wake(&self) -> io::Result<()> {
         os_required!();
     }
-
-    pub fn did_wake(&self) {
-        os_required!();
-    }
 }

@@ -1,39 +1,76 @@
+macro_rules! checked_write {
+    ($socket: ident . $method: ident ( $data: expr $(, $arg: expr)* ) ) => {{
+        let data = $data;
+        let n = $socket.$method($data $(, $arg)*)
+            .expect("unable to write to socket");
+        assert_eq!(n, data.len(), "short write");
+    }};
+}
+
+/// Assert that the provided result is an `io::Error` with kind `WouldBlock`.
+pub fn assert_would_block<T>(result: std::io::Result<T>) {
+    match result {
+        Ok(_) => panic!("unexpected OK result, expected a `WouldBlock` error"),
+        Err(ref err) if err.kind() == std::io::ErrorKind::WouldBlock => {}
+        Err(err) => panic!("unexpected error result: {}", err),
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use mio::{Events, Poll, Token, Waker};
+    use mio::{net, net::TcpStream, Events, Interest, Poll, Token, Waker};
+    use std::io::{Read, Write};
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
     env_logger::init();
 
-    const WAKE_TOKEN: Token = Token(10);
-    let mut poll = Poll::new()?;
-    let mut events = Events::with_capacity(2);
-    let waker = Arc::new(Waker::new(poll.registry(), WAKE_TOKEN)?);
-    // We need to keep the Waker alive, so we'll create a clone for the
-    // thread we create below.
-    let waker1 = waker.clone();
-    let handle = thread::spawn(move || {
-        // Working hard, or hardly working?
-        thread::sleep(Duration::from_millis(500));
-        log::trace!("WAKING!");
-        // Now we'll wake the queue on the other thread.
-        waker1.wake().expect("unable to wake");
-    });
-    // On our current thread we'll poll for events, without a timeout.
-    poll.poll(&mut events, None)?;
-    // After about 500 milliseconds we should be awoken by the other thread and
-    // get a single event.
-    assert!(!events.is_empty());
-    let waker_event = events.iter().next().unwrap();
-    assert!(waker_event.is_readable());
-    assert_eq!(waker_event.token(), WAKE_TOKEN);
-    // We need to tell the waker that we woke up, us otherwise
-    // it might wake us again when polling
-    log::trace!("Signalling waker it did wake!");
-    waker.did_wake();
+    const DATA1: &[u8] = b"Hello world!";
+    const ID1: Token = Token(1);
 
-    log::trace!("About to join thread!");
-    handle.join().unwrap();
-    log::trace!("Thread joined!");
+    let mut poll = Poll::new()?;
+    let mut events = Events::with_capacity(1024);
+
+    let listener = net::TcpListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let sockaddr = listener.local_addr().unwrap();
+    let mut stream = TcpStream::connect(sockaddr).unwrap();
+
+    poll.registry()
+        .register(&mut stream, ID1, Interest::READABLE.add(Interest::WRITABLE))
+        .unwrap();
+
+    let server_stream = listener.accept().unwrap();
+
+    poll.poll(&mut events, None)?;
+
+    /* expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
+    ); */
+    checked_write!(stream.write(DATA1));
+
+    // Try to read something.
+    assert_would_block(stream.read(&mut [0]));
+
+    // Server goes away.
+    drop(server_stream);
+
+    poll.poll(&mut events, None)?;
+
+    /* expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READ_CLOSED)],
+    ); */
+
+    // Make sure we quiesce. `expect_no_events` seems to flake sometimes on mac/freebsd.
+    loop {
+        poll.poll(&mut events, Some(Duration::from_millis(100)))
+            .expect("poll failed");
+        if events.iter().count() == 0 {
+            break;
+        }
+    }
+
     Ok(())
 }

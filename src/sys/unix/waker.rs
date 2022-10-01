@@ -1,11 +1,12 @@
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod eventfd {
     use crate::sys::Selector;
-    use crate::{Interest, Token};
+    use crate::Token;
 
     use std::fs::File;
     use std::io::{self, Read, Write};
-    use std::os::unix::io::{AsRawFd, FromRawFd};
+    use std::mem::ManuallyDrop;
+    use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
     /// Waker backed by `eventfd`.
     ///
@@ -28,7 +29,7 @@ mod eventfd {
                 // it's closed when dropped, e.g. when register below fails.
                 let file = unsafe { File::from_raw_fd(fd) };
                 selector
-                    .register(fd, token, Interest::READABLE)
+                    .register_waker_fd(fd, token)
                     .map(|()| Waker { fd: file, selector })
             })
         }
@@ -47,14 +48,17 @@ mod eventfd {
             }
         }
 
-        pub fn did_wake(&self) {
-            let _ = self.reset();
+        /// Reset the eventfd object
+        fn reset(&self) -> io::Result<()> {
+            Self::reset_by_fd(self.fd.as_raw_fd())
         }
 
-        /// Reset the eventfd object, only need to call this if `wake` fails.
-        fn reset(&self) -> io::Result<()> {
+        /// Reset the eventfd object
+        pub(crate) fn reset_by_fd(fd: RawFd) -> io::Result<()> {
+            let mut file = ManuallyDrop::new(unsafe { File::from_raw_fd(fd) });
+
             let mut buf: [u8; 8] = 0u64.to_ne_bytes();
-            match (&self.fd).read(&mut buf) {
+            match file.read(&mut buf) {
                 Ok(_) => Ok(()),
                 // If the `Waker` hasn't been awoken yet this will return a
                 // `WouldBlock` error which we can safely ignore.
@@ -106,7 +110,10 @@ mod kqueue {
             self.selector.wake(self.token)
         }
 
-        pub fn did_wake(&self) {}
+        pub(crate) fn reset_by_fd(fd: RawFd) -> io::Result<()> {
+            // No-op for kqueue
+            Ok(())
+        }
     }
 }
 
@@ -172,13 +179,11 @@ mod pipe {
             // they're closed when dropped, e.g. when register below fails.
             let sender = unsafe { File::from_raw_fd(fds[1]) };
             let receiver = unsafe { File::from_raw_fd(fds[0]) };
-            selector
-                .register(fds[0], token, Interest::READABLE)
-                .map(|()| Waker {
-                    sender,
-                    receiver,
-                    selector,
-                })
+            selector.register_waker_fd(fds[0], token).map(|()| Waker {
+                sender,
+                receiver,
+                selector,
+            })
         }
 
         pub fn wake(&self) -> io::Result<()> {
@@ -193,7 +198,7 @@ mod pipe {
                 Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
                     // The reading end is full so we'll empty the buffer and try
                     // again.
-                    self.empty();
+                    self.reset();
                     self.wake()
                 }
                 Err(ref err) if err.kind() == io::ErrorKind::Interrupted => self.wake(),
@@ -201,18 +206,20 @@ mod pipe {
             }
         }
 
-        pub fn did_wake(&self) {
-            self.empty();
+        fn reset(&self) {
+            Self::reset_by_fd(self.receiver.as_raw_fd());
         }
 
-        /// Empty the pipe's buffer, only need to call this if `wake` fails.
+        /// Empty the pipe's buffer.
         /// This ignores any errors.
-        fn empty(&self) {
+        pub(crate) fn reset_by_fd(fd: RawFd) -> io::Result<()> {
+            let mut file = ManuallyDrop::new(unsafe { File::from_raw_fd(fd) });
+
             let mut buf = [0; 4096];
             loop {
-                match (&self.receiver).read(&mut buf) {
+                match file.read(&mut buf) {
                     Ok(n) if n > 0 => continue,
-                    _ => return,
+                    _ => return Ok(()),
                 }
             }
         }
