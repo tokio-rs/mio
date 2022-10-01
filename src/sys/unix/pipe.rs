@@ -115,15 +115,17 @@ use crate::{event, Interest, Registry, Token};
 /// # use mio::unix::pipe;
 /// #
 /// # const PIPE_RECV: Token = Token(0);
+/// # const PIPE_SEND: Token = Token(1);
 /// #
 /// # fn main() -> io::Result<()> {
 /// // Same setup as in the example above.
 /// let mut poll = Poll::new()?;
 /// let mut events = Events::with_capacity(8);
 ///
-/// let (sender, mut receiver) = pipe::new()?;
+/// let (mut sender, mut receiver) = pipe::new()?;
 ///
 /// poll.registry().register(&mut receiver, PIPE_RECV, Interest::READABLE)?;
+/// poll.registry().register(&mut sender, PIPE_SEND, Interest::WRITABLE)?;
 ///
 /// // Drop the sender.
 /// drop(sender);
@@ -180,8 +182,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         }
 
         for fd in &fds {
-            if libc::fcntl(*fd, libc::F_SETFL, libc::O_NONBLOCK | libc::FD_CLOEXEC) != 0
-            {
+            if libc::fcntl(*fd, libc::F_SETFL, libc::O_NONBLOCK | libc::FD_CLOEXEC) != 0 {
                 let err = io::Error::last_os_error();
                 // Don't leak file descriptors. Can't handle error though.
                 let _ = libc::close(fds[0]);
