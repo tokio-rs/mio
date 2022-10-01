@@ -101,7 +101,3 @@ required-features = ["os-poll", "net"]
 [[example]]
 name = "udp_server"
 required-features = ["os-poll", "net"]
-
-[[example]]
-name = "test_example"
-required-features = ["os-poll", "net"]
