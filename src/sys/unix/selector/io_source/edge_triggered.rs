@@ -65,7 +65,7 @@ impl IoSourceState {
                     token,
                     interests,
                     fd,
-                    is_registered: false,
+                    is_registered: true,
                 };
 
                 self.inner = Some(Box::new(state));

@@ -86,6 +86,12 @@ struct SelectorState {
     /// File descriptors to poll.
     fds: Mutex<Fds>,
 
+    /// File descriptors which will be removed before the next poll call.
+    ///
+    /// When a file descriptor is deregistered while a poll is running, we need to filter
+    /// out all removed descriptors after that poll is finished running.
+    pending_removal: Mutex<Vec<RawFd>>,
+
     /// The file descriptor of the read half of the notify pipe. This is also stored as the first
     /// file descriptor in `fds.poll_fds`.
     notify_read: RawFd,
@@ -162,6 +168,7 @@ impl SelectorState {
                 })],
                 fd_data: HashMap::new(),
             }),
+            pending_removal: Mutex::new(Vec::new()),
             notify_read: notify_fds[0],
             notify_write: notify_fds[1],
             waiting_operations: AtomicUsize::new(0),
@@ -260,6 +267,12 @@ impl SelectorState {
                 }
             }
 
+            // We now check whether this poll was performed with descriptors which were pending
+            // for removal and filter out any matching.
+            let mut pending_removal_guard = self.pending_removal.lock().unwrap();
+            let pending_removal = std::mem::replace(pending_removal_guard.as_mut(), Vec::new());
+            drop(pending_removal_guard);
+
             // Store the events if there were any.
             if num_fd_events > 0 {
                 let fds = &mut *fds;
@@ -267,6 +280,12 @@ impl SelectorState {
                 events.reserve(num_fd_events);
                 for fd_data in fds.fd_data.values_mut() {
                     let PollFd(poll_fd) = &mut fds.poll_fds[fd_data.poll_fds_index];
+
+                    if pending_removal.contains(&poll_fd.fd) {
+                        // Fd was removed while poll was running
+                        continue;
+                    }
+
                     if poll_fd.revents != 0 {
                         // Store event
                         events.push(Event {
@@ -274,10 +293,10 @@ impl SelectorState {
                             events: poll_fd.revents,
                         });
 
-                        // Remove interest
+                        // Remove the interest which just got triggered
                         // the IoSourceState used with this selector will add back the interest
                         // as soon as an WouldBlock I/O error occurred
-                        poll_fd.events = 0;
+                        poll_fd.events &= !poll_fd.revents;
 
                         if events.len() == num_fd_events {
                             break;
@@ -296,6 +315,24 @@ impl SelectorState {
         if fd == self.notify_read || fd == self.notify_write {
             return Err(io::Error::from(io::ErrorKind::InvalidInput));
         }
+
+        // We must handle the unlikely case that the following order of operations happens:
+        //
+        // register(1 as RawFd)
+        // deregister(1 as RawFd)
+        // register(1 as RawFd)
+        // <poll happens>
+        //
+        // Fd's pending removal only get cleared when poll has been run. It is possible that
+        // between registering and deregistering and then _again_ registering the file descriptor
+        // poll never gets called, thus the fd stays stuck in the pending removal list.
+        //
+        // To avoid this scenario we remove an fd from pending removals when registering it.
+        let mut pending_removal = self.pending_removal.lock().unwrap();
+        if let Some(idx) = pending_removal.iter().position(|&pending| pending == fd) {
+            pending_removal.remove(idx);
+        }
+        drop(pending_removal);
 
         self.modify_fds(|fds| {
             if fds.fd_data.contains_key(&fd) {
@@ -339,6 +376,10 @@ impl SelectorState {
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
+        let mut pending_removal = self.pending_removal.lock().unwrap();
+        pending_removal.push(fd);
+        drop(pending_removal);
+
         self.modify_fds(|fds| {
             let data = fds.fd_data.remove(&fd).ok_or(io::ErrorKind::NotFound)?;
             fds.poll_fds.swap_remove(data.poll_fds_index);
