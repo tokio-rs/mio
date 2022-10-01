@@ -639,14 +639,13 @@ fn tcp_reset_close_event() {
         vec![ExpectEvent::new(ID1, Readiness::READ_CLOSED)],
     );
 
-    // Make sure we quiesce. `expect_no_events` seems to flake sometimes on mac/freebsd.
-    loop {
-        poll.poll(&mut events, Some(Duration::from_millis(100)))
-            .expect("poll failed");
-        if events.iter().count() == 0 {
-            break;
-        }
-    }
+    // Something weird is going on here. Linux keeps emitting HUP, so event though everything is
+    // closed down you still get events. In the linux kernel source there is a comment stating
+    // that EPOLLHUP is not done correctly (see net/ipv4/tcp.c, v6.0-rc7 tcp_poll) and other flaky
+    // things are going on.
+    // TODO: investigate what exactly is going on here and why a loop expecting no more events
+    //       ever worked (linux documentation says that HUP is not maskable and causes poll to
+    //       always return, no exceptions)
 }
 
 #[test]

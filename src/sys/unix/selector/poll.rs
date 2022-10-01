@@ -298,7 +298,7 @@ impl SelectorState {
                         // write readiness.
                         //
                         // TODO: Can this cause busy loops?
-                        continue;
+                        // continue;
                     }
 
                     if poll_fd.revents != 0 {

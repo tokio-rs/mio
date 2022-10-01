@@ -2,7 +2,7 @@
 
 use mio::net::UnixStream;
 use mio::{Interest, Token};
-use std::io::{self, IoSlice, IoSliceMut, Read, Write};
+use std::io::{self, ErrorKind, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::net;
 use std::path::Path;
@@ -442,6 +442,11 @@ where
     );
 
     expect_read!(stream.read(&mut buf), DATA1);
+    // mio can only guarantee further readiness events when WouldBlock is returned
+    assert_eq!(
+        stream.read(&mut buf).map_err(|err| err.kind()).err(),
+        Some(ErrorKind::WouldBlock)
+    );
 
     assert!(stream.take_error().unwrap().is_none());
 
