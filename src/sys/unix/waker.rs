@@ -208,7 +208,7 @@ mod pipe {
         }
 
         fn reset(&self) {
-            Self::reset_by_fd(self.receiver.as_raw_fd());
+            let _ = Self::reset_by_fd(self.receiver.as_raw_fd());
         }
 
         /// Empty the pipe's buffer.
