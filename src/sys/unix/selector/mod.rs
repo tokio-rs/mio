@@ -1,16 +1,23 @@
+cfg_io_source! {
+    mod io_source;
+}
+
 cfg_epoll_selector! {
     mod epoll;
     pub(crate) use self::epoll::{event, Event, Events, Selector};
+    pub(crate) use self::io_source::stateless::IoSourceState;
 }
 
 cfg_kqueue_selector! {
     mod kqueue;
     pub(crate) use self::kqueue::{event, Event, Events, Selector};
+    pub(crate) use self::io_source::stateless::IoSourceState;
 }
 
 cfg_poll_selector! {
     mod poll;
     pub(crate) use self::poll::{event, Event, Events, Selector};
+    pub(crate) use self::io_source::stateless::IoSourceState;
 }
 
 /// Lowest file descriptor used in `Selector::try_clone`.
