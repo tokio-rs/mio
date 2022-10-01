@@ -68,3 +68,76 @@ macro_rules! cfg_any_os_ext {
         )*
     }
 }
+
+/// The `os-poll` feature or one feature that requires is is enabled and the system
+/// supports epoll.
+macro_rules! cfg_epoll_selector {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                any(feature = "os-poll", feature = "net"),
+                any(
+                    target_os = "android",
+                    target_os = "illumos",
+                    target_os = "linux",
+                    target_os = "redox",
+                ),
+                not(feature = "force-old-poll")
+            ))]
+            $item
+        )*
+    };
+}
+
+/// The `os-poll` feature or one feature that requires is is enabled and the system
+/// supports kqueue.
+macro_rules! cfg_kqueue_selector {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                any(feature = "os-poll", feature = "net"),
+                any(
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "netbsd",
+                    target_os = "openbsd"
+                ),
+                not(feature = "force-old-poll")
+            ))]
+            $item
+        )*
+    };
+}
+
+/// The `os-poll` feature or one feature that requires is is enabled and the system
+/// is a generic unix which does not support epoll nor kqueue.
+macro_rules! cfg_poll_selector {
+    ($($item:item)*) => {
+        $(
+            #[cfg(
+                all(
+                    unix,
+                    any(feature = "os-poll", feature = "net"),
+                    any(
+                        not(any(
+                            target_os = "android",
+                            target_os = "illumos",
+                            target_os = "linux",
+                            target_os = "redox",
+                            target_os = "dragonfly",
+                            target_os = "freebsd",
+                            target_os = "ios",
+                            target_os = "macos",
+                            target_os = "netbsd",
+                            target_os = "openbsd"
+                        )),
+                        feature = "force-old-poll"
+                    )
+                )
+            )]
+            $item
+        )*
+    };
+}
