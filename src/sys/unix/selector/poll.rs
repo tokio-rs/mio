@@ -1,3 +1,6 @@
+// This implementation is based on the one in the `polling` crate.
+// Thanks to https://github.com/Kestrer for the original implementation!
+
 use crate::{Interest, Token};
 use std::collections::HashMap;
 use std::convert::TryInto;
