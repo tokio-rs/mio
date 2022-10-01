@@ -234,7 +234,7 @@ impl SelectorState {
             }
 
             // Perform the poll.
-            log::trace!("POLLing on {:?}", fds);
+            log::trace!("Polling on {:?}", fds);
             let num_events = poll(&mut fds.poll_fds, deadline)?;
             if num_events == 0 && deadline.map(|v| v <= Instant::now()).unwrap_or(false) {
                 // timeout
@@ -273,6 +273,11 @@ impl SelectorState {
                             token: fd_data.token,
                             events: poll_fd.revents,
                         });
+
+                        // Remove interest
+                        // the IoSourceState used with this selector will add back the interest
+                        // as soon as an WouldBlock I/O error occurred
+                        poll_fd.events = 0;
 
                         if events.len() == num_fd_events {
                             break;

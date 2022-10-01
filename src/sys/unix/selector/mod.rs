@@ -17,7 +17,7 @@ cfg_kqueue_selector! {
 cfg_poll_selector! {
     mod poll;
     pub(crate) use self::poll::{event, Event, Events, Selector};
-    pub(crate) use self::io_source::stateless::IoSourceState;
+    pub(crate) use self::io_source::edge_triggered ::IoSourceState;
 }
 
 /// Lowest file descriptor used in `Selector::try_clone`.
