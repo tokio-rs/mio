@@ -130,11 +130,12 @@ pub use self::kqueue::Waker;
 ))]
 mod pipe {
     use crate::sys::unix::Selector;
-    use crate::{Interest, Token};
+    use crate::Token;
 
     use std::fs::File;
     use std::io::{self, Read, Write};
-    use std::os::unix::io::{AsRawFd, FromRawFd};
+    use std::mem::ManuallyDrop;
+    use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
     /// Waker backed by a unix pipe.
     ///
