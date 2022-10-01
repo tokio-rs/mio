@@ -2,10 +2,9 @@ use crate::sys::Selector;
 use crate::{Interest, Registry, Token};
 use std::io;
 use std::os::unix::io::RawFd;
-use std::sync::Arc;
 
 struct InternalState {
-    selector: Arc<Selector>,
+    selector: Selector,
     token: Token,
     interests: Interest,
     fd: RawFd,
@@ -58,7 +57,19 @@ impl IoSourceState {
         if self.inner.is_some() {
             Err(io::ErrorKind::AlreadyExists.into())
         } else {
-            registry.selector().register(fd, token, interests)
+            let selector = registry.selector().try_clone()?;
+
+            selector.register(fd, token, interests).map(move |()| {
+                let state = InternalState {
+                    selector,
+                    token,
+                    interests,
+                    fd,
+                    is_registered: false,
+                };
+
+                self.inner = Some(Box::new(state));
+            })
         }
     }
 
@@ -82,6 +93,12 @@ impl IoSourceState {
     }
 
     pub fn deregister(&mut self, registry: &Registry, fd: RawFd) -> io::Result<()> {
+        if let Some(mut state) = self.inner.take() {
+            // Deregistration _may_ fail below, however, dropping the state would only
+            // do the same thing twice anyway
+            state.is_registered = false;
+        }
+
         registry.selector().deregister(fd)
     }
 }
