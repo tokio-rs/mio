@@ -142,6 +142,9 @@ cfg_os_poll! {
         }
 
         pub fn accept(&self, storage: *mut SOCKADDR, len: *mut c_int) -> io::Result<Socket> {
+            // WinSock's accept returns a socket with the same properties as the listener.  it is
+            // called on. In particular, the WSA_FLAG_NO_HANDLE_INHERIT will be inherited from the
+            // listener.
             wsa_syscall!(accept(self.0, storage, len), INVALID_SOCKET).map(Socket)
         }
 
