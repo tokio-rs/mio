@@ -264,10 +264,10 @@ pub fn set_linger_zero(socket: &TcpStream) {
 pub fn set_linger_zero(socket: &TcpStream) {
     use std::os::windows::io::AsRawSocket;
     use windows_sys::Win32::Networking::WinSock::{
-        linger, setsockopt, SOCKET_ERROR, SOL_SOCKET, SO_LINGER,
+        setsockopt, LINGER, SOCKET_ERROR, SOL_SOCKET, SO_LINGER,
     };
 
-    let mut val = linger {
+    let mut val = LINGER {
         l_onoff: 1,
         l_linger: 0,
     };
@@ -278,7 +278,7 @@ pub fn set_linger_zero(socket: &TcpStream) {
             SOL_SOCKET as i32,
             SO_LINGER as i32,
             &mut val as *mut _ as *mut _,
-            size_of::<linger>() as _,
+            size_of::<LINGER>() as _,
         )
     };
     assert!(
