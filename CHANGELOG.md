@@ -1,3 +1,24 @@
+# 0.8.5
+
+## Changed
+
+* Updated `windows-sys` to 0.42.0
+  (https://github.com/tokio-rs/mio/pull/1624).
+* Officially document Wine as not supported, some people claimed it worked,
+  other claims it doesn't, but nobody stepped up to fix the problem
+  (https://github.com/tokio-rs/mio/pull/1596).
+* Switch to GitHub Actions
+  (https://github.com/tokio-rs/mio/pull/1598, https://github.com/tokio-rs/mio/pull/1601).
+* Documented the current Poll::poll time behaviour
+  (https://github.com/tokio-rs/mio/pull/1603).
+
+## Fixed
+
+* Timeout less than one millisecond becoming zero millsiconds
+  (https://github.com/tokio-rs/mio/pull/1615, https://github.com/tokio-rs/mio/pull/1616)
+* Undefined reference to `epoll\_create1` on Android API level < 21.
+  (https://github.com/tokio-rs/mio/pull/1590).
+
 # 0.8.4
 
 ## Added
