@@ -1,3 +1,12 @@
+# 0.8.5
+
+* Update `windows-sys` to 0.42.0
+  (https://github.com/tokio-rs/mio/pull/1624)
+* Round up timeouts to at least 1ms
+  (https://github.com/tokio-rs/mio/pull/1615, https://github.com/tokio-rs/mio/pull/1616)
+* Use raw system call for `epoll_create1` on Android
+  (https://github.com/tokio-rs/mio/pull/1590, fixes https://github.com/tokio-rs/mio/issues/1473)
+
 # 0.8.4
 
 ## Added
