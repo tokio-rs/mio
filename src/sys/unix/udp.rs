@@ -2,6 +2,7 @@ use crate::sys::unix::net::{new_ip_socket, socket_addr};
 
 use std::io;
 use std::mem;
+use std::mem::size_of;
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
@@ -11,6 +12,16 @@ pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
     let socket = new_ip_socket(addr, libc::SOCK_DGRAM);
 
     socket.and_then(|socket| {
+        // On platforms with Berkeley-derived sockets, this allows to quickly
+        // rebind a socket, without needing to wait for the OS to clean up the
+        // previous one.
+        //
+        // On Windows, this allows rebinding sockets which are actively in use,
+        // which allows “socket hijacking”, so we explicitly don't set it here.
+        // https://docs.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse
+        #[cfg(not(windows))]
+        set_reuseaddr(socket, true)?;
+
         let (raw_addr, raw_addr_length) = socket_addr(&addr);
         syscall!(bind(socket, raw_addr.as_ptr(), raw_addr_length))
             .map_err(|err| {
@@ -36,4 +47,16 @@ pub(crate) fn only_v6(socket: &net::UdpSocket) -> io::Result<bool> {
     ))?;
 
     Ok(optval != 0)
+}
+
+fn set_reuseaddr(socket: i32, reuseaddr: bool) -> io::Result<()> {
+    let val: libc::c_int = if reuseaddr { 1 } else { 0 };
+    syscall!(setsockopt(
+        socket.as_raw_fd(),
+        libc::SOL_SOCKET,
+        libc::SO_REUSEADDR,
+        &val as *const libc::c_int as *const libc::c_void,
+        size_of::<libc::c_int>() as libc::socklen_t,
+    ))?;
+    Ok(())
 }
