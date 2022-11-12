@@ -12,7 +12,8 @@ use std::sync::{Mutex, MutexGuard};
 
 #[allow(unused_imports)]
 use net2::{UdpBuilder, UdpSocketExt};
-use winapi::*;
+use winapi::um::minwinbase::OVERLAPPED_ENTRY;
+use winapi::um::winsock2::WSAEMSGSIZE;
 use miow::iocp::CompletionStatus;
 use miow::net::SocketAddrBuf;
 use miow::net::UdpSocketExt as MiowUdpSocketExt;
