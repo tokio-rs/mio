@@ -7,19 +7,15 @@ use std::path::Path;
 use std::{io, mem};
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
-    let socket = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
     let (sockaddr, socklen) = socket_addr(path)?;
     let sockaddr = &sockaddr as *const libc::sockaddr_un as *const libc::sockaddr;
 
-    syscall!(bind(socket, sockaddr, socklen))
-        .and_then(|_| syscall!(listen(socket, 1024)))
-        .map_err(|err| {
-            // Close the socket if we hit an error, ignoring the error from
-            // closing since we can't pass back two errors.
-            let _ = unsafe { libc::close(socket) };
-            err
-        })
-        .map(|_| unsafe { net::UnixListener::from_raw_fd(socket) })
+    let fd = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
+    let socket = unsafe { net::UnixListener::from_raw_fd(fd) };
+    syscall!(bind(fd, sockaddr, socklen))?;
+    syscall!(listen(fd, 1024))?;
+
+    Ok(socket)
 }
 
 pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
