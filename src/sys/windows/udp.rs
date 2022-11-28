@@ -6,25 +6,21 @@ use std::os::windows::raw::SOCKET as StdSocket; // windows-sys uses usize, stdli
 
 use crate::sys::windows::net::{new_ip_socket, socket_addr};
 use windows_sys::Win32::Networking::WinSock::{
-    bind as win_bind, closesocket, getsockopt, IPPROTO_IPV6, IPV6_V6ONLY, SOCKET_ERROR, SOCK_DGRAM,
+    bind as win_bind, getsockopt, IPPROTO_IPV6, IPV6_V6ONLY, SOCKET_ERROR, SOCK_DGRAM,
 };
 
 pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
-    new_ip_socket(addr, SOCK_DGRAM).and_then(|socket| {
-        let (raw_addr, raw_addr_length) = socket_addr(&addr);
-        syscall!(
-            win_bind(socket, raw_addr.as_ptr(), raw_addr_length,),
-            PartialEq::eq,
-            SOCKET_ERROR
-        )
-        .map_err(|err| {
-            // Close the socket if we hit an error, ignoring the error
-            // from closing since we can't pass back two errors.
-            let _ = unsafe { closesocket(socket) };
-            err
-        })
-        .map(|_| unsafe { net::UdpSocket::from_raw_socket(socket as StdSocket) })
-    })
+    let raw_socket = new_ip_socket(addr, SOCK_DGRAM)?;
+    let socket = unsafe { net::UdpSocket::from_raw_socket(raw_socket as StdSocket) };
+
+    let (raw_addr, raw_addr_length) = socket_addr(&addr);
+    syscall!(
+        win_bind(raw_socket, raw_addr.as_ptr(), raw_addr_length),
+        PartialEq::eq,
+        SOCKET_ERROR
+    )?;
+
+    Ok(socket)
 }
 
 pub(crate) fn only_v6(socket: &net::UdpSocket) -> io::Result<bool> {
