@@ -63,15 +63,17 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        syscall!(kqueue())
-            .and_then(|kq| syscall!(fcntl(kq, libc::F_SETFD, libc::FD_CLOEXEC)).map(|_| kq))
-            .map(|kq| Selector {
-                #[cfg(debug_assertions)]
-                id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-                kq,
-                #[cfg(debug_assertions)]
-                has_waker: AtomicBool::new(false),
-            })
+        let kq = syscall!(kqueue())?;
+        let selector = Selector {
+            #[cfg(debug_assertions)]
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            kq,
+            #[cfg(debug_assertions)]
+            has_waker: AtomicBool::new(false),
+        };
+
+        syscall!(fcntl(kq, libc::F_SETFD, libc::FD_CLOEXEC))?;
+        Ok(selector)
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
