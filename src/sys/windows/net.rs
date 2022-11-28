@@ -9,7 +9,7 @@ use windows_sys::Win32::Networking::WinSock::{
 };
 
 /// Initialise the network stack for Windows.
-pub(crate) fn init() {
+fn init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
         // Let standard library call `WSAStartup` for us, we can't do it
@@ -30,6 +30,8 @@ pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: u16) -> io::Result<SO
 }
 
 pub(crate) fn new_socket(domain: u32, socket_type: u16) -> io::Result<SOCKET> {
+    init();
+
     syscall!(
         socket(domain as i32, socket_type as i32, 0),
         PartialEq::eq,
