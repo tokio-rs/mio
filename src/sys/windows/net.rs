@@ -4,8 +4,9 @@ use std::net::SocketAddr;
 use std::sync::Once;
 
 use windows_sys::Win32::Networking::WinSock::{
-    ioctlsocket, socket, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0, INVALID_SOCKET, IN_ADDR,
-    IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0, SOCKET,
+    closesocket, ioctlsocket, socket, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0,
+    INVALID_SOCKET, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0,
+    SOCKET,
 };
 
 /// Initialise the network stack for Windows.
@@ -32,14 +33,18 @@ pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: u16) -> io::Result<SO
 pub(crate) fn new_socket(domain: u32, socket_type: u16) -> io::Result<SOCKET> {
     init();
 
-    syscall!(
+    let socket = syscall!(
         socket(domain as i32, socket_type as i32, 0),
         PartialEq::eq,
         INVALID_SOCKET
-    )
-    .and_then(|socket| {
-        syscall!(ioctlsocket(socket, FIONBIO, &mut 1), PartialEq::ne, 0).map(|_| socket as SOCKET)
-    })
+    )?;
+
+    if let Err(err) = syscall!(ioctlsocket(socket, FIONBIO, &mut 1), PartialEq::ne, 0) {
+        let _ = unsafe { closesocket(socket) };
+        return Err(err);
+    }
+
+    Ok(socket as SOCKET)
 }
 
 /// A type with the same memory layout as `SOCKADDR`. Used in converting Rust level
