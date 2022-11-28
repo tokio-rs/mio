@@ -40,7 +40,7 @@ pub(crate) fn listen(socket: &net::TcpListener, backlog: u32) -> io::Result<()> 
 }
 
 pub(crate) fn set_reuseaddr(socket: &net::TcpListener, reuseaddr: bool) -> io::Result<()> {
-    let val: libc::c_int = if reuseaddr { 1 } else { 0 };
+    let val: libc::c_int = i32::from(reuseaddr);
     syscall!(setsockopt(
         socket.as_raw_fd(),
         libc::SOL_SOCKET,

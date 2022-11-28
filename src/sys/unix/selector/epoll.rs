@@ -89,15 +89,11 @@ impl Selector {
         let timeout = timeout
             .map(|to| {
                 let to_ms = to.as_millis();
-                // as_millis() truncates, so round up to 1 ms as the documentation says can happen.
-                // This avoids turning submillisecond timeouts into immediate returns unless the
-                // caller explicitly requests that by specifying a zero timeout.
-                let to_ms = to_ms
-                    + if to_ms == 0 && to.subsec_nanos() != 0 {
-                        1
-                    } else {
-                        0
-                    };
+                // `Duration::as_millis` truncates, so round up to 1 ms. This
+                // avoids turning sub-millisecond timeouts into a zero timeout,
+                // unless the caller explicitly requests that by specifying a
+                // zero timeout.
+                let to_ms = to_ms + u128::from(to_ms == 0 && to.subsec_nanos() != 0);
                 cmp::min(MAX_SAFE_TIMEOUT, to_ms) as libc::c_int
             })
             .unwrap_or(-1);

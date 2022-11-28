@@ -32,8 +32,8 @@ fn unix_datagram_smoke_unconnected() {
     let path1 = temp_file("unix_datagram_smoke_unconnected1");
     let path2 = temp_file("unix_datagram_smoke_unconnected2");
 
-    let datagram1 = UnixDatagram::bind(&path1).unwrap();
-    let datagram2 = UnixDatagram::bind(&path2).unwrap();
+    let datagram1 = UnixDatagram::bind(path1).unwrap();
+    let datagram2 = UnixDatagram::bind(path2).unwrap();
     smoke_test_unconnected(datagram1, datagram2);
 }
 
@@ -57,8 +57,8 @@ fn unix_datagram_smoke_unconnected_from_std() {
     let path1 = temp_file("unix_datagram_smoke_unconnected_from_std1");
     let path2 = temp_file("unix_datagram_smoke_unconnected_from_std2");
 
-    let datagram1 = net::UnixDatagram::bind(&path1).unwrap();
-    let datagram2 = net::UnixDatagram::bind(&path2).unwrap();
+    let datagram1 = net::UnixDatagram::bind(path1).unwrap();
+    let datagram2 = net::UnixDatagram::bind(path2).unwrap();
 
     datagram1.set_nonblocking(true).unwrap();
     datagram2.set_nonblocking(true).unwrap();
@@ -94,9 +94,9 @@ fn unix_datagram_connect() {
     let path1 = temp_file("unix_datagram_connect1");
     let path2 = temp_file("unix_datagram_connect2");
 
-    let datagram1 = UnixDatagram::bind(&path1).unwrap();
+    let datagram1 = UnixDatagram::bind(path1).unwrap();
     let datagram1_local = datagram1.local_addr().unwrap();
-    let datagram2 = UnixDatagram::bind(&path2).unwrap();
+    let datagram2 = UnixDatagram::bind(path2).unwrap();
     let datagram2_local = datagram2.local_addr().unwrap();
 
     datagram1
@@ -171,7 +171,7 @@ fn unix_datagram_shutdown() {
     let path1 = temp_file("unix_datagram_shutdown1");
     let path2 = temp_file("unix_datagram_shutdown2");
 
-    let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
+    let mut datagram1 = UnixDatagram::bind(path1).unwrap();
     let mut datagram2 = UnixDatagram::bind(&path2).unwrap();
 
     poll.registry()
@@ -246,7 +246,7 @@ fn unix_datagram_reregister() {
         .register(&mut datagram1, TOKEN_1, Interest::READABLE)
         .unwrap();
 
-    let datagram2 = UnixDatagram::bind(&path2).unwrap();
+    let datagram2 = UnixDatagram::bind(path2).unwrap();
     datagram2.connect(&path1).unwrap();
     poll.registry()
         .reregister(&mut datagram1, TOKEN_1, Interest::WRITABLE)
@@ -269,7 +269,7 @@ fn unix_datagram_deregister() {
         .register(&mut datagram1, TOKEN_1, Interest::WRITABLE)
         .unwrap();
 
-    let datagram2 = UnixDatagram::bind(&path2).unwrap();
+    let datagram2 = UnixDatagram::bind(path2).unwrap();
     datagram2.connect(&path1).unwrap();
     poll.registry().deregister(&mut datagram1).unwrap();
     expect_no_events(&mut poll, &mut events);
