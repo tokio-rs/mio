@@ -2,19 +2,12 @@ use std::io;
 use std::net::{self, SocketAddr};
 use std::os::windows::io::AsRawSocket;
 
-use windows_sys::Win32::Networking::WinSock::{
-    self, AF_INET, AF_INET6, SOCKET, SOCKET_ERROR, SOCK_STREAM,
-};
+use windows_sys::Win32::Networking::WinSock::{self, SOCKET, SOCKET_ERROR, SOCK_STREAM};
 
-use crate::sys::windows::net::{init, new_socket, socket_addr};
+use crate::sys::windows::net::{new_ip_socket, socket_addr};
 
 pub(crate) fn new_for_addr(address: SocketAddr) -> io::Result<SOCKET> {
-    init();
-    let domain = match address {
-        SocketAddr::V4(_) => AF_INET,
-        SocketAddr::V6(_) => AF_INET6,
-    };
-    new_socket(domain, SOCK_STREAM)
+    new_ip_socket(address, SOCK_STREAM)
 }
 
 pub(crate) fn bind(socket: &net::TcpListener, addr: SocketAddr) -> io::Result<()> {
