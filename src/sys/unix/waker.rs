@@ -20,14 +20,11 @@ mod eventfd {
 
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
-            syscall!(eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK)).and_then(|fd| {
-                // Turn the file descriptor into a file first so we're ensured
-                // it's closed when dropped, e.g. when register below fails.
-                let file = unsafe { File::from_raw_fd(fd) };
-                selector
-                    .register(fd, token, Interest::READABLE)
-                    .map(|()| Waker { fd: file })
-            })
+            let fd = syscall!(eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK))?;
+            let file = unsafe { File::from_raw_fd(fd) };
+
+            selector.register(fd, token, Interest::READABLE)?;
+            Ok(Waker { fd: file })
         }
 
         pub fn wake(&self) -> io::Result<()> {
@@ -82,11 +79,9 @@ mod kqueue {
 
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
-            selector.try_clone().and_then(|selector| {
-                selector
-                    .setup_waker(token)
-                    .map(|()| Waker { selector, token })
-            })
+            let selector = selector.try_clone()?;
+            selector.setup_waker(token)?;
+            Ok(Waker { selector, token })
         }
 
         pub fn wake(&self) -> io::Result<()> {
@@ -127,13 +122,11 @@ mod pipe {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             let mut fds = [-1; 2];
             syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
-            // Turn the file descriptors into files first so we're ensured
-            // they're closed when dropped, e.g. when register below fails.
             let sender = unsafe { File::from_raw_fd(fds[1]) };
             let receiver = unsafe { File::from_raw_fd(fds[0]) };
-            selector
-                .register(fds[0], token, Interest::READABLE)
-                .map(|()| Waker { sender, receiver })
+
+            selector.register(fds[0], token, Interest::READABLE)?;
+            Ok(Waker { sender, receiver })
         }
 
         pub fn wake(&self) -> io::Result<()> {

@@ -10,16 +10,15 @@ pub(crate) fn bind(path: &Path) -> io::Result<net::UnixDatagram> {
     let (sockaddr, socklen) = socket_addr(path)?;
     let sockaddr = &sockaddr as *const libc::sockaddr_un as *const _;
 
-    let fd = new_socket(libc::AF_UNIX, libc::SOCK_DGRAM)?;
-    let socket = unsafe { net::UnixDatagram::from_raw_fd(fd) };
-    syscall!(bind(fd, sockaddr, socklen))?;
+    let socket = unbound()?;
+    syscall!(bind(socket.as_raw_fd(), sockaddr, socklen))?;
 
     Ok(socket)
 }
 
 pub(crate) fn unbound() -> io::Result<net::UnixDatagram> {
-    new_socket(libc::AF_UNIX, libc::SOCK_DGRAM)
-        .map(|socket| unsafe { net::UnixDatagram::from_raw_fd(socket) })
+    let fd = new_socket(libc::AF_UNIX, libc::SOCK_DGRAM)?;
+    Ok(unsafe { net::UnixDatagram::from_raw_fd(fd) })
 }
 
 pub(crate) fn pair() -> io::Result<(net::UnixDatagram, net::UnixDatagram)> {
