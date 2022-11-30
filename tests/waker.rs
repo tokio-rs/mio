@@ -109,8 +109,8 @@ fn waker_multiple_wakeups_different_thread() {
 
 #[test]
 #[cfg_attr(
-    not(debug_assertions),
-    ignore = "only works with debug_assertions enabled"
+    any(not(debug_assertions), wine),
+    ignore = "only works with debug_assertions enabled and non-Wine"
 )]
 #[should_panic = "Only a single `Waker` can be active per `Poll` instance"]
 fn using_multiple_wakers_panics() {

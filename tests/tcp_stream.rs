@@ -348,6 +348,7 @@ fn shutdown_write() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(wine, ignore = "fails on Wine")]
 #[test]
 fn shutdown_both() {
     let (mut poll, mut events) = init_with_poll();

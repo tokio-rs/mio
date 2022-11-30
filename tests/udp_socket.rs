@@ -384,6 +384,7 @@ fn smoke_test_connected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocke
     assert!(socket2.take_error().unwrap().is_none());
 }
 
+#[cfg_attr(wine, ignore = "fails on Wine")]
 #[test]
 fn reconnect_udp_socket_sending() {
     let (mut poll, mut events) = init_with_poll();
@@ -447,6 +448,7 @@ fn reconnect_udp_socket_sending() {
     assert!(socket3.take_error().unwrap().is_none());
 }
 
+#[cfg_attr(wine, ignore = "fails on Wine")]
 #[test]
 fn reconnect_udp_socket_receiving() {
     let (mut poll, mut events) = init_with_poll();
@@ -531,6 +533,7 @@ fn reconnect_udp_socket_receiving() {
     assert!(socket3.take_error().unwrap().is_none());
 }
 
+#[cfg_attr(wine, ignore = "fails on Wine")]
 #[test]
 fn unconnected_udp_socket_connected_methods() {
     let (mut poll, mut events) = init_with_poll();
