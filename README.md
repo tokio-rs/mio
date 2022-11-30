@@ -137,6 +137,7 @@ Currently supported platforms:
 * Windows
 * iOS
 * macOS
+* Wine (version 7.13+, see [issue #1444])
 
 There are potentially others. If you find that Mio works on another
 platform, submit a PR to update the list!
@@ -149,16 +150,15 @@ The Windows implementation for polling sockets is using the [wepoll] strategy.
 This uses the Windows AFD system to access socket readiness events.
 
 [wepoll]: https://github.com/piscisaureus/wepoll
+[issue #1444]: https://github.com/tokio-rs/mio/issues/1444
 
 ### Unsupported
 
 * Haiku, see [issue #1472]
 * Solaris, see [issue #1152]
-* Wine, see [issue #1444]
 
 [issue #1472]: https://github.com/tokio-rs/mio/issues/1472
 [issue #1152]: https://github.com/tokio-rs/mio/issues/1152
-[issue #1444]: https://github.com/tokio-rs/mio/issues/1444
 
 ## Community
 
