@@ -72,7 +72,7 @@ impl TcpStream {
     ///     `ErrorKind::NotConnected` it means the stream is not yet connected,
     ///     go back to step 3. If it returns an address it means the stream is
     ///     connected, go to step 5. If another error is returned something
-    ///     whent wrong.
+    ///     went wrong.
     ///  5. Now the stream can be used.
     ///
     /// This may return a `WouldBlock` in which case the socket connection
