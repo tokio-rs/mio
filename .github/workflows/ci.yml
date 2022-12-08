@@ -8,6 +8,10 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: full
   CI: true
+
+permissions:
+  contents: read #  to fetch code (actions/checkout)
+
 jobs:
   Test:
     runs-on: ${{ matrix.os }}
