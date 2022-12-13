@@ -139,6 +139,8 @@ jobs:
     - name: Tests
       run: cargo test --all-features --target x86_64-pc-windows-gnu
       env:
+        # Several tests are still failing, so emit cfg(wine) to allow ignoring
+        # them by cfg_attr(wine, ignore).
         RUSTFLAGS: ${{ env.RUSTFLAGS }} --cfg wine
     - name: Tests release build
       run: cargo test --release --all-features --target x86_64-pc-windows-gnu
