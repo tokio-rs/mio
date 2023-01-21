@@ -27,7 +27,7 @@ pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: u16) -> io::Result<SO
         SocketAddr::V6(..) => AF_INET6,
     };
 
-    new_socket(domain, socket_type)
+    new_socket(domain.into(), socket_type)
 }
 
 pub(crate) fn new_socket(domain: u32, socket_type: u16) -> io::Result<SOCKET> {
