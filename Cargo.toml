@@ -49,7 +49,7 @@ log = "0.4.8"
 libc = "0.2.121"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.42"
+version = "0.45"
 features = [
   "Win32_Foundation",                 # Basic types eg HANDLE
   "Win32_Networking_WinSock",         # winsock2 types/functions
