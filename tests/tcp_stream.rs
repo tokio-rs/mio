@@ -793,3 +793,54 @@ fn hup_event_on_disconnect() {
         vec![ExpectEvent::new(Token(1), Interest::READABLE)],
     );
 }
+
+#[test]
+#[cfg(target_os = "linux")]
+fn pollpri() {
+    use mio::net::TcpListener;
+    use nix::sys::socket::{
+        connect, send, socket, AddressFamily, MsgFlags, SockFlag, SockType, SockaddrIn,
+    };
+
+    let (mut poll, mut events) = init_with_poll();
+    let addr = "127.0.0.1:0".parse().unwrap();
+
+    let mut listener = TcpListener::bind(addr).unwrap();
+    let addr = listener.local_addr().unwrap();
+    poll.registry()
+        .register(&mut listener, Token(0), Interest::READABLE)
+        .unwrap();
+
+    let addr_l = match addr {
+        SocketAddr::V4(a) => SockaddrIn::from(a),
+        _ => panic!("Unexpected local address."),
+    };
+    let fd = socket(
+        AddressFamily::Inet,
+        SockType::Stream,
+        SockFlag::empty(),
+        None,
+    )
+    .unwrap();
+    connect(fd, &addr_l).expect("nix::sys::socket::connect");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let (mut sock, _) = listener.accept().unwrap();
+    poll.registry()
+        .register(&mut sock, Token(1), Interest::READABLE)
+        .unwrap();
+
+    // MsgFlags::MSG_OOB sends a tcp packet which is received by linux kernel with
+    // POLLPRI event type aka Readiness::PRIORITY set.
+    send(fd, &DATA2, MsgFlags::MSG_OOB).unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(1), Readiness::PRIORITY)],
+    );
+}

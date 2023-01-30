@@ -66,6 +66,9 @@ libc = "0.2.121"
 env_logger = { version = "0.8.4", default-features = false }
 rand = "0.8"
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+nix = { version = "0", features = ["socket", "uio"] }
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
