@@ -1,6 +1,6 @@
 use crate::{Interest, Token};
 
-use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLRDHUP};
+use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI, EPOLLRDHUP};
 use log::error;
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
@@ -175,6 +175,10 @@ fn interests_to_epoll(interests: Interest) -> u32 {
 
     if interests.is_writable() {
         kind |= EPOLLOUT;
+    }
+
+    if interests.is_priority() {
+        kind |= EPOLLPRI;
     }
 
     kind as u32
