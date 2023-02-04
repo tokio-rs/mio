@@ -23,7 +23,6 @@ overhead as possible over the OS abstractions.
 * [master](https://tokio-rs.github.io/mio/doc/mio/)
 * [v0.8](https://docs.rs/mio/^0.8)
 * [v0.7](https://docs.rs/mio/^0.7)
-* [v0.6](https://docs.rs/mio/^0.6)
 
 This is a low level library, if you are looking for something easier to get
 started with, see [Tokio](https://tokio.rs).
