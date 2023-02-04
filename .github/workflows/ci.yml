@@ -61,6 +61,8 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
+        # NOTE: When updating also update Clippy flags, some are disabled due to
+        # MSRV.
         toolchain: 1.46.0
         override: true
     - name: Check
@@ -90,7 +92,8 @@ jobs:
         override: true
         components: clippy
     - name: Clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings -A clippy::cognitive-complexity
+      # NOTE: `clippy::uninlined-format-args` is enabled due to MSRV.
+      run: cargo clippy --all-targets --all-features -- -D warnings -A clippy::cognitive-complexity -A clippy::uninlined-format-args
   Docs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
