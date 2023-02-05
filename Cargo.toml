@@ -11,7 +11,7 @@ authors       = [
   "Thomas de Zeeuw <thomasdezeeuw@gmail.com>",
   "Tokio Contributors <team@tokio.rs>",
 ]
-description   = "Lightweight non-blocking IO"
+description   = "Lightweight non-blocking I/O."
 homepage      = "https://github.com/tokio-rs/mio"
 repository    = "https://github.com/tokio-rs/mio"
 readme        = "README.md"
