@@ -1,4 +1,4 @@
-# Mio – Metal IO
+# Mio – Metal I/O
 
 Mio is a fast, low-level I/O library for Rust focusing on non-blocking APIs and
 event notification for building high performance I/O apps with as little
