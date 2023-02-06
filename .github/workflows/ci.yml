@@ -21,12 +21,8 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
     - name: Install Cargo-hack
       run: cargo install --debug cargo-hack
     - name: Check all features
@@ -43,12 +39,8 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: nightly
-        override: true
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
     - name: Install minimal verions
       run: cargo update -Zminimal-versions
     - name: Tests
@@ -57,14 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@master
       with:
-        profile: minimal
         # NOTE: When updating also update Clippy flags, some are disabled due to
         # MSRV.
         toolchain: 1.46.0
-        override: true
     - name: Check
       # We only run check allowing us to use newer features in tests.
       run: cargo check --all-features
@@ -72,24 +62,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: nightly
-        override: true
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
     - name: Tests
       run: cargo test --all-features
   Clippy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
       with:
-        profile: minimal
-        toolchain: stable
-        override: true
         components: clippy
     - name: Clippy
       # NOTE: `clippy::uninlined-format-args` is enabled due to MSRV.
@@ -98,24 +81,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
     - name: Check docs
       run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
   Rustfmt:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
       with:
-        profile: minimal
-        toolchain: stable
-        override: true
         components: rustfmt
     - name: Check formatting
       # FIXME: for some reason this doesn't actually check all files.
@@ -126,12 +102,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
       with:
-        profile: minimal
-        toolchain: stable
-        override: true
         components: clippy
     - name: Install all targets
       run: make install_targets
@@ -147,12 +120,8 @@ jobs:
       matrix:
         sanitizer: [address, leak, memory, thread]
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: nightly
-        override: true
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
     - name: Add rust source
       run: rustup component add rust-src
     - name: Run tests with sanitizer
