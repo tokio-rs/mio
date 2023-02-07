@@ -20,7 +20,6 @@ overhead as possible over the OS abstractions.
 
 **API documentation**
 
-* [master](https://tokio-rs.github.io/mio/doc/mio/)
 * [v0.8](https://docs.rs/mio/^0.8)
 * [v0.7](https://docs.rs/mio/^0.7)
 
