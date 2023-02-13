@@ -20,14 +20,14 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
         target_os = "illumos",
         target_os = "linux",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
     ))]
     let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
     let socket = syscall!(socket(domain, socket_type, 0))?;
 
     // Mimick `libstd` and set `SO_NOSIGPIPE` on apple systems.
-    #[cfg(target_vendor = "apple")]
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
     if let Err(err) = syscall!(setsockopt(
         socket,
         libc::SOL_SOCKET,
@@ -40,7 +40,7 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
     }
 
     // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
-    #[cfg(target_vendor = "apple")]
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
     {
         if let Err(err) = syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK)) {
             let _ = syscall!(close(socket));
@@ -92,7 +92,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "ios",
                     target_os = "macos",
                     target_os = "netbsd",
-                    target_os = "openbsd"
+                    target_os = "openbsd",
                 ))]
                 sin_len: 0,
             };
@@ -116,7 +116,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "ios",
                     target_os = "macos",
                     target_os = "netbsd",
-                    target_os = "openbsd"
+                    target_os = "openbsd",
                 ))]
                 sin6_len: 0,
                 #[cfg(target_os = "illumos")]

@@ -249,9 +249,9 @@ pub fn set_linger_zero(socket: &TcpStream) {
         libc::setsockopt(
             socket.as_raw_fd(),
             libc::SOL_SOCKET,
-            #[cfg(target_vendor = "apple")]
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
             libc::SO_LINGER_SEC,
-            #[cfg(not(target_vendor = "apple"))]
+            #[cfg(not(any(target_os = "ios", target_os = "macos")))]
             libc::SO_LINGER,
             &val as *const libc::linger as *const libc::c_void,
             size_of::<libc::linger>() as libc::socklen_t,

@@ -21,7 +21,7 @@ type Count = libc::size_t;
 // Type of the `filter` field in the `kevent` structure.
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 type Filter = libc::c_short;
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 type Filter = i16;
 #[cfg(target_os = "netbsd")]
 type Filter = u32;
@@ -29,7 +29,7 @@ type Filter = u32;
 // Type of the `flags` field in the `kevent` structure.
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 type Flags = libc::c_ushort;
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 type Flags = u16;
 #[cfg(target_os = "netbsd")]
 type Flags = u32;
@@ -405,7 +405,7 @@ pub mod event {
             target_os = "dragonfly",
             target_os = "freebsd",
             target_os = "ios",
-            target_os = "macos"
+            target_os = "macos",
         ))]
         {
             event.filter == libc::EVFILT_AIO
@@ -414,7 +414,7 @@ pub mod event {
             target_os = "dragonfly",
             target_os = "freebsd",
             target_os = "ios",
-            target_os = "macos"
+            target_os = "macos",
         )))]
         {
             false
@@ -450,7 +450,7 @@ pub mod event {
                 target_os = "freebsd",
                 target_os = "dragonfly",
                 target_os = "ios",
-                target_os = "macos"
+                target_os = "macos",
             ))]
             libc::EVFILT_FS,
             #[cfg(target_os = "freebsd")]
@@ -459,7 +459,7 @@ pub mod event {
                 target_os = "freebsd",
                 target_os = "dragonfly",
                 target_os = "ios",
-                target_os = "macos"
+                target_os = "macos",
             ))]
             libc::EVFILT_USER,
             #[cfg(target_os = "freebsd")]
@@ -516,49 +516,49 @@ pub mod event {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
-                target_os = "macos"
+                target_os = "macos",
             ))]
             libc::NOTE_TRIGGER,
             #[cfg(any(
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
-                target_os = "macos"
+                target_os = "macos",
             ))]
             libc::NOTE_FFNOP,
             #[cfg(any(
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
-                target_os = "macos"
+                target_os = "macos",
             ))]
             libc::NOTE_FFAND,
             #[cfg(any(
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
-                target_os = "macos"
+                target_os = "macos",
             ))]
             libc::NOTE_FFOR,
             #[cfg(any(
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
-                target_os = "macos"
+                target_os = "macos",
             ))]
             libc::NOTE_FFCOPY,
             #[cfg(any(
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
-                target_os = "macos"
+                target_os = "macos",
             ))]
             libc::NOTE_FFCTRLMASK,
             #[cfg(any(
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
-                target_os = "macos"
+                target_os = "macos",
             ))]
             libc::NOTE_FFLAGSMASK,
             libc::NOTE_LOWAT,
@@ -593,21 +593,21 @@ pub mod event {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "netbsd",
-                target_os = "openbsd"
+                target_os = "openbsd",
             ))]
             libc::NOTE_TRACK,
             #[cfg(any(
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "netbsd",
-                target_os = "openbsd"
+                target_os = "openbsd",
             ))]
             libc::NOTE_TRACKERR,
             #[cfg(any(
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "netbsd",
-                target_os = "openbsd"
+                target_os = "openbsd",
             ))]
             libc::NOTE_CHILD,
             #[cfg(any(target_os = "ios", target_os = "macos"))]
@@ -635,7 +635,6 @@ pub mod event {
             #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
             libc::NOTE_NSECONDS,
             #[cfg(any(target_os = "ios", target_os = "macos"))]
-            #[cfg(any(target_os = "freebsd", target_os = "ios", target_os = "macos"))]
             libc::NOTE_ABSOLUTE,
             #[cfg(any(target_os = "ios", target_os = "macos"))]
             libc::NOTE_LEEWAY,

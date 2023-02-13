@@ -25,7 +25,7 @@ const WRITABLE: u8 = 0b0010;
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "ios",
-        target_os = "macos"
+        target_os = "macos",
     )),
     allow(dead_code)
 )]
@@ -45,7 +45,7 @@ impl Interest {
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "ios",
-        target_os = "macos"
+        target_os = "macos",
     ))]
     pub const AIO: Interest = Interest(unsafe { NonZeroU8::new_unchecked(AIO) });
 
@@ -152,7 +152,7 @@ impl fmt::Debug for Interest {
             target_os = "dragonfly",
             target_os = "freebsd",
             target_os = "ios",
-            target_os = "macos"
+            target_os = "macos",
         ))]
         {
             if self.is_aio() {
