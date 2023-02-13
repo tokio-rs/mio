@@ -260,7 +260,7 @@ fn connect_twice() {
     ));
     t!(poll
         .registry()
-        .register(&mut c1, Token(1), Interest::READABLE | Interest::WRITABLE,));
+        .register(&mut c1, Token(1), Interest::READABLE | Interest::WRITABLE));
     drop(c1);
 
     let mut events = Events::with_capacity(128);
@@ -290,7 +290,7 @@ fn connect_twice() {
     let mut c2 = client(&name);
     t!(poll
         .registry()
-        .register(&mut c2, Token(2), Interest::READABLE | Interest::WRITABLE,));
+        .register(&mut c2, Token(2), Interest::READABLE | Interest::WRITABLE));
 
     'outer: loop {
         t!(poll.poll(&mut events, None));
@@ -311,7 +311,7 @@ fn reregister_deregister_before_register() {
 
     assert_eq!(
         poll.registry()
-            .reregister(&mut pipe, Token(0), Interest::READABLE,)
+            .reregister(&mut pipe, Token(0), Interest::READABLE)
             .unwrap_err()
             .kind(),
         io::ErrorKind::NotFound,
@@ -337,7 +337,7 @@ fn reregister_deregister_different_poll() {
     assert_eq!(
         poll2
             .registry()
-            .reregister(&mut pipe, Token(0), Interest::READABLE,)
+            .reregister(&mut pipe, Token(0), Interest::READABLE)
             .unwrap_err()
             .kind(),
         io::ErrorKind::AlreadyExists,

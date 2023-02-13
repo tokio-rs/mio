@@ -60,16 +60,13 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
     #[cfg(any(
         // Android x86's seccomp profile forbids calls to `accept4(2)`
         // See https://github.com/tokio-rs/mio/issues/1445 for details
-        all(
-            not(target_arch="x86"),
-            target_os = "android"
-        ),
+        all(not(target_arch="x86"), target_os = "android"),
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "illumos",
         target_os = "linux",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
     ))]
     let stream = {
         syscall!(accept4(
@@ -85,10 +82,10 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
     // OSes inherit the non-blocking flag from the listener, so we just have to
     // set `CLOEXEC`.
     #[cfg(any(
-        all(target_arch = "x86", target_os = "android"),
         target_os = "ios",
         target_os = "macos",
-        target_os = "redox"
+        target_os = "redox",
+        all(target_arch = "x86", target_os = "android"),
     ))]
     let stream = {
         syscall!(accept(
