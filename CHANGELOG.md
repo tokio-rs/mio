@@ -1,3 +1,24 @@
+# 0.8.6
+
+## Added
+
+* `Interest::PRIORITY` on Linux and Android, to trigger `Event::is_priority`
+  (https://github.com/tokio-rs/mio/pull/1647).
+
+## Changed
+
+* Updated windows-sys to 0.45
+  (https://github.com/tokio-rs/mio/pull/1644).
+* We started testing with sanitizers on the CI
+  (https://github.com/tokio-rs/mio/pull/1648).
+
+## Fixed
+
+* A number of potential fd leaks when setup resulted in an error right after
+  creation (https://github.com/tokio-rs/mio/pull/1636).
+* Less truncating for timeout values in `Poll::poll`
+  (https://github.com/tokio-rs/mio/pull/1642).
+
 # 0.8.5
 
 ## Changed
