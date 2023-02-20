@@ -229,7 +229,8 @@ fn duration_millis(dur: Option<Duration>) -> u32 {
         // the caller explicitly requests that by specifying a zero
         // timeout.
         let dur_ms = dur
-            .saturating_add(Duration::from_nanos(999_999))
+            .checked_add(Duration::from_nanos(999_999))
+            .unwrap_or(dur)
             .as_millis();
         cmp::min(dur_ms, u32::MAX as u128) as u32
     } else {
