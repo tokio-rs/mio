@@ -77,7 +77,12 @@ cfg_os_poll! {
     fn pair<T>(flags: libc::c_int) -> io::Result<(T, T)>
         where T: FromRawFd,
     {
-        #[cfg(not(any(target_os = "ios", target_os = "macos")))]
+        #[cfg(not(any(
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "watchos",
+        )))]
         let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
         let mut fds = [-1; 2];
@@ -90,7 +95,12 @@ cfg_os_poll! {
         // performed. If a `fnctl` fails after the sockets have been created,
         // the file descriptors will leak. Creating `pair` above ensures that if
         // there is an error, the file descriptors are closed.
-        #[cfg(any(target_os = "ios", target_os = "macos"))]
+        #[cfg(any(
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "watchos",
+        ))]
         {
             syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
             syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;

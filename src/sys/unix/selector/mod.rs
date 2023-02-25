@@ -17,20 +17,24 @@ pub(crate) use self::epoll::{event, Event, Events, Selector};
 #[cfg(any(
     target_os = "dragonfly",
     target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
     target_os = "ios",
     target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "tvos",
+    target_os = "watchos",
 ))]
 mod kqueue;
 
 #[cfg(any(
     target_os = "dragonfly",
     target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
     target_os = "ios",
     target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "tvos",
+    target_os = "watchos",
 ))]
 pub(crate) use self::kqueue::{event, Event, Events, Selector};
 

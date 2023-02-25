@@ -85,6 +85,8 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
         target_os = "ios",
         target_os = "macos",
         target_os = "redox",
+        target_os = "tvos",
+        target_os = "watchos",
         all(target_arch = "x86", target_os = "android"),
     ))]
     let stream = {
