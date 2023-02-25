@@ -185,7 +185,9 @@ fn unix_stream_shutdown_read() {
         target_os = "ios",
         target_os = "macos",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "tvos",
+        target_os = "watchos",
     ))]
     {
         let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -232,7 +234,9 @@ fn unix_stream_shutdown_write() {
         target_os = "ios",
         target_os = "macos",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "tvos",
+        target_os = "watchos",
     ))]
     expect_events(
         &mut poll,
@@ -294,7 +298,9 @@ fn unix_stream_shutdown_both() {
         target_os = "ios",
         target_os = "macos",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "tvos",
+        target_os = "watchos",
     ))]
     {
         let mut buf = [0; DEFAULT_BUF_SIZE];

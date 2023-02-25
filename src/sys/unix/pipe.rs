@@ -163,7 +163,12 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         }
     }
 
-    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "watchos",
+    ))]
     unsafe {
         // For platforms that don't have `pipe2(2)` we need to manually set the
         // correct flags on the file descriptor.
@@ -195,6 +200,8 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         target_os = "netbsd",
         target_os = "openbsd",
         target_os = "redox",
+        target_os = "tvos",
+        target_os = "watchos",
     )))]
     compile_error!("unsupported target for `mio::unix::pipe`");
 
