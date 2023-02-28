@@ -5,6 +5,7 @@
     unused_imports,
     dead_code
 )]
+#![feature(rustc_private)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // Disallow warnings when running tests.
 #![cfg_attr(test, deny(warnings))]
