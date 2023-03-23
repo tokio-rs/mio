@@ -62,6 +62,11 @@ impl Selector {
     }
 
     pub(crate) fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+        // check for fast path first
+        if waker::fast_wake_awake() {
+            return Ok(());
+        }
+
         events.clear();
 
         let mut subscriptions = self.subscriptions.lock().unwrap();
@@ -349,6 +354,11 @@ pub(crate) mod event {
 }
 
 cfg_os_poll! {
+    cfg_os_ext! {
+        mod waker;
+        pub(crate) use self::waker::{init_waker, Waker};
+    }
+
     cfg_io_source! {
         pub(crate) struct IoSourceState;
 

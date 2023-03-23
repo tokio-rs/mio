@@ -93,4 +93,23 @@ impl Waker {
     pub fn wake(&self) -> io::Result<()> {
         self.inner.wake()
     }
+
+    #[cfg(all(target_os = "wasi", feature = "os-ext"))]
+    /// Initialize a waker environment for WASI with a pair of
+    /// connected FDs.
+    ///
+    /// This is to enumulate something like `eventfd(2)` on Linux. The
+    /// two parameters `receiver` and `sender` are FDs that connected
+    /// with each other on the other side. It is recommended to use
+    /// host implementations that support non-blocking IO, for
+    /// instance, unix socket pair. The third parameter
+    /// `single_threaded` leverages a global atomic variable to form a
+    /// "fast path" for waker, that can only be used in single thread
+    /// case.
+    ///
+    /// *Note*: the function need to be called before creating the new
+    /// waker.
+    pub fn init(receiver: u32, sender: u32, single_threaded: bool) {
+        crate::sys::init_waker(receiver, sender, single_threaded)
+    }
 }
