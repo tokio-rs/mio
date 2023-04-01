@@ -21,7 +21,7 @@ fn init() {
 }
 
 /// Create a new non-blocking socket.
-pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: u16) -> io::Result<SOCKET> {
+pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: i32) -> io::Result<SOCKET> {
     let domain = match addr {
         SocketAddr::V4(..) => AF_INET,
         SocketAddr::V6(..) => AF_INET6,
@@ -30,11 +30,11 @@ pub(crate) fn new_ip_socket(addr: SocketAddr, socket_type: u16) -> io::Result<SO
     new_socket(domain.into(), socket_type)
 }
 
-pub(crate) fn new_socket(domain: u32, socket_type: u16) -> io::Result<SOCKET> {
+pub(crate) fn new_socket(domain: u32, socket_type: i32) -> io::Result<SOCKET> {
     init();
 
     let socket = syscall!(
-        socket(domain as i32, socket_type as i32, 0),
+        socket(domain as i32, socket_type, 0),
         PartialEq::eq,
         INVALID_SOCKET
     )?;
