@@ -317,7 +317,7 @@ fn from_overlapped(ptr: *mut OVERLAPPED) -> Pin<Arc<Mutex<SockState>>> {
 #[cfg(debug_assertions)]
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
-/// Windows implementaion of `sys::Selector`
+/// Windows implementation of `sys::Selector`
 ///
 /// Edge-triggered event notification is simulated by resetting internal event flag of each socket state `SockState`
 /// and setting all events back by intercepting all requests that could cause `io::ErrorKind::WouldBlock` happening.

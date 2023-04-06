@@ -215,7 +215,7 @@ cfg_io_source! {
                 let fd = File::from_raw_handle(afd_helper_handle as RawHandle);
                 // Increment by 2 to reserve space for other types of handles.
                 // Non-AFD types (currently only NamedPipe), use odd numbered
-                // tokens. This allows the selector to differentate between them
+                // tokens. This allows the selector to differentiate between them
                 // and dispatch events accordingly.
                 let token = NEXT_TOKEN.fetch_add(2, Ordering::Relaxed) + 2;
                 let afd = Afd { fd };

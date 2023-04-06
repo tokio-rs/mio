@@ -407,7 +407,7 @@ fn listen_then_close() {
 
     for event in &events {
         if event.token() == Token(1) {
-            panic!("recieved ready() on a closed TcpListener")
+            panic!("received ready() on a closed TcpListener")
         }
     }
 }

@@ -135,7 +135,7 @@ fn unix_listener_deregister() {
 
 #[cfg(target_os = "linux")]
 #[test]
-fn unix_listener_abstract_namesapce() {
+fn unix_listener_abstract_namespace() {
     use rand::Rng;
     let num: u64 = rand::thread_rng().gen();
     let name = format!("\u{0000}-mio-abstract-uds-{}", num);
