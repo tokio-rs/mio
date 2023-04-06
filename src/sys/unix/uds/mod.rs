@@ -3,7 +3,7 @@ pub use self::socketaddr::SocketAddr;
 
 /// Get the `sun_path` field offset of `sockaddr_un` for the target OS.
 ///
-/// On Linux, this funtion equates to the same value as
+/// On Linux, this function equates to the same value as
 /// `size_of::<sa_family_t>()`, but some other implementations include
 /// other fields before `sun_path`, so the expression more portably
 /// describes the size of the address structure.
