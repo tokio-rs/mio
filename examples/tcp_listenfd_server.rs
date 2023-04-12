@@ -36,8 +36,6 @@ fn get_first_listen_fd_listener() -> Option<std::net::TcpListener> {
 }
 
 fn main() -> io::Result<()> {
-    env_logger::init();
-
     std::env::var("LISTEN_FDS").expect("LISTEN_FDS environment variable unset");
 
     // Create a poll instance.

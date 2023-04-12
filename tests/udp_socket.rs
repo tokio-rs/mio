@@ -1,7 +1,6 @@
 #![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-use log::{debug, info};
 use mio::net::UdpSocket;
 use mio::{Events, Interest, Poll, Registry, Token};
 use std::net::{self, IpAddr, SocketAddr};
@@ -779,26 +778,22 @@ impl UdpHandlerSendRecv {
 fn send_recv_udp(mut tx: UdpSocket, mut rx: UdpSocket, connected: bool) {
     init();
 
-    debug!("Starting TEST_UDP_SOCKETS");
     let mut poll = Poll::new().unwrap();
 
     // ensure that the sockets are non-blocking
     let mut buf = [0; 128];
     assert_would_block(rx.recv_from(&mut buf));
 
-    info!("Registering SENDER");
     poll.registry()
         .register(&mut tx, SENDER, Interest::WRITABLE)
         .unwrap();
 
-    info!("Registering LISTENER");
     poll.registry()
         .register(&mut rx, LISTENER, Interest::READABLE)
         .unwrap();
 
     let mut events = Events::with_capacity(1024);
 
-    info!("Starting event loop to test with...");
     let mut handler = UdpHandlerSendRecv::new(tx, rx, connected, "hello world");
 
     while !handler.shutdown {
@@ -807,7 +802,6 @@ fn send_recv_udp(mut tx: UdpSocket, mut rx: UdpSocket, connected: bool) {
         for event in &events {
             if event.is_readable() {
                 if let LISTENER = event.token() {
-                    debug!("We are receiving a datagram now...");
                     let cnt = if !handler.connected {
                         handler.rx.recv_from(&mut handler.rx_buf).unwrap().0
                     } else {
@@ -939,7 +933,6 @@ impl UdpHandler {
 
     fn handle_read(&mut self, _: &Registry, token: Token) {
         if let LISTENER = token {
-            debug!("We are receiving a datagram now...");
             unsafe { self.rx_buf.set_len(self.rx_buf.capacity()) };
             match self.rx.recv_from(&mut self.rx_buf) {
                 Ok((cnt, addr)) => {
@@ -972,27 +965,22 @@ impl UdpHandler {
 pub fn multicast() {
     init();
 
-    debug!("Starting TEST_UDP_CONNECTIONLESS");
     let mut poll = Poll::new().unwrap();
 
     let mut tx = UdpSocket::bind(any_local_address()).unwrap();
     let mut rx = UdpSocket::bind(any_local_address()).unwrap();
 
-    info!("Joining group 227.1.1.100");
     let any = &"0.0.0.0".parse().unwrap();
     rx.join_multicast_v4(&"227.1.1.100".parse().unwrap(), any)
         .unwrap();
 
-    info!("Joining group 227.1.1.101");
     rx.join_multicast_v4(&"227.1.1.101".parse().unwrap(), any)
         .unwrap();
 
-    info!("Registering SENDER");
     poll.registry()
         .register(&mut tx, SENDER, Interest::WRITABLE)
         .unwrap();
 
-    info!("Registering LISTENER");
     poll.registry()
         .register(&mut rx, LISTENER, Interest::READABLE)
         .unwrap();
@@ -1000,8 +988,6 @@ pub fn multicast() {
     let mut events = Events::with_capacity(1024);
 
     let mut handler = UdpHandler::new(tx, rx, "hello world");
-
-    info!("Starting event loop to test with...");
 
     while !handler.shutdown {
         poll.poll(&mut events, None).unwrap();

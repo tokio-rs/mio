@@ -1,7 +1,6 @@
 use crate::{Interest, Token};
 
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI, EPOLLRDHUP};
-use log::error;
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -163,9 +162,7 @@ impl AsRawFd for Selector {
 
 impl Drop for Selector {
     fn drop(&mut self) {
-        if let Err(err) = syscall!(close(self.ep)) {
-            error!("error closing epoll: {}", err);
-        }
+        let _ = syscall!(close(self.ep));
     }
 }
 

@@ -13,7 +13,6 @@ use std::sync::Once;
 use std::time::Duration;
 use std::{env, fmt, fs, io};
 
-use log::{error, warn};
 use mio::event::Event;
 use mio::net::TcpStream;
 use mio::{Events, Interest, Poll, Token};
@@ -22,8 +21,6 @@ pub fn init() {
     static INIT: Once = Once::new();
 
     INIT.call_once(|| {
-        env_logger::try_init().expect("unable to initialise logger");
-
         // Remove all temporary files from previous test runs.
         let dir = temp_dir();
         let _ = fs::remove_dir_all(&dir);
@@ -147,9 +144,6 @@ pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<Exp
 
             if let Some(index) = index {
                 expected.swap_remove(index);
-            } else {
-                // Must accept sporadic events.
-                warn!("got unexpected event: {:?}", event);
             }
         }
 
@@ -169,10 +163,7 @@ pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))
         .expect("unable to poll");
     if !events.is_empty() {
-        for event in events.iter() {
-            error!("unexpected event: {:?}", event);
-        }
-        panic!("received events, but didn't expect any, see above");
+        panic!("received events, but didn't expect any");
     }
 }
 

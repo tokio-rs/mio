@@ -1,5 +1,4 @@
 use crate::{Interest, Token};
-use log::error;
 use std::mem::{self, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -332,9 +331,7 @@ impl AsRawFd for Selector {
 
 impl Drop for Selector {
     fn drop(&mut self) {
-        if let Err(err) = syscall!(close(self.kq)) {
-            error!("error closing kqueue: {}", err);
-        }
+        let _ = syscall!(close(self.kq));
     }
 }
 

@@ -1,6 +1,5 @@
 // You can run this example from the root of the mio repo:
 // cargo run --example udp_server --features="os-poll net"
-use log::warn;
 use mio::{Events, Interest, Poll, Token};
 use std::io;
 
@@ -10,8 +9,6 @@ const UDP_SOCKET: Token = Token(0);
 #[cfg(not(target_os = "wasi"))]
 fn main() -> io::Result<()> {
     use mio::net::UdpSocket;
-
-    env_logger::init();
 
     // Create a poll instance.
     let mut poll = Poll::new()?;
@@ -72,7 +69,7 @@ fn main() -> io::Result<()> {
                     // This should never happen as we only registered our
                     // `UdpSocket` using the `UDP_SOCKET` token, but if it ever
                     // does we'll log it.
-                    warn!("Got event for unexpected token: {:?}", event);
+                    eprintln!("Got event for unexpected token: {:?}", event);
                 }
             }
         }

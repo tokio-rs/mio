@@ -15,8 +15,6 @@ const DATA: &[u8] = b"Hello world!\n";
 
 #[cfg(not(target_os = "wasi"))]
 fn main() -> io::Result<()> {
-    env_logger::init();
-
     // Create a poll instance.
     let mut poll = Poll::new()?;
     // Create storage for events.

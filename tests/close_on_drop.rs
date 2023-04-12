@@ -3,7 +3,6 @@
 
 use std::io::Read;
 
-use log::debug;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 
@@ -39,20 +38,15 @@ impl TestHandler {
     }
 
     fn handle_read(&mut self, poll: &mut Poll, tok: Token) {
-        debug!("readable; tok={:?}", tok);
-
         match tok {
             SERVER => {
-                debug!("server connection ready for accept");
                 let _ = self.srv.accept().unwrap();
             }
             CLIENT => {
-                debug!("client readable");
-
                 match self.state {
                     Initial => {
                         let mut buf = [0; 4096];
-                        debug!("GOT={:?}", self.cli.read(&mut buf[..]));
+                        let _ = self.cli.read(&mut buf[..]);
                         self.state = AfterRead;
                     }
                     AfterRead => {}
@@ -76,7 +70,6 @@ impl TestHandler {
         match tok {
             SERVER => panic!("received writable for token 0"),
             CLIENT => {
-                debug!("client connected");
                 poll.registry()
                     .reregister(&mut self.cli, CLIENT, Interest::READABLE)
                     .unwrap();
@@ -89,7 +82,6 @@ impl TestHandler {
 #[test]
 pub fn close_on_drop() {
     init();
-    debug!("Starting TEST_CLOSE_ON_DROP");
     let mut poll = Poll::new().unwrap();
 
     // == Create & setup server socket

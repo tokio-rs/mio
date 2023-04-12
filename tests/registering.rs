@@ -5,7 +5,6 @@ use std::io::{self, Write};
 use std::thread::sleep;
 use std::time::Duration;
 
-use log::{debug, info, trace};
 #[cfg(debug_assertions)]
 use mio::net::UdpSocket;
 use mio::net::{TcpListener, TcpStream};
@@ -37,7 +36,6 @@ impl TestHandler {
     fn handle_read(&mut self, registry: &Registry, token: Token) {
         match token {
             SERVER => {
-                trace!("handle_read; token=SERVER");
                 let mut sock = self.server.accept().unwrap().0;
                 if let Err(err) = sock.write(b"foobar") {
                     if err.kind() != io::ErrorKind::WouldBlock {
@@ -46,7 +44,6 @@ impl TestHandler {
                 }
             }
             CLIENT => {
-                trace!("handle_read; token=CLIENT");
                 assert!(self.state == 0, "unexpected state {}", self.state);
                 self.state = 1;
                 registry
@@ -58,8 +55,6 @@ impl TestHandler {
     }
 
     fn handle_write(&mut self, registry: &Registry, token: Token) {
-        debug!("handle_write; token={:?}; state={:?}", token, self.state);
-
         assert!(token == CLIENT, "unexpected token {:?}", token);
         assert!(self.state == 1, "unexpected state {}", self.state);
 
@@ -73,14 +68,12 @@ impl TestHandler {
 pub fn register_deregister() {
     init();
 
-    debug!("Starting TEST_REGISTER_DEREGISTER");
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(1024);
 
     let mut server = TcpListener::bind(any_local_address()).unwrap();
     let addr = server.local_addr().unwrap();
 
-    info!("register server socket");
     poll.registry()
         .register(&mut server, SERVER, Interest::READABLE)
         .unwrap();
