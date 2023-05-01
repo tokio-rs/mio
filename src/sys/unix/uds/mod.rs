@@ -61,7 +61,7 @@ cfg_os_poll! {
         let offset = path_offset(&sockaddr);
         let mut socklen = offset + bytes.len();
 
-        match bytes.get(0) {
+        match bytes.first() {
             // The struct has already been zeroes so the null byte for pathname
             // addresses is already there.
             Some(&0) | None => {}

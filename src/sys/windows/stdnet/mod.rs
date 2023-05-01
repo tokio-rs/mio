@@ -4,9 +4,9 @@ mod listener;
 mod socket;
 mod stream;
 
-pub(crate) use self::addr::SocketAddr;
-pub(crate) use self::listener::UnixListener;
-pub(crate) use self::stream::UnixStream;
+pub use self::addr::SocketAddr;
+pub use self::listener::UnixListener;
+pub use self::stream::UnixStream;
 
 cfg_os_poll! {
     pub(self) use self::addr::socket_addr;

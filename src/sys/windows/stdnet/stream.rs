@@ -7,10 +7,12 @@ use windows_sys::Win32::Networking::WinSock::SOCKET_ERROR;
 
 use super::{socket::Socket, SocketAddr};
 
-pub(crate) struct UnixStream(pub(super) Socket);
+/// A Unix stream socket.
+pub struct UnixStream(pub(super) Socket);
 
 impl UnixStream {
-    pub(crate) fn local_addr(&self) -> io::Result<SocketAddr> {
+    /// Connects to the socket specified by [`address`].
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|addr, len| {
             wsa_syscall!(
                 getsockname(self.0.as_raw_socket() as _, addr, len),
@@ -19,7 +21,8 @@ impl UnixStream {
         })
     }
 
-    pub(crate) fn peer_addr(&self) -> io::Result<SocketAddr> {
+    /// Returns the socket address of the remote half of this connection.
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         SocketAddr::new(|addr, len| {
             wsa_syscall!(
                 getpeername(self.0.as_raw_socket() as _, addr, len),
@@ -28,22 +31,28 @@ impl UnixStream {
         })
     }
 
-    pub(crate) fn take_error(&self) -> io::Result<Option<io::Error>> {
+    /// Returns the value of the `SO_ERROR` option.
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.0.take_error()
     }
 
-    pub(crate) fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+    /// Shuts down the read, write, or both halves of this connection.
+    ///
+    /// This function will cause all pending and future I/O calls on the
+    /// specified portions to immediately return with an appropriate value
+    /// (see the documentation of [`Shutdown`]).
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.0.shutdown(how)
     }
 }
 
 cfg_os_poll! {
     use std::path::Path;
-    use windows_sys::Win32::Networking::WinSock::WSAEINPROGRESS;
     use super::socket_addr;
 
     impl UnixStream {
-        pub(crate) fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
+        /// Connects to the socket named by `path`.
+        pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
             let inner = Socket::new()?;
             let (addr, len) = socket_addr(path.as_ref())?;
 
@@ -51,18 +60,19 @@ cfg_os_poll! {
                 connect(
                     inner.as_raw_socket() as _,
                     &addr as *const _ as *const _,
-                    len as i32,
+                    len,
                 ),
                 SOCKET_ERROR
             ) {
                 Ok(_) => {}
-                Err(ref err) if err.raw_os_error() == Some(WSAEINPROGRESS) => {}
+                Err(ref err) if err.kind() == std::io::ErrorKind::Other => {}
                 Err(e) => return Err(e),
             }
             Ok(UnixStream(inner))
         }
 
-        pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        /// Moves the socket into or out of nonblocking mode.
+        pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
             self.0.set_nonblocking(nonblocking)
         }
     }
@@ -118,11 +128,11 @@ impl io::Write for UnixStream {
 
 impl<'a> io::Write for &'a UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.send(buf)
+        self.0.write(buf)
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.0.send_vectored(bufs)
+        self.0.write_vectored(bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {

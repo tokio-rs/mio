@@ -49,16 +49,7 @@ impl UnixStream {
     /// The Unix stream here will not have `connect` called on it, so it
     /// should already be connected via some other means (be it manually, or
     /// the standard library).
-    #[cfg(unix)]
-    #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn from_std(stream: net::UnixStream) -> UnixStream {
-        UnixStream {
-            inner: IoSource::new(stream),
-        }
-    }
-
-    #[cfg(windows)]
-    pub(crate) fn from_std(stream: net::UnixStream) -> UnixStream {
         UnixStream {
             inner: IoSource::new(stream),
         }
@@ -178,34 +169,6 @@ impl UnixStream {
     /// # let _ = std::fs::remove_file(&file_path);
     /// let server = UnixListener::bind(&file_path).unwrap();
     ///
-    /// let handle = std::thread::spawn(move || {
-    ///     if let Ok((stream2, _)) = server.accept() {
-    ///         // Wait until the stream is readable...
-    ///
-    ///         // Read from the stream using a direct WinSock call, of course the
-    ///         // `io::Read` implementation would be easier to use.
-    ///         let mut buf = [0; 512];
-    ///         let n = stream2.try_io(|| {
-    ///             let res = unsafe {
-    ///                 WinSock::recv(
-    ///                     stream2.as_raw_socket().try_into().unwrap(),
-    ///                     &mut buf as *mut _ as *mut _,
-    ///                     buf.len() as c_int,
-    ///                     0
-    ///                 )
-    ///             };
-    ///             if res != WinSock::SOCKET_ERROR {
-    ///                 Ok(res as usize)
-    ///             } else {
-    ///                 // If EAGAIN or EWOULDBLOCK is set by WinSock::recv, the closure
-    ///                 // should return `WouldBlock` error.
-    ///                 Err(io::Error::last_os_error())
-    ///             }
-    ///         }).unwrap();
-    ///         eprintln!("read {} bytes", n);
-    ///     }
-    /// });
-    ///
     /// let stream1 = UnixStream::connect(&file_path).unwrap();
     ///
     /// // Wait until the stream is writable...
@@ -234,6 +197,33 @@ impl UnixStream {
     /// })?;
     /// eprintln!("write {} bytes", n);
     ///
+    /// let handle = std::thread::spawn(move || {
+    ///     if let Ok((stream2, _)) = server.accept() {
+    ///         // Wait until the stream is readable...
+    ///
+    ///         // Read from the stream using a direct WinSock call, of course the
+    ///         // `io::Read` implementation would be easier to use.
+    ///         let mut buf = [0; 512];
+    ///         let n = stream2.try_io(|| {
+    ///             let res = unsafe {
+    ///                 WinSock::recv(
+    ///                     stream2.as_raw_socket().try_into().unwrap(),
+    ///                     &mut buf as *mut _ as *mut _,
+    ///                     buf.len() as c_int,
+    ///                     0
+    ///                 )
+    ///             };
+    ///             if res != WinSock::SOCKET_ERROR {
+    ///                 Ok(res as usize)
+    ///             } else {
+    ///                 // If EAGAIN or EWOULDBLOCK is set by WinSock::recv, the closure
+    ///                 // should return `WouldBlock` error.
+    ///                 Err(io::Error::last_os_error())
+    ///             }
+    ///         }).unwrap();
+    ///         eprintln!("read {} bytes", n);
+    ///     }
+    /// });
     /// # handle.join().unwrap();
     /// # Ok(())
     /// # }
@@ -248,49 +238,49 @@ impl UnixStream {
 
 impl Read for UnixStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.do_io(|inner| (&*inner).read(buf))
+        self.inner.do_io(|mut inner| inner.read(buf))
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|inner| (&*inner).read_vectored(bufs))
+        self.inner.do_io(|mut inner| inner.read_vectored(bufs))
     }
 }
 
 impl<'a> Read for &'a UnixStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.do_io(|inner| (&*inner).read(buf))
+        self.inner.do_io(|mut inner| inner.read(buf))
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|inner| (&*inner).read_vectored(bufs))
+        self.inner.do_io(|mut inner| inner.read_vectored(bufs))
     }
 }
 
 impl Write for UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.do_io(|inner| (&*inner).write(buf))
+        self.inner.do_io(|mut inner| inner.write(buf))
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|inner| (&*inner).write_vectored(bufs))
+        self.inner.do_io(|mut inner| inner.write_vectored(bufs))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.do_io(|inner| (&*inner).flush())
+        self.inner.do_io(|mut inner| inner.flush())
     }
 }
 
 impl<'a> Write for &'a UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.do_io(|inner| (&*inner).write(buf))
+        self.inner.do_io(|mut inner| inner.write(buf))
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|inner| (&*inner).write_vectored(bufs))
+        self.inner.do_io(|mut inner| inner.write_vectored(bufs))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.do_io(|inner| (&*inner).flush())
+        self.inner.do_io(|mut inner| inner.flush())
     }
 }
 

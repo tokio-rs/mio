@@ -3,9 +3,9 @@ use std::os::raw::c_int;
 use std::path::Path;
 use std::{fmt, io, mem};
 
-use windows_sys::Win32::Networking::WinSock::{sockaddr_un, SOCKADDR};
+use windows_sys::Win32::Networking::WinSock::{SOCKADDR, SOCKADDR_UN};
 
-fn path_offset(addr: &sockaddr_un) -> usize {
+fn path_offset(addr: &SOCKADDR_UN) -> usize {
     // Work with an actual instance of the type since using a null pointer is UB
     let base = addr as *const _ as usize;
     let path = &addr.sun_path as *const _ as usize;
@@ -14,16 +14,16 @@ fn path_offset(addr: &sockaddr_un) -> usize {
 
 cfg_os_poll! {
     use windows_sys::Win32::Networking::WinSock::AF_UNIX;
-    pub(super) fn socket_addr(path: &Path) -> io::Result<(sockaddr_un, c_int)> {
-        let sockaddr = mem::MaybeUninit::<sockaddr_un>::zeroed();
+    pub(super) fn socket_addr(path: &Path) -> io::Result<(SOCKADDR_UN, c_int)> {
+        let sockaddr = mem::MaybeUninit::<SOCKADDR_UN>::zeroed();
 
-        // This is safe to assume because a `sockaddr_un` filled with `0`
+        // This is safe to assume because a `SOCKADDR_UN` filled with `0`
         // bytes is properly initialized.
         //
-        // `0` is a valid value for `sockaddr_un::sun_family`; it is
+        // `0` is a valid value for `SOCKADDR_UN::sun_family`; it is
         // `WinSock::AF_UNSPEC`.
         //
-        // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
+        // `[0; 108]` is a valid value for `SOCKADDR_UN::sun_path`; it begins an
         // abstract path.
         let mut sockaddr = unsafe { sockaddr.assume_init() };
         sockaddr.sun_family = AF_UNIX;
@@ -66,8 +66,9 @@ cfg_os_poll! {
     }
 }
 
-pub(crate) struct SocketAddr {
-    addr: sockaddr_un,
+/// An address associated with a Unix socket.
+pub struct SocketAddr {
+    addr: SOCKADDR_UN,
     len: c_int,
 }
 
@@ -77,11 +78,11 @@ impl SocketAddr {
         F: FnOnce(*mut SOCKADDR, *mut c_int) -> io::Result<T>,
     {
         let mut sockaddr = {
-            let sockaddr = mem::MaybeUninit::<sockaddr_un>::zeroed();
+            let sockaddr = mem::MaybeUninit::<SOCKADDR_UN>::zeroed();
             unsafe { sockaddr.assume_init() }
         };
 
-        let mut len = mem::size_of::<sockaddr_un>() as c_int;
+        let mut len = mem::size_of::<SOCKADDR_UN>() as c_int;
         let result = f(&mut sockaddr as *mut _ as *mut _, &mut len)?;
         Ok((
             result,
@@ -97,6 +98,38 @@ impl SocketAddr {
         F: FnOnce(*mut SOCKADDR, *mut c_int) -> io::Result<c_int>,
     {
         SocketAddr::init(f).map(|(_, addr)| addr)
+    }
+
+    cfg_os_poll! {
+        pub(crate) fn from_parts(sockaddr: SOCKADDR_UN, mut len: c_int) -> io::Result<SocketAddr> {
+            if len == 0 {
+                // When there is a datagram from unnamed unix socket
+                // linux returns zero bytes of address
+                len = path_offset(&sockaddr) as c_int; // i.e. zero-length address
+            } else if sockaddr.sun_family != windows_sys::Win32::Networking::WinSock::AF_UNIX as _ {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!(
+                        "file descriptor did not correspond to a Unix socket: {}",
+                        sockaddr.sun_family
+                    ),
+                ));
+            }
+
+            Ok(SocketAddr {
+                addr: sockaddr,
+                len,
+            })
+        }
+    }
+
+    /// Returns the contents of this address if it is a `pathname` address.
+    pub fn as_pathname(&self) -> Option<&Path> {
+        if let AddressKind::Pathname(path) = self.address() {
+            Some(path)
+        } else {
+            None
+        }
     }
 
     pub(crate) fn address(&self) -> AddressKind<'_> {

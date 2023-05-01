@@ -1,6 +1,7 @@
 use std::io;
 use std::mem;
 use std::net::SocketAddr;
+use std::sync::Once;
 
 use windows_sys::Win32::Networking::WinSock::{
     closesocket, ioctlsocket, socket, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0,
@@ -74,7 +75,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, i32) {
             };
 
             let sockaddr_in = SOCKADDR_IN {
-                sin_family: AF_INET as u16, // 1
+                sin_family: AF_INET, // 1
                 sin_port: addr.port().to_be(),
                 sin_addr,
                 sin_zero: [0; 8],
@@ -96,7 +97,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, i32) {
             };
 
             let sockaddr_in6 = SOCKADDR_IN6 {
-                sin6_family: AF_INET6 as u16, // 23
+                sin6_family: AF_INET6, // 23
                 sin6_port: addr.port().to_be(),
                 sin6_addr,
                 sin6_flowinfo: addr.flowinfo(),

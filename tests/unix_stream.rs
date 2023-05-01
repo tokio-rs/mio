@@ -1,8 +1,8 @@
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-#[cfg(windows)]
-use mio::net;
 use mio::net::UnixStream;
+#[cfg(windows)]
+use mio::windows::stdnet as net;
 use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
@@ -12,8 +12,6 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Barrier};
 use std::thread;
-#[cfg(windows)]
-use std::time::Duration;
 
 #[macro_use]
 mod util;
@@ -83,7 +81,6 @@ fn unix_stream_connect() {
     handle.join().unwrap();
 }
 
-#[cfg(unix)]
 #[test]
 fn unix_stream_connect_addr() {
     let (mut poll, mut events) = init_with_poll();
@@ -295,13 +292,7 @@ fn unix_stream_shutdown_write() {
     );
 
     let err = stream.write(DATA2).unwrap_err();
-    #[cfg(unix)]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
-    #[cfg(windows)]
-    {
-        use windows_sys::Win32::Networking::WinSock::WSAESHUTDOWN;
-        assert_eq!(err.raw_os_error(), Some(WSAESHUTDOWN));
-    }
 
     // Read should be ok
     let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -507,6 +498,8 @@ where
 
     assert!(stream.take_error().unwrap().is_none());
 
+    // To comply with draining behavior on windows we have to check assert_would_block()
+    // https://github.com/tokio-rs/mio/issues/1611
     assert_would_block(stream.read(&mut buf));
 
     let bufs = [IoSlice::new(DATA1), IoSlice::new(DATA2)];
@@ -534,49 +527,10 @@ where
     handle.join().unwrap();
 }
 
-#[cfg(windows)]
-fn new_listener<F>(
+fn new_echo_listener(
     connections: usize,
     test_name: &'static str,
-    handle_stream: F,
-) -> (thread::JoinHandle<()>, net::SocketAddr)
-where
-    F: Fn(net::UnixStream) + std::marker::Send + 'static,
-{
-    let (addr_sender, addr_receiver) = channel();
-    let handle = thread::spawn(move || {
-        let path = temp_file(test_name);
-        // We use mio's non-blocking listener here for windows, since there is no listener in std
-        // yet. We must be sure to poll before listener I/O.
-        let mut listener = net::UnixListener::bind(path).unwrap();
-        let (mut poll, mut events) = init_with_poll();
-        poll.registry()
-            .register(&mut listener, TOKEN_1, Interest::READABLE)
-            .unwrap();
-
-        let local_addr = listener.local_addr().unwrap();
-        addr_sender.send(local_addr).unwrap();
-
-        for _ in 0..connections {
-            poll.poll(&mut events, Some(Duration::from_millis(500)))
-                .unwrap();
-            let (stream, _) = listener.accept().unwrap();
-            assert_would_block(listener.accept());
-            handle_stream(stream);
-        }
-    });
-    (handle, addr_receiver.recv().unwrap())
-}
-
-#[cfg(unix)]
-fn new_listener<F>(
-    connections: usize,
-    test_name: &'static str,
-    handle_stream: F,
-) -> (thread::JoinHandle<()>, net::SocketAddr)
-where
-    F: Fn(net::UnixStream) + std::marker::Send + 'static,
-{
+) -> (thread::JoinHandle<()>, net::SocketAddr) {
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
         let path = temp_file(test_name);
@@ -585,45 +539,37 @@ where
         addr_sender.send(local_addr).unwrap();
 
         for _ in 0..connections {
-            let (stream, _) = listener.accept().unwrap();
-            handle_stream(stream);
+            let (mut stream, _) = listener.accept().unwrap();
+
+            // On Linux based system it will cause a connection reset
+            // error when the reading side of the peer connection is
+            // shutdown, we don't consider it an actual here.
+            let (mut read, mut written) = (0, 0);
+            let mut buf = [0; DEFAULT_BUF_SIZE];
+            loop {
+                let n = match stream.read(&mut buf) {
+                    Ok(amount) => {
+                        read += amount;
+                        amount
+                    }
+                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
+                    Err(err) => panic!("{}", err),
+                };
+                if n == 0 {
+                    break;
+                }
+                match stream.write(&buf[..n]) {
+                    Ok(amount) => written += amount,
+                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(ref err) if err.kind() == io::ErrorKind::BrokenPipe => break,
+                    Err(err) => panic!("{}", err),
+                };
+            }
+            assert_eq!(read, written, "unequal reads and writes");
         }
     });
     (handle, addr_receiver.recv().unwrap())
-}
-
-fn new_echo_listener(
-    connections: usize,
-    test_name: &'static str,
-) -> (thread::JoinHandle<()>, net::SocketAddr) {
-    new_listener(connections, test_name, |mut stream| {
-        // On Linux based system it will cause a connection reset
-        // error when the reading side of the peer connection is
-        // shutdown, we don't consider it an actual here.
-        let (mut read, mut written) = (0, 0);
-        let mut buf = [0; DEFAULT_BUF_SIZE];
-        loop {
-            let n = match stream.read(&mut buf) {
-                Ok(amount) => {
-                    read += amount;
-                    amount
-                }
-                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
-                Err(err) => panic!("{}", err),
-            };
-            if n == 0 {
-                break;
-            }
-            match stream.write(&buf[..n]) {
-                Ok(amount) => written += amount,
-                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(ref err) if err.kind() == io::ErrorKind::BrokenPipe => break,
-                Err(err) => panic!("{}", err),
-            };
-        }
-        assert_eq!(read, written, "unequal reads and writes");
-    })
 }
 
 fn new_noop_listener(
@@ -631,10 +577,20 @@ fn new_noop_listener(
     barrier: Arc<Barrier>,
     test_name: &'static str,
 ) -> (thread::JoinHandle<()>, net::SocketAddr) {
-    new_listener(connections, test_name, move |stream| {
-        barrier.wait();
-        stream.shutdown(Shutdown::Write).unwrap();
-        barrier.wait();
-        drop(stream);
-    })
+    let (sender, receiver) = channel();
+    let handle = thread::spawn(move || {
+        let path = temp_file(test_name);
+        let listener = net::UnixListener::bind(path).unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        sender.send(local_addr).unwrap();
+
+        for _ in 0..connections {
+            let (stream, _) = listener.accept().unwrap();
+            barrier.wait();
+            stream.shutdown(Shutdown::Write).unwrap();
+            barrier.wait();
+            drop(stream);
+        }
+    });
+    (handle, receiver.recv().unwrap())
 }

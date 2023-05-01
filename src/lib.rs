@@ -91,6 +91,10 @@ pub mod windows {
     //! Windows only extensions.
 
     pub use crate::sys::named_pipe::NamedPipe;
+    // blocking windows uds which mimick std implementation used for tests
+    cfg_net! {
+        pub use crate::sys::windows::stdnet;
+    }
 }
 
 pub mod features {

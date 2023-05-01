@@ -1,12 +1,10 @@
 use std::cmp::min;
-use std::convert::TryInto;
 use std::io::{self, IoSlice, IoSliceMut};
 use std::mem;
 use std::net::Shutdown;
 use std::os::raw::c_int;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::ptr;
-
 use windows_sys::Win32::Networking::WinSock::{self, closesocket, SOCKET, SOCKET_ERROR, WSABUF};
 
 /// Maximum size of a buffer passed to system call like `recv` and `send`.
@@ -42,42 +40,38 @@ impl Socket {
         );
         match res {
             Ok(_) => Ok(total as usize),
-            Err(ref err) if err.raw_os_error() == Some(WinSock::WSAESHUTDOWN as i32) => Ok(0),
+            Err(ref err) if err.raw_os_error() == Some(WinSock::WSAESHUTDOWN) => Ok(0),
             Err(err) => Err(err),
         }
     }
 
-    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        wsa_syscall!(
-            send(
+    pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        let response = unsafe {
+            windows_sys::Win32::Networking::WinSock::send(
                 self.0,
                 buf.as_ptr().cast(),
                 min(buf.len(), MAX_BUF_LEN) as c_int,
                 0,
-            ),
-            SOCKET_ERROR
-        )
-        .map(|n| n as usize)
+            )
+        };
+        if response == SOCKET_ERROR {
+            return match unsafe { windows_sys::Win32::Networking::WinSock::WSAGetLastError() } {
+                windows_sys::Win32::Networking::WinSock::WSAESHUTDOWN => {
+                    Err(io::Error::new(io::ErrorKind::BrokenPipe, "brokenpipe"))
+                }
+                e => Err(std::io::Error::from_raw_os_error(e)),
+            };
+        }
+        Ok(response as usize)
     }
 
-    pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+    pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         let mut total = 0;
         wsa_syscall!(
             WSASend(
                 self.0,
-                // FIXME: From the `WSASend` docs [1]:
-                // > For a Winsock application, once the WSASend function is called,
-                // > the system owns these buffers and the application may not
-                // > access them.
-                //
-                // So what we're doing is actually UB as `bufs` needs to be `&mut
-                // [IoSlice<'_>]`.
-                //
-                // See: https://github.com/rust-lang/socket2-rs/issues/129.
-                //
-                // [1] https://docs.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasend
-                bufs.as_ptr() as *mut _,
-                min(bufs.len(), u32::MAX as usize) as u32,
+                bufs.as_ptr() as *mut WSABUF,
+                bufs.len().min(u32::MAX as usize) as u32,
                 &mut total,
                 0,
                 std::ptr::null_mut(),
@@ -94,7 +88,7 @@ impl Socket {
             Shutdown::Read => WinSock::SD_RECEIVE,
             Shutdown::Both => WinSock::SD_BOTH,
         };
-        wsa_syscall!(shutdown(self.0, how.try_into().unwrap()), SOCKET_ERROR)?;
+        wsa_syscall!(shutdown(self.0, how), SOCKET_ERROR)?;
         Ok(())
     }
 
@@ -104,8 +98,8 @@ impl Socket {
         wsa_syscall!(
             getsockopt(
                 self.0 as _,
-                WinSock::SOL_SOCKET.try_into().unwrap(),
-                WinSock::SO_ERROR.try_into().unwrap(),
+                WinSock::SOL_SOCKET,
+                WinSock::SO_ERROR,
                 &mut val as *mut _ as *mut _,
                 &mut len,
             ),
@@ -116,36 +110,48 @@ impl Socket {
         if val == 0 {
             Ok(None)
         } else {
-            Ok(Some(io::Error::from_raw_os_error(val as i32)))
+            Ok(Some(io::Error::from_raw_os_error(val)))
         }
     }
 }
 
 cfg_os_poll! {
+    use windows_sys::Win32::Foundation::{HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation};
     use windows_sys::Win32::Networking::WinSock::{INVALID_SOCKET, SOCKADDR};
     use super::init;
 
     impl Socket {
         pub fn new() -> io::Result<Socket> {
             init();
-            wsa_syscall!(
-                WSASocketW(
-                    WinSock::AF_UNIX.into(),
-                    WinSock::SOCK_STREAM.into(),
-                    0,
-                    ptr::null_mut(),
-                    0,
-                    WinSock::WSA_FLAG_OVERLAPPED | WinSock::WSA_FLAG_NO_HANDLE_INHERIT,
-                ),
-                INVALID_SOCKET
-            ).map(Socket)
+            match wsa_syscall!(WSASocketW(
+                WinSock::AF_UNIX.into(),
+                WinSock::SOCK_STREAM,
+                0,
+                ptr::null_mut(),
+                0,
+                WinSock::WSA_FLAG_OVERLAPPED,
+            ), INVALID_SOCKET) {
+                Ok(res) => {
+                    let socket = Socket(res);
+                    socket.set_no_inherit()?;
+                    Ok(socket)
+                },
+                Err(e) => Err(e),
+            }
         }
 
         pub fn accept(&self, storage: *mut SOCKADDR, len: *mut c_int) -> io::Result<Socket> {
             // WinSock's accept returns a socket with the same properties as the listener.  it is
             // called on. In particular, the WSA_FLAG_NO_HANDLE_INHERIT will be inherited from the
             // listener.
-            wsa_syscall!(accept(self.0, storage, len), INVALID_SOCKET).map(Socket)
+            match wsa_syscall!(accept(self.0, storage, len), INVALID_SOCKET) {
+                Ok(res) => {
+                    let socket = Socket(res);
+                    socket.set_no_inherit()?;
+                    Ok(socket)
+                },
+                Err(e) => Err(e),
+            }
         }
 
         pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
@@ -154,6 +160,11 @@ cfg_os_poll! {
                 ioctlsocket(self.0, WinSock::FIONBIO, &mut nonblocking),
                 SOCKET_ERROR
             )?;
+            Ok(())
+        }
+
+        pub fn set_no_inherit(&self) -> io::Result<()> {
+            syscall!(SetHandleInformation(self.0 as HANDLE, HANDLE_FLAG_INHERIT, 0), PartialEq::eq, -1)?;
             Ok(())
         }
     }
