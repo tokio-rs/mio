@@ -7,8 +7,7 @@ env:
 task:
   name: FreeBSD
   setup_script:
-    - pkg install -y curl
-    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - fetch https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile minimal
   cargo_cache:
     folder: $HOME/.cargo/registry
