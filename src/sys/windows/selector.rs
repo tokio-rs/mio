@@ -15,7 +15,7 @@ use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::io;
 use std::marker::PhantomPinned;
-use std::os::windows::io::RawSocket;
+use std::os::windows::io::{AsRawHandle, RawHandle, RawSocket};
 use std::pin::Pin;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicUsize;
@@ -407,6 +407,12 @@ cfg_io_source! {
         pub fn id(&self) -> usize {
             self.id
         }
+    }
+}
+
+impl AsRawHandle for Selector {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.inner.cp.as_raw_handle()
     }
 }
 

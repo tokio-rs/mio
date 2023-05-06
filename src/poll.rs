@@ -2,6 +2,8 @@ use crate::{event, sys, Events, Interest, Token};
 use log::trace;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, RawHandle};
 use std::time::Duration;
 use std::{fmt, io};
 
@@ -419,6 +421,13 @@ impl AsRawFd for Poll {
     }
 }
 
+#[cfg(windows)]
+impl AsRawHandle for Poll {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.registry.as_raw_handle()
+    }
+}
+
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Poll").finish()
@@ -704,11 +713,25 @@ impl AsRawFd for Registry {
     }
 }
 
+#[cfg(windows)]
+impl AsRawHandle for Registry {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.selector.as_raw_handle()
+    }
+}
+
 cfg_os_poll! {
     #[cfg(unix)]
     #[test]
     pub fn as_raw_fd() {
         let poll = Poll::new().unwrap();
         assert!(poll.as_raw_fd() > 0);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    pub fn as_raw_handle() {
+        let poll = Poll::new().unwrap();
+        assert_ne!(poll.as_raw_handle(), core::ptr::null_mut());
     }
 }
