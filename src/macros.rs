@@ -68,3 +68,27 @@ macro_rules! cfg_any_os_ext {
         )*
     }
 }
+
+macro_rules! trace {
+    ($($t:tt)*) => {
+        #[cfg(feature = "log")]
+        log::trace!($($t)*)
+    }
+}
+
+macro_rules! error {
+    ($($t:tt)*) => {
+        #[cfg(feature = "log")]
+        {
+            log::error!($($t)*)
+        }
+
+        // Silence warnings
+        #[cfg(not(feature = "log"))]
+        {
+            if false {
+                format!($($t)*);
+            }
+        }
+    }
+}
