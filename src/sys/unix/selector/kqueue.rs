@@ -1,5 +1,4 @@
 use crate::{Interest, Token};
-use log::error;
 use std::mem::{self, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 use std::os::unix::io::{AsRawFd, RawFd};

@@ -1,5 +1,4 @@
 use crate::{event, sys, Events, Interest, Token};
-use log::trace;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::Duration;
