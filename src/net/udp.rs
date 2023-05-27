@@ -79,7 +79,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 ///                 let num_recv = echoer_socket.recv(&mut buffer)?;
 ///                 println!("echo {:?} -> {:?}", buffer, num_recv);
 ///                 buffer = [0; 9];
-///                 # drop(buffer); // Silence unused assignment warning.
+///                 # _ = buffer; // Silence unused assignment warning.
 ///                 # return Ok(());
 ///             }
 ///             _ => unreachable!()
