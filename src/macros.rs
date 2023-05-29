@@ -71,31 +71,28 @@ macro_rules! cfg_any_os_ext {
 
 macro_rules! trace {
     ($($t:tt)*) => {
-        #[cfg(feature = "log")]
-        log::trace!($($t)*)
+        log!(trace, $($t)*)
     }
 }
 
 macro_rules! warn {
     ($($t:tt)*) => {
-        #[cfg(feature = "log")]
-        log::warn!($($t)*)
+        log!(warn, $($t)*)
     }
 }
 
 macro_rules! error {
     ($($t:tt)*) => {
-        #[cfg(feature = "log")]
-        {
-            log::error!($($t)*)
-        }
+        log!(error, $($t)*)
+    }
+}
 
-        // Silence warnings
+macro_rules! log {
+    ($level: ident, $($t:tt)*) => {
+        #[cfg(feature = "log")]
+        { log::$level!($($t)*) }
+        // Silence unused variables warnings.
         #[cfg(not(feature = "log"))]
-        {
-            if false {
-                format!($($t)*);
-            }
-        }
+        { if false { let _ = ( $($t)* ); } }
     }
 }
