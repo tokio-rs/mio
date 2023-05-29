@@ -76,6 +76,13 @@ macro_rules! trace {
     }
 }
 
+macro_rules! warn {
+    ($($t:tt)*) => {
+        #[cfg(feature = "log")]
+        log::warn!($($t)*)
+    }
+}
+
 macro_rules! error {
     ($($t:tt)*) => {
         #[cfg(feature = "log")]
