@@ -385,6 +385,95 @@ fn smoke_test_connected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocke
 }
 
 #[test]
+fn udp_socket_iptinfo() {
+    let mut socket1 = UdpSocket::bind(any_local_address()).unwrap();
+    let address1 = socket1.local_addr().unwrap();
+
+    let mut socket2 = UdpSocket::bind(any_local_address()).unwrap();
+    let address2 = socket2.local_addr().unwrap();
+
+    socket1.set_pktinfo(true).unwrap();
+    socket2.set_pktinfo(true).unwrap();
+
+    socket1.connect(address2).unwrap();
+    socket2.connect(address1).unwrap();
+
+    let (mut poll, mut events) = init_with_poll();
+
+    assert_socket_non_blocking(&socket1);
+    assert_socket_close_on_exec(&socket1);
+    assert_socket_non_blocking(&socket2);
+    assert_socket_close_on_exec(&socket2);
+
+    poll.registry()
+        .register(
+            &mut socket1,
+            ID1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
+        .expect("unable to register UDP socket");
+    poll.registry()
+        .register(
+            &mut socket2,
+            ID2,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
+        .expect("unable to register UDP socket");
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interest::WRITABLE),
+            ExpectEvent::new(ID2, Interest::WRITABLE),
+        ],
+    );
+
+    // ancillary_data is a cmsghdr followed by an in_pktinfo
+    // struct cmsghdr {
+    //     size_t cmsg_len;    /* Data byte count, including header
+    //                            (type is socklen_t in POSIX) */
+    //     int    cmsg_level;  /* Originating protocol */
+    //     int    cmsg_type;   /* Protocol-specific type */
+    // /* followed by
+    //    unsigned char cmsg_data[]; */
+    // };
+    //
+    // struct in_pktinfo {
+    //     unsigned int   ipi_ifindex;  /* Interface index */
+    //     struct in_addr ipi_spec_dst; /* Local address */
+    //     struct in_addr ipi_addr;     /* Header Destination
+    //                                     address */
+    // };
+    const PKTINFO_LOCALHOST_V4 :[u8;28] = [28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 127, 0, 0, 1, 127, 0, 0, 1];
+
+    let mut buf = [0; 20];
+    let mut ancillary_data = [0; 28];
+    assert_would_block(socket1.recv_with_ancillary_data(&mut buf, &mut ancillary_data));
+    assert_would_block(socket2.recv_with_ancillary_data(&mut buf, &mut ancillary_data));
+
+    checked_write!(socket1.send(DATA1));
+    checked_write!(socket2.send(DATA2));
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(ID1, Interest::READABLE),
+            ExpectEvent::new(ID2, Interest::READABLE),
+        ],
+    );
+
+    expect_read!(socket1.recv_with_ancillary_data(&mut buf, &mut ancillary_data), DATA2);
+    assert_eq!(ancillary_data, PKTINFO_LOCALHOST_V4);
+    expect_read!(socket2.recv_with_ancillary_data(&mut buf, &mut ancillary_data), DATA1);
+    assert_eq!(ancillary_data, PKTINFO_LOCALHOST_V4);
+
+    assert!(socket1.take_error().unwrap().is_none());
+    assert!(socket2.take_error().unwrap().is_none());
+}
+
+#[test]
 fn reconnect_udp_socket_sending() {
     let (mut poll, mut events) = init_with_poll();
 

@@ -303,6 +303,13 @@ impl UdpSocket {
         self.inner.do_io(|inner| inner.recv(buf))
     }
 
+    /// Receives IP_PKTINFO ancillary message that contains a pktinfo structure that supplies some information 
+    /// about the incoming packet. This works only for datagram oriented sockets.
+    #[cfg(unix)]
+    pub fn set_pktinfo(&self, enable: bool) -> io::Result<()> {
+        self.inner.do_io(|inner| sys::udp::set_pktinfo(inner, enable))
+    }
+
     /// Receives in-band and ancillary data from the socket previously bound with connect(). On success, returns
     /// the number of bytes read.
     #[cfg(unix)]

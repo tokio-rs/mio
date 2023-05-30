@@ -51,3 +51,14 @@ pub(crate) fn recv_with_ancillary_data(
     syscall!(recvmsg(socket.as_raw_fd(), &mut msg_hdr, 0)).map(|n| n as usize)
 }
 
+pub(crate) fn set_pktinfo(socket: &net::UdpSocket, enable: bool) -> io::Result<()> {
+    let val: libc::c_int = i32::from(enable);
+    syscall!(setsockopt(
+        socket.as_raw_fd(),
+        libc::IPPROTO_IP,
+        libc::IP_PKTINFO,
+        &val as *const libc::c_int as *const libc::c_void,
+        core::mem::size_of::<libc::c_int>() as libc::socklen_t,
+    ))?;
+    Ok(())
+}
