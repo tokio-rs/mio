@@ -29,3 +29,25 @@ pub(crate) fn only_v6(socket: &net::UdpSocket) -> io::Result<bool> {
 
     Ok(optval != 0)
 }
+
+pub(crate) fn recv_with_ancillary_data(
+    socket: &net::UdpSocket,
+    buf: &mut [u8],
+    ancillary_data: &mut [u8],
+) -> io::Result<usize> {
+    let mut buf = libc::iovec {
+        iov_base: buf.as_mut_ptr().cast(),
+        iov_len: buf.len(),
+    };
+    let mut msg_hdr = libc::msghdr {
+        msg_iov: &mut buf,
+        msg_iovlen: 1,
+        msg_name: std::ptr::null_mut(),
+        msg_namelen: 0,
+        msg_control: ancillary_data.as_mut_ptr().cast(),
+        msg_controllen: ancillary_data.len(),
+        msg_flags: 0,
+    };
+    syscall!(recvmsg(socket.as_raw_fd(), &mut msg_hdr, 0)).map(|n| n as usize)
+}
+

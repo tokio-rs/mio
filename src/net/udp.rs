@@ -303,6 +303,13 @@ impl UdpSocket {
         self.inner.do_io(|inner| inner.recv(buf))
     }
 
+    /// Receives in-band and ancillary data from the socket previously bound with connect(). On success, returns
+    /// the number of bytes read.
+    #[cfg(unix)]
+    pub fn recv_with_ancillary_data(&self, buf: &mut [u8], ancillary_data: &mut [u8]) -> io::Result<usize> {
+        self.inner.do_io(|inner| sys::udp::recv_with_ancillary_data(inner, buf, ancillary_data))
+    }
+
     /// Receives data from the socket, without removing it from the input queue.
     /// On success, returns the number of bytes read.
     ///
