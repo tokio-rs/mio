@@ -1,3 +1,9 @@
+# 0.8.8
+
+## Fixed
+
+* Fix compilation on WASI (https://github.com/tokio-rs/mio/pull/1676).
+
 # 0.8.7
 
 ## Added
