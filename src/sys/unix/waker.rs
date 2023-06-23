@@ -1,4 +1,4 @@
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(not(no_eventfd), any(target_os = "linux", target_os = "android")))]
 mod eventfd {
     use crate::sys::Selector;
     use crate::{Interest, Token};
@@ -55,7 +55,7 @@ mod eventfd {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(not(no_eventfd), any(target_os = "linux", target_os = "android")))]
 pub use self::eventfd::Waker;
 
 #[cfg(any(
@@ -106,6 +106,7 @@ mod kqueue {
 pub use self::kqueue::Waker;
 
 #[cfg(any(
+    no_eventfd,
     target_os = "dragonfly",
     target_os = "illumos",
     target_os = "netbsd",
@@ -176,6 +177,7 @@ mod pipe {
 }
 
 #[cfg(any(
+    no_eventfd,
     target_os = "dragonfly",
     target_os = "illumos",
     target_os = "netbsd",
