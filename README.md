@@ -160,6 +160,27 @@ This uses the Windows AFD system to access socket readiness events.
 [issue #1152]: https://github.com/tokio-rs/mio/issues/1152
 [issue #1444]: https://github.com/tokio-rs/mio/issues/1444
 
+## Unsupported flags
+
+Mio uses different implementations to support the same functionality dependening
+on the platform. Mio generally uses the "best" implementation possible, where
+"best" usually means most efficient for Mio's use case. However this means that
+the implementation is often specific to a limited number of platforms, meaning
+we often have multiple implemetations for the same functionality. In some cases
+it might be required to not use the "best" implementation, but another
+implementation Mio supports (on other platforms). **Mio does not officially
+support secondary implementations on platforms**, however we do have various cfg
+flags to force another implementation for these situations.
+
+Current flags:
+ * `mio_unsupported_force_poll_poll`, uses an implementation based on `poll(2)`
+   for `mio::Poll`.
+ * `mio_unsupported_force_waker_pipe`, uses an implementation based on `pipe(2)`
+   for `mio::Waker`.
+
+**Again, Mio does not officially supports this**. Furthermore these flags may
+disappear in the future.
+
 ## Community
 
 A group of Mio users hang out on [Discord], this can be a good place to go for
