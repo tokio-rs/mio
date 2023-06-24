@@ -57,7 +57,9 @@ jobs:
         toolchain: 1.46.0
     - name: Check
       # We only run check allowing us to use newer features in tests.
-      run: cargo check --all-features
+      # We enable all features except for the `log` feature as since log v0.4.19
+      # it requires a MSRV later then rustc 1.46.
+      run: cargo check --no-default-features --features os-poll,os-ext,net
   Nightly:
     runs-on: ubuntu-latest
     timeout-minutes: 10
