@@ -138,8 +138,8 @@ Currently supported platforms:
 * iOS
 * macOS
 
-There are potentially others. If you find that Mio works on another
-platform, submit a PR to update the list!
+There are potentially others. If you find that Mio works on another platform,
+submit a PR to update the list!
 
 Mio can handle interfacing with each of the event systems of the aforementioned
 platforms. The details of their implementation are further discussed in the
@@ -163,9 +163,11 @@ This uses the Windows AFD system to access socket readiness events.
 ## Community
 
 A group of Mio users hang out on [Discord], this can be a good place to go for
-questions.
+questions. It's also possible to open a [new issue on GitHub] to ask questions,
+report bugs or suggest new features.
 
 [Discord]: https://discord.gg/tokio
+[new issue on GitHub]: https://github.com/tokio-rs/mio/issues/new
 
 ## Contributing
 
