@@ -1,13 +1,77 @@
 #[cfg(all(
+    not(mio_unsupported_force_poll_poll),
+    not(all(
+        not(mio_unsupported_force_waker_pipe),
+        any(
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "watchos",
+        )
+    ))
+))]
+mod fdbased {
+    use std::io;
+    use std::os::fd::AsRawFd;
+    use crate::sys::Selector;
+    #[cfg(all(
+        not(mio_unsupported_force_waker_pipe),
+        any(target_os = "linux", target_os = "android"),
+    ))]
+    use crate::sys::unix::waker::eventfd::WakerInternal;
+    #[cfg(any(
+        mio_unsupported_force_waker_pipe,
+        target_os = "dragonfly",
+        target_os = "illumos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "redox",
+    ))]
+    use crate::sys::unix::waker::pipe::WakerInternal;
+    use crate::{Interest, Token};
+
+    #[derive(Debug)]
+    pub struct Waker {
+        waker: WakerInternal,
+    }
+
+    impl Waker {
+        pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+            let waker = WakerInternal::new()?;
+            selector.register(waker.as_raw_fd(), token, Interest::READABLE)?;
+            Ok(Waker { waker })
+        }
+
+        pub fn wake(&self) -> io::Result<()> {
+            self.waker.wake()
+        }
+    }
+}
+
+#[cfg(all(
+    not(mio_unsupported_force_poll_poll),
+    not(all(
+        not(mio_unsupported_force_waker_pipe),
+        any(
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "watchos",
+        )
+    ))
+))]
+pub use self::fdbased::Waker;
+
+#[cfg(all(
     not(mio_unsupported_force_waker_pipe),
     any(target_os = "linux", target_os = "android")
 ))]
 mod eventfd {
-    use crate::sys::Selector;
-    use crate::{Interest, Token};
-
     use std::fs::File;
     use std::io::{self, Read, Write};
+    use std::os::fd::{AsRawFd, RawFd};
     use std::os::unix::io::FromRawFd;
 
     /// Waker backed by `eventfd`.
@@ -17,17 +81,15 @@ mod eventfd {
     /// unsigned integer and added to the count. Reads must also be 8 bytes and
     /// reset the count to 0, returning the count.
     #[derive(Debug)]
-    pub struct Waker {
+    pub struct WakerInternal {
         fd: File,
     }
 
-    impl Waker {
-        pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+    impl WakerInternal {
+        pub fn new() -> io::Result<WakerInternal> {
             let fd = syscall!(eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK))?;
             let file = unsafe { File::from_raw_fd(fd) };
-
-            selector.register(fd, token, Interest::READABLE)?;
-            Ok(Waker { fd: file })
+            Ok(WakerInternal { fd: file })
         }
 
         pub fn wake(&self) -> io::Result<()> {
@@ -44,6 +106,11 @@ mod eventfd {
             }
         }
 
+        #[cfg(mio_unsupported_force_poll_poll)]
+        pub fn ack_and_reset(&self) {
+            let _ = self.reset();
+        }
+
         /// Reset the eventfd object, only need to call this if `wake` fails.
         fn reset(&self) -> io::Result<()> {
             let mut buf: [u8; 8] = 0u64.to_ne_bytes();
@@ -56,13 +123,20 @@ mod eventfd {
             }
         }
     }
+
+    impl AsRawFd for WakerInternal {
+        fn as_raw_fd(&self) -> RawFd {
+            self.fd.as_raw_fd()
+        }
+    }
 }
 
 #[cfg(all(
+    mio_unsupported_force_poll_poll,
     not(mio_unsupported_force_waker_pipe),
     any(target_os = "linux", target_os = "android")
 ))]
-pub use self::eventfd::Waker;
+pub(crate) use self::eventfd::WakerInternal;
 
 #[cfg(all(
     not(mio_unsupported_force_waker_pipe),
@@ -126,11 +200,9 @@ pub use self::kqueue::Waker;
     target_os = "redox",
 ))]
 mod pipe {
-    use crate::sys::unix::Selector;
-    use crate::{Interest, Token};
-
     use std::fs::File;
     use std::io::{self, Read, Write};
+    use std::os::fd::{AsRawFd, RawFd};
     use std::os::unix::io::FromRawFd;
 
     /// Waker backed by a unix pipe.
@@ -138,20 +210,19 @@ mod pipe {
     /// Waker controls both the sending and receiving ends and empties the pipe
     /// if writing to it (waking) fails.
     #[derive(Debug)]
-    pub struct Waker {
+    pub struct WakerInternal {
         sender: File,
         receiver: File,
     }
 
-    impl Waker {
-        pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+    impl WakerInternal {
+        pub fn new() -> io::Result<WakerInternal> {
             let mut fds = [-1; 2];
             syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
             let sender = unsafe { File::from_raw_fd(fds[1]) };
             let receiver = unsafe { File::from_raw_fd(fds[0]) };
 
-            selector.register(fds[0], token, Interest::READABLE)?;
-            Ok(Waker { sender, receiver })
+            Ok(WakerInternal { sender, receiver })
         }
 
         pub fn wake(&self) -> io::Result<()> {
@@ -174,6 +245,11 @@ mod pipe {
             }
         }
 
+        #[cfg(mio_unsupported_force_poll_poll)]
+        pub fn ack_and_reset(&self) {
+            self.empty();
+        }
+
         /// Empty the pipe's buffer, only need to call this if `wake` fails.
         /// This ignores any errors.
         fn empty(&self) {
@@ -186,14 +262,49 @@ mod pipe {
             }
         }
     }
+
+    impl AsRawFd for WakerInternal {
+        fn as_raw_fd(&self) -> RawFd {
+            self.receiver.as_raw_fd()
+        }
+    }
 }
 
-#[cfg(any(
-    mio_unsupported_force_waker_pipe,
-    target_os = "dragonfly",
-    target_os = "illumos",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "redox",
+#[cfg(all(
+    mio_unsupported_force_poll_poll,
+    any(
+        mio_unsupported_force_waker_pipe,
+        target_os = "dragonfly",
+        target_os = "illumos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "redox",
+    )
 ))]
-pub use self::pipe::Waker;
+pub(crate) use self::pipe::WakerInternal;
+
+#[cfg(mio_unsupported_force_poll_poll)]
+mod poll {
+    use std::io;
+    use crate::sys::Selector;
+    use crate::Token;
+
+    #[derive(Debug)]
+    pub struct Waker {
+        selector: Selector,
+        token: Token,
+    }
+
+    impl Waker {
+        pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+            Ok(Waker { selector: selector.try_clone()?, token })
+        }
+
+        pub fn wake(&self) -> io::Result<()> {
+            self.selector.wake(self.token)
+        }
+    }
+}
+
+#[cfg(mio_unsupported_force_poll_poll)]
+pub use self::poll::Waker;

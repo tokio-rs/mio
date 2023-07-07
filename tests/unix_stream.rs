@@ -451,6 +451,8 @@ where
 
     assert!(stream.take_error().unwrap().is_none());
 
+    assert_would_block(stream.read(&mut buf));
+
     let bufs = [IoSlice::new(DATA1), IoSlice::new(DATA2)];
     let wrote = stream.write_vectored(&bufs).unwrap();
     assert_eq!(wrote, DATA1_LEN + DATA2_LEN);

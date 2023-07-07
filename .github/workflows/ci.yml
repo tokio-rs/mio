@@ -31,6 +31,18 @@ jobs:
       run: cargo test --all-features
     - name: Tests release build
       run: cargo test --release --all-features
+  TestPoll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RUSTFLAGS="--cfg mio_unsupported_force_poll_poll"
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Tests
+      run: cargo test --all-features
+    - name: Tests release build
+      run: cargo test --release --all-features
   MinimalVersions:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
@@ -133,6 +145,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - Test
+      - TestPoll
       - MinimalVersions
       - MSRV
       - Nightly
