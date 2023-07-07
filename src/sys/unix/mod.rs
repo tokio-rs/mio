@@ -33,25 +33,65 @@ cfg_os_poll! {
     }
 
     cfg_io_source! {
-        use std::io;
-
         // Both `kqueue` and `epoll` don't need to hold any user space state.
-        pub(crate) struct IoSourceState;
+        #[cfg(not(mio_unsupported_force_poll_poll))]
+        mod stateless_io_source {
+            use std::io;
+            use std::os::unix::io::RawFd;
+            use crate::Registry;
+            use crate::Token;
+            use crate::Interest;
 
-        impl IoSourceState {
-            pub fn new() -> IoSourceState {
-                IoSourceState
-            }
+            pub(crate) struct IoSourceState;
 
-            pub fn do_io<T, F, R>(&self, f: F, io: &T) -> io::Result<R>
-            where
-                F: FnOnce(&T) -> io::Result<R>,
-            {
-                // We don't hold state, so we can just call the function and
-                // return.
-                f(io)
+            impl IoSourceState {
+                pub fn new() -> IoSourceState {
+                    IoSourceState
+                }
+
+                pub fn do_io<T, F, R>(&self, f: F, io: &T) -> io::Result<R>
+                where
+                    F: FnOnce(&T) -> io::Result<R>,
+                {
+                    // We don't hold state, so we can just call the function and
+                    // return.
+                    f(io)
+                }
+
+                pub fn register(
+                    &mut self,
+                    registry: &Registry,
+                    token: Token,
+                    interests: Interest,
+                    fd: RawFd,
+                ) -> io::Result<()> {
+                    // Pass through, we don't have any state
+                    registry.selector().register(fd, token, interests)
+                }
+
+                pub fn reregister(
+                    &mut self,
+                    registry: &Registry,
+                    token: Token,
+                    interests: Interest,
+                    fd: RawFd,
+                ) -> io::Result<()> {
+                    // Pass through, we don't have any state
+                    registry.selector().reregister(fd, token, interests)
+                }
+
+                pub fn deregister(&mut self, registry: &Registry, fd: RawFd) -> io::Result<()> {
+                    // Pass through, we don't have any state
+                    registry.selector().deregister(fd)
+                }
             }
         }
+
+        #[cfg(not(mio_unsupported_force_poll_poll))]
+        pub(crate) use self::stateless_io_source::IoSourceState;
+
+        #[cfg(mio_unsupported_force_poll_poll)]
+        pub(crate) use self::selector::IoSourceState;
     }
 
     cfg_os_ext! {

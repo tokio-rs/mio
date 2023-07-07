@@ -1,4 +1,7 @@
-#![cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
+#![cfg(all(
+    not(mio_unsupported_force_poll_poll),
+    any(target_os = "freebsd", target_os = "dragonfly"),
+))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::{event::Source, Events, Interest, Poll, Registry, Token};

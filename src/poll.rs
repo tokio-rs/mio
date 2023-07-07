@@ -1,5 +1,5 @@
 use crate::{event, sys, Events, Interest, Token};
-#[cfg(unix)]
+#[cfg(all(unix, not(mio_unsupported_force_poll_poll)))]
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::Duration;
 use std::{fmt, io};
@@ -411,7 +411,7 @@ impl Poll {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(mio_unsupported_force_poll_poll)))]
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
         self.registry.as_raw_fd()
@@ -696,7 +696,7 @@ impl fmt::Debug for Registry {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(mio_unsupported_force_poll_poll)))]
 impl AsRawFd for Registry {
     fn as_raw_fd(&self) -> RawFd {
         self.selector.as_raw_fd()
@@ -704,7 +704,10 @@ impl AsRawFd for Registry {
 }
 
 cfg_os_poll! {
-    #[cfg(unix)]
+    #[cfg(all(
+        unix,
+        not(mio_unsupported_force_poll_poll)
+    ))]
     #[test]
     pub fn as_raw_fd() {
         let poll = Poll::new().unwrap();
