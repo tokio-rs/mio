@@ -44,18 +44,20 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
         return Err(err);
     }
 
-    // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
+    // Darwin (and others) doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
     #[cfg(any(
         target_os = "ios",
         target_os = "macos",
         target_os = "tvos",
         target_os = "watchos",
+        target_os = "espidf",
     ))]
     {
         if let Err(err) = syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK)) {
             let _ = syscall!(close(socket));
             return Err(err);
         }
+        #[cfg(not(target_os = "espidf"))]
         if let Err(err) = syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)) {
             let _ = syscall!(close(socket));
             return Err(err);
@@ -105,6 +107,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "openbsd",
                     target_os = "tvos",
                     target_os = "watchos",
+                    target_os = "espidf",
                 ))]
                 sin_len: 0,
             };
@@ -131,6 +134,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "openbsd",
                     target_os = "tvos",
                     target_os = "watchos",
+                    target_os = "espidf",
                 ))]
                 sin6_len: 0,
                 #[cfg(target_os = "illumos")]

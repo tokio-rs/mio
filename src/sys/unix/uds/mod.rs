@@ -82,6 +82,7 @@ cfg_os_poll! {
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
+            target_os = "espidf",
         )))]
         let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
@@ -89,7 +90,7 @@ cfg_os_poll! {
         syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
         let pair = unsafe { (T::from_raw_fd(fds[0]), T::from_raw_fd(fds[1])) };
 
-        // Darwin doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
+        // Darwin (and others) doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
         //
         // In order to set those flags, additional `fcntl` sys calls must be
         // performed. If a `fnctl` fails after the sockets have been created,
@@ -100,11 +101,14 @@ cfg_os_poll! {
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
+            target_os = "espidf",
         ))]
         {
             syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
+            #[cfg(not(target_os = "espidf"))]
             syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
             syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
+            #[cfg(not(target_os = "espidf"))]
             syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
         }
         Ok(pair)
