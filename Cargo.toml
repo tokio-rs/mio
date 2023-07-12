@@ -51,8 +51,11 @@ log = { version = "0.4.8", optional = true }
 libc = "0.2.149"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.48"
+version = "0.52"
 features = [
+  "Wdk_Foundation",                   # Required for AFD.
+  "Wdk_Storage_FileSystem",           # Required for AFD.
+  "Wdk_System_IO",                    # Required for AFD.
   "Win32_Foundation",                 # Basic types eg HANDLE
   "Win32_Networking_WinSock",         # winsock2 types/functions
   "Win32_Storage_FileSystem",         # Enables NtCreateFile
