@@ -66,7 +66,7 @@ pub use self::fdbased::Waker;
 
 #[cfg(all(
     not(mio_unsupported_force_waker_pipe),
-    any(target_os = "linux", target_os = "android")
+    any(target_os = "linux", target_os = "android", target_os = "espidf")
 ))]
 mod eventfd {
     use std::fs::File;
@@ -86,7 +86,13 @@ mod eventfd {
 
     impl WakerInternal {
         pub fn new() -> io::Result<WakerInternal> {
-            let fd = syscall!(eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK))?;
+            #[cfg(not(target_os = "espidf"))]
+            let flags = libc::EFD_CLOEXEC | libc::EFD_NONBLOCK;
+            // ESP-IDF is EFD_NONBLOCK by default and errors if you try to pass this flag.
+            #[cfg(target_os = "espidf")]
+            let flags = 0;
+            let fd = syscall!(eventfd(0, flags))?;
+
             let file = unsafe { File::from_raw_fd(fd) };
             Ok(WakerInternal { fd: file })
         }
@@ -133,7 +139,7 @@ mod eventfd {
 #[cfg(all(
     mio_unsupported_force_poll_poll,
     not(mio_unsupported_force_waker_pipe),
-    any(target_os = "linux", target_os = "android")
+    any(target_os = "linux", target_os = "android", target_os = "espidf")
 ))]
 pub(crate) use self::eventfd::WakerInternal;
 

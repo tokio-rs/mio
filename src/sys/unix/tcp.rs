@@ -87,6 +87,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
         target_os = "redox",
         target_os = "tvos",
         target_os = "watchos",
+        target_os = "espidf",
         all(target_arch = "x86", target_os = "android"),
     ))]
     let stream = {
@@ -97,10 +98,11 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
         ))
         .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
         .and_then(|s| {
+            #[cfg(not(target_os = "espidf"))]
             syscall!(fcntl(s.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC))?;
 
             // See https://github.com/tokio-rs/mio/issues/1450
-            #[cfg(all(target_arch = "x86", target_os = "android"))]
+            #[cfg(any(all(target_arch = "x86", target_os = "android"), target_os = "espidf",))]
             syscall!(fcntl(s.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK))?;
 
             Ok(s)

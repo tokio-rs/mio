@@ -168,6 +168,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         target_os = "macos",
         target_os = "tvos",
         target_os = "watchos",
+        target_os = "espidf",
     ))]
     unsafe {
         // For platforms that don't have `pipe2(2)` we need to manually set the
@@ -202,6 +203,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
         target_os = "redox",
         target_os = "tvos",
         target_os = "watchos",
+        target_os = "espidf",
     )))]
     compile_error!("unsupported target for `mio::unix::pipe`");
 
