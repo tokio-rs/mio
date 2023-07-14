@@ -36,7 +36,7 @@ fn fmt_debug() {
     {
         assert_eq!(format!("{:?}", Interest::AIO), "AIO");
     }
-    #[cfg(any(target_os = "freebsd"))]
+    #[cfg(target_os = "freebsd")]
     {
         assert_eq!(format!("{:?}", Interest::LIO), "LIO");
     }
