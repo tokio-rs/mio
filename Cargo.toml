@@ -68,7 +68,7 @@ rand = "0.8"
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs", "--generate-link-to-definition"]
 targets = [
   "aarch64-apple-ios",
   "aarch64-linux-android",
