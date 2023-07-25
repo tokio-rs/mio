@@ -230,7 +230,7 @@ impl SelectorId {
     /// Associate an I/O source with `registry`, returning an error if its
     /// already registered.
     fn associate(&self, registry: &Registry) -> io::Result<()> {
-        let registry_id = poll::selector(&registry).id();
+        let registry_id = poll::selector(registry).id();
         let previous_id = self.id.swap(registry_id, Ordering::AcqRel);
 
         if previous_id == Self::UNASSOCIATED {
@@ -247,7 +247,7 @@ impl SelectorId {
     /// error if its registered with a different `Registry` or not registered at
     /// all.
     fn check_association(&self, registry: &Registry) -> io::Result<()> {
-        let registry_id = poll::selector(&registry).id();
+        let registry_id = poll::selector(registry).id();
         let id = self.id.load(Ordering::Acquire);
 
         if id == registry_id {
@@ -268,7 +268,7 @@ impl SelectorId {
     /// Remove a previously made association from `registry`, returns an error
     /// if it was not previously associated with `registry`.
     fn remove_association(&self, registry: &Registry) -> io::Result<()> {
-        let registry_id = poll::selector(&registry).id();
+        let registry_id = poll::selector(registry).id();
         let previous_id = self.id.swap(Self::UNASSOCIATED, Ordering::AcqRel);
 
         if previous_id == registry_id {

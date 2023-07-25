@@ -244,29 +244,29 @@ impl event::Source for Sender {
 
 impl Write for Sender {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.do_io(|sender| (&*sender).write(buf))
+        self.inner.do_io(|mut inner| inner.write(buf))
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|sender| (&*sender).write_vectored(bufs))
+        self.inner.do_io(|mut inner| inner.write_vectored(bufs))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.do_io(|sender| (&*sender).flush())
+        self.inner.do_io(|mut inner| inner.flush())
     }
 }
 
 impl Write for &Sender {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.do_io(|sender| (&*sender).write(buf))
+        self.inner.do_io(|mut inner| inner.write(buf))
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|sender| (&*sender).write_vectored(bufs))
+        self.inner.do_io(|mut inner| inner.write_vectored(bufs))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.do_io(|sender| (&*sender).flush())
+        self.inner.do_io(|mut inner| inner.flush())
     }
 }
 
@@ -341,21 +341,21 @@ impl event::Source for Receiver {
 
 impl Read for Receiver {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.do_io(|sender| (&*sender).read(buf))
+        self.inner.do_io(|mut inner| inner.read(buf))
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|sender| (&*sender).read_vectored(bufs))
+        self.inner.do_io(|mut inner| inner.read_vectored(bufs))
     }
 }
 
 impl Read for &Receiver {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.do_io(|sender| (&*sender).read(buf))
+        self.inner.do_io(|mut inner| inner.read(buf))
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|sender| (&*sender).read_vectored(bufs))
+        self.inner.do_io(|mut inner| inner.read_vectored(bufs))
     }
 }
 
