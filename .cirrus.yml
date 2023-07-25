@@ -1,5 +1,5 @@
 freebsd_instance:
-  image: freebsd-12-2-release-amd64
+  image: freebsd-12-4-release-amd64
 
 env:
   RUST_BACKTRACE: full
@@ -7,8 +7,7 @@ env:
 task:
   name: FreeBSD
   setup_script:
-    - pkg install -y curl
-    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - fetch https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile minimal
   cargo_cache:
     folder: $HOME/.cargo/registry
