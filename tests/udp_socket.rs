@@ -30,7 +30,7 @@ const ID2: Token = Token(3);
 const ID3: Token = Token(4);
 
 #[test]
-#[cfg(all(unix, not(debug_assertions)))]
+#[cfg(all(unix, not(mio_unsupported_force_poll_poll), not(debug_assertions)))]
 fn assert_size() {
     use mio::net::*;
     use std::mem::size_of;
