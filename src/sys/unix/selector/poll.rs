@@ -213,14 +213,14 @@ impl SelectorState {
             }
 
             // Perform the poll.
-            log::trace!("Polling on {:?}", fds);
+            trace!("Polling on {:?}", &fds);
             let num_events = poll(&mut fds.poll_fds, deadline)?;
             if num_events == 0 && deadline.map(|v| v <= Instant::now()).unwrap_or(false) {
                 // timeout
                 return Ok(());
             }
 
-            log::trace!("Poll finished: {:?}", fds);
+            trace!("Poll finished: {:?}", &fds);
             let notified_events = fds.poll_fds[0].0.revents;
             let notified = notified_events != 0;
             let mut num_fd_events = if notified { num_events - 1 } else { num_events };
