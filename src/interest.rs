@@ -163,7 +163,7 @@ impl fmt::Debug for Interest {
                 one = true
             }
         }
-        #[cfg(any(target_os = "freebsd"))]
+        #[cfg(target_os = "freebsd")]
         {
             if self.is_lio() {
                 if one {

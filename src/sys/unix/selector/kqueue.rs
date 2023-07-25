@@ -285,7 +285,7 @@ fn kevent_register(
             Err(err)
         }
     })
-    .and_then(|()| check_errors(&changes, ignored_errors))
+    .and_then(|()| check_errors(changes, ignored_errors))
 }
 
 /// Check all events for possible errors, it returns the first error found.
