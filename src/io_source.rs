@@ -142,7 +142,8 @@ where
     ) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.associate(registry)?;
-        self.state.register(registry, token, interests, self.inner.as_raw_fd())
+        self.state
+            .register(registry, token, interests, self.inner.as_raw_fd())
     }
 
     fn reregister(
@@ -153,7 +154,8 @@ where
     ) -> io::Result<()> {
         #[cfg(debug_assertions)]
         self.selector_id.check_association(registry)?;
-        self.state.reregister(registry, token, interests, self.inner.as_raw_fd())
+        self.state
+            .reregister(registry, token, interests, self.inner.as_raw_fd())
     }
 
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {

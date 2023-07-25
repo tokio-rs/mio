@@ -12,9 +12,6 @@
     ))
 ))]
 mod fdbased {
-    use std::io;
-    use std::os::fd::AsRawFd;
-    use crate::sys::Selector;
     #[cfg(all(
         not(mio_unsupported_force_waker_pipe),
         any(target_os = "linux", target_os = "android"),
@@ -29,7 +26,10 @@ mod fdbased {
         target_os = "redox",
     ))]
     use crate::sys::unix::waker::pipe::WakerInternal;
+    use crate::sys::Selector;
     use crate::{Interest, Token};
+    use std::io;
+    use std::os::fd::AsRawFd;
 
     #[derive(Debug)]
     pub struct Waker {
@@ -285,9 +285,9 @@ pub(crate) use self::pipe::WakerInternal;
 
 #[cfg(mio_unsupported_force_poll_poll)]
 mod poll {
-    use std::io;
     use crate::sys::Selector;
     use crate::Token;
+    use std::io;
 
     #[derive(Debug)]
     pub struct Waker {
@@ -297,7 +297,10 @@ mod poll {
 
     impl Waker {
         pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
-            Ok(Waker { selector: selector.try_clone()?, token })
+            Ok(Waker {
+                selector: selector.try_clone()?,
+                token,
+            })
         }
 
         pub fn wake(&self) -> io::Result<()> {

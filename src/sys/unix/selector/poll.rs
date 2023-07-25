@@ -3,19 +3,19 @@
 // Permission to use this code has been granted by original author:
 // https://github.com/tokio-rs/mio/pull/1602#issuecomment-1218441031
 
+use crate::sys::unix::selector::LOWEST_FD;
+use crate::sys::unix::waker::WakerInternal;
 use crate::{Interest, Token};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
+use std::os::fd::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 use std::{fmt, io};
-use std::os::fd::AsRawFd;
-use crate::sys::unix::selector::LOWEST_FD;
-use crate::sys::unix::waker::WakerInternal;
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -62,7 +62,12 @@ impl Selector {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn register_internal(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<Arc<RegistrationRecord>> {
+    pub(crate) fn register_internal(
+        &self,
+        fd: RawFd,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<Arc<RegistrationRecord>> {
         self.state.register_internal(fd, token, interests)
     }
 
@@ -226,7 +231,8 @@ impl SelectorState {
             let mut num_fd_events = if notified { num_events - 1 } else { num_events };
 
             let mut pending_wake_tokens_guard = self.pending_wake_tokens.lock().unwrap();
-            let pending_wake_tokens = std::mem::replace(pending_wake_tokens_guard.as_mut(), Vec::new());
+            let pending_wake_tokens =
+                std::mem::replace(pending_wake_tokens_guard.as_mut(), Vec::new());
             drop(pending_wake_tokens_guard);
 
             if notified {
@@ -449,7 +455,9 @@ pub(crate) struct RegistrationRecord {
 
 impl RegistrationRecord {
     pub fn new() -> Self {
-        Self { is_unregistered: AtomicBool::new(false) }
+        Self {
+            is_unregistered: AtomicBool::new(false),
+        }
     }
 
     pub fn mark_unregistered(&self) {
@@ -533,10 +541,10 @@ pub struct Event {
 pub type Events = Vec<Event>;
 
 pub mod event {
+    use crate::sys::unix::selector::poll::POLLRDHUP;
     use crate::sys::Event;
     use crate::Token;
     use std::fmt;
-    use crate::sys::unix::selector::poll::POLLRDHUP;
 
     pub fn token(event: &Event) -> Token {
         event.token

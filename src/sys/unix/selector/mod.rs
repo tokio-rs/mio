@@ -24,7 +24,7 @@ pub(crate) use self::epoll::{event, Event, Events, Selector};
 mod poll;
 
 #[cfg(mio_unsupported_force_poll_poll)]
-pub(crate) use self::poll::{event, Event, Events, Selector, IoSourceState};
+pub(crate) use self::poll::{event, Event, Events, IoSourceState, Selector};
 
 #[cfg(all(
     not(mio_unsupported_force_poll_poll),
