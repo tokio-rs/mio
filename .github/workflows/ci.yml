@@ -1,0 +1,144 @@
+name: CI
+on:
+  push:
+    branches: [ "master", "v0.7.x" ]
+  pull_request:
+    branches: [ "master", "v0.7.x" ]
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+  CI: true
+
+permissions:
+  contents: read #  to fetch code (actions/checkout)
+
+jobs:
+  Test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Install Cargo-hack
+      run: cargo install --debug cargo-hack
+    - name: Check all features
+      run: cargo hack check --feature-powerset
+    - name: Tests
+      run: cargo test --all-features
+    - name: Tests release build
+      run: cargo test --release --all-features
+  MinimalVersions:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
+    - name: Install minimal verions
+      run: cargo update -Zminimal-versions
+    - name: Tests
+      run: cargo test --all-features
+  MSRV:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        # NOTE: When updating also update Clippy flags, some are disabled due to
+        # MSRV.
+        toolchain: 1.46.0
+    - name: Check
+      # We only run check allowing us to use newer features in tests.
+      # We enable all features except for the `log` feature as since log v0.4.19
+      # it requires a MSRV later then rustc 1.46.
+      run: cargo check --no-default-features --features os-poll,os-ext,net
+  Nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
+    - name: Tests
+      run: cargo test --all-features
+  Clippy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+    - name: Clippy
+      # NOTE: `clippy::uninlined-format-args` is enabled due to MSRV.
+      run: cargo clippy --all-targets --all-features -- -D warnings -A clippy::cognitive-complexity -A clippy::uninlined-format-args
+  Docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Check docs
+      run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
+  Rustfmt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+    - name: Check formatting
+      # FIXME: for some reason this doesn't actually check all files.
+      # So instead we run `rustfmt` directly on each file.
+      #cargo fmt --all -- --check
+      run: find src tests examples -type f -iname "*.rs" | xargs rustfmt --check
+  CheckTargets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+    - name: Install all targets
+      run: make install_targets
+    - name: Install Cargo-hack
+      run: cargo install --debug cargo-hack
+    - name: Check all targets
+      run: make check_all_targets
+  Sanitizer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, leak, memory, thread]
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
+    - name: Add rust source
+      run: rustup component add rust-src
+    - name: Run tests with sanitizer
+      run: make test_sanitizer SAN=${{ matrix.sanitizer }}
+  # Single job required to merge the pr.
+  Passed:
+    runs-on: ubuntu-latest
+    needs:
+      - Test
+      - MinimalVersions
+      - MSRV
+      - Nightly
+      - Clippy
+      - Docs
+      - Rustfmt
+      - CheckTargets
+    steps:
+      - run: exit 0
