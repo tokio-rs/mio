@@ -29,6 +29,7 @@ use winapi::um::minwinbase::OVERLAPPED;
 
 #[derive(Debug)]
 struct AfdGroup {
+    #[allow(dead_code)] // Not always used depending on the feature set enabled.
     cp: Arc<CompletionPort>,
     afd_group: Mutex<Vec<Arc<Afd>>>,
 }
@@ -36,8 +37,8 @@ struct AfdGroup {
 impl AfdGroup {
     pub fn new(cp: Arc<CompletionPort>) -> AfdGroup {
         AfdGroup {
-            afd_group: Mutex::new(Vec::new()),
             cp,
+            afd_group: Mutex::new(Vec::new()),
         }
     }
 
@@ -93,7 +94,6 @@ pub struct SockState {
     poll_info: AfdPollInfo,
     afd: Arc<Afd>,
 
-    raw_socket: RawSocket,
     base_socket: RawSocket,
 
     user_evts: u32,
@@ -107,7 +107,7 @@ pub struct SockState {
     // last raw os error
     error: Option<i32>,
 
-    pinned: PhantomPinned,
+    _pinned: PhantomPinned,
 }
 
 impl SockState {
@@ -263,7 +263,6 @@ cfg_io_source! {
                 iosb: IoStatusBlock::zeroed(),
                 poll_info: AfdPollInfo::zeroed(),
                 afd,
-                raw_socket,
                 base_socket: get_base_socket(raw_socket)?,
                 user_evts: 0,
                 pending_evts: 0,
@@ -271,7 +270,7 @@ cfg_io_source! {
                 poll_status: SockPollStatus::Idle,
                 delete_pending: false,
                 error: None,
-                pinned: PhantomPinned,
+                _pinned: PhantomPinned,
             })
         }
 
