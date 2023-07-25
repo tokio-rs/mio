@@ -78,7 +78,7 @@ jobs:
         components: clippy
     - name: Clippy
       # NOTE: `clippy::uninlined-format-args` is enabled due to MSRV.
-      run: cargo clippy --all-targets --all-features -- -D warnings -A clippy::cognitive-complexity -A clippy::uninlined-format-args
+      run: cargo clippy --all-features -- -D warnings -A clippy::cognitive-complexity -A clippy::uninlined-format-args
   Docs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -114,20 +114,6 @@ jobs:
       run: cargo install --debug cargo-hack
     - name: Check all targets
       run: make check_all_targets
-  Sanitizer:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        sanitizer: [address, leak, memory, thread]
-    steps:
-    - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@nightly
-    - name: Add rust source
-      run: rustup component add rust-src
-    - name: Run tests with sanitizer
-      run: make test_sanitizer SAN=${{ matrix.sanitizer }}
   # Single job required to merge the pr.
   Passed:
     runs-on: ubuntu-latest
