@@ -66,10 +66,7 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
         target_os = "macos",
         target_os = "netbsd",
         target_os = "solaris",
-        all(
-            target_arch = "x86",
-            target_os = "android"
-        )
+        all(target_arch = "x86", target_os = "android")
     ))]
     let socket = syscall!(accept(
         listener.as_raw_fd(),
@@ -83,9 +80,9 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
         syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC))?;
 
         // See https://github.com/tokio-rs/mio/issues/1450
-        #[cfg(all(target_arch = "x86",target_os = "android"))]
+        #[cfg(all(target_arch = "x86", target_os = "android"))]
         syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK))?;
-        
+
         Ok(s)
     });
 
