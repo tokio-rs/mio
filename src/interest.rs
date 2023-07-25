@@ -63,6 +63,7 @@ impl Interest {
     /// # silent_dead_code_warning(INTERESTS)
     /// ```
     #[allow(clippy::should_implement_trait)]
+    #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn add(self, other: Interest) -> Interest {
         Interest(unsafe { NonZeroU8::new_unchecked(self.0.get() | other.0.get()) })
     }
@@ -87,31 +88,37 @@ impl Interest {
     /// // Its also possible to remove multiple interests at once.
     /// assert_eq!(RW_INTERESTS.remove(RW_INTERESTS), None);
     /// ```
+    #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn remove(self, other: Interest) -> Option<Interest> {
         NonZeroU8::new(self.0.get() & !other.0.get()).map(Interest)
     }
 
     /// Returns true if the value includes readable readiness.
+    #[must_use]
     pub const fn is_readable(self) -> bool {
         (self.0.get() & READABLE) != 0
     }
 
     /// Returns true if the value includes writable readiness.
+    #[must_use]
     pub const fn is_writable(self) -> bool {
         (self.0.get() & WRITABLE) != 0
     }
 
     /// Returns true if `Interest` contains AIO readiness.
+    #[must_use]
     pub const fn is_aio(self) -> bool {
         (self.0.get() & AIO) != 0
     }
 
     /// Returns true if `Interest` contains LIO readiness.
+    #[must_use]
     pub const fn is_lio(self) -> bool {
         (self.0.get() & LIO) != 0
     }
 
     /// Returns true if `Interest` contains priority readiness.
+    #[must_use]
     pub const fn is_priority(self) -> bool {
         (self.0.get() & PRIORITY) != 0
     }
