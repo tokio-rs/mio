@@ -24,6 +24,7 @@ pub struct TcpSocket {
 
 /// Configures a socket's TCP keepalive parameters.
 #[derive(Debug, Default, Clone)]
+#[allow(dead_code)]
 pub struct TcpKeepalive {
     pub(crate) time: Option<Duration>,
     #[cfg(any(
