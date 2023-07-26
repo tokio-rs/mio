@@ -648,14 +648,14 @@ cfg_io_source! {
             let result = f(io);
 
             if let Err(err) = &result {
-            if err.kind() == io::ErrorKind::WouldBlock {
-                self.inner.as_ref().map_or(Ok(()), |state| {
-                    state
-                    .selector
-                    .reregister(state.fd, state.token, state.interests)
-                })?;
+                if err.kind() == io::ErrorKind::WouldBlock {
+                    self.inner.as_ref().map_or(Ok(()), |state| {
+                        state
+                        .selector
+                        .reregister(state.fd, state.token, state.interests)
+                    })?;
+                }
             }
-        }
 
             result
         }
