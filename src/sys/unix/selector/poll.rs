@@ -334,10 +334,8 @@ impl SelectorState {
             if fds.fd_data.contains_key(&fd) {
                 return Err(io::Error::new(
                     io::ErrorKind::AlreadyExists,
-                    "\
-                    same file descriptor registered twice for polling \
-                    (an old file descriptor might have been closed without deregistration)\
-                    ",
+                    "I/O source already registered this `Registry` \
+                    (an old file descriptor might have been closed without deregistration)",
                 ));
             }
 
