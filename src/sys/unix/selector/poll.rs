@@ -49,7 +49,7 @@ impl Selector {
         Ok(Selector {
             state,
             #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(false),
+            has_waker: AtomicBool::new(self.has_waker.load(Ordering::Acquire)),
         })
     }
 
