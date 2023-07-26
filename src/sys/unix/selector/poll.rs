@@ -7,15 +7,14 @@ use crate::sys::unix::selector::LOWEST_FD;
 use crate::sys::unix::waker::WakerInternal;
 use crate::{Interest, Token};
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 use std::os::fd::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::{Duration, Instant};
-use std::{fmt, io};
+use std::time::Duration;
+use std::{cmp, fmt, io};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -197,8 +196,6 @@ impl SelectorState {
     }
 
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
-        let deadline = timeout.map(|t| Instant::now() + t);
-
         events.clear();
 
         let mut fds = self.fds.lock().unwrap();
@@ -216,7 +213,7 @@ impl SelectorState {
 
             // Perform the poll.
             trace!("Polling on {:?}", &fds);
-            let num_events = poll(&mut fds.poll_fds, deadline)?;
+            let num_events = poll(&mut fds.poll_fds, timeout)?;
             trace!("Poll finished: {:?}", &fds);
 
             if num_events == 0 {
@@ -493,26 +490,34 @@ fn interests_to_poll(interest: Interest) -> libc::c_short {
 }
 
 /// Helper function to call poll.
-fn poll(fds: &mut [PollFd], deadline: Option<Instant>) -> io::Result<usize> {
+fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
     loop {
-        // Convert the timeout to milliseconds.
-        let timeout_ms = deadline
-            .map(|deadline| {
-                let timeout = deadline.saturating_duration_since(Instant::now());
+        // A bug in kernels < 2.6.37 makes timeouts larger than LONG_MAX / CONFIG_HZ
+        // (approx. 30 minutes with CONFIG_HZ=1200) effectively infinite on 32 bits
+        // architectures. The magic number is the same constant used by libuv.
+        #[cfg(target_pointer_width = "32")]
+        const MAX_SAFE_TIMEOUT: u128 = 1789569;
+        #[cfg(not(target_pointer_width = "32"))]
+        const MAX_SAFE_TIMEOUT: u128 = libc::c_int::max_value() as u128;
 
-                // Round up to a whole millisecond.
-                let mut ms = timeout.as_millis().try_into().unwrap_or(u64::MAX);
-                if Duration::from_millis(ms) < timeout {
-                    ms = ms.saturating_add(1);
-                }
-                ms.try_into().unwrap_or(i32::MAX)
+        let timeout = timeout
+            .map(|to| {
+                // `Duration::as_millis` truncates, so round up. This avoids
+                // turning sub-millisecond timeouts into a zero timeout, unless
+                // the caller explicitly requests that by specifying a zero
+                // timeout.
+                let to_ms = to
+                    .checked_add(Duration::from_nanos(999_999))
+                    .unwrap_or(to)
+                    .as_millis();
+                cmp::min(MAX_SAFE_TIMEOUT, to_ms) as libc::c_int
             })
             .unwrap_or(-1);
 
         let res = syscall!(poll(
             fds.as_mut_ptr() as *mut libc::pollfd,
             fds.len() as libc::nfds_t,
-            timeout_ms,
+            timeout,
         ));
 
         match res {
