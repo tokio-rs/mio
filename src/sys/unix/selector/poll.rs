@@ -220,8 +220,8 @@ impl SelectorState {
                 return Ok(());
             }
 
-            let notified_events = fds.poll_fds[0].0.revents;
-            let notified = notified_events != 0;
+            let waker_events = fds.poll_fds[0].0.revents;
+            let notified = waker_events != 0;
             let mut num_fd_events = if notified { num_events - 1 } else { num_events };
 
             let pending_wake_token = self.pending_wake_token.lock().unwrap().take();
@@ -248,7 +248,7 @@ impl SelectorState {
                 if let Some(pending_wake_token) = pending_wake_token {
                     events.push(Event {
                         token: pending_wake_token,
-                        events: notified_events,
+                        events: waker_events,
                     });
                 }
 
