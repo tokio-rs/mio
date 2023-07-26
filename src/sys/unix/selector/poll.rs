@@ -283,7 +283,7 @@ impl SelectorState {
                     }
                 }
 
-                break;
+                break; // No more polling.
             }
             
             // If we didn't break above it means we got woken up internally (for example for adding an fd), so we poll again.
