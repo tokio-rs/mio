@@ -606,11 +606,9 @@ pub mod event {
             libc::POLLHUP,
         );
 
-        // Can't reference fields in packed structures.
-        let e_u64 = event.token.0;
-        f.debug_struct("epoll_event")
+        f.debug_struct("poll_event")
+            .field("token", &event.token)
             .field("events", &EventsDetails(event.events))
-            .field("u64", &e_u64)
             .finish()
     }
 }
