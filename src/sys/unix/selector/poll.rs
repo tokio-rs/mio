@@ -245,6 +245,7 @@ impl SelectorState {
 
                 events.reserve(num_fd_events);
 
+                // Add synthetic events we picked up from calls to wake()
                 if let Some(pending_wake_token) = pending_wake_token {
                     events.push(Event {
                         token: pending_wake_token,
