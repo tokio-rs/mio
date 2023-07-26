@@ -107,10 +107,10 @@ struct SelectorState {
     /// out all removed descriptors after that poll is finished running.
     pending_removal: Mutex<Vec<RawFd>>,
 
-    /// Tokens associated with Wakers that have recently asked to wake.  This will
+    /// Token associated with Waker that have recently asked to wake.  This will
     /// cause a synthetic behaviour where on any wakeup we add all pending tokens
     /// to the list of emitted events.
-    pending_wake_tokens: Mutex<Vec<Token>>,
+    pending_wake_token: Mutex<Option<Token>>,
 
     /// Data is written to this to wake up the current instance of `wait`, which can occur when the
     /// user notifies it (in which case `notified` would have been set) or when an operation needs
@@ -187,7 +187,7 @@ impl SelectorState {
                 fd_data: HashMap::new(),
             }),
             pending_removal: Mutex::new(Vec::new()),
-            pending_wake_tokens: Mutex::new(Vec::new()),
+            pending_wake_token: Mutex::new(None),
             notify_waker,
             waiting_operations: AtomicUsize::new(0),
             operations_complete: Condvar::new(),
@@ -227,14 +227,13 @@ impl SelectorState {
             let notified = notified_events != 0;
             let mut num_fd_events = if notified { num_events - 1 } else { num_events };
 
-            let mut pending_wake_tokens_guard = self.pending_wake_tokens.lock().unwrap();
-            let pending_wake_tokens =
-                std::mem::replace(pending_wake_tokens_guard.as_mut(), Vec::new());
-            drop(pending_wake_tokens_guard);
+            let pending_wake_token = self.pending_wake_token.lock().unwrap().take();
 
             if notified {
                 self.notify_waker.ack_and_reset();
-                num_fd_events += pending_wake_tokens.len();
+                if pending_wake_token.is_some() {
+                    num_fd_events += 1;
+                }
             }
 
             // We now check whether this poll was performed with descriptors which were pending
@@ -249,7 +248,7 @@ impl SelectorState {
 
                 events.reserve(num_fd_events);
 
-                for pending_wake_token in pending_wake_tokens {
+                if let Some(pending_wake_token) = pending_wake_token {
                     events.push(Event {
                         token: pending_wake_token,
                         events: notified_events,
@@ -430,9 +429,7 @@ impl SelectorState {
     }
 
     pub fn wake(&self, token: Token) -> io::Result<()> {
-        let mut pending_wake_tokens = self.pending_wake_tokens.lock().unwrap();
-        pending_wake_tokens.push(token);
-        drop(pending_wake_tokens);
+        self.pending_wake_token.lock().unwrap().replace(token);
         self.notify_waker.wake()
     }
 }
