@@ -87,10 +87,7 @@ impl Selector {
     pub fn wake(&self, token: Token) -> io::Result<()> {
         self.state.wake(token)
     }
-}
-
-cfg_io_source! {
-    impl Selector {
+    cfg_io_source! {
         #[cfg(debug_assertions)]
         pub fn id(&self) -> usize {
             self.state.id
