@@ -326,7 +326,7 @@ impl SelectorState {
         // To avoid this scenario we remove an fd from pending removals when registering it.
         let mut pending_removal = self.pending_removal.lock().unwrap();
         if let Some(idx) = pending_removal.iter().position(|&pending| pending == fd) {
-            pending_removal.remove(idx);
+            pending_removal.swap_remove(idx);
         }
         drop(pending_removal);
 
