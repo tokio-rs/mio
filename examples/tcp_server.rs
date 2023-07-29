@@ -40,12 +40,11 @@ fn main() -> io::Result<()> {
     println!("You'll see our welcome message and anything you type will be printed here.");
 
     loop {
-        if let Err(ref e) = poll.poll(&mut events, None) {
-            if interrupted(e) {
+        if let Err(err) = poll.poll(&mut events, None) {
+            if interrupted(&err) {
                 continue;
             }
-            println!("Failed to poll for events: {}", e);
-            break;
+            return Err(err);
         }
 
         for event in events.iter() {
@@ -97,7 +96,6 @@ fn main() -> io::Result<()> {
             }
         }
     }
-    Ok(())
 }
 
 fn next(current: &mut Token) -> Token {
