@@ -40,12 +40,11 @@ fn main() -> io::Result<()> {
     // Our event loop.
     loop {
         // Poll to check if we have events waiting for us.
-        if let Err(ref err) = poll.poll(&mut events, None) {
+        if let Err(err) = poll.poll(&mut events, None) {
             if err.kind() == io::ErrorKind::Interrupted {
                 continue;
             }
-            println!("Failed to poll for events: {}", err);
-            break;
+            return Err(err);
         }
 
         // Process each event.
@@ -83,7 +82,6 @@ fn main() -> io::Result<()> {
             }
         }
     }
-    Ok(())
 }
 
 #[cfg(target_os = "wasi")]
