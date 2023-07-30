@@ -199,6 +199,11 @@ impl SelectorState {
         events.clear();
 
         let mut fds = self.fds.lock().unwrap();
+
+        // Keep track of fds that receive POLLHUP or POLLERR (i.e. won't receive further
+        // events) and internally deregister them before they are externally deregister'd.  See
+        // IoSourceState below to track how the external deregister call will be handled
+        // when this state occurs.
         let mut closed_raw_fds = Vec::new();
 
         loop {
@@ -278,6 +283,9 @@ impl SelectorState {
                         // the interest using reregister.
                         poll_fd.events &= !poll_fd.revents;
 
+                        // Minor optimization to potentially avoid looping n times where n is the
+                        // number of input fds (i.e. we might loop between m and n times where m is
+                        // the number of fds with revents != 0).
                         if events.len() == num_fd_events {
                             break;
                         }
