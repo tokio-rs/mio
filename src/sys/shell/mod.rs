@@ -23,9 +23,10 @@ cfg_io_source! {
     use std::io;
     #[cfg(windows)]
     use std::os::windows::io::RawSocket;
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     use std::os::unix::io::RawFd;
 
+    #[cfg(any(windows, unix))]
     use crate::{Registry, Token, Interest};
 
     pub(crate) struct IoSourceState;
@@ -45,7 +46,7 @@ cfg_io_source! {
         }
     }
 
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     impl IoSourceState {
         pub fn register(
             &mut self,
