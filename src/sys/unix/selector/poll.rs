@@ -294,7 +294,7 @@ impl SelectorState {
 
                 break; // No more polling.
             }
-            
+
             // If we didn't break above it means we got woken up internally (for example for adding an fd), so we poll again.
         }
 
@@ -438,7 +438,11 @@ impl SelectorState {
                 }
             }
 
-            if all_successful { Ok(()) } else { Err(()) }
+            if all_successful {
+                Ok(())
+            } else {
+                Err(())
+            }
         })
     }
 
