@@ -420,19 +420,25 @@ impl SelectorState {
         drop(pending_removal);
 
         self.modify_fds(|fds| {
+            let mut all_successful = true;
+
             for target in targets {
-                let data = fds.fd_data.remove(&target).ok_or(())?;
-                data.shared_record.mark_unregistered();
-                fds.poll_fds.swap_remove(data.poll_fds_index);
-                if let Some(swapped_pollfd) = fds.poll_fds.get(data.poll_fds_index) {
-                    fds.fd_data
-                        .get_mut(&swapped_pollfd.0.fd)
-                        .unwrap()
-                        .poll_fds_index = data.poll_fds_index;
+                match fds.fd_data.remove(target).ok_or(()) {
+                    Ok(data) => {
+                        data.shared_record.mark_unregistered();
+                        fds.poll_fds.swap_remove(data.poll_fds_index);
+                        if let Some(swapped_pollfd) = fds.poll_fds.get(data.poll_fds_index) {
+                            fds.fd_data
+                                .get_mut(&swapped_pollfd.0.fd)
+                                .unwrap()
+                                .poll_fds_index = data.poll_fds_index;
+                        }
+                    }
+                    Err(_) => all_successful = false,
                 }
             }
 
-            Ok(())
+            if all_successful { Ok(()) } else { Err(()) }
         })
     }
 
