@@ -164,6 +164,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
     }
 
     #[cfg(any(
+        target_os = "aix",
         target_os = "ios",
         target_os = "macos",
         target_os = "tvos",
