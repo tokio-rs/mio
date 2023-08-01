@@ -44,6 +44,7 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
     let mut socklen = mem::size_of_val(&sockaddr) as libc::socklen_t;
 
     #[cfg(not(any(
+        target_os = "aix",
         target_os = "ios",
         target_os = "macos",
         target_os = "netbsd",
@@ -67,6 +68,7 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
     };
 
     #[cfg(any(
+        target_os = "aix",
         target_os = "ios",
         target_os = "macos",
         target_os = "netbsd",

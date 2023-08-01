@@ -75,6 +75,7 @@ cfg_os_poll! {
         where T: FromRawFd,
     {
         #[cfg(not(any(
+            target_os = "aix",
             target_os = "ios",
             target_os = "macos",
             target_os = "tvos",
@@ -94,6 +95,7 @@ cfg_os_poll! {
         // the file descriptors will leak. Creating `pair` above ensures that if
         // there is an error, the file descriptors are closed.
         #[cfg(any(
+            target_os = "aix",
             target_os = "ios",
             target_os = "macos",
             target_os = "tvos",

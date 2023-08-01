@@ -191,6 +191,7 @@ pub fn new() -> io::Result<(Sender, Receiver)> {
     }
 
     #[cfg(not(any(
+        target_os = "aix",
         target_os = "android",
         target_os = "dragonfly",
         target_os = "freebsd",

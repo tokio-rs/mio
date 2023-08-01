@@ -19,6 +19,7 @@ mod fdbased {
     use crate::sys::unix::waker::eventfd::WakerInternal;
     #[cfg(any(
         mio_unsupported_force_waker_pipe,
+        target_os = "aix",
         target_os = "dragonfly",
         target_os = "illumos",
         target_os = "netbsd",
@@ -198,6 +199,7 @@ pub use self::kqueue::Waker;
 
 #[cfg(any(
     mio_unsupported_force_waker_pipe,
+    target_os = "aix",
     target_os = "dragonfly",
     target_os = "illumos",
     target_os = "netbsd",
@@ -222,7 +224,10 @@ mod pipe {
     impl WakerInternal {
         pub fn new() -> io::Result<WakerInternal> {
             let mut fds = [-1; 2];
+            #[cfg(not(target_os = "aix"))]
             syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
+            #[cfg(target_os = "aix")]
+            syscall!(pipe(fds.as_mut_ptr()))?;
             let sender = unsafe { File::from_raw_fd(fds[1]) };
             let receiver = unsafe { File::from_raw_fd(fds[0]) };
 
@@ -278,6 +283,7 @@ mod pipe {
     mio_unsupported_force_poll_poll,
     any(
         mio_unsupported_force_waker_pipe,
+        target_os = "aix",
         target_os = "dragonfly",
         target_os = "illumos",
         target_os = "netbsd",
