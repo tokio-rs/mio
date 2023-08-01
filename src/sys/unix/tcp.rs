@@ -82,6 +82,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
     // OSes inherit the non-blocking flag from the listener, so we just have to
     // set `CLOEXEC`.
     #[cfg(any(
+        target_os = "aix",
         target_os = "ios",
         target_os = "macos",
         target_os = "redox",

@@ -99,6 +99,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                 sin_addr,
                 sin_zero: [0; 8],
                 #[cfg(any(
+                    target_os = "aix",
                     target_os = "dragonfly",
                     target_os = "freebsd",
                     target_os = "ios",
@@ -126,6 +127,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                 sin6_flowinfo: addr.flowinfo(),
                 sin6_scope_id: addr.scope_id(),
                 #[cfg(any(
+                    target_os = "aix",
                     target_os = "dragonfly",
                     target_os = "freebsd",
                     target_os = "ios",
