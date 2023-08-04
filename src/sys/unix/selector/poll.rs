@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::mem::swap;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -26,7 +27,8 @@ pub struct Selector {
     #[cfg(debug_assertions)]
     has_waker: AtomicBool,
     /// Buffer used in [`SelectorState::select`].
-    fd_bufs: Vec<RawFd>,
+    fd_bufs0: Vec<RawFd>,
+    fd_bufs1: Vec<RawFd>,
 }
 
 impl Selector {
@@ -35,7 +37,8 @@ impl Selector {
             state: Arc::new(SelectorState::new()?),
             #[cfg(debug_assertions)]
             has_waker: AtomicBool::new(false),
-            fd_bufs: Vec::new(),
+            fd_bufs0: Vec::new(),
+            fd_bufs1: Vec::new(),
         })
     }
 
@@ -45,12 +48,14 @@ impl Selector {
             state: self.state.clone(),
             #[cfg(debug_assertions)]
             has_waker: AtomicBool::new(self.has_waker.load(Ordering::Acquire)),
-            fd_bufs: Vec::new(),
+            fd_bufs0: Vec::new(),
+            fd_bufs1: Vec::new(),
         })
     }
 
     pub fn select(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
-        self.state.select(events, timeout, &mut self.fd_bufs)
+        self.state
+            .select(events, timeout, &mut self.fd_bufs0, &mut self.fd_bufs1)
     }
 
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
@@ -195,9 +200,11 @@ impl SelectorState {
         events: &mut Events,
         timeout: Option<Duration>,
         closed_raw_fds: &mut Vec<RawFd>,
+        pending_removal: &mut Vec<RawFd>,
     ) -> io::Result<()> {
         events.clear();
         closed_raw_fds.clear();
+        pending_removal.clear();
 
         let mut fds = self.fds.lock().unwrap();
 
@@ -236,7 +243,7 @@ impl SelectorState {
             // We now check whether this poll was performed with descriptors which were pending
             // for removal and filter out any matching.
             let mut pending_removal_guard = self.pending_removal.lock().unwrap();
-            let mut pending_removal = std::mem::replace(pending_removal_guard.as_mut(), Vec::new());
+            swap(pending_removal_guard.as_mut(), pending_removal);
             drop(pending_removal_guard);
 
             // Store the events if there were any.
