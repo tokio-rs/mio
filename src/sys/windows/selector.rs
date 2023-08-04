@@ -328,8 +328,6 @@ pub struct Selector {
     #[cfg(debug_assertions)]
     id: usize,
     pub(super) inner: Arc<SelectorInner>,
-    #[cfg(debug_assertions)]
-    has_waker: AtomicBool,
 }
 
 impl Selector {
@@ -341,8 +339,6 @@ impl Selector {
                 #[cfg(debug_assertions)]
                 id,
                 inner: Arc::new(inner),
-                #[cfg(debug_assertions)]
-                has_waker: AtomicBool::new(false),
             }
         })
     }
@@ -352,8 +348,6 @@ impl Selector {
             #[cfg(debug_assertions)]
             id: self.id,
             inner: Arc::clone(&self.inner),
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(self.has_waker.load(Ordering::Acquire)),
         })
     }
 
@@ -363,11 +357,6 @@ impl Selector {
     /// can poll IOCP at a time.
     pub fn select(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         self.inner.select(events, timeout)
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn register_waker(&self) -> bool {
-        self.has_waker.swap(true, Ordering::AcqRel)
     }
 
     pub(super) fn clone_port(&self) -> Arc<CompletionPort> {
