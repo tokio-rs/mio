@@ -128,6 +128,30 @@ fn using_multiple_wakers_panics() {
     drop(waker2);
 }
 
+#[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "only works with debug_assertions enabled"
+)]
+#[should_panic = "Only a single `Waker` can be active per `Poll` instance"]
+fn using_multiple_wakers_panics_different_cloned_registries() {
+    init();
+
+    let poll = Poll::new().expect("unable to create new Poll instance");
+    let registry1 = poll.registry().try_clone().unwrap();
+    let registry2 = poll.registry().try_clone().unwrap();
+
+    let token1 = Token(10);
+    let token2 = Token(11);
+
+    let waker1 = Waker::new(&registry1, token1).expect("unable to first waker");
+    // This should panic.
+    let waker2 = Waker::new(&registry2, token2).unwrap();
+
+    drop(waker1);
+    drop(waker2);
+}
+
 fn expect_waker_event(poll: &mut Poll, events: &mut Events, token: Token) {
     poll.poll(events, Some(Duration::from_millis(100))).unwrap();
     assert!(!events.is_empty());

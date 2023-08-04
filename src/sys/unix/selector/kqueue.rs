@@ -3,7 +3,7 @@ use std::mem::{self, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{cmp, io, ptr, slice};
 
@@ -66,8 +66,6 @@ pub struct Selector {
     #[cfg(debug_assertions)]
     id: usize,
     kq: RawFd,
-    #[cfg(debug_assertions)]
-    has_waker: AtomicBool,
 }
 
 impl Selector {
@@ -77,8 +75,6 @@ impl Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             kq,
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(false),
         };
 
         syscall!(fcntl(kq, libc::F_SETFD, libc::FD_CLOEXEC))?;
@@ -91,8 +87,6 @@ impl Selector {
             #[cfg(debug_assertions)]
             id: self.id,
             kq,
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(self.has_waker.load(Ordering::Acquire)),
         })
     }
 
@@ -211,11 +205,6 @@ impl Selector {
         // the filter wasn't there in first place, but we don't really care
         // about that since our goal is to remove it.
         kevent_register(self.kq, &mut changes, &[libc::ENOENT as i64])
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn register_waker(&self) -> bool {
-        self.has_waker.swap(true, Ordering::AcqRel)
     }
 
     // Used by `Waker`.

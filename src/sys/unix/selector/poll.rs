@@ -22,9 +22,6 @@ static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 #[derive(Debug)]
 pub struct Selector {
     state: Arc<SelectorState>,
-    /// Whether this selector currently has an associated waker.
-    #[cfg(debug_assertions)]
-    has_waker: AtomicBool,
 }
 
 impl Selector {
@@ -33,8 +30,6 @@ impl Selector {
 
         Ok(Selector {
             state: Arc::new(state),
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(false),
         })
     }
 
@@ -44,11 +39,7 @@ impl Selector {
 
         let state = self.state.clone();
 
-        Ok(Selector {
-            state,
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(self.has_waker.load(Ordering::Acquire)),
-        })
+        Ok(Selector { state })
     }
 
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
@@ -75,11 +66,6 @@ impl Selector {
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
         self.state.deregister(fd)
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn register_waker(&self) -> bool {
-        self.has_waker.swap(true, Ordering::AcqRel)
     }
 
     pub fn wake(&self, token: Token) -> io::Result<()> {
