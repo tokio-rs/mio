@@ -3,17 +3,17 @@
 // Permission to use this code has been granted by original author:
 // https://github.com/tokio-rs/mio/pull/1602#issuecomment-1218441031
 
-use crate::sys::unix::selector::LOWEST_FD;
-use crate::sys::unix::waker::WakerInternal;
-use crate::{Interest, Token};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use std::{cmp, fmt, io};
+
+use crate::sys::unix::selector::LOWEST_FD;
+use crate::sys::unix::waker::WakerInternal;
+use crate::{Interest, Token};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -31,10 +31,8 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        let state = SelectorState::new()?;
-
         Ok(Selector {
-            state: Arc::new(state),
+            state: Arc::new(SelectorState::new()?),
             #[cfg(debug_assertions)]
             has_waker: AtomicBool::new(false),
             fd_bufs: Vec::new(),
@@ -42,13 +40,9 @@ impl Selector {
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
-        // Just to keep the compiler happy :)
-        let _ = LOWEST_FD;
-
-        let state = self.state.clone();
-
+        let _ = LOWEST_FD; // Just to keep the compiler happy :)
         Ok(Selector {
-            state,
+            state: self.state.clone(),
             #[cfg(debug_assertions)]
             has_waker: AtomicBool::new(self.has_waker.load(Ordering::Acquire)),
             fd_bufs: Vec::new(),
@@ -89,6 +83,7 @@ impl Selector {
     pub fn wake(&self, token: Token) -> io::Result<()> {
         self.state.wake(token)
     }
+
     cfg_io_source! {
         #[cfg(debug_assertions)]
         pub fn id(&self) -> usize {
@@ -102,33 +97,30 @@ impl Selector {
 struct SelectorState {
     /// File descriptors to poll.
     fds: Mutex<Fds>,
-
     /// File descriptors which will be removed before the next poll call.
     ///
-    /// When a file descriptor is deregistered while a poll is running, we need to filter
-    /// out all removed descriptors after that poll is finished running.
+    /// When a file descriptor is deregistered while a poll is running, we need
+    /// to filter out all removed descriptors after that poll is finished
+    /// running.
     pending_removal: Mutex<Vec<RawFd>>,
-
     /// Token associated with Waker that have recently asked to wake.  This will
-    /// cause a synthetic behaviour where on any wakeup we add all pending tokens
-    /// to the list of emitted events.
+    /// cause a synthetic behaviour where on any wakeup we add all pending
+    /// tokens to the list of emitted events.
     pending_wake_token: Mutex<Option<Token>>,
-
-    /// Data is written to this to wake up the current instance of `wait`, which can occur when the
-    /// user notifies it (in which case `notified` would have been set) or when an operation needs
-    /// to occur (in which case `waiting_operations` would have been incremented).
+    /// Data is written to this to wake up the current instance of `wait`, which
+    /// can occur when the user notifies it (in which case `notified` would have
+    /// been set) or when an operation needs to occur (in which case
+    /// `waiting_operations` would have been incremented).
     notify_waker: WakerInternal,
-
-    /// The number of operations (`add`, `modify` or `delete`) that are currently waiting on the
-    /// mutex to become free. When this is nonzero, `wait` must be suspended until it reaches zero
-    /// again.
+    /// The number of operations (`add`, `modify` or `delete`) that are
+    /// currently waiting on the mutex to become free. When this is nonzero,
+    /// `wait` must be suspended until it reaches zero again.
     waiting_operations: AtomicUsize,
-    /// The condition variable that gets notified when `waiting_operations` reaches zero or
-    /// `notified` becomes true.
+    /// The condition variable that gets notified when `waiting_operations`
+    /// reaches zero or `notified` becomes true.
     ///
     /// This is used with the `fds` mutex.
     operations_complete: Condvar,
-
     /// This selectors id.
     #[cfg(debug_assertions)]
     #[allow(dead_code)]
@@ -140,15 +132,16 @@ struct SelectorState {
 struct Fds {
     /// The list of `pollfds` taken by poll.
     ///
-    /// The first file descriptor is always present and is used to notify the poller.
+    /// The first file descriptor is always present and is used to notify the
+    /// poller.
     poll_fds: Vec<PollFd>,
-    /// The map of each file descriptor to data associated with it. This does not include the file
-    /// descriptors created by the internal notify waker.
+    /// The map of each file descriptor to data associated with it. This does
+    /// not include the file descriptors created by the internal notify waker.
     fd_data: HashMap<RawFd, FdData>,
 }
 
-/// Transparent wrapper around `libc::pollfd`, used to support `Debug` derives without adding the
-/// `extra_traits` feature of `libc`.
+/// Transparent wrapper around `libc::pollfd`, used to support `Debug` derives
+/// without adding the `extra_traits` feature of `libc`.
 #[repr(transparent)]
 #[derive(Clone)]
 struct PollFd(libc::pollfd);
@@ -170,16 +163,15 @@ struct FdData {
     poll_fds_index: usize,
     /// The key of the `Event` associated with this file descriptor.
     token: Token,
-    /// Used to communicate with IoSourceState when we need to internally deregister
-    /// based on a closed fd.
+    /// Used to communicate with IoSourceState when we need to internally
+    /// deregister based on a closed fd.
     shared_record: Arc<RegistrationRecord>,
 }
 
 impl SelectorState {
     pub fn new() -> io::Result<SelectorState> {
         let notify_waker = WakerInternal::new()?;
-
-        Ok(Self {
+        Ok(SelectorState {
             fds: Mutex::new(Fds {
                 poll_fds: vec![PollFd(libc::pollfd {
                     fd: notify_waker.as_raw_fd(),
@@ -262,7 +254,7 @@ impl SelectorState {
                 }
 
                 for fd_data in fds.fd_data.values_mut() {
-                    let PollFd(poll_fd) = &mut fds.poll_fds[fd_data.poll_fds_index];
+                    let poll_fd = &mut fds.poll_fds[fd_data.poll_fds_index].0;
 
                     if pending_removal.contains(&poll_fd.fd) {
                         // Fd was removed while poll was running
@@ -674,7 +666,7 @@ cfg_io_source! {
 
         pub fn do_io<T, F, R>(&self, f: F, io: &T) -> io::Result<R>
         where
-        F: FnOnce(&T) -> io::Result<R>,
+            F: FnOnce(&T) -> io::Result<R>,
         {
             let result = f(io);
 
