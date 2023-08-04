@@ -25,6 +25,8 @@ pub struct Selector {
     /// Whether this selector currently has an associated waker.
     #[cfg(debug_assertions)]
     has_waker: AtomicBool,
+    /// Buffer used in [`SelectorState::select`].
+    fd_bufs: Vec<RawFd>,
 }
 
 impl Selector {
@@ -35,6 +37,7 @@ impl Selector {
             state: Arc::new(state),
             #[cfg(debug_assertions)]
             has_waker: AtomicBool::new(false),
+            fd_bufs: Vec::new(),
         })
     }
 
@@ -48,11 +51,12 @@ impl Selector {
             state,
             #[cfg(debug_assertions)]
             has_waker: AtomicBool::new(self.has_waker.load(Ordering::Acquire)),
+            fd_bufs: Vec::new(),
         })
     }
 
-    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
-        self.state.select(events, timeout)
+    pub fn select(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+        self.state.select(events, timeout, &mut self.fd_bufs)
     }
 
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
@@ -194,16 +198,16 @@ impl SelectorState {
         })
     }
 
-    pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+    pub fn select(
+        &self,
+        events: &mut Events,
+        timeout: Option<Duration>,
+        closed_raw_fds: &mut Vec<RawFd>,
+    ) -> io::Result<()> {
         events.clear();
+        closed_raw_fds.clear();
 
         let mut fds = self.fds.lock().unwrap();
-
-        // Keep track of fds that receive POLLHUP or POLLERR (i.e. won't receive further
-        // events) and internally deregister them before they are externally deregister'd.  See
-        // IoSourceState below to track how the external deregister call will be handled
-        // when this state occurs.
-        let mut closed_raw_fds = Vec::new();
 
         loop {
             // Complete all current operations.
@@ -272,6 +276,12 @@ impl SelectorState {
                             events: poll_fd.revents,
                         });
 
+                        // Keep track of fds that receive POLLHUP or POLLERR
+                        // (i.e. won't receive further events) and internally
+                        // deregister them before they are externally
+                        // deregistered. See IoSourceState below to track how
+                        // the external deregister call will be handled when
+                        // this state occurs.
                         if poll_fd.revents & (libc::POLLHUP | libc::POLLERR) != 0 {
                             pending_removal.push(poll_fd.fd);
                             closed_raw_fds.push(poll_fd.fd);
@@ -299,7 +309,6 @@ impl SelectorState {
 
         drop(fds);
         let _ = self.deregister_all(&closed_raw_fds);
-
         Ok(())
     }
 
