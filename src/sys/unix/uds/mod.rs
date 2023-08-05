@@ -15,16 +15,14 @@ pub(in crate::sys) fn path_offset(sockaddr: &libc::sockaddr_un) -> usize {
 
 cfg_os_poll! {
     use std::cmp::Ordering;
-    use std::os::unix::ffi::OsStrExt;
     use std::os::unix::io::{RawFd, FromRawFd};
-    use std::path::Path;
     use std::{io, mem};
 
     pub(crate) mod datagram;
     pub(crate) mod listener;
     pub(crate) mod stream;
 
-    pub(in crate::sys) fn socket_addr(path: &Path) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
+    pub(in crate::sys) fn socket_addr(bytes: &[u8]) -> io::Result<(libc::sockaddr_un, libc::socklen_t)> {
         let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
 
         // This is safe to assume because a `libc::sockaddr_un` filled with `0`
@@ -39,7 +37,6 @@ cfg_os_poll! {
 
         sockaddr.sun_family = libc::AF_UNIX as libc::sa_family_t;
 
-        let bytes = path.as_os_str().as_bytes();
         match (bytes.first(), bytes.len().cmp(&sockaddr.sun_path.len())) {
             // Abstract paths don't need a null terminator
             (Some(&0), Ordering::Greater) => {
@@ -128,6 +125,7 @@ cfg_os_poll! {
     #[cfg(test)]
     mod tests {
         use super::{path_offset, socket_addr};
+        use std::os::unix::ffi::OsStrExt;
         use std::path::Path;
         use std::str;
 
@@ -139,7 +137,7 @@ cfg_os_poll! {
             // Pathname addresses do have a null terminator, so `socklen` is
             // expected to be `PATH_LEN` + `offset` + 1.
             let path = Path::new(PATH);
-            let (sockaddr, actual) = socket_addr(path).unwrap();
+            let (sockaddr, actual) = socket_addr(path.as_os_str().as_bytes()).unwrap();
             let offset = path_offset(&sockaddr);
             let expected = PATH_LEN + offset + 1;
             assert_eq!(expected as libc::socklen_t, actual)
@@ -152,9 +150,7 @@ cfg_os_poll! {
 
             // Abstract addresses do not have a null terminator, so `socklen` is
             // expected to be `PATH_LEN` + `offset`.
-            let abstract_path = str::from_utf8(PATH).unwrap();
-            let path = Path::new(abstract_path);
-            let (sockaddr, actual) = socket_addr(path).unwrap();
+            let (sockaddr, actual) = socket_addr(PATH).unwrap();
             let offset = path_offset(&sockaddr);
             let expected = PATH_LEN + offset;
             assert_eq!(expected as libc::socklen_t, actual)

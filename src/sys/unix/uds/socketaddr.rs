@@ -73,6 +73,14 @@ cfg_os_poll! {
             SocketAddr { sockaddr, socklen }
         }
 
+        pub(crate) fn raw_sockaddr(&self) -> &libc::sockaddr_un {
+            &self.sockaddr
+        }
+
+        pub(crate) fn raw_socklen(&self) -> &libc::socklen_t {
+            &self.socklen
+        }
+
         /// Returns `true` if the address is unnamed.
         ///
         /// Documentation reflected in [`SocketAddr`]

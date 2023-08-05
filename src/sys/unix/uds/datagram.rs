@@ -2,12 +2,13 @@ use super::{socket_addr, SocketAddr};
 use crate::sys::unix::net::new_socket;
 
 use std::io;
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::os::unix::net;
 use std::path::Path;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixDatagram> {
-    let (sockaddr, socklen) = socket_addr(path)?;
+    let (sockaddr, socklen) = socket_addr(path.as_os_str().as_bytes())?;
     let sockaddr = &sockaddr as *const libc::sockaddr_un as *const _;
 
     let socket = unbound()?;

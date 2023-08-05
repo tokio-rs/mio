@@ -42,6 +42,10 @@ pub(crate) mod listener {
         os_required!()
     }
 
+    pub(crate) fn bind_addr(_: &SocketAddr) -> io::Result<net::UnixListener> {
+        os_required!()
+    }
+
     pub(crate) fn accept(_: &net::UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
         os_required!()
     }
@@ -58,6 +62,10 @@ pub(crate) mod stream {
     use std::path::Path;
 
     pub(crate) fn connect(_: &Path) -> io::Result<net::UnixStream> {
+        os_required!()
+    }
+
+    pub(crate) fn connect_addr(_: &SocketAddr) -> io::Result<net::UnixStream> {
         os_required!()
     }
 

@@ -13,9 +13,14 @@ pub struct UnixListener {
 }
 
 impl UnixListener {
-    /// Creates a new `UnixListener` bound to the specified socket.
+    /// Creates a new `UnixListener` bound to the specified socket `path`.
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
         sys::uds::listener::bind(path.as_ref()).map(UnixListener::from_std)
+    }
+
+    /// Creates a new `UnixListener` bound to the specified socket `address`.
+    pub fn bind_addr(address: &SocketAddr) -> io::Result<UnixListener> {
+        sys::uds::listener::bind_addr(address).map(UnixListener::from_std)
     }
 
     /// Creates a new `UnixListener` from a standard `net::UnixListener`.
