@@ -1,18 +1,27 @@
 use super::socket_addr;
 use crate::net::{SocketAddr, UnixStream};
 use crate::sys::unix::net::new_socket;
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::{io, mem};
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
-    let (sockaddr, socklen) = socket_addr(path)?;
-    let sockaddr = &sockaddr as *const libc::sockaddr_un as *const libc::sockaddr;
+    let socket_address = {
+        let (sockaddr, socklen) = socket_addr(path.as_os_str().as_bytes())?;
+        SocketAddr::from_parts(sockaddr, socklen)
+    };
 
+    bind_addr(&socket_address)
+}
+
+pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
     let fd = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
     let socket = unsafe { net::UnixListener::from_raw_fd(fd) };
-    syscall!(bind(fd, sockaddr, socklen))?;
+    let sockaddr = address.raw_sockaddr() as *const libc::sockaddr_un as *const libc::sockaddr;
+
+    syscall!(bind(fd, sockaddr, *address.raw_socklen()))?;
     syscall!(listen(fd, 1024))?;
 
     Ok(socket)

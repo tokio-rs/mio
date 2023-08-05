@@ -1,4 +1,5 @@
 use crate::io_source::IoSource;
+use crate::net::SocketAddr;
 use crate::{event, sys, Interest, Registry, Token};
 
 use std::fmt;
@@ -20,6 +21,14 @@ impl UnixStream {
     /// cannot be completed immediately. Usually it means the backlog is full.
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
         sys::uds::stream::connect(path.as_ref()).map(UnixStream::from_std)
+    }
+
+    /// Connects to the socket named by `address`.
+    ///
+    /// This may return a `WouldBlock` in which case the socket connection
+    /// cannot be completed immediately. Usually it means the backlog is full.
+    pub fn connect_addr(address: &SocketAddr) -> io::Result<UnixStream> {
+        sys::uds::stream::connect_addr(address).map(UnixStream::from_std)
     }
 
     /// Creates a new `UnixStream` from a standard `net::UnixStream`.
