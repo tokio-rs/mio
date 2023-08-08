@@ -207,6 +207,7 @@ pub use self::kqueue::Waker;
     target_os = "redox",
 ))]
 mod pipe {
+    use crate::unix::pipe::new as new_pipe;
     use std::fs::File;
     use std::io::{self, Read, Write};
     use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
@@ -223,9 +224,9 @@ mod pipe {
 
     impl WakerInternal {
         pub fn new() -> io::Result<WakerInternal> {
-            let (receiver, sender) = Self::pipe2()?;
-            let receiver = unsafe { File::from_raw_fd(receiver) };
-            let sender = unsafe { File::from_raw_fd(sender) };
+            let (sender, receiver) = new_pipe()?;
+            let sender = unsafe { File::from_raw_fd(sender.as_raw_fd()) };
+            let receiver = unsafe { File::from_raw_fd(receiver.as_raw_fd()) };
             Ok(WakerInternal { sender, receiver })
         }
 
@@ -264,32 +265,6 @@ mod pipe {
                     _ => return,
                 }
             }
-        }
-
-        #[cfg(target_os = "aix")]
-        fn pipe2() -> io::Result<(RawFd, RawFd)> {
-            let mut fds = [-1; 2];
-            syscall!(pipe(fds.as_mut_ptr()))?;
-            unsafe {
-                if libc::fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK) != 0
-                    || libc::fcntl(fds[0], libc::F_SETFD, libc::O_CLOEXEC) != 0
-                    || libc::fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK) != 0
-                    || libc::fcntl(fds[1], libc::F_SETFD, libc::O_CLOEXEC) != 0
-                {
-                    let err = io::Error::last_os_error();
-                    let _ = libc::close(fds[0]);
-                    let _ = libc::close(fds[1]);
-                    return Err(err);
-                }
-            }
-            Ok((fds[0], fds[1]))
-        }
-
-        #[cfg(not(target_os = "aix"))]
-        fn pipe2() -> io::Result<(RawFd, RawFd)> {
-            let mut fds = [-1; 2];
-            syscall!(pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC))?;
-            Ok((fds[0], fds[1]))
         }
     }
 
