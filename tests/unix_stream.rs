@@ -81,24 +81,17 @@ fn unix_stream_connect() {
 fn unix_stream_connect_addr() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
-    let local_addr = {
-        // Workaround through a temporary listener using the same address,
-        // as there is currently no way of directly building a `SocketAddr`.
-        let path = temp_file("unix_stream_connect_addr");
-        let listener = net::UnixListener::bind(path.clone()).unwrap();
-        let mio_listener = mio::net::UnixListener::from_std(listener);
-        let address = mio_listener.local_addr().unwrap();
-        drop(mio_listener);
-        _ = std::fs::remove_file(&path);
-        address
-    };
+
     let path = temp_file("unix_stream_connect_addr");
-    let listener = net::UnixListener::bind(path).unwrap();
+    let listener = net::UnixListener::bind(path.clone()).unwrap();
+    let mio_listener = mio::net::UnixListener::from_std(listener);
+
+    let local_addr = mio_listener.local_addr().unwrap();
     let mut stream = UnixStream::connect_addr(&local_addr).unwrap();
 
     let barrier_clone = barrier.clone();
     let handle = thread::spawn(move || {
-        let (stream, _) = listener.accept().unwrap();
+        let (stream, _) = mio_listener.accept().unwrap();
         barrier_clone.wait();
         drop(stream);
     });
