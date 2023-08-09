@@ -207,7 +207,7 @@ pub use self::kqueue::Waker;
     target_os = "redox",
 ))]
 mod pipe {
-    use crate::unix::pipe::new as new_pipe;
+    use crate::sys::unix::pipe;
     use std::fs::File;
     use std::io::{self, Read, Write};
     use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
@@ -224,9 +224,9 @@ mod pipe {
 
     impl WakerInternal {
         pub fn new() -> io::Result<WakerInternal> {
-            let (sender, receiver) = new_pipe()?;
-            let sender = unsafe { File::from_raw_fd(sender.as_raw_fd()) };
-            let receiver = unsafe { File::from_raw_fd(receiver.as_raw_fd()) };
+            let [sender, receiver] = pipe::new_raw()?;
+            let sender = unsafe { File::from_raw_fd(sender) };
+            let receiver = unsafe { File::from_raw_fd(receiver) };
             Ok(WakerInternal { sender, receiver })
         }
 

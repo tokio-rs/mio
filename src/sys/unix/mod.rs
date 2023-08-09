@@ -94,9 +94,19 @@ cfg_os_poll! {
         pub(crate) use self::selector::IoSourceState;
     }
 
-    cfg_os_ext! {
-        pub(crate) mod pipe;
-    }
+    #[cfg(any(
+        // For the public `pipe` module, must match `cfg_os_ext` macro.
+        feature = "os-ext",
+        // For the `Waker` type based on a pipe.
+        mio_unsupported_force_waker_pipe,
+        target_os = "aix",
+        target_os = "dragonfly",
+        target_os = "illumos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "redox",
+    ))]
+    pub(crate) mod pipe;
 }
 
 cfg_not_os_poll! {

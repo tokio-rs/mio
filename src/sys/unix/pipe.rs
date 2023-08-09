@@ -2,9 +2,81 @@
 //!
 //! See the [`new`] function for documentation.
 
+use std::io;
+use std::os::unix::io::RawFd;
+
+pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
+    let mut fds: [RawFd; 2] = [-1, -1];
+
+    #[cfg(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "linux",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "illumos",
+        target_os = "redox",
+    ))]
+    unsafe {
+        if libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "espidf",
+    ))]
+    unsafe {
+        // For platforms that don't have `pipe2(2)` we need to manually set the
+        // correct flags on the file descriptor.
+        if libc::pipe(fds.as_mut_ptr()) != 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        for fd in &fds {
+            if libc::fcntl(*fd, libc::F_SETFL, libc::O_NONBLOCK) != 0
+                || libc::fcntl(*fd, libc::F_SETFD, libc::FD_CLOEXEC) != 0
+            {
+                let err = io::Error::last_os_error();
+                // Don't leak file descriptors. Can't handle closing error though.
+                let _ = libc::close(fds[0]);
+                let _ = libc::close(fds[1]);
+                return Err(err);
+            }
+        }
+    }
+
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "illumos",
+        target_os = "ios",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "redox",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "espidf",
+    )))]
+    compile_error!("unsupported target for `mio::unix::pipe`");
+
+    Ok(fds)
+}
+
+cfg_os_ext! {
 use std::fs::File;
-use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::io::{IoSlice, IoSliceMut, Read, Write};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::process::{ChildStderr, ChildStdin, ChildStdout};
 
 use crate::io_source::IoSource;
@@ -145,74 +217,10 @@ use crate::{event, Interest, Registry, Token};
 /// # }
 /// ```
 pub fn new() -> io::Result<(Sender, Receiver)> {
-    let mut fds: [RawFd; 2] = [-1, -1];
-
-    #[cfg(any(
-        target_os = "android",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "linux",
-        target_os = "netbsd",
-        target_os = "openbsd",
-        target_os = "illumos",
-        target_os = "redox",
-    ))]
-    unsafe {
-        if libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0 {
-            return Err(io::Error::last_os_error());
-        }
-    }
-
-    #[cfg(any(
-        target_os = "aix",
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "watchos",
-        target_os = "espidf",
-    ))]
-    unsafe {
-        // For platforms that don't have `pipe2(2)` we need to manually set the
-        // correct flags on the file descriptor.
-        if libc::pipe(fds.as_mut_ptr()) != 0 {
-            return Err(io::Error::last_os_error());
-        }
-
-        for fd in &fds {
-            if libc::fcntl(*fd, libc::F_SETFL, libc::O_NONBLOCK) != 0
-                || libc::fcntl(*fd, libc::F_SETFD, libc::FD_CLOEXEC) != 0
-            {
-                let err = io::Error::last_os_error();
-                // Don't leak file descriptors. Can't handle closing error though.
-                let _ = libc::close(fds[0]);
-                let _ = libc::close(fds[1]);
-                return Err(err);
-            }
-        }
-    }
-
-    #[cfg(not(any(
-        target_os = "aix",
-        target_os = "android",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "illumos",
-        target_os = "ios",
-        target_os = "linux",
-        target_os = "macos",
-        target_os = "netbsd",
-        target_os = "openbsd",
-        target_os = "redox",
-        target_os = "tvos",
-        target_os = "watchos",
-        target_os = "espidf",
-    )))]
-    compile_error!("unsupported target for `mio::unix::pipe`");
-
-    // SAFETY: we just initialised the `fds` above.
+    let fds = new_raw()?;
+    // SAFETY: `new_raw` initialised the `fds` above.
     let r = unsafe { Receiver::from_raw_fd(fds[0]) };
     let w = unsafe { Sender::from_raw_fd(fds[1]) };
-
     Ok((w, r))
 }
 
@@ -579,3 +587,4 @@ fn set_nonblocking(fd: RawFd, nonblocking: bool) -> io::Result<()> {
 
     Ok(())
 }
+} // `cfg_os_ext!`.
