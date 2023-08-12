@@ -58,7 +58,7 @@ libc = "0.2.86"
 [target.'cfg(windows)'.dependencies]
 miow   = "0.3.6"
 winapi = { version = "0.3", features = ["winsock2", "mswsock", "mstcpip"] }
-ntapi  = "0.3"
+ntapi  = "0.4"
 
 [dev-dependencies]
 env_logger = { version = "0.6.2", default-features = false }
