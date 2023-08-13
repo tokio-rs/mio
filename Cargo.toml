@@ -32,7 +32,7 @@ include       = [
 # For documentation of features see the `mio::features` module.
 [features]
 # By default Mio only provides a shell implementation.
-default = []
+default = ["log"]
 
 # Enables the `Poll` and `Registry` types.
 os-poll = []
@@ -50,7 +50,7 @@ pipe = ["os-ext"] # Replaced with "os-ext" feature.
 os-util = ["os-ext"]# Replaced with "os-ext" feature.
 
 [dependencies]
-log = "0.4.8"
+log = { version = "0.4.8", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.86"
