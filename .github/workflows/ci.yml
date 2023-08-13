@@ -58,8 +58,12 @@ jobs:
     - name: Tests
       run: cargo test --all-features
   MSRV:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@master
