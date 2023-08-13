@@ -51,7 +51,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        os: ["ubuntu-latest", "windows-latest"]
+        # TODO: once we update our MSRV above 1.53 add macOS again. Currently
+        # macOS, specifically Xcode 14, broke support for rustc < 1.53. See
+        # https://github.com/rust-lang/rust/issues/105167.
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@master
