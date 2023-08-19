@@ -4,6 +4,12 @@ mod io_status_block;
 pub mod event;
 pub use event::{Event, Events};
 
+mod ntapi;
+pub(crate) use ntapi::{
+    IO_STATUS_BLOCK_u, NtCancelIoFileEx, NtCreateFile, NtDeviceIoControlFile,
+    RtlNtStatusToDosError, FILE_OPEN, IO_STATUS_BLOCK,
+};
+
 mod selector;
 pub use selector::{Selector, SelectorInner, SockState};
 

@@ -1,6 +1,6 @@
-use ntapi::ntioapi::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
-use ntapi::ntioapi::{NtCancelIoFileEx, NtDeviceIoControlFile};
-use ntapi::ntrtl::RtlNtStatusToDosError;
+use super::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
+use super::{NtCancelIoFileEx, NtDeviceIoControlFile};
+use super::RtlNtStatusToDosError;
 use std::fmt;
 use std::fs::File;
 use std::io;
@@ -117,7 +117,7 @@ cfg_io_source! {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use miow::iocp::CompletionPort;
-    use ntapi::ntioapi::{NtCreateFile, FILE_OPEN};
+    use super::{NtCreateFile, FILE_OPEN};
     use winapi::shared::ntdef::{OBJECT_ATTRIBUTES, UNICODE_STRING, USHORT, WCHAR};
     use winapi::um::handleapi::INVALID_HANDLE_VALUE;
     use winapi::um::winbase::{SetFileCompletionNotificationModes, FILE_SKIP_SET_EVENT_ON_HANDLE};
