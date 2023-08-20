@@ -2,7 +2,7 @@
 // version 0.3.7 (https://crates.io/crates/ntapi/0.3.7)
 // which was released under the MIT License or
 // Apache License 2.0.
-// This was necessary because parts of ntapi v.0.3.7
+// This was necessary because ntapi v.0.3.7
 // uses code which is rejected in rust versions greater
 // than or equal to version 1.68.
 // See here for further information on the error:
