@@ -6,8 +6,8 @@ pub use event::{Event, Events};
 
 mod ntapi;
 pub(crate) use ntapi::{
-    IO_STATUS_BLOCK_u, NtCancelIoFileEx, NtCreateFile, NtDeviceIoControlFile,
-    RtlNtStatusToDosError, FILE_OPEN, IO_STATUS_BLOCK,
+    IO_STATUS_BLOCK_u, NtCancelIoFileEx, NtDeviceIoControlFile,
+    RtlNtStatusToDosError, IO_STATUS_BLOCK,
 };
 
 mod selector;
@@ -36,6 +36,8 @@ cfg_net! {
 
     pub(crate) mod tcp;
     pub(crate) mod udp;
+
+    pub(crate) use ntapi::{NtCreateFile, FILE_OPEN};
 }
 
 cfg_os_ext! {

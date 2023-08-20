@@ -11,15 +11,10 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use winapi::{
-    shared::{
-        basetsd::ULONG_PTR,
-        ntdef::{HANDLE, NTSTATUS, PHANDLE, PLARGE_INTEGER, POBJECT_ATTRIBUTES, PVOID, ULONG},
-    },
-    um::winnt::ACCESS_MASK,
+use winapi::shared::{
+    basetsd::ULONG_PTR,
+    ntdef::{HANDLE, NTSTATUS, PVOID, ULONG},
 };
-
-pub(crate) const FILE_OPEN: ULONG = 0x00000001;
 
 pub type PIO_STATUS_BLOCK = *mut IO_STATUS_BLOCK;
 
@@ -108,19 +103,6 @@ EXTERN! {extern "system" {
         IoRequestToCancel: PIO_STATUS_BLOCK,
         IoStatusBlock: PIO_STATUS_BLOCK,
     ) -> NTSTATUS;
-    fn NtCreateFile(
-        FileHandle: PHANDLE,
-        DesiredAccess: ACCESS_MASK,
-        ObjectAttributes: POBJECT_ATTRIBUTES,
-        IoStatusBlock: PIO_STATUS_BLOCK,
-        AllocationSize: PLARGE_INTEGER,
-        FileAttributes: ULONG,
-        ShareAccess: ULONG,
-        CreateDisposition: ULONG,
-        CreateOptions: ULONG,
-        EaBuffer: PVOID,
-        EaLength: ULONG,
-    ) -> NTSTATUS;
     fn NtDeviceIoControlFile(
         FileHandle: HANDLE,
         Event: HANDLE,
@@ -153,3 +135,26 @@ UNION! {union IO_STATUS_BLOCK_u {
     Status: NTSTATUS,
     Pointer: PVOID,
 }}
+
+cfg_net!(
+    use winapi::{
+        shared::ntdef::{PHANDLE, PLARGE_INTEGER, POBJECT_ATTRIBUTES},
+        um::winnt::ACCESS_MASK,
+    };
+    pub(crate) const FILE_OPEN: ULONG = 0x00000001;
+    EXTERN! {extern "system" {
+        fn NtCreateFile(
+            FileHandle: PHANDLE,
+            DesiredAccess: ACCESS_MASK,
+            ObjectAttributes: POBJECT_ATTRIBUTES,
+            IoStatusBlock: PIO_STATUS_BLOCK,
+            AllocationSize: PLARGE_INTEGER,
+            FileAttributes: ULONG,
+            ShareAccess: ULONG,
+            CreateDisposition: ULONG,
+            CreateOptions: ULONG,
+            EaBuffer: PVOID,
+            EaLength: ULONG,
+        ) -> NTSTATUS;
+    }}
+);
