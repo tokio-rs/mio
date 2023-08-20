@@ -1,6 +1,6 @@
+use super::RtlNtStatusToDosError;
 use super::{IO_STATUS_BLOCK_u, IO_STATUS_BLOCK};
 use super::{NtCancelIoFileEx, NtDeviceIoControlFile};
-use super::RtlNtStatusToDosError;
 use std::fmt;
 use std::fs::File;
 use std::io;
