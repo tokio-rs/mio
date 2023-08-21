@@ -136,12 +136,14 @@ UNION! {union IO_STATUS_BLOCK_u {
     Pointer: PVOID,
 }}
 
-cfg_net!(
+cfg_net! {
     use winapi::{
         shared::ntdef::{PHANDLE, PLARGE_INTEGER, POBJECT_ATTRIBUTES},
         um::winnt::ACCESS_MASK,
     };
+
     pub(crate) const FILE_OPEN: ULONG = 0x00000001;
+
     EXTERN! {extern "system" {
         fn NtCreateFile(
             FileHandle: PHANDLE,
@@ -157,4 +159,4 @@ cfg_net!(
             EaLength: ULONG,
         ) -> NTSTATUS;
     }}
-);
+}

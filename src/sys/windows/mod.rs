@@ -6,8 +6,8 @@ pub use event::{Event, Events};
 
 mod ntapi;
 pub(crate) use ntapi::{
-    IO_STATUS_BLOCK_u, NtCancelIoFileEx, NtDeviceIoControlFile,
-    RtlNtStatusToDosError, IO_STATUS_BLOCK,
+    IO_STATUS_BLOCK_u, NtCancelIoFileEx, NtDeviceIoControlFile, RtlNtStatusToDosError,
+    IO_STATUS_BLOCK,
 };
 
 mod selector;
