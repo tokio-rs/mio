@@ -71,6 +71,25 @@ cfg_os_poll! {
             Ok(UnixStream(inner))
         }
 
+        /// Connects to the socket named by `socker_addr`.
+        pub fn connect_addr(socket_addr: &SocketAddr) -> io::Result<UnixStream> {
+            let inner = Socket::new()?;
+
+            match wsa_syscall!(
+                connect(
+                    inner.as_raw_socket() as _,
+                    &socket_addr.raw_sockaddr() as *const _ as *const _,
+                    socket_addr.raw_socklen(),
+                ),
+                SOCKET_ERROR
+            ) {
+                Ok(_) => {}
+                Err(ref err) if err.kind() == std::io::ErrorKind::Other => {}
+                Err(e) => return Err(e),
+            }
+            Ok(UnixStream(inner))
+        }
+
         /// Moves the socket into or out of nonblocking mode.
         pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
             self.0.set_nonblocking(nonblocking)

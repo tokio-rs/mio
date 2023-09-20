@@ -47,6 +47,20 @@ cfg_os_poll! {
             })
         }
 
+        /// Creates a new `UnixListener` bound to the specified address.
+        pub fn bind_addr(socket_addr: &SocketAddr) -> io::Result<UnixListener> {
+            let inner = Socket::new()?;
+
+            wsa_syscall!(
+                bind(inner.as_raw_socket() as _, &socket_addr.raw_sockaddr() as *const _ as *const _, socket_addr.raw_socklen() as _),
+                SOCKET_ERROR
+            )?;
+            wsa_syscall!(listen(inner.as_raw_socket() as _, 1024), SOCKET_ERROR)?;
+            Ok(UnixListener {
+                inner
+            })
+        }
+
         /// Accepts a new incoming connection to this listener.
         ///
         /// This function will block the calling thread until a new Unix connection

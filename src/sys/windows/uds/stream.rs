@@ -10,6 +10,12 @@ pub(crate) fn connect(path: &Path) -> io::Result<net::UnixStream> {
     Ok(socket)
 }
 
+pub(crate) fn connect_addr(socker_addr: &SocketAddr) -> io::Result<net::UnixStream> {
+    let socket = net::UnixStream::connect_addr(socker_addr)?;
+    socket.set_nonblocking(true)?;
+    Ok(socket)
+}
+
 pub(crate) fn local_addr(socket: &net::UnixStream) -> io::Result<SocketAddr> {
     super::local_addr(socket.as_raw_socket())
 }

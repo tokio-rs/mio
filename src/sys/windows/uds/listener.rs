@@ -2,12 +2,17 @@ use std::io;
 use std::os::windows::io::AsRawSocket;
 use std::path::Path;
 
-use super::SocketAddr;
-use crate::net::UnixStream;
+use crate::net::{SocketAddr, UnixStream};
 use crate::sys::windows::stdnet as net;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
     let listener = net::UnixListener::bind(path)?;
+    listener.set_nonblocking(true)?;
+    Ok(listener)
+}
+
+pub(crate) fn bind_addr(socket_addr: &SocketAddr) -> io::Result<net::UnixListener> {
+    let listener = net::UnixListener::bind_addr(socket_addr)?;
     listener.set_nonblocking(true)?;
     Ok(listener)
 }
