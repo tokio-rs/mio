@@ -7,6 +7,8 @@ use std::os::unix::net;
 use std::path::Path;
 use std::{fmt, io};
 
+pub use sys::uds::listener::DEFAULT_BACKLOG;
+
 /// A non-blocking Unix domain socket server.
 pub struct UnixListener {
     inner: IoSource<net::UnixListener>,
@@ -16,6 +18,11 @@ impl UnixListener {
     /// Creates a new `UnixListener` bound to the specified socket `path`.
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
         sys::uds::listener::bind(path.as_ref()).map(UnixListener::from_std)
+    }
+
+    /// Creates a new `UnixListener` bound to the specified socket `path` and with backlog `backlog`.
+    pub fn bind_with_backlog<P: AsRef<Path>>(path: P, backlog: i32) -> io::Result<UnixListener> {
+        sys::uds::listener::bind_with_backlog(path.as_ref(), backlog).map(UnixListener::from_std)
     }
 
     /// Creates a new `UnixListener` bound to the specified socket `address`.

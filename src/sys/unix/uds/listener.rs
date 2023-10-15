@@ -7,22 +7,32 @@ use std::os::unix::net;
 use std::path::Path;
 use std::{io, mem};
 
+pub const DEFAULT_BACKLOG :i32 = 1024;
+
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
+    bind_with_backlog(path, DEFAULT_BACKLOG)
+}
+
+pub(crate) fn bind_with_backlog(path: &Path, backlog: i32) -> io::Result<net::UnixListener> {
     let socket_address = {
         let (sockaddr, socklen) = socket_addr(path.as_os_str().as_bytes())?;
         SocketAddr::from_parts(sockaddr, socklen)
     };
 
-    bind_addr(&socket_address)
+    bind_addr_with_backlog(&socket_address, backlog)
 }
 
 pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
+    bind_addr_with_backlog(address, DEFAULT_BACKLOG)
+}
+
+pub(crate) fn bind_addr_with_backlog(address: &SocketAddr, backlog: i32) -> io::Result<net::UnixListener> {
     let fd = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
     let socket = unsafe { net::UnixListener::from_raw_fd(fd) };
     let sockaddr = address.raw_sockaddr() as *const libc::sockaddr_un as *const libc::sockaddr;
 
     syscall!(bind(fd, sockaddr, *address.raw_socklen()))?;
-    syscall!(listen(fd, 1024))?;
+    syscall!(listen(fd, backlog))?;
 
     Ok(socket)
 }

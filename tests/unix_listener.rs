@@ -31,6 +31,12 @@ fn unix_listener_smoke() {
 }
 
 #[test]
+fn unix_listener_backlog_smoke() {
+    #[allow(clippy::redundant_closure)]
+    smoke_test(|path| UnixListener::bind_with_backlog(path, 0), "unix_listener_smoke_backlog");
+}
+
+#[test]
 fn unix_listener_from_std() {
     smoke_test(
         |path| {

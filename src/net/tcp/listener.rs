@@ -57,6 +57,20 @@ impl TcpListener {
     /// 4. Calls `listen` on the socket to prepare it to receive new connections.
     #[cfg(not(target_os = "wasi"))]
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
+        Self::bind_with_backlog(addr, 1024)
+    }
+
+    /// Convenience method to bind a new TCP listener to the specified address
+    /// to receive new connections.
+    ///
+    /// This function will take the following steps:
+    ///
+    /// 1. Create a new TCP socket.
+    /// 2. Set the `SO_REUSEADDR` option on the socket on Unix.
+    /// 3. Bind the socket to the specified address.
+    /// 4. Calls `listen` on the socket with backlog to prepare it to receive new connections.
+    #[cfg(not(target_os = "wasi"))]
+    pub fn bind_with_backlog(addr: SocketAddr, backlog: i32) -> io::Result<TcpListener> {
         let socket = new_for_addr(addr)?;
         #[cfg(unix)]
         let listener = unsafe { TcpListener::from_raw_fd(socket) };
@@ -74,7 +88,7 @@ impl TcpListener {
         set_reuseaddr(&listener.inner, true)?;
 
         bind(&listener.inner, addr)?;
-        listen(&listener.inner, 1024)?;
+        listen(&listener.inner, backlog as u32)?;
         Ok(listener)
     }
 

@@ -32,6 +32,11 @@ fn tcp_listener() {
 }
 
 #[test]
+fn tcp_listener_with_backlog() {
+    smoke_test_tcp_listener(any_local_address(), |addr: SocketAddr| -> io::Result<TcpListener> {TcpListener::bind_with_backlog(addr, 1)});
+}
+
+#[test]
 fn tcp_listener_ipv6() {
     smoke_test_tcp_listener(any_local_ipv6_address(), TcpListener::bind);
 }
