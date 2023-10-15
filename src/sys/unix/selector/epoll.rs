@@ -21,7 +21,7 @@ pub struct Selector {
 impl Selector {
     pub fn new() -> io::Result<Selector> {
         #[cfg(not(target_os = "android"))]
-        let res = syscall!(epoll_create1(libc::EPOLL_CLOEXEC));
+            let res = syscall!(epoll_create1(libc::EPOLL_CLOEXEC));
 
         // On Android < API level 16 `epoll_create1` is not defined, so use a
         // raw system call.
@@ -29,7 +29,7 @@ impl Selector {
         // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on that platform,
         // so we use it instead.
         #[cfg(target_os = "android")]
-        let res = syscall!(syscall(libc::SYS_epoll_create1, libc::O_CLOEXEC));
+            let res = syscall!(syscall(libc::SYS_epoll_create1, libc::O_CLOEXEC));
 
         let ep = match res {
             Ok(ep) => ep as RawFd,
@@ -100,11 +100,11 @@ impl Selector {
             events.capacity() as i32,
             timeout,
         ))
-        .map(|n_events| {
-            // This is safe because `epoll_wait` ensures that `n_events` are
-            // assigned.
-            unsafe { events.set_len(n_events as usize) };
-        })
+            .map(|n_events| {
+                // This is safe because `epoll_wait` ensures that `n_events` are
+                // assigned.
+                unsafe { events.set_len(n_events as usize) };
+            })
     }
 
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
@@ -118,9 +118,35 @@ impl Selector {
         syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
     }
 
+    #[cfg(tokio_unstable)]
+    #[doc(hidden)]
+    pub fn register_with_flags(&self, fd: RawFd, token: Token, interests: Interest, flags: u32) -> io::Result<()> {
+        let mut event = libc::epoll_event {
+            events: interests_to_epoll(interests) | flags,
+            u64: usize::from(token) as u64,
+            #[cfg(target_os = "redox")]
+            _pad: 0,
+        };
+
+        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
+    }
+
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let mut event = libc::epoll_event {
             events: interests_to_epoll(interests),
+            u64: usize::from(token) as u64,
+            #[cfg(target_os = "redox")]
+            _pad: 0,
+        };
+
+        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_MOD, fd, &mut event)).map(|_| ())
+    }
+
+    #[cfg(tokio_unstable)]
+    #[doc(hidden)]
+    pub fn reregister_with_flags(&self, fd: RawFd, token: Token, interests: Interest, flags: u32) -> io::Result<()> {
+        let mut event = libc::epoll_event {
+            events: interests_to_epoll(interests) | flags,
             u64: usize::from(token) as u64,
             #[cfg(target_os = "redox")]
             _pad: 0,
@@ -206,7 +232,7 @@ pub mod event {
         event.events as libc::c_int & libc::EPOLLHUP != 0
             // Socket has received FIN or called shutdown(SHUT_RD)
             || (event.events as libc::c_int & libc::EPOLLIN != 0
-                && event.events as libc::c_int & libc::EPOLLRDHUP != 0)
+            && event.events as libc::c_int & libc::EPOLLRDHUP != 0)
     }
 
     pub fn is_write_closed(event: &Event) -> bool {
@@ -214,7 +240,7 @@ pub mod event {
         event.events as libc::c_int & libc::EPOLLHUP != 0
             // Unix pipe write end has closed
             || (event.events as libc::c_int & libc::EPOLLOUT != 0
-                && event.events as libc::c_int & libc::EPOLLERR != 0)
+            && event.events as libc::c_int & libc::EPOLLERR != 0)
             // The other side (read end) of a Unix pipe has closed.
             || event.events as libc::c_int == libc::EPOLLERR
     }

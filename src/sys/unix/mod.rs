@@ -69,6 +69,20 @@ cfg_os_poll! {
                     registry.selector().register(fd, token, interests)
                 }
 
+                #[cfg(all(tokio_unstable, target_os = "linux"))]
+                #[doc(hidden)]
+                pub fn register_with_flags(
+                    &mut self,
+                    registry: &Registry,
+                    token: Token,
+                    interests: Interest,
+                    fd: RawFd,
+                    flags: u32
+                ) -> io::Result<()> {
+                    // Pass through, we don't have any state
+                    registry.selector().register_with_flags(fd, token, interests, flags)
+                }
+
                 pub fn reregister(
                     &mut self,
                     registry: &Registry,
@@ -78,6 +92,20 @@ cfg_os_poll! {
                 ) -> io::Result<()> {
                     // Pass through, we don't have any state
                     registry.selector().reregister(fd, token, interests)
+                }
+
+                #[cfg(all(tokio_unstable, target_os = "linux"))]
+                #[doc(hidden)]
+                pub fn reregister_with_flags(
+                    &mut self,
+                    registry: &Registry,
+                    token: Token,
+                    interests: Interest,
+                    fd: RawFd,
+                    flags: u32
+                ) -> io::Result<()> {
+                    // Pass through, we don't have any state
+                    registry.selector().reregister_with_flags(fd, token, interests, flags)
                 }
 
                 pub fn deregister(&mut self, registry: &Registry, fd: RawFd) -> io::Result<()> {
