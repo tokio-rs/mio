@@ -17,6 +17,7 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
         target_os = "openbsd",
         target_os = "illumos",
         target_os = "redox",
+        target_os = "vita",
     ))]
     unsafe {
         if libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0 {
@@ -67,6 +68,7 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
         target_os = "tvos",
         target_os = "watchos",
         target_os = "espidf",
+        target_os = "vita",
     )))]
     compile_error!("unsupported target for `mio::unix::pipe`");
 
@@ -556,7 +558,7 @@ impl IntoRawFd for Receiver {
     }
 }
 
-#[cfg(not(target_os = "illumos"))]
+#[cfg(not(any(target_os = "illumos", target_os = "vita")))]
 fn set_nonblocking(fd: RawFd, nonblocking: bool) -> io::Result<()> {
     let value = nonblocking as libc::c_int;
     if unsafe { libc::ioctl(fd, libc::FIONBIO, &value) } == -1 {
@@ -566,7 +568,7 @@ fn set_nonblocking(fd: RawFd, nonblocking: bool) -> io::Result<()> {
     }
 }
 
-#[cfg(target_os = "illumos")]
+#[cfg(any(target_os = "illumos", target_os = "vita"))]
 fn set_nonblocking(fd: RawFd, nonblocking: bool) -> io::Result<()> {
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
     if flags < 0 {

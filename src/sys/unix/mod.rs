@@ -105,6 +105,7 @@ cfg_os_poll! {
         target_os = "netbsd",
         target_os = "openbsd",
         target_os = "redox",
+        target_os = "vita",
     ))]
     pub(crate) mod pipe;
 }

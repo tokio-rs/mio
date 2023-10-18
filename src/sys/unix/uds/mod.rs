@@ -81,6 +81,7 @@ cfg_os_poll! {
             target_os = "tvos",
             target_os = "watchos",
             target_os = "espidf",
+            target_os = "vita",
         )))]
         let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
@@ -101,15 +102,17 @@ cfg_os_poll! {
             target_os = "tvos",
             target_os = "watchos",
             target_os = "espidf",
+            target_os = "vita",
         ))]
         {
             syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
-            #[cfg(not(target_os = "espidf"))]
+            #[cfg(not(any(target_os = "espidf", target_os = "vita")))]
             syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
             syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
-            #[cfg(not(target_os = "espidf"))]
+            #[cfg(not(any(target_os = "espidf", target_os = "vita")))]
             syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
         }
+
         Ok(pair)
     }
 
