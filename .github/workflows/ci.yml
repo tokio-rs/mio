@@ -133,6 +133,22 @@ jobs:
       run: cargo install --debug cargo-hack
     - name: Check all targets
       run: make check_all_targets
+  CheckTier3Targets:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ["armv7-sony-vita-newlibeabihf"]
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: rust-src
+    - uses: taiki-e/install-action@cargo-hack
+    - name: Run check
+      run: cargo hack check -Z build-std=std,panic_abort --feature-powerset --target ${{ matrix.target }}
   Sanitizer:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -160,5 +176,6 @@ jobs:
       - Docs
       - Rustfmt
       - CheckTargets
+      - CheckTier3Targets
     steps:
       - run: exit 0

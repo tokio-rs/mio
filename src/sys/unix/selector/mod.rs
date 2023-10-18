@@ -20,10 +20,10 @@ mod epoll;
 ))]
 pub(crate) use self::epoll::{event, Event, Events, Selector};
 
-#[cfg(mio_unsupported_force_poll_poll)]
+#[cfg(any(mio_unsupported_force_poll_poll, target_os = "vita"))]
 mod poll;
 
-#[cfg(mio_unsupported_force_poll_poll)]
+#[cfg(any(mio_unsupported_force_poll_poll, target_os = "vita"))]
 pub(crate) use self::poll::{event, Event, Events, IoSourceState, Selector};
 
 #[cfg(all(

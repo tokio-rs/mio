@@ -34,7 +34,7 @@ cfg_os_poll! {
 
     cfg_io_source! {
         // Both `kqueue` and `epoll` don't need to hold any user space state.
-        #[cfg(not(mio_unsupported_force_poll_poll))]
+        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "vita")))]
         mod stateless_io_source {
             use std::io;
             use std::os::unix::io::RawFd;
@@ -87,10 +87,10 @@ cfg_os_poll! {
             }
         }
 
-        #[cfg(not(mio_unsupported_force_poll_poll))]
+        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "vita")))]
         pub(crate) use self::stateless_io_source::IoSourceState;
 
-        #[cfg(mio_unsupported_force_poll_poll)]
+        #[cfg(any(mio_unsupported_force_poll_poll, target_os = "vita"))]
         pub(crate) use self::selector::IoSourceState;
     }
 
