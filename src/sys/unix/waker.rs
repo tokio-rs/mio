@@ -224,7 +224,7 @@ mod pipe {
 
     impl WakerInternal {
         pub fn new() -> io::Result<WakerInternal> {
-            let [sender, receiver] = pipe::new_raw()?;
+            let [receiver, sender] = pipe::new_raw()?;
             let sender = unsafe { File::from_raw_fd(sender) };
             let receiver = unsafe { File::from_raw_fd(receiver) };
             Ok(WakerInternal { sender, receiver })
