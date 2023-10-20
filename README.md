@@ -162,11 +162,11 @@ This uses the Windows AFD system to access socket readiness events.
 
 ## Unsupported flags
 
-Mio uses different implementations to support the same functionality dependening
+Mio uses different implementations to support the same functionality depending
 on the platform. Mio generally uses the "best" implementation possible, where
 "best" usually means most efficient for Mio's use case. However this means that
 the implementation is often specific to a limited number of platforms, meaning
-we often have multiple implemetations for the same functionality. In some cases
+we often have multiple implementations for the same functionality. In some cases
 it might be required to not use the "best" implementation, but another
 implementation Mio supports (on other platforms). **Mio does not officially
 support secondary implementations on platforms**, however we do have various cfg
