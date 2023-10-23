@@ -1,3 +1,29 @@
+# 0.8.9
+
+## Added
+
+* ESP-IDF framework support
+  (https://github.com/tokio-rs/mio/pull/1692).
+* AIX operating system support
+  (https://github.com/tokio-rs/mio/pull/1704).
+* Vita support
+  (https://github.com/tokio-rs/mio/pull/1721).
+* `{UnixListener,UnixStream}:bind_addr`
+  (https://github.com/tokio-rs/mio/pull/1630).
+* `mio_unsupported_force_poll_poll` and `mio_unsupported_force_waker_pipe`
+  **unsupported** configuration flags to force a specific poll or waker
+  implementation
+  (https://github.com/tokio-rs/mio/pull/1684,
+  https://github.com/tokio-rs/mio/pull/1685,
+  https://github.com/tokio-rs/mio/pull/1692).
+
+## Fixed
+
+* The `pipe(2)` based waker (swapped file descriptors)
+  (https://github.com/tokio-rs/mio/pull/1722).
+* The duplicate waker check to work correctly with cloned `Registry`s.
+  (https://github.com/tokio-rs/mio/pull/1706).
+
 # 0.8.8
 
 ## Fixed
