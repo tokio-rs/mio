@@ -1,4 +1,8 @@
-#[cfg(all(unix, not(mio_unsupported_force_poll_poll), not(target_os = "vita")))]
+#[cfg(all(
+    unix,
+    not(mio_unsupported_force_poll_poll),
+    not(any(target_os = "solaris", target_os = "vita"))
+))]
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(all(debug_assertions, not(target_os = "wasi")))]
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -423,7 +427,11 @@ impl Poll {
     }
 }
 
-#[cfg(all(unix, not(mio_unsupported_force_poll_poll), not(target_os = "vita")))]
+#[cfg(all(
+    unix,
+    not(mio_unsupported_force_poll_poll),
+    not(any(target_os = "solaris", target_os = "vita"))
+))]
 impl AsRawFd for Poll {
     fn as_raw_fd(&self) -> RawFd {
         self.registry.as_raw_fd()
@@ -710,7 +718,11 @@ impl fmt::Debug for Registry {
     }
 }
 
-#[cfg(all(unix, not(mio_unsupported_force_poll_poll), not(target_os = "vita")))]
+#[cfg(all(
+    unix,
+    not(mio_unsupported_force_poll_poll),
+    not(any(target_os = "solaris", target_os = "vita"))
+))]
 impl AsRawFd for Registry {
     fn as_raw_fd(&self) -> RawFd {
         self.selector.as_raw_fd()
@@ -721,7 +733,7 @@ cfg_os_poll! {
     #[cfg(all(
         unix,
         not(mio_unsupported_force_poll_poll),
-        not(target_os = "vita"),
+        not(any(target_os = "solaris", target_os = "vita")),
     ))]
     #[test]
     pub fn as_raw_fd() {

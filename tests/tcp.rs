@@ -572,6 +572,8 @@ fn connect_error() {
         for event in &events {
             if event.token() == Token(0) {
                 assert!(event.is_writable());
+                // Solaris poll(2) says POLLHUP and POLLOUT are mutually exclusive.
+                #[cfg(not(target_os = "solaris"))]
                 assert!(event.is_write_closed());
                 break 'outer;
             }
@@ -698,7 +700,12 @@ fn write_shutdown() {
     // Now, shutdown the write half of the socket.
     socket.shutdown(Shutdown::Write).unwrap();
 
-    wait!(poll, is_readable, true);
+    // POLLRDHUP isn't supported on Solaris
+    if cfg!(target_os = "solaris") {
+        wait!(poll, is_readable, false);
+    } else {
+        wait!(poll, is_readable, true);
+    }
 }
 
 struct MyHandler {

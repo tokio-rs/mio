@@ -186,6 +186,7 @@ fn unix_stream_peer_addr() {
 }
 
 #[test]
+#[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 fn unix_stream_shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_read");
@@ -326,6 +327,8 @@ fn unix_stream_shutdown_both() {
     );
 
     stream.shutdown(Shutdown::Both).unwrap();
+    // Solaris never returns POLLHUP  for sockets.
+    #[cfg(not(target_os = "solaris"))]
     expect_events(
         &mut poll,
         &mut events,
@@ -361,6 +364,7 @@ fn unix_stream_shutdown_both() {
 }
 
 #[test]
+#[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 fn unix_stream_shutdown_listener_write() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
