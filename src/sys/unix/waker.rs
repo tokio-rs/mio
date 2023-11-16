@@ -10,7 +10,7 @@
             target_os = "watchos",
         )
     )),
-    not(target_os = "vita"),
+    not(any(target_os = "solaris", target_os = "vita")),
 ))]
 mod fdbased {
     #[cfg(all(
@@ -63,7 +63,7 @@ mod fdbased {
             target_os = "watchos",
         )
     )),
-    not(target_os = "vita"),
+    not(any(target_os = "solaris", target_os = "vita")),
 ))]
 pub use self::fdbased::Waker;
 
@@ -207,6 +207,7 @@ pub use self::kqueue::Waker;
     target_os = "netbsd",
     target_os = "openbsd",
     target_os = "redox",
+    target_os = "solaris",
     target_os = "vita",
 ))]
 mod pipe {
@@ -253,7 +254,11 @@ mod pipe {
             }
         }
 
-        #[cfg(any(mio_unsupported_force_poll_poll, target_os = "vita"))]
+        #[cfg(any(
+            mio_unsupported_force_poll_poll,
+            target_os = "solaris",
+            target_os = "vita"
+        ))]
         pub fn ack_and_reset(&self) {
             self.empty();
         }
@@ -291,11 +296,16 @@ mod pipe {
             target_os = "redox",
         )
     ),
+    target_os = "solaris",
     target_os = "vita",
 ))]
 pub(crate) use self::pipe::WakerInternal;
 
-#[cfg(any(mio_unsupported_force_poll_poll, target_os = "vita"))]
+#[cfg(any(
+    mio_unsupported_force_poll_poll,
+    target_os = "solaris",
+    target_os = "vita"
+))]
 mod poll {
     use crate::sys::Selector;
     use crate::Token;
@@ -321,5 +331,9 @@ mod poll {
     }
 }
 
-#[cfg(any(mio_unsupported_force_poll_poll, target_os = "vita"))]
+#[cfg(any(
+    mio_unsupported_force_poll_poll,
+    target_os = "solaris",
+    target_os = "vita"
+))]
 pub use self::poll::Waker;

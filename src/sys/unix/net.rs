@@ -21,6 +21,7 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
         target_os = "linux",
         target_os = "netbsd",
         target_os = "openbsd",
+        target_os = "solaris",
     ))]
     let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
 
@@ -149,7 +150,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                 sin6_len: 0,
                 #[cfg(target_os = "vita")]
                 sin6_vport: addr.port().to_be(),
-                #[cfg(target_os = "illumos")]
+                #[cfg(any(target_os = "illumos", target_os = "solaris"))]
                 __sin6_src_id: 0,
             };
 

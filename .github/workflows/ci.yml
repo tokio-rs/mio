@@ -152,7 +152,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ["armv7-sony-vita-newlibeabihf"]
+        target: ["armv7-sony-vita-newlibeabihf", "sparcv9-sun-solaris", "x86_64-pc-solaris"]
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@nightly
