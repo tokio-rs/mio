@@ -5,12 +5,11 @@ use std::io;
 use std::mem::size_of;
 use std::os::windows::io::AsRawHandle;
 
+use windows_sys::Wdk::System::IO::NtDeviceIoControlFile;
 use windows_sys::Win32::Foundation::{
     RtlNtStatusToDosError, HANDLE, NTSTATUS, STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS,
 };
-use windows_sys::Win32::System::WindowsProgramming::{
-    NtDeviceIoControlFile, IO_STATUS_BLOCK, IO_STATUS_BLOCK_0,
-};
+use windows_sys::Win32::System::IO::{IO_STATUS_BLOCK, IO_STATUS_BLOCK_0};
 
 const IOCTL_AFD_POLL: u32 = 0x00012024;
 
@@ -136,9 +135,13 @@ cfg_io_source! {
     use windows_sys::Win32::{
         Foundation::{UNICODE_STRING, INVALID_HANDLE_VALUE},
         System::WindowsProgramming::{
-            OBJECT_ATTRIBUTES, FILE_SKIP_SET_EVENT_ON_HANDLE,
+            FILE_SKIP_SET_EVENT_ON_HANDLE,
         },
-        Storage::FileSystem::{FILE_OPEN, NtCreateFile, SetFileCompletionNotificationModes, SYNCHRONIZE, FILE_SHARE_READ, FILE_SHARE_WRITE},
+        Storage::FileSystem::{SetFileCompletionNotificationModes, SYNCHRONIZE, FILE_SHARE_READ, FILE_SHARE_WRITE},
+    };
+    use windows_sys::Wdk::{
+        Foundation::OBJECT_ATTRIBUTES,
+        Storage::FileSystem::{NtCreateFile, FILE_OPEN}
     };
 
     const AFD_HELPER_ATTRIBUTES: OBJECT_ATTRIBUTES = OBJECT_ATTRIBUTES {

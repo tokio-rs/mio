@@ -56,6 +56,9 @@ features = [
   "Win32_Storage_FileSystem",         # Enables NtCreateFile
   "Win32_System_IO",                  # IO types like OVERLAPPED etc
   "Win32_System_WindowsProgramming",  # General future used for various types/funcs
+  "Wdk_Foundation",                   # Basic WDK types
+  "Wdk_Storage_FileSystem",           # NT APIs for file system IO
+  "Wdk_System_IO",                    # NT APIs for general IO
 ]
 
 [target.'cfg(target_os = "wasi")'.dependencies]
