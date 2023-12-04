@@ -68,12 +68,15 @@ impl TcpStream {
     ///  1. Call `TcpStream::connect`
     ///  2. Register the returned stream with at least [write interest].
     ///  3. Wait for a (writable) event.
-    ///  4. Check `TcpStream::peer_addr`. If it returns `libc::EINPROGRESS` or
+    ///  4. Check `TcpStream::take_error`. If it returns an error, then
+    ///     something went wrong. If it returns `Ok(None)`, then proceed to
+    ///     step 5.
+    ///  5. Check `TcpStream::peer_addr`. If it returns `libc::EINPROGRESS` or
     ///     `ErrorKind::NotConnected` it means the stream is not yet connected,
     ///     go back to step 3. If it returns an address it means the stream is
-    ///     connected, go to step 5. If another error is returned something
+    ///     connected, go to step 6. If another error is returned something
     ///     went wrong.
-    ///  5. Now the stream can be used.
+    ///  6. Now the stream can be used.
     ///
     /// This may return a `WouldBlock` in which case the socket connection
     /// cannot be completed immediately, it usually means there are insufficient
