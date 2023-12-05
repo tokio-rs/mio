@@ -8,8 +8,9 @@ use std::os::windows::io::AsRawHandle;
 use windows_sys::Win32::Foundation::{
     RtlNtStatusToDosError, HANDLE, NTSTATUS, STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS,
 };
-use windows_sys::Win32::System::WindowsProgramming::{
-    NtDeviceIoControlFile, IO_STATUS_BLOCK, IO_STATUS_BLOCK_0,
+use windows_sys::{
+    Wdk::System::IO::NtDeviceIoControlFile,
+    Win32::System::IO::{IO_STATUS_BLOCK, IO_STATUS_BLOCK_0},
 };
 
 const IOCTL_AFD_POLL: u32 = 0x00012024;
@@ -133,12 +134,16 @@ cfg_io_source! {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::iocp::CompletionPort;
-    use windows_sys::Win32::{
-        Foundation::{UNICODE_STRING, INVALID_HANDLE_VALUE},
-        System::WindowsProgramming::{
-            OBJECT_ATTRIBUTES, FILE_SKIP_SET_EVENT_ON_HANDLE,
+    use windows_sys::{
+        Win32::{
+            Foundation::{UNICODE_STRING, INVALID_HANDLE_VALUE},
+            System::WindowsProgramming::FILE_SKIP_SET_EVENT_ON_HANDLE,
+            Storage::FileSystem::{SetFileCompletionNotificationModes, SYNCHRONIZE, FILE_SHARE_READ, FILE_SHARE_WRITE},
         },
-        Storage::FileSystem::{FILE_OPEN, NtCreateFile, SetFileCompletionNotificationModes, SYNCHRONIZE, FILE_SHARE_READ, FILE_SHARE_WRITE},
+        Wdk::{
+            Foundation::OBJECT_ATTRIBUTES,
+            Storage::FileSystem::{FILE_OPEN, NtCreateFile},
+        },
     };
 
     const AFD_HELPER_ATTRIBUTES: OBJECT_ATTRIBUTES = OBJECT_ATTRIBUTES {

@@ -285,8 +285,8 @@ pub fn set_linger_zero(socket: &TcpStream) {
     let res = unsafe {
         setsockopt(
             socket.as_raw_socket() as _,
-            SOL_SOCKET as i32,
-            SO_LINGER as i32,
+            SOL_SOCKET,
+            SO_LINGER,
             &mut val as *mut _ as *mut _,
             size_of::<LINGER>() as _,
         )

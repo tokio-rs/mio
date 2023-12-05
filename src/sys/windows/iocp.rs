@@ -206,7 +206,7 @@ impl CompletionStatus {
     /// A completion key is a per-handle key that is specified when it is added
     /// to an I/O completion port via `add_handle` or `add_socket`.
     pub fn token(&self) -> usize {
-        self.0.lpCompletionKey as usize
+        self.0.lpCompletionKey
     }
 
     /// Returns a pointer to the `Overlapped` structure that was specified when
