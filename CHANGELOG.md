@@ -1,3 +1,10 @@
+# 0.8.10
+
+## Added
+
+* Solaris support
+  (https://github.com/tokio-rs/mio/pull/1724).
+
 # 0.8.9
 
 ## Added
