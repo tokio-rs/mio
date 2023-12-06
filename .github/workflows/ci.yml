@@ -101,8 +101,7 @@ jobs:
       with:
         components: clippy
     - name: Clippy
-      # NOTE: `clippy::uninlined-format-args` is enabled due to MSRV.
-      run: cargo clippy --all-targets --all-features -- -D warnings -A clippy::cognitive-complexity -A clippy::uninlined-format-args
+      run: cargo clippy --all-targets --all-features -- -D warnings
   Docs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
