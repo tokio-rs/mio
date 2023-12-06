@@ -75,22 +75,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest", "windows-latest"]
-        # TODO: once we update our MSRV above 1.53 add macOS again. Currently
-        # macOS, specifically Xcode 14, broke support for rustc < 1.53. See
-        # https://github.com/rust-lang/rust/issues/105167.
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@master
       with:
-        # NOTE: When updating also update Clippy flags, some are disabled due to
-        # MSRV.
-        toolchain: 1.46.0
+        toolchain: 1.74.0
     - name: Check
       # We only run check allowing us to use newer features in tests.
-      # We enable all features except for the `log` feature as since log v0.4.19
-      # it requires a MSRV later then rustc 1.46.
-      run: cargo check --no-default-features --features os-poll,os-ext,net
+      run: cargo check --all-features
   Nightly:
     runs-on: ubuntu-latest
     timeout-minutes: 10
