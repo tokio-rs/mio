@@ -263,9 +263,9 @@ impl SelectorState {
                             closed_raw_fds.push(poll_fd.fd);
                         }
 
-                        // Remove the interest which just got triggered
-                        // the IoSourceState/WakerRegistrar used with this selector will add back
-                        // the interest using reregister.
+                        // Remove the interest which just got triggered the IoSourceState's do_io
+                        // wrapper used with this selector will add back the interest using
+                        // reregister.
                         poll_fd.events &= !poll_fd.revents;
 
                         // Minor optimization to potentially avoid looping n times where n is the
