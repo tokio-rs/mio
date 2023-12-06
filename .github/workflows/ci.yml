@@ -129,8 +129,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy
     - name: Install all targets
       run: make install_targets
     - name: Install Cargo-hack
