@@ -1,9 +1,9 @@
 name: CI
 on:
   push:
-    branches: [ "master", "v0.7.x" ]
+    branches: [ "master", "v0.7.x", "v0.8.x" ]
   pull_request:
-    branches: [ "master", "v0.7.x" ]
+    branches: [ "master", "v0.7.x", "v0.8.x" ]
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: full
