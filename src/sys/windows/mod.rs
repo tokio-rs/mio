@@ -13,7 +13,7 @@ mod overlapped;
 use overlapped::Overlapped;
 
 mod selector;
-pub use selector::{Selector, SelectorInner, SockState};
+pub use selector::Selector;
 
 // Macros must be defined before the modules that use them
 cfg_net! {
@@ -35,6 +35,8 @@ cfg_net! {
 
     pub(crate) mod tcp;
     pub(crate) mod udp;
+
+    pub use selector::{SelectorInner, SockState};
 }
 
 cfg_os_ext! {
