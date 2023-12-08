@@ -50,7 +50,7 @@ impl AfdGroup {
 }
 
 cfg_io_source! {
-    const POLL_GROUP__MAX_GROUP_SIZE: usize = 32;
+    const POLL_GROUP_MAX_GROUP_SIZE: usize = 32;
 
     impl AfdGroup {
         pub fn acquire(&self) -> io::Result<Arc<Afd>> {
@@ -59,7 +59,7 @@ cfg_io_source! {
                 self._alloc_afd_group(&mut afd_group)?;
             } else {
                 // + 1 reference in Vec
-                if Arc::strong_count(afd_group.last().unwrap()) > POLL_GROUP__MAX_GROUP_SIZE  {
+                if Arc::strong_count(afd_group.last().unwrap()) > POLL_GROUP_MAX_GROUP_SIZE  {
                     self._alloc_afd_group(&mut afd_group)?;
                 }
             }
