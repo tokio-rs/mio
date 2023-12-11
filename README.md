@@ -20,8 +20,8 @@ overhead as possible over the OS abstractions.
 
 **API documentation**
 
+* [v1](https://docs.rs/mio/^1)
 * [v0.8](https://docs.rs/mio/^0.8)
-* [v0.7](https://docs.rs/mio/^0.7)
 
 This is a low level library, if you are looking for something easier to get
 started with, see [Tokio](https://tokio.rs).
@@ -32,7 +32,7 @@ To use `mio`, first add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mio = "0.8"
+mio = "1"
 ```
 
 Next we can start using Mio. The following is quick introduction using
@@ -110,7 +110,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 ## Features
 
-* Non-blocking TCP, UDP
+* Non-blocking TCP, UDP, UDS
 * I/O event queue backed by epoll, kqueue, and IOCP
 * Zero allocations at runtime
 * Platform specific extensions
