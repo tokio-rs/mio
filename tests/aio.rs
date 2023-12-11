@@ -28,7 +28,7 @@ impl Aiocb {
     /// The resulting `Aiocb` structure is suitable for use with `aio_fsync`
     pub fn from_fd(fd: RawFd) -> Aiocb {
         // Use mem::zeroed instead of explicitly zeroing each field, because the
-        // number and name of reserved fields is OS-dependent.  On some OSes,
+        // number and name of reserved fields is OS-dependent.  On some OSs,
         // some reserved fields are used the kernel for state, and must be
         // explicitly zeroed when allocated.
         let mut inner = unsafe { mem::zeroed::<libc::aiocb>() };

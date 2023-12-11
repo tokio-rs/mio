@@ -433,7 +433,7 @@ information.
   at least `event::Source` and `Poll`.
 * Mio now uses Rust 2018 and rustfmt for all code.
 * `Event` was changed to be a wrapper around the OS event. This means it can be
-  significantly larger on some OSes.
+  significantly larger on some OSs.
 * `Ready` was removed and replaced with various `is_*` methods on `Event`. For
   example instead checking for readable readiness using
   `Event::ready().is_readable()`, you would call `Event::is_readable()`.

@@ -32,33 +32,6 @@ use crate::{event, Interest, Registry, Token};
 ///
 /// [`Poll`]: crate::Poll
 /// [`do_io`]: IoSource::do_io
-/*
-///
-/// # Examples
-///
-/// Basic usage.
-///
-/// ```
-/// # use std::error::Error;
-/// # fn main() -> Result<(), Box<dyn Error>> {
-/// use mio::{Interest, Poll, Token};
-/// use mio::IoSource;
-///
-/// use std::net;
-///
-/// let poll = Poll::new()?;
-///
-/// // Bind a std TCP listener.
-/// let listener = net::TcpListener::bind("127.0.0.1:0")?;
-/// // Wrap it in the `IoSource` type.
-/// let mut listener = IoSource::new(listener);
-///
-/// // Register the listener.
-/// poll.registry().register(&mut listener, Token(0), Interest::READABLE)?;
-/// #     Ok(())
-/// # }
-/// ```
-*/
 pub struct IoSource<T> {
     state: IoSourceState,
     inner: T,
