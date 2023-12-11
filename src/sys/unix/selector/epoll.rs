@@ -21,33 +21,10 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        let ep = match syscall!(epoll_create1(libc::EPOLL_CLOEXEC)) {
-            Ok(ep) => ep as RawFd,
-            Err(err) => {
-                // When `epoll_create1` is not available fall back to use
-                // `epoll_create` followed by `fcntl`.
-                if let Some(libc::ENOSYS) = err.raw_os_error() {
-                    match syscall!(epoll_create(1024)) {
-                        Ok(ep) => match syscall!(fcntl(ep, libc::F_SETFD, libc::FD_CLOEXEC)) {
-                            Ok(ep) => ep as RawFd,
-                            Err(err) => {
-                                // `fcntl` failed, cleanup `ep`.
-                                let _ = unsafe { libc::close(ep) };
-                                return Err(err);
-                            }
-                        },
-                        Err(err) => return Err(err),
-                    }
-                } else {
-                    return Err(err);
-                }
-            }
-        };
-
         Ok(Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-            ep,
+            ep: syscall!(epoll_create1(libc::EPOLL_CLOEXEC))?,
         })
     }
 
