@@ -79,7 +79,7 @@ impl Selector {
         debug_assert!(events.capacity() >= length);
         #[cfg(debug_assertions)]
         if length == 0 {
-            warn!(
+            log::warn!(
                 "calling mio::Poll::poll with empty subscriptions, this likely not what you want"
             );
         }

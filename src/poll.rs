@@ -548,7 +548,7 @@ impl Registry {
     where
         S: event::Source + ?Sized,
     {
-        trace!(
+        log::trace!(
             "registering event source with poller: token={:?}, interests={:?}",
             token,
             interests
@@ -616,7 +616,7 @@ impl Registry {
     where
         S: event::Source + ?Sized,
     {
-        trace!(
+        log::trace!(
             "reregistering event source with poller: token={:?}, interests={:?}",
             token,
             interests
@@ -679,7 +679,7 @@ impl Registry {
     where
         S: event::Source + ?Sized,
     {
-        trace!("deregistering event source from poller");
+        log::trace!("deregistering event source from poller");
         source.deregister(self)
     }
 

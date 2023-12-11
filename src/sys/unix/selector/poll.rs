@@ -202,9 +202,9 @@ impl SelectorState {
             }
 
             // Perform the poll.
-            trace!("Polling on {:?}", &fds);
+            log::trace!("Polling on {:?}", &fds);
             let num_events = poll(&mut fds.poll_fds, timeout)?;
-            trace!("Poll finished: {:?}", &fds);
+            log::trace!("Poll finished: {:?}", &fds);
 
             if num_events == 0 {
                 return Ok(());
