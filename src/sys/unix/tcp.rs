@@ -80,7 +80,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
     }?;
 
     // But not all platforms have the `accept4(2)` call. Luckily BSD (derived)
-    // OSes inherit the non-blocking flag from the listener, so we just have to
+    // OSs inherit the non-blocking flag from the listener, so we just have to
     // set `CLOEXEC`.
     #[cfg(any(
         target_os = "aix",
