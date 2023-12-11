@@ -20,18 +20,7 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        #[cfg(not(target_os = "android"))]
-        let res = syscall!(epoll_create1(libc::EPOLL_CLOEXEC));
-
-        // On Android < API level 16 `epoll_create1` is not defined, so use a
-        // raw system call.
-        // According to libuv, `EPOLL_CLOEXEC` is not defined on Android API <
-        // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on that platform,
-        // so we use it instead.
-        #[cfg(target_os = "android")]
-        let res = syscall!(syscall(libc::SYS_epoll_create1, libc::O_CLOEXEC));
-
-        let ep = match res {
+        let ep = match syscall!(epoll_create1(libc::EPOLL_CLOEXEC)) {
             Ok(ep) => ep as RawFd,
             Err(err) => {
                 // When `epoll_create1` is not available fall back to use
@@ -268,11 +257,4 @@ pub mod event {
             .field("u64", &e_u64)
             .finish()
     }
-}
-
-#[cfg(target_os = "android")]
-#[test]
-fn assert_close_on_exec_flag() {
-    // This assertion need to be true for Selector::new.
-    assert_eq!(libc::O_CLOEXEC, libc::EPOLL_CLOEXEC);
 }
