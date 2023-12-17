@@ -45,7 +45,7 @@ os-ext = [
 net = []
 
 [dependencies]
-log = { version = "0.4.8" }
+log = "0.4.8"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.149"
