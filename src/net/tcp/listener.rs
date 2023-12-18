@@ -193,6 +193,13 @@ impl FromRawFd for TcpListener {
     }
 }
 
+#[cfg(unix)]
+impl std::os::fd::AsFd for TcpListener {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        unsafe { std::os::fd::BorrowedFd::borrow_raw(self.inner.as_raw_fd()) }
+    }
+}
+
 #[cfg(windows)]
 impl IntoRawSocket for TcpListener {
     fn into_raw_socket(self) -> RawSocket {

@@ -234,3 +234,9 @@ impl FromRawFd for UnixDatagram {
         UnixDatagram::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
+
+impl std::os::fd::AsFd for UnixDatagram {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        unsafe { std::os::fd::BorrowedFd::borrow_raw(self.inner.as_raw_fd()) }
+    }
+}
