@@ -138,12 +138,12 @@ Currently supported platforms:
 * iOS
 * macOS
 
-There are potentially others. If you find that Mio works on another platform,
-submit a PR to update the list!
-
 Mio can handle interfacing with each of the event systems of the aforementioned
 platforms. The details of their implementation are further discussed in the
 `Poll` type of the API documentation (see above).
+
+Mio generally supports the same versions of the above mentioned platforms as
+Rust the language (rustc) does, unless otherwise noted.
 
 The Windows implementation for polling sockets is using the [wepoll] strategy.
 This uses the Windows AFD system to access socket readiness events.
