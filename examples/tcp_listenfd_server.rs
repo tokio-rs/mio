@@ -22,7 +22,7 @@ fn get_first_listen_fd_listener() -> Option<std::net::TcpListener> {
     #[cfg(target_os = "hermit")]
     use std::os::hermit::io::FromRawFd;
     #[cfg(unix)]
-    use std::os::unix::io::FromRawFd;
+    use std::os::fd::FromRawFd;
     #[cfg(target_os = "wasi")]
     use std::os::wasi::io::FromRawFd;
 

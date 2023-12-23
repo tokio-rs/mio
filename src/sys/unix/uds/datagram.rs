@@ -1,5 +1,5 @@
 use std::io;
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::net::{self, SocketAddr};
 
 use crate::sys::unix::net::new_socket;

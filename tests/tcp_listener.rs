@@ -6,7 +6,7 @@ use mio::{Interest, Token};
 use std::io::{self, Read};
 use std::net::{self, SocketAddr};
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
+use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
 use std::sync::{Arc, Barrier};
 use std::thread;
 

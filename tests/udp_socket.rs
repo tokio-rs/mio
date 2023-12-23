@@ -6,7 +6,7 @@ use mio::net::UdpSocket;
 use mio::{Events, Interest, Poll, Registry, Token};
 use std::net::{self, IpAddr, SocketAddr};
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
+use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
 use std::str;
 use std::sync::{Arc, Barrier};
 use std::thread;
