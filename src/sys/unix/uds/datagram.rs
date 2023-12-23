@@ -2,8 +2,8 @@ use super::{socket_addr, SocketAddr};
 use crate::sys::unix::net::new_socket;
 
 use std::io;
-use std::os::unix::ffi::OsStrExt;
 use std::os::fd::{AsRawFd, FromRawFd};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::net;
 use std::path::Path;
 
