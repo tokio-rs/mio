@@ -11,7 +11,6 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use std::{cmp, fmt, io};
 
-use crate::sys::unix::selector::LOWEST_FD;
 use crate::sys::unix::waker::WakerInternal;
 use crate::{Interest, Token};
 
@@ -34,9 +33,6 @@ impl Selector {
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
-        // Just to keep the compiler happy :)
-        let _ = LOWEST_FD;
-
         let state = self.state.clone();
 
         Ok(Selector { state })
