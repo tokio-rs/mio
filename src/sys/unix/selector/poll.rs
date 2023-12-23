@@ -3,7 +3,6 @@
 // Permission to use this code has been granted by original author:
 // https://github.com/tokio-rs/mio/pull/1602#issuecomment-1218441031
 
-use crate::sys::unix::selector::LOWEST_FD;
 use crate::sys::unix::waker::WakerInternal;
 use crate::{Interest, Token};
 use std::collections::HashMap;
@@ -34,9 +33,6 @@ impl Selector {
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
-        // Just to keep the compiler happy :)
-        let _ = LOWEST_FD;
-
         let state = self.state.clone();
 
         Ok(Selector { state })

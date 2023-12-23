@@ -1,4 +1,4 @@
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -16,20 +16,22 @@ static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 pub struct Selector {
     #[cfg(debug_assertions)]
     id: usize,
-    ep: RawFd,
+    ep: OwnedFd,
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
+        // SAFETY: `epoll_create1(2)` ensures the fd is valid.
+        let ep = unsafe { OwnedFd::from_raw_fd(syscall!(epoll_create1(libc::EPOLL_CLOEXEC))?) };
         Ok(Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-            ep: syscall!(epoll_create1(libc::EPOLL_CLOEXEC))?,
+            ep,
         })
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
-        syscall!(fcntl(self.ep, libc::F_DUPFD_CLOEXEC, super::LOWEST_FD)).map(|ep| Selector {
+        self.ep.try_clone().map(|ep| Selector {
             // It's the same selector, so we use the same id.
             #[cfg(debug_assertions)]
             id: self.id,
@@ -52,7 +54,7 @@ impl Selector {
 
         events.clear();
         syscall!(epoll_wait(
-            self.ep,
+            self.ep.as_raw_fd(),
             events.as_mut_ptr(),
             events.capacity() as i32,
             timeout,
@@ -72,7 +74,8 @@ impl Selector {
             _pad: 0,
         };
 
-        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
+        let ep = self.ep.as_raw_fd();
+        syscall!(epoll_ctl(ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
@@ -83,11 +86,13 @@ impl Selector {
             _pad: 0,
         };
 
-        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_MOD, fd, &mut event)).map(|_| ())
+        let ep = self.ep.as_raw_fd();
+        syscall!(epoll_ctl(ep, libc::EPOLL_CTL_MOD, fd, &mut event)).map(|_| ())
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_DEL, fd, ptr::null_mut())).map(|_| ())
+        let ep = self.ep.as_raw_fd();
+        syscall!(epoll_ctl(ep, libc::EPOLL_CTL_DEL, fd, ptr::null_mut())).map(|_| ())
     }
 }
 
@@ -102,15 +107,7 @@ cfg_io_source! {
 
 impl AsRawFd for Selector {
     fn as_raw_fd(&self) -> RawFd {
-        self.ep
-    }
-}
-
-impl Drop for Selector {
-    fn drop(&mut self) {
-        if let Err(err) = syscall!(close(self.ep)) {
-            error!("error closing epoll: {}", err);
-        }
+        self.ep.as_raw_fd()
     }
 }
 
