@@ -1,5 +1,5 @@
 mod socketaddr;
-pub use self::socketaddr::SocketAddr;
+pub use socketaddr::SocketAddr;
 
 /// Get the `sun_path` field offset of `sockaddr_un` for the target OS.
 ///
@@ -129,10 +129,11 @@ cfg_os_poll! {
 
     #[cfg(test)]
     mod tests {
-        use super::{path_offset, socket_addr};
         use std::os::unix::ffi::OsStrExt;
         use std::path::Path;
         use std::str;
+
+        use super::{path_offset, socket_addr};
 
         #[test]
         fn pathname_address() {

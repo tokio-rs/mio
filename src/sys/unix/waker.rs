@@ -13,6 +13,9 @@
     not(any(target_os = "solaris", target_os = "vita")),
 ))]
 mod fdbased {
+    use std::io;
+    use std::os::fd::AsRawFd;
+
     #[cfg(all(
         not(mio_unsupported_force_waker_pipe),
         any(target_os = "linux", target_os = "android"),
@@ -30,8 +33,6 @@ mod fdbased {
     use crate::sys::unix::waker::pipe::WakerInternal;
     use crate::sys::Selector;
     use crate::{Interest, Token};
-    use std::io;
-    use std::os::fd::AsRawFd;
 
     #[derive(Debug)]
     pub struct Waker {
@@ -65,7 +66,7 @@ mod fdbased {
     )),
     not(any(target_os = "solaris", target_os = "vita")),
 ))]
-pub use self::fdbased::Waker;
+pub use fdbased::Waker;
 
 #[cfg(all(
     not(mio_unsupported_force_waker_pipe),
@@ -144,7 +145,7 @@ mod eventfd {
     not(mio_unsupported_force_waker_pipe),
     any(target_os = "linux", target_os = "android", target_os = "espidf")
 ))]
-pub(crate) use self::eventfd::WakerInternal;
+pub(crate) use eventfd::WakerInternal;
 
 #[cfg(all(
     not(mio_unsupported_force_waker_pipe),
@@ -157,10 +158,10 @@ pub(crate) use self::eventfd::WakerInternal;
     )
 ))]
 mod kqueue {
+    use std::io;
+
     use crate::sys::Selector;
     use crate::Token;
-
-    use std::io;
 
     /// Waker backed by kqueue user space notifications (`EVFILT_USER`).
     ///
@@ -197,7 +198,7 @@ mod kqueue {
         target_os = "watchos",
     )
 ))]
-pub use self::kqueue::Waker;
+pub use kqueue::Waker;
 
 #[cfg(any(
     mio_unsupported_force_waker_pipe,
@@ -211,10 +212,11 @@ pub use self::kqueue::Waker;
     target_os = "vita",
 ))]
 mod pipe {
-    use crate::sys::unix::pipe;
     use std::fs::File;
     use std::io::{self, Read, Write};
     use std::os::fd::{AsRawFd, FromRawFd, RawFd};
+
+    use crate::sys::unix::pipe;
 
     /// Waker backed by a unix pipe.
     ///
@@ -299,7 +301,7 @@ mod pipe {
     target_os = "solaris",
     target_os = "vita",
 ))]
-pub(crate) use self::pipe::WakerInternal;
+pub(crate) use pipe::WakerInternal;
 
 #[cfg(any(
     mio_unsupported_force_poll_poll,
@@ -307,9 +309,10 @@ pub(crate) use self::pipe::WakerInternal;
     target_os = "vita"
 ))]
 mod poll {
+    use std::io;
+
     use crate::sys::Selector;
     use crate::Token;
-    use std::io;
 
     #[derive(Debug)]
     pub struct Waker {
@@ -336,4 +339,4 @@ mod poll {
     target_os = "solaris",
     target_os = "vita"
 ))]
-pub use self::poll::Waker;
+pub use poll::Waker;

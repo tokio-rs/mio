@@ -1,16 +1,16 @@
 #![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-use log::{debug, info};
-use mio::net::UdpSocket;
-use mio::{Events, Interest, Poll, Registry, Token};
 use std::net::{self, IpAddr, SocketAddr};
 #[cfg(unix)]
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
-use std::str;
 use std::sync::{Arc, Barrier};
-use std::thread;
 use std::time::Duration;
+use std::{str, thread};
+
+use log::{debug, info};
+use mio::net::UdpSocket;
+use mio::{Events, Interest, Poll, Registry, Token};
 
 #[macro_use]
 mod util;
@@ -32,7 +32,6 @@ const ID3: Token = Token(4);
 #[test]
 #[cfg(all(unix, not(mio_unsupported_force_poll_poll), not(debug_assertions)))]
 fn assert_size() {
-    use mio::net::*;
     use std::mem::size_of;
 
     // Without debug assertions enabled `TcpListener`, `TcpStream` and

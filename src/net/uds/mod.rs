@@ -1,10 +1,9 @@
 mod datagram;
-pub use self::datagram::UnixDatagram;
+pub use datagram::UnixDatagram;
 
 mod listener;
-pub use self::listener::UnixListener;
+pub use listener::UnixListener;
 
 mod stream;
-pub use self::stream::UnixStream;
-
 pub use crate::sys::SocketAddr;
+pub use stream::UnixStream;

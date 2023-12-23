@@ -1,6 +1,6 @@
-use crate::{sys, Token};
-
 use std::fmt;
+
+use crate::{sys, Token};
 
 /// A readiness event.
 ///

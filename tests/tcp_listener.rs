@@ -1,14 +1,15 @@
 #![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-use mio::net::TcpListener;
-use mio::{Interest, Token};
 use std::io::{self, Read};
 use std::net::{self, SocketAddr};
 #[cfg(unix)]
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
 use std::sync::{Arc, Barrier};
 use std::thread;
+
+use mio::net::TcpListener;
+use mio::{Interest, Token};
 
 mod util;
 use util::{

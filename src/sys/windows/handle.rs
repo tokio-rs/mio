@@ -1,4 +1,5 @@
 use std::os::windows::io::RawHandle;
+
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
 
 /// Wrapper around a Windows HANDLE so that we close it upon drop in all scenarios

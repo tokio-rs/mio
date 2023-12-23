@@ -1,11 +1,12 @@
-use super::socket_addr;
-use crate::net::{SocketAddr, UnixStream};
-use crate::sys::unix::net::new_socket;
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::net;
 use std::path::Path;
 use std::{io, mem};
+
+use crate::net::{SocketAddr, UnixStream};
+use crate::sys::unix::net::new_socket;
+use crate::sys::unix::uds::socket_addr;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
     let socket_address = {

@@ -1,9 +1,8 @@
 use std::ffi::c_void;
-use std::fmt;
 use std::fs::File;
-use std::io;
 use std::mem::size_of;
 use std::os::windows::io::AsRawHandle;
+use std::{fmt, io};
 
 use windows_sys::Wdk::Storage::FileSystem::NtCancelIoFileEx;
 use windows_sys::Wdk::System::IO::NtDeviceIoControlFile;
@@ -127,7 +126,7 @@ cfg_io_source! {
     };
     use windows_sys::Win32::System::WindowsProgramming::FILE_SKIP_SET_EVENT_ON_HANDLE;
 
-    use super::iocp::CompletionPort;
+    use crate::sys::windows::iocp::CompletionPort;
 
     const AFD_HELPER_ATTRIBUTES: OBJECT_ATTRIBUTES = OBJECT_ATTRIBUTES {
         Length: size_of::<OBJECT_ATTRIBUTES>() as u32,

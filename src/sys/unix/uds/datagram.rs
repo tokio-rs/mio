@@ -1,11 +1,11 @@
-use super::{socket_addr, SocketAddr};
-use crate::sys::unix::net::new_socket;
-
 use std::io;
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::net;
 use std::path::Path;
+
+use crate::sys::unix::net::new_socket;
+use crate::sys::unix::uds::{socket_addr, SocketAddr};
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixDatagram> {
     let (sockaddr, socklen) = socket_addr(path.as_os_str().as_bytes())?;

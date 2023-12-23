@@ -1,4 +1,3 @@
-use crate::{Interest, Token};
 use std::mem::{self, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
@@ -6,6 +5,8 @@ use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{cmp, io, ptr, slice};
+
+use crate::{Interest, Token};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -353,10 +354,9 @@ unsafe impl Sync for Events {}
 pub mod event {
     use std::fmt;
 
+    use super::{Filter, Flags};
     use crate::sys::Event;
     use crate::Token;
-
-    use super::{Filter, Flags};
 
     pub fn token(event: &Event) -> Token {
         Token(event.udata as usize)

@@ -18,7 +18,7 @@ mod epoll;
         target_os = "redox",
     )
 ))]
-pub(crate) use self::epoll::{event, Event, Events, Selector};
+pub(crate) use epoll::{event, Event, Events, Selector};
 
 #[cfg(any(
     mio_unsupported_force_poll_poll,
@@ -32,11 +32,11 @@ mod poll;
     target_os = "solaris",
     target_os = "vita"
 ))]
-pub(crate) use self::poll::{event, Event, Events, Selector};
+pub(crate) use poll::{event, Event, Events, Selector};
 
 cfg_io_source! {
     #[cfg(any(mio_unsupported_force_poll_poll, target_os = "solaris", target_os = "vita"))]
-    pub(crate) use self::poll::IoSourceState;
+    pub(crate) use poll::IoSourceState;
 }
 
 #[cfg(all(
@@ -67,4 +67,4 @@ mod kqueue;
         target_os = "watchos",
     ),
 ))]
-pub(crate) use self::kqueue::{event, Event, Events, Selector};
+pub(crate) use kqueue::{event, Event, Events, Selector};

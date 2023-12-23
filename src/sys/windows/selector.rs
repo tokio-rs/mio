@@ -1,16 +1,3 @@
-use super::afd::{self, Afd, AfdPollInfo};
-use super::io_status_block::IoStatusBlock;
-use super::Event;
-use crate::sys::Events;
-
-cfg_net! {
-    use crate::sys::event::{
-        ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
-    };
-    use crate::Interest;
-}
-
-use super::iocp::{CompletionPort, CompletionStatus};
 use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::io;
@@ -27,6 +14,11 @@ use windows_sys::Win32::Foundation::{
     ERROR_INVALID_HANDLE, ERROR_IO_PENDING, HANDLE, STATUS_CANCELLED, WAIT_TIMEOUT,
 };
 use windows_sys::Win32::System::IO::OVERLAPPED;
+
+use crate::sys::windows::afd::{self, Afd, AfdPollInfo};
+use crate::sys::windows::io_status_block::IoStatusBlock;
+use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
+use crate::sys::windows::{Event, Events};
 
 #[derive(Debug)]
 struct AfdGroup {
@@ -370,7 +362,7 @@ impl Selector {
 }
 
 cfg_io_source! {
-    use super::InternalState;
+    use super::{InternalState, Overlapped};
     use crate::Token;
 
     impl Selector {
@@ -497,7 +489,7 @@ impl SelectorInner {
                 continue;
             } else if iocp_event.token() % 2 == 1 {
                 // Handle is a named pipe. This could be extended to be any non-AFD event.
-                let callback = (*(iocp_event.overlapped() as *mut super::Overlapped)).callback;
+                let callback = (*(iocp_event.overlapped() as *mut Overlapped)).callback;
 
                 let len = events.len();
                 callback(iocp_event.entry(), Some(events));
@@ -697,9 +689,8 @@ impl Drop for SelectorInner {
                             // Custom event
                         } else if iocp_event.token() % 2 == 1 {
                             // Named pipe, dispatch the event so it can release resources
-                            let callback = unsafe {
-                                (*(iocp_event.overlapped() as *mut super::Overlapped)).callback
-                            };
+                            let callback =
+                                unsafe { (*(iocp_event.overlapped() as *mut Overlapped)).callback };
 
                             callback(iocp_event.entry(), None);
                         } else {
@@ -725,6 +716,11 @@ impl Drop for SelectorInner {
 }
 
 cfg_net! {
+    use crate::sys::event::{
+        ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
+    };
+    use crate::Interest;
+
     fn interests_to_afd_flags(interests: Interest) -> u32 {
         let mut flags = 0;
 

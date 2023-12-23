@@ -1,7 +1,6 @@
-use std::io;
-use std::mem;
 use std::net::SocketAddr;
 use std::sync::Once;
+use std::{io, mem};
 
 use windows_sys::Win32::Networking::WinSock::{
     closesocket, ioctlsocket, socket, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0,

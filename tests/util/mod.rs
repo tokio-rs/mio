@@ -273,6 +273,7 @@ pub fn set_linger_zero(socket: &TcpStream) {
 #[cfg(windows)]
 pub fn set_linger_zero(socket: &TcpStream) {
     use std::os::windows::io::AsRawSocket;
+
     use windows_sys::Win32::Networking::WinSock::{
         setsockopt, LINGER, SOCKET_ERROR, SOL_SOCKET, SO_LINGER,
     };

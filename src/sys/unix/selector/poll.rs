@@ -3,16 +3,16 @@
 // Permission to use this code has been granted by original author:
 // https://github.com/tokio-rs/mio/pull/1602#issuecomment-1218441031
 
-use crate::sys::unix::waker::WakerInternal;
-use crate::{Interest, Token};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::os::fd::{AsRawFd, RawFd};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use std::{cmp, fmt, io};
+
+use crate::sys::unix::waker::WakerInternal;
+use crate::{Interest, Token};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -540,10 +540,11 @@ pub struct Event {
 pub type Events = Vec<Event>;
 
 pub mod event {
+    use std::fmt;
+
     use crate::sys::unix::selector::poll::POLLRDHUP;
     use crate::sys::Event;
     use crate::Token;
-    use std::fmt;
 
     pub fn token(event: &Event) -> Token {
         event.token

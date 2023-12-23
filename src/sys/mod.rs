@@ -55,34 +55,34 @@ cfg_os_poll! {
 cfg_os_poll! {
     mod unix;
     #[allow(unused_imports)]
-    pub use self::unix::*;
+    pub use unix::*;
 }
 
 #[cfg(windows)]
 cfg_os_poll! {
     mod windows;
-    pub use self::windows::*;
+    pub use windows::*;
 }
 
 #[cfg(target_os = "wasi")]
 cfg_os_poll! {
     mod wasi;
-    pub(crate) use self::wasi::*;
+    pub(crate) use wasi::*;
 }
 
 cfg_not_os_poll! {
     mod shell;
-    pub(crate) use self::shell::*;
+    pub(crate) use shell::*;
 
     #[cfg(unix)]
     cfg_any_os_ext! {
         mod unix;
         #[cfg(feature = "os-ext")]
-        pub use self::unix::SourceFd;
+        pub use unix::SourceFd;
     }
 
     #[cfg(unix)]
     cfg_net! {
-        pub use self::unix::SocketAddr;
+        pub use unix::SocketAddr;
     }
 }

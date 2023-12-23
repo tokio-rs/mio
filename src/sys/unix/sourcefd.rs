@@ -1,7 +1,7 @@
-use crate::{event, Interest, Registry, Token};
-
 use std::io;
 use std::os::fd::RawFd;
+
+use crate::{event, Interest, Registry, Token};
 
 /// Adapter for [`RawFd`] providing an [`event::Source`] implementation.
 ///

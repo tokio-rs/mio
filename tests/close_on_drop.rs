@@ -10,7 +10,7 @@ use mio::{Events, Interest, Poll, Registry, Token};
 mod util;
 use util::{any_local_address, init};
 
-use self::TestState::{AfterRead, Initial};
+use TestState::{AfterRead, Initial};
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);

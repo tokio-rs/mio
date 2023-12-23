@@ -16,14 +16,14 @@ macro_rules! syscall {
 
 cfg_os_poll! {
     mod selector;
-    pub(crate) use self::selector::{event, Event, Events, Selector};
+    pub(crate) use selector::{event, Event, Events, Selector};
 
     mod sourcefd;
     #[cfg(feature = "os-ext")]
-    pub use self::sourcefd::SourceFd;
+    pub use sourcefd::SourceFd;
 
     mod waker;
-    pub(crate) use self::waker::Waker;
+    pub(crate) use waker::Waker;
 
     cfg_net! {
         mod net;
@@ -31,7 +31,7 @@ cfg_os_poll! {
         pub(crate) mod tcp;
         pub(crate) mod udp;
         pub(crate) mod uds;
-        pub use self::uds::SocketAddr;
+        pub use uds::SocketAddr;
     }
 
     cfg_io_source! {
@@ -40,6 +40,7 @@ cfg_os_poll! {
         mod stateless_io_source {
             use std::io;
             use std::os::fd::RawFd;
+
             use crate::Registry;
             use crate::Token;
             use crate::Interest;
@@ -90,10 +91,10 @@ cfg_os_poll! {
         }
 
         #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "solaris",target_os = "vita")))]
-        pub(crate) use self::stateless_io_source::IoSourceState;
+        pub(crate) use stateless_io_source::IoSourceState;
 
         #[cfg(any(mio_unsupported_force_poll_poll, target_os = "solaris", target_os = "vita"))]
-        pub(crate) use self::selector::IoSourceState;
+        pub(crate) use selector::IoSourceState;
     }
 
     #[cfg(any(
@@ -116,12 +117,12 @@ cfg_os_poll! {
 cfg_not_os_poll! {
     cfg_net! {
         mod uds;
-        pub use self::uds::SocketAddr;
+        pub use uds::SocketAddr;
     }
 
     cfg_any_os_ext! {
         mod sourcefd;
         #[cfg(feature = "os-ext")]
-        pub use self::sourcefd::SourceFd;
+        pub use sourcefd::SourceFd;
     }
 }

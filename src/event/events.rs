@@ -1,7 +1,7 @@
+use std::fmt;
+
 use crate::event::Event;
 use crate::sys;
-
-use std::fmt;
 
 /// A collection of readiness events.
 ///
