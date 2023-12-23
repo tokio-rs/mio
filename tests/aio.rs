@@ -4,14 +4,13 @@
 ))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-use mio::{event::Source, Events, Interest, Poll, Registry, Token};
-use std::{
-    fs::File,
-    io, mem,
-    os::unix::io::{AsRawFd, RawFd},
-    pin::Pin,
-    ptr,
-};
+use std::fs::File;
+use std::os::fd::{AsRawFd, RawFd};
+use std::pin::Pin;
+use std::{io, mem, ptr};
+
+use mio::event::Source;
+use mio::{Events, Interest, Poll, Registry, Token};
 
 mod util;
 use util::{expect_events, expect_no_events, init, temp_file, ExpectEvent};
