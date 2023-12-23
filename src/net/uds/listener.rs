@@ -1,11 +1,11 @@
-use crate::io_source::IoSource;
-use crate::net::{SocketAddr, UnixStream};
-use crate::{event, sys, Interest, Registry, Token};
-
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::{fmt, io};
+
+use crate::io_source::IoSource;
+use crate::net::{SocketAddr, UnixStream};
+use crate::{event, sys, Interest, Registry, Token};
 
 /// A non-blocking Unix domain socket server.
 pub struct UnixListener {
@@ -105,5 +105,11 @@ impl FromRawFd for UnixListener {
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixListener {
         UnixListener::from_std(FromRawFd::from_raw_fd(fd))
+    }
+}
+
+impl AsFd for UnixListener {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
     }
 }
