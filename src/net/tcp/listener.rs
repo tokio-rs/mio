@@ -1,8 +1,6 @@
 use std::net::{self, SocketAddr};
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "wasi"))]
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
-#[cfg(target_os = "wasi")]
-use std::os::wasi::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::{fmt, io};
@@ -166,21 +164,21 @@ impl fmt::Debug for TcpListener {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "wasi"))]
 impl IntoRawFd for TcpListener {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "wasi"))]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "wasi"))]
 impl FromRawFd for TcpListener {
     /// Converts a `RawFd` to a `TcpListener`.
     ///
@@ -193,7 +191,7 @@ impl FromRawFd for TcpListener {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "wasi"))]
 impl AsFd for TcpListener {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.inner.as_fd()
@@ -224,32 +222,5 @@ impl FromRawSocket for TcpListener {
     /// non-blocking mode.
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
         TcpListener::from_std(FromRawSocket::from_raw_socket(socket))
-    }
-}
-
-#[cfg(target_os = "wasi")]
-impl IntoRawFd for TcpListener {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_inner().into_raw_fd()
-    }
-}
-
-#[cfg(target_os = "wasi")]
-impl AsRawFd for TcpListener {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.as_raw_fd()
-    }
-}
-
-#[cfg(target_os = "wasi")]
-impl FromRawFd for TcpListener {
-    /// Converts a `RawFd` to a `TcpListener`.
-    ///
-    /// # Notes
-    ///
-    /// The caller is responsible for ensuring that the socket is in
-    /// non-blocking mode.
-    unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
-        TcpListener::from_std(FromRawFd::from_raw_fd(fd))
     }
 }

@@ -19,10 +19,8 @@ const DATA: &[u8] = b"Hello world!\n";
 
 #[cfg(not(windows))]
 fn get_first_listen_fd_listener() -> Option<std::net::TcpListener> {
-    #[cfg(unix)]
+    #[cfg(any(unix, target_os = "wasi"))]
     use std::os::fd::FromRawFd;
-    #[cfg(target_os = "wasi")]
-    use std::os::wasi::io::FromRawFd;
 
     let stdlistener = unsafe { std::net::TcpListener::from_raw_fd(3) };
     stdlistener.set_nonblocking(true).unwrap();

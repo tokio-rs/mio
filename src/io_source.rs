@@ -1,8 +1,6 @@
 use std::ops::{Deref, DerefMut};
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "wasi"))]
 use std::os::fd::AsRawFd;
-#[cfg(target_os = "wasi")]
-use std::os::wasi::io::AsRawFd;
 #[cfg(windows)]
 use std::os::windows::io::AsRawSocket;
 #[cfg(debug_assertions)]
