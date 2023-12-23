@@ -18,6 +18,9 @@
     )),
 ))]
 mod fdbased {
+    use std::io;
+    use std::os::fd::AsRawFd;
+
     #[cfg(all(
         not(mio_unsupported_force_waker_pipe),
         any(target_os = "linux", target_os = "android"),
@@ -35,8 +38,6 @@ mod fdbased {
     use crate::sys::unix::waker::pipe::WakerInternal;
     use crate::sys::Selector;
     use crate::{Interest, Token};
-    use std::io;
-    use std::os::fd::AsRawFd;
 
     #[derive(Debug)]
     pub struct Waker {

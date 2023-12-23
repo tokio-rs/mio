@@ -1,10 +1,6 @@
 use std::ops::{Deref, DerefMut};
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::AsRawFd;
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
 use std::os::fd::AsRawFd;
-#[cfg(target_os = "wasi")]
-use std::os::wasi::io::AsRawFd;
 #[cfg(windows)]
 use std::os::windows::io::AsRawSocket;
 #[cfg(debug_assertions)]
