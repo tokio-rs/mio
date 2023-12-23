@@ -1,11 +1,11 @@
-use crate::io_source::IoSource;
-use crate::{event, sys, Interest, Registry, Token};
-
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::{fmt, io};
+
+use crate::io_source::IoSource;
+use crate::{event, sys, Interest, Registry, Token};
 
 /// A Unix datagram socket.
 pub struct UnixDatagram {
@@ -246,5 +246,11 @@ impl From<UnixDatagram> for net::UnixDatagram {
         // mio::net::uds::UnixListener which ensures that we actually pass in a valid file
         // descriptor/socket
         unsafe { net::UnixDatagram::from_raw_fd(datagram.into_raw_fd()) }
+    }
+}
+
+impl AsFd for UnixDatagram {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
     }
 }

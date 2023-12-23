@@ -1,4 +1,4 @@
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::{fmt, io};
@@ -115,5 +115,11 @@ impl From<UnixListener> for net::UnixListener {
         // mio::net::uds::UnixListener which ensures that we actually pass in a valid file
         // descriptor/socket
         unsafe { net::UnixListener::from_raw_fd(listener.into_raw_fd()) }
+    }
+}
+
+impl AsFd for UnixListener {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
     }
 }

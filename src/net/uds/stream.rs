@@ -1,12 +1,12 @@
-use crate::io_source::IoSource;
-use crate::{event, sys, Interest, Registry, Token};
-
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
+
+use crate::io_source::IoSource;
+use crate::{event, sys, Interest, Registry, Token};
 
 /// A non-blocking Unix stream socket.
 pub struct UnixStream {
@@ -259,5 +259,11 @@ impl From<UnixStream> for net::UnixStream {
         // mio::net::uds::UnixStream which ensures that we actually pass in a valid file
         // descriptor/socket
         unsafe { net::UnixStream::from_raw_fd(stream.into_raw_fd()) }
+    }
+}
+
+impl AsFd for UnixStream {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
     }
 }
