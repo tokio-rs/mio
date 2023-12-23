@@ -15,7 +15,7 @@ use std::io;
 use std::net;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 #[cfg(unix)]
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
@@ -573,7 +573,7 @@ impl UdpSocket {
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use std::io;
     /// #[cfg(unix)]
-    /// use std::os::unix::io::AsRawFd;
+    /// use std::os::fd::AsRawFd;
     /// #[cfg(windows)]
     /// use std::os::windows::io::AsRawSocket;
     /// use mio::net::UdpSocket;

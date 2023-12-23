@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 #[cfg(unix)]
-use std::os::unix::io::AsRawFd;
+use std::os::fd::AsRawFd;
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::AsRawFd;
 #[cfg(windows)]
@@ -21,7 +21,7 @@ use crate::{event, Interest, Registry, Token};
 /// Mio supports registering any FD or socket that can be registered with the
 /// underlying OS selector. `IoSource` provides the necessary bridge.
 ///
-/// [`RawFd`]: std::os::unix::io::RawFd
+/// [`RawFd`]: std::os::fd::RawFd
 /// [`RawSocket`]: std::os::windows::io::RawSocket
 ///
 /// # Notes

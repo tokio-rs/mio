@@ -1,7 +1,7 @@
 use crate::{event, Interest, Registry, Token};
 
 use std::io;
-use std::os::unix::io::RawFd;
+use std::os::fd::RawFd;
 
 /// Adapter for [`RawFd`] providing an [`event::Source`] implementation.
 ///
@@ -38,7 +38,7 @@ use std::os::unix::io::RawFd;
 /// use mio::{Interest, Poll, Token};
 /// use mio::unix::SourceFd;
 ///
-/// use std::os::unix::io::AsRawFd;
+/// use std::os::fd::AsRawFd;
 /// use std::net::TcpListener;
 ///
 /// // Bind a std listener
@@ -62,7 +62,7 @@ use std::os::unix::io::RawFd;
 /// use mio::{event, Interest, Registry, Token};
 /// use mio::unix::SourceFd;
 ///
-/// use std::os::unix::io::RawFd;
+/// use std::os::fd::RawFd;
 /// use std::io;
 ///
 /// # #[allow(dead_code)]

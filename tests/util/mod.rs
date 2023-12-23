@@ -7,7 +7,7 @@ use std::mem::size_of;
 use std::net::SocketAddr;
 use std::ops::BitOr;
 #[cfg(unix)]
-use std::os::unix::io::AsRawFd;
+use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::sync::Once;
 use std::time::Duration;

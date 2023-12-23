@@ -8,7 +8,7 @@ use crate::sys::unix::waker::WakerInternal;
 use crate::{Interest, Token};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, RawFd};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};

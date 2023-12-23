@@ -24,7 +24,7 @@ cfg_io_source! {
     #[cfg(windows)]
     use std::os::windows::io::RawSocket;
     #[cfg(unix)]
-    use std::os::unix::io::RawFd;
+    use std::os::fd::RawFd;
 
     #[cfg(any(windows, unix))]
     use crate::{Registry, Token, Interest};

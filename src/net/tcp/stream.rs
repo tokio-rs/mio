@@ -2,7 +2,7 @@ use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
@@ -231,7 +231,7 @@ impl TcpStream {
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use std::io;
     /// #[cfg(unix)]
-    /// use std::os::unix::io::AsRawFd;
+    /// use std::os::fd::AsRawFd;
     /// #[cfg(windows)]
     /// use std::os::windows::io::AsRawSocket;
     /// use mio::net::TcpStream;

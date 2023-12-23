@@ -15,7 +15,7 @@ pub(in crate::sys) fn path_offset(sockaddr: &libc::sockaddr_un) -> usize {
 
 cfg_os_poll! {
     use std::cmp::Ordering;
-    use std::os::unix::io::{RawFd, FromRawFd};
+    use std::os::fd::{RawFd, FromRawFd};
     use std::{io, mem};
 
     pub(crate) mod datagram;

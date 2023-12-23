@@ -1,7 +1,7 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 
@@ -100,7 +100,7 @@ impl UnixStream {
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use std::io;
-    /// use std::os::unix::io::AsRawFd;
+    /// use std::os::fd::AsRawFd;
     /// use mio::net::UnixStream;
     ///
     /// let (stream1, stream2) = UnixStream::pair()?;

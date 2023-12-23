@@ -31,7 +31,7 @@ mod fdbased {
     use crate::sys::Selector;
     use crate::{Interest, Token};
     use std::io;
-    use std::os::unix::io::AsRawFd;
+    use std::os::fd::AsRawFd;
 
     #[derive(Debug)]
     pub struct Waker {
@@ -74,7 +74,7 @@ pub use self::fdbased::Waker;
 mod eventfd {
     use std::fs::File;
     use std::io::{self, Read, Write};
-    use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+    use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 
     /// Waker backed by `eventfd`.
     ///
@@ -214,7 +214,7 @@ mod pipe {
     use crate::sys::unix::pipe;
     use std::fs::File;
     use std::io::{self, Read, Write};
-    use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+    use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 
     /// Waker backed by a unix pipe.
     ///

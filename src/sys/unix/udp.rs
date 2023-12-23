@@ -3,7 +3,7 @@ use crate::sys::unix::net::{new_ip_socket, socket_addr};
 use std::io;
 use std::mem;
 use std::net::{self, SocketAddr};
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::fd::{AsRawFd, FromRawFd};
 
 pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {
     let fd = new_ip_socket(addr, libc::SOCK_DGRAM)?;

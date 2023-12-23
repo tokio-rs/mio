@@ -4,7 +4,7 @@
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
+use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
 use std::sync::{mpsc::channel, Arc, Barrier};
 use std::thread;
 use std::time::Duration;

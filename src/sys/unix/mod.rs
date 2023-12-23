@@ -38,7 +38,7 @@ cfg_os_poll! {
         #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "solaris", target_os = "vita")))]
         mod stateless_io_source {
             use std::io;
-            use std::os::unix::io::RawFd;
+            use std::os::fd::RawFd;
             use crate::Registry;
             use crate::Token;
             use crate::Interest;
