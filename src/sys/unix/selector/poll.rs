@@ -5,10 +5,7 @@
 
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::{AsRawFd, RawFd};
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;

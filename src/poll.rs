@@ -8,7 +8,7 @@
         target_os = "vita"
     )),
 ))]
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, RawFd};
 #[cfg(all(debug_assertions, not(target_os = "wasi")))]
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(all(debug_assertions, not(target_os = "wasi")))]

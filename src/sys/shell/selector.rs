@@ -1,6 +1,6 @@
 use std::io;
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, RawFd};
 use std::time::Duration;
 
 pub type Event = usize;

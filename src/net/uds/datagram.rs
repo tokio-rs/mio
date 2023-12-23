@@ -1,5 +1,5 @@
 use std::net::Shutdown;
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::{fmt, io};
@@ -135,7 +135,7 @@ impl UnixDatagram {
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use std::io;
-    /// use std::os::unix::io::AsRawFd;
+    /// use std::os::fd::AsRawFd;
     /// use mio::net::UnixDatagram;
     ///
     /// let (dgram1, dgram2) = UnixDatagram::pair()?;

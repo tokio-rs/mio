@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
+use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::ffi::OsStrExt;
-use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::{io, mem};

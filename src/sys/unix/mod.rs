@@ -38,13 +38,9 @@ cfg_os_poll! {
         #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "espidf", target_os = "hermit", target_os = "solaris", target_os = "vita")))]
         mod stateless_io_source {
             use std::io;
-            #[cfg(target_os = "hermit")]
-            use std::os::hermit::io::RawFd;
-            #[cfg(unix)]
-            use std::os::unix::io::RawFd;
-            use crate::Registry;
-            use crate::Token;
-            use crate::Interest;
+            use std::os::fd::RawFd;
+
+            use crate::{Registry, Token, Interest};
 
             pub(crate) struct IoSourceState;
 
