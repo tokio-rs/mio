@@ -1,27 +1,21 @@
-use super::socket_addr;
-use crate::net::{SocketAddr, UnixStream};
-use crate::sys::unix::net::new_socket;
+use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsRawFd, FromRawFd};
-use std::os::unix::net;
+use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::{io, mem};
 
-pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
-    let socket_address = {
-        let (sockaddr, socklen) = socket_addr(path.as_os_str().as_bytes())?;
-        SocketAddr::from_parts(sockaddr, socklen)
-    };
-
-    bind_addr(&socket_address)
-}
+use crate::net::UnixStream;
+use crate::sys::unix::net::new_socket;
+use crate::sys::unix::uds::{path_offset, unix_addr};
 
 pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
     let fd = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
     let socket = unsafe { net::UnixListener::from_raw_fd(fd) };
-    let sockaddr = address.raw_sockaddr() as *const libc::sockaddr_un as *const libc::sockaddr;
 
-    syscall!(bind(fd, sockaddr, *address.raw_socklen()))?;
+    let (unix_address, addrlen) = unix_addr(address);
+    let sockaddr = &unix_address as *const libc::sockaddr_un as *const libc::sockaddr;
+    syscall!(bind(fd, sockaddr, addrlen))?;
     syscall!(listen(fd, 1024))?;
 
     Ok(socket)
@@ -39,8 +33,6 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
     // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
     // abstract path.
     let mut sockaddr = unsafe { sockaddr.assume_init() };
-
-    sockaddr.sun_family = libc::AF_UNIX as libc::sa_family_t;
     let mut socklen = mem::size_of_val(&sockaddr) as libc::socklen_t;
 
     #[cfg(not(any(
@@ -106,11 +98,11 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
         Ok(s)
     });
 
-    socket
-        .map(UnixStream::from_std)
-        .map(|stream| (stream, SocketAddr::from_parts(sockaddr, socklen)))
-}
-
-pub(crate) fn local_addr(listener: &net::UnixListener) -> io::Result<SocketAddr> {
-    super::local_addr(listener.as_raw_fd())
+    let socket = socket.map(UnixStream::from_std)?;
+    let path_len = socklen as usize - path_offset(&sockaddr);
+    let address = SocketAddr::from_pathname(Path::new(OsStr::from_bytes(unsafe {
+        // SAFETY: going from i8 to u8 is fine in this context.
+        &*(&sockaddr.sun_path[..path_len] as *const [libc::c_char] as *const [u8])
+    })))?;
+    Ok((socket, address))
 }
