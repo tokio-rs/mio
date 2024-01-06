@@ -21,7 +21,7 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - name: Install Cargo-hack
       run: cargo install --debug cargo-hack
@@ -37,7 +37,7 @@ jobs:
     env:
       RUSTFLAGS: "--cfg mio_unsupported_force_poll_poll"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - name: Tests
       run: cargo test --all-features
@@ -49,7 +49,7 @@ jobs:
     env:
       RUSTFLAGS: "--cfg mio_unsupported_force_waker_pipe"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - name: Tests
       run: cargo test --all-features
@@ -63,7 +63,7 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
     - name: Install minimal verions
       run: cargo update -Zminimal-versions
@@ -77,7 +77,7 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: 1.74.0
@@ -88,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
     - name: Tests
       run: cargo test --all-features
@@ -96,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
@@ -106,7 +106,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - name: Check docs
       run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
@@ -114,7 +114,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt
@@ -127,7 +127,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - name: Install all targets
       run: make install_targets
@@ -144,7 +144,7 @@ jobs:
       matrix:
         target: ["aarch64-apple-ios", "aarch64-apple-tvos", "aarch64-unknown-openbsd", "arm64_32-apple-watchos", "armv7-sony-vita-newlibeabihf", "sparcv9-sun-solaris", "x86_64-pc-solaris", "x86_64-unknown-dragonfly", "x86_64-unknown-openbsd"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: rust-src
@@ -159,7 +159,7 @@ jobs:
       matrix:
         sanitizer: [address, leak, memory, thread]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
     - name: Add rust source
       run: rustup component add rust-src
