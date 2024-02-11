@@ -1,6 +1,9 @@
 use crate::{event, Interest, Registry, Token};
 
 use std::io;
+#[cfg(target_os = "hermit")]
+use std::os::hermit::io::RawFd;
+#[cfg(not(target_os = "hermit"))]
 use std::os::unix::io::RawFd;
 
 /// Adapter for [`RawFd`] providing an [`event::Source`] implementation.

@@ -1,6 +1,8 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
+#[cfg(target_os = "hermit")]
+use std::os::hermit::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(target_os = "wasi")]
@@ -84,6 +86,8 @@ impl TcpStream {
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         let socket = new_for_addr(addr)?;
         #[cfg(unix)]
+        let stream = unsafe { TcpStream::from_raw_fd(socket) };
+        #[cfg(target_os = "hermit")]
         let stream = unsafe { TcpStream::from_raw_fd(socket) };
         #[cfg(windows)]
         let stream = unsafe { TcpStream::from_raw_socket(socket as _) };
@@ -345,21 +349,21 @@ impl fmt::Debug for TcpStream {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 impl IntoRawFd for TcpStream {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 impl AsRawFd for TcpStream {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 impl FromRawFd for TcpStream {
     /// Converts a `RawFd` to a `TcpStream`.
     ///
