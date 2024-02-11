@@ -50,6 +50,9 @@ log = { version = "0.4.8", optional = true }
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.149"
 
+[target.'cfg(target_os = "hermit")'.dependencies]
+hermit-abi = { version = "0.3.6" }
+
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.52"
 features = [
@@ -87,6 +90,7 @@ targets = [
   "x86_64-unknown-linux-gnu",
   "x86_64-unknown-netbsd",
   "x86_64-unknown-openbsd",
+  "x86_64-unknown-hermit",
 ]
 
 [package.metadata.playground]

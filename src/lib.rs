@@ -40,6 +40,9 @@
 //!
 //! The available features are described in the [`features`] module.
 
+#[cfg(target_os = "hermit")]
+extern crate hermit_abi as libc;
+
 // macros used internally
 #[macro_use]
 mod macros;
