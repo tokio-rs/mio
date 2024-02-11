@@ -1,4 +1,6 @@
 use std::net::{self, SocketAddr};
+#[cfg(target_os = "hermit")]
+use std::os::hermit::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(target_os = "wasi")]
@@ -9,7 +11,7 @@ use std::{fmt, io};
 
 use crate::io_source::IoSource;
 use crate::net::TcpStream;
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 use crate::sys::tcp::set_reuseaddr;
 #[cfg(not(target_os = "wasi"))]
 use crate::sys::tcp::{bind, listen, new_for_addr};
@@ -58,7 +60,7 @@ impl TcpListener {
     #[cfg(not(target_os = "wasi"))]
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
         let socket = new_for_addr(addr)?;
-        #[cfg(unix)]
+        #[cfg(any(unix, target_os = "hermit"))]
         let listener = unsafe { TcpListener::from_raw_fd(socket) };
         #[cfg(windows)]
         let listener = unsafe { TcpListener::from_raw_socket(socket as _) };
@@ -166,21 +168,21 @@ impl fmt::Debug for TcpListener {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 impl IntoRawFd for TcpListener {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 impl FromRawFd for TcpListener {
     /// Converts a `RawFd` to a `TcpListener`.
     ///

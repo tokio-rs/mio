@@ -51,8 +51,8 @@ macro_rules! cfg_net {
 macro_rules! cfg_io_source {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "net", all(unix, feature = "os-ext")))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "net", all(unix, feature = "os-ext")))))]
+            #[cfg(any(feature = "net", all(any(unix, target_os = "hermit"), feature = "os-ext")))]
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "net", all(any(unix, target_os = "hermit"), feature = "os-ext")))))]
             $item
         )*
     }

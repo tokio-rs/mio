@@ -70,6 +70,12 @@ cfg_os_poll! {
     pub(crate) use self::wasi::*;
 }
 
+#[cfg(target_os = "hermit")]
+cfg_os_poll! {
+    mod unix;
+    pub(crate) use self::unix::*;
+}
+
 cfg_not_os_poll! {
     mod shell;
     pub(crate) use self::shell::*;

@@ -1,4 +1,6 @@
 use std::ops::{Deref, DerefMut};
+#[cfg(target_os = "hermit")]
+use std::os::hermit::io::AsRawFd;
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 #[cfg(target_os = "wasi")]
@@ -102,7 +104,7 @@ impl<T> DerefMut for IoSource<T> {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 impl<T> event::Source for IoSource<T>
 where
     T: AsRawFd,
