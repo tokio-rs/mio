@@ -19,6 +19,8 @@ const DATA: &[u8] = b"Hello world!\n";
 
 #[cfg(not(windows))]
 fn get_first_listen_fd_listener() -> Option<std::net::TcpListener> {
+    #[cfg(target_os = "hermit")]
+    use std::os::hermit::io::FromRawFd;
     #[cfg(unix)]
     use std::os::unix::io::FromRawFd;
     #[cfg(target_os = "wasi")]
