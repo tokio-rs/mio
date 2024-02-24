@@ -51,7 +51,7 @@ cfg_os_poll! {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 cfg_os_poll! {
     mod unix;
     #[allow(unused_imports)]
@@ -68,12 +68,6 @@ cfg_os_poll! {
 cfg_os_poll! {
     mod wasi;
     pub(crate) use self::wasi::*;
-}
-
-#[cfg(target_os = "hermit")]
-cfg_os_poll! {
-    mod unix;
-    pub(crate) use self::unix::*;
 }
 
 cfg_not_os_poll! {
