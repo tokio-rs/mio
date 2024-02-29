@@ -41,6 +41,14 @@ impl Event {
     pub(super) fn to_completion_status(&self) -> CompletionStatus {
         CompletionStatus::new(self.flags, self.data as usize, std::ptr::null_mut())
     }
+
+    #[cfg(feature = "os-ext")]
+    pub(super) fn to_completion_status_with_overlapped(
+        &self,
+        overlapped: *mut super::Overlapped,
+    ) -> CompletionStatus {
+        CompletionStatus::new(self.flags, self.data as usize, overlapped)
+    }
 }
 
 pub(crate) const READABLE_FLAGS: u32 = afd::POLL_RECEIVE
