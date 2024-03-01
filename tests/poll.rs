@@ -581,7 +581,7 @@ fn poll_registration() {
     let interests = Interest::READABLE;
     registry.register(&mut source, token, interests).unwrap();
     assert_eq!(source.registrations.len(), 1);
-    assert_eq!(source.registrations.get(0), Some(&(token, interests)));
+    assert_eq!(source.registrations.first(), Some(&(token, interests)));
     assert!(source.reregistrations.is_empty());
     assert_eq!(source.deregister_count, 0);
 
@@ -593,7 +593,7 @@ fn poll_registration() {
     assert_eq!(source.registrations.len(), 1);
     assert_eq!(source.reregistrations.len(), 1);
     assert_eq!(
-        source.reregistrations.get(0),
+        source.reregistrations.first(),
         Some(&(re_token, re_interests))
     );
     assert_eq!(source.deregister_count, 0);
