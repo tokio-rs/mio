@@ -1001,6 +1001,11 @@ impl Io {
     fn schedule_event(&self, me: &Arc<Inner>, mut event: Event) {
         // Alter the token so that the selector will identify the IOCP event as
         // one for a named pipe. This will be reversed in `event_done`
+        //
+        // `data` for named pipes is an auto-incrementing counter. Because
+        // `data` is `u64` we do not risk losing the most-significant bit
+        // (unless a user creates 2^62 named pipes during the lifetime of the
+        // process).
         event.data <<= 1;
         event.data += 1;
 
