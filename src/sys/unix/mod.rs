@@ -7,25 +7,7 @@ macro_rules! syscall {
         let res = unsafe { libc::$fn($($arg, )*) };
         #[cfg(target_os = "hermit")]
         if res < 0 {
-            let e = match -res {
-                libc::errno::EACCES => std::io::ErrorKind::PermissionDenied,
-                libc::errno::EADDRINUSE => std::io::ErrorKind::AddrInUse,
-                libc::errno::EADDRNOTAVAIL => std::io::ErrorKind::AddrNotAvailable,
-                libc::errno::EAGAIN => std::io::ErrorKind::WouldBlock,
-                libc::errno::ECONNABORTED => std::io::ErrorKind::ConnectionAborted,
-                libc::errno::ECONNREFUSED => std::io::ErrorKind::ConnectionRefused,
-                libc::errno::ECONNRESET => std::io::ErrorKind::ConnectionReset,
-                libc::errno::EEXIST => std::io::ErrorKind::AlreadyExists,
-                libc::errno::EINTR => std::io::ErrorKind::Interrupted,
-                libc::errno::EINVAL => std::io::ErrorKind::InvalidInput,
-                libc::errno::ENOENT => std::io::ErrorKind::NotFound,
-                libc::errno::ENOTCONN => std::io::ErrorKind::NotConnected,
-                libc::errno::EPERM => std::io::ErrorKind::PermissionDenied,
-                libc::errno::EPIPE => std::io::ErrorKind::BrokenPipe,
-                libc::errno::ETIMEDOUT => std::io::ErrorKind::TimedOut,
-                _ => panic!("Unknown error {}", res),
-            };
-            Err(std::io::Error::from(e))
+            Err(std::io::Error::last_os_error())
         } else {
             Ok(res)
         }
