@@ -42,6 +42,7 @@ impl Event {
         CompletionStatus::new(self.flags, self.data as usize, std::ptr::null_mut())
     }
 
+    #[cfg(feature = "os-ext")]
     pub(super) fn to_completion_status_with_overlapped(
         &self,
         overlapped: *mut super::Overlapped,
