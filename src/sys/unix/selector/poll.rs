@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 #[cfg(target_os = "hermit")]
 use std::os::hermit::io::{AsRawFd, RawFd};
-#[cfg(not(target_os = "hermit"))]
+#[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicUsize, Ordering};
