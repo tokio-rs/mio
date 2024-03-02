@@ -5,12 +5,12 @@ macro_rules! os_required {
 }
 
 mod selector;
-pub(crate) use self::selector::{event, Event, Events, Selector};
+pub(crate) use selector::{event, Event, Events, Selector};
 
 #[cfg(not(target_os = "wasi"))]
 mod waker;
 #[cfg(not(target_os = "wasi"))]
-pub(crate) use self::waker::Waker;
+pub(crate) use waker::Waker;
 
 cfg_net! {
     pub(crate) mod tcp;
@@ -24,7 +24,7 @@ cfg_io_source! {
     #[cfg(windows)]
     use std::os::windows::io::RawSocket;
     #[cfg(unix)]
-    use std::os::unix::io::RawFd;
+    use std::os::fd::RawFd;
 
     #[cfg(any(windows, unix))]
     use crate::{Registry, Token, Interest};

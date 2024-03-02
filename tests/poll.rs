@@ -1,11 +1,10 @@
 #![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-use std::net;
 use std::sync::{Arc, Barrier};
 use std::thread::{self, sleep};
 use std::time::Duration;
-use std::{fmt, io};
+use std::{fmt, io, net};
 
 use mio::event::Source;
 use mio::net::{TcpListener, TcpStream, UdpSocket};
@@ -115,11 +114,11 @@ fn poll_closes_fd() {
 fn drop_cancels_interest_and_shuts_down() {
     init();
 
-    use mio::net::TcpStream;
-    use std::io;
     use std::io::Read;
     use std::net::TcpListener;
-    use std::thread;
+    use std::{io, thread};
+
+    use mio::net::TcpStream;
 
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();

@@ -1,10 +1,9 @@
-use crate::sys::windows::Event;
-use crate::sys::windows::Selector;
-use crate::Token;
-
-use super::iocp::CompletionPort;
 use std::io;
 use std::sync::Arc;
+
+use crate::sys::windows::iocp::CompletionPort;
+use crate::sys::windows::{Event, Selector};
+use crate::Token;
 
 #[derive(Debug)]
 pub struct Waker {

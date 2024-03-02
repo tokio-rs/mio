@@ -24,8 +24,7 @@ use windows_sys::Win32::System::IO::{
 use crate::event::Source;
 use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
 use crate::sys::windows::{Event, Handle, Overlapped};
-use crate::Registry;
-use crate::{Interest, Token};
+use crate::{Interest, Registry, Token};
 
 /// Non-blocking windows named pipe.
 ///

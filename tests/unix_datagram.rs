@@ -1,10 +1,11 @@
 #![cfg(all(unix, feature = "os-poll", feature = "net"))]
 
-use mio::net::UnixDatagram;
-use mio::{Interest, Token};
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::net;
+
+use mio::net::UnixDatagram;
+use mio::{Interest, Token};
 
 #[macro_use]
 mod util;

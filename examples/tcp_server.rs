@@ -1,11 +1,12 @@
 // You can run this example from the root of the mio repo:
 // cargo run --example tcp_server --features="os-poll net"
-use mio::event::Event;
-use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interest, Poll, Registry, Token};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::str::from_utf8;
+
+use mio::event::Event;
+use mio::net::{TcpListener, TcpStream};
+use mio::{Events, Interest, Poll, Registry, Token};
 
 // Setup some tokens to allow us to identify which event is for which socket.
 const SERVER: Token = Token(0);

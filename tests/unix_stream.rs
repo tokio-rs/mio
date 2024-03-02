@@ -1,7 +1,5 @@
 #![cfg(all(unix, feature = "os-poll", feature = "net"))]
 
-use mio::net::UnixStream;
-use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::net;
@@ -9,6 +7,9 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Barrier};
 use std::thread;
+
+use mio::net::UnixStream;
+use mio::{Interest, Token};
 
 #[macro_use]
 mod util;

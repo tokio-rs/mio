@@ -1,6 +1,6 @@
-use crate::{sys, Registry, Token};
-
 use std::io;
+
+use crate::{sys, Registry, Token};
 
 /// Waker allows cross-thread waking of [`Poll`].
 ///

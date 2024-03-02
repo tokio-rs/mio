@@ -26,14 +26,14 @@
 //! give is to always call receive with a large enough buffer.
 
 mod tcp;
-pub use self::tcp::{TcpListener, TcpStream};
+pub use tcp::{TcpListener, TcpStream};
 
 #[cfg(not(target_os = "wasi"))]
 mod udp;
 #[cfg(not(target_os = "wasi"))]
-pub use self::udp::UdpSocket;
+pub use udp::UdpSocket;
 
 #[cfg(unix)]
 mod uds;
 #[cfg(unix)]
-pub use self::uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
+pub use uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};

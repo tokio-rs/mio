@@ -1,5 +1,5 @@
 mod socketaddr;
-pub use self::socketaddr::SocketAddr;
+pub use socketaddr::SocketAddr;
 
 /// Get the `sun_path` field offset of `sockaddr_un` for the target OS.
 ///
@@ -15,7 +15,7 @@ pub(in crate::sys) fn path_offset(sockaddr: &libc::sockaddr_un) -> usize {
 
 cfg_os_poll! {
     use std::cmp::Ordering;
-    use std::os::unix::io::{RawFd, FromRawFd};
+    use std::os::fd::{RawFd, FromRawFd};
     use std::{io, mem};
 
     pub(crate) mod datagram;
@@ -129,10 +129,11 @@ cfg_os_poll! {
 
     #[cfg(test)]
     mod tests {
-        use super::{path_offset, socket_addr};
         use std::os::unix::ffi::OsStrExt;
         use std::path::Path;
         use std::str;
+
+        use super::{path_offset, socket_addr};
 
         #[test]
         fn pathname_address() {

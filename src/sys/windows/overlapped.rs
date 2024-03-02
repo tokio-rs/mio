@@ -1,9 +1,9 @@
-use crate::sys::windows::Event;
-
 use std::cell::UnsafeCell;
 use std::fmt;
 
 use windows_sys::Win32::System::IO::{OVERLAPPED, OVERLAPPED_ENTRY};
+
+use crate::sys::windows::Event;
 
 #[repr(C)]
 pub(crate) struct Overlapped {

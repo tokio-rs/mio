@@ -7,7 +7,7 @@ use std::mem::size_of;
 use std::net::SocketAddr;
 use std::ops::BitOr;
 #[cfg(unix)]
-use std::os::unix::io::AsRawFd;
+use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::sync::Once;
 use std::time::Duration;
@@ -273,6 +273,7 @@ pub fn set_linger_zero(socket: &TcpStream) {
 #[cfg(windows)]
 pub fn set_linger_zero(socket: &TcpStream) {
     use std::os::windows::io::AsRawSocket;
+
     use windows_sys::Win32::Networking::WinSock::{
         setsockopt, LINGER, SOCKET_ERROR, SOL_SOCKET, SO_LINGER,
     };

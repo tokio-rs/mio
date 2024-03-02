@@ -1,12 +1,13 @@
 #![cfg(all(unix, feature = "os-poll", feature = "net"))]
 
-use mio::net::UnixListener;
-use mio::{Interest, Token};
 use std::io::{self, Read};
 use std::os::unix::net;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 use std::thread;
+
+use mio::net::UnixListener;
+use mio::{Interest, Token};
 
 #[macro_use]
 mod util;

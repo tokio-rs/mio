@@ -1,11 +1,12 @@
-use crate::{Interest, Token};
 use std::mem::{self, MaybeUninit};
 use std::ops::{Deref, DerefMut};
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{cmp, io, ptr, slice};
+
+use crate::{Interest, Token};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -65,24 +66,23 @@ macro_rules! kevent {
 pub struct Selector {
     #[cfg(debug_assertions)]
     id: usize,
-    kq: RawFd,
+    kq: OwnedFd,
 }
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
-        let kq = syscall!(kqueue())?;
-        let selector = Selector {
+        // SAFETY: `kqueue(2)` ensures the fd is valid.
+        let kq = unsafe { OwnedFd::from_raw_fd(syscall!(kqueue())?) };
+        syscall!(fcntl(kq.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC))?;
+        Ok(Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             kq,
-        };
-
-        syscall!(fcntl(kq, libc::F_SETFD, libc::FD_CLOEXEC))?;
-        Ok(selector)
+        })
     }
 
     pub fn try_clone(&self) -> io::Result<Selector> {
-        syscall!(fcntl(self.kq, libc::F_DUPFD_CLOEXEC, super::LOWEST_FD)).map(|kq| Selector {
+        self.kq.try_clone().map(|kq| Selector {
             // It's the same selector, so we use the same id.
             #[cfg(debug_assertions)]
             id: self.id,
@@ -106,7 +106,7 @@ impl Selector {
 
         events.clear();
         syscall!(kevent(
-            self.kq,
+            self.kq.as_raw_fd(),
             ptr::null(),
             0,
             events.as_mut_ptr(),
@@ -156,7 +156,7 @@ impl Selector {
             // the array.
             slice::from_raw_parts_mut(changes[0].as_mut_ptr(), n_changes)
         };
-        kevent_register(self.kq, changes, &[libc::EPIPE as i64])
+        kevent_register(self.kq.as_raw_fd(), changes, &[libc::EPIPE as i64])
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
@@ -186,7 +186,7 @@ impl Selector {
         //
         // For the explanation of ignoring `EPIPE` see `register`.
         kevent_register(
-            self.kq,
+            self.kq.as_raw_fd(),
             &mut changes,
             &[libc::ENOENT as i64, libc::EPIPE as i64],
         )
@@ -204,7 +204,7 @@ impl Selector {
         // the ENOENT error when it comes up. The ENOENT error informs us that
         // the filter wasn't there in first place, but we don't really care
         // about that since our goal is to remove it.
-        kevent_register(self.kq, &mut changes, &[libc::ENOENT as i64])
+        kevent_register(self.kq.as_raw_fd(), &mut changes, &[libc::ENOENT as i64])
     }
 
     // Used by `Waker`.
@@ -224,7 +224,8 @@ impl Selector {
             token.0
         );
 
-        syscall!(kevent(self.kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
+        let kq = self.kq.as_raw_fd();
+        syscall!(kevent(kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
             if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
                 Err(io::Error::from_raw_os_error(kevent.data as i32))
             } else {
@@ -250,7 +251,8 @@ impl Selector {
         );
         kevent.fflags = libc::NOTE_TRIGGER;
 
-        syscall!(kevent(self.kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
+        let kq = self.kq.as_raw_fd();
+        syscall!(kevent(kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
             if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
                 Err(io::Error::from_raw_os_error(kevent.data as i32))
             } else {
@@ -314,15 +316,7 @@ cfg_io_source! {
 
 impl AsRawFd for Selector {
     fn as_raw_fd(&self) -> RawFd {
-        self.kq
-    }
-}
-
-impl Drop for Selector {
-    fn drop(&mut self) {
-        if let Err(err) = syscall!(close(self.kq)) {
-            error!("error closing kqueue: {}", err);
-        }
+        self.kq.as_raw_fd()
     }
 }
 
@@ -360,10 +354,9 @@ unsafe impl Sync for Events {}
 pub mod event {
     use std::fmt;
 
+    use super::{Filter, Flags};
     use crate::sys::Event;
     use crate::Token;
-
-    use super::{Filter, Flags};
 
     pub fn token(event: &Event) -> Token {
         Token(event.udata as usize)

@@ -1,10 +1,11 @@
 #![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-use mio::{Events, Poll, Token, Waker};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
+
+use mio::{Events, Poll, Token, Waker};
 
 mod util;
 use util::{assert_send, assert_sync, expect_no_events, init};

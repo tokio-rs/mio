@@ -1,7 +1,7 @@
 use std::fmt;
 
-use super::afd;
-use super::iocp::CompletionStatus;
+use crate::sys::windows::afd;
+use crate::sys::windows::iocp::CompletionStatus;
 use crate::Token;
 
 #[derive(Clone)]

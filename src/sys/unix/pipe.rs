@@ -3,7 +3,7 @@
 //! See the [`new`] function for documentation.
 
 use std::io;
-use std::os::unix::io::RawFd;
+use std::os::fd::RawFd;
 
 pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
     let mut fds: [RawFd; 2] = [-1, -1];
@@ -80,7 +80,7 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
 cfg_os_ext! {
 use std::fs::File;
 use std::io::{IoSlice, IoSliceMut, Read, Write};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd};
 use std::process::{ChildStderr, ChildStdin, ChildStdout};
 
 use crate::io_source::IoSource;
@@ -260,7 +260,7 @@ impl Sender {
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use std::io;
-    /// use std::os::unix::io::AsRawFd;
+    /// use std::os::fd::AsRawFd;
     /// use mio::unix::pipe;
     ///
     /// let (sender, receiver) = pipe::new()?;
@@ -425,7 +425,7 @@ impl Receiver {
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use std::io;
-    /// use std::os::unix::io::AsRawFd;
+    /// use std::os::fd::AsRawFd;
     /// use mio::unix::pipe;
     ///
     /// let (sender, receiver) = pipe::new()?;
@@ -540,11 +540,9 @@ impl From<ChildStderr> for Receiver {
     }
 }
 
-impl FromRawFd for Receiver {
-    unsafe fn from_raw_fd(fd: RawFd) -> Receiver {
-        Receiver {
-            inner: IoSource::new(File::from_raw_fd(fd)),
-        }
+impl IntoRawFd for Receiver {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_inner().into_raw_fd()
     }
 }
 
@@ -554,9 +552,17 @@ impl AsRawFd for Receiver {
     }
 }
 
-impl IntoRawFd for Receiver {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_inner().into_raw_fd()
+impl FromRawFd for Receiver {
+    unsafe fn from_raw_fd(fd: RawFd) -> Receiver {
+        Receiver {
+            inner: IoSource::new(File::from_raw_fd(fd)),
+        }
+    }
+}
+
+impl AsFd for Receiver {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
     }
 }
 
