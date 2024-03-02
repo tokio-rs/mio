@@ -30,7 +30,6 @@ cfg_os_poll! {
         pub(crate) mod tcp;
         pub(crate) mod udp;
         pub(crate) mod uds;
-        pub use self::uds::SocketAddr;
     }
 
     cfg_io_source! {
@@ -113,11 +112,6 @@ cfg_os_poll! {
 }
 
 cfg_not_os_poll! {
-    cfg_net! {
-        mod uds;
-        pub use self::uds::SocketAddr;
-    }
-
     cfg_any_os_ext! {
         mod sourcefd;
         #[cfg(feature = "os-ext")]

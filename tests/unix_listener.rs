@@ -133,17 +133,51 @@ fn unix_listener_deregister() {
     handle.join().unwrap();
 }
 
-#[cfg(target_os = "linux")]
 #[test]
+#[cfg(target_os = "linux")]
 fn unix_listener_abstract_namespace() {
     use rand::Rng;
+    use std::os::linux::net::SocketAddrExt;
+    use std::os::unix::net::SocketAddr;
+
+    let (mut poll, mut events) = init_with_poll();
+    let barrier = Arc::new(Barrier::new(2));
+
     let num: u64 = rand::thread_rng().gen();
-    let name = format!("\u{0000}-mio-abstract-uds-{}", num);
-    let listener = UnixListener::bind(&name).unwrap();
+    let name = format!("mio-abstract-uds-{}", num);
+    let address = SocketAddr::from_abstract_name(name.as_bytes()).unwrap();
+    let mut listener = UnixListener::bind_addr(&address).unwrap();
     assert_eq!(
-        listener.local_addr().unwrap().as_abstract_namespace(),
-        Some(&name.as_bytes()[1..]),
+        listener.local_addr().unwrap().as_abstract_name(),
+        address.as_abstract_name(),
     );
+
+    poll.registry()
+        .register(
+            &mut listener,
+            TOKEN_1,
+            Interest::WRITABLE.add(Interest::READABLE),
+        )
+        .unwrap();
+    expect_no_events(&mut poll, &mut events);
+
+    let barrier2 = barrier.clone();
+    let handle = thread::spawn(move || {
+        let conn = net::UnixStream::connect_addr(&address).unwrap();
+        barrier2.wait();
+        drop(conn);
+    });
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+    );
+
+    let (_, address) = listener.accept().unwrap();
+    assert!(address.is_unnamed());
+
+    barrier.wait();
+    handle.join().unwrap();
 }
 
 fn smoke_test<F>(new_listener: F, test_name: &'static str)

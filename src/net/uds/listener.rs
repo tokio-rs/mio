@@ -1,11 +1,11 @@
-use crate::io_source::IoSource;
-use crate::net::{SocketAddr, UnixStream};
-use crate::{event, sys, Interest, Registry, Token};
-
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net;
+use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::{fmt, io};
+
+use crate::io_source::IoSource;
+use crate::net::UnixStream;
+use crate::{event, sys, Interest, Registry, Token};
 
 /// A non-blocking Unix domain socket server.
 pub struct UnixListener {
@@ -15,7 +15,8 @@ pub struct UnixListener {
 impl UnixListener {
     /// Creates a new `UnixListener` bound to the specified socket `path`.
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
-        sys::uds::listener::bind(path.as_ref()).map(UnixListener::from_std)
+        let addr = SocketAddr::from_pathname(path)?;
+        UnixListener::bind_addr(&addr)
     }
 
     /// Creates a new `UnixListener` bound to the specified socket `address`.
@@ -44,8 +45,8 @@ impl UnixListener {
     }
 
     /// Returns the local socket address of this listener.
-    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
-        sys::uds::listener::local_addr(&self.inner)
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.local_addr()
     }
 
     /// Returns the value of the `SO_ERROR` option.

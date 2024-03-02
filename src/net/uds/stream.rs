@@ -1,12 +1,11 @@
 use crate::io_source::IoSource;
-use crate::net::SocketAddr;
 use crate::{event, sys, Interest, Registry, Token};
 
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net;
+use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 
 /// A non-blocking Unix stream socket.
@@ -20,7 +19,8 @@ impl UnixStream {
     /// This may return a `WouldBlock` in which case the socket connection
     /// cannot be completed immediately. Usually it means the backlog is full.
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
-        sys::uds::stream::connect(path.as_ref()).map(UnixStream::from_std)
+        let addr = SocketAddr::from_pathname(path)?;
+        UnixStream::connect_addr(&addr)
     }
 
     /// Connects to the socket named by `address`.
@@ -59,13 +59,13 @@ impl UnixStream {
     }
 
     /// Returns the socket address of the local half of this connection.
-    pub fn local_addr(&self) -> io::Result<sys::SocketAddr> {
-        sys::uds::stream::local_addr(&self.inner)
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.local_addr()
     }
 
     /// Returns the socket address of the remote half of this connection.
-    pub fn peer_addr(&self) -> io::Result<sys::SocketAddr> {
-        sys::uds::stream::peer_addr(&self.inner)
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.peer_addr()
     }
 
     /// Returns the value of the `SO_ERROR` option.
