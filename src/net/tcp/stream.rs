@@ -88,9 +88,7 @@ impl TcpStream {
     #[cfg(not(target_os = "wasi"))]
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         let socket = new_for_addr(addr)?;
-        #[cfg(unix)]
-        let stream = unsafe { TcpStream::from_raw_fd(socket) };
-        #[cfg(target_os = "hermit")]
+        #[cfg(any(unix, target_os = "hermit"))]
         let stream = unsafe { TcpStream::from_raw_fd(socket) };
         #[cfg(windows)]
         let stream = unsafe { TcpStream::from_raw_socket(socket as _) };
