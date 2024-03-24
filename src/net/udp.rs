@@ -699,19 +699,15 @@ impl FromRawSocket for UdpSocket {
 }
 
 impl From<UdpSocket> for net::UdpSocket {
-    /// Converts a `mio::net::UdpSocket` into a `std::net::UdpSocket`
     fn from(socket: UdpSocket) -> Self {
         // Safety: This is safe since we are extracting the raw fd from a well-constructed
         // mio::net::UdpSocket which ensures that we actually pass in a valid file
         // descriptor/socket
         unsafe {
             #[cfg(any(unix, target_os = "hermit"))]
-            let std_sock = net::UdpSocket::from_raw_fd(socket.into_raw_fd());
-
+            net::UdpSocket::from_raw_fd(socket.into_raw_fd())
             #[cfg(windows)]
-            let std_sock = net::UdpSocket::from_raw_socket(socket.into_raw_socket());
-
-            std_sock
+            net::UdpSocket::from_raw_socket(socket.into_raw_socket())
         }
     }
 }

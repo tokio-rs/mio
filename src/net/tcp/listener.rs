@@ -250,19 +250,15 @@ impl FromRawFd for TcpListener {
 }
 
 impl From<TcpListener> for net::TcpListener {
-    /// Converts a `mio::net::TcpListener` into a `std::net::TcpListener`
     fn from(listener: TcpListener) -> Self {
         // Safety: This is safe since we are extracting the raw fd from a well-constructed
         // mio::net::TcpListener which ensures that we actually pass in a valid file
         // descriptor/socket
         unsafe {
             #[cfg(any(unix, target_os = "hermit"))]
-            let std_listener = net::TcpListener::from_raw_fd(listener.into_raw_fd());
-
+            net::TcpListener::from_raw_fd(listener.into_raw_fd())
             #[cfg(windows)]
-            let std_listener = net::TcpListener::from_raw_socket(listener.into_raw_socket());
-
-            std_listener
+            net::TcpListener::from_raw_socket(listener.into_raw_socket())
         }
     }
 }
