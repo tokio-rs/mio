@@ -256,9 +256,13 @@ impl From<TcpListener> for net::TcpListener {
         // descriptor/socket
         unsafe {
             #[cfg(any(unix, target_os = "hermit"))]
-            net::TcpListener::from_raw_fd(listener.into_raw_fd())
+            {
+                net::TcpListener::from_raw_fd(listener.into_raw_fd())
+            }
             #[cfg(windows)]
-            net::TcpListener::from_raw_socket(listener.into_raw_socket())
+            {
+                net::TcpListener::from_raw_socket(listener.into_raw_socket())
+            }
         }
     }
 }

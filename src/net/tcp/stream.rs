@@ -438,9 +438,13 @@ impl From<TcpStream> for net::TcpStream {
         // descriptor/socket
         unsafe {
             #[cfg(any(unix, target_os = "hermit"))]
-            net::TcpStream::from_raw_fd(stream.into_raw_fd())
+            {
+                net::TcpStream::from_raw_fd(stream.into_raw_fd())
+            }
             #[cfg(windows)]
-            net::TcpStream::from_raw_socket(stream.into_raw_socket())
+            {
+                net::TcpStream::from_raw_socket(stream.into_raw_socket())
+            }
         }
     }
 }

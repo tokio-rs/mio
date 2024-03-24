@@ -705,9 +705,13 @@ impl From<UdpSocket> for net::UdpSocket {
         // descriptor/socket
         unsafe {
             #[cfg(any(unix, target_os = "hermit"))]
-            net::UdpSocket::from_raw_fd(socket.into_raw_fd())
+            {
+                net::UdpSocket::from_raw_fd(socket.into_raw_fd())
+            }
             #[cfg(windows)]
-            net::UdpSocket::from_raw_socket(socket.into_raw_socket())
+            {
+                net::UdpSocket::from_raw_socket(socket.into_raw_socket())
+            }
         }
     }
 }
