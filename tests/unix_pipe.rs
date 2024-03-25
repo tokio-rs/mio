@@ -53,6 +53,7 @@ fn smoke() {
 }
 
 #[test]
+#[cfg_attr(target_os = "nto", ignore = "Read close events are detected by NTO")]
 fn event_when_sender_is_dropped() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(8);
@@ -91,6 +92,7 @@ fn event_when_sender_is_dropped() {
 }
 
 #[test]
+#[cfg_attr(target_os = "nto", ignore = "Read close events are detected by NTO")]
 fn event_when_receiver_is_dropped() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(8);
@@ -124,10 +126,10 @@ fn event_when_receiver_is_dropped() {
 }
 
 #[test]
+#[cfg_attr(target_os = "nto", ignore = "Read close events are detected by NTO")]
 fn from_child_process_io() {
     // `cat` simply echo everything that we write via standard in.
     let mut child = Command::new("cat")
-        .env_clear()
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -175,7 +177,6 @@ fn from_child_process_io() {
 fn nonblocking_child_process_io() {
     // `cat` simply echo everything that we write via standard in.
     let mut child = Command::new("cat")
-        .env_clear()
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
