@@ -130,7 +130,8 @@ fn drop_cancels_interest_and_shuts_down() {
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("set_read_timeout");
         match stream.read(&mut [0; 16]) {
-            Ok(_) => (),
+            Ok(0) => (),
+            Ok(n) => panic!("unexpected read of {n} bytes"),
             Err(err) => {
                 if err.kind() != io::ErrorKind::UnexpectedEof {
                     panic!("{}", err);
