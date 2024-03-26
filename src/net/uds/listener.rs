@@ -107,3 +107,12 @@ impl FromRawFd for UnixListener {
         UnixListener::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
+
+impl From<UnixListener> for net::UnixListener {
+    fn from(listener: UnixListener) -> Self {
+        // Safety: This is safe since we are extracting the raw fd from a well-constructed
+        // mio::net::uds::UnixListener which ensures that we actually pass in a valid file
+        // descriptor/socket
+        unsafe { net::UnixListener::from_raw_fd(listener.into_raw_fd()) }
+    }
+}
