@@ -255,7 +255,7 @@ impl From<TcpListener> for net::TcpListener {
         // mio::net::TcpListener which ensures that we actually pass in a valid file
         // descriptor/socket
         unsafe {
-            #[cfg(any(unix, target_os = "hermit"))]
+            #[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
             {
                 net::TcpListener::from_raw_fd(listener.into_raw_fd())
             }

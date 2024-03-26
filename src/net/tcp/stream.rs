@@ -437,7 +437,7 @@ impl From<TcpStream> for net::TcpStream {
         // mio::net::TcpStream which ensures that we actually pass in a valid file
         // descriptor/socket
         unsafe {
-            #[cfg(any(unix, target_os = "hermit"))]
+            #[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
             {
                 net::TcpStream::from_raw_fd(stream.into_raw_fd())
             }

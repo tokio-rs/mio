@@ -704,7 +704,7 @@ impl From<UdpSocket> for net::UdpSocket {
         // mio::net::UdpSocket which ensures that we actually pass in a valid file
         // descriptor/socket
         unsafe {
-            #[cfg(any(unix, target_os = "hermit"))]
+            #[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
             {
                 net::UdpSocket::from_raw_fd(socket.into_raw_fd())
             }
