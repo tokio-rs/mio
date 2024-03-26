@@ -187,6 +187,7 @@ fn unix_stream_peer_addr() {
 
 #[test]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
+#[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
 fn unix_stream_shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_read");
@@ -365,6 +366,7 @@ fn unix_stream_shutdown_both() {
 
 #[test]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
+#[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
 fn unix_stream_shutdown_listener_write() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
