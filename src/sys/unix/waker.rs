@@ -108,9 +108,9 @@ mod eventfd {
             Ok(WakerInternal { fd: file })
         }
 
+        #[allow(clippy::unused_io_amount)] // Don't care about partial writes.
         pub fn wake(&self) -> io::Result<()> {
             let buf: [u8; 8] = 1u64.to_ne_bytes();
-            #[allow(clippy::unused_io_amount)] // Don't care about partial writes.
             match (&self.fd).write(&buf) {
                 Ok(_) => Ok(()),
                 Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
@@ -129,9 +129,9 @@ mod eventfd {
         }
 
         /// Reset the eventfd object, only need to call this if `wake` fails.
+        #[allow(clippy::unused_io_amount)] // Don't care about partial reads.
         fn reset(&self) -> io::Result<()> {
             let mut buf: [u8; 8] = 0u64.to_ne_bytes();
-            #[allow(clippy::unused_io_amount)] // Don't care about partial reads.
             match (&self.fd).read(&mut buf) {
                 Ok(_) => Ok(()),
                 // If the `Waker` hasn't been awoken yet this will return a
