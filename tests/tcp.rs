@@ -622,6 +622,7 @@ fn write_error() {
     let buf = [0; 1024];
     loop {
         match s.write(&buf) {
+            Ok(0) => panic!("unexpected end"),
             Ok(_) => {}
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => wait_writable(),
             Err(e) => {
