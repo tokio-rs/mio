@@ -430,3 +430,21 @@ impl FromRawFd for TcpStream {
         TcpStream::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
+
+impl From<TcpStream> for net::TcpStream {
+    fn from(stream: TcpStream) -> Self {
+        // Safety: This is safe since we are extracting the raw fd from a well-constructed
+        // mio::net::TcpStream which ensures that we actually pass in a valid file
+        // descriptor/socket
+        unsafe {
+            #[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
+            {
+                net::TcpStream::from_raw_fd(stream.into_raw_fd())
+            }
+            #[cfg(windows)]
+            {
+                net::TcpStream::from_raw_socket(stream.into_raw_socket())
+            }
+        }
+    }
+}

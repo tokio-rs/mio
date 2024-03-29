@@ -234,3 +234,12 @@ impl FromRawFd for UnixDatagram {
         UnixDatagram::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
+
+impl From<UnixDatagram> for net::UnixDatagram {
+    fn from(datagram: UnixDatagram) -> Self {
+        // Safety: This is safe since we are extracting the raw fd from a well-constructed
+        // mio::net::uds::UnixListener which ensures that we actually pass in a valid file
+        // descriptor/socket
+        unsafe { net::UnixDatagram::from_raw_fd(datagram.into_raw_fd()) }
+    }
+}
