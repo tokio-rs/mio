@@ -28,8 +28,8 @@ impl Event {
     ///
     /// # Notes
     ///
-    /// Out-of-band (OOB) data also triggers readable events. But must
-    /// application don't actually read OOB data, this could leave an
+    /// Out-of-band (OOB) data also triggers readable events. But most
+    /// applications don't actually read OOB data, this could leave an
     /// application open to a Denial-of-Service (Dos) attack, see
     /// <https://github.com/sandstorm-io/sandstorm-website/blob/58f93346028c0576e8147627667328eaaf4be9fa/_posts/2015-04-08-osx-security-bug.md>.
     /// However because Mio uses edge-triggers it will not result in an infinite
