@@ -113,7 +113,7 @@ cfg_os_poll! {
             #[cfg(not(any(target_os = "espidf", target_os = "vita", target_os = "nto")))]
             syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
             syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
-            #[cfg(not(any(target_os = "espidf", target_os = "vita")))]
+            #[cfg(not(any(target_os = "espidf", target_os = "vita", target_os = "nto")))]
             syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
         }
 

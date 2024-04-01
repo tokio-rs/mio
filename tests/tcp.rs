@@ -701,7 +701,7 @@ fn write_shutdown() {
     // Now, shutdown the write half of the socket.
     socket.shutdown(Shutdown::Write).unwrap();
 
-    // POLLRDHUP isn't supported on Solaris, 
+    // POLLRDHUP isn't supported on Solaris,
     if cfg!(any(target_os = "solaris", target_os = "nto")) {
         wait!(poll, is_readable, false);
     } else {
