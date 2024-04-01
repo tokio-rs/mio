@@ -82,8 +82,11 @@ cfg_os_poll! {
             target_os = "watchos",
             target_os = "espidf",
             target_os = "vita",
+            target_os = "nto",
         )))]
         let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+        #[cfg(target_os = "nto")]
+        let flags = flags | libc::SOCK_CLOEXEC;
 
         let mut fds = [-1; 2];
         syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;
@@ -103,13 +106,14 @@ cfg_os_poll! {
             target_os = "watchos",
             target_os = "espidf",
             target_os = "vita",
+            target_os = "nto",
         ))]
         {
             syscall!(fcntl(fds[0], libc::F_SETFL, libc::O_NONBLOCK))?;
-            #[cfg(not(any(target_os = "espidf", target_os = "vita")))]
+            #[cfg(not(any(target_os = "espidf", target_os = "vita", target_os = "nto")))]
             syscall!(fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC))?;
             syscall!(fcntl(fds[1], libc::F_SETFL, libc::O_NONBLOCK))?;
-            #[cfg(not(any(target_os = "espidf", target_os = "vita")))]
+            #[cfg(not(any(target_os = "espidf", target_os = "vita", target_os = "nto")))]
             syscall!(fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC))?;
         }
 
