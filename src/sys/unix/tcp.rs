@@ -88,6 +88,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
     #[cfg(any(
         target_os = "aix",
         target_os = "ios",
+        target_os = "visionos",
         target_os = "macos",
         target_os = "redox",
         target_os = "tvos",

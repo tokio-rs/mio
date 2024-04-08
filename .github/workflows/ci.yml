@@ -142,7 +142,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ["aarch64-apple-ios", "aarch64-apple-tvos", "aarch64-unknown-openbsd", "arm64_32-apple-watchos", "armv7-sony-vita-newlibeabihf", "sparcv9-sun-solaris", "x86_64-pc-solaris", "x86_64-unknown-dragonfly", "x86_64-unknown-openbsd"]
+        target: ["aarch64-apple-ios", "aarch64-apple-visionos", "aarch64-apple-tvos", "aarch64-unknown-openbsd", "arm64_32-apple-watchos", "armv7-sony-vita-newlibeabihf", "sparcv9-sun-solaris", "x86_64-pc-solaris", "x86_64-unknown-dragonfly", "x86_64-unknown-openbsd"]
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
