@@ -30,6 +30,7 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
     // Mimick `libstd` and set `SO_NOSIGPIPE` on apple systems.
     #[cfg(any(
         target_os = "ios",
+        target_os = "visionos",
         target_os = "macos",
         target_os = "tvos",
         target_os = "watchos",
@@ -48,6 +49,7 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
     // Darwin (and others) doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
     #[cfg(any(
         target_os = "ios",
+        target_os = "visionos",
         target_os = "macos",
         target_os = "tvos",
         target_os = "watchos",
@@ -108,6 +110,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "dragonfly",
                     target_os = "freebsd",
                     target_os = "ios",
+                    target_os = "visionos",
                     target_os = "macos",
                     target_os = "netbsd",
                     target_os = "openbsd",
@@ -139,6 +142,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "dragonfly",
                     target_os = "freebsd",
                     target_os = "ios",
+                    target_os = "visionos",
                     target_os = "macos",
                     target_os = "netbsd",
                     target_os = "openbsd",

@@ -22,6 +22,7 @@ type Count = libc::size_t;
 type Filter = libc::c_short;
 #[cfg(any(
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "tvos",
     target_os = "watchos"
@@ -35,6 +36,7 @@ type Filter = u32;
 type Flags = libc::c_ushort;
 #[cfg(any(
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "tvos",
     target_os = "watchos"
@@ -211,6 +213,7 @@ impl Selector {
     #[cfg(any(
         target_os = "freebsd",
         target_os = "ios",
+        target_os = "visionos",
         target_os = "macos",
         target_os = "tvos",
         target_os = "watchos"
@@ -237,6 +240,7 @@ impl Selector {
     #[cfg(any(
         target_os = "freebsd",
         target_os = "ios",
+        target_os = "visionos",
         target_os = "macos",
         target_os = "tvos",
         target_os = "watchos"
@@ -374,6 +378,7 @@ pub mod event {
             #[cfg(any(
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -387,6 +392,7 @@ pub mod event {
             #[cfg(not(any(
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -427,6 +433,7 @@ pub mod event {
             target_os = "dragonfly",
             target_os = "freebsd",
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
@@ -438,6 +445,7 @@ pub mod event {
             target_os = "dragonfly",
             target_os = "freebsd",
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
@@ -476,6 +484,7 @@ pub mod event {
                 target_os = "freebsd",
                 target_os = "dragonfly",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -487,6 +496,7 @@ pub mod event {
                 target_os = "freebsd",
                 target_os = "dragonfly",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -500,6 +510,7 @@ pub mod event {
             libc::EVFILT_EXCEPT,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -507,6 +518,7 @@ pub mod event {
             libc::EVFILT_MACHPORT,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -537,6 +549,7 @@ pub mod event {
             libc::EV_SYSFLAGS,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -544,6 +557,7 @@ pub mod event {
             libc::EV_FLAG0,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -551,6 +565,7 @@ pub mod event {
             libc::EV_POLL,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -571,6 +586,7 @@ pub mod event {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -580,6 +596,7 @@ pub mod event {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -589,6 +606,7 @@ pub mod event {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -598,6 +616,7 @@ pub mod event {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -607,6 +626,7 @@ pub mod event {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -616,6 +636,7 @@ pub mod event {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -625,6 +646,7 @@ pub mod event {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -639,6 +661,7 @@ pub mod event {
             libc::NOTE_EOF,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -650,6 +673,7 @@ pub mod event {
             libc::NOTE_REVOKE,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -662,6 +686,7 @@ pub mod event {
             libc::NOTE_EXEC,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -669,6 +694,7 @@ pub mod event {
             libc::NOTE_SIGNAL,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -676,6 +702,7 @@ pub mod event {
             libc::NOTE_EXITSTATUS,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -706,6 +733,7 @@ pub mod event {
             libc::NOTE_CHILD,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -713,6 +741,7 @@ pub mod event {
             libc::NOTE_EXIT_DETAIL_MASK,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -720,6 +749,7 @@ pub mod event {
             libc::NOTE_EXIT_DECRYPTFAIL,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -727,6 +757,7 @@ pub mod event {
             libc::NOTE_EXIT_MEMORY,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -734,6 +765,7 @@ pub mod event {
             libc::NOTE_EXIT_CSERROR,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -741,6 +773,7 @@ pub mod event {
             libc::NOTE_VM_PRESSURE,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -748,6 +781,7 @@ pub mod event {
             libc::NOTE_VM_PRESSURE_TERMINATE,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -755,6 +789,7 @@ pub mod event {
             libc::NOTE_VM_PRESSURE_SUDDEN_TERMINATE,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -763,6 +798,7 @@ pub mod event {
             #[cfg(any(
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -773,6 +809,7 @@ pub mod event {
             #[cfg(any(
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -781,6 +818,7 @@ pub mod event {
             #[cfg(any(
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -788,6 +826,7 @@ pub mod event {
             libc::NOTE_NSECONDS,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -795,6 +834,7 @@ pub mod event {
             libc::NOTE_ABSOLUTE,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -802,6 +842,7 @@ pub mod event {
             libc::NOTE_LEEWAY,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"
@@ -809,6 +850,7 @@ pub mod event {
             libc::NOTE_CRITICAL,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos"

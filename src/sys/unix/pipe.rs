@@ -29,6 +29,7 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
     #[cfg(any(
         target_os = "aix",
         target_os = "ios",
+        target_os = "visionos",
         target_os = "macos",
         target_os = "tvos",
         target_os = "watchos",
@@ -61,6 +62,7 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
         target_os = "freebsd",
         target_os = "illumos",
         target_os = "ios",
+        target_os = "visionos",
         target_os = "linux",
         target_os = "macos",
         target_os = "netbsd",

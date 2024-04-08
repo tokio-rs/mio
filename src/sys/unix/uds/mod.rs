@@ -77,6 +77,7 @@ cfg_os_poll! {
         #[cfg(not(any(
             target_os = "aix",
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
@@ -98,6 +99,7 @@ cfg_os_poll! {
         #[cfg(any(
             target_os = "aix",
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",

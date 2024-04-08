@@ -251,6 +251,7 @@ pub fn set_linger_zero(socket: &TcpStream) {
             libc::SOL_SOCKET,
             #[cfg(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -258,6 +259,7 @@ pub fn set_linger_zero(socket: &TcpStream) {
             libc::SO_LINGER_SEC,
             #[cfg(not(any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
