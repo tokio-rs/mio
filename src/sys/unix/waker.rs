@@ -100,6 +100,7 @@ mod eventfd {
             Ok(WakerInternal { fd: file })
         }
 
+        #[allow(clippy::unused_io_amount)]
         pub fn wake(&self) -> io::Result<()> {
             let buf: [u8; 8] = 1u64.to_ne_bytes();
             match (&self.fd).write(&buf) {
@@ -120,6 +121,7 @@ mod eventfd {
         }
 
         /// Reset the eventfd object, only need to call this if `wake` fails.
+        #[allow(clippy::unused_io_amount)]
         fn reset(&self) -> io::Result<()> {
             let mut buf: [u8; 8] = 0u64.to_ne_bytes();
             match (&self.fd).read(&mut buf) {

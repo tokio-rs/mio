@@ -584,6 +584,7 @@ fn connect_error() {
 }
 
 #[test]
+#[allow(clippy::unused_io_amount)]
 fn write_error() {
     init();
 
