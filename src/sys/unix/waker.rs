@@ -108,7 +108,6 @@ mod eventfd {
             Ok(WakerInternal { fd: file })
         }
 
-        #[allow(clippy::unused_io_amount)] // Don't care about partial writes.
         pub fn wake(&self) -> io::Result<()> {
             let buf: [u8; 8] = 1u64.to_ne_bytes();
             match (&self.fd).write(&buf) {
