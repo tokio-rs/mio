@@ -207,7 +207,7 @@ impl Selector {
 }
 
 /// Token used to a add a timeout subscription, also used in removing it again.
-const TIMEOUT_TOKEN: wasi::Userdata = wasi::Userdata::max_value();
+const TIMEOUT_TOKEN: wasi::Userdata = wasi::Userdata::MAX;
 
 /// Returns a `wasi::Subscription` for `timeout`.
 fn timeout_subscription(timeout: Duration) -> wasi::Subscription {

@@ -96,7 +96,7 @@ impl CompletionPort {
         );
         let mut removed = 0;
         let timeout = duration_millis(timeout);
-        let len = cmp::min(list.len(), <u32>::max_value() as usize) as u32;
+        let len = cmp::min(list.len(), u32::MAX as usize) as u32;
         let ret = unsafe {
             GetQueuedCompletionStatusEx(
                 self.handle.raw(),
