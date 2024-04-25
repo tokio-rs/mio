@@ -105,6 +105,7 @@ fn next(current: &mut Token) -> Token {
 }
 
 /// Returns `true` if the connection is done.
+#[allow(clippy::unused_io_amount)]
 fn handle_connection_event(
     registry: &Registry,
     connection: &mut TcpStream,
