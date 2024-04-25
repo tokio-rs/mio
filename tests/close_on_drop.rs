@@ -38,6 +38,7 @@ impl TestHandler {
         }
     }
 
+    #[allow(clippy::unused_io_amount)]
     fn handle_read(&mut self, registry: &Registry, tok: Token) {
         debug!("readable; tok={:?}", tok);
 
