@@ -128,7 +128,6 @@ mod eventfd {
         }
 
         /// Reset the eventfd object, only need to call this if `wake` fails.
-        #[allow(clippy::unused_io_amount)] // Don't care about partial reads.
         fn reset(&self) -> io::Result<()> {
             let mut buf: [u8; 8] = 0u64.to_ne_bytes();
             match (&self.fd).read(&mut buf) {
