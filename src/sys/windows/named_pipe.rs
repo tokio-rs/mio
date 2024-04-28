@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::{fmt, mem, slice};
 
 use windows_sys::Win32::Foundation::{
-    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_NO_DATA, ERROR_PIPE_CONNECTED,
-    ERROR_PIPE_LISTENING, ERROR_MORE_DATA, HANDLE, INVALID_HANDLE_VALUE,
+    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA,
+    ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
@@ -312,7 +312,14 @@ impl Inner {
     #[inline]
     unsafe fn remaining_size(&self) -> io::Result<usize> {
         let mut remaining = 0;
-        let r = PeekNamedPipe(self.handle.raw(), std::ptr::null_mut(), 0, std::ptr::null_mut(), std::ptr::null_mut(), &mut remaining);
+        let r = PeekNamedPipe(
+            self.handle.raw(),
+            std::ptr::null_mut(),
+            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut remaining,
+        );
         if r == 0 {
             Err(io::Error::last_os_error())
         } else {
@@ -565,12 +572,9 @@ impl<'a> Read for &'a NamedPipe {
                 Ok(n)
             }
 
-            // Schedule another read with a bigger buffer
-            e @ State::InsufficientBufferSize(..) => {
-                state.read = e;
-                Inner::schedule_read(&self.inner, &mut state, None);
-                Err(would_block())
-            }
+            // We scheduled another read with a bigger buffer after the first read (see `read_done`)
+            // This is not possible in theory, just like `State::None` case, but return would block for now.
+            State::InsufficientBufferSize(..) => Err(would_block()),
 
             // Looks like an in-flight read hit an error, return that here while
             // we schedule a new one.
@@ -723,10 +727,11 @@ impl Inner {
     /// scheduled.
     fn schedule_read(me: &Arc<Inner>, io: &mut Io, events: Option<&mut Vec<Event>>) -> bool {
         // Check to see if a read is already scheduled/completed
+
         let mut buf = match mem::replace(&mut io.read, State::None) {
             State::None => me.get_buffer(),
             State::InsufficientBufferSize(mut buf, rem) => {
-                buf.reserve(rem);
+                buf.reserve_exact(rem);
                 buf
             }
             e @ _ => {
@@ -739,7 +744,7 @@ impl Inner {
         let e = unsafe {
             let overlapped = me.read.as_ptr() as *mut _;
             let slice = slice::from_raw_parts_mut(buf.as_mut_ptr(), buf.capacity());
-            me.read_overlapped(slice, overlapped)
+            me.read_overlapped(&mut slice[buf.len()..], overlapped)
         };
         match e {
             // See `NamedPipe::connect` above for the rationale behind `forget`
@@ -910,6 +915,8 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
                     Ok(rem) => {
                         buf.set_len(status.bytes_transferred() as usize);
                         io.read = State::InsufficientBufferSize(buf, rem);
+                        Inner::schedule_read(&me, &mut io, None);
+                        return;
                     }
                     Err(e) => {
                         io.read = State::Err(e);
