@@ -1,6 +1,4 @@
 use std::net::{self, SocketAddr};
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(target_os = "wasi")]
@@ -11,7 +9,7 @@ use std::{fmt, io};
 
 use crate::io_source::IoSource;
 use crate::net::TcpStream;
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(unix)]
 use crate::sys::tcp::set_reuseaddr;
 #[cfg(not(target_os = "wasi"))]
 use crate::sys::tcp::{bind, listen, new_for_addr};
@@ -60,7 +58,7 @@ impl TcpListener {
     #[cfg(not(target_os = "wasi"))]
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
         let socket = new_for_addr(addr)?;
-        #[cfg(any(unix, target_os = "hermit"))]
+        #[cfg(unix)]
         let listener = unsafe { TcpListener::from_raw_fd(socket) };
         #[cfg(windows)]
         let listener = unsafe { TcpListener::from_raw_socket(socket as _) };
@@ -168,21 +166,21 @@ impl fmt::Debug for TcpListener {
     }
 }
 
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(unix)]
 impl IntoRawFd for TcpListener {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(unix)]
 impl AsRawFd for TcpListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(unix)]
 impl FromRawFd for TcpListener {
     /// Converts a `RawFd` to a `TcpListener`.
     ///
@@ -246,23 +244,5 @@ impl FromRawFd for TcpListener {
     /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> TcpListener {
         TcpListener::from_std(FromRawFd::from_raw_fd(fd))
-    }
-}
-
-impl From<TcpListener> for net::TcpListener {
-    fn from(listener: TcpListener) -> Self {
-        // Safety: This is safe since we are extracting the raw fd from a well-constructed
-        // mio::net::TcpListener which ensures that we actually pass in a valid file
-        // descriptor/socket
-        unsafe {
-            #[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
-            {
-                net::TcpListener::from_raw_fd(listener.into_raw_fd())
-            }
-            #[cfg(windows)]
-            {
-                net::TcpListener::from_raw_socket(listener.into_raw_socket())
-            }
-        }
     }
 }

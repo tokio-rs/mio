@@ -85,8 +85,6 @@ cfg_os_poll! {
             target_os = "nto",
         )))]
         let flags = flags | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-        #[cfg(target_os = "nto")]
-        let flags = flags | libc::SOCK_CLOEXEC;
 
         let mut fds = [-1; 2];
         syscall!(socketpair(libc::AF_UNIX, flags, 0, fds.as_mut_ptr()))?;

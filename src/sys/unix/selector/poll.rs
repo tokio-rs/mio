@@ -8,9 +8,6 @@ use crate::sys::unix::waker::WakerInternal;
 use crate::{Interest, Token};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::{AsRawFd, RawFd};
-#[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -266,9 +263,9 @@ impl SelectorState {
                             closed_raw_fds.push(poll_fd.fd);
                         }
 
-                        // Remove the interest which just got triggered the IoSourceState's do_io
-                        // wrapper used with this selector will add back the interest using
-                        // reregister.
+                        // Remove the interest which just got triggered
+                        // the IoSourceState/WakerRegistrar used with this selector will add back
+                        // the interest using reregister.
                         poll_fd.events &= !poll_fd.revents;
 
                         // Minor optimization to potentially avoid looping n times where n is the
@@ -507,7 +504,7 @@ fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
         #[cfg(target_pointer_width = "32")]
         const MAX_SAFE_TIMEOUT: u128 = 1789569;
         #[cfg(not(target_pointer_width = "32"))]
-        const MAX_SAFE_TIMEOUT: u128 = libc::c_int::MAX as u128;
+        const MAX_SAFE_TIMEOUT: u128 = libc::c_int::max_value() as u128;
 
         let timeout = timeout
             .map(|to| {

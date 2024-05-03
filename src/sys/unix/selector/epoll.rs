@@ -1,12 +1,11 @@
+use crate::{Interest, Token};
+
+use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI, EPOLLRDHUP};
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{io, ptr};
-
-use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI, EPOLLRDHUP};
-
-use crate::{Interest, Token};
+use std::{cmp, i32, io, ptr};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -21,10 +20,44 @@ pub struct Selector {
 
 impl Selector {
     pub fn new() -> io::Result<Selector> {
+        #[cfg(not(target_os = "android"))]
+        let res = syscall!(epoll_create1(libc::EPOLL_CLOEXEC));
+
+        // On Android < API level 16 `epoll_create1` is not defined, so use a
+        // raw system call.
+        // According to libuv, `EPOLL_CLOEXEC` is not defined on Android API <
+        // 21. But `EPOLL_CLOEXEC` is an alias for `O_CLOEXEC` on that platform,
+        // so we use it instead.
+        #[cfg(target_os = "android")]
+        let res = syscall!(syscall(libc::SYS_epoll_create1, libc::O_CLOEXEC));
+
+        let ep = match res {
+            Ok(ep) => ep as RawFd,
+            Err(err) => {
+                // When `epoll_create1` is not available fall back to use
+                // `epoll_create` followed by `fcntl`.
+                if let Some(libc::ENOSYS) = err.raw_os_error() {
+                    match syscall!(epoll_create(1024)) {
+                        Ok(ep) => match syscall!(fcntl(ep, libc::F_SETFD, libc::FD_CLOEXEC)) {
+                            Ok(ep) => ep as RawFd,
+                            Err(err) => {
+                                // `fcntl` failed, cleanup `ep`.
+                                let _ = unsafe { libc::close(ep) };
+                                return Err(err);
+                            }
+                        },
+                        Err(err) => return Err(err),
+                    }
+                } else {
+                    return Err(err);
+                }
+            }
+        };
+
         Ok(Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-            ep: syscall!(epoll_create1(libc::EPOLL_CLOEXEC))?,
+            ep,
         })
     }
 
@@ -38,15 +71,25 @@ impl Selector {
     }
 
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+        // A bug in kernels < 2.6.37 makes timeouts larger than LONG_MAX / CONFIG_HZ
+        // (approx. 30 minutes with CONFIG_HZ=1200) effectively infinite on 32 bits
+        // architectures. The magic number is the same constant used by libuv.
+        #[cfg(target_pointer_width = "32")]
+        const MAX_SAFE_TIMEOUT: u128 = 1789569;
+        #[cfg(not(target_pointer_width = "32"))]
+        const MAX_SAFE_TIMEOUT: u128 = libc::c_int::max_value() as u128;
+
         let timeout = timeout
             .map(|to| {
                 // `Duration::as_millis` truncates, so round up. This avoids
                 // turning sub-millisecond timeouts into a zero timeout, unless
                 // the caller explicitly requests that by specifying a zero
                 // timeout.
-                to.checked_add(Duration::from_nanos(999_999))
+                let to_ms = to
+                    .checked_add(Duration::from_nanos(999_999))
                     .unwrap_or(to)
-                    .as_millis() as libc::c_int
+                    .as_millis();
+                cmp::min(MAX_SAFE_TIMEOUT, to_ms) as libc::c_int
             })
             .unwrap_or(-1);
 
@@ -211,7 +254,9 @@ pub mod event {
             libc::EPOLLET,
             libc::EPOLLRDHUP,
             libc::EPOLLONESHOT,
+            #[cfg(target_os = "linux")]
             libc::EPOLLEXCLUSIVE,
+            #[cfg(any(target_os = "android", target_os = "linux"))]
             libc::EPOLLWAKEUP,
             libc::EPOLL_CLOEXEC,
         );
@@ -223,4 +268,11 @@ pub mod event {
             .field("u64", &e_u64)
             .finish()
     }
+}
+
+#[cfg(target_os = "android")]
+#[test]
+fn assert_close_on_exec_flag() {
+    // This assertion need to be true for Selector::new.
+    assert_eq!(libc::O_CLOEXEC, libc::EPOLL_CLOEXEC);
 }

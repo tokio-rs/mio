@@ -14,8 +14,6 @@ use std::fmt;
 use std::io;
 use std::net;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
@@ -644,21 +642,21 @@ impl fmt::Debug for UdpSocket {
     }
 }
 
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(unix)]
 impl IntoRawFd for UdpSocket {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(unix)]
 impl AsRawFd for UdpSocket {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(unix)]
 impl FromRawFd for UdpSocket {
     /// Converts a `RawFd` to a `UdpSocket`.
     ///
@@ -695,23 +693,5 @@ impl FromRawSocket for UdpSocket {
     /// non-blocking mode.
     unsafe fn from_raw_socket(socket: RawSocket) -> UdpSocket {
         UdpSocket::from_std(FromRawSocket::from_raw_socket(socket))
-    }
-}
-
-impl From<UdpSocket> for net::UdpSocket {
-    fn from(socket: UdpSocket) -> Self {
-        // Safety: This is safe since we are extracting the raw fd from a well-constructed
-        // mio::net::UdpSocket which ensures that we actually pass in a valid file
-        // descriptor/socket
-        unsafe {
-            #[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
-            {
-                net::UdpSocket::from_raw_fd(socket.into_raw_fd())
-            }
-            #[cfg(windows)]
-            {
-                net::UdpSocket::from_raw_socket(socket.into_raw_socket())
-            }
-        }
     }
 }

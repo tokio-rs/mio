@@ -22,11 +22,8 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
         target_os = "netbsd",
         target_os = "openbsd",
         target_os = "solaris",
-        target_os = "hermit",
     ))]
     let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-    #[cfg(target_os = "nto")]
-    let socket_type = socket_type | libc::SOCK_CLOEXEC;
 
     let socket = syscall!(socket(domain, socket_type, 0))?;
 
@@ -119,7 +116,6 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "watchos",
                     target_os = "espidf",
                     target_os = "vita",
-                    target_os = "hermit",
                     target_os = "nto",
                 ))]
                 sin_len: 0,

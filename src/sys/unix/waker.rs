@@ -10,7 +10,7 @@
             target_os = "watchos",
         )
     )),
-    not(any(target_os = "solaris", target_os = "vita", target_os = "hermit")),
+    not(any(target_os = "solaris", target_os = "vita", target_os = "nto")),
 ))]
 mod fdbased {
     #[cfg(all(
@@ -63,25 +63,17 @@ mod fdbased {
             target_os = "watchos",
         )
     )),
-    not(any(target_os = "solaris", target_os = "vita", target_os = "hermit")),
+    not(any(target_os = "solaris", target_os = "vita", target_os = "nto")),
 ))]
 pub use self::fdbased::Waker;
 
 #[cfg(all(
     not(mio_unsupported_force_waker_pipe),
-    any(
-        target_os = "linux",
-        target_os = "android",
-        target_os = "espidf",
-        target_os = "hermit"
-    )
+    any(target_os = "linux", target_os = "android", target_os = "espidf")
 ))]
 mod eventfd {
     use std::fs::File;
     use std::io::{self, Read, Write};
-    #[cfg(target_os = "hermit")]
-    use std::os::hermit::io::{AsRawFd, FromRawFd, RawFd};
-    #[cfg(not(target_os = "hermit"))]
     use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
     /// Waker backed by `eventfd`.
@@ -108,7 +100,6 @@ mod eventfd {
             Ok(WakerInternal { fd: file })
         }
 
-        #[allow(clippy::unused_io_amount)] // Don't care about partial writes.
         pub fn wake(&self) -> io::Result<()> {
             let buf: [u8; 8] = 1u64.to_ne_bytes();
             match (&self.fd).write(&buf) {
@@ -123,13 +114,12 @@ mod eventfd {
             }
         }
 
-        #[cfg(any(mio_unsupported_force_poll_poll, target_os = "hermit"))]
+        #[cfg(mio_unsupported_force_poll_poll)]
         pub fn ack_and_reset(&self) {
             let _ = self.reset();
         }
 
         /// Reset the eventfd object, only need to call this if `wake` fails.
-        #[allow(clippy::unused_io_amount)] // Don't care about partial reads.
         fn reset(&self) -> io::Result<()> {
             let mut buf: [u8; 8] = 0u64.to_ne_bytes();
             match (&self.fd).read(&mut buf) {
@@ -154,9 +144,6 @@ mod eventfd {
     not(mio_unsupported_force_waker_pipe),
     any(target_os = "linux", target_os = "android", target_os = "espidf")
 ))]
-pub(crate) use self::eventfd::WakerInternal;
-
-#[cfg(target_os = "hermit")]
 pub(crate) use self::eventfd::WakerInternal;
 
 #[cfg(all(
@@ -222,6 +209,7 @@ pub use self::kqueue::Waker;
     target_os = "redox",
     target_os = "solaris",
     target_os = "vita",
+    target_os = "nto",
 ))]
 mod pipe {
     use crate::sys::unix::pipe;
@@ -270,7 +258,8 @@ mod pipe {
         #[cfg(any(
             mio_unsupported_force_poll_poll,
             target_os = "solaris",
-            target_os = "vita"
+            target_os = "vita",
+            target_os = "nto"
         ))]
         pub fn ack_and_reset(&self) {
             self.empty();
@@ -311,6 +300,7 @@ mod pipe {
     ),
     target_os = "solaris",
     target_os = "vita",
+    target_os = "nto",
 ))]
 pub(crate) use self::pipe::WakerInternal;
 
@@ -318,7 +308,7 @@ pub(crate) use self::pipe::WakerInternal;
     mio_unsupported_force_poll_poll,
     target_os = "solaris",
     target_os = "vita",
-    target_os = "hermit"
+    target_os = "nto"
 ))]
 mod poll {
     use crate::sys::Selector;
@@ -349,6 +339,6 @@ mod poll {
     mio_unsupported_force_poll_poll,
     target_os = "solaris",
     target_os = "vita",
-    target_os = "hermit"
+    target_os = "nto"
 ))]
 pub use self::poll::Waker;

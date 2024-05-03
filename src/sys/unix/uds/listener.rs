@@ -91,7 +91,7 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
         // Ensure the socket is closed if either of the `fcntl` calls
         // error below.
         let s = unsafe { net::UnixStream::from_raw_fd(socket) };
-        #[cfg(not(any(target_os = "espidf", target_os = "vita")))]
+        #[cfg(not(any(target_os = "espidf", target_os = "vita", target_os = "nto")))]
         syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC))?;
 
         // See https://github.com/tokio-rs/mio/issues/1450

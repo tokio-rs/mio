@@ -92,7 +92,7 @@ impl Selector {
 
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         let timeout = timeout.map(|to| libc::timespec {
-            tv_sec: cmp::min(to.as_secs(), libc::time_t::MAX as u64) as libc::time_t,
+            tv_sec: cmp::min(to.as_secs(), libc::time_t::max_value() as u64) as libc::time_t,
             // `Duration::subsec_nanos` is guaranteed to be less than one
             // billion (the number of nanoseconds in a second), making the
             // cast to i32 safe. The cast itself is needed for platforms
