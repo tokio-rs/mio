@@ -2,7 +2,8 @@
 
 use std::ffi::OsStr;
 use std::fs::OpenOptions;
-use std::io::{self, Read, Write};
+use std::io::{self, ErrorKind, Read, Write};
+use std::iter;
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{FromRawHandle, IntoRawHandle, RawHandle};
@@ -186,6 +187,52 @@ fn read_sz_greater_than_default_buf_size() {
     let mut buf = [0; 15314];
     assert_eq!(t!(server.read(&mut buf)), 15314);
     assert_eq!(&buf[..15314], msg.as_bytes());
+}
+
+#[test]
+fn multi_read_sz_greater_than_default_buf_size() {
+    let (mut server, mut client) = pipe_msg_mode();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    std::thread::spawn(move || {
+        let msgs = vec!["hello".repeat(10), "world".repeat(100), "mio".repeat(1000)];
+
+        let mut poll = t!(Poll::new());
+        t!(poll.registry().register(
+            &mut client,
+            Token(1),
+            Interest::READABLE | Interest::WRITABLE,
+        ));
+        let mut events = Events::with_capacity(128);
+        for msg in msgs.iter() {
+            t!(poll.poll(&mut events, None));
+            t!(client.write(msg.as_bytes()));
+        }
+    });
+
+    let mut events = Events::with_capacity(128);
+    let msgs = vec!["hello".repeat(10), "world".repeat(100), "mio".repeat(1000)];
+    for m in msgs.into_iter() {
+        let m = m.as_bytes();
+        loop {
+            t!(poll.poll(&mut events, None));
+            let events = events.iter().collect::<Vec<_>>();
+            if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
+                let mut buf = [0; 3000];
+                let Ok(read) = server.read(&mut buf) else {
+                    continue;
+                };
+                assert_eq!(read, m.len());
+                assert_eq!(buf[..read], *m);
+                break;
+            }
+        }
+    }
 }
 
 #[test]
