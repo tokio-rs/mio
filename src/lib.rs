@@ -5,6 +5,7 @@
     unused_imports,
     dead_code
 )]
+#![allow(unexpected_cfgs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // Disallow warnings when running tests.
 #![cfg_attr(test, deny(warnings))]
