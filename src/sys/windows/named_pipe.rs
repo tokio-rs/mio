@@ -27,6 +27,8 @@ use crate::sys::windows::{Event, Handle, Overlapped};
 use crate::Registry;
 use crate::{Interest, Token};
 
+const MAX_BUFFER_SZ: usize = 65536;
+
 /// Non-blocking windows named pipe.
 ///
 /// This structure internally contains a `HANDLE` which represents the named
@@ -731,7 +733,8 @@ impl Inner {
         let mut buf = match mem::replace(&mut io.read, State::None) {
             State::None => me.get_buffer(),
             State::InsufficientBufferSize(mut buf, rem) => {
-                buf.reserve_exact(rem);
+                let sz_rem = std::cmp::min(rem, MAX_BUFFER_SZ);
+                buf.reserve_exact(sz_rem);
                 buf
             }
             e @ _ => {
@@ -911,9 +914,12 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
                 io.read = State::Ok(buf, 0);
             }
             Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as i32) => {
+                buf.set_len(status.bytes_transferred() as usize);
                 match me.remaining_size() {
+                    Ok(rem) if rem == 0 => {
+                        io.read = State::Ok(buf, 0);
+                    }
                     Ok(rem) => {
-                        buf.set_len(status.bytes_transferred() as usize);
                         io.read = State::InsufficientBufferSize(buf, rem);
                         Inner::schedule_read(&me, &mut io, None);
                         return;
