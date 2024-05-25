@@ -168,12 +168,10 @@ mod eventfd {
     any(
         target_os = "android",
         target_os = "espidf",
+        target_os = "hermit",
         target_os = "linux",
     )
 ))]
-pub(crate) use self::eventfd::WakerInternal;
-
-#[cfg(target_os = "hermit")]
 pub(crate) use self::eventfd::WakerInternal;
 
 #[cfg(all(
