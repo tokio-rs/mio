@@ -10,7 +10,12 @@
             target_os = "watchos",
         )
     )),
-    not(any(target_os = "solaris", target_os = "vita", target_os = "hermit")),
+    not(any(
+        target_os = "espidf",
+        target_os = "hermit",
+        target_os = "solaris",
+        target_os = "vita"
+    )),
 ))]
 mod fdbased {
     #[cfg(all(
@@ -63,17 +68,22 @@ mod fdbased {
             target_os = "watchos",
         )
     )),
-    not(any(target_os = "solaris", target_os = "vita", target_os = "hermit")),
+    not(any(
+        target_os = "espidf",
+        target_os = "hermit",
+        target_os = "solaris",
+        target_os = "vita"
+    )),
 ))]
 pub use self::fdbased::Waker;
 
 #[cfg(all(
     not(mio_unsupported_force_waker_pipe),
     any(
-        target_os = "linux",
         target_os = "android",
         target_os = "espidf",
-        target_os = "hermit"
+        target_os = "hermit",
+        target_os = "linux",
     )
 ))]
 mod eventfd {
@@ -123,7 +133,11 @@ mod eventfd {
             }
         }
 
-        #[cfg(any(mio_unsupported_force_poll_poll, target_os = "hermit"))]
+        #[cfg(any(
+            mio_unsupported_force_poll_poll,
+            target_os = "espidf",
+            target_os = "hermit"
+        ))]
         pub fn ack_and_reset(&self) {
             let _ = self.reset();
         }
@@ -150,9 +164,12 @@ mod eventfd {
 }
 
 #[cfg(all(
-    mio_unsupported_force_poll_poll,
     not(mio_unsupported_force_waker_pipe),
-    any(target_os = "linux", target_os = "android", target_os = "espidf")
+    any(
+        target_os = "android",
+        target_os = "espidf",
+        target_os = "linux",
+    )
 ))]
 pub(crate) use self::eventfd::WakerInternal;
 
@@ -269,8 +286,9 @@ mod pipe {
 
         #[cfg(any(
             mio_unsupported_force_poll_poll,
+            target_os = "espidf",
             target_os = "solaris",
-            target_os = "vita"
+            target_os = "vita",
         ))]
         pub fn ack_and_reset(&self) {
             self.empty();
@@ -316,9 +334,10 @@ pub(crate) use self::pipe::WakerInternal;
 
 #[cfg(any(
     mio_unsupported_force_poll_poll,
+    target_os = "espidf",
+    target_os = "hermit",
     target_os = "solaris",
     target_os = "vita",
-    target_os = "hermit"
 ))]
 mod poll {
     use crate::sys::Selector;
@@ -347,8 +366,9 @@ mod poll {
 
 #[cfg(any(
     mio_unsupported_force_poll_poll,
+    target_os = "espidf",
+    target_os = "hermit",
     target_os = "solaris",
     target_os = "vita",
-    target_os = "hermit"
 ))]
 pub use self::poll::Waker;
