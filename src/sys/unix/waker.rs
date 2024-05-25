@@ -166,10 +166,9 @@ mod eventfd {
 #[cfg(all(
     not(mio_unsupported_force_waker_pipe),
     any(
-        target_os = "android",
+        mio_unsupported_force_poll_poll,
         target_os = "espidf",
         target_os = "hermit",
-        target_os = "linux",
     )
 ))]
 pub(crate) use self::eventfd::WakerInternal;
