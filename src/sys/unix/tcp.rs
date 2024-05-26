@@ -37,7 +37,7 @@ pub(crate) fn connect(socket: &net::TcpStream, addr: SocketAddr) -> io::Result<(
 }
 
 pub(crate) fn listen(socket: &net::TcpListener, backlog: u32) -> io::Result<()> {
-    let backlog = backlog.try_into().unwrap_or(i32::max_value());
+    let backlog = backlog.try_into().unwrap_or(i32::MAX);
     syscall!(listen(socket.as_raw_fd(), backlog))?;
     Ok(())
 }

@@ -3,20 +3,20 @@
 // Permission to use this code has been granted by original author:
 // https://github.com/tokio-rs/mio/pull/1602#issuecomment-1218441031
 
-use crate::sys::unix::selector::LOWEST_FD;
-use crate::sys::unix::waker::WakerInternal;
-use crate::{Interest, Token};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 #[cfg(target_os = "hermit")]
 use std::os::hermit::io::{AsRawFd, RawFd};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use std::{cmp, fmt, io};
+
+use crate::sys::unix::selector::LOWEST_FD;
+use crate::sys::unix::waker::WakerInternal;
+use crate::{Interest, Token};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -74,6 +74,7 @@ impl Selector {
     pub fn wake(&self, token: Token) -> io::Result<()> {
         self.state.wake(token)
     }
+
     cfg_io_source! {
         #[cfg(debug_assertions)]
         pub fn id(&self) -> usize {
@@ -507,7 +508,7 @@ fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
         #[cfg(target_pointer_width = "32")]
         const MAX_SAFE_TIMEOUT: u128 = 1789569;
         #[cfg(not(target_pointer_width = "32"))]
-        const MAX_SAFE_TIMEOUT: u128 = libc::c_int::max_value() as u128;
+        const MAX_SAFE_TIMEOUT: u128 = libc::c_int::MAX as u128;
 
         let timeout = timeout
             .map(|to| {
