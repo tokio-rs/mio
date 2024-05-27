@@ -51,7 +51,7 @@ cfg_os_poll! {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "hermit"))]
 cfg_os_poll! {
     mod unix;
     #[allow(unused_imports)]

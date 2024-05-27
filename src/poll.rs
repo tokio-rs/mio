@@ -731,7 +731,7 @@ impl AsRawFd for Registry {
 
 cfg_os_poll! {
     #[cfg(all(
-        unix,
+        any(unix, target_os = "hermit"),
         not(mio_unsupported_force_poll_poll),
         not(any(target_os = "solaris", target_os = "vita")),
     ))]
