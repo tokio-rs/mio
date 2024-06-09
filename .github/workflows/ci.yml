@@ -134,6 +134,7 @@ jobs:
           - aarch64-apple-ios
           - aarch64-apple-tvos
           - aarch64-apple-visionos
+          - aarch64-apple-watchos
           - aarch64-linux-android
           - aarch64-unknown-openbsd
           - arm-linux-androideabi
