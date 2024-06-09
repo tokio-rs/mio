@@ -57,7 +57,7 @@ fn unix_addr(address: &SocketAddr) -> (libc::sockaddr_un, libc::socklen_t) {
     // SAFETY: since `addr` is a valid Unix address, it must not be larger than
     // `SUN_LEN` bytes, thus we won't overwrite the size of sockaddr.sun_path.
     // SAFETY: null byte is already written because we zeroed the address above.
-    debug_assert!(addr.len() <= sockaddr.sun_path.len());
+    debug_assert!(offset + addr.len() <= sockaddr.sun_path.len());
     unsafe {
         ptr::copy_nonoverlapping(
             addr.as_ptr(),
