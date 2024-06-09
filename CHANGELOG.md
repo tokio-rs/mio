@@ -1,3 +1,51 @@
+# 1.0
+
+With v1 Mio is able to bump its MSRV to 1.70, allowing us to implement I/O
+safety traits (https://github.com/rust-lang/rust/issues/87074) and replace
+`SocketAddr` with the version found in the standard library.
+
+## Added
+
+* Implement `AsFd` for`TcpListener`, `TcpStream`, `UdpSocket`, `UnixDatagram`,
+  `UnixListener`, `UnixStream`, `pipe::Receiver` and `pipe::Sender`
+  (https://github.com/tokio-rs/mio/pull/1749, https://github.com/tokio-rs/mio/pull/1797).
+* Implement `From` for `TcpListener`, `TcpStream`, `UdpSocket`, `UnixDatagram`,
+  `UnixListener`, and `UnixStream` for their standard library counterpart
+  (https://github.com/tokio-rs/mio/pull/1767).
+* Add support for abstract namespaces on Android
+  (https://github.com/tokio-rs/mio/pull/1749).
+* Add support for QNX OS
+  (https://github.com/tokio-rs/mio/pull/1766,
+  https://github.com/tokio-rs/mio/pull/1800).
+* Add support for Apple visionOS
+  (https://github.com/tokio-rs/mio/pull/1795).
+* Support for Haiku
+  (https://github.com/tokio-rs/mio/pull/1807).
+
+## Removed
+
+* The `SocketAddr` type is removed in favour of `std::os::unix::net::SocketAddr`
+  (https://github.com/tokio-rs/mio/pull/1760). All methods on Mio's version
+  should exist on the version in the standard library.
+
+## Changes
+
+* MSRV was updated to 1.74, updating to Rust edition edition
+  (https://github.com/tokio-rs/mio/pull/1733).
+* `UnixDatagram::{local_addr,peer_addr,bind_addr,recv_from}`,
+  `UnixListener::{local_addr,bind_addr,accept}` and
+  `UnixStream::{local_addr,peer_addr,connect_addr}` return and/or use
+  `std::os::unix::net::SocketAddr` instead of Mio's own `SocketAddr` type
+  (https://github.com/tokio-rs/mio/pull/1760).
+* Use `OwnedFd` internally for `Poll` where possible
+  (https://github.com/tokio-rs/mio/pull/1749).
+* Support ESP-IDF and Hermit without cfg flags
+  (https://github.com/tokio-rs/mio/pull/1789,
+  https://github.com/tokio-rs/mio/pull/1802,
+  https://github.com/tokio-rs/mio/pull/1802).
+* Updated windows-sys to v0.52
+  (https://github.com/tokio-rs/mio/pull/1668).
+
 # 0.8.11
 
 * Fix receiving IOCP events after deregistering a Windows named pipe
