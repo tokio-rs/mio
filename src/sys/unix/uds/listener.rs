@@ -22,17 +22,15 @@ pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
 }
 
 pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, SocketAddr)> {
-    let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
-
-    // This is safe to assume because a `libc::sockaddr_un` filled with `0`
-    // bytes is properly initialized.
+    // SAFETY: `libc::sockaddr_un` zero filled is properly initialized.
     //
     // `0` is a valid value for `sockaddr_un::sun_family`; it is
     // `libc::AF_UNSPEC`.
     //
     // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
     // abstract path.
-    let mut sockaddr = unsafe { sockaddr.assume_init() };
+    let mut sockaddr = unsafe { mem::zeroed::<libc::sockaddr_un>() };
+
     let mut socklen = mem::size_of_val(&sockaddr) as libc::socklen_t;
 
     #[cfg(not(any(
