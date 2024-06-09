@@ -126,23 +126,35 @@ jobs:
   CheckTargets:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-    - name: Install all targets
-      run: make install_targets
-    - name: Install Cargo-hack
-      run: cargo install --debug cargo-hack
-    - name: Check all targets
-      run: make check_all_targets
-  CheckTier3Targets:
-    name: Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        target: ["aarch64-apple-ios", "aarch64-apple-tvos", "aarch64-apple-visionos", "aarch64-unknown-openbsd", "arm64_32-apple-watchos", "armv7-sony-vita-newlibeabihf", "sparcv9-sun-solaris", "x86_64-pc-solaris", "x86_64-unknown-dragonfly", "x86_64-unknown-openbsd"]
+        target:
+          - aarch64-apple-darwin
+          - aarch64-apple-ios
+          - aarch64-apple-tvos
+          - aarch64-apple-visionos
+          - aarch64-linux-android
+          - aarch64-unknown-openbsd
+          - arm-linux-androideabi
+          - arm64_32-apple-watchos
+          - armv7-sony-vita-newlibeabihf
+          - i686-unknown-linux-gnu
+          - sparcv9-sun-solaris
+          - wasm32-wasi
+          - x86_64-apple-darwin
+          - x86_64-apple-ios
+          - x86_64-pc-solaris
+          - x86_64-pc-windows-gnu
+          - x86_64-pc-windows-msvc
+          - x86_64-unknown-dragonfly
+          - x86_64-unknown-freebsd
+          - x86_64-unknown-illumos
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - x86_64-unknown-netbsd
+          - x86_64-unknown-openbsd
+          - x86_64-unknown-redox
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
@@ -178,6 +190,5 @@ jobs:
       - Docs
       - Rustfmt
       - CheckTargets
-      - CheckTier3Targets
     steps:
       - run: exit 0
