@@ -136,9 +136,14 @@ jobs:
           - aarch64-apple-visionos
           - aarch64-apple-watchos
           - aarch64-linux-android
+          - aarch64-unknown-freebsd
           - aarch64-unknown-hermit
+          - aarch64-unknown-linux-gnu
+          - aarch64-unknown-linux-musl
+          - aarch64-unknown-netbsd
           - aarch64-unknown-nto-qnx710
           - aarch64-unknown-openbsd
+          - aarch64-unknown-redox
           - arm-linux-androideabi
           - arm64_32-apple-watchos
           - armv7-sony-vita-newlibeabihf
