@@ -67,6 +67,8 @@ fn unix_addr(address: &SocketAddr) -> (libc::sockaddr_un, libc::socklen_t) {
     };
 
     let mut addrlen = path_offset(&sockaddr) + addr.len();
+    // +1 for null byte at the end of the path, not needed for abstract
+    // namespaces (which start with a null byte).
     match addr.first() {
         Some(&0) | None => {}
         Some(_) => addrlen += 1,
