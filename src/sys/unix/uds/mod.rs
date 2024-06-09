@@ -1,4 +1,6 @@
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(target_os = "android")]
+use std::os::android::net::SocketAddrExt;
+#[cfg(target_os = "linux")]
 use std::os::linux::net::SocketAddrExt;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::FromRawFd;

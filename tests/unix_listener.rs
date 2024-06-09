@@ -134,7 +134,7 @@ fn unix_listener_deregister() {
 }
 
 #[test]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 fn unix_listener_abstract_namespace() {
     use rand::Rng;
     use std::os::linux::net::SocketAddrExt;
