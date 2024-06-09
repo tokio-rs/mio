@@ -25,17 +25,14 @@ fn path_offset(sockaddr: &libc::sockaddr_un) -> usize {
 
 /// Converts a Rust `SocketAddr` into the system representation.
 fn unix_addr(address: &SocketAddr) -> (libc::sockaddr_un, libc::socklen_t) {
-    let sockaddr = mem::MaybeUninit::<libc::sockaddr_un>::zeroed();
-
-    // This is safe to assume because a `libc::sockaddr_un` filled with `0`
-    // bytes is properly initialized.
+    // SAFETY: `libc::sockaddr_un` zero filled is properly initialized.
     //
     // `0` is a valid value for `sockaddr_un::sun_family`; it is
     // `libc::AF_UNSPEC`.
     //
     // `[0; 108]` is a valid value for `sockaddr_un::sun_path`; it begins an
     // abstract path.
-    let mut sockaddr = unsafe { sockaddr.assume_init() };
+    let mut sockaddr = unsafe { mem::zeroed::<libc::sockaddr_un>() };
 
     sockaddr.sun_family = libc::AF_UNIX as libc::sa_family_t;
 
