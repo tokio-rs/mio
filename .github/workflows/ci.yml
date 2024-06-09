@@ -143,6 +143,7 @@ jobs:
           - arm64_32-apple-watchos
           - armv7-sony-vita-newlibeabihf
           - i686-unknown-linux-gnu
+          - riscv32imc-esp-espidf
           - sparcv9-sun-solaris
           - wasm32-wasi
           - x86_64-apple-darwin
