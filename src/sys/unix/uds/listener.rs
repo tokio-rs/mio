@@ -100,15 +100,9 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
 
     #[allow(unused_mut)] // See below.
     let mut path_len = socklen as usize - path_offset(&sockaddr);
-    // Darwin is being weird, it returns a length of 16, but an unnamed (all
+    // On FreeBSD and Darwin, it returns a length of 14/16, but an unnamed (all
     // zero) address. Map that to a length of 0 to match other OS.
-    #[cfg(any(
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "watchos",
-    ))]
-    if socklen == 16 && sockaddr.sun_path[0] == 0 {
+    if sockaddr.sun_path[0] == 0 {
         path_len = 0;
     }
     let address = SocketAddr::from_pathname(Path::new(OsStr::from_bytes(unsafe {
