@@ -58,9 +58,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
     // On platforms that support it we can use `accept4(2)` to set `NONBLOCK`
     // and `CLOEXEC` in the call to accept the connection.
     #[cfg(any(
-        // Android x86's seccomp profile forbids calls to `accept4(2)`
-        // See https://github.com/tokio-rs/mio/issues/1445 for details
-        all(not(target_arch="x86"), target_os = "android"),
+        target_os = "android",
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "illumos",
@@ -93,7 +91,6 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
         target_os = "vita",
         target_os = "hermit",
         target_os = "nto",
-        all(target_arch = "x86", target_os = "android"),
     ))]
     let stream = {
         syscall!(accept(
@@ -106,9 +103,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
             #[cfg(not(any(target_os = "espidf", target_os = "vita")))]
             syscall!(fcntl(s.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC))?;
 
-            // See https://github.com/tokio-rs/mio/issues/1450
             #[cfg(any(
-                all(target_arch = "x86", target_os = "android"),
                 target_os = "espidf",
                 target_os = "vita",
                 target_os = "hermit",
