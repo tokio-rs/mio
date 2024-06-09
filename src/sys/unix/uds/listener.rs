@@ -102,8 +102,8 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
 
     #[allow(unused_mut)] // See below.
     let mut path_len = socklen as usize - path_offset(&sockaddr);
-    // Darwin is being weird, it return a length of 16, but other an unnamed
-    // (all zero) address. Map that to a length of 0 to match other OS.
+    // Darwin is being weird, it returns a length of 16, but an unnamed (all
+    // zero) address. Map that to a length of 0 to match other OS.
     #[cfg(any(
         target_os = "ios",
         target_os = "macos",
