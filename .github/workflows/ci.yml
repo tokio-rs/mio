@@ -145,7 +145,10 @@ jobs:
           - x86_64-apple-darwin
           - x86_64-apple-ios
           - x86_64-pc-solaris
-          - x86_64-pc-windows-gnu
+          # TODO: solve the following err:
+          # `Error calling dlltool 'x86_64-w64-mingw32-dlltool'`, build log:
+          # <https://github.com/tokio-rs/mio/actions/runs/9436499623/job/25991326487?pr=1794>.
+          #- x86_64-pc-windows-gnu
           - x86_64-pc-windows-msvc
           - x86_64-unknown-dragonfly
           - x86_64-unknown-freebsd
