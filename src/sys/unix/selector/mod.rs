@@ -24,6 +24,7 @@ pub(crate) use self::epoll::{event, Event, Events, Selector};
     mio_unsupported_force_poll_poll,
     target_os = "espidf",
     target_os = "hermit",
+    target_os = "nto",
     target_os = "solaris",
     target_os = "vita",
 ))]
@@ -33,6 +34,7 @@ mod poll;
     mio_unsupported_force_poll_poll,
     target_os = "espidf",
     target_os = "hermit",
+    target_os = "nto",
     target_os = "solaris",
     target_os = "vita",
 ))]
@@ -43,6 +45,7 @@ cfg_io_source! {
         mio_unsupported_force_poll_poll,
         target_os = "espidf",
         target_os = "hermit",
+        target_os = "nto",
         target_os = "solaris",
         target_os = "vita",
     ))]
