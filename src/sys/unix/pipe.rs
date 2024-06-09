@@ -395,6 +395,12 @@ impl IntoRawFd for Sender {
     }
 }
 
+impl AsFd for Sender {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
 /// Receiving end of an Unix pipe.
 ///
 /// See [`new`] for documentation, including examples.
