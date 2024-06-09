@@ -527,6 +527,8 @@ pub mod event {
             libc::EV_FLAG1,
             libc::EV_ERROR,
             libc::EV_EOF,
+            // Not stable across OS versions on OpenBSD.
+            #[cfg(not(target_os = "openbsd"))]
             libc::EV_SYSFLAGS,
             #[cfg(any(
                 target_os = "ios",
