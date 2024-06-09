@@ -24,6 +24,7 @@ type Filter = libc::c_short;
     target_os = "ios",
     target_os = "macos",
     target_os = "tvos",
+    target_os = "visionos",
     target_os = "watchos"
 ))]
 type Filter = i16;
@@ -37,6 +38,7 @@ type Flags = libc::c_ushort;
     target_os = "ios",
     target_os = "macos",
     target_os = "tvos",
+    target_os = "visionos",
     target_os = "watchos"
 ))]
 type Flags = u16;
@@ -213,6 +215,7 @@ impl Selector {
         target_os = "ios",
         target_os = "macos",
         target_os = "tvos",
+        target_os = "visionos",
         target_os = "watchos"
     ))]
     pub fn setup_waker(&self, token: Token) -> io::Result<()> {
@@ -239,6 +242,7 @@ impl Selector {
         target_os = "ios",
         target_os = "macos",
         target_os = "tvos",
+        target_os = "visionos",
         target_os = "watchos"
     ))]
     pub fn wake(&self, token: Token) -> io::Result<()> {
@@ -376,6 +380,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             // Used by the `Awakener`. On platforms that use `eventfd` or a unix
@@ -389,6 +394,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             )))]
             {
@@ -429,6 +435,7 @@ pub mod event {
             target_os = "ios",
             target_os = "macos",
             target_os = "tvos",
+            target_os = "visionos",
             target_os = "watchos",
         ))]
         {
@@ -440,6 +447,7 @@ pub mod event {
             target_os = "ios",
             target_os = "macos",
             target_os = "tvos",
+            target_os = "visionos",
             target_os = "watchos",
         )))]
         {
@@ -478,6 +486,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::EVFILT_FS,
@@ -489,6 +498,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::EVFILT_USER,
@@ -502,6 +512,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::EVFILT_MACHPORT,
@@ -509,6 +520,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::EVFILT_VM,
@@ -539,6 +551,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::EV_FLAG0,
@@ -546,6 +559,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::EV_POLL,
@@ -553,6 +567,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::EV_OOBAND,
@@ -573,6 +588,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::NOTE_TRIGGER,
@@ -582,6 +598,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::NOTE_FFNOP,
@@ -591,6 +608,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::NOTE_FFAND,
@@ -600,6 +618,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::NOTE_FFOR,
@@ -609,6 +628,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::NOTE_FFCOPY,
@@ -618,6 +638,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::NOTE_FFCTRLMASK,
@@ -627,6 +648,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::NOTE_FFLAGSMASK,
@@ -641,6 +663,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_EXTEND,
@@ -652,6 +675,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_NONE,
@@ -664,6 +688,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_SIGNAL,
@@ -671,6 +696,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_EXITSTATUS,
@@ -678,6 +704,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_EXIT_DETAIL,
@@ -708,6 +735,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_EXIT_DETAIL_MASK,
@@ -715,6 +743,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_EXIT_DECRYPTFAIL,
@@ -722,6 +751,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_EXIT_MEMORY,
@@ -729,6 +759,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_EXIT_CSERROR,
@@ -736,6 +767,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_VM_PRESSURE,
@@ -743,6 +775,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_VM_PRESSURE_TERMINATE,
@@ -750,6 +783,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_VM_PRESSURE_SUDDEN_TERMINATE,
@@ -757,6 +791,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_VM_ERROR,
@@ -765,6 +800,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_SECONDS,
@@ -775,6 +811,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_USECONDS,
@@ -783,6 +820,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_NSECONDS,
@@ -790,6 +828,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_ABSOLUTE,
@@ -797,6 +836,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_LEEWAY,
@@ -804,6 +844,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_CRITICAL,
@@ -811,6 +852,7 @@ pub mod event {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos"
             ))]
             libc::NOTE_BACKGROUND,
