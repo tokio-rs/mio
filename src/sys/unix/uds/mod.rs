@@ -1,4 +1,4 @@
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 use std::os::linux::net::SocketAddrExt;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::FromRawFd;
@@ -40,7 +40,7 @@ fn unix_addr(address: &SocketAddr) -> (libc::sockaddr_un, libc::socklen_t) {
     let mut offset = 0;
     let addr = match address.as_pathname() {
         Some(path) => path.as_os_str().as_bytes(),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "android", target_os = "linux"))]
         None => match address.as_abstract_name() {
             Some(name) => {
                 offset += 1;
@@ -48,7 +48,7 @@ fn unix_addr(address: &SocketAddr) -> (libc::sockaddr_un, libc::socklen_t) {
             }
             None => UNNAMED_ADDRESS,
         },
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "android", target_os = "linux")))]
         None => UNNAMED_ADDRESS,
     };
 
@@ -146,7 +146,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "android", target_os = "linux"))]
     fn abstract_address() {
         use std::os::linux::net::SocketAddrExt;
 
