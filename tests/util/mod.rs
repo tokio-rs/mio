@@ -253,6 +253,7 @@ pub fn set_linger_zero(socket: &TcpStream) {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             ))]
             libc::SO_LINGER_SEC,
@@ -260,6 +261,7 @@ pub fn set_linger_zero(socket: &TcpStream) {
                 target_os = "ios",
                 target_os = "macos",
                 target_os = "tvos",
+                target_os = "visionos",
                 target_os = "watchos",
             )))]
             libc::SO_LINGER,

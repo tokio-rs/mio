@@ -31,6 +31,7 @@ fn fmt_debug() {
         target_os = "ios",
         target_os = "macos",
         target_os = "tvos",
+        target_os = "visionos",
         target_os = "watchos",
     ))]
     {
