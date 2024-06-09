@@ -13,6 +13,7 @@
     not(any(
         target_os = "espidf",
         target_os = "hermit",
+        target_os = "nto",
         target_os = "solaris",
         target_os = "vita"
     )),
@@ -72,6 +73,7 @@ mod fdbased {
     not(any(
         target_os = "espidf",
         target_os = "hermit",
+        target_os = "nto",
         target_os = "solaris",
         target_os = "vita"
     )),
@@ -230,6 +232,7 @@ pub use self::kqueue::Waker;
     target_os = "dragonfly",
     target_os = "illumos",
     target_os = "netbsd",
+    target_os = "nto",
     target_os = "openbsd",
     target_os = "redox",
     target_os = "solaris",
@@ -282,6 +285,7 @@ mod pipe {
         #[cfg(any(
             mio_unsupported_force_poll_poll,
             target_os = "espidf",
+            target_os = "nto",
             target_os = "solaris",
             target_os = "vita",
         ))]
@@ -322,6 +326,7 @@ mod pipe {
             target_os = "redox",
         )
     ),
+    target_os = "nto",
     target_os = "solaris",
     target_os = "vita",
 ))]
@@ -331,6 +336,7 @@ pub(crate) use self::pipe::WakerInternal;
     mio_unsupported_force_poll_poll,
     target_os = "espidf",
     target_os = "hermit",
+    target_os = "nto",
     target_os = "solaris",
     target_os = "vita",
 ))]
@@ -363,6 +369,7 @@ mod poll {
     mio_unsupported_force_poll_poll,
     target_os = "espidf",
     target_os = "hermit",
+    target_os = "nto",
     target_os = "solaris",
     target_os = "vita",
 ))]
