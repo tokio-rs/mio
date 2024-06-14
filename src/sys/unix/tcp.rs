@@ -89,6 +89,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
     // set `CLOEXEC`.
     #[cfg(any(
         target_os = "aix",
+        target_os = "haiku",
         target_os = "ios",
         target_os = "macos",
         target_os = "redox",

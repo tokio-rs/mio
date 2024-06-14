@@ -87,6 +87,7 @@ where
 {
     #[cfg(not(any(
         target_os = "aix",
+        target_os = "haiku",
         target_os = "ios",
         target_os = "macos",
         target_os = "nto",
@@ -110,6 +111,7 @@ where
     // there is an error, the file descriptors are closed.
     #[cfg(any(
         target_os = "aix",
+        target_os = "haiku",
         target_os = "ios",
         target_os = "macos",
         target_os = "nto",
