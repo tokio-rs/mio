@@ -3,6 +3,7 @@
     not(mio_unsupported_force_poll_poll),
     not(any(
         target_os = "espidf",
+        target_os = "haiku",
         target_os = "hermit",
         target_os = "nto",
         target_os = "solaris",
@@ -438,6 +439,7 @@ impl Poll {
     not(mio_unsupported_force_poll_poll),
     not(any(
         target_os = "espidf",
+        target_os = "haiku",
         target_os = "hermit",
         target_os = "nto",
         target_os = "solaris",
@@ -735,6 +737,7 @@ impl fmt::Debug for Registry {
     not(mio_unsupported_force_poll_poll),
     not(any(
         target_os = "espidf",
+        target_os = "haiku",
         target_os = "hermit",
         target_os = "nto",
         target_os = "solaris",
