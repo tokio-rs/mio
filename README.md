@@ -169,7 +169,7 @@ Rust version can an older minor version instead. Below is a list of Mio versions
 and their MSRV:
 
  * v0.8: Rust 1.46.
- * v1.0: Rust 1.74.
+ * v1.0: Rust 1.70.
 
 Note however that Mio also has dependencies, which might have different MSRV
 policies. We try to stick to the above policy when updating dependencies, but
