@@ -868,6 +868,9 @@ pub mod event {
     }
 }
 
+// No special requirement from the implementation around waking.
+pub(crate) use crate::sys::unix::waker::Waker;
+
 cfg_io_source! {
     mod stateless_io_source;
     pub(crate) use stateless_io_source::IoSourceState;

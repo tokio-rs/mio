@@ -22,6 +22,7 @@ pub(crate) struct Waker {
 }
 
 impl Waker {
+    #[allow(dead_code)] // Not used by the `poll(2)` implementation.
     pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
         let waker = Waker::new_unregistered()?;
         selector.register(waker.fd.as_raw_fd(), token, Interest::READABLE)?;
@@ -54,12 +55,7 @@ impl Waker {
         }
     }
 
-    #[cfg(any(
-        mio_unsupported_force_poll_poll,
-        target_os = "espidf",
-        target_os = "fuchsia",
-        target_os = "hermit",
-    ))]
+    #[allow(dead_code)] // Only used by the `poll(2)` implementation.
     pub(crate) fn ack_and_reset(&self) {
         let _ = self.reset();
     }

@@ -16,7 +16,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use std::{cmp, fmt, io};
 
-use crate::sys::unix::waker::WakerInternal;
+use crate::sys::unix::waker::Waker as WakerInternal;
 use crate::{Interest, Token};
 
 /// Unique id for use as `SelectorId`.
@@ -161,7 +161,7 @@ struct FdData {
 
 impl SelectorState {
     pub fn new() -> io::Result<SelectorState> {
-        let notify_waker = WakerInternal::new()?;
+        let notify_waker = WakerInternal::new_unregistered()?;
 
         Ok(Self {
             fds: Mutex::new(Fds {
@@ -622,6 +622,25 @@ pub mod event {
             .field("token", &event.token)
             .field("events", &EventsDetails(event.events))
             .finish()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Waker {
+    selector: Selector,
+    token: Token,
+}
+
+impl Waker {
+    pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+        Ok(Waker {
+            selector: selector.try_clone()?,
+            token,
+        })
+    }
+
+    pub(crate) fn wake(&self) -> io::Result<()> {
+        self.selector.wake(self.token)
     }
 }
 
