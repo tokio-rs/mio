@@ -221,3 +221,8 @@ pub mod event {
             .finish()
     }
 }
+
+cfg_io_source! {
+    mod stateless_io_source;
+    pub(crate) use stateless_io_source::IoSourceState;
+}

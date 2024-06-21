@@ -868,6 +868,11 @@ pub mod event {
     }
 }
 
+cfg_io_source! {
+    mod stateless_io_source;
+    pub(crate) use stateless_io_source::IoSourceState;
+}
+
 #[test]
 #[cfg(feature = "os-ext")]
 fn does_not_register_rw() {
