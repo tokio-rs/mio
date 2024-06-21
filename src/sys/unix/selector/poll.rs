@@ -546,10 +546,12 @@ pub struct Event {
 pub type Events = Vec<Event>;
 
 pub mod event {
-    use crate::sys::unix::selector::poll::POLLRDHUP;
+    use std::fmt;
+
     use crate::sys::Event;
     use crate::Token;
-    use std::fmt;
+
+    use super::POLLRDHUP;
 
     pub fn token(event: &Event) -> Token {
         event.token
