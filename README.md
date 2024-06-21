@@ -161,7 +161,7 @@ This uses the Windows AFD system to access socket readiness events.
 The MSRV (Minimum Supported Rust Version) is fixed for a given minor (1.x)
 version. However it can be increased when bumping minor versions, i.e. going
 from 1.0 to 1.1 allows us to increase the MSRV. Users unable to increase their
-Rust version can an older minor version instead. Below is a list of Mio versions
+Rust version can use an older minor version instead. Below is a list of Mio versions
 and their MSRV:
 
  * v0.8: Rust 1.46.
