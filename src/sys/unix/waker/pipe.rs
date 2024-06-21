@@ -8,6 +8,8 @@ use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 use std::os::hermit::io::{AsRawFd, FromRawFd, RawFd};
 
 use crate::sys::unix::pipe;
+use crate::sys::Selector;
+use crate::{Interest, Token};
 
 /// Waker backed by a unix pipe.
 ///
@@ -20,7 +22,13 @@ pub(crate) struct Waker {
 }
 
 impl Waker {
-    pub(crate) fn new() -> io::Result<Waker> {
+    pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+        let waker = Waker::new_unregistered()?;
+        selector.register(waker.fd.as_raw_fd(), token, Interest::READABLE)?;
+        Ok(waker)
+    }
+
+    pub(crate) fn new_unregistered() -> io::Result<Waker> {
         let [receiver, sender] = pipe::new_raw()?;
         let sender = unsafe { File::from_raw_fd(sender) };
         let receiver = unsafe { File::from_raw_fd(receiver) };

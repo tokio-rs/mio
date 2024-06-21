@@ -7,6 +7,9 @@ use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 #[cfg(target_os = "hermit")]
 use std::os::hermit::io::{AsRawFd, FromRawFd, RawFd};
 
+use crate::sys::Selector;
+use crate::{Interest, Token};
+
 /// Waker backed by `eventfd`.
 ///
 /// `eventfd` is effectively an 64 bit counter. All writes must be of 8
@@ -19,14 +22,19 @@ pub(crate) struct Waker {
 }
 
 impl Waker {
-    pub(crate) fn new() -> io::Result<Waker> {
+    pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+        let waker = Waker::new_unregistered()?;
+        selector.register(waker.fd.as_raw_fd(), token, Interest::READABLE)?;
+        Ok(waker)
+    }
+
+    pub(crate) fn new_unregistered() -> io::Result<Waker> {
         #[cfg(not(target_os = "espidf"))]
         let flags = libc::EFD_CLOEXEC | libc::EFD_NONBLOCK;
         // ESP-IDF is EFD_NONBLOCK by default and errors if you try to pass this flag.
         #[cfg(target_os = "espidf")]
         let flags = 0;
         let fd = syscall!(eventfd(0, flags))?;
-
         let file = unsafe { File::from_raw_fd(fd) };
         Ok(Waker { fd: file })
     }
