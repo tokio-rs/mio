@@ -116,33 +116,37 @@ cfg_os_poll! {
         pub(crate) mod uds;
     }
 
-    #[cfg(any(
-        // For the public `pipe` module, must match `cfg_os_ext` macro.
-        all(feature = "os-ext", not(target_os = "hermit")),
-        // For the `Waker` type based on a pipe.
-        mio_unsupported_force_waker_pipe,
-        all(
-            // `kqueue(2)` based waker doesn't work with `poll(2)`.
-            mio_unsupported_force_poll_poll,
-            any(
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos",
-                target_os = "tvos",
-                target_os = "visionos",
-                target_os = "watchos",
+    #[cfg(all(
+        any(
+            // For the public `pipe` module, must match `cfg_os_ext` macro.
+            feature = "os-ext",
+            // For the `Waker` type based on a pipe.
+            mio_unsupported_force_waker_pipe,
+            all(
+                // `kqueue(2)` based waker doesn't work with `poll(2)`.
+                mio_unsupported_force_poll_poll,
+                any(
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "tvos",
+                    target_os = "visionos",
+                    target_os = "watchos",
+                ),
             ),
+            // NOTE: also add to the list list for the `pipe` module below.
+            target_os = "aix",
+            target_os = "dragonfly",
+            target_os = "haiku",
+            target_os = "netbsd",
+            target_os = "nto",
+            target_os = "openbsd",
+            target_os = "redox",
+            target_os = "solaris",
+            target_os = "vita",
         ),
-        // NOTE: also add to the list list for the `pipe` module below.
-        target_os = "aix",
-        target_os = "dragonfly",
-        target_os = "haiku",
-        target_os = "netbsd",
-        target_os = "nto",
-        target_os = "openbsd",
-        target_os = "redox",
-        target_os = "solaris",
-        target_os = "vita",
+        // Hermit doesn't support pipes.
+        not(target_os = "hermit"),
     ))]
     pub(crate) mod pipe;
 }
