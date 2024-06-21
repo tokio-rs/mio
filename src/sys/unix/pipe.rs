@@ -3,12 +3,7 @@
 //! See the [`new`] function for documentation.
 
 use std::io;
-#[cfg(not(target_os = "hermit"))]
 use std::os::fd::RawFd;
-// TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
-// can use `std::os::fd` and be merged with the above.
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::RawFd;
 
 pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
     let mut fds: [RawFd; 2] = [-1, -1];
@@ -69,12 +64,7 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
 cfg_os_ext! {
 use std::fs::File;
 use std::io::{IoSlice, IoSliceMut, Read, Write};
-#[cfg(not(target_os = "hermit"))]
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd};
-// TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
-// can use `std::os::fd` and be merged with the above.
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd};
 use std::process::{ChildStderr, ChildStdin, ChildStdout};
 
 use crate::io_source::IoSource;
