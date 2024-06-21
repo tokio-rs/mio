@@ -28,7 +28,7 @@ mod fdbased {
         not(mio_unsupported_force_waker_pipe),
         any(target_os = "android", target_os = "fuchsia", target_os = "linux"),
     ))]
-    use crate::sys::unix::waker::eventfd::WakerInternal;
+    use crate::sys::unix::waker::eventfd::Waker as WakerInternal;
     #[cfg(any(
         mio_unsupported_force_waker_pipe,
         target_os = "aix",
@@ -38,7 +38,7 @@ mod fdbased {
         target_os = "openbsd",
         target_os = "redox",
     ))]
-    use crate::sys::unix::waker::pipe::WakerInternal;
+    use crate::sys::unix::waker::pipe::Waker as WakerInternal;
     use crate::sys::Selector;
     use crate::{Interest, Token};
 
@@ -105,7 +105,7 @@ mod eventfd;
         target_os = "hermit",
     )
 ))]
-pub(crate) use self::eventfd::WakerInternal;
+pub(crate) use self::eventfd::Waker as WakerInternal;
 
 #[cfg(all(
     not(mio_unsupported_force_waker_pipe),
@@ -166,7 +166,7 @@ mod pipe;
     target_os = "solaris",
     target_os = "vita",
 ))]
-pub(crate) use self::pipe::WakerInternal;
+pub(crate) use self::pipe::Waker as WakerInternal;
 
 #[cfg(any(
     mio_unsupported_force_poll_poll,
