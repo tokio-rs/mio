@@ -51,7 +51,17 @@ cfg_os_poll! {
     mod selector;
     pub(crate) use self::selector::*;
 
-
+    #[cfg_attr(all(
+        not(mio_unsupported_force_waker_pipe),
+        any(
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "visionos",
+            target_os = "watchos",
+        )
+    ), path = "waker/kqueue.rs")]
     mod waker;
     pub(crate) use self::waker::Waker;
 

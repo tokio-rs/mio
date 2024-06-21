@@ -107,32 +107,6 @@ mod eventfd;
 ))]
 pub(crate) use self::eventfd::Waker as WakerInternal;
 
-#[cfg(all(
-    not(mio_unsupported_force_waker_pipe),
-    any(
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "visionos",
-        target_os = "watchos",
-    )
-))]
-mod kqueue;
-
-#[cfg(all(
-    not(mio_unsupported_force_waker_pipe),
-    any(
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "visionos",
-        target_os = "watchos",
-    )
-))]
-pub(crate) use self::kqueue::Waker;
-
 #[cfg(any(
     mio_unsupported_force_waker_pipe,
     target_os = "aix",
