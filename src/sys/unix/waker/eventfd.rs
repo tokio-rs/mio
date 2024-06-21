@@ -14,12 +14,12 @@ use std::os::hermit::io::{AsRawFd, FromRawFd, RawFd};
 /// unsigned integer and added to the count. Reads must also be 8 bytes and
 /// reset the count to 0, returning the count.
 #[derive(Debug)]
-pub(crate) struct WakerInternal {
+pub(crate) struct Waker {
     fd: File,
 }
 
-impl WakerInternal {
-    pub(crate) fn new() -> io::Result<WakerInternal> {
+impl Waker {
+    pub(crate) fn new() -> io::Result<Waker> {
         #[cfg(not(target_os = "espidf"))]
         let flags = libc::EFD_CLOEXEC | libc::EFD_NONBLOCK;
         // ESP-IDF is EFD_NONBLOCK by default and errors if you try to pass this flag.
@@ -28,7 +28,7 @@ impl WakerInternal {
         let fd = syscall!(eventfd(0, flags))?;
 
         let file = unsafe { File::from_raw_fd(fd) };
-        Ok(WakerInternal { fd: file })
+        Ok(Waker { fd: file })
     }
 
     #[allow(clippy::unused_io_amount)] // Don't care about partial writes.
@@ -70,7 +70,7 @@ impl WakerInternal {
     }
 }
 
-impl AsRawFd for WakerInternal {
+impl AsRawFd for Waker {
     fn as_raw_fd(&self) -> RawFd {
         self.fd.as_raw_fd()
     }

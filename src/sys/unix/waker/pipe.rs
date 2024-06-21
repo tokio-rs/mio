@@ -9,17 +9,17 @@ use crate::sys::unix::pipe;
 /// Waker controls both the sending and receiving ends and empties the pipe
 /// if writing to it (waking) fails.
 #[derive(Debug)]
-pub(crate) struct WakerInternal {
+pub(crate) struct Waker {
     sender: File,
     receiver: File,
 }
 
-impl WakerInternal {
-    pub(crate) fn new() -> io::Result<WakerInternal> {
+impl Waker {
+    pub(crate) fn new() -> io::Result<Waker> {
         let [receiver, sender] = pipe::new_raw()?;
         let sender = unsafe { File::from_raw_fd(sender) };
         let receiver = unsafe { File::from_raw_fd(receiver) };
-        Ok(WakerInternal { sender, receiver })
+        Ok(Waker { sender, receiver })
     }
 
     pub(crate) fn wake(&self) -> io::Result<()> {
@@ -67,7 +67,7 @@ impl WakerInternal {
     }
 }
 
-impl AsRawFd for WakerInternal {
+impl AsRawFd for Waker {
     fn as_raw_fd(&self) -> RawFd {
         self.receiver.as_raw_fd()
     }
