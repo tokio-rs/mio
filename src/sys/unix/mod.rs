@@ -51,12 +51,13 @@ cfg_os_poll! {
     mod selector;
     pub(crate) use self::selector::*;
 
-    mod sourcefd;
-    #[cfg(feature = "os-ext")]
-    pub use self::sourcefd::SourceFd;
 
     mod waker;
     pub(crate) use self::waker::Waker;
+
+    mod sourcefd;
+    #[cfg(feature = "os-ext")]
+    pub use self::sourcefd::SourceFd;
 
     cfg_net! {
         mod net;
