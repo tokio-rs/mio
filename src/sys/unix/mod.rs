@@ -49,11 +49,7 @@ cfg_os_poll! {
         target_os = "vita",
     ), path = "selector/poll.rs")]
     mod selector;
-    pub(crate) use self::selector::{event, Event, Events, Selector};
-
-    cfg_io_source! {
-        pub(crate) use self::selector::IoSourceState;
-    }
+    pub(crate) use self::selector::*;
 
     mod sourcefd;
     #[cfg(feature = "os-ext")]
