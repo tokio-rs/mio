@@ -43,18 +43,18 @@ mod fdbased {
     use crate::{Interest, Token};
 
     #[derive(Debug)]
-    pub struct Waker {
+    pub(crate) struct Waker {
         waker: WakerInternal,
     }
 
     impl Waker {
-        pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+        pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             let waker = WakerInternal::new()?;
             selector.register(waker.as_raw_fd(), token, Interest::READABLE)?;
             Ok(Waker { waker })
         }
 
-        pub fn wake(&self) -> io::Result<()> {
+        pub(crate) fn wake(&self) -> io::Result<()> {
             self.waker.wake()
         }
     }
@@ -82,7 +82,7 @@ mod fdbased {
         target_os = "vita"
     )),
 ))]
-pub use self::fdbased::Waker;
+pub(crate) use self::fdbased::Waker;
 
 #[cfg(all(
     not(mio_unsupported_force_waker_pipe),
@@ -131,7 +131,7 @@ mod kqueue;
         target_os = "watchos",
     )
 ))]
-pub use self::kqueue::Waker;
+pub(crate) use self::kqueue::Waker;
 
 #[cfg(any(
     mio_unsupported_force_waker_pipe,
@@ -183,20 +183,20 @@ mod poll {
     use std::io;
 
     #[derive(Debug)]
-    pub struct Waker {
+    pub(crate) struct Waker {
         selector: Selector,
         token: Token,
     }
 
     impl Waker {
-        pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+        pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
             Ok(Waker {
                 selector: selector.try_clone()?,
                 token,
             })
         }
 
-        pub fn wake(&self) -> io::Result<()> {
+        pub(crate) fn wake(&self) -> io::Result<()> {
             self.selector.wake(self.token)
         }
     }
@@ -211,4 +211,4 @@ mod poll {
     target_os = "solaris",
     target_os = "vita",
 ))]
-pub use self::poll::Waker;
+pub(crate) use self::poll::Waker;
