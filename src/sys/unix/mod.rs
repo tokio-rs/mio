@@ -15,6 +15,39 @@ macro_rules! syscall {
 }
 
 cfg_os_poll! {
+    #[cfg_attr(all(
+        not(mio_unsupported_force_poll_poll),
+        any(
+            target_os = "android",
+            target_os = "illumos",
+            target_os = "linux",
+            target_os = "redox",
+        )
+    ), path = "selector/epoll.rs")]
+    #[cfg_attr(all(
+        not(mio_unsupported_force_poll_poll),
+        any(
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "tvos",
+            target_os = "visionos",
+            target_os = "watchos",
+        )
+    ), path = "selector/kqueue.rs")]
+    #[cfg_attr(any(
+        mio_unsupported_force_poll_poll,
+        target_os = "espidf",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "hermit",
+        target_os = "nto",
+        target_os = "solaris",
+        target_os = "vita",
+    ), path = "selector/poll.rs")]
     mod selector;
     pub(crate) use self::selector::{event, Event, Events, Selector};
 
