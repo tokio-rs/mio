@@ -27,6 +27,10 @@ fn is_send_and_sync() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "hurd",
+    ignore = "getting pathname isn't supported on GNU/Hurd"
+)]
 fn unix_datagram_smoke_unconnected() {
     init();
     let path1 = temp_file("unix_datagram_smoke_unconnected1");
@@ -52,6 +56,10 @@ fn unix_datagram_smoke_connected() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "hurd",
+    ignore = "getting pathname isn't supported on GNU/Hurd"
+)]
 fn unix_datagram_smoke_unconnected_from_std() {
     init();
     let path1 = temp_file("unix_datagram_smoke_unconnected_from_std1");
@@ -89,6 +97,10 @@ fn unix_datagram_smoke_connected_from_std() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "hurd",
+    ignore = "getting pathname isn't supported on GNU/Hurd"
+)]
 fn unix_datagram_connect() {
     init();
     let path1 = temp_file("unix_datagram_connect1");
@@ -166,6 +178,7 @@ fn unix_datagram_pair() {
 }
 
 #[test]
+#[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
 fn unix_datagram_shutdown() {
@@ -285,6 +298,7 @@ fn smoke_test_unconnected(mut datagram1: UnixDatagram, mut datagram2: UnixDatagr
     assert_socket_non_blocking(&datagram2);
     assert_socket_close_on_exec(&datagram2);
 
+    // "getting pathname isn't supported on GNU/Hurd")]
     let addr1 = datagram1.local_addr().unwrap();
     let addr2 = datagram2.local_addr().unwrap();
     let path1 = addr1.as_pathname().expect("failed to get pathname");
@@ -343,18 +357,22 @@ fn smoke_test_connected(mut datagram1: UnixDatagram, mut datagram2: UnixDatagram
     assert_socket_non_blocking(&datagram2);
     assert_socket_close_on_exec(&datagram2);
 
-    let local_addr1 = datagram1.local_addr().unwrap();
-    let peer_addr1 = datagram1.peer_addr().unwrap();
-    let local_addr2 = datagram2.local_addr().unwrap();
-    let peer_addr2 = datagram2.peer_addr().unwrap();
-    assert_eq!(
-        local_addr1.as_pathname().expect("failed to get pathname"),
-        peer_addr2.as_pathname().expect("failed to get pathname")
-    );
-    assert_eq!(
-        local_addr2.as_pathname().expect("failed to get pathname"),
-        peer_addr1.as_pathname().expect("failed to get pathname")
-    );
+    // "getting pathname isn't supported on GNU/Hurd")]
+    #[cfg(not(target_os = "hurd"))]
+    {
+        let local_addr1 = datagram1.local_addr().unwrap();
+        let peer_addr1 = datagram1.peer_addr().unwrap();
+        let local_addr2 = datagram2.local_addr().unwrap();
+        let peer_addr2 = datagram2.peer_addr().unwrap();
+        assert_eq!(
+            local_addr1.as_pathname().expect("failed to get pathname"),
+            peer_addr2.as_pathname().expect("failed to get pathname")
+        );
+        assert_eq!(
+            local_addr2.as_pathname().expect("failed to get pathname"),
+            peer_addr1.as_pathname().expect("failed to get pathname")
+        );
+    }
 
     poll.registry()
         .register(

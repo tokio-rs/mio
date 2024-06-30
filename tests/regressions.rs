@@ -16,6 +16,7 @@ const ID1: Token = Token(1);
 const WAKE_TOKEN: Token = Token(10);
 
 #[test]
+#[cfg_attr(target_os = "hurd", ignore = "protocol not supported")]
 fn issue_776() {
     init();
 

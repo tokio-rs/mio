@@ -112,6 +112,7 @@ fn poll_closes_fd() {
 }
 
 #[test]
+#[cfg_attr(target_os = "hurd", ignore = "protocol not supported")]
 fn drop_cancels_interest_and_shuts_down() {
     init();
 
