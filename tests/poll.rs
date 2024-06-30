@@ -126,6 +126,8 @@ fn drop_cancels_interest_and_shuts_down() {
 
     let handle = thread::spawn(move || {
         let mut stream = listener.incoming().next().unwrap().unwrap();
+        // SO_RCVTIMEO not supported on GNU/Hurd
+        #[cfg(not(target_os = "hurd"))]
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("set_read_timeout");
