@@ -67,6 +67,8 @@ fn unix_listener_local_addr() {
     );
 
     let (stream, expected_addr) = listener.accept().unwrap();
+    // getting pathname isn't supported on GNU/Hurd
+    #[cfg(not(target_os = "hurd"))]
     assert_eq!(stream.local_addr().unwrap().as_pathname().unwrap(), &path);
     assert!(expected_addr.as_pathname().is_none());
 

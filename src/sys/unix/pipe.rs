@@ -13,6 +13,7 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "fuchsia",
+        target_os = "hurd",
         target_os = "linux",
         target_os = "netbsd",
         target_os = "openbsd",

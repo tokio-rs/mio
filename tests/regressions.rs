@@ -24,6 +24,8 @@ fn issue_776() {
 
     let handle = thread::spawn(move || {
         let mut stream = listener.accept().expect("accept").0;
+        // SO_RCVTIMEO not supported on GNU/Hurd
+        #[cfg(not(target_os = "hurd"))]
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("set_read_timeout");
