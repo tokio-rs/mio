@@ -516,6 +516,7 @@ fn no_events_after_deregister() {
     windows,
     ignore = "fails on Windows; client read closed events are not triggered"
 )]
+#[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
 fn tcp_shutdown_client_read_close_event() {
@@ -553,6 +554,7 @@ fn tcp_shutdown_client_read_close_event() {
 #[cfg_attr(
     any(
         target_os = "android",
+        target_os = "hurd",
         target_os = "illumos",
         target_os = "solaris",
         target_os = "linux",
@@ -591,6 +593,7 @@ fn tcp_shutdown_client_write_close_event() {
 }
 
 #[test]
+#[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
 fn tcp_shutdown_server_write_close_event() {
@@ -623,6 +626,7 @@ fn tcp_shutdown_server_write_close_event() {
 }
 
 #[test]
+#[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
 fn tcp_reset_close_event() {
@@ -673,7 +677,7 @@ fn tcp_reset_close_event() {
     ignore = "fails on Windows; client close events are not found"
 )]
 #[cfg_attr(
-    any(target_os = "illumos", target_os = "solaris"),
+    any(target_os = "hurd", target_os = "illumos", target_os = "solaris"),
     ignore = "fails; client write_closed events are not found"
 )]
 fn tcp_shutdown_client_both_close_event() {

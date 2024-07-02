@@ -54,8 +54,8 @@ fn smoke() {
 
 #[test]
 #[cfg_attr(
-    target_os = "nto",
-    ignore = "Writer fd close events do not trigger POLLHUP on nto target"
+    any(target_os = "hurd", target_os = "nto"),
+    ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
 )]
 fn event_when_sender_is_dropped() {
     let mut poll = Poll::new().unwrap();
@@ -96,8 +96,8 @@ fn event_when_sender_is_dropped() {
 
 #[test]
 #[cfg_attr(
-    target_os = "nto",
-    ignore = "Read fd close events do not trigger POLLHUP on nto target"
+    any(target_os = "hurd", target_os = "nto"),
+    ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
 )]
 fn event_when_receiver_is_dropped() {
     let mut poll = Poll::new().unwrap();
@@ -133,8 +133,8 @@ fn event_when_receiver_is_dropped() {
 
 #[test]
 #[cfg_attr(
-    target_os = "nto",
-    ignore = "Read/Write close eventsdo not trigger POLLHUP on nto target"
+    any(target_os = "hurd", target_os = "nto"),
+    ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
 )]
 fn from_child_process_io() {
     // `cat` simply echo everything that we write via standard in.
