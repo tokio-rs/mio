@@ -3,6 +3,9 @@ use crate::sys::unix::net::{new_ip_socket, socket_addr};
 use std::io;
 use std::mem;
 use std::net::{self, SocketAddr};
+#[cfg(target_os = "hermit")]
+use std::os::hermit::io::{AsRawFd, FromRawFd};
+#[cfg(not(target_os = "hermit"))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
 pub fn bind(addr: SocketAddr) -> io::Result<net::UdpSocket> {

@@ -2,6 +2,9 @@ use std::convert::TryInto;
 use std::io;
 use std::mem::{size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
+#[cfg(target_os = "hermit")]
+use std::os::hermit::io::{AsRawFd, FromRawFd};
+#[cfg(not(target_os = "hermit"))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
 use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
@@ -91,6 +94,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
         target_os = "watchos",
         target_os = "espidf",
         target_os = "vita",
+        target_os = "hermit",
         all(target_arch = "x86", target_os = "android"),
     ))]
     let stream = {
@@ -109,6 +113,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
                 all(target_arch = "x86", target_os = "android"),
                 target_os = "espidf",
                 target_os = "vita",
+                target_os = "hermit",
             ))]
             syscall!(fcntl(s.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK))?;
 

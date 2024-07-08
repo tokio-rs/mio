@@ -5,6 +5,13 @@
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
         let res = unsafe { libc::$fn($($arg, )*) };
+        #[cfg(target_os = "hermit")]
+        if res < 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(res)
+        }
+        #[cfg(unix)]
         if res == -1 {
             Err(std::io::Error::last_os_error())
         } else {
@@ -29,16 +36,21 @@ cfg_os_poll! {
 
         pub(crate) mod tcp;
         pub(crate) mod udp;
+        #[cfg(not(target_os = "hermit"))]
         pub(crate) mod uds;
+        #[cfg(not(target_os = "hermit"))]
         pub use self::uds::SocketAddr;
     }
 
     cfg_io_source! {
         // Both `kqueue` and `epoll` don't need to hold any user space state.
-        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "solaris", target_os = "vita")))]
+        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "hermit", target_os = "solaris", target_os = "vita")))]
         mod stateless_io_source {
             use std::io;
+            #[cfg(unix)]
             use std::os::unix::io::RawFd;
+            #[cfg(target_os = "hermit")]
+            use std::os::hermit::io::RawFd;
             use crate::Registry;
             use crate::Token;
             use crate::Interest;
@@ -88,16 +100,16 @@ cfg_os_poll! {
             }
         }
 
-        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "solaris",target_os = "vita")))]
+        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "hermit", target_os = "solaris",target_os = "vita")))]
         pub(crate) use self::stateless_io_source::IoSourceState;
 
-        #[cfg(any(mio_unsupported_force_poll_poll, target_os = "solaris", target_os = "vita"))]
+        #[cfg(any(mio_unsupported_force_poll_poll, target_os = "hermit", target_os = "solaris", target_os = "vita"))]
         pub(crate) use self::selector::IoSourceState;
     }
 
     #[cfg(any(
         // For the public `pipe` module, must match `cfg_os_ext` macro.
-        feature = "os-ext",
+        all(feature = "os-ext", not(target_os = "hermit")),
         // For the `Waker` type based on a pipe.
         mio_unsupported_force_waker_pipe,
         target_os = "aix",
