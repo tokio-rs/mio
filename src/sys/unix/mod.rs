@@ -5,6 +5,13 @@
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
         let res = unsafe { libc::$fn($($arg, )*) };
+        #[cfg(target_os = "hermit")]
+        if res < 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(res)
+        }
+        #[cfg(unix)]
         if res == -1 {
             Err(std::io::Error::last_os_error())
         } else {
