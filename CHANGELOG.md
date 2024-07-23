@@ -1,3 +1,16 @@
+# 1.0.1
+
+* Added Fuchsia support
+  (https://github.com/tokio-rs/mio/pull/1811).
+* Added GNU/Hurd support
+  (https://github.com/tokio-rs/mio/pull/1816).
+* Fixed an issue where accepting on a UDS socket without sometime pass an address
+  with a NULL byte to SocketAddr::from_pathname
+  (https://github.com/tokio-rs/mio/pull/1817).
+* Internal cleanups that should make the `cfg` sitations easier to follow
+  (https://github.com/tokio-rs/mio/pull/1812,
+  https://github.com/tokio-rs/mio/pull/1813).
+
 # 1.0
 
 With v1 Mio is able to bump its MSRV to 1.70, allowing us to implement I/O
