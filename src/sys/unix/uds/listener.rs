@@ -109,9 +109,13 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
     if sockaddr.sun_path[0] == 0 {
         path_len = 0;
     }
-    let address = SocketAddr::from_pathname(Path::new(OsStr::from_bytes(unsafe {
-        // SAFETY: going from i8 to u8 is fine in this context.
-        &*(&sockaddr.sun_path[..path_len] as *const [libc::c_char] as *const [u8])
-    })))?;
+    // SAFETY: going from i8 to u8 is fine in this context.
+    let mut path =
+        unsafe { &*(&sockaddr.sun_path[..path_len] as *const [libc::c_char] as *const [u8]) };
+    // Remove last null as `SocketAddr::from_pathname` doesn't accept it.
+    if let Some(0) = path.last() {
+        path = &path[..path.len() - 1];
+    }
+    let address = SocketAddr::from_pathname(Path::new(OsStr::from_bytes(path)))?;
     Ok((socket, address))
 }
