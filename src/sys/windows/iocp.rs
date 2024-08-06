@@ -6,6 +6,7 @@ use std::fmt;
 use std::io;
 use std::mem;
 use std::os::windows::io::*;
+use std::ptr::null_mut;
 use std::time::Duration;
 
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
@@ -19,6 +20,14 @@ use windows_sys::Win32::System::IO::{
 pub(crate) struct CompletionPort {
     handle: Handle,
 }
+
+// SAFETY: `Handles`s are, in general, not thread-safe. However, we only used `Handle`s for
+// resources that are thread-safe in `CompletionPort`.
+unsafe impl Send for CompletionPort {}
+
+// SAFETY: `Handles`s are, in general, not thread-safe. However, we only used `Handle`s for
+// resources that are thread-safe in `CompletionPort`.
+unsafe impl Sync for CompletionPort {}
 
 /// A status message received from an I/O completion port.
 ///
@@ -45,8 +54,8 @@ impl CompletionPort {
     /// allowed for threads associated with this port. Consult the Windows
     /// documentation for more information about this value.
     pub fn new(threads: u32) -> io::Result<CompletionPort> {
-        let ret = unsafe { CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, threads) };
-        if ret == 0 {
+        let ret = unsafe { CreateIoCompletionPort(INVALID_HANDLE_VALUE, null_mut(), 0, threads) };
+        if ret.is_null() {
             Err(io::Error::last_os_error())
         } else {
             Ok(CompletionPort {
@@ -69,7 +78,7 @@ impl CompletionPort {
         let ret = unsafe {
             CreateIoCompletionPort(t.as_raw_handle() as HANDLE, self.handle.raw(), token, 0)
         };
-        if ret == 0 {
+        if ret.is_null() {
             Err(io::Error::last_os_error())
         } else {
             Ok(())
@@ -191,7 +200,7 @@ impl CompletionStatus {
     /// This function is useful when creating a stack buffer or vector of
     /// completion statuses to be passed to the `get_many` function.
     pub fn zero() -> Self {
-        Self::new(0, 0, std::ptr::null_mut())
+        Self::new(0, 0, null_mut())
     }
 
     /// Returns the number of bytes that were transferred for the I/O operation

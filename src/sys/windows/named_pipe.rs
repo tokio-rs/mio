@@ -92,6 +92,14 @@ struct Inner {
     pool: Mutex<BufferPool>,
 }
 
+// SAFETY: `Handles`s are, in general, not thread-safe. However, we only used `Handle`s for
+// resources that are thread-safe in `Inner`.
+unsafe impl Send for Inner {}
+
+// SAFETY: `Handles`s are, in general, not thread-safe. However, we only used `Handle`s for
+// resources that are thread-safe in `Inner`.
+unsafe impl Sync for Inner {}
+
 impl Inner {
     /// Converts a pointer to `Inner.connect` to a pointer to `Inner`.
     ///
