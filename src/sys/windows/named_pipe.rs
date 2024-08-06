@@ -73,6 +73,9 @@ pub struct NamedPipe {
     inner: Arc<Inner>,
 }
 
+unsafe impl Send for NamedPipe {}
+unsafe impl Sync for NamedPipe {}
+
 /// # Notes
 ///
 /// The memory layout of this structure must be fixed as the
