@@ -53,7 +53,7 @@ libc = "0.2.149"
 libc = { package = "hermit-abi", version = "0.3.9" }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.52"
+version = "0.59"
 features = [
   "Wdk_Foundation",                   # Required for AFD.
   "Wdk_Storage_FileSystem",           # Required for AFD.
