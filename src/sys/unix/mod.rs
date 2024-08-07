@@ -59,7 +59,6 @@ cfg_os_poll! {
             target_os = "espidf",
             target_os = "fuchsia",
             target_os = "hermit",
-            target_os = "illumos",
             target_os = "linux",
         )
     ), path = "waker/eventfd.rs")]
@@ -94,6 +93,7 @@ cfg_os_poll! {
         target_os = "dragonfly",
         target_os = "haiku",
         target_os = "hurd",
+        target_os = "illumos",
         target_os = "netbsd",
         target_os = "nto",
         target_os = "openbsd",
@@ -146,6 +146,7 @@ cfg_os_poll! {
             target_os = "openbsd",
             target_os = "redox",
             target_os = "solaris",
+            target_os = "illumos",
             target_os = "vita",
         ),
         // Hermit doesn't support pipes.
