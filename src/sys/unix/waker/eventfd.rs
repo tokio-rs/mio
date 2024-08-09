@@ -47,7 +47,7 @@ impl Waker {
         // generated.
         // See https://www.illumos.org/issues/16700.
         #[cfg(target_os = "illumos")]
-        self.reset();
+        self.reset()?;
 
         let buf: [u8; 8] = 1u64.to_ne_bytes();
         match (&self.fd).write(&buf) {
