@@ -40,7 +40,7 @@ impl Waker {
         // The epoll emulation on some illumos systems currently requires
         // the pipe buffer to be completely empty for an edge-triggered
         // wakeup on the pipe read side.
-        // See https://www.illumos.org/issues/16700.
+        // See https://www.illumos.org/issues/13436.
         #[cfg(target_os = "illumos")]
         self.empty();
 
