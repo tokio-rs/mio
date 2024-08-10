@@ -1,3 +1,11 @@
+# 1.0.2
+
+* Work around eventfd bug on illumos
+  (https://github.com/tokio-rs/mio/pull/1826).
+* Fix dead code warning on Hermit when building with `--no-default-features
+  --features os-ext`
+  (https://github.com/tokio-rs/mio/pull/1828).
+
 # 1.0.1
 
 * Added Fuchsia support
