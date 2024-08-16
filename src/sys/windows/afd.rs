@@ -66,7 +66,7 @@ impl Afd {
         (*iosb).Anonymous.Status = STATUS_PENDING;
         let status = NtDeviceIoControlFile(
             self.fd.as_raw_handle() as HANDLE,
-            null_mut(),
+            std::ptr::null_mut(),
             None,
             overlapped,
             iosb,

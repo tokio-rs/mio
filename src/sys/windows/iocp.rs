@@ -6,6 +6,7 @@ use std::fmt;
 use std::io;
 use std::mem;
 use std::os::windows::io::*;
+use std::ptr::null_mut;
 use std::time::Duration;
 
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
@@ -191,7 +192,7 @@ impl CompletionStatus {
     /// This function is useful when creating a stack buffer or vector of
     /// completion statuses to be passed to the `get_many` function.
     pub fn zero() -> Self {
-        Self::new(0, 0, std::ptr::null_mut())
+        Self::new(0, 0, null_mut())
     }
 
     /// Returns the number of bytes that were transferred for the I/O operation
