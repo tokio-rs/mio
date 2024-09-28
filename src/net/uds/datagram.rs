@@ -1,5 +1,5 @@
 use std::net::Shutdown;
-use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::{fmt, io};
@@ -249,8 +249,20 @@ impl From<UnixDatagram> for net::UnixDatagram {
     }
 }
 
+impl From<UnixDatagram> for OwnedFd {
+    fn from(unix_datagram: UnixDatagram) -> Self {
+        unix_datagram.inner.into_inner().into()
+    }
+}
+
 impl AsFd for UnixDatagram {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.inner.as_fd()
+    }
+}
+
+impl From<OwnedFd> for UnixDatagram {
+    fn from(fd: OwnedFd) -> Self {
+        UnixDatagram::from_std(From::from(fd))
     }
 }

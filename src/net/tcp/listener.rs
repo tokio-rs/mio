@@ -1,12 +1,14 @@
 use std::net::{self, SocketAddr};
 #[cfg(any(unix, target_os = "wasi"))]
-use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 // TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
 // can use `std::os::fd` and be merged with the above.
 #[cfg(target_os = "hermit")]
-use std::os::hermit::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::hermit::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 #[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::os::windows::io::{
+    AsRawSocket, AsSocket, BorrowedSocket, FromRawSocket, IntoRawSocket, OwnedSocket, RawSocket,
+};
 use std::{fmt, io};
 
 use crate::io_source::IoSource;
@@ -196,9 +198,29 @@ impl FromRawFd for TcpListener {
 }
 
 #[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
+impl From<TcpListener> for OwnedFd {
+    fn from(tcp_listener: TcpListener) -> Self {
+        tcp_listener.inner.into_inner().into()
+    }
+}
+
+#[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
 impl AsFd for TcpListener {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.inner.as_fd()
+    }
+}
+
+#[cfg(any(unix, target_os = "hermit", target_os = "wasi"))]
+impl From<OwnedFd> for TcpListener {
+    /// Converts a `RawFd` to a `TcpListener`.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
+    fn from(fd: OwnedFd) -> Self {
+        TcpListener::from_std(From::from(fd))
     }
 }
 
@@ -226,6 +248,33 @@ impl FromRawSocket for TcpListener {
     /// non-blocking mode.
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpListener {
         TcpListener::from_std(FromRawSocket::from_raw_socket(socket))
+    }
+}
+
+#[cfg(windows)]
+impl From<TcpListener> for OwnedSocket {
+    fn from(tcp_listener: TcpListener) -> Self {
+        tcp_listener.inner.into_inner().into()
+    }
+}
+
+#[cfg(windows)]
+impl AsSocket for TcpListener {
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        self.inner.as_socket()
+    }
+}
+
+#[cfg(windows)]
+impl From<OwnedSocket> for TcpListener {
+    /// Converts a `RawSocket` to a `TcpListener`.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
+    fn from(socket: OwnedSocket) -> Self {
+        TcpListener::from_std(From::from(socket))
     }
 }
 
