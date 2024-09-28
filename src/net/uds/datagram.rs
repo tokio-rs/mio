@@ -1,5 +1,5 @@
 use std::net::Shutdown;
-use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd, OwnedFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::{fmt, io};
