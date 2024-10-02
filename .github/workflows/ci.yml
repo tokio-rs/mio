@@ -152,6 +152,7 @@ jobs:
           - armv7-sony-vita-newlibeabihf
           - i686-unknown-linux-gnu
           - i686-unknown-hurd-gnu
+          - powerpc64-ibm-aix
           - riscv32imc-esp-espidf
           - sparcv9-sun-solaris
           - wasm32-wasi
