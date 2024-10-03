@@ -40,6 +40,7 @@ cfg_os_poll! {
     ), path = "selector/kqueue.rs")]
     #[cfg_attr(any(
         mio_unsupported_force_poll_poll,
+        target_os = "aix",
         target_os = "espidf",
         target_os = "fuchsia",
         target_os = "haiku",
