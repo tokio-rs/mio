@@ -65,8 +65,13 @@ features = [
   "Win32_System_WindowsProgramming",  # General future used for various types/funcs
 ]
 
-[target.'cfg(target_os = "wasi")'.dependencies]
+[target.'cfg(all(target_os = "wasi", not(target_env = "p2")))'.dependencies]
 wasi = "0.11.0"
+
+[target.'cfg(all(target_os = "wasi", target_env = "p2"))'.dependencies]
+wasi = "0.13.3"
+
+[target.'cfg(target_os = "wasi")'.dependencies]
 libc = "0.2.159"
 
 [dev-dependencies]
@@ -80,6 +85,7 @@ targets = [
   "aarch64-apple-ios",
   "aarch64-linux-android",
   "wasm32-wasip1",
+  "wasm32-wasip2",
   "x86_64-apple-darwin",
   "x86_64-pc-windows-gnu",
   "x86_64-pc-windows-msvc",
