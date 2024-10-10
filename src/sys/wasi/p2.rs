@@ -24,6 +24,19 @@
 // API (see the `netc` module below) to do so.  Once
 // https://github.com/WebAssembly/wasi-libc/issues/542 is addressed, we'll be
 // able to switch to a public API.
+//
+// TODO #1: Add a public, WASIp2-only API for registering
+// `wasi::io::poll::Pollable`s directly (i.e. those which do not correspond to
+// any `wasi-libc` file descriptor.
+//
+// TODO #2: Add support for binding, listening, and accepting.  This would
+// involve adding cases for `TCP_SOCKET_STATE_UNBOUND`,
+// `TCP_SOCKET_STATE_BOUND`, and `TCP_SOCKET_STATE_LISTENING` to the `match`
+// statements in `Selector::select`.
+//
+// TODO #3: Add support for UDP sockets.  This would involve adding cases for
+// the `UDP_SOCKET_STATE_*` tags to the `match` statements in
+// `Selector::select`.
 
 use crate::{Interest, Token};
 use netc as libc;
