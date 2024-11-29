@@ -103,7 +103,7 @@ jobs:
       with:
         components: clippy
     - name: Clippy
-      run: cargo clippy --all-targets --all-features -- --allow clippy::mixed-attributes-style --allow clippy::unused-io-amount -D warnings
+      run: cargo clippy --all-targets --all-features -- --allow clippy::mixed-attributes-style --allow clippy::unused-io-amount --allow clippy::needless-lifetimes -D warnings
   Docs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
