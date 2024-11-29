@@ -1,3 +1,13 @@
+# 1.0.3
+
+* Implement more I/O safety traits
+  (https://github.com/tokio-rs/mio/pull/1831).
+* Remove hermit-abi dependency, now using libc
+  (https://github.com/tokio-rs/mio/pull/1830).
+* Use `poll(2)` implementation on AIX, removing the need for using
+  `mio_unsupported_force_poll_poll`
+  (https://github.com/tokio-rs/mio/pull/1833).
+
 # 1.0.2
 
 * Work around eventfd bug on illumos

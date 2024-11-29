@@ -103,7 +103,7 @@ jobs:
       with:
         components: clippy
     - name: Clippy
-      run: cargo clippy --all-targets --all-features -- --allow clippy::mixed-attributes-style --allow clippy::unused-io-amount -D warnings
+      run: cargo clippy --all-targets --all-features -- --allow clippy::mixed-attributes-style --allow clippy::unused-io-amount --allow clippy::needless-lifetimes -D warnings
   Docs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -135,7 +135,8 @@ jobs:
           - aarch64-apple-darwin
           - aarch64-apple-ios
           - aarch64-apple-tvos
-          - aarch64-apple-visionos
+          # Can't build standard library.
+          #- aarch64-apple-visionos
           - aarch64-apple-watchos
           - aarch64-linux-android
           - aarch64-unknown-freebsd
@@ -151,11 +152,12 @@ jobs:
           - arm64_32-apple-watchos
           - armv7-sony-vita-newlibeabihf
           - i686-unknown-linux-gnu
-          - i686-unknown-hurd-gnu
+          # TODO: reenable <https://github.com/tokio-rs/mio/issues/1844>.
+          #- i686-unknown-hurd-gnu
           # - powerpc64-ibm-aix Enable CI runs once aix has full stdlib upstreamed
           - riscv32imc-esp-espidf
           - sparcv9-sun-solaris
-          - wasm32-wasi
+          - wasm32-wasip1
           - x86_64-apple-darwin
           - x86_64-apple-ios
           - x86_64-pc-nto-qnx710
