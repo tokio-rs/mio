@@ -155,7 +155,7 @@ jobs:
           # - powerpc64-ibm-aix Enable CI runs once aix has full stdlib upstreamed
           - riscv32imc-esp-espidf
           - sparcv9-sun-solaris
-          - wasm32-wasi
+          - wasm32-wasi-p1
           - x86_64-apple-darwin
           - x86_64-apple-ios
           - x86_64-pc-nto-qnx710
