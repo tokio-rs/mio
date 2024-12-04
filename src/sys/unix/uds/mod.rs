@@ -158,6 +158,9 @@ mod tests {
     #[test]
     #[cfg(any(target_os = "android", target_os = "linux"))]
     fn abstract_address() {
+        #[cfg(target_os = "android")]
+        use std::os::android::net::SocketAddrExt;
+        #[cfg(target_os = "linux")]
         use std::os::linux::net::SocketAddrExt;
 
         const PATH: &[u8] = &[0, 116, 111, 107, 105, 111];
