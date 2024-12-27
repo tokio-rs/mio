@@ -42,6 +42,8 @@ os-ext = [
 ]
 # Enables `mio::net` module containing networking primitives.
 net = []
+# Enables OS process polling.
+process = []
 
 [dependencies]
 log = { version = "0.4.8", optional = true }

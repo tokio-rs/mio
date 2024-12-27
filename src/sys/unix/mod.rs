@@ -106,6 +106,19 @@ cfg_os_poll! {
     // NOTE: the `Waker` type is expected in the selector module as the
     // `poll(2)` implementation needs to do some special stuff.
 
+    #[cfg(feature = "process")]
+    #[cfg_attr(any(
+        target_os = "android",
+        target_os = "espidf",
+        target_os = "fuchsia",
+        target_os = "hermit",
+        target_os = "illumos",
+        target_os = "linux",
+    ), path = "process/pidfd.rs")]
+    mod process;
+    #[cfg(feature = "process")]
+    pub use self::process::Process;
+
     mod sourcefd;
     #[cfg(feature = "os-ext")]
     pub use self::sourcefd::SourceFd;

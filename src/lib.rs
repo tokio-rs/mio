@@ -46,6 +46,8 @@ mod macros;
 
 mod interest;
 mod poll;
+#[cfg(feature = "process")]
+mod process;
 mod sys;
 mod token;
 #[cfg(not(target_os = "wasi"))]
@@ -68,6 +70,8 @@ pub use poll::{Poll, Registry};
 pub use token::Token;
 #[cfg(not(target_os = "wasi"))]
 pub use waker::Waker;
+#[cfg(feature = "process")]
+pub use process::Process;
 
 #[cfg(all(unix, feature = "os-ext"))]
 #[cfg_attr(docsrs, doc(cfg(all(unix, feature = "os-ext"))))]
