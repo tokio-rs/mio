@@ -15,7 +15,7 @@ use crate::{sys, Interest, Registry, Token};
 ///
 /// # Implementation notes
 ///
-/// On Linux [`Process`] uses `pidfd`.
+/// [`Process`] uses `pidfd` on Linux, `EVFILT_PROC` on MacOS/BSD.
 #[derive(Debug)]
 pub struct Process {
     inner: sys::Process,

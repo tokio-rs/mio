@@ -115,6 +115,14 @@ cfg_os_poll! {
         target_os = "illumos",
         target_os = "linux",
     ), path = "process/pidfd.rs")]
+    #[cfg_attr(any(
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos",
+        target_os = "watchos",
+    ), path = "process/pid.rs")]
     mod process;
     #[cfg(feature = "process")]
     pub use self::process::Process;

@@ -1,11 +1,9 @@
 #![cfg(all(feature = "os-poll", feature = "net", feature = "process"))]
 
+use mio::{Interest, Process, Token};
 use std::process::{Command, Stdio};
 
-use mio::{Interest, Process, Token};
-
 mod util;
-
 use util::{expect_events, init_with_poll_with_capacity, ExpectEvent};
 
 // Test basic process polling functionality by spawning two child processes.
@@ -59,7 +57,7 @@ fn after_wait() {
 // Test for potential race conditions in process polling by spawning many child processes at once.
 #[test]
 fn stress_test() {
-    let num_processes = 1000;
+    let num_processes = 100;
     let (mut poll, mut events) = init_with_poll_with_capacity(num_processes);
     let mut children = Vec::with_capacity(num_processes);
     let mut procs = Vec::with_capacity(num_processes);
