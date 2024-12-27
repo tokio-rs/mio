@@ -70,7 +70,12 @@ impl Source for Process {
     target_os = "linux",
 ))]
 mod linux {
+    #[cfg(not(target_os = "hermit"))]
     use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+    // TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
+    // can use `std::os::fd` and be merged with the above.
+    #[cfg(target_os = "hermit")]
+    use std::os::hermit::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 
     use super::*;
 
