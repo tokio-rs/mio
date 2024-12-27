@@ -1,4 +1,4 @@
-#![cfg(all(feature = "os-poll", feature = "net", feature = "process"))]
+#![cfg(all(feature = "os-poll", feature = "net", feature = "os-proc"))]
 
 use mio::{Interest, Process, Token};
 use std::process::{Command, Stdio};

@@ -40,10 +40,10 @@ os-ext = [
   "windows-sys/Win32_System_Pipes",
   "windows-sys/Win32_Security",
 ]
+# Enables OS process polling.
+os-proc = ["os-poll"]
 # Enables `mio::net` module containing networking primitives.
 net = []
-# Enables OS process polling.
-process = []
 
 [dependencies]
 log = { version = "0.4.8", optional = true }

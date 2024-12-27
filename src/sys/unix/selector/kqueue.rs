@@ -249,7 +249,7 @@ impl Selector {
     }
 }
 
-#[cfg(feature = "process")]
+#[cfg(feature = "os-proc")]
 impl Selector {
     pub fn register_pid(
         &self,
@@ -442,7 +442,7 @@ pub mod event {
         match event.filter {
             // Emit process's read event *only* on process exit
             // to make `EVFILT_PROC` behaviour consistent with `pidfd`.
-            #[cfg(feature = "process")]
+            #[cfg(feature = "os-proc")]
             libc::EVFILT_PROC if (event.fflags & libc::NOTE_EXIT) != 0 => true,
             // File descriptor's read event.
             libc::EVFILT_READ => true,

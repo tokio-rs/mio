@@ -69,12 +69,12 @@ macro_rules! cfg_any_os_ext {
     }
 }
 
-/// The `process` feature is enabled.
-macro_rules! cfg_process {
+/// The `os-proc` feature is enabled.
+macro_rules! cfg_os_proc {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "process")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
+            #[cfg(feature = "os-proc")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "os-proc")))]
             $item
         )*
     }

@@ -106,7 +106,7 @@ cfg_os_poll! {
     // NOTE: the `Waker` type is expected in the selector module as the
     // `poll(2)` implementation needs to do some special stuff.
 
-    #[cfg(feature = "process")]
+    #[cfg(feature = "os-proc")]
     #[cfg_attr(any(
         target_os = "android",
         target_os = "espidf",
@@ -124,7 +124,7 @@ cfg_os_poll! {
         target_os = "watchos",
     ), path = "process/pid.rs")]
     mod process;
-    #[cfg(feature = "process")]
+    #[cfg(feature = "os-proc")]
     pub use self::process::Process;
 
     mod sourcefd;
