@@ -10,7 +10,7 @@ use util::{expect_events, init_with_poll_with_capacity, ExpectEvent};
 
 // Test basic process polling functionality by spawning two child processes.
 #[test]
-fn child_process() {
+fn before_wait() {
     let (mut poll, mut events) = init_with_poll_with_capacity(2);
     let mut child1 = new_command().spawn().unwrap();
     let mut child2 = new_command().spawn().unwrap();
@@ -35,6 +35,25 @@ fn child_process() {
 
     child1.wait().unwrap();
     child2.wait().unwrap();
+}
+
+// Test that the process that has been waited for still generates read event.
+#[test]
+fn after_wait() {
+    let (mut poll, mut events) = init_with_poll_with_capacity(2);
+    let mut child1 = new_command().spawn().unwrap();
+    let mut p1 = Process::new(&child1).unwrap();
+
+    poll.registry()
+        .register(&mut p1, ID1, Interest::READABLE)
+        .unwrap();
+
+    child1.wait().unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
 }
 
 // Test for potential race conditions in process polling by spawning many child processes at once.
@@ -69,7 +88,9 @@ fn stress_test() {
 fn new_command() -> Command {
     let mut cmd = Command::new("cargo");
     cmd.arg("--version");
+    cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::null());
+    cmd.stderr(Stdio::null());
     cmd
 }
 

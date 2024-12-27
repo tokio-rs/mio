@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::Error;
-use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::process::Child;
 
 use libc::{pid_t, SYS_pidfd_open, PIDFD_NONBLOCK};
@@ -26,6 +26,12 @@ impl Process {
     }
 }
 
+impl AsFd for Process {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.fd.as_fd()
+    }
+}
+
 impl AsRawFd for Process {
     fn as_raw_fd(&self) -> RawFd {
         self.fd.as_raw_fd()
@@ -42,6 +48,19 @@ impl FromRawFd for Process {
 impl IntoRawFd for Process {
     fn into_raw_fd(self) -> RawFd {
         self.fd.into_raw_fd()
+    }
+}
+
+impl From<OwnedFd> for Process {
+    fn from(other: OwnedFd) -> Self {
+        let fd = other.into();
+        Self { fd }
+    }
+}
+
+impl From<Process> for OwnedFd {
+    fn from(other: Process) -> Self {
+        other.fd.into()
     }
 }
 

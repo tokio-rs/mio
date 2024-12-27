@@ -1,13 +1,4 @@
 use std::io::Error;
-#[cfg(any(
-    target_os = "android",
-    target_os = "espidf",
-    target_os = "fuchsia",
-    target_os = "hermit",
-    target_os = "illumos",
-    target_os = "linux",
-))]
-use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::process::Child;
 
 use crate::event::Source;
@@ -15,16 +6,16 @@ use crate::{sys, Interest, Registry, Token};
 
 /// Process allows polling OS processes for completion.
 ///
-/// When the process exits the event with [`readable`] readiness is generated.
+/// When the process exits the event with [`readable`](crate::event::Event::readable) readiness is generated.
 ///
 /// # Notes
 ///
 /// Events are delivered even if the process has exited by the time [`poll`](crate::Poll::poll) is
-/// called.
+/// called and has been waited for.
 ///
 /// # Implementation notes
 ///
-/// On Linux `Process` uses `pidfd`.
+/// On Linux [`Process`] uses `pidfd`.
 #[derive(Debug)]
 pub struct Process {
     inner: sys::Process,
@@ -69,7 +60,7 @@ impl Source for Process {
     }
 }
 
-// This `impl` is useful to send/receive `pidfd` over a UNIX domain socket.
+// The following trait implementations are useful to send/receive `pidfd` over a UNIX-domain socket.
 #[cfg(any(
     target_os = "android",
     target_os = "espidf",
@@ -78,39 +69,46 @@ impl Source for Process {
     target_os = "illumos",
     target_os = "linux",
 ))]
-impl AsRawFd for Process {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.as_raw_fd()
-    }
-}
+mod linux {
+    use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 
-// This `impl` is useful to send/receive `pidfd` over a UNIX domain socket.
-#[cfg(any(
-    target_os = "android",
-    target_os = "espidf",
-    target_os = "fuchsia",
-    target_os = "hermit",
-    target_os = "illumos",
-    target_os = "linux",
-))]
-impl FromRawFd for Process {
-    unsafe fn from_raw_fd(fd: RawFd) -> Self {
-        let inner = sys::Process::from_raw_fd(fd);
-        Self { inner }
-    }
-}
+    use super::*;
 
-// This `impl` is useful to send/receive `pidfd` over a UNIX domain socket.
-#[cfg(any(
-    target_os = "android",
-    target_os = "espidf",
-    target_os = "fuchsia",
-    target_os = "hermit",
-    target_os = "illumos",
-    target_os = "linux",
-))]
-impl IntoRawFd for Process {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_raw_fd()
+    impl AsFd for Process {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            self.inner.as_fd()
+        }
+    }
+
+    impl AsRawFd for Process {
+        fn as_raw_fd(&self) -> RawFd {
+            self.inner.as_raw_fd()
+        }
+    }
+
+    impl FromRawFd for Process {
+        unsafe fn from_raw_fd(fd: RawFd) -> Self {
+            let inner = sys::Process::from_raw_fd(fd);
+            Self { inner }
+        }
+    }
+
+    impl IntoRawFd for Process {
+        fn into_raw_fd(self) -> RawFd {
+            self.inner.into_raw_fd()
+        }
+    }
+
+    impl From<OwnedFd> for Process {
+        fn from(other: OwnedFd) -> Self {
+            let inner = other.into();
+            Self { inner }
+        }
+    }
+
+    impl From<Process> for OwnedFd {
+        fn from(other: Process) -> Self {
+            other.inner.into()
+        }
     }
 }
