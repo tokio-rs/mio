@@ -69,6 +69,17 @@ macro_rules! cfg_any_os_ext {
     }
 }
 
+/// The `process` feature is enabled.
+macro_rules! cfg_process {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "process")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! trace {
     ($($t:tt)*) => {
         log!(trace, $($t)*)

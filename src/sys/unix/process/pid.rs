@@ -1,10 +1,8 @@
-use std::io::Error;
-use std::process::Child;
-
-use libc::pid_t;
-
 use crate::event::Source;
 use crate::{Interest, Registry, Token};
+use libc::pid_t;
+use std::io::Error;
+use std::process::Child;
 
 #[derive(Debug)]
 pub struct Process {

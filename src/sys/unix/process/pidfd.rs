@@ -1,12 +1,10 @@
+use crate::event::Source;
+use crate::{Interest, Registry, Token};
+use libc::{pid_t, SYS_pidfd_open, PIDFD_NONBLOCK};
 use std::fs::File;
 use std::io::Error;
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::process::Child;
-
-use libc::{pid_t, SYS_pidfd_open, PIDFD_NONBLOCK};
-
-use crate::event::Source;
-use crate::{Interest, Registry, Token};
 
 #[derive(Debug)]
 pub struct Process {
