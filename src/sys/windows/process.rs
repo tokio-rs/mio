@@ -1,25 +1,15 @@
 use crate::event::Source;
-use crate::sys::windows::iocp::CompletionPort;
 use crate::{Interest, Registry, Token};
-use std::collections::HashMap;
 use std::io;
 use std::mem::size_of;
 use std::os::windows::io::{
     AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle, IntoRawHandle, OwnedHandle, RawHandle,
 };
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::Mutex;
 use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectAssociateCompletionPortInformation,
     SetInformationJobObject, JOBOBJECT_ASSOCIATE_COMPLETION_PORT,
 };
-
-// Odd tokens are for named pipes
-static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(2);
-// inner token -> token
-pub(crate) static TOKEN_MAPPING: LazyLock<Mutex<HashMap<usize, Token>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // https://devblogs.microsoft.com/oldnewthing/20130405-00/?p=4743
 #[derive(Debug)]
@@ -32,10 +22,7 @@ impl Process {
     pub fn new(child: RawHandle) -> io::Result<Self> {
         let job = new_job()?;
         assign_process_to_job(job.as_raw_handle(), child)?;
-        let io = Mutex::new(Io {
-            cp: None,
-            token: None,
-        });
+        let io = Mutex::new(Io { inner_token: None });
         Ok(Self { job, io })
     }
 }
@@ -54,10 +41,7 @@ impl AsHandle for Process {
 
 impl FromRawHandle for Process {
     unsafe fn from_raw_handle(job: RawHandle) -> Self {
-        let io = Mutex::new(Io {
-            cp: None,
-            token: None,
-        });
+        let io = Mutex::new(Io { inner_token: None });
         let job = OwnedHandle::from_raw_handle(job);
         Self { job, io }
     }
@@ -78,10 +62,7 @@ impl From<Process> for OwnedHandle {
 impl From<OwnedHandle> for Process {
     fn from(other: OwnedHandle) -> Self {
         let job = other.into();
-        let io = Mutex::new(Io {
-            cp: None,
-            token: None,
-        });
+        let io = Mutex::new(Io { inner_token: None });
         Self { job, io }
     }
 }
@@ -90,87 +71,44 @@ impl Source for Process {
     fn register(&mut self, registry: &Registry, token: Token, _: Interest) -> io::Result<()> {
         let mut io = self.io.lock().unwrap();
 
-        io.check_association(registry, false)?;
-
-        if io.token.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::AlreadyExists,
-                "I/O source already registered with a `Registry`",
-            ));
+        if io.inner_token.is_some() {
+            return Err(io::ErrorKind::InvalidInput.into());
         }
 
-        if io.cp.is_none() {
-            let selector = registry.selector();
+        let selector = registry.selector();
+        let port = selector.as_raw_handle();
+        let inner_token = selector.register_process(token)?;
+        associate_job_with_completion_port(self.job.as_raw_handle(), port, inner_token)?;
 
-            let port = selector.clone_port();
+        io.inner_token = Some(inner_token);
 
-            let inner_token = NEXT_TOKEN.fetch_add(3, Relaxed) + 3;
-            TOKEN_MAPPING.lock().unwrap().insert(inner_token, token);
-            associate_job_with_completion_port(
-                self.job.as_raw_handle(),
-                port.as_raw_handle(),
-                inner_token,
-            )?;
-
-            io.cp = Some(port);
-        }
-
-        io.token = Some(token);
         drop(io);
 
         Ok(())
     }
 
     fn reregister(&mut self, registry: &Registry, token: Token, _: Interest) -> io::Result<()> {
-        let mut io = self.io.lock().unwrap();
-
-        io.check_association(registry, true)?;
-
-        io.token = Some(token);
-        drop(io);
-
+        let io = self.io.lock().unwrap();
+        let inner_token = io.inner_token.ok_or_else(|| io::ErrorKind::InvalidInput)?;
+        registry.selector().reregister_process(inner_token, token)?;
         Ok(())
     }
 
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         let mut io = self.io.lock().unwrap();
-
-        io.check_association(registry, true)?;
-
-        if io.token.is_none() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "I/O source not registered with `Registry`",
-            ));
-        }
-
-        io.token = None;
+        let inner_token = io
+            .inner_token
+            .take()
+            .ok_or_else(|| io::ErrorKind::InvalidInput)?;
+        registry.selector().deregister_process(inner_token)?;
         Ok(())
     }
 }
 
 #[derive(Debug)]
 struct Io {
-    // Uniquely identifies the selector associated with this named pipe
-    cp: Option<Arc<CompletionPort>>,
-    // Token used to identify events
-    token: Option<Token>,
-}
-
-impl Io {
-    fn check_association(&self, registry: &Registry, required: bool) -> io::Result<()> {
-        match self.cp {
-            Some(ref cp) if !registry.selector().same_port(cp) => Err(io::Error::new(
-                io::ErrorKind::AlreadyExists,
-                "I/O source already registered with a different `Registry`",
-            )),
-            None if required => Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "I/O source not registered with `Registry`",
-            )),
-            _ => Ok(()),
-        }
-    }
+    // Inner token used to identify events
+    inner_token: Option<usize>,
 }
 
 fn new_job() -> io::Result<OwnedHandle> {

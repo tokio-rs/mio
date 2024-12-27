@@ -11,8 +11,10 @@ use std::process::Child;
 ///
 /// # Notes
 ///
-/// Events are delivered even if the process has exited by the time [`poll`](crate::Poll::poll) is
-/// called and has been waited for.
+/// Events are delivered even if the process has exited and has been waited for
+/// by the time [`poll`](crate::Poll::poll) is called.
+///
+/// On Windows a process might be registered with at most one poller.
 ///
 /// # Implementation notes
 ///
@@ -34,13 +36,6 @@ impl Process {
     #[cfg(unix)]
     pub fn from_pid(pid: libc::pid_t) -> Result<Self, Error> {
         let inner = sys::Process::from_pid(pid)?;
-        Ok(Self { inner })
-    }
-
-    /// Create new process from the process handle.
-    #[cfg(windows)]
-    pub fn from_handle(child: RawHandle) -> Result<Self, Error> {
-        let inner = sys::Process::new(child)?;
         Ok(Self { inner })
     }
 }

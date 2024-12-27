@@ -14,6 +14,7 @@ use overlapped::Overlapped;
 
 mod selector;
 pub use selector::Selector;
+pub(crate) use selector::TokenType;
 
 // Macros must be defined before the modules that use them
 cfg_net! {

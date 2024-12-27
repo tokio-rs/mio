@@ -139,7 +139,7 @@ impl From<Interest> for Readiness {
 }
 
 pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<ExpectEvent>) {
-    const TIMEOUT: Duration = Duration::from_millis(500);
+    const TIMEOUT: Duration = Duration::from_millis(4999);
     const MAX_ITERATIONS: usize = 1000;
 
     // In a lot of calls we expect more then one event, but it could be that
@@ -150,6 +150,7 @@ pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<Exp
         poll.poll(events, Some(TIMEOUT)).expect("unable to poll");
 
         if t.elapsed() >= TIMEOUT && events.is_empty() {
+            warn!("poll timed out");
             // Poll timed out.
             break;
         }

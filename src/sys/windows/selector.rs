@@ -1,7 +1,6 @@
 use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
-use crate::sys::windows::process::TOKEN_MAPPING;
 use crate::sys::Events;
 use windows_sys::Win32::System::SystemServices::{
     JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS, JOB_OBJECT_MSG_EXIT_PROCESS,
@@ -15,15 +14,13 @@ cfg_net! {
 }
 
 use super::iocp::{CompletionPort, CompletionStatus};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ffi::c_void;
 use std::io;
 use std::marker::PhantomPinned;
-use std::os::windows::io::RawSocket;
+use std::os::windows::io::{AsRawHandle, RawHandle, RawSocket};
 use std::pin::Pin;
-#[cfg(debug_assertions)]
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -57,14 +54,14 @@ cfg_io_source! {
     const POLL_GROUP_MAX_GROUP_SIZE: usize = 32;
 
     impl AfdGroup {
-        pub fn acquire(&self) -> io::Result<Arc<Afd>> {
+        pub fn acquire(&self, inner_token: usize) -> io::Result<Arc<Afd>> {
             let mut afd_group = self.afd_group.lock().unwrap();
             if afd_group.len() == 0 {
-                self._alloc_afd_group(&mut afd_group)?;
+                self._alloc_afd_group(&mut afd_group, inner_token)?;
             } else {
                 // + 1 reference in Vec
                 if Arc::strong_count(afd_group.last().unwrap()) > POLL_GROUP_MAX_GROUP_SIZE  {
-                    self._alloc_afd_group(&mut afd_group)?;
+                    self._alloc_afd_group(&mut afd_group, inner_token)?;
                 }
             }
 
@@ -77,8 +74,8 @@ cfg_io_source! {
             }
         }
 
-        fn _alloc_afd_group(&self, afd_group: &mut Vec<Arc<Afd>>) -> io::Result<()> {
-            let afd = Afd::new(&self.cp)?;
+        fn _alloc_afd_group(&self, afd_group: &mut Vec<Arc<Afd>>, inner_token: usize) -> io::Result<()> {
+            let afd = Afd::new(&self.cp, inner_token)?;
             let arc = Arc::new(afd);
             afd_group.push(arc);
             Ok(())
@@ -367,9 +364,52 @@ impl Selector {
         self.inner.cp.clone()
     }
 
-    #[cfg(any(feature = "os-ext", feature = "os-proc"))]
+    pub(super) fn as_raw_handle(&self) -> RawHandle {
+        self.inner.cp.as_raw_handle()
+    }
+
+    #[cfg(feature = "os-ext")]
     pub(super) fn same_port(&self, other: &Arc<CompletionPort>) -> bool {
         Arc::ptr_eq(&self.inner.cp, other)
+    }
+
+    pub(super) fn next_token(&self, token_type: TokenType) -> usize {
+        self.inner.next_token(token_type)
+    }
+
+    pub(super) fn register_process(&self, token: Token) -> io::Result<usize> {
+        use std::collections::hash_map::Entry::*;
+        let inner_token = self.inner.next_token(TokenType::Process);
+        let mut token_mapping = self.inner.token_mapping.lock().unwrap();
+        match token_mapping.entry(inner_token) {
+            Vacant(v) => {
+                v.insert(token);
+            }
+            Occupied(..) => return Err(io::ErrorKind::AlreadyExists.into()),
+        }
+        Ok(inner_token)
+    }
+
+    pub(super) fn reregister_process(&self, inner_token: usize, token: Token) -> io::Result<()> {
+        use std::collections::hash_map::Entry::*;
+        let mut token_mapping = self.inner.token_mapping.lock().unwrap();
+        match token_mapping.entry(inner_token) {
+            Vacant(..) => return Err(io::ErrorKind::NotFound.into()),
+            Occupied(mut o) => {
+                *o.get_mut() = token;
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn deregister_process(&self, inner_token: usize) -> io::Result<()> {
+        self.inner
+            .token_mapping
+            .lock()
+            .unwrap()
+            .remove(&inner_token)
+            .ok_or_else(|| io::ErrorKind::NotFound)?;
+        Ok(())
     }
 }
 
@@ -403,12 +443,48 @@ cfg_io_source! {
     }
 }
 
+/// Inner token type.
+///
+/// Token is calculated using the following formula:
+///
+/// `next_token * NUM_INNER_TOKEN_TYPES + offset`
+///
+/// The `offset` is determined by the token type. `next_token` is the sequence number of the token
+/// of a particular type allocated for a particular selector.
+#[derive(Debug, PartialEq, Eq)]
+#[repr(usize)]
+pub enum TokenType {
+    Afd = 0,
+    NamedPipe = 1,
+    Process = 2,
+}
+
+impl From<usize> for TokenType {
+    fn from(other: usize) -> Self {
+        const AFD: usize = TokenType::Afd as usize;
+        const NAMED_PIPE: usize = TokenType::NamedPipe as usize;
+        const PROCESS: usize = TokenType::Process as usize;
+        match other % NUM_INNER_TOKEN_TYPES {
+            AFD => TokenType::Afd,
+            NAMED_PIPE => TokenType::NamedPipe,
+            PROCESS => TokenType::Process,
+            _ => unreachable!(),
+        }
+    }
+}
+
+const NUM_INNER_TOKEN_TYPES: usize = 3;
+
 #[derive(Debug)]
 pub struct SelectorInner {
     pub(super) cp: Arc<CompletionPort>,
     update_queue: Mutex<VecDeque<Pin<Arc<Mutex<SockState>>>>>,
     afd_group: AfdGroup,
     is_polling: AtomicBool,
+    next_token: [AtomicUsize; NUM_INNER_TOKEN_TYPES],
+    // The mapping between inner tokens and public-facing tokens.
+    // Currently only process tokens are present here.
+    token_mapping: Mutex<HashMap<usize, Token>>,
 }
 
 // We have ensured thread safety by introducing lock manually.
@@ -425,6 +501,14 @@ impl SelectorInner {
                 update_queue: Mutex::new(VecDeque::new()),
                 afd_group: AfdGroup::new(cp_afd),
                 is_polling: AtomicBool::new(false),
+                // Do not change the order of the items in the following array without changing `TokenType`
+                // values first.
+                next_token: [
+                    AtomicUsize::new(TokenType::Afd as usize),
+                    AtomicUsize::new(TokenType::NamedPipe as usize),
+                    AtomicUsize::new(TokenType::Process as usize),
+                ],
+                token_mapping: Mutex::new(Default::default()),
             }
         })
     }
@@ -470,6 +554,11 @@ impl SelectorInner {
         }
     }
 
+    fn next_token(&self, token_type: TokenType) -> usize {
+        self.next_token[token_type as usize].fetch_add(NUM_INNER_TOKEN_TYPES, Ordering::Relaxed)
+            + NUM_INNER_TOKEN_TYPES
+    }
+
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
         let mut update_queue = self.update_queue.lock().unwrap();
         for sock in update_queue.iter_mut() {
@@ -495,14 +584,14 @@ impl SelectorInner {
         let mut n = 0;
         let mut update_queue = self.update_queue.lock().unwrap();
         for iocp_event in iocp_events.iter() {
-            if iocp_event.token() % 3 == 2 {
-                // Process
+            let token_type: TokenType = iocp_event.token().into();
+            if token_type == TokenType::Process {
                 match iocp_event.bytes_transferred() {
                     // We are only interested in "process exit" events to be consistent with `pidfd`.
                     JOB_OBJECT_MSG_EXIT_PROCESS | JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS => {
                         // lpOverlapped is the process id
-                        eprintln!("feed_events {}", iocp_event.bytes_transferred());
-                        if let Some(token) = TOKEN_MAPPING.lock().unwrap().get(&iocp_event.token())
+                        if let Some(token) =
+                            self.token_mapping.lock().unwrap().get(&iocp_event.token())
                         {
                             let mut event = Event::new(*token);
                             event.set_readable();
@@ -517,7 +606,7 @@ impl SelectorInner {
                 events.push(Event::from_completion_status(iocp_event));
                 n += 1;
                 continue;
-            } else if iocp_event.token() % 3 == 1 {
+            } else if token_type == TokenType::NamedPipe {
                 // Handle is a named pipe. This could be extended to be any non-AFD event.
                 let callback = (*(iocp_event.overlapped() as *mut super::Overlapped)).callback;
 
@@ -563,7 +652,8 @@ cfg_io_source! {
             let flags = interests_to_afd_flags(interests);
 
             let sock = {
-                let sock = this._alloc_sock_for_rawsocket(socket)?;
+                let inner_token = this.next_token(TokenType::Afd);
+                let sock = this._alloc_sock_for_rawsocket(socket, inner_token)?;
                 let event = Event {
                     flags,
                     data: token.0 as u64,
@@ -640,8 +730,9 @@ cfg_io_source! {
         fn _alloc_sock_for_rawsocket(
             &self,
             raw_socket: RawSocket,
+            inner_token: usize,
         ) -> io::Result<Pin<Arc<Mutex<SockState>>>> {
-            let afd = self.afd_group.acquire()?;
+            let afd = self.afd_group.acquire(inner_token)?;
             Ok(Arc::pin(Mutex::new(SockState::new(raw_socket, afd)?)))
         }
     }
@@ -715,18 +806,18 @@ impl Drop for SelectorInner {
                 Ok(iocp_events) => {
                     events_num = iocp_events.iter().len();
                     for iocp_event in iocp_events.iter() {
+                        let token_type: TokenType = iocp_event.token().into();
                         if iocp_event.overlapped().is_null() {
                             // Custom event
-                        } else if iocp_event.token() % 3 == 1 {
+                        } else if token_type == TokenType::NamedPipe {
                             // Named pipe, dispatch the event so it can release resources
                             let callback = unsafe {
                                 (*(iocp_event.overlapped() as *mut super::Overlapped)).callback
                             };
 
                             callback(iocp_event.entry(), None);
-                        } else if iocp_event.token() % 3 == 2 {
-                            // Process
-                            eprintln!("SelectorInner::drop");
+                        } else if token_type == TokenType::Process {
+                            // The resources are released automatically on drop.
                         } else {
                             // drain sock state to release memory of Arc reference
                             let _sock_state = from_overlapped(iocp_event.overlapped());

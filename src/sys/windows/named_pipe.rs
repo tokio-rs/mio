@@ -1,8 +1,8 @@
 use std::ffi::OsStr;
 use std::io::{self, Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
-use std::sync::atomic::Ordering::{Relaxed, SeqCst};
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Mutex};
 use std::{fmt, mem, slice};
 
@@ -23,9 +23,8 @@ use windows_sys::Win32::System::IO::{
 
 use crate::event::Source;
 use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
-use crate::sys::windows::{Event, Handle, Overlapped};
-use crate::Registry;
-use crate::{Interest, Token};
+use crate::sys::windows::{Event, Handle, Overlapped, TokenType};
+use crate::{Interest, Registry, Token};
 
 /// Non-blocking windows named pipe.
 ///
@@ -351,9 +350,6 @@ enum State {
     Err(io::Error),
 }
 
-// Odd tokens are for named pipes
-static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
-
 fn would_block() -> io::Error {
     io::ErrorKind::WouldBlock.into()
 }
@@ -622,7 +618,7 @@ impl Source for NamedPipe {
 
             io.cp = Some(selector.clone_port());
 
-            let inner_token = NEXT_TOKEN.fetch_add(3, Relaxed) + 3;
+            let inner_token = selector.next_token(TokenType::NamedPipe);
             selector.inner.cp.add_handle(inner_token, self)?;
         }
 
