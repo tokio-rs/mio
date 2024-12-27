@@ -46,6 +46,11 @@ cfg_os_ext! {
 mod waker;
 pub(crate) use waker::Waker;
 
+cfg_os_proc! {
+    mod process;
+    pub(crate) use process::Process;
+}
+
 cfg_io_source! {
     use std::io;
     use std::os::windows::io::RawSocket;

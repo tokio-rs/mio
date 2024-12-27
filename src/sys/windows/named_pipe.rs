@@ -622,7 +622,7 @@ impl Source for NamedPipe {
 
             io.cp = Some(selector.clone_port());
 
-            let inner_token = NEXT_TOKEN.fetch_add(2, Relaxed) + 2;
+            let inner_token = NEXT_TOKEN.fetch_add(3, Relaxed) + 3;
             selector.inner.cp.add_handle(inner_token, self)?;
         }
 

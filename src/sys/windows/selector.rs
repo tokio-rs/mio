@@ -1,7 +1,11 @@
 use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
+use crate::sys::windows::process::TOKEN_MAPPING;
 use crate::sys::Events;
+use windows_sys::Win32::System::SystemServices::{
+    JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS, JOB_OBJECT_MSG_EXIT_PROCESS,
+};
 
 cfg_net! {
     use crate::sys::event::{
@@ -363,7 +367,7 @@ impl Selector {
         self.inner.cp.clone()
     }
 
-    #[cfg(feature = "os-ext")]
+    #[cfg(any(feature = "os-ext", feature = "os-proc"))]
     pub(super) fn same_port(&self, other: &Arc<CompletionPort>) -> bool {
         Arc::ptr_eq(&self.inner.cp, other)
     }
@@ -491,11 +495,29 @@ impl SelectorInner {
         let mut n = 0;
         let mut update_queue = self.update_queue.lock().unwrap();
         for iocp_event in iocp_events.iter() {
-            if iocp_event.overlapped().is_null() {
+            if iocp_event.token() % 3 == 2 {
+                // Process
+                match iocp_event.bytes_transferred() {
+                    // We are only interested in "process exit" events to be consistent with `pidfd`.
+                    JOB_OBJECT_MSG_EXIT_PROCESS | JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS => {
+                        // lpOverlapped is the process id
+                        eprintln!("feed_events {}", iocp_event.bytes_transferred());
+                        if let Some(token) = TOKEN_MAPPING.lock().unwrap().get(&iocp_event.token())
+                        {
+                            let mut event = Event::new(*token);
+                            event.set_readable();
+                            events.push(event);
+                            n += 1;
+                        }
+                    }
+                    _ => {}
+                }
+                continue;
+            } else if iocp_event.overlapped().is_null() {
                 events.push(Event::from_completion_status(iocp_event));
                 n += 1;
                 continue;
-            } else if iocp_event.token() % 2 == 1 {
+            } else if iocp_event.token() % 3 == 1 {
                 // Handle is a named pipe. This could be extended to be any non-AFD event.
                 let callback = (*(iocp_event.overlapped() as *mut super::Overlapped)).callback;
 
@@ -695,13 +717,16 @@ impl Drop for SelectorInner {
                     for iocp_event in iocp_events.iter() {
                         if iocp_event.overlapped().is_null() {
                             // Custom event
-                        } else if iocp_event.token() % 2 == 1 {
+                        } else if iocp_event.token() % 3 == 1 {
                             // Named pipe, dispatch the event so it can release resources
                             let callback = unsafe {
                                 (*(iocp_event.overlapped() as *mut super::Overlapped)).callback
                             };
 
                             callback(iocp_event.entry(), None);
+                        } else if iocp_event.token() % 3 == 2 {
+                            // Process
+                            eprintln!("SelectorInner::drop");
                         } else {
                             // drain sock state to release memory of Arc reference
                             let _sock_state = from_overlapped(iocp_event.overlapped());

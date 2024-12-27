@@ -106,26 +106,26 @@ cfg_os_poll! {
     // NOTE: the `Waker` type is expected in the selector module as the
     // `poll(2)` implementation needs to do some special stuff.
 
-    #[cfg(feature = "os-proc")]
-    #[cfg_attr(any(
-        target_os = "android",
-        target_os = "espidf",
-        target_os = "fuchsia",
-        target_os = "hermit",
-        target_os = "illumos",
-        target_os = "linux",
-    ), path = "process/pidfd.rs")]
-    #[cfg_attr(any(
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "visionos",
-        target_os = "watchos",
-    ), path = "process/pid.rs")]
-    mod process;
-    #[cfg(feature = "os-proc")]
-    pub use self::process::Process;
+    cfg_os_proc! {
+        #[cfg_attr(any(
+            target_os = "android",
+            target_os = "espidf",
+            target_os = "fuchsia",
+            target_os = "hermit",
+            target_os = "illumos",
+            target_os = "linux",
+        ), path = "process/pidfd.rs")]
+        #[cfg_attr(any(
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "visionos",
+            target_os = "watchos",
+        ), path = "process/pid.rs")]
+        mod process;
+        pub use self::process::Process;
+    }
 
     mod sourcefd;
     #[cfg(feature = "os-ext")]

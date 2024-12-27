@@ -205,7 +205,7 @@ cfg_io_source! {
                 // Non-AFD types (currently only NamedPipe), use odd numbered
                 // tokens. This allows the selector to differentiate between them
                 // and dispatch events accordingly.
-                let token = NEXT_TOKEN.fetch_add(2, Ordering::Relaxed) + 2;
+                let token = NEXT_TOKEN.fetch_add(3, Ordering::Relaxed) + 3;
                 let afd = Afd { fd };
                 cp.add_handle(token, &afd.fd)?;
                 match SetFileCompletionNotificationModes(
