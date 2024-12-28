@@ -564,7 +564,6 @@ fn connect_error() {
                 // Without fastopen we would be getting the connection error
                 assert!(event.is_writable() || event.is_error());
                 // Solaris poll(2) says POLLHUP and POLLOUT are mutually exclusive.
-                // Doesn't work on FreeBSD either.
                 #[cfg(not(target_os = "solaris"))]
                 assert!(event.is_write_closed());
                 break 'outer;
