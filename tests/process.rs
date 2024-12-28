@@ -22,6 +22,7 @@
                 target_os = "watchos",
             ),
         ),
+        windows,
     ),
 ))]
 
