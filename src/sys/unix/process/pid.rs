@@ -17,6 +17,10 @@ impl Process {
     pub fn from_pid(pid: pid_t) -> Result<Self, Error> {
         Ok(Self { pid })
     }
+
+    pub fn pid(&self) -> pid_t {
+        self.pid
+    }
 }
 
 impl Source for Process {

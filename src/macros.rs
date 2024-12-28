@@ -80,6 +80,16 @@ macro_rules! cfg_os_proc {
     }
 }
 
+macro_rules! cfg_if {
+    ($condition:meta, $($item:item)*) => {
+        $(
+            #[cfg($condition)]
+            #[cfg_attr(docsrs, doc(cfg($condition)))]
+            $item
+        )*
+    }
+}
+
 macro_rules! trace {
     ($($t:tt)*) => {
         log!(trace, $($t)*)
