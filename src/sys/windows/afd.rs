@@ -117,6 +117,7 @@ cfg_io_source! {
     use std::mem::zeroed;
     use std::os::windows::io::{FromRawHandle, RawHandle};
     use std::ptr::null_mut;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
     use windows_sys::Wdk::Storage::FileSystem::{NtCreateFile, FILE_OPEN};
@@ -161,6 +162,8 @@ cfg_io_source! {
         'o' as _
     ];
 
+    static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(0);
+
     impl AfdPollInfo {
         pub fn zeroed() -> AfdPollInfo {
             unsafe { zeroed() }
@@ -169,7 +172,7 @@ cfg_io_source! {
 
     impl Afd {
         /// Create new Afd instance.
-        pub(crate) fn new(cp: &CompletionPort, inner_token: usize) -> io::Result<Afd> {
+        pub(crate) fn new(cp: &CompletionPort) -> io::Result<Afd> {
             let mut afd_helper_handle: HANDLE = INVALID_HANDLE_VALUE;
             let mut iosb = IO_STATUS_BLOCK {
                 Anonymous: IO_STATUS_BLOCK_0 { Status: 0 },
@@ -198,8 +201,13 @@ cfg_io_source! {
                     return Err(io::Error::new(raw_err.kind(), msg));
                 }
                 let fd = File::from_raw_handle(afd_helper_handle as RawHandle);
+                // Increment by 2 to reserve space for other types of handles.
+                // Non-AFD types (currently only NamedPipe), use odd numbered
+                // tokens. This allows the selector to differentiate between them
+                // and dispatch events accordingly.
+                let token = NEXT_TOKEN.fetch_add(2, Ordering::Relaxed) + 2;
                 let afd = Afd { fd };
-                cp.add_handle(inner_token, &afd.fd)?;
+                cp.add_handle(token, &afd.fd)?;
                 match SetFileCompletionNotificationModes(
                     afd_helper_handle,
                     FILE_SKIP_SET_EVENT_ON_HANDLE as u8 // This is just 2, so fits in u8

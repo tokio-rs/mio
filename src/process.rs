@@ -2,7 +2,7 @@ use crate::event::Source;
 use crate::{sys, Interest, Registry, Token};
 use std::io::Error;
 #[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, RawHandle};
+use std::os::windows::io::AsRawHandle;
 use std::process::Child;
 
 /// Process allows polling OS processes for completion.
@@ -13,8 +13,6 @@ use std::process::Child;
 ///
 /// Events are delivered even if the process has exited and has been waited for
 /// by the time [`poll`](crate::Poll::poll) is called.
-///
-/// On Windows a process might be registered with at most one poller.
 ///
 /// # Implementation notes
 ///
