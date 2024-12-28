@@ -536,10 +536,6 @@ fn connection_reset_by_peer() {
 }
 
 #[test]
-#[cfg_attr(
-    all(mio_unsupported_force_poll_poll, any(target_os = "freebsd", target_os = "macos")),
-    ignore = "Doesn't work on MacOS/FreeBSD with `poll`."
-)]
 fn connect_error() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -699,9 +695,7 @@ fn write_shutdown() {
     if cfg!(any(
         target_os = "hurd",
         target_os = "solaris",
-        target_os = "nto",
-        // Not supported when using `poll` as a `kqueue` replacement on FreeBSD.
-        all(mio_unsupported_force_poll_poll, target_os = "freebsd"),
+        target_os = "nto"
     )) {
         wait!(poll, is_readable, false);
     } else {

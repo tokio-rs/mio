@@ -377,45 +377,44 @@ impl Selector {
     }
 }
 
-cfg_os_proc! {
-    impl Selector {
-        pub(super) fn as_raw_handle(&self) -> RawHandle {
-            self.inner.cp.as_raw_handle()
-        }
+#[cfg(feature = "os-proc")]
+impl Selector {
+    pub(super) fn as_raw_handle(&self) -> RawHandle {
+        self.inner.cp.as_raw_handle()
+    }
 
-        pub(super) fn register_handle(&self, handle: RawHandle, info: HandleInfo) -> io::Result<()> {
-            use std::collections::hash_map::Entry::*;
-            let mut handles = self.inner.handles.lock().unwrap();
-            match handles.entry(handle) {
-                Vacant(v) => {
-                    v.insert(info);
-                }
-                Occupied(..) => return Err(io::ErrorKind::AlreadyExists.into()),
+    pub(super) fn register_handle(&self, handle: RawHandle, info: HandleInfo) -> io::Result<()> {
+        use std::collections::hash_map::Entry::*;
+        let mut handles = self.inner.handles.lock().unwrap();
+        match handles.entry(handle) {
+            Vacant(v) => {
+                v.insert(info);
             }
-            Ok(())
+            Occupied(..) => return Err(io::ErrorKind::AlreadyExists.into()),
         }
+        Ok(())
+    }
 
-        pub(super) fn reregister_handle(&self, handle: RawHandle, info: HandleInfo) -> io::Result<()> {
-            use std::collections::hash_map::Entry::*;
-            let mut handles = self.inner.handles.lock().unwrap();
-            match handles.entry(handle) {
-                Vacant(..) => return Err(io::ErrorKind::NotFound.into()),
-                Occupied(mut o) => {
-                    *o.get_mut() = info;
-                }
+    pub(super) fn reregister_handle(&self, handle: RawHandle, info: HandleInfo) -> io::Result<()> {
+        use std::collections::hash_map::Entry::*;
+        let mut handles = self.inner.handles.lock().unwrap();
+        match handles.entry(handle) {
+            Vacant(..) => return Err(io::ErrorKind::NotFound.into()),
+            Occupied(mut o) => {
+                *o.get_mut() = info;
             }
-            Ok(())
         }
+        Ok(())
+    }
 
-        pub(super) fn deregister_handle(&self, handle: RawHandle) -> io::Result<()> {
-            self.inner
-                .handles
-                .lock()
-                .unwrap()
-                .remove(&handle)
-                .ok_or(io::ErrorKind::NotFound)?;
-            Ok(())
-        }
+    pub(super) fn deregister_handle(&self, handle: RawHandle) -> io::Result<()> {
+        self.inner
+            .handles
+            .lock()
+            .unwrap()
+            .remove(&handle)
+            .ok_or(io::ErrorKind::NotFound)?;
+        Ok(())
     }
 }
 

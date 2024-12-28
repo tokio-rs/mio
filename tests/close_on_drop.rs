@@ -4,7 +4,6 @@
 use std::io::Read;
 
 use log::debug;
-use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Registry, Token};
 
@@ -39,10 +38,10 @@ impl TestHandler {
         }
     }
 
-    fn handle_read(&mut self, registry: &Registry, event: &Event) {
-        debug!("readable; tok={:?}", event.token());
+    fn handle_read(&mut self, registry: &Registry, tok: Token) {
+        debug!("readable; tok={:?}", tok);
 
-        match event.token() {
+        match tok {
             SERVER => {
                 debug!("server connection ready for accept");
                 let _ = self.srv.accept().unwrap();
@@ -65,14 +64,12 @@ impl TestHandler {
                     Ok(_) => panic!("the client socket should not be readable"),
                     Err(e) => panic!("Unexpected error {:?}", e),
                 }
-                if !event.is_read_closed() {
-                    registry
-                        .reregister(&mut self.cli, CLIENT, Interest::READABLE)
-                        .unwrap();
-                }
             }
-            _ => panic!("received unknown token {:?}", event.token()),
+            _ => panic!("received unknown token {:?}", tok),
         }
+        registry
+            .reregister(&mut self.cli, CLIENT, Interest::READABLE)
+            .unwrap();
     }
 
     fn handle_write(&mut self, registry: &Registry, tok: Token) {
@@ -122,7 +119,7 @@ pub fn close_on_drop() {
 
         for event in &events {
             if event.is_readable() {
-                handler.handle_read(poll.registry(), event);
+                handler.handle_read(poll.registry(), event.token());
             }
 
             if event.is_writable() {

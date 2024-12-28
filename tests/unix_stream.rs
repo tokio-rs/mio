@@ -205,10 +205,6 @@ fn unix_stream_peer_addr() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
-#[cfg_attr(
-    all(mio_unsupported_force_poll_poll, any(target_os = "freebsd", target_os = "macos")),
-    ignore = "POLLRDHUP isn't supported when using `poll` as a `kqueue` replacement on FreeBSD/MacOS."
-)]
 fn unix_stream_shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_read");
@@ -298,19 +294,16 @@ fn unix_stream_shutdown_write() {
 
     stream.shutdown(Shutdown::Write).unwrap();
 
-    #[cfg(all(
-        not(mio_unsupported_force_poll_poll),
-        any(
-            target_os = "dragonfly",
-            target_os = "freebsd",
-            target_os = "ios",
-            target_os = "macos",
-            target_os = "netbsd",
-            target_os = "openbsd",
-            target_os = "tvos",
-            target_os = "visionos",
-            target_os = "watchos"
-        ),
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "tvos",
+        target_os = "visionos",
+        target_os = "watchos",
     ))]
     expect_events(
         &mut poll,
@@ -334,10 +327,6 @@ fn unix_stream_shutdown_write() {
 #[cfg_attr(
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
-)]
-#[cfg_attr(
-    all(mio_unsupported_force_poll_poll, target_os = "macos"),
-    ignore = "Doesn't work on MacOS with `poll`."
 )]
 fn unix_stream_shutdown_both() {
     let (mut poll, mut events) = init_with_poll();
@@ -407,10 +396,6 @@ fn unix_stream_shutdown_both() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
-#[cfg_attr(
-    all(mio_unsupported_force_poll_poll, target_os = "freebsd"),
-    ignore = "POLLRDHUP isn't supported when using `poll` as a `kqueue` replacement on FreeBSD."
-)]
 fn unix_stream_shutdown_listener_write() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));

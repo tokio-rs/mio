@@ -57,10 +57,6 @@ fn smoke() {
     any(target_os = "hurd", target_os = "nto"),
     ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
 )]
-#[cfg_attr(
-    all(mio_unsupported_force_poll_poll, any(target_os = "macos")),
-    ignore = "Doesn't work on MacOS with `poll`."
-)]
 fn event_when_sender_is_dropped() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(8);
@@ -103,10 +99,6 @@ fn event_when_sender_is_dropped() {
     any(target_os = "hurd", target_os = "nto"),
     ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
 )]
-#[cfg_attr(
-    all(mio_unsupported_force_poll_poll, any(target_os = "macos")),
-    ignore = "Doesn't work on MacOS with `poll`."
-)]
 fn event_when_receiver_is_dropped() {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(8);
@@ -143,10 +135,6 @@ fn event_when_receiver_is_dropped() {
 #[cfg_attr(
     any(target_os = "hurd", target_os = "nto"),
     ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
-)]
-#[cfg_attr(
-    all(mio_unsupported_force_poll_poll, any(target_os = "macos")),
-    ignore = "Doesn't work on MacOS with `poll`."
 )]
 fn from_child_process_io() {
     // `cat` simply echo everything that we write via standard in.
