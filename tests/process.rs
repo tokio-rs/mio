@@ -1,4 +1,29 @@
-#![cfg(all(feature = "os-poll", feature = "net", feature = "os-proc"))]
+#![cfg(all(
+    feature = "os-poll",
+    feature = "net",
+    feature = "os-proc",
+    any(
+        // pidfd
+        any(
+            target_os = "android",
+            target_os = "illumos",
+            target_os = "linux",
+            target_os = "redox",
+        ),
+        // kqueue
+        all(
+            not(mio_unsupported_force_poll_poll),
+            any(
+                target_os = "freebsd",
+                target_os = "ios",
+                target_os = "macos",
+                target_os = "tvos",
+                target_os = "visionos",
+                target_os = "watchos",
+            ),
+        ),
+    ),
+))]
 
 use mio::{Interest, Process, Token};
 use std::process::{Command, Stdio};

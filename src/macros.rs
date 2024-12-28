@@ -73,7 +73,32 @@ macro_rules! cfg_any_os_ext {
 macro_rules! cfg_os_proc {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "os-proc")]
+            #[cfg(
+                all(
+                    feature = "os-proc",
+                    any(
+                        // pidfd
+                        any(
+                            target_os = "android",
+                            target_os = "illumos",
+                            target_os = "linux",
+                            target_os = "redox",
+                        ),
+                        // kqueue
+                        all(
+                            not(mio_unsupported_force_poll_poll),
+                            any(
+                                target_os = "freebsd",
+                                target_os = "ios",
+                                target_os = "macos",
+                                target_os = "tvos",
+                                target_os = "visionos",
+                                target_os = "watchos",
+                            ),
+                        ),
+                    ),
+                ),
+            )]
             #[cfg_attr(docsrs, doc(cfg(feature = "os-proc")))]
             $item
         )*

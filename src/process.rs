@@ -64,11 +64,9 @@ impl Source for Process {
 cfg_if! {
     any(
         target_os = "android",
-        target_os = "espidf",
-        target_os = "fuchsia",
-        target_os = "hermit",
         target_os = "illumos",
         target_os = "linux",
+        target_os = "redox",
     ),
     mod linux {
         use super::*;
@@ -120,13 +118,16 @@ cfg_if! {
 }
 
 cfg_if! {
-    any(
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "visionos",
-        target_os = "watchos",
+    all(
+        not(mio_unsupported_force_poll_poll), // `Process` needs kqueue
+        any(
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "visionos",
+            target_os = "watchos",
+        ),
     ),
     impl Process {
         /// Get process id.

@@ -348,8 +348,7 @@ fn get_reregister_flags(interest: bool) -> u16 {
         flags | libc::EV_ADD
     } else {
         flags | libc::EV_DELETE
-    };
-    flags
+    }
 }
 
 struct Changes<const N: usize> {
