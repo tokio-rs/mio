@@ -70,6 +70,10 @@ impl TestHandler {
 }
 
 #[test]
+#[cfg_attr(
+    all(mio_unsupported_force_poll_poll, target_os = "macos"),
+    ignore = "Doesn't work on MacOS with `poll`."
+)]
 pub fn register_deregister() {
     init();
 

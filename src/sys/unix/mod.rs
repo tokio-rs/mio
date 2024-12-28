@@ -107,23 +107,6 @@ cfg_os_poll! {
     // `poll(2)` implementation needs to do some special stuff.
 
     cfg_os_proc! {
-        #[cfg_attr(any(
-            target_os = "android",
-            target_os = "illumos",
-            target_os = "linux",
-            target_os = "redox",
-        ), path = "process/pidfd.rs")]
-        #[cfg_attr(all(
-            not(mio_unsupported_force_poll_poll), // `Process` needs kqueue
-            any(
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos",
-                target_os = "tvos",
-                target_os = "visionos",
-                target_os = "watchos",
-            ),
-        ), path = "process/pid.rs")]
         mod process;
         pub use self::process::Process;
     }

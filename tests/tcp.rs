@@ -536,7 +536,10 @@ fn connection_reset_by_peer() {
 }
 
 #[test]
-#[cfg_attr(target_os = "freebsd", ignore = "Doesn't work on FreeBSD.")]
+#[cfg_attr(
+    all(mio_unsupported_force_poll_poll, any(target_os = "freebsd", target_os = "macos")),
+    ignore = "Doesn't work on MacOS/FreeBSD with `poll`."
+)]
 fn connect_error() {
     let (mut poll, mut events) = init_with_poll();
 

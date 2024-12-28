@@ -18,18 +18,8 @@ impl Process {
     }
 }
 
-#[cfg(any(
-    target_os = "android",
-    target_os = "espidf",
-    target_os = "fuchsia",
-    target_os = "hermit",
-    target_os = "illumos",
-    target_os = "linux",
-))]
-mod linux {
-    use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
-
-    use super::*;
+cfg_os_proc_pidfd! {
+    use_fd_traits!();
 
     impl AsFd for Process {
         fn as_fd(&self) -> BorrowedFd<'_> {
@@ -68,6 +58,55 @@ mod linux {
     }
 }
 
+cfg_os_proc_kqueue! {
+    impl Process {
+        pub fn pid(&self) -> libc::pid_t {
+            os_required!()
+        }
+    }
+}
+
+cfg_os_proc_job_object! {
+    use std::os::windows::io::{
+        AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle, IntoRawHandle, OwnedHandle, RawHandle,
+    };
+
+    impl AsRawHandle for Process {
+        fn as_raw_handle(&self) -> RawHandle {
+            os_required!()
+        }
+    }
+
+    impl AsHandle for Process {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            os_required!()
+        }
+    }
+
+    impl FromRawHandle for Process {
+        unsafe fn from_raw_handle(_: RawHandle) -> Self {
+            os_required!()
+        }
+    }
+
+    impl IntoRawHandle for Process {
+        fn into_raw_handle(self) -> RawHandle {
+            os_required!()
+        }
+    }
+
+    impl From<Process> for OwnedHandle {
+        fn from(_: Process) -> Self {
+            os_required!()
+        }
+    }
+
+    impl From<OwnedHandle> for Process {
+        fn from(_: OwnedHandle) -> Self {
+            os_required!()
+        }
+    }
+}
 impl Source for Process {
     fn register(&mut self, _: &Registry, _: Token, _: Interest) -> Result<(), Error> {
         os_required!()

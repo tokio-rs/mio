@@ -77,14 +77,14 @@ macro_rules! cfg_os_proc {
                 all(
                     feature = "os-proc",
                     any(
-                        // pidfd
+                        // pidfd (should be the same as in `cfg_os_proc_pidfd` macro)
                         any(
                             target_os = "android",
                             target_os = "illumos",
                             target_os = "linux",
                             target_os = "redox",
                         ),
-                        // kqueue
+                        // kqueue (should be the same as in `cfg_os_proc_kqueue` macro)
                         all(
                             not(mio_unsupported_force_poll_poll),
                             any(
@@ -107,13 +107,64 @@ macro_rules! cfg_os_proc {
     }
 }
 
-macro_rules! cfg_if {
-    ($condition:meta, $($item:item)*) => {
+/// `os-proc` feature uses `pidfd` implementation.
+macro_rules! cfg_os_proc_pidfd {
+    ($($item:item)*) => {
         $(
-            #[cfg($condition)]
-            #[cfg_attr(docsrs, doc(cfg($condition)))]
+            #[cfg(
+                any(
+                    target_os = "android",
+                    target_os = "illumos",
+                    target_os = "linux",
+                    target_os = "redox",
+                )
+            )]
             $item
         )*
+    };
+}
+
+/// `os-proc` feature uses `kqueue` implementation.
+macro_rules! cfg_os_proc_kqueue {
+    ($($item:item)*) => {
+        $(
+            #[cfg(
+                all(
+                    // `Process` needs `kqueue`.
+                    not(mio_unsupported_force_poll_poll),
+                    any(
+                        target_os = "freebsd",
+                        target_os = "ios",
+                        target_os = "macos",
+                        target_os = "tvos",
+                        target_os = "visionos",
+                        target_os = "watchos",
+                    ),
+                )
+            )]
+            $item
+        )*
+    };
+}
+
+/// `os-proc` feature uses `job-object` implementation.
+macro_rules! cfg_os_proc_job_object {
+    ($($item:item)*) => {
+        $(
+            #[cfg(windows)]
+            $item
+        )*
+    };
+}
+
+macro_rules! use_fd_traits {
+    () => {
+        #[cfg(not(target_os = "hermit"))]
+        use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+        // TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
+        // can use `std::os::fd` and be merged with the above.
+        #[cfg(target_os = "hermit")]
+        use std::os::hermit::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
     }
 }
 

@@ -14,8 +14,8 @@ use std::process::Child;
 ///
 /// # Implementation notes
 ///
-/// [`Process`] uses `pidfd` on Linux, `EVFILT_PROC` on MacOS/BSD and `AssignProcessToJobObject` on
-/// Windows.
+/// [`Process`] uses `pidfd` on Linux, `kqueue`'s `EVFILT_PROC` on MacOS/BSD and
+/// `AssignProcessToJobObject` on Windows.
 #[derive(Debug)]
 pub struct Process {
     inner: sys::Process,
@@ -61,74 +61,49 @@ impl Source for Process {
 }
 
 // The following trait implementations are useful to send/receive `pidfd` over a UNIX-domain socket.
-cfg_if! {
-    any(
-        target_os = "android",
-        target_os = "illumos",
-        target_os = "linux",
-        target_os = "redox",
-    ),
-    mod linux {
-        use super::*;
-        #[cfg(not(target_os = "hermit"))]
-        use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
-        // TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
-        // can use `std::os::fd` and be merged with the above.
-        #[cfg(target_os = "hermit")]
-        use std::os::hermit::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+cfg_os_proc_pidfd! {
+    use_fd_traits!();
 
-        impl AsFd for Process {
-            fn as_fd(&self) -> BorrowedFd<'_> {
-                self.inner.as_fd()
-            }
+    impl AsFd for Process {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            self.inner.as_fd()
         }
+    }
 
-        impl AsRawFd for Process {
-            fn as_raw_fd(&self) -> RawFd {
-                self.inner.as_raw_fd()
-            }
+    impl AsRawFd for Process {
+        fn as_raw_fd(&self) -> RawFd {
+            self.inner.as_raw_fd()
         }
+    }
 
-        impl FromRawFd for Process {
-            unsafe fn from_raw_fd(fd: RawFd) -> Self {
-                let inner = sys::Process::from_raw_fd(fd);
-                Self { inner }
-            }
+    impl FromRawFd for Process {
+        unsafe fn from_raw_fd(fd: RawFd) -> Self {
+            let inner = sys::Process::from_raw_fd(fd);
+            Self { inner }
         }
+    }
 
-        impl IntoRawFd for Process {
-            fn into_raw_fd(self) -> RawFd {
-                self.inner.into_raw_fd()
-            }
+    impl IntoRawFd for Process {
+        fn into_raw_fd(self) -> RawFd {
+            self.inner.into_raw_fd()
         }
+    }
 
-        impl From<OwnedFd> for Process {
-            fn from(other: OwnedFd) -> Self {
-                let inner = other.into();
-                Self { inner }
-            }
+    impl From<OwnedFd> for Process {
+        fn from(other: OwnedFd) -> Self {
+            let inner = other.into();
+            Self { inner }
         }
+    }
 
-        impl From<Process> for OwnedFd {
-            fn from(other: Process) -> Self {
-                other.inner.into()
-            }
+    impl From<Process> for OwnedFd {
+        fn from(other: Process) -> Self {
+            other.inner.into()
         }
     }
 }
 
-cfg_if! {
-    all(
-        not(mio_unsupported_force_poll_poll), // `Process` needs kqueue
-        any(
-            target_os = "freebsd",
-            target_os = "ios",
-            target_os = "macos",
-            target_os = "tvos",
-            target_os = "visionos",
-            target_os = "watchos",
-        ),
-    ),
+cfg_os_proc_kqueue! {
     impl Process {
         /// Get process id.
         pub fn pid(&self) -> libc::pid_t {
@@ -137,50 +112,46 @@ cfg_if! {
     }
 }
 
-cfg_if! {
-    windows,
-    mod windows {
-        use super::*;
-        use std::os::windows::io::{
-            AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle, IntoRawHandle, OwnedHandle, RawHandle,
-        };
+cfg_os_proc_job_object! {
+    use std::os::windows::io::{
+        AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle, IntoRawHandle, OwnedHandle, RawHandle,
+    };
 
-        impl AsRawHandle for Process {
-            fn as_raw_handle(&self) -> RawHandle {
-                self.inner.as_raw_handle()
-            }
+    impl AsRawHandle for Process {
+        fn as_raw_handle(&self) -> RawHandle {
+            self.inner.as_raw_handle()
         }
+    }
 
-        impl AsHandle for Process {
-            fn as_handle(&self) -> BorrowedHandle<'_> {
-                self.inner.as_handle()
-            }
+    impl AsHandle for Process {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            self.inner.as_handle()
         }
+    }
 
-        impl FromRawHandle for Process {
-            unsafe fn from_raw_handle(job: RawHandle) -> Self {
-                let inner = sys::Process::from_raw_handle(job);
-                Self { inner }
-            }
+    impl FromRawHandle for Process {
+        unsafe fn from_raw_handle(job: RawHandle) -> Self {
+            let inner = sys::Process::from_raw_handle(job);
+            Self { inner }
         }
+    }
 
-        impl IntoRawHandle for Process {
-            fn into_raw_handle(self) -> RawHandle {
-                self.inner.into_raw_handle()
-            }
+    impl IntoRawHandle for Process {
+        fn into_raw_handle(self) -> RawHandle {
+            self.inner.into_raw_handle()
         }
+    }
 
-        impl From<Process> for OwnedHandle {
-            fn from(other: Process) -> Self {
-                other.inner.into()
-            }
+    impl From<Process> for OwnedHandle {
+        fn from(other: Process) -> Self {
+            other.inner.into()
         }
+    }
 
-        impl From<OwnedHandle> for Process {
-            fn from(other: OwnedHandle) -> Self {
-                let inner = other.into();
-                Self { inner }
-            }
+    impl From<OwnedHandle> for Process {
+        fn from(other: OwnedHandle) -> Self {
+            let inner = other.into();
+            Self { inner }
         }
     }
 }

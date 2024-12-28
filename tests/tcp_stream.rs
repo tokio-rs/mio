@@ -568,8 +568,8 @@ fn tcp_shutdown_client_read_close_event() {
     ignore = "fails; client write_closed events are not found"
 )]
 #[cfg_attr(
-    all(mio_unsupported_force_poll_poll, target_os = "freebsd"),
-    ignore = "fails when using `poll` as a `kqueue` replacement on FreeBSD"
+    all(mio_unsupported_force_poll_poll, any(target_os = "freebsd", target_os = "macos")),
+    ignore = "Doesn't work on MacOS/FreeBSD with `poll`."
 )]
 fn tcp_shutdown_client_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
