@@ -193,13 +193,16 @@ impl Selector {
     }
 
     // Used by `Waker`.
-    #[cfg(any(
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "visionos",
-        target_os = "watchos"
+    #[cfg(all(
+        not(mio_unsupported_force_waker_pipe),
+        any(
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "visionos",
+            target_os = "watchos"
+        ),
     ))]
     pub fn setup_waker(&self, token: Token) -> io::Result<()> {
         // First attempt to accept user space notifications.
@@ -221,13 +224,16 @@ impl Selector {
     }
 
     // Used by `Waker`.
-    #[cfg(any(
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "visionos",
-        target_os = "watchos"
+    #[cfg(all(
+        not(mio_unsupported_force_waker_pipe),
+        any(
+            target_os = "freebsd",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "visionos",
+            target_os = "watchos"
+        ),
     ))]
     pub fn wake(&self, token: Token) -> io::Result<()> {
         let mut kevent = kevent!(

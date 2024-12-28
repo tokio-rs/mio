@@ -181,6 +181,10 @@ fn unix_datagram_pair() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(
+    all(mio_unsupported_force_poll_poll, target_os = "freebsd"),
+    ignore = "POLLRDHUP isn't supported when using `poll` as a `kqueue` replacement on FreeBSD."
+)]
 fn unix_datagram_shutdown() {
     let (mut poll, mut events) = init_with_poll();
     let path1 = temp_file("unix_datagram_shutdown1");

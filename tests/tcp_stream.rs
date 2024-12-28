@@ -5,7 +5,8 @@ use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 #[cfg(unix)]
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
-use std::sync::{mpsc::channel, Arc, Barrier};
+use std::sync::mpsc::channel;
+use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 
@@ -519,6 +520,10 @@ fn no_events_after_deregister() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(
+    all(mio_unsupported_force_poll_poll, target_os = "freebsd"),
+    ignore = "POLLRDHUP isn't supported when using `poll` as a `kqueue` replacement on FreeBSD."
+)]
 fn tcp_shutdown_client_read_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -562,6 +567,10 @@ fn tcp_shutdown_client_read_close_event() {
     ),
     ignore = "fails; client write_closed events are not found"
 )]
+#[cfg_attr(
+    all(mio_unsupported_force_poll_poll, target_os = "freebsd"),
+    ignore = "fails when using `poll` as a `kqueue` replacement on FreeBSD"
+)]
 fn tcp_shutdown_client_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -596,6 +605,10 @@ fn tcp_shutdown_client_write_close_event() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(
+    all(mio_unsupported_force_poll_poll, target_os = "freebsd"),
+    ignore = "POLLRDHUP isn't supported when using `poll` as a `kqueue` replacement on FreeBSD."
+)]
 fn tcp_shutdown_server_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -629,6 +642,10 @@ fn tcp_shutdown_server_write_close_event() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(
+    all(mio_unsupported_force_poll_poll, target_os = "freebsd"),
+    ignore = "POLLRDHUP isn't supported when using `poll` as a `kqueue` replacement on FreeBSD."
+)]
 fn tcp_reset_close_event() {
     let (mut poll, mut events) = init_with_poll();
 

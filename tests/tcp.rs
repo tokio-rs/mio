@@ -536,6 +536,7 @@ fn connection_reset_by_peer() {
 }
 
 #[test]
+#[cfg_attr(target_os = "freebsd", ignore = "Doesn't work on FreeBSD.")]
 fn connect_error() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -563,6 +564,7 @@ fn connect_error() {
                 // Without fastopen we would be getting the connection error
                 assert!(event.is_writable() || event.is_error());
                 // Solaris poll(2) says POLLHUP and POLLOUT are mutually exclusive.
+                // Doesn't work on FreeBSD either.
                 #[cfg(not(target_os = "solaris"))]
                 assert!(event.is_write_closed());
                 break 'outer;
@@ -695,7 +697,9 @@ fn write_shutdown() {
     if cfg!(any(
         target_os = "hurd",
         target_os = "solaris",
-        target_os = "nto"
+        target_os = "nto",
+        // Not supported when using `poll` as a `kqueue` replacement on FreeBSD.
+        all(mio_unsupported_force_poll_poll, target_os = "freebsd"),
     )) {
         wait!(poll, is_readable, false);
     } else {
