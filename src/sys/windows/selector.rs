@@ -2,9 +2,14 @@ use super::afd::{self, Afd, AfdPollInfo};
 use super::io_status_block::IoStatusBlock;
 use super::Event;
 use crate::sys::Events;
-use windows_sys::Win32::System::SystemServices::{
-    JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS, JOB_OBJECT_MSG_EXIT_PROCESS,
-};
+
+cfg_os_proc! {
+    use std::collections::HashMap;
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::System::SystemServices::{
+        JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS, JOB_OBJECT_MSG_EXIT_PROCESS,
+    };
+}
 
 cfg_net! {
     use crate::sys::event::{
@@ -14,11 +19,11 @@ cfg_net! {
 }
 
 use super::iocp::{CompletionPort, CompletionStatus};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::io;
 use std::marker::PhantomPinned;
-use std::os::windows::io::{AsRawHandle, RawHandle, RawSocket};
+use std::os::windows::io::{RawHandle, RawSocket};
 use std::pin::Pin;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicUsize;
@@ -366,47 +371,51 @@ impl Selector {
         self.inner.cp.clone()
     }
 
-    pub(super) fn as_raw_handle(&self) -> RawHandle {
-        self.inner.cp.as_raw_handle()
-    }
-
     #[cfg(feature = "os-ext")]
     pub(super) fn same_port(&self, other: &Arc<CompletionPort>) -> bool {
         Arc::ptr_eq(&self.inner.cp, other)
     }
+}
 
-    pub(super) fn register_handle(&self, handle: RawHandle, info: HandleInfo) -> io::Result<()> {
-        use std::collections::hash_map::Entry::*;
-        let mut handles = self.inner.handles.lock().unwrap();
-        match handles.entry(handle) {
-            Vacant(v) => {
-                v.insert(info);
-            }
-            Occupied(..) => return Err(io::ErrorKind::AlreadyExists.into()),
+cfg_os_proc! {
+    impl Selector {
+        pub(super) fn as_raw_handle(&self) -> RawHandle {
+            self.inner.cp.as_raw_handle()
         }
-        Ok(())
-    }
 
-    pub(super) fn reregister_handle(&self, handle: RawHandle, info: HandleInfo) -> io::Result<()> {
-        use std::collections::hash_map::Entry::*;
-        let mut handles = self.inner.handles.lock().unwrap();
-        match handles.entry(handle) {
-            Vacant(..) => return Err(io::ErrorKind::NotFound.into()),
-            Occupied(mut o) => {
-                *o.get_mut() = info;
+        pub(super) fn register_handle(&self, handle: RawHandle, info: HandleInfo) -> io::Result<()> {
+            use std::collections::hash_map::Entry::*;
+            let mut handles = self.inner.handles.lock().unwrap();
+            match handles.entry(handle) {
+                Vacant(v) => {
+                    v.insert(info);
+                }
+                Occupied(..) => return Err(io::ErrorKind::AlreadyExists.into()),
             }
+            Ok(())
         }
-        Ok(())
-    }
 
-    pub(super) fn deregister_handle(&self, handle: RawHandle) -> io::Result<()> {
-        self.inner
-            .handles
-            .lock()
-            .unwrap()
-            .remove(&handle)
-            .ok_or_else(|| io::ErrorKind::NotFound)?;
-        Ok(())
+        pub(super) fn reregister_handle(&self, handle: RawHandle, info: HandleInfo) -> io::Result<()> {
+            use std::collections::hash_map::Entry::*;
+            let mut handles = self.inner.handles.lock().unwrap();
+            match handles.entry(handle) {
+                Vacant(..) => return Err(io::ErrorKind::NotFound.into()),
+                Occupied(mut o) => {
+                    *o.get_mut() = info;
+                }
+            }
+            Ok(())
+        }
+
+        pub(super) fn deregister_handle(&self, handle: RawHandle) -> io::Result<()> {
+            self.inner
+                .handles
+                .lock()
+                .unwrap()
+                .remove(&handle)
+                .ok_or(io::ErrorKind::NotFound)?;
+            Ok(())
+        }
     }
 }
 
@@ -441,9 +450,10 @@ cfg_io_source! {
 }
 
 /// The data associated with a registered handle.
+#[cfg(feature = "os-proc")]
 #[derive(Debug)]
 pub enum HandleInfo {
-    Process(Token),
+    Process(crate::Token),
 }
 
 #[derive(Debug)]
@@ -455,11 +465,13 @@ pub struct SelectorInner {
     /// Raw handles registered in the selector.
     ///
     /// Currently contains only `Process`-related handles.
+    #[cfg(feature = "os-proc")]
     handles: Mutex<HashMap<RawHandle, HandleInfo>>,
 }
 
 // We have ensured thread safety by introducing lock manually.
 unsafe impl Sync for SelectorInner {}
+unsafe impl Send for SelectorInner {}
 
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
@@ -472,6 +484,7 @@ impl SelectorInner {
                 update_queue: Mutex::new(VecDeque::new()),
                 afd_group: AfdGroup::new(cp_afd),
                 is_polling: AtomicBool::new(false),
+                #[cfg(feature = "os-proc")]
                 handles: Mutex::new(Default::default()),
             }
         })
@@ -543,8 +556,9 @@ impl SelectorInner {
         let mut n = 0;
         let mut update_queue = self.update_queue.lock().unwrap();
         for iocp_event in iocp_events.iter() {
-            let handle = iocp_event.token() as RawHandle;
-            if let Some(HandleInfo::Process(token)) = self.handles.lock().unwrap().get(&handle) {
+            let _handle = iocp_event.token() as RawHandle;
+            #[cfg(feature = "os-proc")]
+            if let Some(HandleInfo::Process(token)) = self.handles.lock().unwrap().get(&_handle) {
                 match iocp_event.bytes_transferred() {
                     // We are only interested in "process exit" events to be consistent with `pidfd`.
                     JOB_OBJECT_MSG_EXIT_PROCESS | JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS => {
@@ -557,7 +571,8 @@ impl SelectorInner {
                     _ => {}
                 }
                 continue;
-            } else if iocp_event.overlapped().is_null() {
+            }
+            if iocp_event.overlapped().is_null() {
                 events.push(Event::from_completion_status(iocp_event));
                 n += 1;
                 continue;
@@ -759,12 +774,15 @@ impl Drop for SelectorInner {
                 Ok(iocp_events) => {
                     events_num = iocp_events.iter().len();
                     for iocp_event in iocp_events.iter() {
-                        let handle = iocp_event.token() as RawHandle;
+                        let _handle = iocp_event.token() as RawHandle;
+                        #[cfg(feature = "os-proc")]
                         if let Some(HandleInfo::Process(..)) =
-                            self.handles.lock().unwrap().get(&handle)
+                            self.handles.lock().unwrap().get(&_handle)
                         {
                             // The resources are released automatically on drop.
-                        } else if iocp_event.overlapped().is_null() {
+                            continue;
+                        }
+                        if iocp_event.overlapped().is_null() {
                             // Custom event
                         } else if iocp_event.token() % 2 == 1 {
                             // Named pipe, dispatch the event so it can release resources

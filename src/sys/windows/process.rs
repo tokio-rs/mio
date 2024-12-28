@@ -67,13 +67,12 @@ impl IntoRawHandle for Process {
 
 impl From<Process> for OwnedHandle {
     fn from(other: Process) -> Self {
-        other.job.into()
+        other.job
     }
 }
 
 impl From<OwnedHandle> for Process {
-    fn from(other: OwnedHandle) -> Self {
-        let job = other.into();
+    fn from(job: OwnedHandle) -> Self {
         Self { job }
     }
 }
@@ -85,7 +84,7 @@ impl Source for Process {
         let info = HandleInfo::Process(token);
         selector.register_handle(handle, info)?;
         let job_port = JOBOBJECT_ASSOCIATE_COMPLETION_PORT {
-            CompletionKey: self.job.as_raw_handle() as *mut c_void,
+            CompletionKey: self.job.as_raw_handle(),
             CompletionPort: selector.as_raw_handle() as HANDLE,
         };
         // SAFETY: We provide valid `job` and `port` handles.
@@ -93,7 +92,7 @@ impl Source for Process {
             SetInformationJobObject(
                 self.job.as_handle_ptr(),
                 JobObjectAssociateCompletionPortInformation,
-                std::ptr::from_ref(&job_port) as *const c_void,
+                &job_port as *const JOBOBJECT_ASSOCIATE_COMPLETION_PORT as *const c_void,
                 size_of::<JOBOBJECT_ASSOCIATE_COMPLETION_PORT>() as u32,
             ),
             PartialEq::eq,

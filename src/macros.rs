@@ -96,6 +96,8 @@ macro_rules! cfg_os_proc {
                                 target_os = "watchos",
                             ),
                         ),
+                        // windows
+                        windows,
                     ),
                 ),
             )]

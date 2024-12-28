@@ -1,6 +1,3 @@
-use std::os::windows::io::AsRawHandle;
-use windows_sys::Win32::Foundation::HANDLE;
-
 mod afd;
 
 pub mod event;
@@ -16,13 +13,12 @@ mod overlapped;
 use overlapped::Overlapped;
 
 mod selector;
-pub(crate) use selector::HandleInfo;
 pub use selector::Selector;
 
 /// Helper macro to execute a system call that returns an `io::Result`.
 //
 // Macro must be defined before any modules that uses them.
-#[cfg(any(feature = "net", feature = "os-proc"))
+#[cfg(any(feature = "net", feature = "os-proc"))]
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
         let res = unsafe { $fn($($arg, )*) };
@@ -54,6 +50,10 @@ pub(crate) use waker::Waker;
 cfg_os_proc! {
     mod process;
     pub(crate) use process::Process;
+    pub(crate) use selector::HandleInfo;
+
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::HANDLE;
 
     /// Helper trait to convert `RawHandle` to `HANDLE`.
     pub(crate) trait AsHandlePtr {
