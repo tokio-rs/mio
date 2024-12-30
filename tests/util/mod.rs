@@ -147,7 +147,14 @@ pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<Exp
     // lenient we'll poll a couple of times.
     for _ in 0..MAX_ITERATIONS {
         let t = Instant::now();
-        poll.poll(events, Some(TIMEOUT)).expect("unable to poll");
+        match poll.poll(events, Some(TIMEOUT)) {
+            Ok(..) => {}
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
+                warn!("poll interrupted");
+                continue;
+            }
+            Err(e) => panic!("failed to poll: {}", e),
+        }
 
         if t.elapsed() >= TIMEOUT && events.is_empty() {
             warn!("poll timed out");
