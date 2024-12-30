@@ -78,12 +78,7 @@ macro_rules! cfg_os_proc {
                     feature = "os-proc",
                     any(
                         // pidfd (should be the same as in `cfg_os_proc_pidfd` macro)
-                        any(
-                            target_os = "android",
-                            target_os = "illumos",
-                            target_os = "linux",
-                            target_os = "redox",
-                        ),
+                        any(target_os = "android", target_os = "linux"),
                         // kqueue (should be the same as in `cfg_os_proc_kqueue` macro)
                         all(
                             not(mio_unsupported_force_poll_poll),
@@ -99,7 +94,7 @@ macro_rules! cfg_os_proc {
                                 target_os = "watchos",
                             ),
                         ),
-                        // windows
+                        // windows (should be the same as in `cfg_os_proc_job_object` macro)
                         windows,
                     ),
                 ),
@@ -114,14 +109,7 @@ macro_rules! cfg_os_proc {
 macro_rules! cfg_os_proc_pidfd {
     ($($item:item)*) => {
         $(
-            #[cfg(
-                any(
-                    target_os = "android",
-                    target_os = "illumos",
-                    target_os = "linux",
-                    target_os = "redox",
-                )
-            )]
+            #[cfg(any(target_os = "android", target_os = "linux"))]
             $item
         )*
     };
