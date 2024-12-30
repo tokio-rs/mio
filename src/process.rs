@@ -5,7 +5,7 @@ use std::process::Child;
 
 /// Process allows polling OS processes for completion.
 ///
-/// When the process exits the event with [`readable`](crate::event::Event::readable) readiness is generated.
+/// When the process exits the event with _readable_ readiness is generated.
 ///
 /// # Notes
 ///
