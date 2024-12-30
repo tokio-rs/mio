@@ -88,9 +88,12 @@ macro_rules! cfg_os_proc {
                         all(
                             not(mio_unsupported_force_poll_poll),
                             any(
+                                target_os = "dragonfly",
                                 target_os = "freebsd",
                                 target_os = "ios",
                                 target_os = "macos",
+                                target_os = "netbsd",
+                                target_os = "openbsd",
                                 target_os = "tvos",
                                 target_os = "visionos",
                                 target_os = "watchos",
@@ -133,9 +136,12 @@ macro_rules! cfg_os_proc_kqueue {
                     // `Process` needs `kqueue`.
                     not(mio_unsupported_force_poll_poll),
                     any(
+                        target_os = "dragonfly",
                         target_os = "freebsd",
                         target_os = "ios",
                         target_os = "macos",
+                        target_os = "netbsd",
+                        target_os = "openbsd",
                         target_os = "tvos",
                         target_os = "visionos",
                         target_os = "watchos",
