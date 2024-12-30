@@ -63,6 +63,21 @@ macro_rules! kevent {
     };
 }
 
+/// Same as `kevent` but infers `flags` from `interest`.
+///
+/// Adds `EV_ADD` when `interest` is true, `EV_DELETE` otherwise.
+macro_rules! kevent_update {
+    ($id: expr, $filter: expr, $interest: expr, $data: expr) => {{
+        let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
+        let add_delete = if $interest {
+            libc::EV_ADD
+        } else {
+            libc::EV_DELETE
+        };
+        kevent!($id, $filter, flags | add_delete, $data)
+    }};
+}
+
 #[derive(Debug)]
 pub struct Selector {
     #[cfg(debug_assertions)]
@@ -154,12 +169,9 @@ impl Selector {
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        let write_flags = get_reregister_flags(interests.is_writable());
-        let read_flags = get_reregister_flags(interests.is_readable());
-
         let mut changes: [libc::kevent; 2] = [
-            kevent!(fd, libc::EVFILT_WRITE, write_flags, token.0),
-            kevent!(fd, libc::EVFILT_READ, read_flags, token.0),
+            kevent_update!(fd, libc::EVFILT_WRITE, interests.is_writable(), token.0),
+            kevent_update!(fd, libc::EVFILT_READ, interests.is_readable(), token.0),
         ];
 
         // Since there is no way to check with which interests the fd was
@@ -276,10 +288,10 @@ impl Selector {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        let mut changes: [libc::kevent; 1] = [kevent!(
+        let mut changes: [libc::kevent; 1] = [kevent_update!(
             pid,
             libc::EVFILT_PROC,
-            get_reregister_flags(interests.is_readable()),
+            interests.is_readable(),
             token.0
         )];
         kevent_register(self.kq.as_raw_fd(), &mut changes, &[libc::ENOENT as i64])
@@ -337,18 +349,6 @@ fn check_errors(events: &[libc::kevent], ignored_errors: &[i64]) -> io::Result<(
         }
     }
     Ok(())
-}
-
-/// Get `reregister` flags for the specified `interest`.
-///
-/// Returns standard flags plus `EV_ADD` when `interest` is true, `EV_DELETE` otherwise.
-fn get_reregister_flags(interest: bool) -> u16 {
-    let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
-    if interest {
-        flags | libc::EV_ADD
-    } else {
-        flags | libc::EV_DELETE
-    }
 }
 
 struct Changes<const N: usize> {
