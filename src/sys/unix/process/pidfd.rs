@@ -1,6 +1,6 @@
 use crate::event::Source;
 use crate::{Interest, Registry, Token};
-use libc::{pid_t, SYS_pidfd_open, PIDFD_NONBLOCK};
+use libc::{pid_t, SYS_pidfd_open, O_NONBLOCK};
 use std::fs::File;
 use std::io::Error;
 use std::process::Child;
@@ -18,7 +18,8 @@ impl Process {
     }
 
     pub fn from_pid(pid: pid_t) -> Result<Self, Error> {
-        let fd = syscall!(syscall(SYS_pidfd_open, pid, PIDFD_NONBLOCK))?;
+        // NB: `O_NONBLOCK` is the same as `PIDFD_NONBLOCK`.
+        let fd = syscall!(syscall(SYS_pidfd_open, pid, O_NONBLOCK))?;
         // SAFETY: `pidfd_open(2)` ensures the fd is valid.
         let fd = unsafe { File::from_raw_fd(fd as RawFd) };
         Ok(Self { fd })
