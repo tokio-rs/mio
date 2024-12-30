@@ -164,8 +164,10 @@ macro_rules! use_fd_traits {
         // TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
         // can use `std::os::fd` and be merged with the above.
         #[cfg(target_os = "hermit")]
-        use std::os::hermit::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
-    }
+        use std::os::hermit::io::{
+            AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd,
+        };
+    };
 }
 
 macro_rules! trace {
