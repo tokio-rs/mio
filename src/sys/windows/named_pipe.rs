@@ -924,8 +924,9 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
                         Inner::schedule_read(&me, &mut io, None);
                         return;
                     }
-                    Err(e) => {
-                        io.read = State::Err(e);
+                    Err(_e) => {
+                        // When `PeekNamedPipe` encountered an error, truncate and return whatever is recoverable from the bytes
+                        io.read = State::Ok(buf, 0);
                     }
                 }
             }
