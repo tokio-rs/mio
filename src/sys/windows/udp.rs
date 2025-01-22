@@ -30,8 +30,8 @@ pub(crate) fn only_v6(socket: &net::UdpSocket) -> io::Result<bool> {
     syscall!(
         getsockopt(
             socket.as_raw_socket() as usize,
-            IPPROTO_IPV6 as i32,
-            IPV6_V6ONLY as i32,
+            IPPROTO_IPV6,
+            IPV6_V6ONLY,
             optval.as_mut_ptr().cast(),
             &mut optlen,
         ),

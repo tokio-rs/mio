@@ -282,7 +282,7 @@ impl Read for TcpStream {
     }
 }
 
-impl<'a> Read for &'a TcpStream {
+impl Read for &TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.do_io(|mut inner| inner.read(buf))
     }
@@ -306,7 +306,7 @@ impl Write for TcpStream {
     }
 }
 
-impl<'a> Write for &'a TcpStream {
+impl Write for &TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.do_io(|mut inner| inner.write(buf))
     }

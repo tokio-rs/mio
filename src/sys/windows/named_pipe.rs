@@ -515,7 +515,7 @@ impl Write for NamedPipe {
     }
 }
 
-impl<'a> Read for &'a NamedPipe {
+impl Read for &NamedPipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut state = self.inner.io.lock().unwrap();
 
@@ -566,7 +566,7 @@ impl<'a> Read for &'a NamedPipe {
     }
 }
 
-impl<'a> Write for &'a NamedPipe {
+impl Write for &NamedPipe {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
@@ -947,7 +947,7 @@ fn event_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
         // cleanup. In this case, `events` is `None` and we don't need to track
         // the event.
         if let Some(events) = events {
-            let mut ev = Event::from_completion_status(&status);
+            let mut ev = Event::from_completion_status(status);
             // Reverse the `.data` alteration done in `schedule_event`. This
             // alteration was done so the selector recognized the event as one from
             // a named pipe.
