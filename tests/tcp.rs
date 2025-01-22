@@ -205,12 +205,8 @@ fn read() {
         for event in &events {
             assert_eq!(event.token(), Token(1));
             let mut buf = [0; 1024];
-            loop {
-                if let Ok(amt) = data.socket.read(&mut buf) {
-                    data.amt += amt;
-                } else {
-                    break;
-                }
+            while let Ok(amt) = data.socket.read(&mut buf) {
+                data.amt += amt;
                 if data.amt >= N {
                     data.shutdown = true;
                     break;
@@ -270,12 +266,8 @@ fn peek() {
                 Err(err) => panic!("unexpected error: {}", err),
             }
 
-            loop {
-                if let Ok(amt) = data.socket.read(&mut buf) {
-                    data.amt += amt;
-                } else {
-                    break;
-                }
+            while let Ok(amt) = data.socket.read(&mut buf) {
+                data.amt += amt;
                 if data.amt >= N {
                     data.shutdown = true;
                     break;
@@ -329,12 +321,8 @@ fn write() {
         for event in &events {
             assert_eq!(event.token(), Token(1));
             let buf = [0; 1024];
-            loop {
-                if let Ok(amt) = data.socket.write(&buf) {
-                    data.amt += amt;
-                } else {
-                    break;
-                }
+            while let Ok(amt) = data.socket.write(&buf) {
+                data.amt += amt;
                 if data.amt >= N {
                     data.shutdown = true;
                     break;
