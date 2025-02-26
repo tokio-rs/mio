@@ -31,7 +31,7 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
 
     let socket = syscall!(socket(domain, socket_type, 0))?;
 
-    // Mimick `libstd` and set `SO_NOSIGPIPE` on apple systems.
+    // Mimic `libstd` and set `SO_NOSIGPIPE` on apple systems.
     #[cfg(any(
         target_os = "ios",
         target_os = "macos",

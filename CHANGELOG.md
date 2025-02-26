@@ -25,7 +25,7 @@
 * Fixed an issue where accepting on a UDS socket without sometime pass an address
   with a NULL byte to SocketAddr::from_pathname
   (https://github.com/tokio-rs/mio/pull/1817).
-* Internal cleanups that should make the `cfg` sitations easier to follow
+* Internal cleanups that should make the `cfg` situations easier to follow
   (https://github.com/tokio-rs/mio/pull/1812,
   https://github.com/tokio-rs/mio/pull/1813).
 
@@ -550,7 +550,7 @@ information.
 - Work around Linux kernel < 2.6.37 bug on 32-bits making timeouts longer then
   ~30 minutes effectively infinite
   (https://github.com/tokio-rs/mio/commit/e7cba59950e9c9fa6194e29b5b1e72029e3df455).
-- Update miow and net2 depedencies to get rid of invalid memory layout assumption
+- Update miow and net2 dependencies to get rid of invalid memory layout assumption
   (https://github.com/tokio-rs/mio/commit/13f02ac0a86d7c0c0001e5ff8960a0b4340d075c).
 
 # 0.6.22 (May 01, 2020)
