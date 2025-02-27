@@ -329,7 +329,7 @@ impl Poll {
         }
     }
 
-    /// Returns a Registry which can be used to register
+    /// Returns a `Registry` which can be used to register
     /// `event::Source`s.
     pub fn registry(&self) -> &Registry {
         &self.registry
