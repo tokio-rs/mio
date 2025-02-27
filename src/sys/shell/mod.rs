@@ -7,6 +7,11 @@ macro_rules! os_required {
 mod selector;
 pub(crate) use self::selector::{event, Event, Events, Selector};
 
+cfg_os_proc! {
+    mod process;
+    pub(crate) use self::process::Process;
+}
+
 #[cfg(not(target_os = "wasi"))]
 mod waker;
 #[cfg(not(target_os = "wasi"))]
