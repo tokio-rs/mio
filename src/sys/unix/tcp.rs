@@ -118,6 +118,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
             // See https://github.com/tokio-rs/mio/issues/1450
             #[cfg(any(
                 all(target_arch = "x86", target_os = "android"),
+                target_os = "aix",
                 target_os = "espidf",
                 target_os = "vita",
                 target_os = "hermit",

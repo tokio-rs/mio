@@ -764,6 +764,7 @@ cfg_os_poll! {
         unix,
         not(mio_unsupported_force_poll_poll),
         not(any(
+            target_os = "aix",
             target_os = "espidf",
             target_os = "hermit",
             target_os = "hurd",
