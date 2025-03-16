@@ -665,7 +665,7 @@ cfg_io_source! {
         ] {
             if let Ok(base_socket) = try_get_base_socket(raw_socket, ioctl) {
                 // Since we know now that we're dealing with an LSP (otherwise
-                // SIO_BASE_HANDLE would't have failed), only return any result
+                // SIO_BASE_HANDLE wouldn't have failed), only return any result
                 // when it is different from the original `raw_socket`.
                 if base_socket != raw_socket {
                     return Ok(base_socket);
