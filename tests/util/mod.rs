@@ -10,7 +10,7 @@ use std::ops::BitOr;
 use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::sync::Once;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{env, fmt, fs, io};
 
 use log::{error, warn};
@@ -32,10 +32,14 @@ pub fn init() {
 }
 
 pub fn init_with_poll() -> (Poll, Events) {
+    init_with_poll_with_capacity(16)
+}
+
+pub fn init_with_poll_with_capacity(capacity: usize) -> (Poll, Events) {
     init();
 
     let poll = Poll::new().expect("unable to create Poll instance");
-    let events = Events::with_capacity(16);
+    let events = Events::with_capacity(capacity);
     (poll, events)
 }
 
@@ -135,12 +139,28 @@ impl From<Interest> for Readiness {
 }
 
 pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<ExpectEvent>) {
+    const TIMEOUT: Duration = Duration::from_millis(4999);
+    const MAX_ITERATIONS: usize = 1000;
+
     // In a lot of calls we expect more then one event, but it could be that
     // poll returns the first event only in a single call. To be a bit more
     // lenient we'll poll a couple of times.
-    for _ in 0..3 {
-        poll.poll(events, Some(Duration::from_millis(500)))
-            .expect("unable to poll");
+    for _ in 0..MAX_ITERATIONS {
+        let t = Instant::now();
+        match poll.poll(events, Some(TIMEOUT)) {
+            Ok(..) => {}
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
+                warn!("poll interrupted");
+                continue;
+            }
+            Err(e) => panic!("failed to poll: {}", e),
+        }
+
+        if t.elapsed() >= TIMEOUT && events.is_empty() {
+            warn!("poll timed out");
+            // Poll timed out.
+            break;
+        }
 
         for event in events.iter() {
             let index = expected.iter().position(|expected| expected.matches(event));
@@ -287,8 +307,8 @@ pub fn set_linger_zero(socket: &TcpStream) {
     let res = unsafe {
         setsockopt(
             socket.as_raw_socket() as _,
-            SOL_SOCKET as i32,
-            SO_LINGER as i32,
+            SOL_SOCKET,
+            SO_LINGER,
             &mut val as *mut _ as *mut _,
             size_of::<LINGER>() as _,
         )

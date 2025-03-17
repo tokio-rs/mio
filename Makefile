@@ -19,9 +19,11 @@ test_all: check_all_targets
 # compile correctly.
 test_sanitizer:
 	@if [ -z $${SAN+x} ]; then echo "Required '\$$SAN' variable is not set" 1>&2; exit 1; fi
-	RUSTFLAGS="-Z sanitizer=$$SAN -Z sanitizer-memory-track-origins" \
-	RUSTDOCFLAGS="-Z sanitizer=$$SAN -Z sanitizer-memory-track-origins" \
-	cargo test -Z build-std --all-features --target $(RUSTUP_TARGET)
+	# We use `-Zexport-executable-symbols` here as a workaround for the following issue:
+	# https://github.com/rust-lang/rust/issues/111073
+	RUSTFLAGS="-Z sanitizer=$$SAN -Z sanitizer-memory-track-origins -Zexport-executable-symbols --cfg mio_sanitize_$$SAN" \
+	RUSTDOCFLAGS="-Z sanitizer=$$SAN -Z sanitizer-memory-track-origins -Zexport-executable-symbols --cfg mio_sanitize_$$SAN" \
+	cargo test -Z build-std --all-features --target $(RUSTUP_TARGET) -- --nocapture
 
 # Check all targets using all features.
 check_all_targets: $(TARGETS)
