@@ -5,12 +5,7 @@
 
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-#[cfg(not(target_os = "hermit"))]
 use std::os::fd::{AsRawFd, RawFd};
-// TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
-// can use `std::os::fd` and be merged with the above.
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::{AsRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
