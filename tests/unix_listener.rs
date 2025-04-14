@@ -89,7 +89,7 @@ fn unix_listener_register() {
 }
 
 #[test]
-#[cfg_attr(target_os = "cygwin", ignore)]
+#[cfg_attr(target_os = "cygwin", ignore = "Cygwin blocks on connect")]
 fn unix_listener_reregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -117,7 +117,7 @@ fn unix_listener_reregister() {
 }
 
 #[test]
-#[cfg_attr(target_os = "cygwin", ignore)]
+#[cfg_attr(target_os = "cygwin", ignore = "Cygwin blocks on connect")]
 fn unix_listener_deregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
