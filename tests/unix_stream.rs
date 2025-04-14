@@ -37,14 +37,12 @@ fn unix_stream_send_and_sync() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore)]
 fn unix_stream_smoke() {
     #[allow(clippy::redundant_closure)]
     smoke_test(|path| UnixStream::connect(path), "unix_stream_smoke");
 }
 
 #[test]
-#[cfg_attr(target_os = "cygwin", ignore)]
 fn unix_stream_connect() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -88,7 +86,6 @@ fn unix_stream_connect() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore)]
 fn unix_stream_connect_addr() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -135,7 +132,6 @@ fn unix_stream_connect_addr() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore)]
 fn unix_stream_from_std() {
     smoke_test(
         |path| {
@@ -187,7 +183,7 @@ fn unix_stream_pair() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore)]
+#[cfg_attr(target_os = "cygwin", ignore = "nonblocking connect doesn't handshake")]
 fn unix_stream_peer_addr() {
     init();
     let (handle, expected_addr) = new_echo_listener(1, "unix_stream_peer_addr");
@@ -272,7 +268,6 @@ fn unix_stream_shutdown_read() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore)]
 fn unix_stream_shutdown_write() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_write");
@@ -335,7 +330,6 @@ fn unix_stream_shutdown_write() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore)]
 fn unix_stream_shutdown_both() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_both");
@@ -364,7 +358,7 @@ fn unix_stream_shutdown_both() {
 
     stream.shutdown(Shutdown::Both).unwrap();
     // Solaris never returns POLLHUP  for sockets.
-    #[cfg(not(target_os = "solaris"))]
+    #[cfg(not(any(target_os = "solaris", target_os = "cygwin")))]
     expect_events(
         &mut poll,
         &mut events,
@@ -442,7 +436,6 @@ fn unix_stream_shutdown_listener_write() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore)]
 fn unix_stream_register() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_register");
@@ -464,7 +457,6 @@ fn unix_stream_register() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore)]
 fn unix_stream_reregister() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_reregister");
@@ -493,7 +485,7 @@ fn unix_stream_reregister() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore)]
+#[cfg_attr(target_os = "cygwin", ignore = "nonblocking connect doesn't handshake")]
 fn unix_stream_deregister() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_deregister");
@@ -605,7 +597,14 @@ fn new_echo_listener(
                         amount
                     }
                     Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                    Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
+                    Err(ref err)
+                        if matches!(
+                            err.kind(),
+                            io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted
+                        ) =>
+                    {
+                        break
+                    }
                     Err(err) => panic!("{}", err),
                 };
                 if n == 0 {
