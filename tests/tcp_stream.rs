@@ -550,7 +550,7 @@ fn tcp_shutdown_client_read_close_event() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore = "fails; client write_closed events are not found")]
+#[cfg_attr(any(windows, target_os = "cygwin"), ignore = "fails; client write_closed events are not found")]
 #[cfg_attr(
     any(
         target_os = "android",
@@ -596,6 +596,7 @@ fn tcp_shutdown_client_write_close_event() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
 fn tcp_shutdown_server_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -629,6 +630,7 @@ fn tcp_shutdown_server_write_close_event() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
 fn tcp_reset_close_event() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -673,7 +675,7 @@ fn tcp_reset_close_event() {
 
 #[test]
 #[cfg_attr(
-    windows,
+    any(windows, target_os = "cygwin"),
     ignore = "fails on Windows; client close events are not found"
 )]
 #[cfg_attr(
@@ -729,7 +731,7 @@ fn echo_listener(addr: SocketAddr, n_connections: usize) -> (thread::JoinHandle<
                     // error when the reading side of the peer connection is
                     // shutdown, we don't consider it an actual here.
                     .or_else(|err| match err {
-                        ref err if err.kind() == io::ErrorKind::ConnectionReset => Ok(0),
+                        ref err if matches!(err.kind(), io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted) => Ok(0),
                         err => Err(err),
                     })
                     .expect("error reading");

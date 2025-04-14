@@ -21,6 +21,7 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
         target_os = "redox",
         target_os = "solaris",
         target_os = "vita",
+        target_os = "cygwin",
     ))]
     unsafe {
         if libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0 {
