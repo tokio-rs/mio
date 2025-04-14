@@ -3,14 +3,13 @@
 //! Required types:
 //!
 //! * `Event`: a type alias for the system specific event, e.g. `kevent` or
-//!            `epoll_event`.
+//!   `epoll_event`.
 //! * `event`: a module with various helper functions for `Event`, see
-//!            [`crate::event::Event`] for the required functions.
+//!   [`crate::event::Event`] for the required functions.
 //! * `Events`: collection of `Event`s, see [`crate::Events`].
 //! * `IoSourceState`: state for the `IoSource` type.
 //! * `Selector`: selector used to register event sources and poll for events,
-//!               see [`crate::Poll`] and [`crate::Registry`] for required
-//!               methods.
+//!   see [`crate::Poll`] and [`crate::Registry`] for required methods.
 //! * `tcp` and `udp` modules: see the [`crate::net`] module.
 //! * `Waker`: see [`crate::Waker`].
 
