@@ -561,7 +561,7 @@ fn unconnected_udp_socket_connected_methods() {
     );
 
     // Socket is unconnected, but we're using an connected method.
-    if cfg!(not(any(target_os = "hurd", target_os = "windows"))) {
+    if cfg!(not(any(target_os = "hurd", target_os = "windows", target_os = "cygwin"))) {
         assert_error(socket1.send(DATA1), "address required");
     }
     if cfg!(target_os = "windows") {
@@ -630,7 +630,8 @@ fn connected_udp_socket_unconnected_methods() {
         target_os = "android",
         target_os = "hurd",
         target_os = "linux",
-        target_os = "windows"
+        target_os = "windows",
+        target_os = "cygwin",
     )))]
     assert_error(socket1.send_to(DATA1, address2), "already connected");
     // Even if the address is the same.
@@ -638,7 +639,8 @@ fn connected_udp_socket_unconnected_methods() {
         target_os = "android",
         target_os = "hurd",
         target_os = "linux",
-        target_os = "windows"
+        target_os = "windows",
+        target_os = "cygwin",
     )))]
     assert_error(socket1.send_to(DATA1, address3), "already connected");
 

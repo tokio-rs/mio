@@ -49,6 +49,7 @@ cfg_os_poll! {
         target_os = "nto",
         target_os = "solaris",
         target_os = "vita",
+        target_os = "cygwin",
     ), path = "selector/poll.rs")]
     mod selector;
     pub(crate) use self::selector::*;
@@ -101,6 +102,7 @@ cfg_os_poll! {
         target_os = "redox",
         target_os = "solaris",
         target_os = "vita",
+        target_os = "cygwin",
     ), path = "waker/pipe.rs")]
     mod waker;
     // NOTE: the `Waker` type is expected in the selector module as the
@@ -148,6 +150,7 @@ cfg_os_poll! {
             target_os = "redox",
             target_os = "solaris",
             target_os = "vita",
+            target_os = "cygwin",
         ),
         // Hermit doesn't support pipes.
         not(target_os = "hermit"),

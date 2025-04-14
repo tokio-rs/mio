@@ -24,6 +24,7 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
         target_os = "openbsd",
         target_os = "solaris",
         target_os = "hermit",
+        target_os = "cygwin",
     ))]
     let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
     #[cfg(target_os = "nto")]
