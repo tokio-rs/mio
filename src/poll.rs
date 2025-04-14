@@ -10,7 +10,8 @@
         target_os = "hurd",
         target_os = "nto",
         target_os = "solaris",
-        target_os = "vita"
+        target_os = "vita",
+        target_os = "cygwin",
     )),
 ))]
 use std::os::fd::{AsRawFd, RawFd};
@@ -449,7 +450,8 @@ impl Poll {
         target_os = "hurd",
         target_os = "nto",
         target_os = "solaris",
-        target_os = "vita"
+        target_os = "vita",
+        target_os = "cygwin",
     )),
 ))]
 impl AsRawFd for Poll {
@@ -750,7 +752,8 @@ impl fmt::Debug for Registry {
         target_os = "hurd",
         target_os = "nto",
         target_os = "solaris",
-        target_os = "vita"
+        target_os = "vita",
+        target_os = "cygwin",
     )),
 ))]
 impl AsRawFd for Registry {
@@ -770,7 +773,8 @@ cfg_os_poll! {
             target_os = "hurd",
             target_os = "nto",
             target_os = "solaris",
-            target_os = "vita"
+            target_os = "vita",
+            target_os = "cygwin",
         )),
     ))]
     #[test]

@@ -54,7 +54,7 @@ fn smoke() {
 
 #[test]
 #[cfg_attr(
-    any(target_os = "hurd", target_os = "nto"),
+    any(target_os = "hurd", target_os = "nto", target_os = "cygwin"),
     ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
 )]
 fn event_when_sender_is_dropped() {
@@ -96,7 +96,7 @@ fn event_when_sender_is_dropped() {
 
 #[test]
 #[cfg_attr(
-    any(target_os = "hurd", target_os = "nto"),
+    any(target_os = "hurd", target_os = "nto", target_os = "cygwin"),
     ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
 )]
 fn event_when_receiver_is_dropped() {
@@ -133,7 +133,7 @@ fn event_when_receiver_is_dropped() {
 
 #[test]
 #[cfg_attr(
-    any(target_os = "hurd", target_os = "nto"),
+    any(target_os = "hurd", target_os = "nto", target_os = "cygwin"),
     ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
 )]
 fn from_child_process_io() {
