@@ -561,7 +561,11 @@ fn unconnected_udp_socket_connected_methods() {
     );
 
     // Socket is unconnected, but we're using an connected method.
-    if cfg!(not(any(target_os = "hurd", target_os = "windows", target_os = "cygwin"))) {
+    if cfg!(not(any(
+        target_os = "hurd",
+        target_os = "windows",
+        target_os = "cygwin"
+    ))) {
         assert_error(socket1.send(DATA1), "address required");
     }
     if cfg!(target_os = "windows") {
