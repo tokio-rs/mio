@@ -66,7 +66,7 @@ impl Afd {
         (*iosb).Anonymous.Status = STATUS_PENDING;
         let status = NtDeviceIoControlFile(
             self.fd.as_raw_handle() as HANDLE,
-            0,
+            std::ptr::null_mut(),
             None,
             overlapped,
             iosb,
@@ -131,7 +131,7 @@ cfg_io_source! {
 
     const AFD_HELPER_ATTRIBUTES: OBJECT_ATTRIBUTES = OBJECT_ATTRIBUTES {
         Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
-        RootDirectory: 0,
+        RootDirectory: null_mut(),
         ObjectName: &AFD_OBJ_NAME as *const _ as *mut _,
         Attributes: 0,
         SecurityDescriptor: null_mut(),
