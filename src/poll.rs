@@ -23,6 +23,9 @@ use std::{fmt, io};
 
 use crate::{event, sys, Events, Interest, Token};
 
+#[cfg(all(unix, feature = "os-ext"))]
+use crate::io_source::IoSource;
+
 /// Polls for readiness events on all registered values.
 ///
 /// `Poll` allows a program to monitor a large number of [`event::Source`]s,
@@ -265,6 +268,9 @@ use crate::{event, sys, Events, Interest, Token};
 /// [`SourceFd`]: unix/struct.SourceFd.html
 /// [`Poll::poll`]: struct.Poll.html#method.poll
 pub struct Poll {
+    #[cfg(all(unix, feature = "os-ext"))]
+    registry: IoSource<Registry>,
+    #[cfg(not(all(unix, feature = "os-ext")))]
     registry: Registry,
 }
 
@@ -320,6 +326,13 @@ impl Poll {
         /// ```
         pub fn new() -> io::Result<Poll> {
             sys::Selector::new().map(|selector| Poll {
+                #[cfg(all(unix, feature = "os-ext"))]
+                registry: IoSource::new(Registry {
+                    selector,
+                    #[cfg(all(debug_assertions, not(target_os = "wasi")))]
+                    has_waker: Arc::new(AtomicBool::new(false)),
+                }),
+                #[cfg(not(all(unix, feature = "os-ext")))]
                 registry: Registry {
                     selector,
                     #[cfg(all(debug_assertions, not(target_os = "wasi")))]
@@ -461,6 +474,31 @@ impl AsRawFd for Poll {
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Poll").finish()
+    }
+}
+
+#[cfg(all(unix, feature = "os-ext"))]
+impl event::Source for Poll {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        registry.register(&mut self.registry, token, interests)
+    }
+
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        registry.reregister(&mut self.registry, token, interests)
+    }
+
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
+        registry.deregister(&mut self.registry)
     }
 }
 
