@@ -5,7 +5,7 @@ use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{cmp, io, ptr, slice};
+use std::{cmp, io, ptr, slice, fmt};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -324,7 +324,6 @@ impl AsRawFd for Selector {
 }
 
 pub type Event = libc::kevent;
-#[derive(Debug)]
 pub struct Events(Vec<libc::kevent>);
 
 impl Events {
@@ -360,6 +359,12 @@ impl Deref for Events {
 impl DerefMut for Events {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl fmt::Debug for Events {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Events: TODO: actually print them")
     }
 }
 
