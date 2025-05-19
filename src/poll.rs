@@ -433,7 +433,11 @@ impl Poll {
     ///
     /// [struct]: #
     pub fn poll(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
-        self.registry.selector.select(events.sys(), timeout)
+        // This is safe because the memory layout of `Event` is
+        // the same as `sys::Event` due to the `repr(transparent)` attribute.
+        let events: &mut Vec<sys::Event> = unsafe { std::mem::transmute(events) };
+
+        self.registry.selector.select(events, timeout)
     }
 }
 

@@ -18,6 +18,11 @@ pub struct Event {
     inner: sys::Event,
 }
 
+/// A collection of readiness events.
+///
+/// just a type alias for Vec<Event>, exists for backwards compatibility
+pub type Events = Vec<Event>;
+
 impl Event {
     /// Returns the event's token.
     pub fn token(&self) -> Token {
@@ -181,15 +186,6 @@ impl Event {
     /// FreeBSD this method checks the `EVFILT_LIO` flag.
     pub fn is_lio(&self) -> bool {
         sys::event::is_lio(&self.inner)
-    }
-
-    /// Create a reference to an `Event` from a platform specific event.
-    pub(crate) fn from_sys_event_ref(sys_event: &sys::Event) -> &Event {
-        unsafe {
-            // This is safe because the memory layout of `Event` is
-            // the same as `sys::Event` due to the `repr(transparent)` attribute.
-            &*(sys_event as *const sys::Event as *const Event)
-        }
     }
 }
 
