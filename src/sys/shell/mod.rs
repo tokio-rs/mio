@@ -5,7 +5,7 @@ macro_rules! os_required {
 }
 
 mod selector;
-pub(crate) use self::selector::{event, Event, Selector};
+pub(crate) use self::selector::{event, Event, Events, Selector};
 
 #[cfg(not(target_os = "wasi"))]
 mod waker;
