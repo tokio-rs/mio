@@ -167,3 +167,15 @@ impl Events {
         }
     }
 }
+
+impl<'a> From<&'a Events> for &'a Vec<Event> {
+    fn from(value: &'a Events) -> Self {
+        &value.events
+    }
+}
+
+impl<'a> From<&'a mut Events> for &'a mut Vec<Event> {
+    fn from(value: &'a mut Events) -> Self {
+        &mut value.events
+    }
+}
