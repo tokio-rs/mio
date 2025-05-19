@@ -326,12 +326,6 @@ impl AsRawFd for Selector {
 pub type Event = libc::kevent;
 pub struct Events(Vec<libc::kevent>);
 
-impl Events {
-    pub fn with_capacity(capacity: usize) -> Events {
-        Events(Vec::with_capacity(capacity))
-    }
-}
-
 impl Deref for Events {
     type Target = Vec<libc::kevent>;
 
