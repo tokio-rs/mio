@@ -364,7 +364,7 @@ impl DerefMut for Events {
 
 impl fmt::Debug for Events {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Events: TODO: actually print them")
+        write!(f, "Events(Vec<libc::kevent>)")
     }
 }
 
