@@ -1,7 +1,9 @@
+#![allow(clippy::useless_conversion)]
 use crate::event::Event;
 use crate::sys;
 
 use std::fmt;
+use std::mem::transmute;
 
 /// A collection of readiness events.
 ///
@@ -104,7 +106,8 @@ impl Events {
     /// assert_eq!(1024, events.capacity());
     /// ```
     pub fn capacity(&self) -> usize {
-        self.inner.capacity()
+        let vec: &Vec<Event> = self.into();
+        vec.capacity()
     }
 
     /// Returns `true` if `self` contains no `Event` values.
@@ -118,7 +121,8 @@ impl Events {
     /// assert!(events.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+        let vec: &Vec<Event> = self.into();
+        vec.is_empty()
     }
 
     /// Returns an iterator over the `Event` values.
@@ -204,27 +208,43 @@ impl<'a> Iterator for Iter<'a> {
     type Item = &'a Event;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ret = self
-            .inner
-            .inner
-            .get(self.pos)
-            .map(Event::from_sys_event_ref);
+        let vec: &Vec<Event> = self.inner.into();
+        let ret = vec.get(self.pos);
         self.pos += 1;
         ret
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self.inner.inner.len();
+        let vec: &Vec<Event> = self.inner.into();
+        let size = vec.len();
         (size, Some(size))
     }
 
     fn count(self) -> usize {
-        self.inner.inner.len()
+        let vec: &Vec<Event> = self.inner.into();
+        vec.len()
     }
 }
 
 impl fmt::Debug for Events {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self).finish()
+    }
+}
+
+// The following From implementation are safe because the memory layout of `Event`
+// is the same as `sys::Event` due to the `repr(transparent)` attribute.
+
+impl<'a> From<&'a Events> for &'a Vec<Event> {
+    fn from(value: &'a Events) -> Self {
+        let inner: &Vec<sys::Event> = (&value.inner).into();
+        unsafe { transmute(inner) }
+    }
+}
+
+impl<'a> From<&'a mut Events> for &'a mut Vec<Event> {
+    fn from(value: &'a mut Events) -> Self {
+        let inner: &mut Vec<sys::Event> = (&mut value.inner).into();
+        unsafe { transmute(inner) }
     }
 }

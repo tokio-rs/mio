@@ -5,7 +5,30 @@ use std::time::Duration;
 
 pub type Event = usize;
 
-pub type Events = Vec<Event>;
+#[derive(Debug)]
+pub struct Events();
+
+impl Events {
+    pub fn with_capacity(_: usize) -> Self {
+        os_required!()
+    }
+
+    pub fn clear(&mut self) {
+        os_required!()
+    }
+}
+
+impl<'a> From<&'a Events> for &'a Vec<Event> {
+    fn from(_: &'a Events) -> Self {
+        os_required!()
+    }
+}
+
+impl<'a> From<&'a mut Events> for &'a mut Vec<Event> {
+    fn from(_: &'a mut Events) -> Self {
+        os_required!()
+    }
+}
 
 #[derive(Debug)]
 pub struct Selector {}

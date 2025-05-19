@@ -5,7 +5,7 @@ use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{cmp, io, ptr, slice};
+use std::{cmp, fmt, io, ptr, slice};
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -330,6 +330,22 @@ impl Events {
     pub fn with_capacity(capacity: usize) -> Events {
         Events(Vec::with_capacity(capacity))
     }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+}
+
+impl<'a> From<&'a Events> for &'a Vec<Event> {
+    fn from(value: &'a Events) -> Self {
+        &value.0
+    }
+}
+
+impl<'a> From<&'a mut Events> for &'a mut Vec<Event> {
+    fn from(value: &'a mut Events) -> Self {
+        &mut value.0
+    }
 }
 
 impl Deref for Events {
@@ -343,6 +359,12 @@ impl Deref for Events {
 impl DerefMut for Events {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl fmt::Debug for Events {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Events: TODO: actually print them")
     }
 }
 

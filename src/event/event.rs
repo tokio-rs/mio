@@ -182,15 +182,6 @@ impl Event {
     pub fn is_lio(&self) -> bool {
         sys::event::is_lio(&self.inner)
     }
-
-    /// Create a reference to an `Event` from a platform specific event.
-    pub(crate) fn from_sys_event_ref(sys_event: &sys::Event) -> &Event {
-        unsafe {
-            // This is safe because the memory layout of `Event` is
-            // the same as `sys::Event` due to the `repr(transparent)` attribute.
-            &*(sys_event as *const sys::Event as *const Event)
-        }
-    }
 }
 
 /// When the [alternate] flag is enabled this will print platform specific

@@ -4,7 +4,7 @@ use super::afd;
 use super::iocp::CompletionStatus;
 use crate::Token;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Event {
     pub flags: u32,
     pub data: u64,
@@ -121,6 +121,7 @@ pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
         .finish()
 }
 
+#[derive(Debug)]
 pub struct Events {
     /// Raw I/O event completions are filled in here by the call to `get_many`
     /// on the completion port above. These are then processed to run callbacks
@@ -165,5 +166,17 @@ impl Events {
         for status in self.statuses.iter_mut() {
             *status = CompletionStatus::zero();
         }
+    }
+}
+
+impl<'a> From<&'a Events> for &'a Vec<Event> {
+    fn from(value: &'a Events) -> Self {
+        &value.events
+    }
+}
+
+impl<'a> From<&'a mut Events> for &'a mut Vec<Event> {
+    fn from(value: &'a mut Events) -> Self {
+        &mut value.events
     }
 }
