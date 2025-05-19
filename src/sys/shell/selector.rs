@@ -12,6 +12,10 @@ impl Events {
     pub fn with_capacity(cap: usize) -> Self {
         Self(Vec::with_capacity(cap))
     }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
 }
 
 impl<'a> From<&'a Events> for &'a Vec<Event> {

@@ -185,8 +185,7 @@ impl Events {
     /// # }
     /// ```
     pub fn clear(&mut self) {
-        let vec: &mut Vec<Event> = self.into();
-        vec.clear();
+        self.inner.clear();
     }
 
     /// Returns a shared reference to the underlying Vec
