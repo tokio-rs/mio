@@ -1,3 +1,14 @@
+# 1.0.4
+
+* Update windows-sys to 0.59
+  (https://github.com/tokio-rs/mio/pull/1857).
+* Fix build failure of uds tests on Android
+  (https://github.com/tokio-rs/mio/pull/1847).
+* Fix set nonblocking socket on AIX
+  (https://github.com/tokio-rs/mio/pull/1867).
+* Emit a better error when using mio on WASM
+  (https://github.com/tokio-rs/mio/pull/1856).
+
 # 1.0.3
 
 * Implement more I/O safety traits
