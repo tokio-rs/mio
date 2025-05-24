@@ -154,7 +154,8 @@ jobs:
           - i686-unknown-linux-gnu
           # TODO: reenable <https://github.com/tokio-rs/mio/issues/1844>.
           #- i686-unknown-hurd-gnu
-          - powerpc64-ibm-aix
+          # TODO: reenable <https://github.com/tokio-rs/mio/issues/1882>.
+          #- powerpc64-ibm-aix
           - riscv32imc-esp-espidf
           - sparcv9-sun-solaris
           - wasm32-wasip1
