@@ -663,3 +663,18 @@ pub fn assert_error<T, E: fmt::Display>(result: Result<T, E>, expected_msg: &str
         ),
     }
 }
+
+#[cfg(all(unix, feature = "os-ext"))]
+#[test]
+fn double_poll() {
+    init();
+    let outer_poll = Poll::new().unwrap();
+    let registry = outer_poll.registry();
+
+    let mut inner_poll = Poll::new().unwrap();
+    let token = Token(0);
+    let interests = Interest::READABLE;
+    registry
+        .register(&mut inner_poll, token, interests)
+        .unwrap();
+}
