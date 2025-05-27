@@ -183,6 +183,7 @@ fn unix_stream_pair() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
+#[cfg_attr(target_os = "cygwin", ignore = "nonblocking connect doesn't handshake")]
 fn unix_stream_peer_addr() {
     init();
     let (handle, expected_addr) = new_echo_listener(1, "unix_stream_peer_addr");
@@ -205,6 +206,7 @@ fn unix_stream_peer_addr() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
 fn unix_stream_shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_read");
@@ -356,7 +358,7 @@ fn unix_stream_shutdown_both() {
 
     stream.shutdown(Shutdown::Both).unwrap();
     // Solaris never returns POLLHUP  for sockets.
-    #[cfg(not(target_os = "solaris"))]
+    #[cfg(not(any(target_os = "solaris", target_os = "cygwin")))]
     expect_events(
         &mut poll,
         &mut events,
@@ -396,6 +398,7 @@ fn unix_stream_shutdown_both() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
 fn unix_stream_shutdown_listener_write() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -482,6 +485,7 @@ fn unix_stream_reregister() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
+#[cfg_attr(target_os = "cygwin", ignore = "nonblocking connect doesn't handshake")]
 fn unix_stream_deregister() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_deregister");
@@ -593,7 +597,14 @@ fn new_echo_listener(
                         amount
                     }
                     Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                    Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
+                    Err(ref err)
+                        if matches!(
+                            err.kind(),
+                            io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted
+                        ) =>
+                    {
+                        break
+                    }
                     Err(err) => panic!("{}", err),
                 };
                 if n == 0 {

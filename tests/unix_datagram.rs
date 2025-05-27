@@ -31,6 +31,10 @@ fn is_send_and_sync() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
+#[cfg_attr(
+    target_os = "cygwin",
+    ignore = "getting pathname isn't supported on Cygwin"
+)]
 fn unix_datagram_smoke_unconnected() {
     init();
     let path1 = temp_file("unix_datagram_smoke_unconnected1");
@@ -59,6 +63,10 @@ fn unix_datagram_smoke_connected() {
 #[cfg_attr(
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
+)]
+#[cfg_attr(
+    target_os = "cygwin",
+    ignore = "getting pathname isn't supported on Cygwin"
 )]
 fn unix_datagram_smoke_unconnected_from_std() {
     init();
@@ -181,6 +189,7 @@ fn unix_datagram_pair() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
 fn unix_datagram_shutdown() {
     let (mut poll, mut events) = init_with_poll();
     let path1 = temp_file("unix_datagram_shutdown1");
