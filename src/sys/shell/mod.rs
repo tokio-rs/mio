@@ -21,12 +21,8 @@ cfg_net! {
 
 cfg_io_source! {
     use std::io;
-    #[cfg(any(unix))]
+    #[cfg(any(unix, target_os = "hermit"))]
     use std::os::fd::RawFd;
-    // TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
-    // can use `std::os::fd` and be merged with the above.
-    #[cfg(target_os = "hermit")]
-    use std::os::hermit::io::RawFd;
     #[cfg(windows)]
     use std::os::windows::io::RawSocket;
 

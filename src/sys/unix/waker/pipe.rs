@@ -1,11 +1,6 @@
 use std::fs::File;
 use std::io::{self, Read, Write};
-#[cfg(not(target_os = "hermit"))]
 use std::os::fd::{AsRawFd, FromRawFd, RawFd};
-// TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
-// can use `std::os::fd` and be merged with the above.
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::{AsRawFd, FromRawFd, RawFd};
 
 use crate::sys::unix::pipe;
 use crate::sys::Selector;
