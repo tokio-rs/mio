@@ -156,9 +156,8 @@ cfg_os_poll! {
 }
 
 cfg_not_os_poll! {
-    cfg_any_os_ext! {
+    cfg_os_ext! {
         mod sourcefd;
-        #[cfg(feature = "os-ext")]
         pub use self::sourcefd::SourceFd;
     }
 }
