@@ -183,13 +183,31 @@ fn unix_stream_pair() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore = "nonblocking connect doesn't handshake")]
 fn unix_stream_peer_addr() {
     init();
     let (handle, expected_addr) = new_echo_listener(1, "unix_stream_peer_addr");
     let expected_path = expected_addr.as_pathname().expect("failed to get pathname");
 
     let stream = UnixStream::connect(expected_path).unwrap();
+    // Complete handshake to unblock the server thread.
+    #[cfg(target_os = "cygwin")]
+    let stream = {
+        let mut stream = stream;
+        let (mut poll, mut events) = init_with_poll();
+        poll.registry()
+            .register(
+                &mut stream,
+                TOKEN_1,
+                Interest::READABLE.add(Interest::WRITABLE),
+            )
+            .unwrap();
+        expect_events(
+            &mut poll,
+            &mut events,
+            vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
+        );
+        stream
+    };
 
     assert_eq!(
         stream.peer_addr().unwrap().as_pathname().unwrap(),
@@ -485,13 +503,30 @@ fn unix_stream_reregister() {
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
 )]
-#[cfg_attr(target_os = "cygwin", ignore = "nonblocking connect doesn't handshake")]
 fn unix_stream_deregister() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_deregister");
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = UnixStream::connect(path).unwrap();
+    // Complete handshake to unblock the server thread.
+    #[cfg(target_os = "cygwin")]
+    {
+        let (mut poll, mut events) = init_with_poll();
+        poll.registry()
+            .register(
+                &mut stream,
+                TOKEN_1,
+                Interest::READABLE.add(Interest::WRITABLE),
+            )
+            .unwrap();
+        expect_events(
+            &mut poll,
+            &mut events,
+            vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
+        );
+        poll.registry().deregister(&mut stream).unwrap();
+    }
     poll.registry()
         .register(&mut stream, TOKEN_1, Interest::WRITABLE)
         .unwrap();
