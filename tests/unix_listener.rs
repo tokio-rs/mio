@@ -110,6 +110,9 @@ fn unix_listener_reregister() {
         &mut events,
         vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
+    // Complete handshake to unblock the client thread.
+    #[cfg(target_os = "cygwin")]
+    listener.accept().unwrap();
 
     barrier.wait();
     handle.join().unwrap();
@@ -130,6 +133,9 @@ fn unix_listener_deregister() {
 
     poll.registry().deregister(&mut listener).unwrap();
     expect_no_events(&mut poll, &mut events);
+    // Complete handshake to unblock the client thread.
+    #[cfg(target_os = "cygwin")]
+    listener.accept().unwrap();
 
     barrier.wait();
     handle.join().unwrap();

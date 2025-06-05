@@ -189,6 +189,25 @@ fn unix_stream_peer_addr() {
     let expected_path = expected_addr.as_pathname().expect("failed to get pathname");
 
     let stream = UnixStream::connect(expected_path).unwrap();
+    // Complete handshake to unblock the server thread.
+    #[cfg(target_os = "cygwin")]
+    let stream = {
+        let mut stream = stream;
+        let (mut poll, mut events) = init_with_poll();
+        poll.registry()
+            .register(
+                &mut stream,
+                TOKEN_1,
+                Interest::READABLE.add(Interest::WRITABLE),
+            )
+            .unwrap();
+        expect_events(
+            &mut poll,
+            &mut events,
+            vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
+        );
+        stream
+    };
 
     assert_eq!(
         stream.peer_addr().unwrap().as_pathname().unwrap(),
@@ -205,6 +224,7 @@ fn unix_stream_peer_addr() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
 fn unix_stream_shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
     let (handle, remote_addr) = new_echo_listener(1, "unix_stream_shutdown_read");
@@ -356,7 +376,7 @@ fn unix_stream_shutdown_both() {
 
     stream.shutdown(Shutdown::Both).unwrap();
     // Solaris never returns POLLHUP  for sockets.
-    #[cfg(not(target_os = "solaris"))]
+    #[cfg(not(any(target_os = "solaris", target_os = "cygwin")))]
     expect_events(
         &mut poll,
         &mut events,
@@ -396,6 +416,7 @@ fn unix_stream_shutdown_both() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
 fn unix_stream_shutdown_listener_write() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -488,6 +509,24 @@ fn unix_stream_deregister() {
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = UnixStream::connect(path).unwrap();
+    // Complete handshake to unblock the server thread.
+    #[cfg(target_os = "cygwin")]
+    {
+        let (mut poll, mut events) = init_with_poll();
+        poll.registry()
+            .register(
+                &mut stream,
+                TOKEN_1,
+                Interest::READABLE.add(Interest::WRITABLE),
+            )
+            .unwrap();
+        expect_events(
+            &mut poll,
+            &mut events,
+            vec![ExpectEvent::new(TOKEN_1, Interest::WRITABLE)],
+        );
+        poll.registry().deregister(&mut stream).unwrap();
+    }
     poll.registry()
         .register(&mut stream, TOKEN_1, Interest::WRITABLE)
         .unwrap();
@@ -593,7 +632,14 @@ fn new_echo_listener(
                         amount
                     }
                     Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                    Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => break,
+                    Err(ref err)
+                        if matches!(
+                            err.kind(),
+                            io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted
+                        ) =>
+                    {
+                        break
+                    }
                     Err(err) => panic!("{}", err),
                 };
                 if n == 0 {
