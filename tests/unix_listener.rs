@@ -89,7 +89,6 @@ fn unix_listener_register() {
 }
 
 #[test]
-#[cfg_attr(target_os = "cygwin", ignore = "Cygwin blocks on connect")]
 fn unix_listener_reregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -111,13 +110,15 @@ fn unix_listener_reregister() {
         &mut events,
         vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
+    // Complete handshake to unblock the client thread.
+    #[cfg(target_os = "cygwin")]
+    listener.accept().unwrap();
 
     barrier.wait();
     handle.join().unwrap();
 }
 
 #[test]
-#[cfg_attr(target_os = "cygwin", ignore = "Cygwin blocks on connect")]
 fn unix_listener_deregister() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -132,6 +133,9 @@ fn unix_listener_deregister() {
 
     poll.registry().deregister(&mut listener).unwrap();
     expect_no_events(&mut poll, &mut events);
+    // Complete handshake to unblock the client thread.
+    #[cfg(target_os = "cygwin")]
+    listener.accept().unwrap();
 
     barrier.wait();
     handle.join().unwrap();
