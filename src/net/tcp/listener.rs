@@ -86,8 +86,8 @@ impl TcpListener {
     ///
     /// This function is intended to be used to wrap a TCP listener from the
     /// standard library in the Mio equivalent. The conversion assumes nothing
-    /// about the underlying listener; ; it is left up to the user to set it
-    /// in non-blocking mode.
+    /// about the underlying listener; it is left up to the user to set it
+    /// into non-blocking mode.
     pub fn from_std(listener: net::TcpListener) -> TcpListener {
         TcpListener {
             inner: IoSource::new(listener),
