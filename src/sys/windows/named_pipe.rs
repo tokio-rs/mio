@@ -602,7 +602,7 @@ impl<'a> Write for &'a NamedPipe {
         match Inner::maybe_schedule_write(&self.inner, owned_buf, 0, &mut io)? {
             // Some bytes are written immediately
             Some(n) => Ok(n),
-            // Write operation is anqueued for whole buffer
+            // Write operation is enqueued for whole buffer
             None => Ok(buf.len()),
         }
     }
