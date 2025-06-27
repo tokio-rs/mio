@@ -96,7 +96,7 @@ struct Liocb {
     /// The actual list passed to `libc::lio_listio`.
     ///
     /// It must live for as long as any of the operations are still being
-    /// processesed, because the aio subsystem uses its address as a unique
+    /// processed, because the aio subsystem uses its address as a unique
     /// identifier.
     list: Box<[*mut libc::aiocb]>,
     sev: libc::sigevent,
