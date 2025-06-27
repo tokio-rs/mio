@@ -13,7 +13,7 @@ use std::os::windows::io::{
 };
 
 use crate::io_source::IoSource;
-#[cfg(not(target_os = "wasi"))]
+#[cfg(any(not(target_os = "wasi"), target_env = "p2"))]
 use crate::sys::tcp::{connect, new_for_addr};
 use crate::{event, Interest, Registry, Token};
 
@@ -87,10 +87,10 @@ impl TcpStream {
     /// entries in the routing cache.
     ///
     /// [write interest]: Interest::WRITABLE
-    #[cfg(not(target_os = "wasi"))]
+    #[cfg(any(not(target_os = "wasi"), target_env = "p2"))]
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         let socket = new_for_addr(addr)?;
-        #[cfg(any(unix, target_os = "hermit"))]
+        #[cfg(any(unix, target_os = "hermit", all(target_os = "wasi", target_env = "p2")))]
         let stream = unsafe { TcpStream::from_raw_fd(socket) };
         #[cfg(windows)]
         let stream = unsafe { TcpStream::from_raw_socket(socket as _) };
