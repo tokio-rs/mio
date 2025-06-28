@@ -57,7 +57,7 @@ fn issue_776() {
     match stream.read(&mut buf) {
         Ok(_) => panic!("unexpected ok"),
         Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => (),
-        Err(err) => panic!("unexpected error: {}", err),
+        Err(err) => panic!("unexpected error: {err}"),
     }
 
     drop(stream);

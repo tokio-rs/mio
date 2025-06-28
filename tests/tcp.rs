@@ -263,7 +263,7 @@ fn peek() {
             match data.socket.peek(&mut buf) {
                 Ok(_) => (),
                 Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(err) => panic!("unexpected error: {}", err),
+                Err(err) => panic!("unexpected error: {err}"),
             }
 
             while let Ok(amt) = data.socket.read(&mut buf) {
@@ -500,7 +500,7 @@ fn connection_reset_by_peer() {
                         break 'outer;
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
-                    Err(e) => panic!("unexpected error {:?}", e),
+                    Err(e) => panic!("unexpected error {e:?}"),
                 }
             }
         }
@@ -527,7 +527,7 @@ fn connection_reset_by_peer() {
                 match server.read(&mut buf) {
                     Ok(0) | Err(_) => {}
 
-                    Ok(x) => panic!("expected empty buffer but read {} bytes", x),
+                    Ok(x) => panic!("expected empty buffer but read {x} bytes"),
                 }
                 return;
             }
@@ -547,7 +547,7 @@ fn connect_error() {
             // unfortunately doesn't get us the code coverage we want.
             return;
         }
-        Err(e) => panic!("TcpStream::connect unexpected error {:?}", e),
+        Err(e) => panic!("TcpStream::connect unexpected error {e:?}"),
     };
 
     poll.registry()
@@ -616,7 +616,7 @@ fn write_error() {
             Ok(_) => {}
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => wait_writable(),
             Err(e) => {
-                println!("good error: {}", e);
+                println!("good error: {e}");
                 break;
             }
         }

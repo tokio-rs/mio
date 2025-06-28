@@ -167,7 +167,7 @@ fn drop_cancels_interest_and_shuts_down() {
     match stream.read(&mut buf) {
         Ok(_) => panic!("unexpected ok"),
         Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => (),
-        Err(err) => panic!("unexpected error: {}", err),
+        Err(err) => panic!("unexpected error: {err}"),
     }
 
     drop(stream);
@@ -657,9 +657,7 @@ pub fn assert_error<T, E: fmt::Display>(result: Result<T, E>, expected_msg: &str
         Ok(_) => panic!("unexpected OK result"),
         Err(err) => assert!(
             err.to_string().contains(expected_msg),
-            "wanted: {}, got: {}",
-            err,
-            expected_msg
+            "wanted: {err}, got: {expected_msg}",
         ),
     }
 }

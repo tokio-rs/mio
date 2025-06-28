@@ -152,7 +152,7 @@ fn unix_listener_abstract_namespace() {
     let barrier = Arc::new(Barrier::new(2));
 
     let num: u64 = rand::thread_rng().gen();
-    let name = format!("mio-abstract-uds-{}", num);
+    let name = format!("mio-abstract-uds-{num}");
     let address = SocketAddr::from_abstract_name(name.as_bytes()).unwrap();
     let mut listener = UnixListener::bind_addr(&address).unwrap();
     assert_eq!(

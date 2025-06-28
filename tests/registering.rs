@@ -41,7 +41,7 @@ impl TestHandler {
                 let mut sock = self.server.accept().unwrap().0;
                 if let Err(err) = sock.write(b"foobar") {
                     if err.kind() != io::ErrorKind::WouldBlock {
-                        panic!("unexpected error writing to connection: {}", err);
+                        panic!("unexpected error writing to connection: {err}");
                     }
                 }
             }
@@ -58,9 +58,9 @@ impl TestHandler {
     }
 
     fn handle_write(&mut self, registry: &Registry, token: Token) {
-        debug!("handle_write; token={:?}; state={:?}", token, self.state);
+        debug!("handle_write; token={token:?}; state={:?}", self.state);
 
-        assert!(token == CLIENT, "unexpected token {:?}", token);
+        assert!(token == CLIENT, "unexpected token {token:?}");
         assert!(self.state == 1, "unexpected state {}", self.state);
 
         self.state = 2;

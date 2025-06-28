@@ -21,7 +21,7 @@ impl Selector {
 }
 
 #[cfg(unix)]
-cfg_any_os_ext! {
+cfg_os_ext! {
     use crate::{Interest, Token};
 
     impl Selector {
@@ -40,7 +40,7 @@ cfg_any_os_ext! {
 }
 
 #[cfg(target_os = "wasi")]
-cfg_any_os_ext! {
+cfg_os_ext! {
     use crate::{Interest, Token};
 
     impl Selector {

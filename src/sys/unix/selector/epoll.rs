@@ -1,12 +1,16 @@
+use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{io, ptr};
 
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI, EPOLLRDHUP};
 
 use crate::{Interest, Token};
+
+cfg_io_source! {
+    use std::ptr;
+}
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -78,6 +82,7 @@ impl Selector {
         syscall!(epoll_ctl(ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
     }
 
+    cfg_io_source! {
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let mut event = libc::epoll_event {
             events: interests_to_epoll(interests),
@@ -93,6 +98,7 @@ impl Selector {
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
         let ep = self.ep.as_raw_fd();
         syscall!(epoll_ctl(ep, libc::EPOLL_CTL_DEL, fd, ptr::null_mut())).map(|_| ())
+    }
     }
 }
 
