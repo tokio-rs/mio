@@ -7,14 +7,14 @@ use std::sync::{Arc, Mutex};
 use std::{fmt, mem, slice};
 
 use windows_sys::Win32::Foundation::{
-    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_NO_DATA, ERROR_PIPE_CONNECTED,
-    ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
+    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA,
+    ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
 };
 use windows_sys::Win32::System::Pipes::{
-    ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_TYPE_BYTE,
+    ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PeekNamedPipe, PIPE_TYPE_BYTE,
     PIPE_UNLIMITED_INSTANCES,
 };
 use windows_sys::Win32::System::IO::{
@@ -26,6 +26,8 @@ use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
 use crate::sys::windows::{Event, Handle, Overlapped};
 use crate::Registry;
 use crate::{Interest, Token};
+
+const MAX_BUFFER_SZ: usize = 65536;
 
 /// Non-blocking windows named pipe.
 ///
@@ -315,6 +317,25 @@ impl Inner {
             Ok(transferred as usize)
         }
     }
+
+    /// Calls the `PeekNamedPipe` function to get the remaining size of message in NamedPipe
+    #[inline]
+    unsafe fn remaining_size(&self) -> io::Result<usize> {
+        let mut remaining = 0;
+        let r = PeekNamedPipe(
+            self.handle.raw(),
+            std::ptr::null_mut(),
+            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut remaining,
+        );
+        if r == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(remaining as usize)
+        }
+    }
 }
 
 #[test]
@@ -357,6 +378,7 @@ enum State {
     Pending(Vec<u8>, usize),
     Ok(Vec<u8>, usize),
     Err(io::Error),
+    InsufficientBufferSize(Vec<u8>, usize),
 }
 
 // Odd tokens are for named pipes
@@ -543,7 +565,7 @@ impl<'a> Read for &'a NamedPipe {
             }
 
             // We previously read something into `data`, try to copy out some
-            // data. If we copy out all the data schedule a new read and
+            // data. If we copy out all the data, schedule a new read
             // otherwise store the buffer to get read later.
             State::Ok(data, cur) => {
                 let n = {
@@ -559,6 +581,10 @@ impl<'a> Read for &'a NamedPipe {
                 }
                 Ok(n)
             }
+
+            // We scheduled another read with a bigger buffer after the first read (see `read_done`)
+            // This is not possible in theory, just like `State::None` case, but return would block for now.
+            State::InsufficientBufferSize(..) => Err(would_block()),
 
             // Looks like an in-flight read hit an error, return that here while
             // we schedule a new one.
@@ -711,19 +737,26 @@ impl Inner {
     /// scheduled.
     fn schedule_read(me: &Arc<Inner>, io: &mut Io, events: Option<&mut Vec<Event>>) -> bool {
         // Check to see if a read is already scheduled/completed
-        match io.read {
-            State::None => {}
-            _ => return true,
-        }
+
+        let mut buf = match mem::replace(&mut io.read, State::None) {
+            State::None => me.get_buffer(),
+            State::InsufficientBufferSize(mut buf, rem) => {
+                let sz_rem = std::cmp::min(rem, MAX_BUFFER_SZ);
+                buf.reserve_exact(sz_rem);
+                buf
+            }
+            e @ _ => {
+                io.read = e;
+                return true;
+            }
+        };
 
         // Allocate a buffer and schedule the read.
-        let mut buf = me.get_buffer();
         let e = unsafe {
             let overlapped = me.read.as_ptr() as *mut _;
             let slice = slice::from_raw_parts_mut(buf.as_mut_ptr(), buf.capacity());
-            me.read_overlapped(slice, overlapped)
+            me.read_overlapped(&mut slice[buf.len()..], overlapped)
         };
-
         match e {
             // See `NamedPipe::connect` above for the rationale behind `forget`
             Ok(_) => {
@@ -882,8 +915,28 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
         match me.result(status.overlapped()) {
             Ok(n) => {
                 debug_assert_eq!(status.bytes_transferred() as usize, n);
-                buf.set_len(status.bytes_transferred() as usize);
+                // Extend the len depending on the initial len is necessary
+                // when we call `ReadFile` again after resizing
+                // our internal buffer
+                buf.set_len(buf.len() + status.bytes_transferred() as usize);
                 io.read = State::Ok(buf, 0);
+            }
+            Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as i32) => {
+                buf.set_len(status.bytes_transferred() as usize);
+                match me.remaining_size() {
+                    Ok(rem) if rem == 0 => {
+                        io.read = State::Ok(buf, 0);
+                    }
+                    Ok(rem) => {
+                        io.read = State::InsufficientBufferSize(buf, rem);
+                        Inner::schedule_read(&me, &mut io, None);
+                        return;
+                    }
+                    Err(_e) => {
+                        // When `PeekNamedPipe` encountered an error, truncate and return whatever is recoverable from the bytes
+                        io.read = State::Ok(buf, 0);
+                    }
+                }
             }
             Err(e) => {
                 debug_assert_eq!(status.bytes_transferred(), 0);
