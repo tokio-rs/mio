@@ -63,6 +63,21 @@ macro_rules! kevent {
     };
 }
 
+/// Same as `kevent` but infers `flags` from `interest`.
+///
+/// Adds `EV_ADD` when `interest` is true, `EV_DELETE` otherwise.
+macro_rules! kevent_update {
+    ($id: expr, $filter: expr, $interest: expr, $data: expr) => {{
+        let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
+        let add_delete = if $interest {
+            libc::EV_ADD
+        } else {
+            libc::EV_DELETE
+        };
+        kevent!($id, $filter, flags | add_delete, $data)
+    }};
+}
+
 #[derive(Debug)]
 pub struct Selector {
     #[cfg(debug_assertions)]
@@ -124,20 +139,14 @@ impl Selector {
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let flags = libc::EV_CLEAR | libc::EV_RECEIPT | libc::EV_ADD;
         // At most we need two changes, but maybe we only need 1.
-        let mut changes: [MaybeUninit<libc::kevent>; 2] =
-            [MaybeUninit::uninit(), MaybeUninit::uninit()];
-        let mut n_changes = 0;
+        let mut changes: Changes<2> = Changes::new();
 
         if interests.is_writable() {
-            let kevent = kevent!(fd, libc::EVFILT_WRITE, flags, token.0);
-            changes[n_changes] = MaybeUninit::new(kevent);
-            n_changes += 1;
+            changes.push(kevent!(fd, libc::EVFILT_WRITE, flags, token.0));
         }
 
         if interests.is_readable() {
-            let kevent = kevent!(fd, libc::EVFILT_READ, flags, token.0);
-            changes[n_changes] = MaybeUninit::new(kevent);
-            n_changes += 1;
+            changes.push(kevent!(fd, libc::EVFILT_READ, flags, token.0));
         }
 
         // Older versions of macOS (OS X 10.11 and 10.10 have been witnessed)
@@ -152,30 +161,17 @@ impl Selector {
         // instead of propagating it.
         //
         // More info can be found at tokio-rs/mio#582.
-        let changes = unsafe {
-            // This is safe because we ensure that at least `n_changes` are in
-            // the array.
-            slice::from_raw_parts_mut(changes[0].as_mut_ptr(), n_changes)
-        };
-        kevent_register(self.kq.as_raw_fd(), changes, &[libc::EPIPE as i64])
+        kevent_register(
+            self.kq.as_raw_fd(),
+            changes.as_mut_slice(),
+            &[libc::EPIPE as i64],
+        )
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
-        let write_flags = if interests.is_writable() {
-            flags | libc::EV_ADD
-        } else {
-            flags | libc::EV_DELETE
-        };
-        let read_flags = if interests.is_readable() {
-            flags | libc::EV_ADD
-        } else {
-            flags | libc::EV_DELETE
-        };
-
         let mut changes: [libc::kevent; 2] = [
-            kevent!(fd, libc::EVFILT_WRITE, write_flags, token.0),
-            kevent!(fd, libc::EVFILT_READ, read_flags, token.0),
+            kevent_update!(fd, libc::EVFILT_WRITE, interests.is_writable(), token.0),
+            kevent_update!(fd, libc::EVFILT_READ, interests.is_readable(), token.0),
         ];
 
         // Since there is no way to check with which interests the fd was
@@ -265,6 +261,53 @@ impl Selector {
     }
 }
 
+#[cfg(feature = "os-proc")]
+impl Selector {
+    pub fn register_pid(
+        &self,
+        pid: libc::pid_t,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        let flags = libc::EV_CLEAR | libc::EV_RECEIPT | libc::EV_ADD;
+        let mut changes: Changes<1> = Changes::new();
+
+        if interests.is_readable() {
+            let mut kevent = kevent!(pid, libc::EVFILT_PROC, flags, token.0);
+            // We are only interested in "process exit" event to be consistent with `pidfd`.
+            kevent.fflags = libc::NOTE_EXIT;
+            changes.push(kevent);
+        }
+
+        kevent_register(self.kq.as_raw_fd(), changes.as_mut_slice(), &[])
+    }
+
+    pub fn reregister_pid(
+        &self,
+        pid: libc::pid_t,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        let mut changes: [libc::kevent; 1] = [kevent_update!(
+            pid,
+            libc::EVFILT_PROC,
+            interests.is_readable(),
+            token.0
+        )];
+        kevent_register(self.kq.as_raw_fd(), &mut changes, &[libc::ENOENT as i64])
+    }
+
+    pub fn deregister_pid(&self, pid: libc::pid_t) -> io::Result<()> {
+        let mut changes: [libc::kevent; 1] = [kevent!(
+            pid,
+            libc::EVFILT_PROC,
+            libc::EV_DELETE | libc::EV_RECEIPT,
+            0
+        )];
+        kevent_register(self.kq.as_raw_fd(), &mut changes, &[libc::ENOENT as i64])
+    }
+}
+
 /// Register `changes` with `kq`ueue.
 fn kevent_register(
     kq: RawFd,
@@ -306,6 +349,34 @@ fn check_errors(events: &[libc::kevent], ignored_errors: &[i64]) -> io::Result<(
         }
     }
     Ok(())
+}
+
+struct Changes<const N: usize> {
+    changes: [MaybeUninit<libc::kevent>; N],
+    n_changes: usize,
+}
+
+impl<const N: usize> Changes<N> {
+    fn new() -> Self {
+        Self {
+            changes: [MaybeUninit::uninit(); N],
+            n_changes: 0,
+        }
+    }
+
+    fn push(&mut self, kevent: libc::kevent) {
+        debug_assert!(self.n_changes < N, "too many events, increase `N`");
+        self.changes[self.n_changes] = MaybeUninit::new(kevent);
+        self.n_changes += 1;
+    }
+
+    fn as_mut_slice(&mut self) -> &mut [libc::kevent] {
+        unsafe {
+            // This is safe because we ensure that at least `n_changes` are in
+            // the array.
+            slice::from_raw_parts_mut(self.changes[0].as_mut_ptr(), self.n_changes)
+        }
+    }
 }
 
 cfg_io_source! {
@@ -367,7 +438,16 @@ pub mod event {
     }
 
     pub fn is_readable(event: &Event) -> bool {
-        event.filter == libc::EVFILT_READ || {
+        match event.filter {
+            // Emit process's read event *only* on process exit
+            // to make `EVFILT_PROC` behaviour consistent with `pidfd`.
+            #[cfg(feature = "os-proc")]
+            libc::EVFILT_PROC if (event.fflags & libc::NOTE_EXIT) != 0 => true,
+            // File descriptor's read event.
+            libc::EVFILT_READ => true,
+            // Used by the `Awakener`. On platforms that use `eventfd` or a unix
+            // pipe it will emit a readable event so we'll fake that here as
+            // well.
             #[cfg(any(
                 target_os = "freebsd",
                 target_os = "ios",
@@ -376,23 +456,8 @@ pub mod event {
                 target_os = "visionos",
                 target_os = "watchos"
             ))]
-            // Used by the `Awakener`. On platforms that use `eventfd` or a unix
-            // pipe it will emit a readable event so we'll fake that here as
-            // well.
-            {
-                event.filter == libc::EVFILT_USER
-            }
-            #[cfg(not(any(
-                target_os = "freebsd",
-                target_os = "ios",
-                target_os = "macos",
-                target_os = "tvos",
-                target_os = "visionos",
-                target_os = "watchos"
-            )))]
-            {
-                false
-            }
+            libc::EVFILT_USER => true,
+            _ => false,
         }
     }
 
@@ -404,7 +469,7 @@ pub mod event {
         (event.flags & libc::EV_ERROR) != 0 ||
             // When the read end of the socket is closed, EV_EOF is set on
             // flags, and fflags contains the error if there is one.
-            (event.flags & libc::EV_EOF) != 0 && event.fflags != 0
+            (event.flags & libc::EV_EOF) != 0 && event.fflags != 0 && event.filter != libc::EVFILT_PROC
     }
 
     pub fn is_read_closed(event: &Event) -> bool {

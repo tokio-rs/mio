@@ -64,6 +64,11 @@ cfg_net! {
     pub mod net;
 }
 
+cfg_os_proc! {
+    mod process;
+    pub use process::Process;
+}
+
 #[doc(no_inline)]
 pub use event::Events;
 pub use interest::Interest;
@@ -123,6 +128,11 @@ pub mod features {
     //!
     //! `os-ext` enables additional OS specific facilities. These facilities can
     //! be found in the `unix` and `windows` module.
+    //!
+    #![cfg_attr(feature = "os-proc", doc = "## `os-proc` (enabled)")]
+    #![cfg_attr(not(feature = "os-proc"), doc = "## `os-proc` (disabled)")]
+    //!
+    //! `os-proc` enables OS process polling via `Process`.
     //!
     #![cfg_attr(feature = "net", doc = "## Network types (enabled)")]
     #![cfg_attr(not(feature = "net"), doc = "## Network types (disabled)")]

@@ -112,6 +112,7 @@ fn waker_multiple_wakeups_different_thread() {
     not(debug_assertions),
     ignore = "only works with debug_assertions enabled"
 )]
+#[cfg_attr(not(mio_sanitize_leak), ignore = "Doesn't work under `leak` sanitizer")]
 #[should_panic = "Only a single `Waker` can be active per `Poll` instance"]
 fn using_multiple_wakers_panics() {
     init();
@@ -133,6 +134,7 @@ fn using_multiple_wakers_panics() {
     not(debug_assertions),
     ignore = "only works with debug_assertions enabled"
 )]
+#[cfg_attr(not(mio_sanitize_leak), ignore = "Doesn't work under `leak` sanitizer")]
 #[should_panic = "Only a single `Waker` can be active per `Poll` instance"]
 fn using_multiple_wakers_panics_different_cloned_registries() {
     init();

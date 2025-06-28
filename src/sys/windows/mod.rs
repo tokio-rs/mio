@@ -15,22 +15,23 @@ use overlapped::Overlapped;
 mod selector;
 pub use selector::Selector;
 
+/// Helper macro to execute a system call that returns an `io::Result`.
+//
+// Macro must be defined before any modules that uses them.
+#[cfg(any(feature = "net", feature = "os-proc"))]
+macro_rules! syscall {
+    ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
+        let res = unsafe { $fn($($arg, )*) };
+        if $err_test(&res, &$err_value) {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(res)
+        }
+    }};
+}
+
 // Macros must be defined before the modules that use them
 cfg_net! {
-    /// Helper macro to execute a system call that returns an `io::Result`.
-    //
-    // Macro must be defined before any modules that uses them.
-    macro_rules! syscall {
-        ($fn: ident ( $($arg: expr),* $(,)* ), $err_test: path, $err_value: expr) => {{
-            let res = unsafe { $fn($($arg, )*) };
-            if $err_test(&res, &$err_value) {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(res)
-            }
-        }};
-    }
-
     mod net;
 
     pub(crate) mod tcp;
@@ -45,6 +46,26 @@ cfg_os_ext! {
 
 mod waker;
 pub(crate) use waker::Waker;
+
+cfg_os_proc! {
+    mod process;
+    pub(crate) use process::Process;
+    pub(crate) use selector::HandleInfo;
+
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::HANDLE;
+
+    /// Helper trait to convert `RawHandle` to `HANDLE`.
+    pub(crate) trait AsHandlePtr {
+        fn as_handle_ptr(&self) -> HANDLE;
+    }
+
+    impl<T: AsRawHandle> AsHandlePtr for T {
+        fn as_handle_ptr(&self) -> HANDLE {
+            self.as_raw_handle() as HANDLE
+        }
+    }
+}
 
 cfg_io_source! {
     use std::io;

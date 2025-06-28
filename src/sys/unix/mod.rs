@@ -108,6 +108,11 @@ cfg_os_poll! {
     // NOTE: the `Waker` type is expected in the selector module as the
     // `poll(2)` implementation needs to do some special stuff.
 
+    cfg_os_proc! {
+        mod process;
+        pub use self::process::Process;
+    }
+
     mod sourcefd;
     #[cfg(feature = "os-ext")]
     pub use self::sourcefd::SourceFd;
