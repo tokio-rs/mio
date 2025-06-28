@@ -61,12 +61,14 @@ impl Selector {
         self.state.register_internal(fd, token, interests)
     }
 
+    cfg_io_source! {
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         self.state.reregister(fd, token, interests)
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
         self.state.deregister(fd)
+    }
     }
 
     pub fn wake(&self, token: Token) -> io::Result<()> {
@@ -354,6 +356,7 @@ impl SelectorState {
         })
     }
 
+    cfg_io_source! {
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         self.modify_fds(|fds| {
             let data = fds.fd_data.get_mut(&fd).ok_or(io::ErrorKind::NotFound)?;
@@ -369,6 +372,7 @@ impl SelectorState {
         self.deregister_all(&[fd])
             .map_err(|_| io::ErrorKind::NotFound)?;
         Ok(())
+    }
     }
 
     /// Perform a modification on `fds`, interrupting the current caller of `wait` if it's running.

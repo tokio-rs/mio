@@ -1,11 +1,19 @@
-use crate::{Interest, Token};
-use std::mem::{self, MaybeUninit};
+use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::{cmp, io, ptr, slice};
+use std::{cmp, io, ptr};
+
+use crate::Token;
+
+cfg_io_source! {
+    use std::mem::MaybeUninit;
+    use std::slice;
+
+    use crate::Interest;
+}
 
 /// Unique id for use as `SelectorId`.
 #[cfg(debug_assertions)]
@@ -121,6 +129,7 @@ impl Selector {
         })
     }
 
+    cfg_io_source! {
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let flags = libc::EV_CLEAR | libc::EV_RECEIPT | libc::EV_ADD;
         // At most we need two changes, but maybe we only need 1.
@@ -207,6 +216,7 @@ impl Selector {
         // about that since our goal is to remove it.
         kevent_register(self.kq.as_raw_fd(), &mut changes, &[libc::ENOENT as i64])
     }
+    }
 
     // Used by `Waker`.
     #[cfg(any(
@@ -265,6 +275,7 @@ impl Selector {
     }
 }
 
+cfg_io_source! {
 /// Register `changes` with `kq`ueue.
 fn kevent_register(
     kq: RawFd,
@@ -306,6 +317,7 @@ fn check_errors(events: &[libc::kevent], ignored_errors: &[i64]) -> io::Result<(
         }
     }
     Ok(())
+}
 }
 
 cfg_io_source! {
