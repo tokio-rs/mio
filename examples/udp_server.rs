@@ -77,7 +77,7 @@ fn main() -> io::Result<()> {
                     // This should never happen as we only registered our
                     // `UdpSocket` using the `UDP_SOCKET` token, but if it ever
                     // does we'll log it.
-                    warn!("Got event for unexpected token: {:?}", event);
+                    warn!("Got event for unexpected token: {event:?}");
                 }
             }
         }
