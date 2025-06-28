@@ -124,7 +124,7 @@ impl Selector {
         })
     }
 
-    #[cfg(feature = "net")]
+    cfg_io_source! {
     pub(crate) fn register(
         &self,
         fd: wasi::Fd,
@@ -166,7 +166,6 @@ impl Selector {
         Ok(())
     }
 
-    #[cfg(feature = "net")]
     pub(crate) fn reregister(
         &self,
         fd: wasi::Fd,
@@ -177,7 +176,6 @@ impl Selector {
             .and_then(|()| self.register(fd, token, interests))
     }
 
-    #[cfg(feature = "net")]
     pub(crate) fn deregister(&self, fd: wasi::Fd) -> io::Result<()> {
         let mut subscriptions = self.subscriptions.lock().unwrap();
 
@@ -203,6 +201,7 @@ impl Selector {
         }
 
         ret
+    }
     }
 }
 
