@@ -89,7 +89,7 @@ fn main() -> io::Result<()> {
                         }
                     };
 
-                    println!("Accepted connection from: {}", address);
+                    println!("Accepted connection from: {address}");
 
                     let token = next(&mut unique_token);
                     poll.registry()
@@ -185,7 +185,7 @@ fn handle_connection_event(
             if let Ok(str_buf) = from_utf8(received_data) {
                 println!("Received data: {}", str_buf.trim_end());
             } else {
-                println!("Received (none UTF-8) data: {:?}", received_data);
+                println!("Received (none UTF-8) data: {received_data:?}");
             }
         }
 

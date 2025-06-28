@@ -970,7 +970,7 @@ impl UdpHandler {
                     unsafe { self.rx_buf.set_len(cnt) };
                     assert_eq!(addr.ip(), self.localhost);
                 }
-                res => panic!("unexpected result: {:?}", res),
+                res => panic!("unexpected result: {res:?}"),
             }
             assert_eq!(str::from_utf8(&self.rx_buf).unwrap(), self.msg);
             self.shutdown = true;

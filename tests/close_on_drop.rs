@@ -39,7 +39,7 @@ impl TestHandler {
     }
 
     fn handle_read(&mut self, registry: &Registry, tok: Token) {
-        debug!("readable; tok={:?}", tok);
+        debug!("readable; tok={tok:?}");
 
         match tok {
             SERVER => {
@@ -62,10 +62,10 @@ impl TestHandler {
                 match self.cli.read(&mut buf) {
                     Ok(0) => self.shutdown = true,
                     Ok(_) => panic!("the client socket should not be readable"),
-                    Err(e) => panic!("Unexpected error {:?}", e),
+                    Err(e) => panic!("Unexpected error {e:?}"),
                 }
             }
-            _ => panic!("received unknown token {:?}", tok),
+            _ => panic!("received unknown token {tok:?}"),
         }
         registry
             .reregister(&mut self.cli, CLIENT, Interest::READABLE)
@@ -81,7 +81,7 @@ impl TestHandler {
                     .reregister(&mut self.cli, CLIENT, Interest::READABLE)
                     .unwrap();
             }
-            _ => panic!("received unknown token {:?}", tok),
+            _ => panic!("received unknown token {tok:?}"),
         }
     }
 }
