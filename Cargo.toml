@@ -53,7 +53,7 @@ libc = "0.2.159"
 libc = "0.2.159"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.59"
+version = "0.60"
 features = [
   "Wdk_Foundation",                   # Required for AFD.
   "Wdk_Storage_FileSystem",           # Required for AFD.
@@ -61,6 +61,7 @@ features = [
   "Win32_Foundation",                 # Basic types eg HANDLE
   "Win32_Networking_WinSock",         # winsock2 types/functions
   "Win32_Storage_FileSystem",         # Enables NtCreateFile
+  "Win32_Security",                   # Enables NtCreateFile
   "Win32_System_IO",                  # IO types like OVERLAPPED etc
   "Win32_System_WindowsProgramming",  # General future used for various types/funcs
 ]
