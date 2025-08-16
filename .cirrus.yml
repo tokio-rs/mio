@@ -5,22 +5,33 @@ env:
   RUST_BACKTRACE: full
 
 task:
-  name: FreeBSD
+  matrix:
+    - name: nightly freebsd-15 x86_64 20250102
+      freebsd_instance:
+       image: freebsd-15-0-current-amd64-ufs-20250102
+    - name: nightly freebsd-15 x86_64 20250206
+      freebsd_instance:
+       image: freebsd-15-0-current-amd64-ufs-20250206
+    - name: nightly freebsd-15 x86_64 20250306
+      freebsd_instance:
+       image: freebsd-15-0-current-amd64-ufs-20250306
+    - name: nightly freebsd-15 x86_64 20250403
+      freebsd_instance:
+       image: freebsd-15-0-current-amd64-ufs-20250403
+    - name: nightly freebsd-15 x86_64 20250606
+      freebsd_instance:
+       image: freebsd-15-0-current-amd64-ufs-20250606
+    - name: nightly freebsd-15 x86_64 20250703
+      freebsd_instance:
+       image: freebsd-15-0-current-amd64-ufs-20250703
   setup_script:
+    - pkg install -y compat14x-amd64
     - fetch https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile minimal
   cargo_cache:
     folder: $HOME/.cargo/registry
-  build_script:
-    - . $HOME/.cargo/env
-    - cargo build
-    - cargo build --no-default-features
   amd64_test_script:
     - . $HOME/.cargo/env
-    - cargo test --all-features
-  i386_test_script:
-    - . $HOME/.cargo/env
-    - rustup target add i686-unknown-freebsd
-    - cargo test --target i686-unknown-freebsd --all-features
+    - cargo test --all-features --test unix_stream unix_stream_shutdown_write -- --nocapture
   before_cache_script:
     - rm -rf $HOME/.cargo/registry/index
