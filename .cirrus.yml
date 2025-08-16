@@ -1,29 +1,26 @@
-freebsd_instance:
-  image: freebsd-13-2-release-amd64
-
 env:
   RUST_BACKTRACE: full
 
 task:
   matrix:
-    - name: nightly freebsd-15 x86_64 20250102
-      freebsd_instance:
-       image: freebsd-15-0-current-amd64-ufs-20250102
-    - name: nightly freebsd-15 x86_64 20250206
-      freebsd_instance:
-       image: freebsd-15-0-current-amd64-ufs-20250206
-    - name: nightly freebsd-15 x86_64 20250306
-      freebsd_instance:
-       image: freebsd-15-0-current-amd64-ufs-20250306
     - name: nightly freebsd-15 x86_64 20250403
       freebsd_instance:
        image: freebsd-15-0-current-amd64-ufs-20250403
+    - name: nightly freebsd-15 x86_64 20250424
+      freebsd_instance:
+       image: freebsd-15-0-current-amd64-ufs-20250424
+    - name: nightly freebsd-15 x86_64 20250522
+      freebsd_instance:
+       image: freebsd-15-0-current-amd64-ufs-20250522
+    - name: nightly freebsd-15 x86_64 20250529
+      freebsd_instance:
+       image: freebsd-15-0-current-amd64-ufs-20250529
     - name: nightly freebsd-15 x86_64 20250606
       freebsd_instance:
        image: freebsd-15-0-current-amd64-ufs-20250606
-    - name: nightly freebsd-15 x86_64 20250703
+    - name: nightly freebsd-15 x86_64 20250718
       freebsd_instance:
-       image: freebsd-15-0-current-amd64-ufs-20250703
+       image: freebsd-15-0-current-amd64-ufs-20250718
   setup_script:
     - pkg install -y compat14x-amd64
     - fetch https://sh.rustup.rs -o rustup.sh
