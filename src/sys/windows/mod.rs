@@ -109,6 +109,7 @@ cfg_io_source! {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => true,
                 _ => false
             };
+
             if is_ok_or_would_block{
                 self.inner.as_ref().map_or(Ok(()), |state| {
                     state
