@@ -212,6 +212,9 @@ impl TcpStream {
     /// Successive calls return the same data. This is accomplished by passing
     /// `MSG_PEEK` as a flag to the underlying recv system call.
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        #[cfg(windows)]
+        return self.inner.do_io_and_reregister(|inner| inner.peek(buf));
+        #[cfg(not(windows))]
         self.inner.peek(buf)
     }
 

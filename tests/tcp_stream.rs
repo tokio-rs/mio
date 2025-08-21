@@ -876,3 +876,72 @@ fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
         }
     }
 }
+
+/// Test that `peek` works correctly with readiness events.
+///
+/// `peek` should not remove the readable interest on Windows,
+/// but since it is also a read operation, so previously `SockState::feed_event` will remove the readable interest after a successful peek.
+#[test]
+fn peek_readiness() {
+    let mut buf = [0; 2];
+    let (mut poll, mut events) = init_with_poll();
+
+    let listener = net::TcpListener::bind(any_local_address()).unwrap();
+    let sockaddr = listener.local_addr().unwrap();
+    let thread_handle = thread::spawn(move || listener.accept().unwrap());
+    let stream1 = net::TcpStream::connect(sockaddr).unwrap();
+    let (mut stream2, _) = thread_handle.join().unwrap();
+
+    stream1.set_nonblocking(true).unwrap();
+    let mut stream1 = TcpStream::from_std(stream1);
+
+    poll.registry()
+        .register(&mut stream1, ID1, Interest::READABLE)
+        .unwrap();
+
+    expect_no_events(&mut poll, &mut events);
+    assert_would_block(stream1.peek(&mut buf));
+
+    assert_eq!(stream2.write(&[0]).unwrap(), 1);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
+    );
+    assert_eq!(stream1.peek(&mut buf).unwrap(), 1);
+    // a successful peek shouldn't remove readable interest
+    // (which did on windows that due to peek is also read)
+
+    assert_eq!(stream2.write(&[0]).unwrap(), 1);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
+    );
+    assert_eq!(stream1.peek(&mut buf).unwrap(), 2);
+    assert_eq!(stream1.read(&mut buf).unwrap(), 2);
+    assert_would_block(stream1.peek(&mut buf));
+    // a would block peek also should not remove readable interest on windows
+    // but it previously did as peek is also read
+
+    assert_eq!(stream2.write(&[0, 1, 2, 3]).unwrap(), 4);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
+    );
+    assert_eq!(stream1.read(&mut buf).unwrap(), 2);
+    assert_eq!(stream1.peek(&mut buf).unwrap(), 2);
+
+    assert_eq!(stream1.read(&mut buf).unwrap(), 2);
+    assert_would_block(stream1.peek(&mut buf));
+
+    drop(stream2);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
+    );
+    assert_eq!(stream1.peek(&mut buf).unwrap(), 0);
+}

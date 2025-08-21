@@ -134,6 +134,7 @@ impl From<Interest> for Readiness {
     }
 }
 
+#[track_caller]
 pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<ExpectEvent>) {
     // In a lot of calls we expect more then one event, but it could be that
     // poll returns the first event only in a single call. To be a bit more
@@ -164,6 +165,7 @@ pub fn expect_events(poll: &mut Poll, events: &mut Events, mut expected: Vec<Exp
     );
 }
 
+#[track_caller]
 pub fn expect_no_events(poll: &mut Poll, events: &mut Events) {
     poll.poll(events, Some(Duration::from_millis(50)))
         .expect("unable to poll");
