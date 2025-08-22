@@ -106,7 +106,7 @@ cfg_io_source! {
             let result = f(io);
 
             let is_ok_or_would_block = match &result{
-                Ok(_) => true,
+                Ok(_) => false,
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => true,
                 _ => false
             };

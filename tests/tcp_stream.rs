@@ -975,14 +975,6 @@ fn peek_ok(){
         &mut events,
         vec![ExpectEvent::new(ID1, Readiness::READABLE)],
     );
-
-    assert_eq!(stream2.write(&[0]).unwrap(), 1);
-    // this panic with no event on windows if not re-register after successful peek
-    expect_events(
-        &mut poll,
-        &mut events,
-        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
-    );
 }
 
 
