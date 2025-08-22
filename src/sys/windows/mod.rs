@@ -98,6 +98,7 @@ cfg_io_source! {
             result
         }
 
+        #[allow(unused)]
         pub fn do_io_and_reregister<T, F, R>(&self, f: F, io: &T) -> io::Result<R>
         where
             F: FnOnce(&T) -> io::Result<R>,
@@ -105,7 +106,7 @@ cfg_io_source! {
             let result = f(io);
 
             let is_ok_or_would_block = match &result{
-                Ok(_) => true,
+                Ok(_) => false,
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => true,
                 _ => false
             };

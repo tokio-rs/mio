@@ -69,6 +69,7 @@ impl<T> IoSource<T> {
         self.state.do_io(f, &self.inner)
     }
 
+    #[allow(unused)]
     #[cfg(all(windows, feature="net", feature="os-poll"))]
     pub fn do_io_and_reregister<F, R>(&self, f: F) -> io::Result<R>
     where
