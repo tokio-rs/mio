@@ -98,30 +98,6 @@ cfg_io_source! {
             result
         }
 
-        #[allow(unused)]
-        pub fn do_io_and_reregister<T, F, R>(&self, f: F, io: &T) -> io::Result<R>
-        where
-            F: FnOnce(&T) -> io::Result<R>,
-        {
-            let result = f(io);
-
-            let is_ok_or_would_block = match &result{
-                Ok(_) => false,
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => true,
-                _ => false
-            };
-
-            if is_ok_or_would_block{
-                self.inner.as_ref().map_or(Ok(()), |state| {
-                    state
-                        .selector
-                        .reregister(state.sock_state.clone(), state.token, state.interests)
-                })?;
-            }
-
-            result
-        }
-
         pub fn register(
             &mut self,
             registry: &Registry,
