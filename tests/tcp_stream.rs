@@ -878,7 +878,7 @@ fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
 }
 
 #[test]
-fn peek_ok(){
+fn peek_ok() {
     let mut buf = [0; 2];
     let (mut poll, mut events) = init_with_poll();
 
@@ -890,7 +890,7 @@ fn peek_ok(){
 
     stream1.set_nonblocking(true).unwrap();
     let mut stream1 = TcpStream::from_std(stream1);
-    
+
     poll.registry()
         .register(&mut stream1, ID1, Interest::READABLE)
         .unwrap();
@@ -908,10 +908,9 @@ fn peek_ok(){
     );
 }
 
-
 #[test]
-fn peek_would_block(){
-    let mut buf = [0; 2];
+fn peek_would_block() {
+    let mut buf = [0; 1];
     let (mut poll, mut events) = init_with_poll();
 
     let listener = net::TcpListener::bind(any_local_address()).unwrap();
@@ -922,7 +921,7 @@ fn peek_would_block(){
 
     stream1.set_nonblocking(true).unwrap();
     let mut stream1 = TcpStream::from_std(stream1);
-    
+
     poll.registry()
         .register(&mut stream1, ID1, Interest::READABLE)
         .unwrap();
@@ -935,10 +934,10 @@ fn peek_would_block(){
         &mut events,
         vec![ExpectEvent::new(ID1, Readiness::READABLE)],
     );
-    
+
     assert_eq!(stream1.read(&mut buf).unwrap(), 1);
     assert_would_block(stream1.peek(&mut buf));
-    
+
     assert_eq!(stream2.write(&[0, 1, 2, 3]).unwrap(), 4);
 
     // this panic with no event on windows if not re-register after would block peek
