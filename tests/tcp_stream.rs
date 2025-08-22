@@ -898,7 +898,15 @@ fn peek_ok() {
     expect_no_events(&mut poll, &mut events);
 
     assert_eq!(stream2.write(&[0]).unwrap(), 1);
-    assert_eq!(stream1.peek(&mut buf).unwrap(), 1);
+    // peek multiple times until we get a byte
+    loop{
+        let res = stream1.peek(&mut buf);
+        match res{
+            Ok(1) => break,
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock =>{continue}
+            _ => panic!("Unexpected error: {:?}", res),
+        }
+    }
     // a successful peek shouldn't remove readable interest
     // so we should still get a readable event
     expect_events(
