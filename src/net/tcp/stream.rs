@@ -215,7 +215,6 @@ impl TcpStream {
         #[cfg(all(windows, feature = "net", feature = "os-poll"))]
         {
             self.inner.do_io(|inner| inner.peek(buf))
-            // self.inner.peek(buf)
         }
         #[cfg(not(all(windows, feature = "net", feature = "os-poll")))]
         {
