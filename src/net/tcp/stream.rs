@@ -214,8 +214,8 @@ impl TcpStream {
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         #[cfg(all(windows, feature = "net", feature = "os-poll"))]
         {
-            // self.inner.do_io_and_reregister(|inner| inner.peek(buf))
-            self.inner.peek(buf)
+            self.inner.do_io_and_reregister(|inner| inner.peek(buf))
+            // self.inner.peek(buf)
         }
         #[cfg(not(all(windows, feature = "net", feature = "os-poll")))]
         {

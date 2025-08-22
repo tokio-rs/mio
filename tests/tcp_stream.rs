@@ -975,8 +975,9 @@ fn peek_ok(){
         &mut events,
         vec![ExpectEvent::new(ID1, Readiness::READABLE)],
     );
-    
+
     assert_eq!(stream2.write(&[0]).unwrap(), 1);
+    // this panic with no event on windows if not re-register after successful peek
     expect_events(
         &mut poll,
         &mut events,
@@ -1006,7 +1007,6 @@ fn peek_would_block(){
     expect_no_events(&mut poll, &mut events);
 
     assert_eq!(stream2.write(&[0]).unwrap(), 1);
-    // a would block peek also should not remove readable interest
     expect_events(
         &mut poll,
         &mut events,
@@ -1017,7 +1017,9 @@ fn peek_would_block(){
     assert_would_block(stream1.peek(&mut buf));
     
     assert_eq!(stream2.write(&[0, 1, 2, 3]).unwrap(), 4);
-    // a would block peek also should not remove readable interest
+
+    // this panic with no event on windows if not re-register after would block peek
+    // I don't know why it need to re-register for that to work
     expect_events(
         &mut poll,
         &mut events,
