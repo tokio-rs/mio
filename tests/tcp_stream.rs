@@ -916,6 +916,7 @@ fn peek_ok() {
     );
 }
 
+#[cfg(not(mio_unsupported_force_poll_poll))]
 #[test]
 fn peek_would_block() {
     let mut buf = [0; 1];
