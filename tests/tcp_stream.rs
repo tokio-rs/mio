@@ -899,11 +899,11 @@ fn peek_ok() {
 
     assert_eq!(stream2.write(&[0]).unwrap(), 1);
     // peek multiple times until we get a byte
-    loop{
+    loop {
         let res = stream1.peek(&mut buf);
-        match res{
+        match res {
             Ok(1) => break,
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock =>{continue}
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => continue,
             _ => panic!("Unexpected error: {:?}", res),
         }
     }
