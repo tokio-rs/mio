@@ -17,7 +17,7 @@ pub(crate) fn connect(_: &net::TcpStream, _: SocketAddr) -> io::Result<()> {
 }
 
 #[cfg(not(target_os = "wasi"))]
-pub(crate) fn listen(_: &net::TcpListener, _: u32) -> io::Result<()> {
+pub(crate) fn listen(_: &net::TcpListener, _: i32) -> io::Result<()> {
     os_required!();
 }
 
