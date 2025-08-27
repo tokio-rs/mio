@@ -161,7 +161,7 @@ impl Read for UnixStream {
     }
 }
 
-impl<'a> Read for &'a UnixStream {
+impl Read for &'_ UnixStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.do_io(|mut inner| inner.read(buf))
     }
@@ -185,7 +185,7 @@ impl Write for UnixStream {
     }
 }
 
-impl<'a> Write for &'a UnixStream {
+impl Write for &'_ UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.do_io(|mut inner| inner.write(buf))
     }
