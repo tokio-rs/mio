@@ -13,11 +13,11 @@ use std::{fmt, io};
 
 use crate::io_source::IoSource;
 use crate::net::TcpStream;
-use crate::sys::get_listen_backlog_size;
 #[cfg(any(unix, target_os = "hermit"))]
 use crate::sys::tcp::set_reuseaddr;
 #[cfg(not(target_os = "wasi"))]
 use crate::sys::tcp::{bind, listen, new_for_addr};
+use crate::sys::LISTEN_BACKLOG_SIZE;
 use crate::{event, sys, Interest, Registry, Token};
 
 /// A structure representing a socket server
@@ -79,7 +79,7 @@ impl TcpListener {
         set_reuseaddr(&listener.inner, true)?;
 
         bind(&listener.inner, addr)?;
-        listen(&listener.inner, get_listen_backlog_size())?;
+        listen(&listener.inner, LISTEN_BACKLOG_SIZE)?;
         Ok(listener)
     }
 

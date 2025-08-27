@@ -98,42 +98,40 @@ cfg_not_os_poll! {
 /// - Default values vary depending on the OS and its version. Common defaults
 ///   include: -1, 128, 1024, and 4096.
 ///
+// Here is the original code from the standard library
+// https://github.com/rust-lang/rust/blob/4f808ba6bf9f1c8dde30d009e73386d984491587/library/std/src/os/unix/net/listener.rs#L72
+//
 #[allow(dead_code)]
-pub(crate) const fn get_listen_backlog_size() -> i32 {
-    // Here is the original code from the standard library
-    // https://github.com/rust-lang/rust/blob/4f808ba6bf9f1c8dde30d009e73386d984491587/library/std/src/os/unix/net/listener.rs#L72
-    #[cfg(any(
-        target_os = "windows",
-        target_os = "redox",
-        target_os = "espidf",
-        target_os = "horizon"
-    ))]
-    const BACKLOG_SIZE: i32 = 128;
+#[cfg(any(
+    target_os = "windows",
+    target_os = "redox",
+    target_os = "espidf",
+    target_os = "horizon"
+))]
+pub(crate) const LISTEN_BACKLOG_SIZE: i32 = 128;
 
-    #[allow(dead_code)]
-    #[cfg(any(
-                // Silently capped to `/proc/sys/net/core/somaxconn`.
-                target_os = "linux",
-                // Silently capped to `kern.ipc.soacceptqueue`.
-                target_os = "freebsd",
-                // Silently capped to `kern.somaxconn sysctl`.
-                target_os = "openbsd",
-                // Silently capped to the default 128.
-                target_vendor = "apple",
-            ))]
-    const BACKLOG_SIZE: i32 = -1;
+#[allow(dead_code)]
+#[cfg(any(
+    // Silently capped to `/proc/sys/net/core/somaxconn`.
+    target_os = "linux",
+    // Silently capped to `kern.ipc.soacceptqueue`.
+    target_os = "freebsd",
+    // Silently capped to `kern.somaxconn sysctl`.
+    target_os = "openbsd",
+    // Silently capped to the default 128.
+    target_vendor = "apple",
+))]
+pub(crate) const LISTEN_BACKLOG_SIZE: i32 = -1;
 
-    #[allow(dead_code)]
-    #[cfg(not(any(
-        target_os = "windows",
-        target_os = "redox",
-        target_os = "espidf",
-        target_os = "horizon",
-        target_os = "linux",
-        target_os = "freebsd",
-        target_os = "openbsd",
-        target_vendor = "apple",
-    )))]
-    const BACKLOG_SIZE: i32 = libc::SOMAXCONN;
-    BACKLOG_SIZE
-}
+#[allow(dead_code)]
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "redox",
+    target_os = "espidf",
+    target_os = "horizon",
+    target_os = "linux",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_vendor = "apple",
+)))]
+pub(crate) const LISTEN_BACKLOG_SIZE: i32 = libc::SOMAXCONN;

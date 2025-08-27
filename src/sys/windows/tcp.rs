@@ -47,7 +47,6 @@ pub(crate) fn connect(socket: &net::TcpStream, addr: SocketAddr) -> io::Result<(
 }
 
 pub(crate) fn listen(socket: &net::TcpListener, backlog: i32) -> io::Result<()> {
-    use std::convert::TryInto;
     use WinSock::listen;
 
     syscall!(
