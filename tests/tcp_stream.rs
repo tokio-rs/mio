@@ -955,8 +955,6 @@ fn peek_would_block() {
 
     assert_eq!(stream2.write(&[0, 1, 2, 3]).unwrap(), 4);
 
-    // this panic with no event on windows if not re-register after would block peek
-    // becuase mio simulate edge-triggered behavior in `SockState::feed_event` and need reregister
     expect_events(
         &mut poll,
         &mut events,
