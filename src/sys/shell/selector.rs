@@ -40,7 +40,7 @@ cfg_os_ext! {
 }
 
 #[cfg(target_os = "wasi")]
-cfg_os_ext! {
+cfg_any_os_ext! {
     use crate::{Interest, Token};
 
     impl Selector {
