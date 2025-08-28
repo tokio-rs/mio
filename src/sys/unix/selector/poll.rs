@@ -61,7 +61,7 @@ impl Selector {
         self.state.register_internal(fd, token, interests)
     }
 
-    cfg_io_source! {
+    cfg_any_os_ext! {
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         self.state.reregister(fd, token, interests)
     }
@@ -356,7 +356,7 @@ impl SelectorState {
         })
     }
 
-    cfg_io_source! {
+    cfg_any_os_ext! {
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         self.modify_fds(|fds| {
             let data = fds.fd_data.get_mut(&fd).ok_or(io::ErrorKind::NotFound)?;
