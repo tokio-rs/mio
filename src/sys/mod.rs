@@ -110,6 +110,14 @@ cfg_not_os_poll! {
 ))]
 pub(crate) const LISTEN_BACKLOG_SIZE: i32 = 128;
 
+/// This is a special case for some target(s) supported by `mio`.  This value
+/// is needed because `libc::SOMAXCON` (used as a fallback for unknown targets)
+/// is not implemented for them. Feel free to update this if the `libc` crate
+/// changes.
+#[allow(dead_code)]
+#[cfg(target_os = "hermit")]
+pub(crate) const LISTEN_BACKLOG_SIZE: i32 = 1024;
+
 #[allow(dead_code)]
 #[cfg(any(
     // Silently capped to `/proc/sys/net/core/somaxconn`.
@@ -132,6 +140,8 @@ pub(crate) const LISTEN_BACKLOG_SIZE: i32 = -1;
     target_os = "linux",
     target_os = "freebsd",
     target_os = "openbsd",
+    target_os = "wasi",
+    target_os = "hermit",
     target_vendor = "apple",
 )))]
 pub(crate) const LISTEN_BACKLOG_SIZE: i32 = libc::SOMAXCONN;
