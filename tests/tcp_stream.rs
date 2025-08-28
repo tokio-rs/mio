@@ -876,3 +876,129 @@ fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
         }
     }
 }
+
+#[test]
+fn peek_ok() {
+    let mut buf = [0; 2];
+    let (mut poll, mut events) = init_with_poll();
+
+    let listener = net::TcpListener::bind(any_local_address()).unwrap();
+    let sockaddr = listener.local_addr().unwrap();
+    let thread_handle = thread::spawn(move || listener.accept().unwrap());
+    let stream1 = net::TcpStream::connect(sockaddr).unwrap();
+    let (mut stream2, _) = thread_handle.join().unwrap();
+
+    stream1.set_nonblocking(true).unwrap();
+    let mut stream1 = TcpStream::from_std(stream1);
+
+    poll.registry()
+        .register(&mut stream1, ID1, Interest::READABLE)
+        .unwrap();
+
+    expect_no_events(&mut poll, &mut events);
+
+    assert_eq!(stream2.write(&[0]).unwrap(), 1);
+    // peek multiple times until we get a byte
+    peek_until_ok(&mut buf, &mut stream1, 1);
+    // a successful peek shouldn't remove readable interest
+    // so we should still get a readable event
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
+    );
+}
+
+fn peek_until_ok<const N: usize>(buf: &mut [u8; N], stream1: &mut TcpStream, expected: usize) {
+    loop {
+        let res = stream1.peek(buf);
+        match res {
+            Ok(x) => {
+                assert_eq!(x, expected);
+                break;
+            }
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => continue,
+            _ => panic!("Unexpected error: {:?}", res),
+        }
+    }
+}
+
+#[test]
+fn peek_would_block() {
+    let mut buf = [0; 1];
+    let (mut poll, mut events) = init_with_poll();
+
+    let listener = net::TcpListener::bind(any_local_address()).unwrap();
+    let sockaddr = listener.local_addr().unwrap();
+    let thread_handle = thread::spawn(move || listener.accept().unwrap());
+    let stream1 = net::TcpStream::connect(sockaddr).unwrap();
+    let (mut stream2, _) = thread_handle.join().unwrap();
+
+    stream1.set_nonblocking(true).unwrap();
+    let mut stream1 = TcpStream::from_std(stream1);
+
+    poll.registry()
+        .register(&mut stream1, ID1, Interest::READABLE)
+        .unwrap();
+
+    expect_no_events(&mut poll, &mut events);
+
+    assert_eq!(stream2.write(&[0]).unwrap(), 1);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
+    );
+
+    assert_eq!(stream1.read(&mut buf).unwrap(), 1);
+    assert_would_block(stream1.peek(&mut buf));
+
+    assert_eq!(stream2.write(&[0, 1, 2, 3]).unwrap(), 4);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
+    );
+}
+
+#[test]
+fn read_peek_would_block() {
+    let mut buf = [0; 1];
+    let (mut poll, mut events) = init_with_poll();
+
+    let listener = net::TcpListener::bind(any_local_address()).unwrap();
+    let sockaddr = listener.local_addr().unwrap();
+    let thread_handle = thread::spawn(move || listener.accept().unwrap());
+    let stream1 = net::TcpStream::connect(sockaddr).unwrap();
+    let (mut stream2, _) = thread_handle.join().unwrap();
+
+    stream1.set_nonblocking(true).unwrap();
+    let mut stream1 = TcpStream::from_std(stream1);
+
+    poll.registry()
+        .register(&mut stream1, ID1, Interest::READABLE)
+        .unwrap();
+
+    assert_would_block(stream1.read(&mut buf));
+
+    assert_eq!(stream2.write(&[0]).unwrap(), 1);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
+    );
+
+    assert_eq!(stream1.read(&mut buf).unwrap(), 1);
+
+    assert_would_block(stream1.peek(&mut buf));
+
+    assert_eq!(stream2.write(&[1]).unwrap(), 1);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Readiness::READABLE)],
+    );
+}
