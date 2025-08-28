@@ -165,7 +165,7 @@ impl Selector {
         kevent_register(self.kq.as_raw_fd(), changes, &[libc::EPIPE as i64])
     }
 
-    cfg_io_source! {
+    cfg_any_os_ext! {
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let flags = libc::EV_CLEAR | libc::EV_RECEIPT;
         let write_flags = if interests.is_writable() {

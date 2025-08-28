@@ -82,7 +82,7 @@ impl Selector {
         syscall!(epoll_ctl(ep, libc::EPOLL_CTL_ADD, fd, &mut event)).map(|_| ())
     }
 
-    cfg_io_source! {
+    cfg_any_os_ext! {
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let mut event = libc::epoll_event {
             events: interests_to_epoll(interests),
