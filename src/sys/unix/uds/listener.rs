@@ -8,6 +8,7 @@ use std::{io, mem};
 use crate::net::UnixStream;
 use crate::sys::unix::net::new_socket;
 use crate::sys::unix::uds::{path_offset, unix_addr};
+use crate::sys::LISTEN_BACKLOG_SIZE;
 
 pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
     let fd = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
@@ -16,7 +17,7 @@ pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
     let (unix_address, addrlen) = unix_addr(address);
     let sockaddr = &unix_address as *const libc::sockaddr_un as *const libc::sockaddr;
     syscall!(bind(fd, sockaddr, addrlen))?;
-    syscall!(listen(fd, 1024))?;
+    syscall!(listen(fd, LISTEN_BACKLOG_SIZE))?;
 
     Ok(socket)
 }
