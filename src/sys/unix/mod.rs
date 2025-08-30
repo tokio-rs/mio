@@ -78,7 +78,7 @@ cfg_os_poll! {
         )
     ), path = "waker/kqueue.rs")]
     #[cfg_attr(any(
-        // NOTE: also add to the list list for the `pipe` module below.
+        // NOTE: also add to the list for the `pipe` module below.
         mio_unsupported_force_waker_pipe,
         all(
             // `kqueue(2)` based waker doesn't work with `poll(2)`.
@@ -140,7 +140,7 @@ cfg_os_poll! {
                     target_os = "watchos",
                 ),
             ),
-            // NOTE: also add to the list list for the `pipe` module below.
+            // NOTE: also add to the list for the `pipe` module below.
             target_os = "aix",
             target_os = "dragonfly",
             target_os = "haiku",
