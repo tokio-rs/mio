@@ -144,14 +144,13 @@ fn unix_listener_deregister() {
 #[test]
 #[cfg(any(target_os = "android", target_os = "linux"))]
 fn unix_listener_abstract_namespace() {
-    use rand::Rng;
     use std::os::linux::net::SocketAddrExt;
     use std::os::unix::net::SocketAddr;
 
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
 
-    let num: u64 = rand::thread_rng().gen();
+    let num: u64 = rand::random();
     let name = format!("mio-abstract-uds-{num}");
     let address = SocketAddr::from_abstract_name(name.as_bytes()).unwrap();
     let mut listener = UnixListener::bind_addr(&address).unwrap();

@@ -82,7 +82,7 @@ jobs:
       with:
         # NOTE: full version (including .0) to work around
         # <https://github.com/dtolnay/rust-toolchain/issues/112>.
-        toolchain: 1.70.0
+        toolchain: 1.71.0
     - name: Check
       # We only run check allowing us to use newer features in tests.
       run: cargo check --all-features
