@@ -83,6 +83,9 @@ jobs:
         # NOTE: full version (including .0) to work around
         # <https://github.com/dtolnay/rust-toolchain/issues/112>.
         toolchain: 1.70.0
+    - name: Pin windows-sys version
+      if: ${{ matrix.os == 'windows-latest' }}
+      run: cargo update -p windows-sys --precise 0.60.0
     - name: Check
       # We only run check allowing us to use newer features in tests.
       run: cargo check --all-features

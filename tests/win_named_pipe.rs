@@ -8,7 +8,6 @@ use std::time::Duration;
 
 use mio::windows::NamedPipe;
 use mio::{Events, Interest, Poll, Token};
-use rand::Rng;
 use windows_sys::Win32::{Foundation::ERROR_NO_DATA, Storage::FileSystem::FILE_FLAG_OVERLAPPED};
 
 fn _assert_kinds() {
@@ -28,7 +27,7 @@ macro_rules! t {
 }
 
 fn server() -> (NamedPipe, String) {
-    let num: u64 = rand::thread_rng().gen();
+    let num: u64 = rand::random();
     let name = format!(r"\\.\pipe\my-pipe-{}", num);
     let pipe = t!(NamedPipe::new(&name));
     (pipe, name)
