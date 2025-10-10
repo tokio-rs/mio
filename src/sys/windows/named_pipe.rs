@@ -875,6 +875,13 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     // Move from the `Pending` to `Ok` state.
     let mut io = me.io.lock().unwrap();
     let mut buf = match mem::replace(&mut io.read, State::None) {
+        State::Ok(buf, pos) => {
+            io.read = State::Ok(buf, pos);
+
+            // Flag readiness that we have undelivered data to be read.
+            io.notify_readable(&me, events);
+            return;
+        }
         State::Pending(buf, _) => buf,
         State::Err(e) => {
             io.read = State::Err(e);
