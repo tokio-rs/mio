@@ -929,7 +929,7 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             io.notify_writable(&me, events);
             return;
         }
-        _ => unreachable!(),
+        State::None => unreachable!(),
     };
 
     unsafe {
