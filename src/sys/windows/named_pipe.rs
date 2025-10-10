@@ -876,6 +876,13 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let mut io = me.io.lock().unwrap();
     let mut buf = match mem::replace(&mut io.read, State::None) {
         State::Pending(buf, _) => buf,
+        State::Err(e) => {
+            io.read = State::Err(e);
+
+            // Flag readiness that the error needs to be delivered.
+            io.notify_readable(&me, events);
+            return;
+        }
         _ => unreachable!(),
     };
     unsafe {
