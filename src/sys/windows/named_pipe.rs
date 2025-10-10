@@ -872,7 +872,6 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     // `schedule_read` above.
     let me = unsafe { Arc::from_raw(Inner::ptr_from_read_overlapped(status.overlapped())) };
 
-    // Move from the `Pending` to `Ok` state.
     let mut io = me.io.lock().unwrap();
     let mut buf = match mem::replace(&mut io.read, State::None) {
         State::Ok(buf, pos) => {
