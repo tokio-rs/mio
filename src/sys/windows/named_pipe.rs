@@ -922,6 +922,13 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             return;
         }
         State::Pending(buf, pos) => (buf, pos),
+        State::Err(e) => {
+            io.write = State::Err(e);
+
+            // Flag readiness that the error needs to be delivered.
+            io.notify_writable(&me, events);
+            return;
+        }
         _ => unreachable!(),
     };
 
