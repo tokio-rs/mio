@@ -916,7 +916,8 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let mut io = me.io.lock().unwrap();
     let (buf, pos) = match mem::replace(&mut io.write, State::None) {
         // `Ok` here means, that the operation was completed immediately
-        // `bytes_transferred` is already reported to a client
+        // `bytes_transferred` is already reported to a client.
+        // Hence, we don't reset the state to `Ok` but leave it in `None`.
         State::Ok(..) => {
             io.notify_writable(&me, events);
             return;
