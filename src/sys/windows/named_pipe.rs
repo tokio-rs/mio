@@ -890,7 +890,7 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             io.notify_readable(&me, events);
             return;
         }
-        _ => unreachable!(),
+        State::None => unreachable!(),
     };
     unsafe {
         match me.result(status.overlapped()) {
