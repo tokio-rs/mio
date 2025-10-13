@@ -323,26 +323,77 @@ impl AsRawFd for Selector {
     }
 }
 
-pub type Event = libc::kevent;
-pub struct Events(Vec<libc::kevent>);
+#[repr(transparent)]
+pub struct Event(libc::kevent);
 
-impl Events {
-    pub fn with_capacity(capacity: usize) -> Events {
-        Events(Vec::with_capacity(capacity))
+impl Event {
+    pub fn new(kevent: libc::kevent) -> Self {
+        Self(kevent)
+    }
+    
+    pub fn as_raw(&self) -> &libc::kevent {
+        &self.0
+    }
+    
+    pub fn token(&self) -> Token {
+        Token(self.0.udata as usize)
     }
 }
 
-impl Deref for Events {
-    type Target = Vec<libc::kevent>;
+unsafe impl Send for Event {}
+unsafe impl Sync for Event {}
 
+impl std::ops::Deref for Event {
+    type Target = libc::kevent;
+    
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for Events {
+impl std::ops::DerefMut for Event {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+pub struct Events(Vec<Event>);
+
+impl Events {
+    pub fn with_capacity(capacity: usize) -> Events {
+        Events(Vec::with_capacity(capacity))
+    }
+    
+    pub fn as_mut_ptr(&mut self) -> *mut libc::kevent {
+        self.0.as_mut_ptr().cast()
+    }
+    
+    pub fn capacity(&self) -> usize {
+        self.0.capacity()
+    }
+    
+    pub fn clear(&mut self) {
+        self.0.clear()
+    }
+    
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+    
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    
+    pub fn get(&self, index: usize) -> Option<&Event> {
+        self.0.get(index)
+    }
+    
+    pub unsafe fn set_len(&mut self, new_len: usize) {
+        self.0.set_len(new_len);
+    }
+    
+    pub fn iter(&self) -> std::slice::Iter<Event> {
+        self.0.iter()
     }
 }
 
