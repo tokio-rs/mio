@@ -324,6 +324,7 @@ impl AsRawFd for Selector {
 }
 
 #[repr(transparent)]
+#[derive(Clone)]
 pub struct Event(libc::kevent);
 
 impl Event {
@@ -343,7 +344,7 @@ impl Event {
 unsafe impl Send for Event {}
 unsafe impl Sync for Event {}
 
-impl std::ops::Deref for Event {
+impl Deref for Event {
     type Target = libc::kevent;
 
     fn deref(&self) -> &Self::Target {
@@ -351,7 +352,7 @@ impl std::ops::Deref for Event {
     }
 }
 
-impl std::ops::DerefMut for Event {
+impl DerefMut for Event {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
