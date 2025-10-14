@@ -328,10 +328,6 @@ impl AsRawFd for Selector {
 pub struct Event(libc::kevent);
 
 impl Event {
-    pub fn new(kevent: libc::kevent) -> Self {
-        Self(kevent)
-    }
-
     pub fn as_raw(&self) -> &libc::kevent {
         &self.0
     }
@@ -940,34 +936,4 @@ fn does_not_register_rw() {
     poll.registry()
         .register(&mut kqf, Token(1234), Interest::READABLE)
         .unwrap();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn event_new() {
-        let token_value = 0x1234usize;
-        let kevent = libc::kevent {
-            ident: 42,
-            filter: libc::EVFILT_READ,
-            flags: libc::EV_ADD,
-            fflags: 0,
-            data: 0,
-            udata: token_value as UData,
-        };
-
-        let event = Event::new(kevent);
-        assert_eq!(event.token(), Token(token_value));
-    }
-
-    #[test]
-    fn event_send_sync() {
-        fn assert_send<T: Send>() {}
-        fn assert_sync<T: Sync>() {}
-        
-        assert_send::<Event>();
-        assert_sync::<Event>();
-    }
 }
