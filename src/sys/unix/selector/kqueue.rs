@@ -392,10 +392,6 @@ impl Events {
     pub unsafe fn set_len(&mut self, new_len: usize) {
         self.0.set_len(new_len);
     }
-
-    pub fn iter(&self) -> std::slice::Iter<Event> {
-        self.0.iter()
-    }
 }
 
 // `Events` cannot derive `Send` or `Sync` because of the
@@ -415,11 +411,11 @@ pub mod event {
     use super::{Filter, Flags};
 
     pub fn token(event: &Event) -> Token {
-        Token(event.udata as usize)
+        event.token()
     }
 
     pub fn is_readable(event: &Event) -> bool {
-        event.filter == libc::EVFILT_READ || {
+        event.as_raw().filter == libc::EVFILT_READ || {
             #[cfg(any(
                 target_os = "freebsd",
                 target_os = "ios",
@@ -449,22 +445,22 @@ pub mod event {
     }
 
     pub fn is_writable(event: &Event) -> bool {
-        event.filter == libc::EVFILT_WRITE
+        event.as_raw().filter == libc::EVFILT_WRITE
     }
 
     pub fn is_error(event: &Event) -> bool {
-        (event.flags & libc::EV_ERROR) != 0 ||
+        (event.as_raw().flags & libc::EV_ERROR) != 0 ||
             // When the read end of the socket is closed, EV_EOF is set on
             // flags, and fflags contains the error if there is one.
-            (event.flags & libc::EV_EOF) != 0 && event.fflags != 0
+            (event.as_raw().flags & libc::EV_EOF) != 0 && event.as_raw().fflags != 0
     }
 
     pub fn is_read_closed(event: &Event) -> bool {
-        event.filter == libc::EVFILT_READ && event.flags & libc::EV_EOF != 0
+        event.as_raw().filter == libc::EVFILT_READ && event.as_raw().flags & libc::EV_EOF != 0
     }
 
     pub fn is_write_closed(event: &Event) -> bool {
-        event.filter == libc::EVFILT_WRITE && event.flags & libc::EV_EOF != 0
+        event.as_raw().filter == libc::EVFILT_WRITE && event.as_raw().flags & libc::EV_EOF != 0
     }
 
     pub fn is_priority(_: &Event) -> bool {
@@ -484,7 +480,7 @@ pub mod event {
             target_os = "watchos",
         ))]
         {
-            event.filter == libc::EVFILT_AIO
+            event.as_raw().filter == libc::EVFILT_AIO
         }
         #[cfg(not(any(
             target_os = "dragonfly",
@@ -504,7 +500,7 @@ pub mod event {
     pub fn is_lio(event: &Event) -> bool {
         #[cfg(target_os = "freebsd")]
         {
-            event.filter == libc::EVFILT_LIO
+            event.as_raw().filter == libc::EVFILT_LIO
         }
         #[cfg(not(target_os = "freebsd"))]
         {
@@ -513,6 +509,7 @@ pub mod event {
     }
 
     pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
+        let event = event.as_raw();
         debug_detail!(
             FilterDetails(Filter),
             PartialEq::eq,
