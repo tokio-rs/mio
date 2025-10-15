@@ -166,6 +166,7 @@ and their MSRV:
 
  * v0.8: Rust 1.46.
  * v1.0: Rust 1.70.
+ * v1.1: Rust 1.71.
 
 Note however that Mio also has dependencies, which might have different MSRV
 policies. We try to stick to the above policy when updating dependencies, but
