@@ -872,11 +872,24 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     // `schedule_read` above.
     let me = unsafe { Arc::from_raw(Inner::ptr_from_read_overlapped(status.overlapped())) };
 
-    // Move from the `Pending` to `Ok` state.
     let mut io = me.io.lock().unwrap();
     let mut buf = match mem::replace(&mut io.read, State::None) {
+        State::Ok(buf, pos) => {
+            io.read = State::Ok(buf, pos);
+
+            // Flag readiness that we have undelivered data to be read.
+            io.notify_readable(&me, events);
+            return;
+        }
         State::Pending(buf, _) => buf,
-        _ => unreachable!(),
+        State::Err(e) => {
+            io.read = State::Err(e);
+
+            // Flag readiness that the error needs to be delivered.
+            io.notify_readable(&me, events);
+            return;
+        }
+        State::None => unreachable!(),
     };
     unsafe {
         match me.result(status.overlapped()) {
@@ -909,13 +922,21 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let mut io = me.io.lock().unwrap();
     let (buf, pos) = match mem::replace(&mut io.write, State::None) {
         // `Ok` here means, that the operation was completed immediately
-        // `bytes_transferred` is already reported to a client
+        // `bytes_transferred` is already reported to a client.
+        // Hence, we don't reset the state to `Ok` but leave it in `None`.
         State::Ok(..) => {
             io.notify_writable(&me, events);
             return;
         }
         State::Pending(buf, pos) => (buf, pos),
-        _ => unreachable!(),
+        State::Err(e) => {
+            io.write = State::Err(e);
+
+            // Flag readiness that the error needs to be delivered.
+            io.notify_writable(&me, events);
+            return;
+        }
+        State::None => unreachable!(),
     };
 
     unsafe {
