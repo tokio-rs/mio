@@ -3,11 +3,12 @@
 
 use std::time::Duration;
 
+use mio::event::{self, Event, Events};
 use mio::net::TcpStream;
-use mio::{event, Token, Waker};
+use mio::{Token, Waker};
 
 mod util;
-use util::init_with_poll;
+use util::{assert_send, assert_sync, init_with_poll};
 
 const WAKE_TOKEN: Token = Token(10);
 
@@ -40,4 +41,13 @@ fn events_all() {
 
     events.clear();
     assert!(events.is_empty());
+}
+
+#[test]
+fn is_event_send_sync() {
+    assert_send::<Event>();
+    assert_sync::<Event>();
+
+    assert_send::<Events>();
+    assert_sync::<Events>();
 }
