@@ -110,7 +110,7 @@ impl Selector {
             self.kq.as_raw_fd(),
             ptr::null(),
             0,
-            events.as_mut_ptr(),
+            events.as_mut_ptr().cast(),
             events.capacity() as Count,
             timeout,
         ))
