@@ -147,7 +147,9 @@ jobs:
           - aarch64-unknown-openbsd
           - aarch64-unknown-redox
           - arm-linux-androideabi
-          - arm64_32-apple-watchos
+          # Can't build standard library.
+          # See https://github.com/rust-lang/rust/issues/147776
+          #- arm64_32-apple-watchos
           # Standard library doesn't build anymore:
           # <https://github.com/rust-lang/rust/issues/147437>
           #- armv7-sony-vita-newlibeabihf
