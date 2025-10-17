@@ -1,3 +1,23 @@
+# 1.1.0
+
+MSRV was increased to 1.71 to support windows-sys v0.61.
+
+* Changed the backlog passed to listen to match the standard library, this
+  should effect most users but see the pr for details
+  (https://github.com/tokio-rs/mio/pull/1896).
+* Fixed an issue where `TcpStream::peek` returned `WouldBlock` the events would
+  stop working correctly
+  (https://github.com/tokio-rs/mio/pull/1895).
+* Added support for cygwin
+  (https://github.com/tokio-rs/mio/pull/1871).
+* Make `Event` `Send` and `Sync` on platforms using kqueue
+  (https://github.com/tokio-rs/mio/pull/1906).
+* Fixed an issue where it would reach `unreachable!` code in `NamedPipe`
+  (https://github.com/tokio-rs/mio/pull/1903).
+* Updated windows-sys to 0.60 and 0.61
+  (https://github.com/tokio-rs/mio/pull/1891
+  and https://github.com/tokio-rs/mio/pull/1901).
+
 # 1.0.4
 
 * Update windows-sys to 0.59
