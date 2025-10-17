@@ -34,7 +34,7 @@ fn main() -> io::Result<()> {
     println!("Anything you type will be echoed back to you.");
 
     // Initialize a buffer for the UDP packet. We use the maximum size of a UDP
-    // packet, which is the maximum value of 16 a bit integer.
+    // packet, which is the maximum value of a 16-bit integer (65536).
     let mut buf = [0; 1 << 16];
 
     // Our event loop.
