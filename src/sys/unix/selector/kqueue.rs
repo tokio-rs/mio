@@ -327,16 +327,6 @@ impl AsRawFd for Selector {
 #[derive(Clone)]
 pub struct Event(libc::kevent);
 
-impl Event {
-    pub fn as_raw(&self) -> &libc::kevent {
-        &self.0
-    }
-
-    pub fn token(&self) -> Token {
-        Token(self.0.udata as usize)
-    }
-}
-
 unsafe impl Send for Event {}
 unsafe impl Sync for Event {}
 
@@ -393,11 +383,11 @@ pub mod event {
     use super::{Filter, Flags};
 
     pub fn token(event: &Event) -> Token {
-        event.token()
+        Token(event.0.udata as usize)
     }
 
     pub fn is_readable(event: &Event) -> bool {
-        event.as_raw().filter == libc::EVFILT_READ || {
+        event.0.filter == libc::EVFILT_READ || {
             #[cfg(any(
                 target_os = "freebsd",
                 target_os = "ios",
@@ -427,22 +417,22 @@ pub mod event {
     }
 
     pub fn is_writable(event: &Event) -> bool {
-        event.as_raw().filter == libc::EVFILT_WRITE
+        event.0.filter == libc::EVFILT_WRITE
     }
 
     pub fn is_error(event: &Event) -> bool {
-        (event.as_raw().flags & libc::EV_ERROR) != 0 ||
+        (event.0.flags & libc::EV_ERROR) != 0 ||
             // When the read end of the socket is closed, EV_EOF is set on
             // flags, and fflags contains the error if there is one.
-            (event.as_raw().flags & libc::EV_EOF) != 0 && event.as_raw().fflags != 0
+            (event.0.flags & libc::EV_EOF) != 0 && event.0.fflags != 0
     }
 
     pub fn is_read_closed(event: &Event) -> bool {
-        event.as_raw().filter == libc::EVFILT_READ && event.as_raw().flags & libc::EV_EOF != 0
+        event.0.filter == libc::EVFILT_READ && event.0.flags & libc::EV_EOF != 0
     }
 
     pub fn is_write_closed(event: &Event) -> bool {
-        event.as_raw().filter == libc::EVFILT_WRITE && event.as_raw().flags & libc::EV_EOF != 0
+        event.0.filter == libc::EVFILT_WRITE && event.0.flags & libc::EV_EOF != 0
     }
 
     pub fn is_priority(_: &Event) -> bool {
@@ -462,7 +452,7 @@ pub mod event {
             target_os = "watchos",
         ))]
         {
-            event.as_raw().filter == libc::EVFILT_AIO
+            event.0.filter == libc::EVFILT_AIO
         }
         #[cfg(not(any(
             target_os = "dragonfly",
@@ -482,7 +472,7 @@ pub mod event {
     pub fn is_lio(event: &Event) -> bool {
         #[cfg(target_os = "freebsd")]
         {
-            event.as_raw().filter == libc::EVFILT_LIO
+            event.0.filter == libc::EVFILT_LIO
         }
         #[cfg(not(target_os = "freebsd"))]
         {
@@ -491,7 +481,6 @@ pub mod event {
     }
 
     pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
-        let event = event.as_raw();
         debug_detail!(
             FilterDetails(Filter),
             PartialEq::eq,
@@ -885,14 +874,14 @@ pub mod event {
         );
 
         // Can't reference fields in packed structures.
-        let ident = event.ident;
-        let data = event.data;
-        let udata = event.udata;
+        let ident = event.0.ident;
+        let data = event.0.data;
+        let udata = event.0.udata;
         f.debug_struct("kevent")
             .field("ident", &ident)
-            .field("filter", &FilterDetails(event.filter))
-            .field("flags", &FlagsDetails(event.flags))
-            .field("fflags", &FflagsDetails(event.fflags))
+            .field("filter", &FilterDetails(event.0.filter))
+            .field("flags", &FlagsDetails(event.0.flags))
+            .field("fflags", &FflagsDetails(event.0.fflags))
             .field("data", &data)
             .field("udata", &udata)
             .finish()
