@@ -133,8 +133,7 @@ jobs:
           - aarch64-apple-darwin
           - aarch64-apple-ios
           - aarch64-apple-tvos
-          # Can't build standard library.
-          #- aarch64-apple-visionos
+          - aarch64-apple-visionos
           - aarch64-apple-watchos
           - aarch64-linux-android
           - aarch64-unknown-freebsd
@@ -147,18 +146,15 @@ jobs:
           - aarch64-unknown-openbsd
           - aarch64-unknown-redox
           - arm-linux-androideabi
-          # Can't build standard library.
-          # See https://github.com/rust-lang/rust/issues/147776
-          #- arm64_32-apple-watchos
+          - arm64_32-apple-watchos
           # Standard library doesn't build anymore:
           # <https://github.com/rust-lang/rust/issues/147437>
           #- armv7-sony-vita-newlibeabihf
           - i686-unknown-linux-gnu
-          # TODO: reenable <https://github.com/tokio-rs/mio/issues/1844>.
-          #- i686-unknown-hurd-gnu
+          - i686-unknown-hurd-gnu
           # TODO: reenable <https://github.com/tokio-rs/mio/issues/1882>.
           #- powerpc64-ibm-aix
-          #- riscv32imc-esp-espidf
+          - riscv32imc-esp-espidf
           - sparcv9-sun-solaris
           - wasm32-wasip1
           - x86_64-apple-darwin
@@ -173,7 +169,7 @@ jobs:
           - x86_64-unknown-dragonfly
           - x86_64-unknown-freebsd
           - x86_64-unknown-fuchsia
-          #- x86_64-unknown-haiku
+          - x86_64-unknown-haiku
           - x86_64-unknown-hermit
           - x86_64-unknown-illumos
           - x86_64-unknown-linux-gnu
