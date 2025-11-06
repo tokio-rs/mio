@@ -1,8 +1,10 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
-use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
-use std::os::unix::net::{self, SocketAddr};
+#[cfg(unix)]
+use std::os::{fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},unix::net::{self, SocketAddr}};
+#[cfg(windows)]
+use crate::sys::{net,uds::socket::SocketAddr};
 use std::path::Path;
 
 use crate::io_source::IoSource;
@@ -228,18 +230,20 @@ impl fmt::Debug for UnixStream {
         self.inner.fmt(f)
     }
 }
-
+#[cfg(unix)]
 impl IntoRawFd for UnixStream {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
+#[cfg(unix)]
 
 impl AsRawFd for UnixStream {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
+#[cfg(unix)]
 
 impl FromRawFd for UnixStream {
     /// Converts a `RawFd` to a `UnixStream`.
@@ -252,6 +256,7 @@ impl FromRawFd for UnixStream {
         UnixStream::from_std(FromRawFd::from_raw_fd(fd))
     }
 }
+#[cfg(unix)]
 
 impl From<UnixStream> for net::UnixStream {
     fn from(stream: UnixStream) -> Self {
@@ -261,18 +266,21 @@ impl From<UnixStream> for net::UnixStream {
         unsafe { net::UnixStream::from_raw_fd(stream.into_raw_fd()) }
     }
 }
+#[cfg(unix)]
 
 impl From<UnixStream> for OwnedFd {
     fn from(unix_stream: UnixStream) -> Self {
         unix_stream.inner.into_inner().into()
     }
 }
+#[cfg(unix)]
 
 impl AsFd for UnixStream {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.inner.as_fd()
     }
 }
+#[cfg(unix)]
 
 impl From<OwnedFd> for UnixStream {
     fn from(fd: OwnedFd) -> Self {

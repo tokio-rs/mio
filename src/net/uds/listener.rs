@@ -1,5 +1,7 @@
-use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
-use std::os::unix::net::{self, SocketAddr};
+#[cfg(unix)]
+use std::os::{fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},unix::net::{self, SocketAddr}};
+#[cfg(windows)]
+use crate::sys::{net,uds::{SocketAddr}};
 use std::path::Path;
 use std::{fmt, io};
 
@@ -84,19 +86,19 @@ impl fmt::Debug for UnixListener {
         self.inner.fmt(f)
     }
 }
-
+#[cfg(unix)]
 impl IntoRawFd for UnixListener {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
-
+#[cfg(unix)]
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
-
+#[cfg(unix)]
 impl FromRawFd for UnixListener {
     /// Converts a `RawFd` to a `UnixListener`.
     ///
@@ -109,6 +111,7 @@ impl FromRawFd for UnixListener {
     }
 }
 
+#[cfg(unix)]
 impl From<UnixListener> for net::UnixListener {
     fn from(listener: UnixListener) -> Self {
         // Safety: This is safe since we are extracting the raw fd from a well-constructed
@@ -117,19 +120,19 @@ impl From<UnixListener> for net::UnixListener {
         unsafe { net::UnixListener::from_raw_fd(listener.into_raw_fd()) }
     }
 }
-
+#[cfg(unix)]
 impl From<UnixListener> for OwnedFd {
     fn from(unix_listener: UnixListener) -> Self {
         unix_listener.inner.into_inner().into()
     }
 }
-
+#[cfg(unix)]
 impl AsFd for UnixListener {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.inner.as_fd()
     }
 }
-
+#[cfg(unix)]
 impl From<OwnedFd> for UnixListener {
     fn from(fd: OwnedFd) -> Self {
         UnixListener::from_std(From::from(fd))

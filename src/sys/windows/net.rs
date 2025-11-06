@@ -3,6 +3,7 @@ use std::mem;
 use std::net::SocketAddr;
 use std::sync::Once;
 
+use windows_sys::Win32::Networking::WinSock::SOCKADDR_UN;
 use windows_sys::Win32::Networking::WinSock::{
     closesocket, ioctlsocket, socket, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0,
     INVALID_SOCKET, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0,
@@ -55,6 +56,7 @@ pub(crate) fn new_socket(domain: u32, socket_type: i32) -> io::Result<SOCKET> {
 pub(crate) union SocketAddrCRepr {
     v4: SOCKADDR_IN,
     v6: SOCKADDR_IN6,
+    unix: SOCKADDR_UN
 }
 
 impl SocketAddrCRepr {
@@ -109,3 +111,6 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, i32) {
         }
     }
 }
+
+pub use super::uds::UnixStream;
+pub use super::uds::UnixListener;

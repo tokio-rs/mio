@@ -30,7 +30,7 @@ include       = [
 # For documentation of features see the `mio::features` module.
 [features]
 # By default Mio only provides a shell implementation.
-default = ["log"]
+default = ["log","os-ext","net"]
 
 # Enables the `Poll` and `Registry` types.
 os-poll = []

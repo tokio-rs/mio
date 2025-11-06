@@ -31,7 +31,7 @@ cfg_net! {
         }};
     }
 
-    mod net;
+    pub mod net;
 
     pub(crate) mod tcp;
     pub(crate) mod udp;
@@ -41,6 +41,7 @@ cfg_net! {
 
 cfg_os_ext! {
     pub(crate) mod named_pipe;
+    pub(crate) mod uds;
 }
 
 mod waker;

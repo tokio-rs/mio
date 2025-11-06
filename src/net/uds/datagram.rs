@@ -1,6 +1,6 @@
+#![cfg(unix)]
 use std::net::Shutdown;
-use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
-use std::os::unix::net::{self, SocketAddr};
+use std::os::{fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},unix::net::{self, SocketAddr}};
 use std::path::Path;
 use std::{fmt, io};
 
@@ -215,19 +215,19 @@ impl fmt::Debug for UnixDatagram {
         self.inner.fmt(f)
     }
 }
-
+#[cfg(unix)]
 impl IntoRawFd for UnixDatagram {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
-
+#[cfg(unix)]
 impl AsRawFd for UnixDatagram {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
-
+#[cfg(unix)]
 impl FromRawFd for UnixDatagram {
     /// Converts a `RawFd` to a `UnixDatagram`.
     ///
@@ -248,19 +248,19 @@ impl From<UnixDatagram> for net::UnixDatagram {
         unsafe { net::UnixDatagram::from_raw_fd(datagram.into_raw_fd()) }
     }
 }
-
+#[cfg(unix)]
 impl From<UnixDatagram> for OwnedFd {
     fn from(unix_datagram: UnixDatagram) -> Self {
         unix_datagram.inner.into_inner().into()
     }
 }
-
+#[cfg(unix)]
 impl AsFd for UnixDatagram {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.inner.as_fd()
     }
 }
-
+#[cfg(unix)]
 impl From<OwnedFd> for UnixDatagram {
     fn from(fd: OwnedFd) -> Self {
         UnixDatagram::from_std(From::from(fd))

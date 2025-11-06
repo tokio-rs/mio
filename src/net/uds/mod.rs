@@ -1,4 +1,5 @@
 mod datagram;
+#[cfg(unix)]
 pub use self::datagram::UnixDatagram;
 
 mod listener;
