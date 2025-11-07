@@ -50,7 +50,7 @@ mod macros;
 mod interest;
 mod poll;
 mod sys;
-#[cfg(windows)]
+#[cfg(all(windows, feature = "net"))]
 pub use sys::uds;
 mod token;
 #[cfg(not(target_os = "wasi"))]
