@@ -1,13 +1,15 @@
+#[cfg(windows)]
+use crate::sys::uds::{net, SocketAddr};
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
 #[cfg(windows)]
-use std::os::windows::io::{FromRawSocket, IntoRawSocket};
-use std::os::windows::io::{AsRawSocket, RawSocket};
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 #[cfg(unix)]
-use std::os::{fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},unix::net::{self, SocketAddr}};
-#[cfg(windows)]
-use crate::sys::{uds::{SocketAddr,net}};
+use std::os::{
+    fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},
+    unix::net::{self, SocketAddr},
+};
 
 use std::path::Path;
 

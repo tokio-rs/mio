@@ -1,14 +1,14 @@
 #[cfg(windows)]
 use crate::sys::uds::{net, SocketAddr};
 #[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, IntoRawSocket, RawSocket};
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 #[cfg(unix)]
 use std::os::{
     fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},
     unix::net::{self, SocketAddr},
 };
+use std::path::Path;
 use std::{fmt, io};
-use std::{os::windows::io::FromRawSocket, path::Path};
 
 use crate::io_source::IoSource;
 use crate::net::UnixStream;
