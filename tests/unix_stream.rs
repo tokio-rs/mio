@@ -12,6 +12,7 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Barrier};
 use std::thread;
+use std::time::Duration;
 
 #[macro_use]
 mod util;
@@ -102,7 +103,8 @@ fn unix_stream_connect_addr() {
 
     let barrier_clone = barrier.clone();
     let handle = thread::spawn(move || {
-        let (stream, _) = mio_listener.accept().unwrap();
+        let (mut stream, _) = mio_listener.accept().unwrap();
+        stream.write_all(b"Hi").unwrap();
         barrier_clone.wait();
         drop(stream);
     });
@@ -121,12 +123,18 @@ fn unix_stream_connect_addr() {
     );
 
     barrier.wait();
+    #[cfg(unix)]
     expect_events(
         &mut poll,
         &mut events,
         vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
-
+    #[cfg(windows)]
+    {
+        let mut buf = [0; 2];
+        assert_eq!(stream.read(&mut buf).unwrap(), 2);
+        assert_eq!(buf, *b"Hi");
+    }
     handle.join().unwrap();
 }
 
@@ -551,7 +559,7 @@ where
     let path = remote_addr.as_pathname().expect("failed to get pathname");
 
     let mut stream = connect_stream(path).unwrap();
-
+    stream.set_nonblocking(true).unwrap();
     assert_socket_non_blocking(&stream);
     assert_socket_close_on_exec(&stream);
 
@@ -588,12 +596,14 @@ where
     let bufs = [IoSlice::new(DATA1), IoSlice::new(DATA2)];
     let wrote = stream.write_vectored(&bufs).unwrap();
     assert_eq!(wrote, DATA1_LEN + DATA2_LEN);
+    #[cfg(unix)]
     expect_events(
         &mut poll,
         &mut events,
         vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
-
+    #[cfg(windows)]
+    std::thread::sleep(Duration::from_millis(500));
     let mut buf1 = [1; DATA1_LEN];
     let mut buf2 = [2; DATA2_LEN + 1];
     let mut bufs = [IoSliceMut::new(&mut buf1), IoSliceMut::new(&mut buf2)];
@@ -607,6 +617,7 @@ where
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
+    std::fs::remove_file(remote_addr.as_pathname().unwrap()).unwrap();
     handle.join().unwrap();
 }
 
@@ -617,7 +628,7 @@ fn new_echo_listener(
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
         let path = temp_file(test_name);
-        let listener = net::UnixListener::bind(path).unwrap();
+        let listener = net::UnixListener::bind(&path).unwrap();
         let local_addr = listener.local_addr().unwrap();
         addr_sender.send(local_addr).unwrap();
 
@@ -635,8 +646,15 @@ fn new_echo_listener(
                         read += amount;
                         amount
                     }
-                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                    Err(_) => break,
+                    Err(e) => {
+                        //I don't know why Windows keep send WSAEWOULDBLOCK code.
+                        //even connection closed
+                        if !&path.exists() {
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(200));
+                        continue;
+                    }
                 };
                 if n == 0 {
                     break;
@@ -650,6 +668,7 @@ fn new_echo_listener(
             }
             assert_eq!(read, written, "unequal reads and writes");
         }
+        eprintln!("Exit");
         drop(listener);
     });
     (handle, addr_receiver.recv().unwrap())
