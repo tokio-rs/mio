@@ -123,17 +123,17 @@ impl Socket {
         }
     }
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        let mut s = SocketAddr::default();
-        s.addrlen = size_of::<SOCKADDR_UN>() as i32;
+        let mut addr = SocketAddr::default();
+        addr.addrlen = size_of::<SOCKADDR_UN>() as i32;
         match unsafe {
             WinSock::getpeername(
                 self.0,
-                &mut s.addr as *mut _ as *mut _,
-                &mut s.addrlen as *mut _ as *mut _,
+                &mut addr.addr as *mut _ as *mut _,
+                &mut addr.addrlen as *mut _ as *mut _,
             )
         } {
             SOCKET_ERROR => Err(wsa_error()),
-            _ => Ok(s),
+            _ => Ok(addr),
         }
     }
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
