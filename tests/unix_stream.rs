@@ -623,7 +623,7 @@ fn new_echo_listener(
 
         for _ in 0..connections {
             let (mut stream, _) = listener.accept().unwrap();
-
+            stream.set_nonblocking(true).unwrap();
             // On Linux based system it will cause a connection reset
             // error when the reading side of the peer connection is
             // shutdown, we don't consider it an actual here.
@@ -650,6 +650,7 @@ fn new_echo_listener(
             }
             assert_eq!(read, written, "unequal reads and writes");
         }
+        drop(listener);
     });
     (handle, addr_receiver.recv().unwrap())
 }
