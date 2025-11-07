@@ -1,8 +1,8 @@
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
+use mio::net::UnixStream;
 #[cfg(windows)]
 use mio::uds::net;
-use mio::net::UnixStream;
 use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
@@ -636,15 +636,7 @@ fn new_echo_listener(
                         amount
                     }
                     Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
-                    Err(ref err)
-                        if matches!(
-                            err.kind(),
-                            io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted
-                        ) =>
-                    {
-                        break
-                    }
-                    Err(err) => panic!("{}", err),
+                    Err(_) => break,
                 };
                 if n == 0 {
                     break;
