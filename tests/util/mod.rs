@@ -195,7 +195,7 @@ pub fn assert_would_block<T>(result: io::Result<T>) {
         Ok(_) => panic!("unexpected OK result, expected a `WouldBlock` error"),
         Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
         #[cfg(unix)]
-        Err(_) => panic!("unexpected error: {e}"),
+        Err(e) => panic!("unexpected error: {e}"),
         #[cfg(windows)]
         Err(_) => {}
     }
