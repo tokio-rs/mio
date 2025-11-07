@@ -7,6 +7,8 @@ use std::fmt::Debug;
 use std::io;
 use std::net::Shutdown;
 use std::os::windows::io::AsRawSocket;
+use std::os::windows::io::FromRawSocket;
+use std::os::windows::io::IntoRawSocket;
 use std::os::windows::io::RawSocket;
 use std::path::Path;
 use windows_sys::Win32::Networking::WinSock;
@@ -91,7 +93,7 @@ impl UnixStream {
     /// ```no_run
     /// use mio::sys::uds::SocketAddr;
     ///
-    /// let addr = SocketAddr::from_path("/tmp/socket.sock")?;
+    /// let addr = SocketAddr::from_path("/tmp/my_socket")?;
     /// let stream = UnixStream::connect_addr(&addr)?;
     /// # Ok::<(), std::io::Error>(())
     /// ```
@@ -182,5 +184,15 @@ pub(crate) fn connect_addr(address: &SocketAddr) -> io::Result<UnixStream> {
 impl AsRawSocket for UnixStream {
     fn as_raw_socket(&self) -> RawSocket {
         self.0 .0 as _
+    }
+}
+impl FromRawSocket for UnixStream {
+    unsafe fn from_raw_socket(sock: RawSocket) -> Self {
+        UnixStream(Socket(sock as _))
+    }
+}
+impl IntoRawSocket for UnixStream {
+    fn into_raw_socket(self) -> RawSocket {
+        self.0.0 as _
     }
 }

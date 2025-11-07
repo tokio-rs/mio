@@ -1,12 +1,14 @@
 #[cfg(windows)]
 use crate::sys::uds::{net, SocketAddr};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, IntoRawSocket, RawSocket};
 #[cfg(unix)]
 use std::os::{
     fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},
     unix::net::{self, SocketAddr},
 };
-use std::path::Path;
 use std::{fmt, io};
+use std::{os::windows::io::FromRawSocket, path::Path};
 
 use crate::io_source::IoSource;
 use crate::net::UnixStream;
@@ -143,5 +145,23 @@ impl AsFd for UnixListener {
 impl From<OwnedFd> for UnixListener {
     fn from(fd: OwnedFd) -> Self {
         UnixListener::from_std(From::from(fd))
+    }
+}
+#[cfg(windows)]
+impl AsRawSocket for UnixListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
+}
+#[cfg(windows)]
+impl FromRawSocket for UnixListener {
+    unsafe fn from_raw_socket(sock: RawSocket) -> Self {
+        UnixListener::from_std(FromRawSocket::from_raw_socket(sock))
+    }
+}
+#[cfg(windows)]
+impl IntoRawSocket for UnixListener {
+    fn into_raw_socket(self) -> RawSocket {
+        self.inner.into_inner().into_raw_socket()
     }
 }

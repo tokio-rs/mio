@@ -1,7 +1,7 @@
 use super::{socketaddr_un, startup, wsa_error, Socket, SocketAddr, UnixStream};
 use std::{
     io,
-    os::windows::io::{AsRawSocket, RawSocket},
+    os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket},
     path::Path,
 };
 use windows_sys::Win32::Networking::WinSock::{self, SOCKADDR_UN, SOCKET_ERROR};
@@ -207,6 +207,16 @@ pub(crate) fn accept(s: &UnixListener) -> io::Result<(crate::net::UnixStream, So
 
 impl AsRawSocket for UnixListener {
     fn as_raw_socket(&self) -> RawSocket {
+        self.0 .0 as _
+    }
+}
+impl FromRawSocket for UnixListener {
+    unsafe fn from_raw_socket(sock: RawSocket) -> Self {
+        Self(Socket(sock as _))
+    }
+}
+impl IntoRawSocket for UnixListener {
+    fn into_raw_socket(self) -> RawSocket {
         self.0 .0 as _
     }
 }

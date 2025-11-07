@@ -1,6 +1,9 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
+#[cfg(windows)]
+use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+use std::os::windows::io::{AsRawSocket, RawSocket};
 #[cfg(unix)]
 use std::os::{fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},unix::net::{self, SocketAddr}};
 #[cfg(windows)]
@@ -291,5 +294,23 @@ impl AsFd for UnixStream {
 impl From<OwnedFd> for UnixStream {
     fn from(fd: OwnedFd) -> Self {
         UnixStream::from_std(From::from(fd))
+    }
+}
+#[cfg(windows)]
+impl AsRawSocket for UnixStream {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
+}
+#[cfg(windows)]
+impl FromRawSocket for UnixStream {
+    unsafe fn from_raw_socket(sock: RawSocket) -> Self {
+        UnixStream::from_std(FromRawSocket::from_raw_socket(sock))
+    }
+}
+#[cfg(windows)]
+impl IntoRawSocket for UnixStream {
+    fn into_raw_socket(self) -> RawSocket {
+        self.inner.into_inner().into_raw_socket()
     }
 }
