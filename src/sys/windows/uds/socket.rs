@@ -124,6 +124,7 @@ impl Socket {
     }
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         let mut s = SocketAddr::default();
+        s.addrlen = size_of::<SOCKADDR_UN>() as i32;
         match unsafe {
             WinSock::getpeername(
                 self.0,
