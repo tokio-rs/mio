@@ -1,8 +1,8 @@
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-use mio::net::UnixStream;
 #[cfg(windows)]
-use mio::sys::net;
+use mio::uds::net;
+use mio::net::UnixStream;
 use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
@@ -409,7 +409,7 @@ fn unix_stream_shutdown_both() {
     #[cfg(unix)]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
     #[cfg(windows)]
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionAbroted);
+    assert_eq!(err.kind(), io::ErrorKind::ConnectionAborted);
 
     // Close the connection to allow the remote to shutdown
     drop(stream);

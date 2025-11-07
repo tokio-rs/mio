@@ -41,7 +41,8 @@ cfg_net! {
 
 cfg_os_ext! {
     pub(crate) mod named_pipe;
-    pub(crate) mod uds;
+    /// UDS on Windows
+    pub mod uds;
 }
 
 mod waker;

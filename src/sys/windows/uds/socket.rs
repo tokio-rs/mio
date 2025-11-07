@@ -1,11 +1,11 @@
 use super::{startup, wsa_error};
-use std::{ffi::CStr, fmt::Debug, io, net::Shutdown, os::raw::c_int, path::Path, time::Duration};
+use std::{ffi::CStr, fmt::Debug, io, net::Shutdown, os::raw::c_int, path::Path};
 use windows_sys::Win32::Networking::WinSock::{
     self, AF_UNIX, FIONBIO, INVALID_SOCKET, SOCKADDR, SOCKADDR_UN, SOCKET, SOCKET_ERROR,
     SOCK_STREAM, SOL_SOCKET, SO_ERROR,
 };
 #[derive(Debug)]
-pub struct Socket(pub SOCKET);
+pub(crate) struct Socket(pub SOCKET);
 
 impl Socket {
     pub fn new() -> io::Result<Self> {
@@ -60,6 +60,7 @@ impl Socket {
     }
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         let mut addr = SocketAddr::default();
+        addr.addrlen = size_of::<SOCKADDR_UN>() as i32;
         match unsafe {
             WinSock::getsockname(
                 self.0,
@@ -113,69 +114,70 @@ impl Socket {
             _ => Ok(()),
         }
     }
-    pub fn set_timeout(&self, dur: Option<Duration>, kind: i32) -> io::Result<()> {
-        let timeout = match dur {
-            Some(dur) => dur.as_millis() as u32,
-            None => 0,
-        }
-        .to_ne_bytes();
-        match unsafe {
-            WinSock::setsockopt(
-                self.0,
-                SOL_SOCKET,
-                kind,
-                &timeout as *const _,
-                timeout.len() as _,
-            )
-        } {
-            SOCKET_ERROR => Err(wsa_error()),
-            _ => Ok(()),
-        }
-    }
-    //seems like not support
-    //https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-getsockopt
-    pub fn timeout(&self, kind: i32) -> io::Result<Option<Duration>> {
-        let mut val = c_int::default();
-        let mut len = size_of::<c_int>();
-        match unsafe {
-            WinSock::getsockopt(
-                self.0,
-                SOL_SOCKET,
-                kind,
-                &mut val as *mut _ as *mut _,
-                &mut len as *mut _ as *mut _,
-            )
-        } {
-            SOCKET_ERROR => Err(wsa_error()),
-            _ => Ok(Some(Duration::from_millis(val as u64))),
-        }
-    }
 }
 #[derive(Default)]
+/// A socket address for Unix domain sockets.
+///
+/// This struct wraps the underlying system socket address structure
+/// along with its length to provide a safe interface for working with
+/// Unix domain sockets.
 pub struct SocketAddr {
+    /// The underlying system socket address structure
     pub addr: SOCKADDR_UN,
+    /// The length of the socket address structure
     pub addrlen: i32,
 }
 
 impl Debug for SocketAddr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> core::fmt::Result {
-        let sun_path_str = unsafe {
-            CStr::from_ptr(self.addr.sun_path.as_ptr())
-                .to_string_lossy()
-        };
-        
-        write!(f, "SocketAddr {{ addr: SOCKADDR_UN {{ sun_family: {}, sun_path: {:?} }}, addrlen: {} }}",
-               self.addr.sun_family, sun_path_str, self.addrlen)
+        let sun_path_str = unsafe { CStr::from_ptr(self.addr.sun_path.as_ptr()).to_string_lossy() };
+
+        write!(
+            f,
+            "SocketAddr {{ addr: SOCKADDR_UN {{ sun_family: {}, sun_path: {:?} }}, addrlen: {} }}",
+            self.addr.sun_family, sun_path_str, self.addrlen
+        )
     }
 }
 impl SocketAddr {
+    /// Creates a new `SocketAddr` from a filesystem path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A path to a socket file in the filesystem
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(SocketAddr)` if the address was successfully created,
+    /// or an `io::Error` if the path is invalid or too long.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::Path;
+    /// use mio::uds::SocketAddr;
+    ///
+    /// let addr = SocketAddr::from_pathname("/tmp/my_socket.sock").unwrap();
+    /// ```
     pub fn from_pathname<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let (addr, addrlen) = socketaddr_un(path.as_ref())?;
         Ok(Self { addr, addrlen })
     }
+    /// Returns the contents of this address if it is a `pathname` address
+    pub fn as_pathname(&self) -> Option<&Path> {
+        let path_ptr = self.addr.sun_path.as_ptr();
+        if unsafe { *path_ptr } == 0 {
+            return None;
+        }
+        let c_str = unsafe { CStr::from_ptr(path_ptr) };
+        match c_str.to_str() {
+            Ok(s) => Some(Path::new(s)),
+            Err(_e) => None,
+        }
+    }
 }
 
-pub fn socketaddr_un(path: &Path) -> io::Result<(SOCKADDR_UN, i32)> {
+pub(crate) fn socketaddr_un(path: &Path) -> io::Result<(SOCKADDR_UN, i32)> {
     // let bytes = path.as_os_str().as_encoded_bytes();
     let mut sockaddr = SOCKADDR_UN::default();
     // Winsock2 expects 'sun_path' to be a Win32 UTF-8 file system path

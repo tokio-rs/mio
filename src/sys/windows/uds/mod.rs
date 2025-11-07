@@ -1,12 +1,13 @@
 use std::io;
+///we need this file to report std::os::unix::net
 pub mod net;
-pub mod stream;
+pub(crate) mod stream;
 pub use stream::*;
-pub mod socket;
+mod socket;
 pub use socket::*;
-pub mod listener;
+pub(crate) mod listener;
 pub use listener::*;
-pub fn startup() -> io::Result<()> {
+pub(crate) fn startup() -> io::Result<()> {
     use windows_sys::Win32::Networking::WinSock::{self, WSADATA};
     use WinSock::{WSAEFAULT, WSAEINPROGRESS, WSAEPROCLIM, WSASYSNOTREADY, WSAVERNOTSUPPORTED};
     let mut wsa_data = WSADATA::default();
@@ -29,7 +30,7 @@ pub fn startup() -> io::Result<()> {
         _ => Err(io::Error::other("Unknown WSAStartup error")),
     }
 }
-pub fn wsa_error() -> io::Error {
+pub(crate) fn wsa_error() -> io::Error {
     use windows_sys::Win32::Networking::WinSock::{
         WSAGetLastError, WSAEACCES, WSAEADDRINUSE, WSAEADDRNOTAVAIL, WSAEAFNOSUPPORT,
         WSAECONNABORTED, WSAECONNREFUSED, WSAECONNRESET, WSAEHOSTUNREACH, WSAEINPROGRESS,

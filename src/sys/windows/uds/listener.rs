@@ -1,7 +1,6 @@
 use super::{socketaddr_un, startup, wsa_error, Socket, SocketAddr, UnixStream};
 use std::{
     io,
-    ops::{Deref, DerefMut},
     os::windows::io::{AsRawSocket, RawSocket},
     path::Path,
 };
@@ -182,24 +181,22 @@ impl UnixListener {
         let s = self
             .0
             .accept(&mut addr as *mut _ as *mut _, &mut addrlen as *mut _)?;
-        Ok((UnixStream(s), SocketAddr { addr, addrlen }))
+        Ok((UnixStream::new(s), SocketAddr { addr, addrlen }))
+    }
+    /// Returns the socket address of the local half of this connection.
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.0.local_addr()
+    }
+    /// Returns the value of the `SO_ERROR` option.
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.0.take_error()
     }
 }
-impl Deref for UnixListener {
-    type Target = Socket;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl DerefMut for UnixListener {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-pub fn bind_addr(socket_addr: &SocketAddr) -> io::Result<UnixListener> {
+
+pub(crate)  fn bind_addr(socket_addr: &SocketAddr) -> io::Result<UnixListener> {
     UnixListener::bind_addr(socket_addr)
 }
-pub fn accept(s: &UnixListener) -> io::Result<(crate::net::UnixStream, SocketAddr)> {
+pub(crate) fn accept(s: &UnixListener) -> io::Result<(crate::net::UnixStream, SocketAddr)> {
     let (inner, addr) = s.accept()?;
     Ok((crate::net::UnixStream::from_std(inner), addr))
 }
