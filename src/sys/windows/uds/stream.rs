@@ -143,6 +143,9 @@ impl io::Write for UnixStream {
     fn flush(&mut self) -> io::Result<()> {
         io::Write::flush(&mut &*self)
     }
+    fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        io::Write::write_vectored(&mut &*self, bufs)
+    }
 }
 impl io::Write for &UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -151,15 +154,24 @@ impl io::Write for &UnixStream {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
+    fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        self.0.write_vectored(bufs)
+    }
 }
 impl io::Read for &UnixStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.recv(buf)
     }
+    fn read_vectored(&mut self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
+        self.0.recv_vectored(bufs)
+    }
 }
 impl io::Read for UnixStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         io::Read::read(&mut &*self, buf)
+    }
+    fn read_vectored(&mut self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
+        io::Read::read_vectored(&mut &*self, bufs)
     }
 }
 

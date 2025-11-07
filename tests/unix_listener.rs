@@ -1,12 +1,12 @@
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::net::UnixListener;
+#[cfg(windows)]
+use mio::uds::net;
 use mio::{Interest, Token};
 use std::io::{self, Read};
 #[cfg(unix)]
 use std::os::unix::net;
-#[cfg(windows)]
-use mio::uds::net;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 use std::thread;

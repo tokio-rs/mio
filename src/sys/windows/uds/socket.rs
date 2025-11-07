@@ -1,8 +1,8 @@
 use super::{startup, wsa_error};
-use std::{ffi::CStr, fmt::Debug, io, net::Shutdown, os::raw::c_int, path::Path};
+use std::{ffi::CStr, fmt::Debug, io, net::Shutdown, os::raw::c_int, path::Path, ptr::null_mut};
 use windows_sys::Win32::Networking::WinSock::{
     self, AF_UNIX, FIONBIO, INVALID_SOCKET, SOCKADDR, SOCKADDR_UN, SOCKET, SOCKET_ERROR,
-    SOCK_STREAM, SOL_SOCKET, SO_ERROR,
+    SOCK_STREAM, SOL_SOCKET, SO_ERROR, WSABUF,
 };
 #[derive(Debug)]
 pub(crate) struct Socket(pub SOCKET);
@@ -25,11 +25,61 @@ impl Socket {
             }
         }
     }
+    pub fn write_vectored(&self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        let bufs: Vec<_> = bufs
+            .iter()
+            .map(|buf| WSABUF {
+                buf: buf.as_ptr() as *mut _,
+                len: buf.len() as _,
+            })
+            .collect();
+        let mut bytes_send = 0;
+        unsafe {
+            match WinSock::WSASend(
+                self.0,
+                bufs.as_ptr(),
+                bufs.len() as _,
+                &mut bytes_send,
+                0,
+                null_mut(),
+                None,
+            ) {
+                0 => Ok(bytes_send as usize),
+                _ => Err(wsa_error()),
+            }
+        }
+    }
+
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         unsafe {
             match WinSock::recv(self.0 as _, buf.as_mut_ptr(), buf.len() as _, 0) {
                 0 => Err(io::Error::other("Connection closed")),
                 len if len > 0 => Ok(len as _),
+                _ => Err(wsa_error()),
+            }
+        }
+    }
+    pub fn recv_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
+        unsafe {
+            let mut bytes_received = 0;
+            let mut flags = 0;
+            let mut bufs: Vec<_> = bufs
+                .iter_mut()
+                .map(|buf| WSABUF {
+                    len: buf.len() as _,
+                    buf: buf.as_mut_ptr(),
+                })
+                .collect();
+            match WinSock::WSARecv(
+                self.0,
+                bufs.as_mut_ptr(),
+                bufs.len() as _,
+                &mut bytes_received,
+                &mut flags,
+                null_mut(),
+                None,
+            ) {
+                0 => Ok(bytes_received as usize),
                 _ => Err(wsa_error()),
             }
         }
