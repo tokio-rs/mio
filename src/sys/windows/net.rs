@@ -111,6 +111,3 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, i32) {
         }
     }
 }
-
-pub use super::uds::UnixStream;
-pub use super::uds::UnixListener;

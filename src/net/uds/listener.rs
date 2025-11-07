@@ -1,7 +1,10 @@
-#[cfg(unix)]
-use std::os::{fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},unix::net::{self, SocketAddr}};
 #[cfg(windows)]
-use crate::sys::{net,uds::{SocketAddr}};
+use crate::sys::uds::{net, SocketAddr};
+#[cfg(unix)]
+use std::os::{
+    fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},
+    unix::net::{self, SocketAddr},
+};
 use std::path::Path;
 use std::{fmt, io};
 

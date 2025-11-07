@@ -1,5 +1,5 @@
 use std::io;
-
+pub mod net;
 pub mod stream;
 pub use stream::*;
 pub mod socket;

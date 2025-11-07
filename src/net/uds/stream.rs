@@ -4,7 +4,8 @@ use std::net::Shutdown;
 #[cfg(unix)]
 use std::os::{fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd},unix::net::{self, SocketAddr}};
 #[cfg(windows)]
-use crate::sys::{net,uds::socket::SocketAddr};
+use crate::sys::{uds::{SocketAddr,net}};
+
 use std::path::Path;
 
 use crate::io_source::IoSource;

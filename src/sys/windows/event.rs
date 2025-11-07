@@ -4,7 +4,7 @@ use super::afd;
 use super::iocp::CompletionStatus;
 use crate::Token;
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct Event {
     pub flags: u32,
     pub data: u64,

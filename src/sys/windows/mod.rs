@@ -31,7 +31,7 @@ cfg_net! {
         }};
     }
 
-    pub mod net;
+    mod net;
 
     pub(crate) mod tcp;
     pub(crate) mod udp;

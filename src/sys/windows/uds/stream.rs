@@ -12,9 +12,50 @@ use super::startup;
 use super::socketaddr_un;
 use super::Socket;
 use super::SocketAddr;
+/// A Unix domain socket stream client.
+/// 
+/// This type represents a connected Unix domain socket client stream, 
+/// providing bidirectional I/O communication with a server.
+/// 
+/// # Examples
+/// 
+/// ```no_run
+/// use std::io::{Read, Write};
+/// 
+/// let mut stream = UnixStream::connect("/tmp/socket.sock")?;
+/// stream.write_all(b"Hello, server!")?;
+/// 
+/// let mut response = String::new();
+/// stream.read_to_string(&mut response)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[derive(Debug)]
 pub struct UnixStream(pub Socket);
 impl UnixStream {
+     /// Connects to a Unix domain socket server at the specified filesystem path.
+    /// 
+    /// This function creates a new socket and establishes a connection to the server
+    /// listening on the given path. The path must be a valid filesystem path that
+    /// the server is bound to.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` - The filesystem path of the server socket to connect to
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an `io::Error` if:
+    /// - Winsock initialization fails
+    /// - Socket creation fails  
+    /// - The connection attempt fails
+    /// - The provided path is invalid
+    /// 
+    /// # Examples
+    /// 
+    /// ```no_run
+    /// let stream = UnixStream::connect("C:/my_socket")?;
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         unsafe {
             startup()?;
@@ -26,6 +67,32 @@ impl UnixStream {
             }
         }
     }
+    
+    /// Connects to a Unix domain socket server using a pre-constructed `SocketAddr`.
+    /// 
+    /// This function creates a new socket and establishes a connection to the server
+    /// address specified by the given `SocketAddr`. This is useful when you already
+    /// have a socket address constructed and want to reuse it.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `socket_addr` - The socket address of the server to connect to
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an `io::Error` if:
+    /// - Socket creation fails
+    /// - The connection attempt fails
+    /// 
+    /// # Examples
+    /// 
+    /// ```no_run
+    /// use mio::sys::uds::SocketAddr;
+    /// 
+    /// let addr = SocketAddr::from_path("C:/my_socket")?;
+    /// let stream = UnixStream::connect_addr(&addr)?;
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
     pub fn connect_addr(socket_addr: &SocketAddr) -> io::Result<Self> {
         let s = Socket::new()?;
         match unsafe {

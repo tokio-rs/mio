@@ -1,9 +1,12 @@
-#![cfg(all(unix, feature = "os-poll", feature = "net"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::net::UnixStream;
+#[cfg(windows)]
+use mio::sys::net;
 use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
+#[cfg(unix)]
 use std::os::unix::net;
 use std::path::Path;
 use std::sync::mpsc::channel;
@@ -146,6 +149,7 @@ fn unix_stream_from_std() {
 }
 
 #[test]
+#[cfg(unix)]
 fn unix_stream_pair() {
     let (mut poll, mut events) = init_with_poll();
 
