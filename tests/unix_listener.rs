@@ -1,9 +1,12 @@
-#![cfg(all(unix, feature = "os-poll", feature = "net"))]
+#![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::net::UnixListener;
 use mio::{Interest, Token};
 use std::io::{self, Read};
+#[cfg(unix)]
 use std::os::unix::net;
+#[cfg(windows)]
+use mio::uds::net;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 use std::thread;
@@ -220,12 +223,13 @@ where
 
     let mut buf = [0; DEFAULT_BUF_SIZE];
     assert_would_block(stream.read(&mut buf));
-
+    drop(stream);
     assert_would_block(listener.accept());
     assert!(listener.take_error().unwrap().is_none());
 
     barrier.wait();
     handle.join().unwrap();
+    drop(listener);
 }
 
 fn open_connections(
