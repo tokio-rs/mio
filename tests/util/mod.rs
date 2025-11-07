@@ -193,6 +193,10 @@ pub fn assert_error<T, E: fmt::Display>(result: Result<T, E>, expected_msg: &str
 pub fn assert_would_block<T>(result: io::Result<T>) {
     match result {
         Ok(_) => panic!("unexpected OK result, expected a `WouldBlock` error"),
+        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+        #[cfg(unix)]
+        Err(_) => panic!("unexpected error: {e}"),
+        #[cfg(windows)]
         Err(_) => {}
     }
 }

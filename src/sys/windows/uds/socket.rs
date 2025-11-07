@@ -208,7 +208,7 @@ impl SocketAddr {
     /// use std::path::Path;
     /// use mio::uds::SocketAddr;
     ///
-    /// let addr = SocketAddr::from_pathname("/tmp/my_socket.sock").unwrap();
+    /// let addr = SocketAddr::from_pathname("/tmp/socket.sock").unwrap();
     /// ```
     pub fn from_pathname<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let (addr, addrlen) = socketaddr_un(path.as_ref())?;

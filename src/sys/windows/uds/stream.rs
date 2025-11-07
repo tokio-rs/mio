@@ -55,7 +55,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```no_run
-    /// let stream = UnixStream::connect("C:/my_socket")?;
+    /// let stream = UnixStream::connect("/tmp/socket.sock")?;
     /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<Self> {
@@ -91,7 +91,7 @@ impl UnixStream {
     /// ```no_run
     /// use mio::sys::uds::SocketAddr;
     ///
-    /// let addr = SocketAddr::from_path("C:/my_socket")?;
+    /// let addr = SocketAddr::from_path("/tmp/socket.sock")?;
     /// let stream = UnixStream::connect_addr(&addr)?;
     /// # Ok::<(), std::io::Error>(())
     /// ```

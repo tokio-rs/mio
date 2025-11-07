@@ -22,7 +22,7 @@ use windows_sys::Win32::Networking::WinSock::{self, SOCKADDR_UN, SOCKET_ERROR};
 ///
 /// fn main() -> io::Result<()> {
 ///     // Bind to a socket file
-///     let listener = UnixListener::bind("C:/socket.sock")?;
+///     let listener = UnixListener::bind("/tmp/socket.sock")?;
 ///     
 ///     // Accept incoming connections
 ///     match listener.accept() {
@@ -68,7 +68,7 @@ impl UnixListener {
     /// ```no_run
     /// use mio::sys::uds::UnixListener;
     ///
-    /// let listener = UnixListener::bind("/tmp/my_socket.sock").unwrap();
+    /// let listener = UnixListener::bind("/tmp/socket.sock").unwrap();
     /// ```
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         unsafe {

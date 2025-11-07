@@ -233,7 +233,7 @@ fn unix_stream_peer_addr() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
-    std::fs::remove_file(path).unwrap();
+    let _ = std::fs::remove_file(path);
 
     handle.join().unwrap();
 }
@@ -296,7 +296,7 @@ fn unix_stream_shutdown_read() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
-    std::fs::remove_file(path).unwrap();
+    let _ = std::fs::remove_file(path);
     handle.join().unwrap();
 }
 
@@ -359,7 +359,7 @@ fn unix_stream_shutdown_write() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
-    std::fs::remove_file(path).unwrap();
+    let _ = std::fs::remove_file(path);
 
     handle.join().unwrap();
 }
@@ -430,7 +430,7 @@ fn unix_stream_shutdown_both() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
-    std::fs::remove_file(path).unwrap();
+    let _ = std::fs::remove_file(path);
 
     handle.join().unwrap();
 }
@@ -469,7 +469,7 @@ fn unix_stream_shutdown_listener_write() {
     );
 
     barrier.wait();
-    std::fs::remove_file(path).unwrap();
+    let _ = std::fs::remove_file(path);
 
     handle.join().unwrap();
 }
@@ -492,7 +492,7 @@ fn unix_stream_register() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
-    std::fs::remove_file(path).unwrap();
+    let _ = std::fs::remove_file(path);
 
     handle.join().unwrap();
 }
@@ -522,7 +522,7 @@ fn unix_stream_reregister() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
-    std::fs::remove_file(path).unwrap();
+    let _ = std::fs::remove_file(path);
 
     handle.join().unwrap();
 }
@@ -564,7 +564,7 @@ fn unix_stream_deregister() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
-    std::fs::remove_file(path).unwrap();
+    let _ = std::fs::remove_file(path);
 
     handle.join().unwrap();
 }
@@ -636,7 +636,7 @@ where
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
-    std::fs::remove_file(remote_addr.as_pathname().unwrap()).unwrap();
+    let _ = std::fs::remove_file(path);
     handle.join().unwrap();
 }
 
