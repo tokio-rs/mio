@@ -58,6 +58,10 @@ impl UnixListener {
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.inner.take_error()
     }
+    /// Sets the non-blocking mode for this socket
+    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        self.inner.set_nonblocking(nonblocking)
+    }
 }
 
 impl event::Source for UnixListener {

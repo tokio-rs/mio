@@ -199,7 +199,7 @@ where
     let path = temp_file(test_name);
 
     let mut listener = new_listener(&path).unwrap();
-
+    listener.set_nonblocking(true).unwrap();
     assert_socket_non_blocking(&listener);
     assert_socket_close_on_exec(&listener);
 

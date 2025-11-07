@@ -153,6 +153,10 @@ impl UnixStream {
     {
         self.inner.do_io(|_| f())
     }
+    /// Sets the non-blocking mode for this socket
+    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        self.inner.set_nonblocking(nonblocking)
+    }
 }
 
 impl Read for UnixStream {
