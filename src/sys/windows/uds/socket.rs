@@ -1,5 +1,5 @@
 use super::{startup, wsa_error};
-use std::{io, net::Shutdown, os::raw::c_int, path::Path, time::Duration};
+use std::{ffi::CStr, fmt::Debug, io, net::Shutdown, os::raw::c_int, path::Path, time::Duration};
 use windows_sys::Win32::Networking::WinSock::{
     self, AF_UNIX, FIONBIO, INVALID_SOCKET, SOCKADDR, SOCKADDR_UN, SOCKET, SOCKET_ERROR,
     SOCK_STREAM, SOL_SOCKET, SO_ERROR,
@@ -151,17 +151,21 @@ impl Socket {
         }
     }
 }
-
+#[derive(Default)]
 pub struct SocketAddr {
     pub addr: SOCKADDR_UN,
     pub addrlen: i32,
 }
-impl Default for SocketAddr {
-    fn default() -> Self {
-        Self {
-            addr: SOCKADDR_UN::default(),
-            addrlen: 0,
-        }
+
+impl Debug for SocketAddr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> core::fmt::Result {
+        let sun_path_str = unsafe {
+            CStr::from_ptr(self.addr.sun_path.as_ptr())
+                .to_string_lossy()
+        };
+        
+        write!(f, "SocketAddr {{ addr: SOCKADDR_UN {{ sun_family: {}, sun_path: {:?} }}, addrlen: {} }}",
+               self.addr.sun_family, sun_path_str, self.addrlen)
     }
 }
 impl SocketAddr {

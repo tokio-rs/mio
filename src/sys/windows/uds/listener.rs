@@ -1,10 +1,9 @@
 use super::{socketaddr_un, startup, wsa_error, Socket, SocketAddr, UnixStream};
 use std::{
-    io,
-    ops::{Deref, DerefMut},
-    path::Path,
+    io, ops::{Deref, DerefMut}, os::windows::io::{AsRawSocket, RawSocket}, path::Path
 };
 use windows_sys::Win32::Networking::WinSock::{self, SOCKADDR_UN, SOCKET_ERROR};
+#[derive(Debug)]
 pub struct UnixListener(Socket);
 
 impl UnixListener {
@@ -73,4 +72,10 @@ pub fn bind_addr(socket_addr: &SocketAddr) -> io::Result<UnixListener> {
 pub fn accept(s: &UnixListener) -> io::Result<(crate::net::UnixStream, SocketAddr)> {
     let (inner, addr) = s.accept()?;
     Ok((crate::net::UnixStream::from_std(inner), addr))
+}
+
+impl AsRawSocket for UnixListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.0.0 as _
+    }
 }

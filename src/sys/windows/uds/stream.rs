@@ -2,15 +2,44 @@ use std::fmt::Debug;
 use std::io;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use std::os::windows::io::AsRawSocket;
+use std::os::windows::io::RawSocket;
 use std::path::Path;
-
-use crate::event;
-
+use windows_sys::Win32::Networking::WinSock;
+use windows_sys::Win32::Networking::WinSock::SOCKET_ERROR;
+use super::wsa_error;
+use super::startup;
+use super::socketaddr_un;
 use super::Socket;
 use super::SocketAddr;
 #[derive(Debug)]
 pub struct UnixStream(pub Socket);
-impl UnixStream {}
+impl UnixStream {
+    pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        unsafe {
+            startup()?;
+            let s = Socket::new()?;
+            let (addr, len) = socketaddr_un(path.as_ref())?;
+            match WinSock::connect(s.0, &addr as *const _ as *const _, len) {
+                SOCKET_ERROR => Err(wsa_error()),
+                _ => Ok(Self(s)),
+            }
+        }
+    }
+    pub fn connect_addr(socket_addr: &SocketAddr) -> io::Result<Self> {
+        let s = Socket::new()?;
+        match unsafe {
+            WinSock::connect(
+                s.0,
+                &socket_addr.addr as *const _ as *const _,
+                socket_addr.addrlen,
+            )
+        } {
+            SOCKET_ERROR => Err(wsa_error()),
+            _ => Ok(Self(s)),
+        }
+    }
+}
 impl io::Write for UnixStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         io::Write::write(&mut &*self, buf)
@@ -48,35 +77,12 @@ impl DerefMut for UnixStream {
         &mut self.0
     }
 }
-pub fn connect(path: &Path) -> io::Result<UnixStream> {
-    todo!()
-}
 pub fn connect_addr(address: &SocketAddr) -> io::Result<UnixStream> {
-    todo!()
+    UnixStream::connect_addr(address)
 }
-pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
-    todo!()
-}
-impl event::Source for UnixStream {
-    fn register(
-        &mut self,
-        registry: &crate::Registry,
-        token: crate::Token,
-        interests: crate::Interest,
-    ) -> io::Result<()> {
-        todo!()
-    }
 
-    fn reregister(
-        &mut self,
-        registry: &crate::Registry,
-        token: crate::Token,
-        interests: crate::Interest,
-    ) -> io::Result<()> {
-        todo!()
-    }
-
-    fn deregister(&mut self, registry: &crate::Registry) -> io::Result<()> {
-        todo!()
+impl AsRawSocket for UnixStream {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.0.0 as _
     }
 }
