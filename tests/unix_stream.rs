@@ -57,7 +57,8 @@ fn unix_stream_connect() {
 
     let barrier_clone = barrier.clone();
     let handle = thread::spawn(move || {
-        let (stream, _) = listener.accept().unwrap();
+        let (mut stream, _) = listener.accept().unwrap();
+        stream.write_all(b"Hi").unwrap();
         barrier_clone.wait();
         drop(stream);
     });
@@ -76,12 +77,18 @@ fn unix_stream_connect() {
     );
 
     barrier.wait();
+    #[cfg(unix)]
     expect_events(
         &mut poll,
         &mut events,
         vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
-
+    #[cfg(windows)]
+    {
+        let mut buf = [0; 2];
+        assert_eq!(stream.read(&mut buf).unwrap(), 2);
+        assert_eq!(buf, *b"Hi");
+    }
     handle.join().unwrap();
 }
 
@@ -198,9 +205,9 @@ fn unix_stream_pair() {
 fn unix_stream_peer_addr() {
     init();
     let (handle, expected_addr) = new_echo_listener(1, "unix_stream_peer_addr");
-    let expected_path = expected_addr.as_pathname().expect("failed to get pathname");
+    let path = expected_addr.as_pathname().expect("failed to get pathname");
 
-    let stream = UnixStream::connect(expected_path).unwrap();
+    let stream = UnixStream::connect(path).unwrap();
     // Complete handshake to unblock the server thread.
     #[cfg(target_os = "cygwin")]
     let stream = {
@@ -221,14 +228,13 @@ fn unix_stream_peer_addr() {
         stream
     };
 
-    assert_eq!(
-        stream.peer_addr().unwrap().as_pathname().unwrap(),
-        expected_path
-    );
+    assert_eq!(stream.peer_addr().unwrap().as_pathname().unwrap(), path);
     assert!(stream.local_addr().unwrap().as_pathname().is_none());
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
+    std::fs::remove_file(path).unwrap();
+
     handle.join().unwrap();
 }
 
@@ -290,6 +296,7 @@ fn unix_stream_shutdown_read() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
+    std::fs::remove_file(path).unwrap();
     handle.join().unwrap();
 }
 
@@ -352,6 +359,8 @@ fn unix_stream_shutdown_write() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
+    std::fs::remove_file(path).unwrap();
+
     handle.join().unwrap();
 }
 
@@ -421,6 +430,8 @@ fn unix_stream_shutdown_both() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
+    std::fs::remove_file(path).unwrap();
+
     handle.join().unwrap();
 }
 
@@ -458,6 +469,8 @@ fn unix_stream_shutdown_listener_write() {
     );
 
     barrier.wait();
+    std::fs::remove_file(path).unwrap();
+
     handle.join().unwrap();
 }
 
@@ -479,6 +492,8 @@ fn unix_stream_register() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
+    std::fs::remove_file(path).unwrap();
+
     handle.join().unwrap();
 }
 
@@ -507,6 +522,8 @@ fn unix_stream_reregister() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
+    std::fs::remove_file(path).unwrap();
+
     handle.join().unwrap();
 }
 
@@ -547,6 +564,8 @@ fn unix_stream_deregister() {
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
+    std::fs::remove_file(path).unwrap();
+
     handle.join().unwrap();
 }
 
