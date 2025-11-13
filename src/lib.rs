@@ -27,7 +27,7 @@
 //!
 //! ## Examples
 //!
-//! Examples can found in the `examples` directory of the source code, or [on
+//! Examples can be found in the `examples` directory of the source code, or [on
 //! GitHub].
 //!
 //! [on GitHub]: https://github.com/tokio-rs/mio/tree/master/examples
