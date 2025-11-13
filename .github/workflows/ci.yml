@@ -143,7 +143,9 @@ jobs:
           - aarch64-unknown-linux-musl
           - aarch64-unknown-netbsd
           - aarch64-unknown-nto-qnx710
-          - aarch64-unknown-openbsd
+          # Standard library doesn't build anymore:
+          # <https://github.com/rust-lang/rust/issues/148898>
+          # - aarch64-unknown-openbsd
           - aarch64-unknown-redox
           - arm-linux-androideabi
           - arm64_32-apple-watchos
