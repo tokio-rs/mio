@@ -81,9 +81,9 @@ cfg_not_os_poll! {
     }
 }
 
-/// Define the `listen` backlog parameters as in the standard library. This
-/// helps avoid hardcoded unsynchronized values and allows better control of
-/// default values depending on the target.
+/// Define the `listen` backlog parameters. This helps avoid hardcoded
+/// unsynchronized values and allows better control of default values depending
+/// on the target.
 ///
 /// Selecting a “valid” default value can be tricky due to:
 ///
@@ -98,7 +98,8 @@ cfg_not_os_poll! {
 /// - Default values vary depending on the OS and its version. Common defaults
 ///   include: -1, 128, 1024, and 4096.
 ///
-// Here is the original code from the standard library
+// The logic here is taken from the standard library for unix sockets. TCP
+// sockets in the standard library use much smaller sizes.
 // https://github.com/rust-lang/rust/blob/4f808ba6bf9f1c8dde30d009e73386d984491587/library/std/src/os/unix/net/listener.rs#L72
 //
 #[allow(dead_code)]
