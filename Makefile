@@ -17,14 +17,11 @@ test_all: check_all_targets
 # NOTE: Requires a nightly compiler.
 # NOTE: Keep `RUSTFLAGS` and `RUSTDOCFLAGS` in sync to ensure the doc tests
 # compile correctly.
-# TODO: remove `--all-targets` once
-# <https://github.com/rust-lang/rust/issues/147394> and/or
-# <https://github.com/rust-lang/rust/issues/146465> are fixed.
 test_sanitizer:
 	@if [ -z $${SAN+x} ]; then echo "Required '\$$SAN' variable is not set" 1>&2; exit 1; fi
 	RUSTFLAGS="-Z sanitizer=$$SAN -Z sanitizer-memory-track-origins" \
 	RUSTDOCFLAGS="-Z sanitizer=$$SAN -Z sanitizer-memory-track-origins" \
-	cargo test --all-targets -Z build-std --all-features --target $(RUSTUP_TARGET)
+	cargo test -Z build-std --all-features --target $(RUSTUP_TARGET)
 
 # Check all targets using all features.
 check_all_targets: $(TARGETS)
