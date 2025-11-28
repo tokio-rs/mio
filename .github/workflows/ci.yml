@@ -23,8 +23,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
-    - name: Install Cargo-hack
-      run: cargo install --debug cargo-hack
+    - uses: taiki-e/install-action@cargo-hack
     - name: Check all features
       run: cargo hack check --feature-powerset
     - name: Tests
