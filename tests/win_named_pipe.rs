@@ -10,6 +10,9 @@ use mio::windows::NamedPipe;
 use mio::{Events, Interest, Poll, Token};
 use windows_sys::Win32::{Foundation::ERROR_NO_DATA, Storage::FileSystem::FILE_FLAG_OVERLAPPED};
 
+mod util;
+use util::{expect_events, ExpectEvent};
+
 fn _assert_kinds() {
     fn _assert_send<T: Send>() {}
     fn _assert_sync<T: Sync>() {}
@@ -369,15 +372,11 @@ fn read_message_larger_than_internal_buffer() {
     let expected_msg = vec![0x5u8; 8192];
     assert_eq!(t!(client.write(&expected_msg)), 8192);
 
-    loop {
-        t!(poll.poll(&mut events, Some(Duration::from_secs(5))));
-        let events_vec = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events_vec.iter().find(|e| e.token() == Token(0)) {
-            if event.is_readable() {
-                break;
-            }
-        }
-    }
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
 
     let mut buf = [0u8; 4000];
     let mut actual_msg = Vec::new();
@@ -422,15 +421,11 @@ fn read_with_small_buffer_provided() {
     let expected_msg = vec![1u8; 10000];
     assert_eq!(t!(client.write(&expected_msg)), 10000);
 
-    loop {
-        t!(poll.poll(&mut events, Some(Duration::from_secs(5))));
-        let events_vec = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events_vec.iter().find(|e| e.token() == Token(0)) {
-            if event.is_readable() {
-                break;
-            }
-        }
-    }
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
 
     let mut buf = [0u8; 128];
     let mut actual_msg = Vec::new();
