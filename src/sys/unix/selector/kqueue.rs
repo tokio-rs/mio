@@ -50,10 +50,7 @@ type Flags = u16;
 type Flags = u32;
 
 // Type of the `udata` field in the `kevent` structure.
-#[cfg(not(target_os = "netbsd"))]
 type UData = *mut libc::c_void;
-#[cfg(target_os = "netbsd")]
-type UData = libc::intptr_t;
 
 macro_rules! kevent {
     ($id: expr, $filter: expr, $flags: expr, $data: expr) => {
