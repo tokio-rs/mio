@@ -10,6 +10,9 @@ use mio::windows::NamedPipe;
 use mio::{Events, Interest, Poll, Token};
 use windows_sys::Win32::{Foundation::ERROR_NO_DATA, Storage::FileSystem::FILE_FLAG_OVERLAPPED};
 
+mod util;
+use util::{expect_events, ExpectEvent};
+
 fn _assert_kinds() {
     fn _assert_send<T: Send>() {}
     fn _assert_sync<T: Sync>() {}
@@ -346,4 +349,102 @@ fn reregister_deregister_different_poll() {
         poll2.registry().deregister(&mut pipe).unwrap_err().kind(),
         io::ErrorKind::AlreadyExists,
     );
+}
+
+#[test]
+fn read_message_larger_than_internal_buffer() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    // Send message larger than the IPC kernel buffer (4096 bytes)
+    let expected_msg = vec![0x5u8; 8192];
+    assert_eq!(t!(client.write(&expected_msg)), 8192);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf = [0u8; 4000];
+    let mut actual_msg = Vec::new();
+
+    loop {
+        match server.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                actual_msg.extend_from_slice(&buf[..n]);
+                if actual_msg.len() >= expected_msg.len() {
+                    break;
+                }
+            }
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                t!(poll.poll(&mut events, Some(Duration::from_secs(1))));
+            }
+            Err(e) => panic!("error reading message: {e}"),
+        }
+    }
+
+    assert_eq!(expected_msg, actual_msg);
+}
+
+#[test]
+fn read_with_small_buffer_provided() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    let expected_msg = vec![1u8; 10000];
+    assert_eq!(t!(client.write(&expected_msg)), 10000);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf = [0u8; 128];
+    let mut actual_msg = Vec::new();
+
+    loop {
+        match server.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                actual_msg.extend_from_slice(&buf[..n]);
+                if actual_msg.len() >= expected_msg.len() {
+                    break;
+                }
+            }
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+            }
+            Err(e) => panic!("error reading message: {e}"),
+        }
+    }
+
+    assert_eq!(actual_msg, expected_msg);
 }
