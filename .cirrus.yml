@@ -1,11 +1,17 @@
-freebsd_instance:
-  image: freebsd-13-2-release-amd64
-
 env:
   RUST_BACKTRACE: full
 
 task:
-  name: FreeBSD
+  matrix:
+    - name: Freebsd 13
+      freebsd_instance:
+        image: freebsd-13-5-release-amd64
+    - name: Freebsd 14
+      freebsd_instance:
+        image: freebsd-14-3-release-amd64-ufs
+    - name: Freebsd 15
+      freebsd_instance:
+        image: freebsd-15-0-release-amd64-ufs
   setup_script:
     - fetch https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile minimal
