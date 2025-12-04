@@ -1,3 +1,10 @@
+# 1.1.1
+
+* Handle `ERROR_MORE_DATA` when scheduling reads for Window named pipes
+  (https://github.com/tokio-rs/mio/pull/1921).
+* Fix compilation error on NetBSD due to changes in types in the libc crate
+  (https://github.com/tokio-rs/mio/pull/1923).
+
 # 1.1.0
 
 MSRV was increased to 1.71 to support windows-sys v0.61.
