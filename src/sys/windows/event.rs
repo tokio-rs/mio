@@ -31,12 +31,14 @@ impl Event {
         self.flags |= afd::POLL_SEND;
     }
 
+    
     pub(super) fn from_completion_status(status: &CompletionStatus) -> Event {
         Event {
             flags: status.bytes_transferred(),
             data: status.token() as u64,
         }
     }
+    
 
     pub(super) fn to_completion_status(&self) -> CompletionStatus {
         CompletionStatus::new(self.flags, self.data as usize, std::ptr::null_mut())
@@ -61,6 +63,23 @@ pub(crate) const ERROR_FLAGS: u32 = afd::POLL_CONNECT_FAIL;
 pub(crate) const READ_CLOSED_FLAGS: u32 =
     afd::POLL_DISCONNECT | afd::POLL_ABORT | afd::POLL_CONNECT_FAIL;
 pub(crate) const WRITE_CLOSED_FLAGS: u32 = afd::POLL_ABORT | afd::POLL_CONNECT_FAIL;
+
+/// An extended internal flag to indicate that the instance belongs to 
+/// `NtAssociateWaitCompletionPacket`.
+#[cfg(all(target_os = "windows", feature = "os-extended"))]
+pub(crate) const INT_FLAG_WIN_EVENT: u32 = 1 << 31;
+
+/// Checks if flag [INT_FLAG_WIN_EVENT] is set and clears it.
+#[cfg(all(target_os = "windows", feature = "os-extended"))]
+pub(crate) 
+fn is_win_event(event: &mut Event) -> bool
+{
+    let res = event.flags & INT_FLAG_WIN_EVENT > 0;
+
+    event.flags = event.flags & !INT_FLAG_WIN_EVENT;
+
+    return res;
+}
 
 pub fn is_readable(event: &Event) -> bool {
     event.flags & READABLE_FLAGS != 0

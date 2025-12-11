@@ -3,6 +3,12 @@ use super::io_status_block::IoStatusBlock;
 use super::Event;
 use crate::sys::Events;
 
+#[cfg(feature = "os-extended")]
+use crate::sys::event::is_win_event;
+
+#[cfg(feature = "os-extended")]
+use crate::sys::windows::source_hndl::{SourceCompPack, SourceCompPacks};
+
 cfg_net! {
     use crate::sys::event::{
         ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
@@ -15,6 +21,8 @@ use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::io;
 use std::marker::PhantomPinned;
+#[cfg(feature = "os-extended")]
+use std::os::windows::io::{AsRawHandle};
 use std::os::windows::io::RawSocket;
 use std::pin::Pin;
 #[cfg(debug_assertions)]
@@ -403,12 +411,122 @@ cfg_io_source! {
 pub struct SelectorInner {
     pub(super) cp: Arc<CompletionPort>,
     update_queue: Mutex<VecDeque<Pin<Arc<Mutex<SockState>>>>>,
+
+    /// Contains all completion ports which are binded to `event handles`. 
+    /// It is requiret to call [NtAssociateWaitCompletionPacket] every time
+    /// the program wants to poll these handles, for this reason it is required
+    /// to keep them here. It would be better to have a `Weak` reference to 
+    /// the owner and ask to re-associate, but it will require to `upgrade`
+    /// the reference each time the `poll` is called. 
+    #[cfg(feature = "os-extended")]
+    completion_packs: Mutex<SourceCompPacks>,
     afd_group: AfdGroup,
     is_polling: AtomicBool,
 }
 
 // We have ensured thread safety by introducing lock manually.
 unsafe impl Sync for SelectorInner {}
+
+/// Windows Event Completion Pack Association
+#[cfg(feature = "os-extended")]
+impl SelectorInner
+{
+    /// Registeres the [SourceCompPack] to the selector's `completion_packs` list 
+    /// and associates the [SourceCompPack] with instance's `cp` [CompletionPort].
+    /// 
+    /// # Arguments
+    /// 
+    /// * `scp` - [SourceCompPack] a scp to register. The provided data must comply with the
+    ///     [SourceCompPacks] requirments.
+    ///
+    /// # Returns 
+    /// 
+    /// An [Result::Err] is returned:
+    /// 
+    /// * [SourceCompPacks::insert_sorted] - errors
+    /// 
+    /// * [SourceCompPack::associate_wait_completion_packet] - errors
+    pub(crate) 
+    fn regester_completion_pack(&self, scp: SourceCompPack) -> io::Result<()>
+    {
+        let mut lock= 
+            self
+                .completion_packs
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+
+        // insert and associate with the registrie's CompPort
+        lock
+            .insert_sorted(scp)?
+            .associate_wait_completion_packet(self.cp.as_raw_handle())?;
+
+        return Ok(());
+    }
+
+    /// Removes the [SourceCompPack] from the selector's `completion_packs` by the
+    /// `token` number and deassociates the `completion` from `completion port`.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `token` - a token of the [SourceCompPack] instance to deassociate.
+    /// 
+    /// # Returns 
+    /// 
+    /// An [Result::Err] is returned:
+    /// 
+    /// * [SourceCompPacks::remove] - errors
+    /// 
+    /// * [SourceCompPack::deassociate_wait_completion_packet] - errors
+    pub(crate) 
+    fn unregister_completion_pack(&self, token: Token) -> io::Result<SourceCompPack>
+    {
+        // remove from queue
+        let scp = 
+            self
+                .completion_packs
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .remove(token)?;
+
+        // cancel WaitCompletionPacket
+        scp.deassociate_wait_completion_packet(false)?;
+
+        return Ok(scp);
+    }
+
+    /// Replaces the current `token` to new `token`.
+    /// 
+    /// # Returns 
+    /// 
+    /// An [Result::Err] is returned:
+    /// 
+    /// * [SourceCompPacks::search] - errors
+    /// 
+    /// * [SourceCompPack::deassociate_wait_completion_packet] - error 
+    /// 
+    /// * [SourceCompPack::associate_wait_completion_packet] - error
+    pub(crate)
+    fn replace_completion_pack_token(&self, cur_token: Token, token: Token) -> io::Result<()>
+    {
+        let mut lock =
+            self
+                .completion_packs
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+
+        let scp = lock.search(cur_token)?;
+
+        scp.set_token(token);
+
+        // deassociate, because the token value have changed
+        scp.deassociate_wait_completion_packet(false)?;
+
+        // associate again
+        scp.associate_wait_completion_packet(self.cp.as_raw_handle())?;
+
+        return Ok(());
+    }
+}
 
 impl SelectorInner {
     pub fn new() -> io::Result<SelectorInner> {
@@ -421,6 +539,8 @@ impl SelectorInner {
                 update_queue: Mutex::new(VecDeque::new()),
                 afd_group: AfdGroup::new(cp_afd),
                 is_polling: AtomicBool::new(false),
+                #[cfg(feature = "os-extended")]
+                completion_packs: Mutex::new(SourceCompPacks::new()),
             }
         })
     }
@@ -428,6 +548,8 @@ impl SelectorInner {
     /// # Safety
     ///
     /// May only be calling via `Selector::select`.
+    /// 
+    /// Blocking! Blocks if `timeout` is [Option::None] until any event recevied!
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
 
@@ -492,9 +614,43 @@ impl SelectorInner {
         let mut update_queue = self.update_queue.lock().unwrap();
         for iocp_event in iocp_events.iter() {
             if iocp_event.overlapped().is_null() {
-                events.push(Event::from_completion_status(iocp_event));
-                n += 1;
-                continue;
+
+                #[cfg(feature = "os-extended")]
+                {
+                    let mut event = Event::from_completion_status(iocp_event);
+
+                    // check if it is a `event` handle
+                    if is_win_event(&mut event) == true
+                    {
+                        // reassosiate
+                        let res = 
+                            self
+                                .completion_packs
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner())
+                                .re_associate_wait_comp_pack_by_token(self.cp.as_raw_handle(), Token(event.data as usize));
+
+                        if let Err(_e) = res.as_ref()
+                        {
+                            // if error == not found, the instance, probably, has gone while we were behind, ignore
+                            // but this "feeder" does not return errors, so ignore all
+
+                            // TODO: TO CONSIDER: if it will not be reassociated, the event will never be visible to completion
+                            // port!
+                        }
+                    }
+
+                    events.push(event);
+                    n += 1;
+                    continue;
+                }
+
+                #[cfg(not(feature = "os-extended"))]
+                {
+                    events.push(Event::from_completion_status(iocp_event));
+                    n += 1;
+                    continue;
+                }
             } else if iocp_event.token() % 2 == 1 {
                 // Handle is a named pipe. This could be extended to be any non-AFD event.
                 let callback = (*(iocp_event.overlapped() as *mut super::Overlapped)).callback;

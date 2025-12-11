@@ -19,6 +19,8 @@ use windows_sys::Win32::System::IO::{
 #[derive(Debug)]
 pub(crate) struct CompletionPort {
     handle: Handle,
+    
+
 }
 
 // SAFETY: `Handles`s are, in general, not thread-safe. However, we only used `Handle`s for
@@ -34,6 +36,17 @@ unsafe impl Sync for CompletionPort {}
 /// These statuses can be created via the `new` or `empty` constructors and then
 /// provided to a completion port, or they are read out of a completion port.
 /// The fields of each status are read through its accessor methods.
+/// 
+/// The `NtAssociateWaitCompletionPacket` has the following [OVERLAPPED_ENTRY]
+/// layout:
+/// 
+/// * `OVERLAPED_ENTRY::lpCompletionKey` corresponds to arg `KeyContext`
+/// 
+/// * `OVERLAPED_ENTRY.lpOverlapped` corresponds to arg `ApcContext`
+/// 
+/// * `OVERLAPED_ENTRY.Internal` corresponds to arg `IoStatus`
+/// 
+/// * `OVERLAPED_ENTRY.dwNumberOfBytesTransfered` corresponds to arg `IoStatusInformation`
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct CompletionStatus(OVERLAPPED_ENTRY);
@@ -63,6 +76,7 @@ impl CompletionPort {
             })
         }
     }
+
 
     /// Associates a new `HANDLE` to this I/O completion port.
     ///

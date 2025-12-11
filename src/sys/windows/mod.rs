@@ -39,6 +39,12 @@ cfg_net! {
     pub use selector::{SelectorInner, SockState};
 }
 
+cfg_os_extended! {
+    mod ffi;
+
+    pub mod source_hndl;
+}
+
 cfg_os_ext! {
     pub(crate) mod named_pipe;
 }

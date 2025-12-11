@@ -102,6 +102,9 @@ pub mod windows {
     //! Windows only extensions.
 
     pub use crate::sys::named_pipe::NamedPipe;
+
+    #[cfg(feature = "os-extended")]
+    pub use crate::sys::source_hndl::SourceEventHndl;
 }
 
 pub mod features {
