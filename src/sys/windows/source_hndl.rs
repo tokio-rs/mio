@@ -1,20 +1,13 @@
 use std::
 {
-    cell::OnceCell, 
-    cmp::Ordering, 
-    collections::{BTreeSet}, 
-    io::{self, ErrorKind}, 
-    os::
+    cell::OnceCell, collections::BTreeMap, io::{self, ErrorKind}, os::
     {
         raw::c_void, 
         windows::io::{AsHandle, AsRawHandle, BorrowedHandle, OwnedHandle, RawHandle}
-    }, 
-    ptr::null_mut, 
-    sync::Arc, 
-    usize
+    }, ptr::null_mut, sync::{Arc, Mutex, OnceLock, Weak}, usize
 };
 
-use windows_sys::Win32::{Storage::FileSystem::{FILE_TYPE_UNKNOWN, GetFileType}};
+use windows_sys::Win32::{Storage::FileSystem::{FILE_TYPE_UNKNOWN, GetFileType}, System::IO::{OVERLAPPED_ENTRY}};
 
 use crate::
 {
@@ -24,13 +17,14 @@ use crate::
     event::Source, 
     sys::
     {
-        SelectorInner, 
-        event::INT_FLAG_WIN_EVENT, 
-        windows::ffi::{self, IO_CANCELLED_ERROR, ffi_nt_create_wait_completion_packet}
+        SelectorInner, windows::{Event, ffi::{self, IO_CANCELLED_ERROR, ffi_nt_create_wait_completion_packet}, iocp::CompletionStatus, tokens::{TokenEvent, TokenGenerator, TokenSelector}}
     }
 };
 
 use super::ffi::HANDLE;
+
+
+static NEXT_TOKEN: TokenGenerator<TokenEvent> = TokenGenerator::new();
 
 /// A wait completion packet.
 /// 
@@ -40,7 +34,10 @@ use super::ffi::HANDLE;
 /// closed when instance goes out of scope. The `event handle`
 /// is closed by the owner.
 /// 
-/// The `token` is assigned outside and must be unique.
+/// `internal_token` is generated automatically. It is visible
+/// for `selector`.
+/// 
+/// `user_token` is assigned by user and visible only yo user.
 #[derive(Debug)]
 pub(crate) struct SourceCompPack
 {
@@ -51,12 +48,31 @@ pub(crate) struct SourceCompPack
     /// the `event_hndl` is assigned.
     comp_hndl: OwnedHandle,
 
-    /// Token which was assigned outside. Unique.
+    /// Token which was AUTOMATICALLY assigned. Unique.
     /// Used for binary search ans sorking in ascending order.
-    token: Token
+    internal_token: TokenEvent,
+
+    /// user assigned token
+    user_token: Token,
+
+    /// selector
+    si: Arc<SelectorInner>,
+
+    /// A weak reference to this stuct
+    me: Weak<Mutex<SourceCompPack>>,
 }
 
+unsafe impl Sync for SourceCompPack {}
+
 unsafe impl Send for SourceCompPack {}
+
+impl Drop for SourceCompPack
+{
+    fn drop(&mut self) 
+    {
+        let _ = self.deassociate_wait_completion_packet(true);
+    }
+}
 
 impl Eq for SourceCompPack {}
 
@@ -68,11 +84,12 @@ impl PartialEq for SourceCompPack
     }
 }
 
+/*
 impl PartialEq<Token> for &SourceCompPack
 {
     fn eq(&self, other: &Token) -> bool 
     {
-        return self.token == *other;
+        return self.index_token == *other;
     }
 }
 
@@ -80,7 +97,7 @@ impl Ord for SourceCompPack
 {
     fn cmp(&self, other: &Self) -> Ordering 
     {
-        return self.token.cmp(&other.token);
+        return self.index_token.cmp(&other.index_token);
     }
 }
 
@@ -91,15 +108,24 @@ impl PartialOrd for SourceCompPack
         return Some(self.cmp(other));
     }
 }
+*/
 
 impl SourceCompPack
 {
     /// Creates new instance. The `ev_hndl` is borrowed to make sure that the
     /// provided argument originates from the source.
+    /// 
+    /// # Returns
+    /// 
+    /// * [ffi_nt_create_wait_completion_packet] - errors
     pub(crate) 
-    fn new(ev_hndl: BorrowedHandle<'_>, token: Token) -> io::Result<Self>
+    fn new(inner: Arc<SelectorInner>, ev_hndl: BorrowedHandle<'_>, token: Token) -> io::Result<Self>
     {
+        // calling NTDLL to create a competion packet
         let wcp_oh = ffi_nt_create_wait_completion_packet()?;
+
+        // mapping our token
+        let index_token = NEXT_TOKEN.next();
 
         return Ok(
             Self
@@ -108,16 +134,89 @@ impl SourceCompPack
                     ev_hndl.as_raw_handle(),
                 comp_hndl: 
                     wcp_oh,
-                token: 
+                    internal_token: index_token,
+                user_token: 
                     token,
+                si: 
+                    inner,
+                me: 
+                    Weak::default(),
             }
         );
     }
 
-    pub(crate) 
-    fn set_token(&mut self, token: Token)
+    /// Sets the [Weak] reference
+    fn set_ref(&mut self, me: &Weak<Mutex<SourceCompPack>>)
     {
-        self.token = token;
+        self.me = me.clone();
+    }
+
+    /// An event handler which is called from `event_feed` feeder.
+    /// 
+    /// # Panics
+    /// 
+    /// Because the `event_feed` in `selector` does not support soft result
+    /// handling, the [Self::associate_wait_completion_packet] is `unwrapped`.
+    pub(super)     
+    fn from_overlapped(status: &OVERLAPPED_ENTRY, opt_events: Option<&mut Vec<Event>>) 
+    {
+        let cp_status = CompletionStatus::from_entry(status);
+
+        // cast the raw pointer into the `weak` reference and try to upgrade.
+        let Some(scp) = 
+            unsafe 
+            {
+                Weak::<Mutex<SourceCompPack>>::from_raw(cp_status.overlapped() as *const Mutex<SourceCompPack>) 
+            }
+            .upgrade()
+            else
+            {
+                // the owner of the object have dropped it. Ignore
+                return;
+            };
+
+        // there is a potential problem with race conditions, depends on what the user will do.
+        // 1) the ARC is aquired, but the mutex is locked because the reregistration is running and moved on
+        //      another selector.
+        // 2) user dropped `handle` before we locked mutex and won the race. So the removed event will be 
+        //      returned.
+        
+        // lock mutex asap
+        let scp_lock = 
+            scp.lock().unwrap_or_else(|e| e.into_inner());
+
+        // read event, but we cannot know if another thread is dropping the `handle`, so 
+        // it will be deassociated later, but the last event (after dropping) will be emited.
+        if let Some(events) = opt_events 
+        {
+            let ev = Event::from_completion_status_event(&cp_status); 
+
+            events.push(ev);
+        }
+
+        // rebind
+
+        // there is way the error can be handled. TODO: add return declaration?
+        let _ = scp_lock.associate_wait_completion_packet().unwrap();
+
+        drop(scp_lock);
+
+        return;
+    }
+
+
+    /// Sets the user token
+    pub(crate) 
+    fn set_user_token(&mut self, token: Token)
+    {
+        self.user_token = token;
+    }
+
+    /// Sets the [SelectorInner].
+    pub(crate) 
+    fn set_selector(&mut self, si: Arc<SelectorInner>)
+    {
+        self.si = si;
     }
 
     /// A wrapper around the [ffi::NtAssociateWaitCompletionPacket]. 
@@ -129,20 +228,20 @@ impl SourceCompPack
     /// An [Result::Err] is returned:
     /// 
     /// * [ffi::NTSTATUS] is returned
-    pub(crate) 
-    fn associate_wait_completion_packet(&self, iocp_handle: RawHandle) -> io::Result<()>
+    pub(super) 
+    fn associate_wait_completion_packet(&self) -> io::Result<()>
     {
         unsafe
         {
             ffi::
                 NtAssociateWaitCompletionPacket(
                     self.comp_hndl.as_raw_handle(), 
-                    iocp_handle, 
+                    self.si.cp.as_raw_handle(), 
                     self.event_hndl, 
-                    self.token.0 as *mut c_void, // OVERLAPED_ENTRY.lpCompletionKey
-                    null_mut(), // OVERLAPED_ENTRY.lpOverlapped
+                    self.internal_token.get_token().0 as *mut c_void, // OVERLAPED_ENTRY.lpCompletionKey
+                    Weak::into_raw(self.me.clone()).cast_mut() as *mut c_void, // OVERLAPED_ENTRY.lpOverlapped
                     0, //OVERLAPED_ENTRY.Internal
-                    INT_FLAG_WIN_EVENT as usize, //OVERLAPED_ENTRY.dwNumberOfBytesTransfered
+                    self.user_token.0, //OVERLAPED_ENTRY.dwNumberOfBytesTransfered
                     null_mut()
                 )
                 .into_result()?
@@ -166,7 +265,7 @@ impl SourceCompPack
     /// An [Result::Err] is returned:
     /// 
     /// * [ffi::NTSTATUS] is returned except [IO_CANCELLED_ERROR]
-    pub(crate)
+    pub(super)
     fn deassociate_wait_completion_packet(&self, rem_sig_packet: bool) -> io::Result<()>
     {
         let res = 
@@ -186,6 +285,8 @@ impl SourceCompPack
     }
 }
 
+static SCP_PACKS: OnceLock<Mutex<SourceCompPacks>> = OnceLock::new();
+
 /// A wait completion packet storage.
 /// 
 /// Sorted in ascending order, because the `binary search` is used 
@@ -204,200 +305,236 @@ impl SourceCompPack
 pub(crate) struct SourceCompPacks
 {
     /// A list of WaitCompletionPacket associations.
-    scp_list: Vec<SourceCompPack>,
-
-    /// A `ev_hndl` duplicate detector.
-    ev_hndl_dup: BTreeSet<usize>,
+    scp_list: BTreeMap<usize, Arc<Mutex<SourceCompPack>>>,
 }
 
 impl SourceCompPacks
 {
-    pub(crate)
-    fn new() -> Self
-    {
-        return 
-            Self
-            { 
-                scp_list: Vec::with_capacity(10),
-                ev_hndl_dup: BTreeSet::new(),
-            };
-    }
-
-    /// Inserts the `scp` to the list. The `scp` token must be 
-    /// unique because it is used as a key for binary_searching and
-    /// sorting.
-    /// 
-    /// This function also checks if `ev_hndl` of `scp` have been already
-    /// inserted.
-    /// 
-    /// # Arguments 
-    /// 
-    /// * `scp` - a [SourceCompPack] structure.
+    /// Inserts the `scp` to the BTree.
     /// 
     /// # Returns
     /// 
     /// An [Result::Err] is returned:
     /// 
-    /// * [ErrorKind::NotFound] - in case if record with `event handle` is already on
-    /// the list or if token of the [SourceCompPack] was found. The error description 
-    /// is a [String] type.
-    /// 
-    /// Otherwise, a mutable reference to stored [SourceCompPack] is returned.
-    pub(crate) 
-    fn insert_sorted(&mut self, scp: SourceCompPack) -> io::Result<&mut SourceCompPack>
+    /// * [ErrorKind::AlreadyExists] - `ev_hndl` presents on the list.
+    fn insert(&mut self, ev_hndl: BorrowedHandle<'_>, scp: Arc<Mutex<SourceCompPack>>) -> io::Result<()>
     {
-        let res = 
-            self
-                .scp_list
-                .binary_search_by(|l_scp| 
-                    l_scp.cmp(&scp) // searches by token
-                );
+        let ev_handle = ev_hndl.as_raw_handle() as usize;
 
-        match res
+        if self.scp_list.contains_key(&ev_handle) == true
         {
-            Ok(_index) => 
-                return Err( 
-                    io::Error::new(
-                        ErrorKind::AlreadyExists, 
-                        format!("token is on the list: {}", scp.token.0)
-                    ) 
-                ),
-            Err(index) => 
-            {
-                // check for token duplicates
-                if let Some(_) = self.ev_hndl_dup.get(&(scp.event_hndl as usize))
-                {
-                    return Err( 
-                        io::Error::new(
-                            ErrorKind::AlreadyExists, 
-                            format!("ev_handl is on the list: {}", scp.event_hndl as usize)
-                        ) 
-                    );
-                }
-
-                self.scp_list.insert(index, scp);
-
-                return Ok( self.scp_list.get_mut(index).unwrap() );
-            }
+            return Err(
+                io::Error::new(ErrorKind::AlreadyExists, 
+                format!("ev_handle: {} already registered!", ev_handle))
+            );
         }
+
+        let _ = self.scp_list.insert(ev_handle, scp);
+
+        return Ok(());
     }
 
-
-    /// Searches on the list using binary search.
-    #[inline]
-    fn binary_search_token_internal(&self, token: Token) -> io::Result<usize>
-    {
-        return 
-            self
-                .scp_list
-                .binary_search_by_key(&token, |scp| scp.token)
-                .map_err(|_e|
-                    io::Error::new(ErrorKind::NotFound, format!("token: {} not found!", token.0))
-                );
-    }
-
-    /// Searches for the record by the `token` using binary search.
+    /// Removes from BTree.
     /// 
     /// # Returns
     /// 
     /// An [Result::Err] is returned:
     /// 
-    /// * [ErrorKind::NotFound] - in case if record with `token` does not exist. 
-    /// The error description is a [String] type.
-    /// 
-    /// Otherwise, the mutable reference to [SourceCompPack] is returned.
-    /// V opačnom prípade sa vráti meniteľný odkaz na [SourceCompPack].
-    pub(crate) 
-    fn search(&mut self, token: Token) -> io::Result<&mut SourceCompPack>
+    /// * [ErrorKind::NotFound] - `ev_hndl` was not found.
+    fn remove(&mut self, ev_hndl: BorrowedHandle<'_>) -> io::Result<Arc<Mutex<SourceCompPack>>>
     {
-        return 
-            self
-                .binary_search_token_internal(token)
-                .map(|scp_index|
-                    self.scp_list.get_mut(scp_index).unwrap()
+        let loc_ev_handl = ev_hndl.as_raw_handle() as usize;
+
+        let Some(scp) = self.scp_list.remove(&loc_ev_handl)
+            else
+            {
+                return Err(
+                    io::Error::new(ErrorKind::NotFound, 
+                        format!("ev_handle: {} already registered!", loc_ev_handl))
                 );
-    }
+            };
 
-    /// Removes the record by the `event` handle!
-    /// 
-    /// # Returns
-    /// 
-    /// An [Result::Err] is returned:
-    /// 
-    /// * [ErrorKind::NotFound] - in case if record with `token` does not exist. 
-    /// The error description is a [String] type.
-    /// 
-    /// Otherwise, the inner type contains [SourceCompPack]. See description for this
-    /// structure.
-    pub(crate) 
-    fn remove(&mut self, token: Token) -> io::Result<SourceCompPack>
-    {
-        return 
-            self
-                .binary_search_token_internal(token)
-                .map(|scp_index|
-                    {
-                        let scp = self.scp_list.remove(scp_index);
-
-                        // remove the token from dup finder
-                        let _ = self.ev_hndl_dup.remove(&(scp.event_hndl as usize));
-
-                        scp
-                    }
-                );
-    }
-
-    /*pub(crate) 
-    fn re_associate_wait_comp_pack(&self, iocp_handle: RawHandle) -> io::Result<()>
-    {
-        return 
-            self
-                .scp_list
-                .iter()
-                .map(|v| 
-                    v.associate_wait_completion_packet(iocp_handle)
-                )
-                .collect();
-    }*/
-
-    /// Performs a `NtAssociateWaitCompletionPacket` for the [SourceCompPack] by [Token] which was
-    /// assigned. The reason (why `token` was used is this function is called during the event feeding).
-    /// 
-    /// It does NOT use a binary_search because it is not possible to resolve the `event` handle from
-    /// `token`.
-    /// 
-    /// It is needed because:
-    /// 
-    /// > When the packet is picked up, the association must be reestablished by calling this function again. 
-    /// > An error is returned if the wait completion packet is already in use for an association.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `iocp_hanle` - a [RawHandle] to the initial `IoCompletionPort` which is polled.
-    /// 
-    /// * `token` - [Token] which identifies the instance.
-    /// 
-    /// # Returns
-    /// 
-    /// An [Result::Err] is returned:
-    /// 
-    /// * [ErrorKind::NotFound] - in case if record with `token` does not exist.
-    /// The error description is a [String] type.
-    /// 
-    /// * a raw OS error with `NTSTATUS` code. No description is awailable.
-    pub(crate) 
-    fn re_associate_wait_comp_pack_by_token(&self, iocp_handle: RawHandle, token: Token) -> io::Result<()>
-    {
-        let scp = 
-            self
-                .binary_search_token_internal(token)
-                .map(|scp_index|
-                    self.scp_list.get(scp_index).unwrap()
-                )?;
-
-        return scp.associate_wait_completion_packet(iocp_handle);
+        return Ok(scp);
     }
 }
+    
+/// Adapter for [`BorrowedHandle`] providing an [`Source`] implementation.
+/// 
+/// `SourceHndl` enables registering only event* types with `poll`.
+///
+/// Works same way as `SourceFd`. The code is safe, but it lacks of the control
+/// under the provided `handle`. The program which uses this methos is responsible 
+/// for deregistering the [BorrowedHandle].
+/// 
+/// Example:
+/// 
+/// ```ignore
+/// let mut se_hndl_timer = PrimitiveTimer::new("timer_1");
+/// 
+/// let mut poll = Poll::new().unwrap();
+/// 
+/// poll.registry().register(&mut SourceHndl::new(&se_hndl_timer).unwrap(), Token(1), Interest::READABLE).unwrap();
+/// ```
+#[derive(Debug)]
+pub struct SourceHndl<'hndl>(BorrowedHandle<'hndl>);
+
+impl<'hndl> Source for SourceHndl<'hndl>
+{
+    /// # Returns
+    /// 
+    /// An [Result::Err] is returned:
+    /// 
+    /// * [SourceCompPack::associate_wait_completion_packet] - errors
+    /// 
+    /// * [SourceCompPacks::insert] - errors
+    fn register(&mut self, registry: &Registry, token: Token, _interests: Interest) -> io::Result<()> 
+    {
+        let scp_pack = SCP_PACKS.get_or_init(|| Mutex::new(SourceCompPacks::default()));
+
+        let mut scp_lock = scp_pack.lock().unwrap_or_else(|e| e.into_inner());
+
+        let mut scp = 
+            SourceCompPack::new(registry.selector().inner.clone(), self.0, token)?;
+
+        // creating pair event:completion
+        let scp = 
+            Arc::new_cyclic(|me| 
+                {
+                    scp.set_ref(me);
+
+                    return Mutex::new(scp);
+                }
+            );
+
+        scp_lock.insert(self.0, scp.clone())?;
+
+        // associate
+        {
+            scp.lock().unwrap().associate_wait_completion_packet()?;
+        }
+
+        return Ok(());
+    }
+
+    /// # Returns
+    /// 
+    /// An [Result::Err] is returned:
+    /// 
+    /// * [SourceCompPacks::remove] - errors
+    /// 
+    /// * [SourceCompPack::associate_wait_completion_packet] - errors
+    /// 
+    /// * [SourceCompPack::deassociate_wait_completion_packet] - errors
+    /// 
+    /// * [SourceCompPacks::insert] - errors
+    fn reregister(&mut self, registry: &Registry, token: Token, _interests: Interest) -> io::Result<()> 
+    {
+        let scp_pack = SCP_PACKS.get_or_init(|| Mutex::new(SourceCompPacks::default()));
+
+        let mut scp_lock = scp_pack.lock().unwrap_or_else(|e| e.into_inner());
+
+        let scp = scp_lock.remove(self.0)?;
+        
+        {
+            let mut scp_lock = 
+                scp.lock().unwrap_or_else(|e| e.into_inner());
+            
+            if registry.selector().same_port(&scp_lock.si.cp) == false
+            {
+                scp_lock.deassociate_wait_completion_packet(false)?;
+
+                // update token just in case
+                scp_lock.set_user_token(token);
+
+                // replace selector
+                scp_lock.set_selector(registry.selector().inner.clone());
+
+                // register completion pack
+                scp_lock.associate_wait_completion_packet()?;
+            }
+            else if scp_lock.user_token != token
+            {
+                scp_lock.deassociate_wait_completion_packet(false)?;
+                
+                // update token just in case
+                scp_lock.set_user_token(token);
+
+                // register completion pack
+                scp_lock.associate_wait_completion_packet()?;
+            }
+        }
+        
+        // restore 
+        let _ = scp_lock.insert(self.0, scp)?;
+       
+        return Ok(());
+    }
+
+    /// # Returns
+    /// 
+    /// An [Result::Err] is returned:
+    /// 
+    /// * [SourceCompPacks::remove] - errors
+    /// 
+    /// * [SourceCompPack::deassociate_wait_completion_packet] - errors
+    fn deregister(&mut self, _registry: &Registry) -> io::Result<()> 
+    {
+        let scp_pack = SCP_PACKS.get_or_init(|| Mutex::new(SourceCompPacks::default()));
+
+        let mut scp_lock = scp_pack.lock().unwrap_or_else(|e| e.into_inner());
+
+        let scp = scp_lock.remove(self.0)?;
+        
+        scp.lock().unwrap().deassociate_wait_completion_packet(true)?;
+
+        return Ok(());
+    }
+}
+
+impl<'hndl> TryFrom<BorrowedHandle<'hndl>> for SourceHndl<'hndl>
+{
+    type Error = io::Error;
+
+    fn try_from(hndl: BorrowedHandle<'hndl>) -> Result<Self, Self::Error> 
+    {
+        // try to verify that this is an event
+        if unsafe { GetFileType(hndl.as_handle().as_raw_handle()) } != FILE_TYPE_UNKNOWN
+        {
+            return Err(io::Error::new(ErrorKind::InvalidData, "handler is not event type"));
+        }
+
+        return Ok(Self(hndl));
+    }
+}
+
+impl<'hndl> SourceHndl<'hndl>
+{
+    /// Creates new instance by calling [TryFrom] from [BorrowedHandle].
+    /// 
+    /// The `hndl` is a `handle` which originates from 
+    /// 
+    /// * CreateWaitableTimer
+    /// 
+    /// * CreateEvent
+    /// 
+    /// * or other where `handle` is an event object.
+    /// 
+    /// # Returns
+    /// 
+    /// An [Result::Err] is returned:
+    /// 
+    /// * [ErrorKind::InvalidData] - is returned if the [GetFileType] returns other
+    ///     than the type [FILE_TYPE_UNKNOWN].
+    /// 
+    /// Otherwise, the instance is returned.
+    #[inline]
+    pub 
+    fn new<HNDL: AsHandle>(hndl: &'hndl HNDL) -> io::Result<Self>
+    {
+        return Self::try_from(hndl.as_handle());
+    }
+}
+
 
 /// Adapter for the any `HNDL` structure which implements the
 /// [AsHandle] to any `event` handle from the list below:
@@ -442,8 +579,9 @@ pub struct SourceEventHndl<HNDL: AsHandle>
     /// A event based instance
     ev_source: OnceCell<HNDL>,
 
-    /// A bind to selector.
-    si_bind: Option<(Arc<SelectorInner>, Token)>,
+    /// An atomic reference to `scp`. Should not be clonned. A [Weak] reference
+    /// is passed to `selector` to detect when event `self` was dropped.
+    scp_bind: Option<Arc<Mutex<SourceCompPack>>>,
 }
 
 impl<HNDL: AsHandle> AsHandle for SourceEventHndl<HNDL>
@@ -497,8 +635,7 @@ impl<HNDL: AsHandle> SourceEventHndl<HNDL>
             Self
             {
                 ev_source: OnceCell::from(hndl),
-                //token: None,
-                si_bind: None,
+                scp_bind: None,
             }
         );
     }
@@ -507,7 +644,13 @@ impl<HNDL: AsHandle> SourceEventHndl<HNDL>
     pub 
     fn get_token(&self) -> Option<Token>
     {
-        return self.si_bind.as_ref().map(|(_, token)| *token);
+        return 
+            self
+                .scp_bind
+                .as_ref()
+                .map(|scp| 
+                    scp.lock().unwrap_or_else(|e| e.into_inner()).user_token
+                );
     }
 
     /// Internal function. Unregisteres the instance from the `completion_packs` list
@@ -517,10 +660,12 @@ impl<HNDL: AsHandle> SourceEventHndl<HNDL>
     fn unreg(&mut self) -> io::Result<()>
     {
         return 
-            if let Some((si, token)) = self.si_bind.take()
+            if let Some(si) = self.scp_bind.take()
             {
                 si
-                    .unregister_completion_pack(token)
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .deassociate_wait_completion_packet(true)
                     .map(|_| ())
             }
             else
@@ -577,37 +722,49 @@ impl<HNDL: AsHandle> Source for SourceEventHndl<HNDL>
     /// 
     /// Errors: 
     /// 
-    /// * [ErrorKind::ResourceBusy] - if already registered, error description [String]
+    /// * [ErrorKind::AlreadyExists] - if already registered, error description [String]
     /// 
     /// * [SourceCompPack::new] - errors
     /// 
-    /// * [SelectorInner::regester_completion_pack] - error
+    /// * [SourceCompPack::associate_wait_completion_packet] - error
     fn register(&mut self, registry: &Registry, token: Token, _interests: Interest) -> io::Result<()> 
     {
         let ev_source = self.ev_source.get().unwrap();
 
         // check if already binded
-        if let Some((si, token)) = self.si_bind.as_ref()
+        if let Some(_scp) = self.scp_bind.as_ref()
         {
             return Err(
                 io::Error::new(
-                    ErrorKind::ResourceBusy, 
-                    format!("hndl: {} token: {} already polled by {}", 
-                        ev_source.as_handle().as_raw_handle() as usize, 
-                        token.0,
-                        si.cp.as_raw_handle() as usize)
+                    ErrorKind::AlreadyExists, 
+                    format!("hndl: {} already registered", 
+                        ev_source.as_handle().as_raw_handle() as usize)
                 )
             )
         }
 
-        // creating pair event:completion
-        let scp = SourceCompPack::new(ev_source.as_handle(), token)?;
+        let mut scp = 
+            SourceCompPack::new(registry.selector().inner.clone(), ev_source.as_handle(), token)?;
 
-        // regester completion pack
-        registry.selector().inner.regester_completion_pack(scp)?;
+        // creating pair event:completion
+        let scp = 
+            Arc::new_cyclic(|me| 
+                {
+                    scp.set_ref(me);
+
+                    return Mutex::new(scp);
+                }
+            );
+
+        // associate
+        {
+            scp.lock().unwrap().associate_wait_completion_packet()?;
+        }
 
         // bind
-        self.si_bind.replace((registry.selector().inner.clone(), token));
+        self
+            .scp_bind
+            .replace(scp);
 
         return Ok(());
     }
@@ -616,14 +773,12 @@ impl<HNDL: AsHandle> Source for SourceEventHndl<HNDL>
     /// 
     /// Errors: 
     /// 
-    /// * [ErrorKind::NotConnected] - if instance was not regestered previously, 
+    /// * [ErrorKind::NotFound] - if instance was not regestered previously, 
     ///     error description [String]
     /// 
-    /// * [SelectorInner::update_completion_pack_token] errors
+    /// * [SourceCompPack::associate_wait_completion_packet] errors
     /// 
-    /// * [SelectorInner::regester_completion_pack] errors
-    /// 
-    /// * [SelectorInner::unregister_completion_pack] errors
+    /// * [SourceCompPack::deassociate_wait_completion_packet] errors
     fn reregister(
         &mut self,
         registry: &Registry,
@@ -633,27 +788,38 @@ impl<HNDL: AsHandle> Source for SourceEventHndl<HNDL>
     {
         let ev_source = self.ev_source.get().unwrap();
 
-        if let Some((si, se_token)) = self.si_bind.take()
+        if let Some(scp) = self.scp_bind.take()
         {
-            if registry.selector().same_port(&si.cp) == false
             {
-                let mut scp = 
-                    si.unregister_completion_pack(se_token)?;
+                let mut scp_lock = scp.lock().unwrap_or_else(|e| e.into_inner());
+                
+                if registry.selector().same_port(&scp_lock.si.cp) == false
+                {
+                    scp_lock.deassociate_wait_completion_packet(false)?;
 
-                // update token just in case
-                scp.set_token(token);
+                    // update token just in case
+                    scp_lock.set_user_token(token);
 
-                // regester completion pack
-                registry.selector().inner.regester_completion_pack(scp)?;
-            }
-            else if se_token != token
-            {
-                // update token in SourceCompPack on the SelectorInner side
-                si.replace_completion_pack_token(se_token, token)?;
+                    // replace selector
+                    scp_lock.set_selector(registry.selector().inner.clone());
+
+                    // regester completion pack
+                    scp_lock.associate_wait_completion_packet()?;
+                }
+                else if scp_lock.user_token != token
+                {
+                    scp_lock.deassociate_wait_completion_packet(false)?;
+                    
+                    // update token just in case
+                    scp_lock.set_user_token(token);
+
+                    // regester completion pack
+                    scp_lock.associate_wait_completion_packet()?;
+                }
             }
             
             // restore 
-            self.si_bind.replace((registry.selector().inner.clone(), token));
+            let _ = self.scp_bind.replace(scp);
 
             // otherwise nothing has changed
 
@@ -663,8 +829,8 @@ impl<HNDL: AsHandle> Source for SourceEventHndl<HNDL>
         {
              return Err(
                 io::Error::new(
-                    ErrorKind::NotConnected, 
-                    format!("hndl: {} not regestred with Registry", 
+                    ErrorKind::NotFound, 
+                    format!("hndl: {} not registred with Registry", 
                         ev_source.as_handle().as_raw_handle() as usize)
                 )
             )
@@ -681,29 +847,34 @@ impl<HNDL: AsHandle> Source for SourceEventHndl<HNDL>
     /// * [ErrorKind::NotConnected] - if instance was not regestered previously, 
     ///     error description [String]
     /// 
-    /// * [SelectorInner::unregister_completion_pack] - errors
+    /// * [SourceCompPack::deassociate_wait_completion_packet] - errors
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> 
     {
-        if let Some((si, se_token)) = self.si_bind.take()
+        if let Some(scp) = self.scp_bind.take()
         {
-            if registry.selector().same_port(&si.cp) == false
             {
-                return Err(
-                    io::Error::new(
-                        ErrorKind::CrossesDevices, 
-                        format!("hndl: {} token: {} is on different port", 
-                            self.ev_source.get().unwrap().as_handle().as_raw_handle() as usize,
-                            se_token.0)
+                let scp_lock = scp.lock().unwrap_or_else(|e| e.into_inner());
+
+                if registry.selector().same_port(&scp_lock.si.cp) == false
+                {
+                    // restore
+                    self.scp_bind.replace(scp.clone());
+
+                    return Err(
+                        io::Error::new(
+                            ErrorKind::CrossesDevices, 
+                            format!("hndl: {} token: {} is on different port", 
+                                self.ev_source.get().unwrap().as_handle().as_raw_handle() as usize,
+                                scp_lock.user_token.0)
+                        )
                     )
-                )
+                }
+
+                // deregister the instance
+                scp_lock.deassociate_wait_completion_packet(true)?;
             }
 
-            // deregister the instance
-            let _ = 
-                registry
-                    .selector()
-                    .inner
-                    .unregister_completion_pack(se_token)?;
+            drop(scp);
         }
         else
         {
@@ -719,4 +890,5 @@ impl<HNDL: AsHandle> Source for SourceEventHndl<HNDL>
         return Ok(());
     }
 }
+
 

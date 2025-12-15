@@ -102,6 +102,14 @@ unsafe extern "system"
         WaitCompletionPacketHandle: RawHandle,
         RemoveSignaledPacket: u8, // boolean
     ) -> NTSTATUS;
+
+    pub unsafe fn NtRemoveIoCompletion(
+        IoCompletionHandle: HANDLE, 
+        KeyContext: *mut c_void,
+        ApcContext: *mut c_void,
+        IoStatusBlock: *mut c_void,
+        Timeout: *const i64,
+    ) -> NTSTATUS;
 }
 
 /// Error for `NtCancelWaitCompletionPacket` indicating double cancell.

@@ -12,6 +12,8 @@ use windows_sys::Win32::Foundation::{
 };
 use windows_sys::Win32::System::IO::{IO_STATUS_BLOCK, IO_STATUS_BLOCK_0};
 
+use crate::sys::windows::tokens::{TokenGenerator, TokenAfd};
+
 const IOCTL_AFD_POLL: u32 = 0x00012024;
 
 /// Winsock2 AFD driver instance.
@@ -117,7 +119,8 @@ cfg_io_source! {
     use std::mem::zeroed;
     use std::os::windows::io::{FromRawHandle, RawHandle};
     use std::ptr::null_mut;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    //use std::sync::atomic::{AtomicUsize, Ordering};
+    
 
     use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
     use windows_sys::Wdk::Storage::FileSystem::{NtCreateFile, FILE_OPEN};
@@ -162,7 +165,8 @@ cfg_io_source! {
         'o' as _
     ];
 
-    static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(0);
+    //static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(0);
+    static NEXT_TOKEN: TokenGenerator<TokenAfd> = TokenGenerator::new();
 
     impl AfdPollInfo {
         pub fn zeroed() -> AfdPollInfo {
@@ -201,11 +205,16 @@ cfg_io_source! {
                     return Err(io::Error::new(raw_err.kind(), msg));
                 }
                 let fd = File::from_raw_handle(afd_helper_handle as RawHandle);
-                // Increment by 2 to reserve space for other types of handles.
+               
+               /* // Increment by 2 to reserve space for other types of handles.
                 // Non-AFD types (currently only NamedPipe), use odd numbered
                 // tokens. This allows the selector to differentiate between them
                 // and dispatch events accordingly.
-                let token = NEXT_TOKEN.fetch_add(2, Ordering::Relaxed) + 2;
+                let token = NEXT_TOKEN.fetch_add(2, Ordering::Relaxed) + 2;*/
+
+                //  Generate token.
+                let token = NEXT_TOKEN.next();
+
                 let afd = Afd { fd };
                 cp.add_handle(token, &afd.fd)?;
                 match SetFileCompletionNotificationModes(

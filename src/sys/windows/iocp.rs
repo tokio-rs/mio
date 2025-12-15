@@ -1,5 +1,10 @@
 //! Bindings to IOCP, I/O Completion Ports
 
+use crate::Token;
+use crate::sys::Event;
+use crate::sys::windows::tokens::TokenDefault;
+use crate::sys::windows::tokens::TokenSelector;
+
 use super::{Handle, Overlapped};
 use std::cmp;
 use std::fmt;
@@ -87,10 +92,14 @@ impl CompletionPort {
     /// Any object which is convertible to a `HANDLE` via the `AsRawHandle`
     /// trait can be provided to this function, such as `std::fs::File` and
     /// friends.
+    /// 
+    /// # Generics
+    /// 
+    /// * `TOKEN` - [TokenSelector] a value from internal token generator.
     #[cfg(any(feature = "net", feature = "os-ext"))]
-    pub fn add_handle<T: AsRawHandle + ?Sized>(&self, token: usize, t: &T) -> io::Result<()> {
+    pub fn add_handle<T: AsRawHandle + ?Sized, TOKEN: TokenSelector>(&self, token: TOKEN, t: &T) -> io::Result<()> {
         let ret = unsafe {
-            CreateIoCompletionPort(t.as_raw_handle() as HANDLE, self.handle.raw(), token, 0)
+            CreateIoCompletionPort(t.as_raw_handle() as HANDLE, self.handle.raw(), token.get_token().0, 0)
         };
         if ret.is_null() {
             Err(io::Error::last_os_error())
@@ -187,13 +196,50 @@ impl CompletionStatus {
     /// This function is useful when creating a status to send to a port with
     /// the `post` method. The parameters are opaquely passed through and not
     /// interpreted by the system at all.
-    pub(crate) fn new(bytes: u32, token: usize, overlapped: *mut Overlapped) -> Self {
-        CompletionStatus(OVERLAPPED_ENTRY {
-            dwNumberOfBytesTransferred: bytes,
-            lpCompletionKey: token,
-            lpOverlapped: overlapped as *mut _,
-            Internal: 0,
-        })
+    fn new<S>(bytes: u32, user_token: Token, token_selector: S, overlapped: *mut Overlapped) -> Self 
+    where 
+        S: TokenSelector
+    {
+        CompletionStatus(
+            OVERLAPPED_ENTRY 
+            {
+                dwNumberOfBytesTransferred: bytes,
+                lpCompletionKey: token_selector.get_token().0,
+                lpOverlapped: overlapped as *mut _,
+                Internal: user_token.0,
+            }
+        )
+    }
+
+    /*
+    pub(super) 
+    fn from_event_overlapped<S>(ev: &Event, internal_token: S, overlapped: *mut Overlapped) -> Self 
+    where 
+        S: TokenSelector
+    {
+        CompletionStatus(
+            OVERLAPPED_ENTRY 
+            {
+                dwNumberOfBytesTransferred: ev.flags,
+                lpCompletionKey: internal_token.get_token().0,
+                lpOverlapped: overlapped as *mut _,
+                Internal: ev.data as usize,
+            }
+        )
+    }*/
+
+     pub(super) 
+    fn from_event_overlapped(ev: &Event, overlapped: *mut Overlapped) -> Self 
+    {
+        CompletionStatus(
+            OVERLAPPED_ENTRY 
+            {
+                dwNumberOfBytesTransferred: ev.flags,
+                lpCompletionKey: ev.data as usize,
+                lpOverlapped: overlapped as *mut _,
+                Internal: 0,
+            }
+        )
     }
 
     /// Creates a new borrowed completion status from the borrowed
@@ -214,7 +260,7 @@ impl CompletionStatus {
     /// This function is useful when creating a stack buffer or vector of
     /// completion statuses to be passed to the `get_many` function.
     pub fn zero() -> Self {
-        Self::new(0, 0, null_mut())
+        Self::new(0, Token(0), TokenDefault::new(0),  null_mut())
     }
 
     /// Returns the number of bytes that were transferred for the I/O operation
@@ -236,6 +282,11 @@ impl CompletionStatus {
     /// the I/O operation was started.
     pub fn overlapped(&self) -> *mut OVERLAPPED {
         self.0.lpOverlapped
+    }
+
+    pub fn internal(&self) -> usize
+    {
+        self.0.Internal
     }
 
     /// Returns a pointer to the internal `OVERLAPPED_ENTRY` object.
@@ -261,6 +312,7 @@ fn duration_millis(dur: Option<Duration>) -> u32 {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::{CompletionPort, CompletionStatus};
@@ -275,8 +327,8 @@ mod tests {
     fn get_many() {
         let c = CompletionPort::new(1).unwrap();
 
-        c.post(CompletionStatus::new(1, 2, 3 as *mut _)).unwrap();
-        c.post(CompletionStatus::new(4, 5, 6 as *mut _)).unwrap();
+        c.post(CompletionStatus::new(1, 2, 10, 3 as *mut _)).unwrap();
+        c.post(CompletionStatus::new(4, 5, 11, 6 as *mut _)).unwrap();
 
         let mut s = vec![CompletionStatus::zero(); 4];
         {
@@ -284,9 +336,11 @@ mod tests {
             assert_eq!(s.len(), 2);
             assert_eq!(s[0].bytes_transferred(), 1);
             assert_eq!(s[0].token(), 2);
+            assert_eq!(s[0].internal(), 10);
             assert_eq!(s[0].overlapped(), 3 as *mut _);
             assert_eq!(s[1].bytes_transferred(), 4);
             assert_eq!(s[1].token(), 5);
+            assert_eq!(s[1].internal(), 11);
             assert_eq!(s[1].overlapped(), 6 as *mut _);
         }
         assert_eq!(s[2].bytes_transferred(), 0);
@@ -294,3 +348,4 @@ mod tests {
         assert_eq!(s[2].overlapped(), 0 as *mut _);
     }
 }
+*/

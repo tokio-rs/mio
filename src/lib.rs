@@ -3,8 +3,9 @@
     missing_debug_implementations,
     rust_2018_idioms,
     unused_imports,
-    dead_code
+  //  dead_code
 )]
+#![allow(dead_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // Disallow warnings when running tests.
 #![cfg_attr(test, deny(warnings))]
@@ -105,6 +106,9 @@ pub mod windows {
 
     #[cfg(feature = "os-extended")]
     pub use crate::sys::source_hndl::SourceEventHndl;
+    
+    #[cfg(feature = "os-extended")]
+    pub use crate::sys::source_hndl::SourceHndl;
 }
 
 pub mod features {

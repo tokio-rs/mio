@@ -33,13 +33,12 @@ include       = [
 default = ["log"]
 
 # Enables the Event* hanle registration.
-os-extended = []
+os-extended = ["os-poll", "os-ext", "net"]
 # Enables the `Poll` and `Registry` types.
 os-poll = []
 # Enables additional OS specific extensions, e.g. Unix `pipe(2)`.
 os-ext = [
-  "os-poll",
-  #"os-extended", 
+  "os-poll", 
   "windows-sys/Win32_System_Pipes",
   "windows-sys/Win32_Security",
 ]
