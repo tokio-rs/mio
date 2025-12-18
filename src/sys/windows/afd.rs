@@ -12,7 +12,6 @@ use windows_sys::Win32::Foundation::{
 };
 use windows_sys::Win32::System::IO::{IO_STATUS_BLOCK, IO_STATUS_BLOCK_0};
 
-use crate::sys::windows::tokens::{TokenGenerator, TokenAfd};
 
 const IOCTL_AFD_POLL: u32 = 0x00012024;
 
@@ -129,6 +128,8 @@ cfg_io_source! {
         SetFileCompletionNotificationModes, FILE_SHARE_READ, FILE_SHARE_WRITE, SYNCHRONIZE,
     };
     use windows_sys::Win32::System::WindowsProgramming::FILE_SKIP_SET_EVENT_ON_HANDLE;
+
+    use crate::sys::windows::tokens::{TokenGenerator, TokenAfd};
 
     use super::iocp::CompletionPort;
 

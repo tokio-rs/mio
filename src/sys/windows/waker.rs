@@ -3,7 +3,7 @@ use windows_sys::Win32::System::IO::OVERLAPPED_ENTRY;
 use crate::sys::windows::Event;
 use crate::sys::windows::Selector;
 use crate::Token;
-use crate::sys::windows::iocp::CompletionStatus;
+//use crate::sys::windows::iocp::CompletionStatus;
 use crate::sys::windows::tokens::TokenGenerator;
 use crate::sys::windows::tokens::WakerTokenId;
 use crate::sys::windows::tokens::TokenSelector;
@@ -46,9 +46,9 @@ impl Waker {
     }
 
     pub(super)
-    fn from_overlapped(status: &OVERLAPPED_ENTRY, opt_events: Option<&mut Vec<Event>>)
+    fn from_overlapped(_status: &OVERLAPPED_ENTRY, _opt_events: Option<&mut Vec<Event>>)
     {
-        let cp_status = CompletionStatus::from_entry(status);
+        /*let cp_status = CompletionStatus::from_entry(status);
 
         let Some(user_token) = 
             unsafe 
@@ -70,6 +70,6 @@ impl Waker {
             ev.data = user_token.0 as u64;
 
             events.push(ev);
-        }
+        }*/
     }
 }

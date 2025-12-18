@@ -3,7 +3,7 @@
     missing_debug_implementations,
     rust_2018_idioms,
     unused_imports,
-  //  dead_code
+    dead_code
 )]
 #![allow(dead_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]

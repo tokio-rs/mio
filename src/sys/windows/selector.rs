@@ -3,9 +3,8 @@ use super::io_status_block::IoStatusBlock;
 use super::Event;
 use crate::sys::{Events, Waker};
 
-
-use crate::sys::source_hndl::SourceCompPack;
 use crate::sys::windows::tokens::{DecocdedToken, TokenAfd, TokenEvent, WakerTokenId, TokenPipe};
+
 
 cfg_net! {
     use crate::sys::event::{
@@ -26,6 +25,9 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+#[cfg(feature = "os-extended")]
+use crate::sys::source_hndl::SourceCompPack;
 
 use windows_sys::Win32::Foundation::{
     ERROR_INVALID_HANDLE, ERROR_IO_PENDING, HANDLE, STATUS_CANCELLED, WAIT_TIMEOUT,
@@ -537,11 +539,16 @@ impl SelectorInner {
             }
             else if decoded_token == TokenEvent::def()
             {
-                let len = events.len();
-                SourceCompPack::from_overlapped(iocp_event.entry(), Some(events));
-                n += events.len() - len;
-                
-                continue;
+                #[cfg(feature = "os-extended")]
+                {
+                    let len = events.len();
+                    SourceCompPack::from_overlapped(iocp_event.entry(), Some(events));
+                    n += events.len() - len;
+                    
+                    continue;
+                }
+
+                panic!("assertion trap: os-extended was not enabled, but token received, token: {}", decoded_token);
             }
             else
             {
