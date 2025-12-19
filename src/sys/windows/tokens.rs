@@ -9,17 +9,13 @@
  +----------+---------------------------------------------+-------+---+---+---+---+---+---+---+
  | Type     | Mask                                        | 7H 7L | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
  +----------+---------------------------------------------+-------+---+---+---+---+---+---+---+
- | N/a      | 0x0000_0000_0000_0000-0x7FFF_FFFF_FFFF_FFFF | 0-7 x | X | X | X | X | X | X | X |
- | AFD      | 0x8000_0000_0000_0000-0x9FFF_FFFF_FFFF_FFFF | 8-9 x | X | X | X | X | X | X | X |
- | Pipe     | 0xA000_0000_0000_0000-0xBFFF_FFFF_FFFF_FFFF | A-B x | X | X | X | X | X | X | X |
- | Event    | 0xC000_0000_0000_0000-0xCFFF_FFFF_FFFF_FFFF | C   x | X | X | X | X | X | X | X |
- | Internal | 0xD000_0000_0000_0000-0xDFFF_FFFF_FFFF_FFFF | D   x | X | X | X | X | X | X | X |
- | Spare    | 0xE000_0000_0000_0000-0xFFFF_FFFF_FFFF_FFFF | E-F x | x | x | x | x | x | x | x |
+ | AFD      | 0x0000_0000_0000_0000-0x5FFF_FFFF_FFFF_FFFF | 0-2 x | X | X | X | X | X | X | X |
+ | Pipe     | 0x6000_0000_0000_0000-0xBFFF_FFFF_FFFF_FFFF | 3-5 x | X | X | X | X | X | X | X |
+ | Event    | 0xC000_0000_0000_0000-0xDFFF_FFFF_FFFF_FFFF | 6   x | X | X | X | X | X | X | X |
+ | Waker    | 0xE000_0000_0000_0000-0xFFFF_FFFF_FFFF_FFFF | 7   x | X | X | X | X | X | X | X |
  +----------+---------------------------------------------+-------+---+---+---+---+---+---+---+
  * ```
- * 
- * 0000_0000_0000_0000 - 7FFF_FFFF_FFFF_FFFF = 9 223 372 036 854 775 807
- * 8000_0000_0000_0000 - 9FFF_FFFF_FFFF_FFFF = 2 305 843 009 213 693 951
+ * 0x0000_0000_0000_0000-0x5FFF_FFFF_FFFF_FFFF = 6 917 529 027 641 081 855
  */
 
 
@@ -36,17 +32,17 @@ pub mod token_generator_atomic
 
     #[repr(transparent)]
     #[derive(Debug)]
-    pub(super) struct TokenGenInner(AtomicUsize);
+    pub struct TokenGenInner(AtomicUsize);
 
     impl TokenGenInner
     {
-        pub(super) const
+        pub const
         fn new(token_type: usize) -> Self
         {
             return Self( AtomicUsize::new(token_type) );
         }
 
-        pub(super)
+        pub
         fn next_mapped(&self, token_type: TokenType, range: RangeInclusive<usize>) -> usize
         {
             let mut last = self.0.load(Ordering::Relaxed);
@@ -64,10 +60,11 @@ pub mod token_generator_atomic
                         }
                     };
 
+        
                 // check that we are in range
-                if range.contains(&(next_token & TOKEN_TYPE_MASK)) == false
+                if range.contains(&last) == false
                 {
-                    panic!("exhausted range {:X} {:X} {:X}", next_token, next_token & TOKEN_TYPE_MASK, token_type.0);
+                    panic!("exhausted range next: {:X} last: {:X} {:X} {:X}", next_token, last, next_token & TOKEN_TYPE_MASK, token_type.0);
                 }
 
                 let Err(new_token) = 
@@ -78,7 +75,7 @@ pub mod token_generator_atomic
             }
         }
 
-        pub(super)
+        pub
         fn next(&self) -> usize
         {
             let mut last = self.0.load(Ordering::Relaxed);
@@ -116,17 +113,17 @@ pub mod token_generator_mutex
 
     #[repr(transparent)]
     #[derive(Debug)]
-    pub(super) struct TokenGenInner(Mutex<usize>);
+    pub struct TokenGenInner(Mutex<usize>);
 
     impl TokenGenInner
     {
-        pub(super) const 
+        pub const 
         fn new(token_type: usize) -> Self
         {
             return Self( Mutex::new(token_type) );
         }
 
-        pub(super)
+        pub
         fn next_mapped(&self, token_type: TokenType, range: RangeInclusive<usize>) -> usize
         {
             let mut lock = 
@@ -140,9 +137,9 @@ pub mod token_generator_mutex
                     Some(token) =>
                     { 
                         // check that we are in range
-                        if range.contains(&(token & TOKEN_TYPE_MASK)) == false
+                        if range.contains(&cur_token) == false
                         {
-                            panic!("exhausted range {:X} {:X} {:X}", token, token & TOKEN_TYPE_MASK, token_type.0);
+                            panic!("exhausted range next: {:X} last: {:X} {:X} {:X}", token, cur_token, token & TOKEN_TYPE_MASK, token_type.0);
                         }
 
                         token
@@ -159,7 +156,7 @@ pub mod token_generator_mutex
             return cur_token;
         }
 
-        pub(super)
+        pub 
         fn next(&self, token_type: TokenType) -> usize
         {
             let mut lock = 
@@ -205,7 +202,7 @@ use self::token_generator_atomic::*;
 use self::token_generator_mutex::*;
 
 /// A `marker` which is used for token type declaration.
-pub(super) trait TokenSelector: Clone + Copy + fmt::Debug
+pub trait TokenSelector: Clone + Copy + fmt::Debug
 {
     /// A code which indicates the owner of the token.
     const TOKEN_TYPE: TokenType;
@@ -226,7 +223,7 @@ pub(super) trait TokenSelector: Clone + Copy + fmt::Debug
 /// A helper struct which indicates that the value is a token type.
 #[repr(transparent)]
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub(super) struct TokenType(usize);
+pub struct TokenType(usize);
 
 impl PartialEq<usize> for TokenType
 {
@@ -238,28 +235,58 @@ impl PartialEq<usize> for TokenType
 
 impl TokenType
 {
+    pub const BIT_MASKING_OFFSET: usize = 3;
+
     /// Converts the `type` number of the token owner into the mapped value.
     const 
     fn derive(code: usize) -> Self
     {
-        return Self(code << ((std::mem::size_of::<usize>() * 8) - 4));
+        return Self(code << ((std::mem::size_of::<usize>() * 8) - Self::BIT_MASKING_OFFSET));
     }
 }
 
-/// Assigned to AFD type.
-const AFD_TOKEN: usize = 0x8;
+/// Assigned to AFD type. 0..=2
+const AFD_TOKEN: usize = 0x0;
+const AFD_TOKEN_WIDTH: usize = 0x2;
 
-/// Assigned to PIPE type
-const PIPE_TOKEN: usize = 0xA;
+/// Assigned to PIPE type 3..=5
+const PIPE_TOKEN: usize = 0x3;
+const PIPE_TOKEN_WIDTH: usize = 0x2;
 
-/// Assigned to event type
-const EVENT_TOKEN: usize = 0xC;
+/// Assigned to event type 6
+const EVENT_TOKEN: usize = 0x6;
+const EVENT_TOKEN_WIDTH: usize = 0;
 
-const WAKER_TOKEN: usize = 0xD;
+/// Assigned to waker and rest 7
+const WAKER_TOKEN: usize = 0x7;
+const WAKER_TOKEN_WIDTH: usize = 0;
+
+#[cfg(test)]
+impl TokenSelector for usize
+{
+    const TOKEN_TYPE: TokenType = TokenType::derive(0);
+
+    const TOKEN_TYPE_RANGE: RangeInclusive<usize> = (0..=0);
+
+    fn new(token: usize) -> Self where Self: Sized 
+    {
+        token
+    }
+
+    fn get_token(&self) -> Token 
+    {
+        Token(*self)
+    }
+
+    fn into_inner(self) -> Token 
+    {
+        Token(self)
+    }
+}
 
 /// Default (init)
 #[derive(Debug, Clone, Copy)]
-pub(super) struct TokenDefault;
+pub struct TokenDefault;
 
 impl TokenSelector for TokenDefault
 {
@@ -285,14 +312,14 @@ impl TokenSelector for TokenDefault
 
 /// AFD
 #[derive(Debug, Clone, Copy)]
-pub(super) struct TokenAfd(Token);
+pub struct TokenAfd(Token);
 
 impl TokenSelector for TokenAfd
 {
     const TOKEN_TYPE: TokenType = TokenType::derive(AFD_TOKEN);
 
     const TOKEN_TYPE_RANGE: RangeInclusive<usize> = 
-        (Self::TOKEN_TYPE.0..=TokenType::derive(AFD_TOKEN + 1).0 | !TOKEN_TYPE_MASK);
+        (Self::TOKEN_TYPE.0..=TokenType::derive(AFD_TOKEN + AFD_TOKEN_WIDTH).0 | !TOKEN_TYPE_MASK);
 
     fn new(token: usize) -> Self where Self: Sized
     {
@@ -321,14 +348,14 @@ impl TokenAfd
 
 /// PIPE
 #[derive(Debug, Clone, Copy)]
-pub(super) struct TokenPipe(Token);
+pub struct TokenPipe(Token);
 
 impl TokenSelector for TokenPipe
 {
     const TOKEN_TYPE: TokenType = TokenType::derive(PIPE_TOKEN);
 
     const TOKEN_TYPE_RANGE: RangeInclusive<usize> = 
-        (Self::TOKEN_TYPE.0..=TokenType::derive(PIPE_TOKEN + 1).0 | !TOKEN_TYPE_MASK);
+        (Self::TOKEN_TYPE.0..=TokenType::derive(PIPE_TOKEN + PIPE_TOKEN_WIDTH).0 | !TOKEN_TYPE_MASK);
         
 
     fn new(token: usize) -> Self where Self: Sized
@@ -358,14 +385,14 @@ impl TokenPipe
 
 /// EVENT
 #[derive(Debug, Clone, Copy)]
-pub(super) struct TokenEvent(Token);
+pub struct TokenEvent(Token);
 
 impl TokenSelector for TokenEvent
 {
     const TOKEN_TYPE: TokenType = TokenType::derive(EVENT_TOKEN);
 
     const TOKEN_TYPE_RANGE: RangeInclusive<usize> = 
-        (Self::TOKEN_TYPE.0..=TokenType::derive(EVENT_TOKEN).0 | !TOKEN_TYPE_MASK);
+        (Self::TOKEN_TYPE.0..=TokenType::derive(EVENT_TOKEN + EVENT_TOKEN_WIDTH).0 | !TOKEN_TYPE_MASK);
 
     fn new(token: usize) -> Self where Self: Sized
     {
@@ -395,7 +422,7 @@ impl TokenEvent
 /// Intenral ID
 #[cfg(debug_assertions)]
 #[derive(Debug, Clone, Copy)]
-pub(super) struct WakerTokenId(Token);
+pub struct WakerTokenId(Token);
 
 impl WakerTokenId
 {
@@ -412,7 +439,7 @@ impl TokenSelector for WakerTokenId
     const TOKEN_TYPE: TokenType = TokenType::derive(WAKER_TOKEN);
 
     const TOKEN_TYPE_RANGE: RangeInclusive<usize> = 
-        (Self::TOKEN_TYPE.0..=TokenType::derive(WAKER_TOKEN).0 | !TOKEN_TYPE_MASK);
+        (Self::TOKEN_TYPE.0..=TokenType::derive(WAKER_TOKEN + WAKER_TOKEN_WIDTH).0 | !TOKEN_TYPE_MASK);
 
     fn new(token: usize) -> Self where Self: Sized
     {
@@ -433,7 +460,7 @@ impl TokenSelector for WakerTokenId
 /// Mapped tokens generator.
 #[repr(transparent)]
 #[derive(Debug)]
-pub(super) struct TokenGenerator<TYPE: TokenSelector>(TokenGenInner, PhantomData<TYPE>);
+pub struct TokenGenerator<TYPE: TokenSelector>(TokenGenInner, PhantomData<TYPE>);
 
 impl<TYPE: TokenSelector>  TokenGenerator<TYPE>
 {
@@ -461,15 +488,13 @@ impl<TYPE: TokenSelector>  TokenGenerator<TYPE>
 
 
 /// Mask 0xF000 ... 0000
-const TOKEN_TYPE_MASK: usize = (1 << ((std::mem::size_of::<usize>() * 8) - 8)) * 240;
+const TOKEN_TYPE_MASK: usize = (1 << ((std::mem::size_of::<usize>() * 8) - 8)) * 224;//240;
 
-/// MSB bit
-const TOKEN_TYPE_BIT: usize = (1 << ((std::mem::size_of::<usize>() * 8) - 8)) * 128;
 
 /// Decodes the mapped token.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct DecocdedToken(usize);
+pub struct DecocdedToken(usize);
 
 impl From<usize> for DecocdedToken
 {
@@ -503,7 +528,7 @@ impl DecocdedToken
     pub(super)  
     fn get_source_code(&self) -> usize
     {
-        return self.decode_type() >> ((std::mem::size_of::<usize>() * 8) - 4) as usize;
+        return self.decode_type() >> ((std::mem::size_of::<usize>() * 8) - TokenType::BIT_MASKING_OFFSET) as usize;
     } 
 
     /// Returns the type of the mapped token.
@@ -588,19 +613,19 @@ mod tests
     #[test]
     fn test0_token_type_mask()
     {
-        assert_eq!(TOKEN_TYPE_MASK, 0xF000_0000_0000_0000);
+        assert_eq!(TOKEN_TYPE_MASK, 0xE000_0000_0000_0000);
+        
+        assert_eq!(TokenAfd::TOKEN_TYPE.0, 0x0000_0000_0000_0000);
+        assert_eq!(TokenAfd::TOKEN_TYPE_RANGE, 0x0000_0000_0000_0000..=0x5FFF_FFFF_FFFF_FFFF);
 
-        assert_eq!(TokenAfd::TOKEN_TYPE.0, 0x8000_0000_0000_0000);
-        assert_eq!(TokenAfd::TOKEN_TYPE_RANGE, 0x8000_0000_0000_0000..=0x9FFF_FFFF_FFFF_FFFF);
-
-        assert_eq!(TokenPipe::TOKEN_TYPE.0, 0xA000_0000_0000_0000);
-        assert_eq!(TokenPipe::TOKEN_TYPE_RANGE, 0xA000_0000_0000_0000..=0xBFFF_FFFF_FFFF_FFFF);
+        assert_eq!(TokenPipe::TOKEN_TYPE.0, 0x6000_0000_0000_0000);
+        assert_eq!(TokenPipe::TOKEN_TYPE_RANGE, 0x6000_0000_0000_0000..=0xBFFF_FFFF_FFFF_FFFF);
         
         assert_eq!(TokenEvent::TOKEN_TYPE.0, 0xC000_0000_0000_0000);
-        assert_eq!(TokenEvent::TOKEN_TYPE_RANGE, 0xC000_0000_0000_0000..=0xCFFF_FFFF_FFFF_FFFF);
+        assert_eq!(TokenEvent::TOKEN_TYPE_RANGE, 0xC000_0000_0000_0000..=0xDFFF_FFFF_FFFF_FFFF);
 
-        assert_eq!(WakerTokenId::TOKEN_TYPE.0, 0xD000_0000_0000_0000);
-        assert_eq!(WakerTokenId::TOKEN_TYPE_RANGE, 0xD000_0000_0000_0000..=0xDFFF_FFFF_FFFF_FFFF);
+        assert_eq!(WakerTokenId::TOKEN_TYPE.0, 0xE000_0000_0000_0000);
+        assert_eq!(WakerTokenId::TOKEN_TYPE_RANGE, 0xE000_0000_0000_0000..=0xFFFF_FFFF_FFFF_FFFF);
     }
 
     #[cfg(target_pointer_width = "32")]
@@ -609,17 +634,17 @@ mod tests
     {
         assert_eq!(TOKEN_TYPE_MASK, 0xF000_0000);
 
-        assert_eq!(TokenAfd::TOKEN_TYPE.0, 0x8000_0000);
-        assert_eq!(TokenAfd::TOKEN_TYPE_RANGE, 0x8000_0000..=0x9FFF_FFFF);
+        assert_eq!(TokenAfd::TOKEN_TYPE.0, 0x0000_0000);
+        assert_eq!(TokenAfd::TOKEN_TYPE_RANGE, 0x0000_0000..=0x5FFF_FFFF);
 
-        assert_eq!(TokenPipe::TOKEN_TYPE.0, 0xA000_0000);
-        assert_eq!(TokenPipe::TOKEN_TYPE_RANGE, 0xA000_0000..=0xBFFF_FFFF);
+        assert_eq!(TokenPipe::TOKEN_TYPE.0, 0x6000_0000);
+        assert_eq!(TokenPipe::TOKEN_TYPE_RANGE, 0x6000_0000..=0xBFFF_FFFF);
         
         assert_eq!(TokenEvent::TOKEN_TYPE.0, 0xC000_0000);
-        assert_eq!(TokenEvent::TOKEN_TYPE_RANGE, 0xC000_0000..=0xCFFF_FFFF);
+        assert_eq!(TokenEvent::TOKEN_TYPE_RANGE, 0xC000_0000..=0xDFFF_FFFF);
 
-        assert_eq!(WakerTokenId::TOKEN_TYPE.0, 0xD000_0000);
-        assert_eq!(WakerTokenId::TOKEN_TYPE_RANGE, 0xD000_0000..=0xDFFF_FFFF);
+        assert_eq!(WakerTokenId::TOKEN_TYPE.0, 0xE000_0000);
+        assert_eq!(WakerTokenId::TOKEN_TYPE_RANGE, 0xE000_0000..=0xFFFF_FFFF);
     }
 
     #[test]
@@ -670,9 +695,9 @@ mod tests
         deriv += 1;
         assert_eq!(token.0.0, deriv);
     }
-
+ 
     #[test]
-    #[should_panic = "exhausted range D000000000000000 D000000000000000 C000000000000000"]
+    #[should_panic = "exhausted range next: E000000000000001 last: E000000000000000 E000000000000000 C000000000000000"]
     fn test3_generator_ev_type()
     {
         let gen_tok = 
@@ -681,10 +706,17 @@ mod tests
         let mut deriv = TokenEvent::TOKEN_TYPE.0 + ((!TOKEN_TYPE_MASK) - 2);
 
         let token = gen_tok.next();
+        println!("{:X} {:X}", token.0.0, deriv);
         assert_eq!(token.0.0, deriv);
 
         let token = gen_tok.next();
         deriv += 1;
+        println!("{:X} {:X}", token.0.0, deriv);
+        assert_eq!(token.0.0, deriv);
+
+        let token = gen_tok.next();
+        deriv += 1;
+        println!("{:X} {:X}", token.0.0, deriv);
         assert_eq!(token.0.0, deriv);
 
         let _token = gen_tok.next();

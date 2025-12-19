@@ -26,9 +26,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-#[cfg(feature = "os-extended")]
-use crate::sys::source_hndl::SourceCompPack;
-
 use windows_sys::Win32::Foundation::{
     ERROR_INVALID_HANDLE, ERROR_IO_PENDING, HANDLE, STATUS_CANCELLED, WAIT_TIMEOUT,
 };
@@ -466,7 +463,6 @@ impl SelectorInner {
         unsafe { self.update_sockets_events() }?;
 
         let result = self.cp.get_many(statuses, timeout);
-
         self.is_polling.store(false, Ordering::Relaxed);
 
         match result {
@@ -541,13 +537,18 @@ impl SelectorInner {
             {
                 #[cfg(feature = "os-extended")]
                 {
+                    use crate::sys::source_hndl::OverlappedCallback;
+
+                    let callback = OverlappedCallback::from(iocp_event.overlapped());
+                    
                     let len = events.len();
-                    SourceCompPack::from_overlapped(iocp_event.entry(), Some(events));
+                    callback.call(iocp_event.entry(), Some(events));
                     n += events.len() - len;
                     
                     continue;
                 }
 
+                #[cfg(not(feature = "os-extended"))]
                 panic!("assertion trap: os-extended was not enabled, but token received, token: {}", decoded_token);
             }
             else
@@ -735,18 +736,44 @@ impl Drop for SelectorInner {
                 Ok(iocp_events) => {
                     events_num = iocp_events.iter().len();
                     for iocp_event in iocp_events.iter() {
-                        if iocp_event.overlapped().is_null() {
-                            // Custom event
-                        } else if iocp_event.token() % 2 == 1 {
+                        let decoded_token = DecocdedToken::from(iocp_event.token());
+
+                        if decoded_token == TokenPipe::def()
+                        {
                             // Named pipe, dispatch the event so it can release resources
                             let callback = unsafe {
                                 (*(iocp_event.overlapped() as *mut super::Overlapped)).callback
                             };
 
                             callback(iocp_event.entry(), None);
-                        } else {
+                        }
+                        else if decoded_token == TokenAfd::def()
+                        {
                             // drain sock state to release memory of Arc reference
                             let _sock_state = from_overlapped(iocp_event.overlapped());
+                        }
+                        else if decoded_token == TokenEvent::def()
+                        {
+                            #[cfg(feature = "os-extended")]
+                            {
+                                use crate::sys::source_hndl::OverlappedCallback;
+
+                                let callback = OverlappedCallback::from(iocp_event.overlapped());
+                            
+                                callback.call(iocp_event.entry(), None);
+                            }
+
+                            #[cfg(not(feature = "os-extended"))]
+                            panic!("assertion trap: os-extended was not enabled, but token received, token: {}", decoded_token);
+                        }
+                        else if decoded_token == WakerTokenId::def()
+                        {
+                            Waker::from_overlapped(iocp_event.entry(), None);
+                            
+                        }
+                        else
+                        {
+                             // Custom event
                         }
                     }
                 }

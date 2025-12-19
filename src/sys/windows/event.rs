@@ -39,17 +39,8 @@ impl Event {
             data: status.token() as u64,
         }
     }
-
-    /// Used by `source_hndl.rs`
-    #[cfg(all(target_os = "windows", feature = "os-extended"))]
-    pub(super) fn from_completion_status_event(status: &CompletionStatus) -> Event {
-        Event {
-            flags: 0,
-            data: status.bytes_transferred() as u64,
-        }
-    }
     
-    #[cfg(feature = "os-ext")]
+    #[cfg(feature = "os-poll")]
     pub(super) 
     fn to_completion_status_with_overlapped(
         &self,

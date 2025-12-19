@@ -33,7 +33,7 @@ include       = [
 default = ["log"]
 
 # Enables the Event* hanle registration.
-os-extended = ["os-poll", "os-ext", "net"]
+os-extended = ["os-ext"]
 # Enables the `Poll` and `Registry` types.
 os-poll = []
 # Enables additional OS specific extensions, e.g. Unix `pipe(2)`.
@@ -113,7 +113,7 @@ required-features = ["os-poll", "net"]
 
 [[example]]
 name = "windows_event"
-required-features = ["os-ext"]
+required-features = ["os-extended", "net"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(mio_unsupported_force_poll_poll)', 'cfg(mio_unsupported_force_waker_pipe)'] }

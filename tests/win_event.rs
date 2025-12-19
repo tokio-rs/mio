@@ -1,21 +1,20 @@
-#![cfg(all(windows, feature = "os-poll", feature = "os-extended"))]
+#![cfg(all(windows, feature = "os-extended"))]
 
 #[macro_use]
 mod util;
 
-use std::collections::HashSet;
-use std::io::ErrorKind;
-use std::mem;
+use std::io::{self};
 use std::os::windows::io::{AsHandle, FromRawHandle, OwnedHandle};
 use std::ptr::null;
 use std::os::windows::io::AsRawHandle;
 use std::time::{Duration, Instant};
-use mio::net::UdpSocket;
+
 use mio::windows::{SourceEventHndl, SourceHndl};
 use mio::{Events, Interest, Poll, Token};
+use windows_sys::Win32::Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows_sys::Win32::System::Threading::
 {
-    CreateEventA, CreateWaitableTimerExW, EVENT_ALL_ACCESS, SetEvent, SetWaitableTimer
+    CreateWaitableTimerExW, EVENT_ALL_ACCESS, SetWaitableTimer, WaitForSingleObject
 };
 
 #[repr(transparent)]
@@ -76,9 +75,10 @@ impl PrimitiveTimer
         return Self{ hndl_timer: hndl_timer};
     }
 
-    fn arm_relative(&self, timeout: i64) 
+    fn arm_relative(&self, timeout: i64)  -> io::Result<()>
     {
         let time: i64 = timeout / 100;
+        let res = 
         unsafe
         {
             SetWaitableTimer(
@@ -90,51 +90,44 @@ impl PrimitiveTimer
                 false.into()
             )
         };
+
+        if res != 0
+        {
+            return Ok(());
+        }
+        else
+        {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    fn poll(&self) -> Result<usize, io::Error>
+    {
+        let res =
+            unsafe { WaitForSingleObject(self.hndl_timer.as_raw_handle(), 0) };
+
+        if res == WAIT_OBJECT_0
+        {
+            return Ok(0);
+        }
+        else if res == WAIT_TIMEOUT
+        {
+            // would block
+            return Ok(1);
+        }
+        else
+        {            
+            return Err(io::Error::last_os_error());
+        }
     }
 }
 
 #[test]
-fn test_event_win()
+fn test_event_win_simple()
 {
-    // timer 1 
+// timer 1 
     let mut se_hndl_timer = 
-        SourceEventHndl::new(PrimitiveTimer::new("timer_1")).unwrap();
-
-    // timer 2
-    let mut se_hndl_timer2 = 
-        SourceEventHndl::new(PrimitiveTimer::new("timer_2")).unwrap();
-
-    // a control UDP socket
-    let mut udp_addr = util::any_local_address();
-    udp_addr.set_port(40000);
-    
-    let mut udp_s1 = UdpSocket::bind(udp_addr).unwrap();
-    println!("{:?}", udp_addr);
-
-    // udp sender (sends to control UDP socket)
-    let mut udp_addr2 = util::any_local_address();
-    udp_addr2.set_port(40001);
-    let udp_sender = std::net::UdpSocket::bind(udp_addr2).unwrap();
-   
-    // simple event
-    let hndl_event = 
-        unsafe
-        {
-            HANDLE(
-                CreateEventA(
-                    null(), 
-                    false.into(), 
-                    false.into(),  
-                    mem::transmute("test_event\0".as_ptr())
-                )
-            )
-            .try_into_owned()
-            .unwrap()
-        };
-
-    
-    let mut se_hndl_event = SourceEventHndl::new(hndl_event).unwrap();
-
+        SourceEventHndl::new(PrimitiveTimer::new("timer_6")).unwrap();
 
     // poll
     let mut poll = Poll::new().unwrap();
@@ -142,27 +135,14 @@ fn test_event_win()
     // registering
     poll.registry().register(&mut se_hndl_timer, Token(1), Interest::READABLE).unwrap();
 
-    // check double registration
-    let fail = poll.registry().register(&mut se_hndl_timer, Token(8), Interest::READABLE);
-    assert_eq!(fail.is_err(), true);
-    assert_eq!(fail.err().as_ref().unwrap().kind(), ErrorKind::AlreadyExists);
-
-    // rest
-    poll.registry().register(&mut se_hndl_timer2, Token(2), Interest::READABLE).unwrap();
-    poll.registry().register(&mut se_hndl_event, Token(3), Interest::READABLE).unwrap();
-    poll.registry().register(&mut udp_s1, Token(10), Interest::READABLE | Interest::WRITABLE).unwrap();
-
-    let mut events = Events::with_capacity(2);
-    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
-
     // set timer to relative 100ms step
-    se_hndl_timer.inner().arm_relative(-100_000_000);
+    se_hndl_timer.inner().arm_relative(-100_000).unwrap();
 
     // --- poll
     let mut events = Events::with_capacity(2);
 
     println!("poll timer 1");
-    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
+    poll.poll(&mut events, None).unwrap();
 
     assert_eq!(events.is_empty(), false);
     
@@ -175,93 +155,56 @@ fn test_event_win()
 
     assert_eq!(event_iter.next().is_none(), true);
 
-    // ---
-    se_hndl_timer.inner().arm_relative(-200_000_000);
-    se_hndl_timer2.inner().arm_relative(-250_000_000);
-  
+     // set timer to relative 100ms step
+    se_hndl_timer.inner().arm_relative(-100_000_000).unwrap();
+
     // --- poll
     let mut events = Events::with_capacity(2);
-    let mut exp_ev: HashSet<usize> = [1, 2].into_iter().collect();
 
-    for i in 0..2
-    {
-        println!("poll timer 2, round: {}", i);
-        poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
+    println!("poll timer 2");
+    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
 
-        assert_eq!(events.is_empty(), false);
+    drop(se_hndl_timer);
 
-        let mut event_iter = events.iter();
+    println!("poll timer drop timer");
+    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
 
-        let ev0 = event_iter.next();
+    assert_eq!(events.is_empty(), true);
 
-        assert_eq!(ev0.is_some(), true);
+    println!("poll timer last");
+    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
 
-        let exp_val = exp_ev.remove(&ev0.as_ref().unwrap().token().0);
+}
 
-        assert_eq!(exp_val, true);
+#[test]
+fn test_event_win_simple2()
+{
+// timer 1 
+    let mut se_hndl_timer = 
+        SourceEventHndl::new(PrimitiveTimer::new("timer_8888")).unwrap();
 
-        assert_eq!(event_iter.next().is_none(), true);
-    }
+    // poll
+    let mut poll = Poll::new().unwrap();
 
+    // registering
+    poll.registry().register(&mut se_hndl_timer, Token(1), Interest::READABLE).unwrap();
 
-    unsafe 
-    {
-        SetEvent(se_hndl_event.as_raw_handle())
-    };
+    // set timer to relative 100ns step = 500ms
+    se_hndl_timer.inner().arm_relative(-500_000_000).unwrap();
 
-    udp_sender.send_to(&[1, 2, 3], udp_addr).unwrap();
+    // --- poll
+    let mut events = Events::with_capacity(2);
 
-    let mut exp_ev: HashSet<usize> = [3, 10].into_iter().collect();
-
-    println!("poll event/udp");
-    poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
-
-    assert_eq!(events.is_empty(), false);
-
-    for ev in events.iter()
-    {
-        println!("poll event/udp event: {:?}", ev);
-
-        assert_eq!(exp_ev.remove(&ev.token().0), true);
-    }
-
-    assert_eq!(exp_ev.is_empty(), true);
+    println!("poll timer 1");
     
-
-    // empty poll
-
-    println!("poll empty");
-    poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
-
-    assert_eq!(events.is_empty(), true);
-
-
-    // --------------------- unregister
-
-    println!("unregister test poll");
-    poll.registry().deregister(&mut se_hndl_timer2).unwrap();
-
-    // set unreg timer
-    se_hndl_timer2.inner().arm_relative(-200_000_000);
-
-    // poll res must be empty
-    poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
-
-    assert_eq!(events.is_empty(), true);
-
-    // ------------------ reregister with different token
-    println!("reregister test poll");
-
-    poll.registry().reregister(&mut se_hndl_timer, Token(7), Interest::READABLE).unwrap();
-
-    // set unreg timer
-    se_hndl_timer.inner().arm_relative(-1_000_000_000); // 1 sec
-
     let s = Instant::now();
-
-    poll.poll(&mut events, Some(Duration::from_millis(1100))).unwrap();
+    
+    poll.poll(&mut events, Some(Duration::from_millis(900))).unwrap();
 
     let e = s.elapsed();
+    println!("{}", e.as_millis());
+    assert!(e.as_millis() > 480 && e.as_millis() < 550, "{}", e.as_millis());
+    
 
     assert_eq!(events.is_empty(), false);
     
@@ -270,210 +213,161 @@ fn test_event_win()
     let ev0 = event_iter.next();
 
     assert_eq!(ev0.is_some(), true);
-    assert_eq!(ev0.as_ref().unwrap().token(), Token(7));
+    assert_eq!(ev0.as_ref().unwrap().token(), Token(1));
+
+    assert_eq!(event_iter.next().is_none(), true);
+
+     // set timer to relative 100ms step
+    se_hndl_timer.inner().arm_relative(-100_000_000).unwrap();
+
+    // --- poll
+    let mut events = Events::with_capacity(2);
+
+    println!("poll timer 2");
+    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
+
+    poll.registry().deregister(&mut se_hndl_timer).unwrap();
+
+    println!("poll timer dereg");
+    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
+
+    assert_eq!(events.is_empty(), true);
+
+    println!("poll timer last");
+    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
+}
+
+#[test]
+fn test_event_win_try_check_packet_cancel_ordeing_racing()
+{
+    // timer 1 
+    let mut se_hndl_timer = 
+        SourceEventHndl::new(PrimitiveTimer::new("timer_3")).unwrap();
+
+    // poll
+    let mut poll = Poll::new().unwrap();
+
+    // registering
+    poll.registry().register(&mut se_hndl_timer, Token(1), Interest::READABLE).unwrap();
+
+    // set timer to relative 100ns (minimum)
+    se_hndl_timer.inner().arm_relative(-100).unwrap();
+    
+    std::thread::sleep(Duration::from_nanos(1000));
+
+    // now deregister the instance to generate the cancel before timer
+    poll.registry().deregister(&mut se_hndl_timer).unwrap();
+
+    assert_eq!(se_hndl_timer.get_token(), None);
+
+    // --- poll
+    let mut events = Events::with_capacity(2);
+
+    println!("poll timer after timer drop");
+    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
+
+    assert_eq!(events.is_empty(), true);
+    assert_eq!(se_hndl_timer.inner().poll().ok(), Some(1));
+
+    println!("end of test");
+    drop(se_hndl_timer);
+
+}
+
+#[test]
+fn test_event_win_try_check_packet_cancel_ordeing_racing_ev()
+{
+    // timer 1 
+    let se_hndl_timer = PrimitiveTimer::new("timer_1");
+
+    // poll
+    let mut poll = Poll::new().unwrap();
+
+    // registering
+    poll.registry().register(&mut SourceHndl::new(&se_hndl_timer).unwrap(), Token(1), Interest::READABLE).unwrap();
+
+    // set timer to relative 100ns (minimum)
+    se_hndl_timer.arm_relative(-100).unwrap();
+    
+    std::thread::sleep(Duration::from_nanos(100));
+    
+    // now deregister the instance to generate the cancel before timer
+    poll.registry().deregister(&mut SourceHndl::new(&se_hndl_timer).unwrap()).unwrap();
+
+    // --- poll
+    let mut events = Events::with_capacity(2);
+
+    println!("poll timer after timer drop");
+    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
+
+    assert_eq!(events.is_empty(), true);
+
+    assert_eq!(se_hndl_timer.poll().ok(), Some(1));
+
+    println!("end of test");
+    drop(se_hndl_timer);
+
+}
+
+#[test]
+fn test_event_win_different_thread()
+{
+    // timer 1 
+    let mut se_hndl_timer = 
+        SourceEventHndl::new(PrimitiveTimer::new("timer_11")).unwrap();
+
+    let mut events = Events::with_capacity(2);
+
+    // poll
+    let mut poll = Poll::new().unwrap();
+
+    // registering
+    poll.registry().register(&mut se_hndl_timer, Token(1), Interest::READABLE).unwrap();
+
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
+
+    std::thread::spawn(move ||
+        {
+            // set timer to relative 100ns (minimum)
+            se_hndl_timer.inner().arm_relative(-1_000_000_000).unwrap(); // 1 sec
+
+            std::thread::sleep(Duration::from_millis(1600));
+
+            se_hndl_timer.inner().arm_relative(-1_000).unwrap(); // 10 us
+
+            std::thread::sleep(Duration::from_millis(1));
+
+            drop(se_hndl_timer);
+
+            tx.send(()).unwrap();
+            return;
+        }
+    );
+
+    let s = Instant::now();
+
+    poll.poll(&mut events, Some(Duration::from_millis(1200))).unwrap();
+
+    let e = s.elapsed();
+
+    let mut event_iter = events.iter();
+    
+    let ev0 = event_iter.next();
+    assert_eq!(ev0.is_some(), true);
+    assert_eq!(ev0.as_ref().unwrap().token(), Token(1));
 
     assert_eq!(event_iter.next().is_none(), true);
 
     println!("time took: {:?}", e);
-    assert!(e.as_millis() >= 900 && e.as_millis() < 1200);
+    assert!(e.as_millis() >= 900 && e.as_millis() < 1200, "{}", e.as_millis());
 
-    // ------------------ into inner test
-    println!("into inner test");
+    rx.recv_timeout(Duration::from_secs(1)).unwrap();
 
-    se_hndl_timer.inner().arm_relative(-1_000_000_000); // 1.5 sec
-
-    let hndl_timer = se_hndl_timer.try_into_inner().unwrap();
-
-    // poll res must be empty
-    poll.poll(&mut events, Some(Duration::from_millis(1100))).unwrap();
+    poll.poll(&mut events, Some(Duration::from_millis(100))).unwrap();
 
     assert_eq!(events.is_empty(), true);
-
-    drop(hndl_timer);
 
     return;
-}
-
-#[test]
-fn test_event_win2()
-{
-     // timer 1 
-    let se_hndl_timer = PrimitiveTimer::new("timer_1");
-
-    // timer 2
-    let se_hndl_timer2 = PrimitiveTimer::new("timer_2");
-
-    // a control UDP socket
-    let mut udp_addr = util::any_local_address();
-    udp_addr.set_port(40000);
-    
-    let mut udp_s1 = UdpSocket::bind(udp_addr).unwrap();
-    println!("{:?}", udp_addr);
-
-    // udp sender (sends to control UDP socket)
-    let mut udp_addr2 = util::any_local_address();
-    udp_addr2.set_port(40001);
-    let udp_sender = std::net::UdpSocket::bind(udp_addr2).unwrap();
-   
-    // simple event
-    let se_hndl_event = 
-        unsafe
-        {
-            HANDLE(
-                CreateEventA(
-                    null(), 
-                    false.into(), 
-                    false.into(),  
-                    mem::transmute("test_event\0".as_ptr())
-                )
-            )
-            .try_into_owned()
-            .unwrap()
-        };
-
-    // poll
-    let mut poll = Poll::new().unwrap();
-
-    // registering
-    poll.registry().register(&mut SourceHndl::new(&se_hndl_timer).unwrap(), Token(1), Interest::READABLE).unwrap();
-
-    // check double registration
-    let fail = poll.registry().register(&mut SourceHndl::new(&se_hndl_timer).unwrap(), Token(8), Interest::READABLE);
-    assert_eq!(fail.is_err(), true);
-    assert_eq!(fail.err().as_ref().unwrap().kind(), ErrorKind::AlreadyExists);
-
-    // rest
-    poll.registry().register(&mut SourceHndl::new(&se_hndl_timer2).unwrap(), Token(2), Interest::READABLE).unwrap();
-    poll.registry().register(&mut SourceHndl::new(&se_hndl_event).unwrap(), Token(3), Interest::READABLE).unwrap();
-    poll.registry().register(&mut udp_s1, Token(10), Interest::READABLE | Interest::WRITABLE).unwrap();
-
-
-    let mut events = Events::with_capacity(2);
-    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
-
-    // set timer to relative 100ms step
-    se_hndl_timer.arm_relative(-100_000_000);
-
-    // --- poll
-    let mut events = Events::with_capacity(2);
-
-    println!("poll timer 1");
-    poll.poll(&mut events, Some(Duration::from_millis(200))).unwrap();
-
-    assert_eq!(events.is_empty(), false);
-    
-    let mut event_iter = events.iter();
-
-    let ev0 = event_iter.next();
-
-    assert_eq!(ev0.is_some(), true);
-    assert_eq!(ev0.as_ref().unwrap().token(), Token(1));
-
-    assert_eq!(event_iter.next().is_none(), true);
-
-    // ------------------
-
-    unsafe 
-    {
-        SetEvent(se_hndl_event.as_raw_handle())
-    };
-
-    udp_sender.send_to(&[1, 2, 3], udp_addr).unwrap();
-
-    let mut exp_ev: HashSet<usize> = [3, 10].into_iter().collect();
-
-    println!("poll event/udp");
-    poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
-
-    assert_eq!(events.is_empty(), false);
-
-    for ev in events.iter()
-    {
-        println!("poll event/udp event: {:?}", ev);
-
-        assert_eq!(exp_ev.remove(&ev.token().0), true);
-    }
-
-    assert_eq!(exp_ev.is_empty(), true);
-    
-    // --------------------- unregister
-
-    println!("unregister test poll");
-    poll.registry().deregister(&mut SourceHndl::new(&se_hndl_timer2).unwrap()).unwrap();
-
-    // set unreg timer
-    se_hndl_timer2.arm_relative(-200_000_000);
-
-    // poll res must be empty
-    poll.poll(&mut events, Some(Duration::from_millis(300))).unwrap();
-
-    assert_eq!(events.is_empty(), true);
-
-    // ------------------ reregister with different token
-    println!("reregister test poll");
-
-    poll.registry().reregister(&mut SourceHndl::new(&se_hndl_timer).unwrap(), Token(7), Interest::READABLE).unwrap();
-
-    // set unreg timer
-    se_hndl_timer.arm_relative(-1_000_000_000); // 1 sec
-
-    let s = Instant::now();
-
-    poll.poll(&mut events, Some(Duration::from_millis(1100))).unwrap();
-
-    let e = s.elapsed();
-
-    assert_eq!(events.is_empty(), false);
-    
-    let mut event_iter = events.iter();
-
-    let ev0 = event_iter.next();
-
-    assert_eq!(ev0.is_some(), true);
-    assert_eq!(ev0.as_ref().unwrap().token(), Token(7));
-
-    assert_eq!(event_iter.next().is_none(), true);
-
-    println!("time took: {:?}", e);
-    assert!(e.as_millis() >= 900 && e.as_millis() < 1200);
 
 }
 
-#[test]
-fn test_event_mix()
-{
-     // timer 1 
-    let se_hndl_timer = PrimitiveTimer::new("timer_1");
-
-    // timer 2
-    let mut se_hndl_timer2 = 
-        SourceEventHndl::new(PrimitiveTimer::new("timer_2")).unwrap();
-
-    // poll
-    let mut poll = Poll::new().unwrap();
-
-    // registering
-    poll.registry().register(&mut SourceHndl::new(&se_hndl_timer).unwrap(), Token(1), Interest::READABLE).unwrap();
-    poll.registry().register(&mut se_hndl_timer2, Token(2), Interest::READABLE).unwrap();
-
-    se_hndl_timer.arm_relative(-400_000_000);
-    se_hndl_timer2.inner().arm_relative(-500_000_000);
-
-    let mut exp_times = vec![2, 1];
-
-    let mut events = Events::with_capacity(2);
-
-    while exp_times.is_empty() == false
-    {
-        println!("poll timer 1");
-        poll.poll(&mut events, Some(Duration::from_millis(500))).unwrap();
-
-        let mut eve_iter = events.iter();
-
-        let ev = eve_iter.next().unwrap();
-
-        assert_eq!(ev.token().0, exp_times.pop().unwrap());
-
-        assert_eq!(eve_iter.next().is_none(), true);
-    }
-}
