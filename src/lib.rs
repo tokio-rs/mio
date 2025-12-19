@@ -5,6 +5,7 @@
     unused_imports,
     dead_code
 )]
+#![allow(dead_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // Disallow warnings when running tests.
 #![cfg_attr(test, deny(warnings))]
@@ -102,6 +103,12 @@ pub mod windows {
     //! Windows only extensions.
 
     pub use crate::sys::named_pipe::NamedPipe;
+
+    #[cfg(feature = "os-extended")]
+    pub use crate::sys::source_hndl::SourceEventHndl;
+    
+    #[cfg(feature = "os-extended")]
+    pub use crate::sys::source_hndl::SourceHndl;
 }
 
 pub mod features {

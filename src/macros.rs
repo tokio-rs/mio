@@ -35,6 +35,17 @@ macro_rules! cfg_os_ext {
     }
 }
 
+/// The `os-extended` feature is enabled.
+macro_rules! cfg_os_extended {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "os-extended")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "os-extended")))]
+            $item
+        )*
+    }
+}
+
 /// The `net` feature is enabled.
 macro_rules! cfg_net {
     ($($item:item)*) => {

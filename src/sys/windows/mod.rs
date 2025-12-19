@@ -3,6 +3,8 @@ mod afd;
 pub mod event;
 pub use event::{Event, Events};
 
+mod tokens;
+
 mod handle;
 use handle::Handle;
 
@@ -37,6 +39,12 @@ cfg_net! {
     pub(crate) mod udp;
 
     pub use selector::{SelectorInner, SockState};
+}
+
+cfg_os_extended! {
+    mod ffi;
+
+    pub mod source_hndl;
 }
 
 cfg_os_ext! {

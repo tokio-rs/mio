@@ -30,6 +30,7 @@ fn main() -> io::Result<()> {
     poll.registry()
         .register(&mut server, SERVER, Interest::READABLE)?;
 
+    
     // Map of `Token` -> `TcpStream`.
     let mut connections = HashMap::new();
     // Unique token for each incoming connection.
