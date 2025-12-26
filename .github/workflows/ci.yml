@@ -146,9 +146,7 @@ jobs:
           - aarch64-unknown-redox
           - arm-linux-androideabi
           - arm64_32-apple-watchos
-          # Standard library doesn't build anymore:
-          # <https://github.com/rust-lang/rust/issues/147437>
-          #- armv7-sony-vita-newlibeabihf
+          - armv7-sony-vita-newlibeabihf
           - i686-unknown-linux-gnu
           - i686-unknown-hurd-gnu
           # TODO: reenable <https://github.com/tokio-rs/mio/issues/1882>.
