@@ -32,11 +32,13 @@ include       = [
 # By default Mio only provides a shell implementation.
 default = ["log"]
 
+# Enables the Event* hanle registration.
+os-extended = ["os-ext"]
 # Enables the `Poll` and `Registry` types.
 os-poll = []
 # Enables additional OS specific extensions, e.g. Unix `pipe(2)`.
 os-ext = [
-  "os-poll",
+  "os-poll", 
   "windows-sys/Win32_System_Pipes",
   "windows-sys/Win32_Security",
 ]
@@ -64,6 +66,7 @@ features = [
   "Win32_Security",                   # Enables NtCreateFile
   "Win32_System_IO",                  # IO types like OVERLAPPED etc
   "Win32_System_WindowsProgramming",  # General future used for various types/funcs
+  "Win32_System_Threading",           # Needed for testing CreateWaitableTimerExW
 ]
 
 [target.'cfg(target_os = "wasi")'.dependencies]
@@ -107,6 +110,10 @@ required-features = ["os-poll", "net"]
 [[example]]
 name = "udp_server"
 required-features = ["os-poll", "net"]
+
+[[example]]
+name = "windows_event"
+required-features = ["os-extended", "net"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(mio_unsupported_force_poll_poll)', 'cfg(mio_unsupported_force_waker_pipe)'] }

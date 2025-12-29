@@ -1,8 +1,10 @@
 use std::ffi::OsStr;
 use std::io::{self, Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
-use std::sync::atomic::Ordering::{Relaxed, SeqCst};
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+/*use std::sync::atomic::Ordering::{Relaxed, SeqCst};
+use std::sync::atomic::{AtomicBool, AtomicUsize};*/
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::{fmt, mem, slice};
 
@@ -23,6 +25,7 @@ use windows_sys::Win32::System::IO::{
 
 use crate::event::Source;
 use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
+use crate::sys::windows::tokens::{TokenGenerator, TokenPipe, TokenSelector};
 use crate::sys::windows::{Event, Handle, Overlapped};
 use crate::Registry;
 use crate::{Interest, Token};
@@ -344,8 +347,15 @@ fn ptr_from() {
 struct Io {
     // Uniquely identifies the selector associated with this named pipe
     cp: Option<Arc<CompletionPort>>,
-    // Token used to identify events
-    token: Option<Token>,
+
+    /// User defined token. Token used to identify events in user space.
+    user_token: Option<Token>,
+
+    /// Internal token. The token is generated from global token generator,
+    /// so it is uniq for every `selector`. It remains the same until 
+    /// instance is destructed. It is used by selector to route the event
+    /// to the correct sub-system i.e `NamedPipe`, `EventHndl`, `Afd`.
+    internal_token: Option<TokenPipe>,
     read: State,
     write: State,
     connect_error: Option<io::Error>,
@@ -360,7 +370,9 @@ enum State {
 }
 
 // Odd tokens are for named pipes
-static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
+//static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
+
+static NEXT_TOKEN: TokenGenerator<TokenPipe> = TokenGenerator::new();
 
 fn would_block() -> io::Error {
     io::ErrorKind::WouldBlock.into()
@@ -496,7 +508,8 @@ impl FromRawHandle for NamedPipe {
                 event: Overlapped::new(event_done),
                 io: Mutex::new(Io {
                     cp: None,
-                    token: None,
+                    user_token: None,
+                    internal_token: None,
                     read: State::None,
                     write: State::None,
                     connect_error: None,
@@ -527,7 +540,7 @@ impl<'a> Read for &'a NamedPipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut state = self.inner.io.lock().unwrap();
 
-        if state.token.is_none() {
+        if state.user_token.is_none() {
             return Err(would_block());
         }
 
@@ -579,7 +592,7 @@ impl<'a> Write for &'a NamedPipe {
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
 
-        if io.token.is_none() {
+        if io.user_token.is_none() {
             return Err(would_block());
         }
 
@@ -618,23 +631,26 @@ impl Source for NamedPipe {
 
         io.check_association(registry, false)?;
 
-        if io.token.is_some() {
+        if io.user_token.is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
                 "I/O source already registered with a `Registry`",
             ));
         }
 
-        if io.cp.is_none() {
+        if io.cp.is_none() 
+        {
             let selector = registry.selector();
 
             io.cp = Some(selector.clone_port());
 
-            let inner_token = NEXT_TOKEN.fetch_add(2, Relaxed) + 2;
+            let inner_token = NEXT_TOKEN.next();
             selector.inner.cp.add_handle(inner_token, self)?;
+
+            io.internal_token = Some(inner_token);
         }
 
-        io.token = Some(token);
+        io.user_token = Some(token);
         drop(io);
 
         Inner::post_register(&self.inner, None);
@@ -647,7 +663,7 @@ impl Source for NamedPipe {
 
         io.check_association(registry, true)?;
 
-        io.token = Some(token);
+        io.user_token = Some(token);
         drop(io);
 
         Inner::post_register(&self.inner, None);
@@ -660,14 +676,14 @@ impl Source for NamedPipe {
 
         io.check_association(registry, true)?;
 
-        if io.token.is_none() {
+        if io.user_token.is_none() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
                 "I/O source not registered with `Registry`",
             ));
         }
 
-        io.token = None;
+        io.user_token = None;
         Ok(())
     }
 }
@@ -995,7 +1011,7 @@ fn event_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let io = me.io.lock().unwrap();
 
     // Make sure the I/O handle is still registered with the selector
-    if io.token.is_some() {
+    if let Some(user_token) = io.user_token {
         // This method is also called during `Selector::drop` to perform
         // cleanup. In this case, `events` is `None` and we don't need to track
         // the event.
@@ -1004,7 +1020,9 @@ fn event_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             // Reverse the `.data` alteration done in `schedule_event`. This
             // alteration was done so the selector recognized the event as one from
             // a named pipe.
-            ev.data >>= 1;
+            //ev.data >>= 1;
+            ev.data = user_token.clone().0 as u64;
+
             events.push(ev);
         }
     }
@@ -1026,44 +1044,52 @@ impl Io {
     }
 
     fn notify_readable(&self, me: &Arc<Inner>, events: Option<&mut Vec<Event>>) {
-        if let Some(token) = self.token {
-            let mut ev = Event::new(token);
-            ev.set_readable();
-
+        if let Some(token) = self.user_token {
             if let Some(events) = events {
+                // set user token and return to user
+                let mut ev = Event::new(token);
+                ev.set_readable();
+
                 events.push(ev);
             } else {
+                // set internal token and schedule, so selector could route it correctly
+                let mut ev = Event::new(self.internal_token.as_ref().unwrap().clone().get_token());
+                ev.set_readable();
+
                 self.schedule_event(me, ev);
             }
         }
     }
 
     fn notify_writable(&self, me: &Arc<Inner>, events: Option<&mut Vec<Event>>) {
-        if let Some(token) = self.token {
-            let mut ev = Event::new(token);
-            ev.set_writable();
+        if let Some(token) = self.user_token {
 
             if let Some(events) = events {
+                // set user token and return to user
+                let mut ev = Event::new(token);
+                ev.set_writable();
+
                 events.push(ev);
             } else {
+                // set internal token and schedule, so selector could route it correctly
+                let mut ev = Event::new(self.internal_token.as_ref().unwrap().clone().get_token());
+                ev.set_writable();
+
                 self.schedule_event(me, ev);
             }
         }
     }
 
-    fn schedule_event(&self, me: &Arc<Inner>, mut event: Event) {
+    fn schedule_event(&self, me: &Arc<Inner>, event: Event) {
         // Alter the token so that the selector will identify the IOCP event as
         // one for a named pipe. This will be reversed in `event_done`
-        //
-        // `data` for named pipes is an auto-incrementing counter. Because
-        // `data` is `u64` we do not risk losing the most-significant bit
-        // (unless a user creates 2^62 named pipes during the lifetime of the
-        // process).
-        event.data <<= 1;
-        event.data += 1;
+
+        // The token in `event` is either a user or internal, depends on where the
+        // is routed.
 
         let completion_status =
-            event.to_completion_status_with_overlapped(me.event.as_ptr() as *mut _);
+            event
+                .to_completion_status_with_overlapped(me.event.as_ptr() as *mut _);
 
         match self.cp.as_ref().unwrap().post(completion_status) {
             Ok(_) => {
