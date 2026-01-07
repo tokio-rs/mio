@@ -196,6 +196,26 @@ jobs:
       run: rustup component add rust-src
     - name: Run tests with sanitizer
       run: make test_sanitizer SAN=${{ matrix.sanitizer }}
+  Wine:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+    # Install linker, libraries, and test runner (Wine) for x86_64-pc-windows-gnu.
+    - uses: taiki-e/setup-cross-toolchain-action@v1
+      with:
+        target: x86_64-pc-windows-gnu
+        runner: wine@7.13
+    - name: Tests
+      run: cargo test --all-features --target x86_64-pc-windows-gnu
+      env:
+        # Several tests are still failing, so emit cfg(wine) to allow ignoring
+        # them by cfg_attr(wine, ignore).
+        RUSTFLAGS: ${{ env.RUSTFLAGS }} --cfg wine
+    - name: Tests release build
+      run: cargo test --release --all-features --target x86_64-pc-windows-gnu
+      env:
+        RUSTFLAGS: ${{ env.RUSTFLAGS }} --cfg wine
   # Single job required to merge the pr.
   Passed:
     runs-on: ubuntu-latest
@@ -209,5 +229,6 @@ jobs:
       - Docs
       - Rustfmt
       - CheckTargets
+      - Wine
     steps:
       - run: exit 0
