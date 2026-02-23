@@ -8,6 +8,7 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: full
   CI: true
+  WASMTIME_VERSION: 41.0.3
 
 permissions:
   contents: read #  to fetch code (actions/checkout)
@@ -90,15 +91,14 @@ jobs:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - name: Setup `wasmtime`
-      uses: bytecodealliance/actions/wasmtime/setup@v1
-      with:
-        version: "41.0.3"
+      run: |
+        curl -OL https://github.com/bytecodealliance/wasmtime/releases/download/v${WASMTIME_VERSION}/wasmtime-v${WASMTIME_VERSION}-x86_64-linux.tar.xz
+        tar xf wasmtime-v${WASMTIME_VERSION}-x86_64-linux.tar.xz
+        echo CARGO_TARGET_WASM32_WASIP2_RUNNER="$(pwd)/wasmtime-v${WASMTIME_VERSION}-x86_64-linux/wasmtime run -Sinherit-network" >> $GITHUB_ENV
     - name: Install target
       run: rustup target add wasm32-wasip2
     - name: Tests
       run: cargo test --target wasm32-wasip2 --all-features
-      env:
-        CARGO_TARGET_WASM32_WASIP2_RUNNER: wasmtime run -Sinherit-network
   Nightly:
     runs-on: ubuntu-latest
     timeout-minutes: 10
