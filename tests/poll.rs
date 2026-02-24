@@ -1,4 +1,3 @@
-#![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
 use std::net;
@@ -111,6 +110,10 @@ fn poll_closes_fd() {
     }
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn drop_cancels_interest_and_shuts_down() {
     init();
@@ -174,6 +177,10 @@ fn drop_cancels_interest_and_shuts_down() {
     handle.join().unwrap();
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn registry_behind_arc() {
     // `Registry` should work behind an `Arc`, being `Sync` and `Send`.
@@ -236,6 +243,10 @@ pub fn registry_ops_flow(
     registry.reregister(source, token, final_interests)
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn registry_operations_are_thread_safe() {
     let (mut poll, mut events) = init_with_poll();
@@ -322,6 +333,10 @@ fn registry_operations_are_thread_safe() {
     handle3.join().unwrap();
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn register_during_poll() {
     let (mut poll, mut events) = init_with_poll();
@@ -423,6 +438,10 @@ pub fn double_register_different_token() {
     );
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn poll_ok_after_cancelling_pending_ops() {
     let (mut poll, mut events) = init_with_poll();

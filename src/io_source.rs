@@ -104,7 +104,11 @@ impl<T> DerefMut for IoSource<T> {
     }
 }
 
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(any(
+    unix,
+    target_os = "hermit",
+    all(target_os = "wasi", not(target_env = "p1"))
+))]
 impl<T> event::Source for IoSource<T>
 where
     T: AsRawFd,
@@ -175,7 +179,7 @@ where
     }
 }
 
-#[cfg(target_os = "wasi")]
+#[cfg(all(target_os = "wasi", target_env = "p1"))]
 impl<T> event::Source for IoSource<T>
 where
     T: AsRawFd,

@@ -62,6 +62,17 @@ impl Waker {
         self.empty();
     }
 
+    #[allow(dead_code)] // Only used by the `poll(2)` implementation.
+    pub(crate) fn fd(&self) -> Option<RawFd> {
+        Some(self.as_raw_fd())
+    }
+
+    /// Only ever `true` for the `single_threaded.rs` implementation.
+    #[allow(dead_code)] // Only used by the `poll(2)` implementation.
+    pub(crate) fn woken(&self) -> bool {
+        false
+    }
+
     /// Empty the pipe's buffer, only need to call this if `wake` fails.
     /// This ignores any errors.
     fn empty(&self) {

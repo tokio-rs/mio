@@ -1,4 +1,3 @@
-#![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::net::{TcpListener, TcpStream};
@@ -13,8 +12,11 @@ use std::time::Duration;
 mod util;
 use util::{
     any_local_address, assert_send, assert_sync, expect_events, expect_no_events, init,
-    init_with_poll, set_linger_zero, ExpectEvent,
+    init_with_poll, ExpectEvent,
 };
+
+#[cfg(not(target_os = "wasi"))]
+use util::set_linger_zero;
 
 const LISTEN: Token = Token(0);
 const CLIENT: Token = Token(1);
@@ -42,6 +44,10 @@ fn is_send_and_sync() {
     assert_sync::<TcpStream>();
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn accept() {
     init();
@@ -88,6 +94,10 @@ fn accept() {
     handle.join().unwrap();
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn connect() {
     init();
@@ -162,6 +172,10 @@ fn connect() {
     handle.join().unwrap();
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn read() {
     init();
@@ -217,6 +231,10 @@ fn read() {
     handle.join().unwrap();
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading or peeking"
+)]
 #[test]
 fn peek() {
     init();
@@ -278,6 +296,10 @@ fn peek() {
     handle.join().unwrap();
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn write() {
     init();
@@ -409,6 +431,10 @@ fn bind_twice_bad() {
     assert!(TcpListener::bind(addr).is_err());
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn multiple_writes_immediate_success() {
     init();
@@ -471,6 +497,7 @@ fn connection_reset_by_peer() {
 
     // Connect client
     let mut client = TcpStream::connect(addr).unwrap();
+    #[cfg(not(target_os = "wasi"))]
     set_linger_zero(&client);
 
     // Register server
@@ -563,7 +590,7 @@ fn connect_error() {
                 // Without fastopen we would be getting the connection error
                 assert!(event.is_writable() || event.is_error());
                 // Solaris poll(2) says POLLHUP and POLLOUT are mutually exclusive.
-                #[cfg(not(any(target_os = "solaris", target_os = "cygwin")))]
+                #[cfg(not(any(target_os = "solaris", target_os = "cygwin", target_os = "wasi")))]
                 assert!(event.is_write_closed());
                 break 'outer;
             }
@@ -573,6 +600,10 @@ fn connect_error() {
     assert!(stream.take_error().unwrap().is_some());
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn write_error() {
     init();
@@ -656,6 +687,10 @@ macro_rules! wait {
     }};
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
+)]
 #[test]
 fn write_shutdown() {
     init();
@@ -697,6 +732,7 @@ fn write_shutdown() {
         target_os = "solaris",
         target_os = "nto",
         target_os = "cygwin",
+        target_os = "wasi",
     )) {
         wait!(poll, is_readable, false);
     } else {
@@ -773,6 +809,10 @@ fn local_addr_ready() {
     }
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
+)]
 #[test]
 fn write_then_drop() {
     init();
@@ -829,6 +869,10 @@ fn write_then_drop() {
     expect_read!(s.read(&mut buf), &[1, 2, 3, 4]);
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
+)]
 #[test]
 fn write_then_deregister() {
     init();
@@ -888,6 +932,10 @@ const ID1: Token = Token(1);
 const ID2: Token = Token(2);
 const ID3: Token = Token(3);
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
+)]
 #[test]
 fn tcp_no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();

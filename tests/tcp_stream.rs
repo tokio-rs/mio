@@ -1,4 +1,3 @@
-#![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
@@ -14,13 +13,17 @@ use mio::{Interest, Token};
 
 #[macro_use]
 mod util;
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "windows", target_os = "wasi")))]
 use util::init;
 use util::{
-    any_local_address, any_local_ipv6_address, assert_send, assert_socket_close_on_exec,
-    assert_socket_non_blocking, assert_sync, assert_would_block, expect_events, expect_no_events,
-    init_with_poll, set_linger_zero, ExpectEvent, Readiness,
+    any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
+    expect_events, expect_no_events, init_with_poll, ExpectEvent, Readiness,
 };
+
+// Close-on-exec doesn't apply to WASI; non-blocking does, but `wasi-libc`
+// doesn't support it yet (https://github.com/WebAssembly/wasi-libc/pull/742).
+#[cfg(not(target_os = "wasi"))]
+use util::{assert_socket_close_on_exec, assert_socket_non_blocking, set_linger_zero};
 
 const DATA1: &[u8] = b"Hello world!";
 const DATA2: &[u8] = b"Hello mars!";
@@ -37,16 +40,28 @@ fn is_send_and_sync() {
     assert_sync::<TcpStream>();
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn tcp_stream_ipv4() {
     smoke_test_tcp_stream(any_local_address(), TcpStream::connect);
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn tcp_stream_ipv6() {
     smoke_test_tcp_stream(any_local_ipv6_address(), TcpStream::connect);
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn tcp_stream_std() {
     smoke_test_tcp_stream(any_local_address(), |addr| {
@@ -67,8 +82,11 @@ where
     let (handle, addr) = echo_listener(addr, 1);
     let mut stream = make_stream(addr).unwrap();
 
-    assert_socket_non_blocking(&stream);
-    assert_socket_close_on_exec(&stream);
+    #[cfg(not(target_os = "wasi"))]
+    {
+        assert_socket_non_blocking(&stream);
+        assert_socket_close_on_exec(&stream);
+    }
 
     poll.registry()
         .register(&mut stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
@@ -81,6 +99,7 @@ where
     );
 
     let mut buf = [0; 16];
+    #[cfg(not(target_os = "wasi"))] // WASI does not yet support peeking
     assert_would_block(stream.peek(&mut buf));
     assert_would_block(stream.read(&mut buf));
 
@@ -99,6 +118,7 @@ where
         vec![ExpectEvent::new(ID1, Interest::READABLE)],
     );
 
+    #[cfg(not(target_os = "wasi"))] // WASI does not yet support peeking
     expect_read!(stream.peek(&mut buf), DATA1);
     expect_read!(stream.read(&mut buf), DATA1);
 
@@ -134,6 +154,10 @@ where
     handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn set_get_ttl() {
     let (mut poll, mut events) = init_with_poll();
@@ -166,6 +190,10 @@ fn set_get_ttl() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn get_ttl_without_previous_set() {
     let (mut poll, mut events) = init_with_poll();
@@ -196,6 +224,10 @@ fn get_ttl_without_previous_set() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn set_get_nodelay() {
     let (mut poll, mut events) = init_with_poll();
@@ -228,6 +260,10 @@ fn set_get_nodelay() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn get_nodelay_without_previous_set() {
     let (mut poll, mut events) = init_with_poll();
@@ -260,6 +296,10 @@ fn get_nodelay_without_previous_set() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
@@ -351,6 +391,10 @@ fn shutdown_write() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn shutdown_both() {
     let (mut poll, mut events) = init_with_poll();
@@ -398,7 +442,7 @@ fn shutdown_both() {
     }
 
     let err = stream.write(DATA2).unwrap_err();
-    #[cfg(unix)]
+    #[cfg(not(windows))]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
     #[cfg(windows)]
     assert_eq!(err.kind(), io::ErrorKind::ConnectionAborted);
@@ -428,6 +472,10 @@ fn raw_fd() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn registering() {
     let (mut poll, mut events) = init_with_poll();
@@ -448,6 +496,10 @@ fn registering() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn reregistering() {
     let (mut poll, mut events) = init_with_poll();
@@ -476,6 +528,10 @@ fn reregistering() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
@@ -499,7 +555,10 @@ fn no_events_after_deregister() {
 
     // Also, write should work
     let mut buf = [0; 16];
-    assert_would_block(stream.peek(&mut buf));
+    #[cfg(not(target_os = "wasi"))] // WASI does not yet support peeking
+    {
+        assert_would_block(stream.peek(&mut buf));
+    }
     assert_would_block(stream.read(&mut buf));
 
     checked_write!(stream.write(DATA1));
@@ -512,6 +571,10 @@ fn no_events_after_deregister() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[cfg_attr(
     windows,
     ignore = "fails on Windows; client read closed events are not triggered"
@@ -550,6 +613,10 @@ fn tcp_shutdown_client_read_close_event() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[cfg_attr(
     any(windows, target_os = "cygwin"),
     ignore = "fails; client write_closed events are not found"
@@ -596,6 +663,7 @@ fn tcp_shutdown_client_write_close_event() {
 }
 
 #[test]
+#[cfg_attr(target_os = "wasi", ignore = "POLLRDHUP isn't supported on WASI")]
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
@@ -630,6 +698,7 @@ fn tcp_shutdown_server_write_close_event() {
 }
 
 #[test]
+#[cfg_attr(target_os = "wasi", ignore = "POLLRDHUP isn't supported on WASI")]
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
@@ -677,6 +746,10 @@ fn tcp_reset_close_event() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[cfg_attr(
     any(windows, target_os = "cygwin"),
     ignore = "fails on Windows; client close events are not found"
@@ -785,6 +858,10 @@ fn start_listener(
     (thread_handle, receiver.recv().unwrap())
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support `POLLHUP` or `POLLRDHUP`"
+)]
 #[test]
 fn hup_event_on_disconnect() {
     use mio::net::TcpListener;
@@ -818,6 +895,7 @@ fn hup_event_on_disconnect() {
 
     let (sock, _) = listener.accept().unwrap();
     // Prevent the OS from performing a graceful shutdown
+    #[cfg(not(target_os = "wasi"))]
     set_linger_zero(&sock);
     drop(sock);
 
@@ -877,6 +955,7 @@ fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
     }
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[test]
 fn peek_ok() {
     let mut buf = [0; 2];
@@ -923,6 +1002,7 @@ fn peek_until_ok<const N: usize>(buf: &mut [u8; N], stream1: &mut TcpStream, exp
     }
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[test]
 fn peek_would_block() {
     let mut buf = [0; 1];
@@ -962,6 +1042,7 @@ fn peek_would_block() {
     );
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[test]
 fn read_peek_would_block() {
     let mut buf = [0; 1];

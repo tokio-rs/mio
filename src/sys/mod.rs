@@ -50,7 +50,11 @@ cfg_os_poll! {
     }
 }
 
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(any(
+    unix,
+    target_os = "hermit",
+    all(target_os = "wasi", not(target_env = "p1"))
+))]
 cfg_os_poll! {
     mod unix;
     #[allow(unused_imports)]
@@ -63,10 +67,10 @@ cfg_os_poll! {
     pub use self::windows::*;
 }
 
-#[cfg(target_os = "wasi")]
+#[cfg(all(target_os = "wasi", target_env = "p1"))]
 cfg_os_poll! {
-    mod wasi;
-    pub(crate) use self::wasi::*;
+    mod wasip1;
+    pub(crate) use self::wasip1::*;
 }
 
 cfg_not_os_poll! {
@@ -115,7 +119,7 @@ pub(crate) const LISTEN_BACKLOG_SIZE: i32 = 128;
 /// is not implemented for them. Feel free to update this if the `libc` crate
 /// changes.
 #[allow(dead_code)]
-#[cfg(target_os = "hermit")]
+#[cfg(any(target_os = "hermit", target_os = "wasi"))]
 pub(crate) const LISTEN_BACKLOG_SIZE: i32 = 1024;
 
 #[allow(dead_code)]

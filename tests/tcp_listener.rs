@@ -1,4 +1,3 @@
-#![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
 use mio::net::TcpListener;
@@ -12,10 +11,14 @@ use std::thread;
 
 mod util;
 use util::{
-    any_local_address, any_local_ipv6_address, assert_send, assert_socket_close_on_exec,
-    assert_socket_non_blocking, assert_sync, assert_would_block, expect_events, expect_no_events,
-    init, init_with_poll, ExpectEvent,
+    any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
+    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
 };
+
+// Close-on-exec doesn't apply to WASI; non-blocking does, but `wasi-libc`
+// doesn't support it yet (https://github.com/WebAssembly/wasi-libc/pull/742).
+#[cfg(not(target_os = "wasi"))]
+use util::{assert_socket_close_on_exec, assert_socket_non_blocking};
 
 const ID1: Token = Token(0);
 const ID2: Token = Token(1);
@@ -26,16 +29,28 @@ fn is_send_and_sync() {
     assert_sync::<TcpListener>();
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn tcp_listener() {
     smoke_test_tcp_listener(any_local_address(), TcpListener::bind);
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn tcp_listener_ipv6() {
     smoke_test_tcp_listener(any_local_ipv6_address(), TcpListener::bind);
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn tcp_listener_std() {
     smoke_test_tcp_listener(any_local_address(), |addr| {
@@ -56,8 +71,11 @@ where
     let mut listener = make_listener(addr).unwrap();
     let address = listener.local_addr().unwrap();
 
-    assert_socket_non_blocking(&listener);
-    assert_socket_close_on_exec(&listener);
+    #[cfg(not(target_os = "wasi"))]
+    {
+        assert_socket_non_blocking(&listener);
+        assert_socket_close_on_exec(&listener);
+    }
 
     poll.registry()
         .register(&mut listener, ID1, Interest::READABLE)
@@ -147,6 +165,10 @@ fn registering() {
     // NOTE: more tests are done in the smoke tests above.
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn reregister() {
     let (mut poll, mut events) = init_with_poll();
@@ -183,6 +205,10 @@ fn reregister() {
     thread_handle.join().expect("unable to join thread");
 }
 
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
@@ -216,6 +242,10 @@ fn no_events_after_deregister() {
 }
 
 /// This tests reregister on successful accept works
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[test]
 fn tcp_listener_two_streams() {
     let (mut poll1, mut events) = init_with_poll();

@@ -41,7 +41,10 @@ use crate::{event, Interest, Registry, Token};
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// use mio::{Interest, Poll, Token};
+/// #[cfg(unix)]
 /// use mio::unix::SourceFd;
+/// #[cfg(target_os = "wasi")]
+/// use mio::wasi::SourceFd;
 ///
 /// use std::os::fd::AsRawFd;
 /// use std::net::TcpListener;
@@ -65,7 +68,10 @@ use crate::{event, Interest, Registry, Token};
 #[cfg_attr(all(feature = "os-poll", feature = "os-ext"), doc = "```")]
 #[cfg_attr(not(all(feature = "os-poll", feature = "os-ext")), doc = "```ignore")]
 /// use mio::{event, Interest, Registry, Token};
+/// #[cfg(unix)]
 /// use mio::unix::SourceFd;
+/// #[cfg(target_os = "wasi")]
+/// use mio::wasi::SourceFd;
 ///
 /// use std::os::fd::RawFd;
 /// use std::io;

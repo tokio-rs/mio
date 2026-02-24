@@ -96,6 +96,14 @@ pub mod hermit {
     pub use crate::sys::SourceFd;
 }
 
+#[cfg(all(target_os = "wasi", not(target_env = "p1"), feature = "os-ext"))]
+#[cfg_attr(docsrs, doc(cfg(all(target_os = "wasi", feature = "os-ext"))))]
+pub mod wasi {
+    //! WASI-only extensions.
+
+    pub use crate::sys::SourceFd;
+}
+
 #[cfg(all(windows, feature = "os-ext"))]
 #[cfg_attr(docsrs, doc(cfg(all(windows, feature = "os-ext"))))]
 pub mod windows {

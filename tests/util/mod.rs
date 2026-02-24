@@ -1,20 +1,24 @@
 // Not all functions are used by all tests.
 #![allow(dead_code, unused_macros)]
-#![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
+#[cfg(not(target_os = "wasi"))]
 use std::mem::size_of;
 use std::net::SocketAddr;
 use std::ops::BitOr;
 #[cfg(unix)]
 use std::os::fd::AsRawFd;
+#[cfg(not(target_os = "wasi"))]
 use std::path::PathBuf;
 use std::sync::Once;
 use std::time::Duration;
-use std::{env, fmt, fs, io};
+#[cfg(not(target_os = "wasi"))]
+use std::{env, fs};
+use std::{fmt, io};
 
 use log::{error, warn};
 use mio::event::Event;
+#[cfg(not(target_os = "wasi"))]
 use mio::net::TcpStream;
 use mio::{Events, Interest, Poll, Token};
 
@@ -24,10 +28,16 @@ pub fn init() {
     INIT.call_once(|| {
         env_logger::try_init().expect("unable to initialise logger");
 
-        // Remove all temporary files from previous test runs.
-        let dir = temp_dir();
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("unable to create temporary directory");
+        // Each test is run in a sandbox on WASI (and `temp_dir`
+        // doesn't work as of this writing, anyway), so no need to
+        // clean up here.
+        #[cfg(not(target_os = "wasi"))]
+        {
+            // Remove all temporary files from previous test runs.
+            let dir = temp_dir();
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(&dir).expect("unable to create temporary directory");
+        }
     })
 }
 
@@ -199,6 +209,8 @@ pub fn assert_would_block<T>(result: io::Result<T>) {
 }
 
 /// Assert that `NONBLOCK` is set on `socket`.
+// Once https://github.com/WebAssembly/wasi-libc/pull/742 lands and makes
+// it into Rust std, we can enable this for `target_os = "wasi"` as well.
 #[cfg(unix)]
 pub fn assert_socket_non_blocking<S>(socket: &S)
 where
@@ -300,6 +312,7 @@ pub fn set_linger_zero(socket: &TcpStream) {
 }
 
 /// Returns a path to a temporary file using `name` as filename.
+#[cfg(not(target_os = "wasi"))]
 pub fn temp_file(name: &'static str) -> PathBuf {
     let mut path = temp_dir();
     path.push(name);
@@ -307,6 +320,7 @@ pub fn temp_file(name: &'static str) -> PathBuf {
 }
 
 /// Returns the temporary directory for Mio test files.
+#[cfg(not(target_os = "wasi"))]
 fn temp_dir() -> PathBuf {
     let mut path = env::temp_dir();
     path.push("mio_tests");

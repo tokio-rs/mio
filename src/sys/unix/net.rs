@@ -27,6 +27,10 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
         target_os = "cygwin",
     ))]
     let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+    // WASI doesn't have the concept of `fork`ing or `exec`ing processes, so
+    // `SOCK_CLOEXEC` neither exists nor is relevant:
+    #[cfg(target_os = "wasi")]
+    let socket_type = socket_type | libc::SOCK_NONBLOCK;
     #[cfg(target_os = "nto")]
     let socket_type = socket_type | libc::SOCK_CLOEXEC;
 
@@ -108,7 +112,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                 sin_family: libc::AF_INET as libc::sa_family_t,
                 sin_port: addr.port().to_be(),
                 sin_addr,
-                #[cfg(not(any(target_os = "haiku", target_os = "vita")))]
+                #[cfg(not(any(target_os = "haiku", target_os = "vita", target_os = "wasi")))]
                 sin_zero: [0; 8],
                 #[cfg(target_os = "haiku")]
                 sin_zero: [0; 24],
