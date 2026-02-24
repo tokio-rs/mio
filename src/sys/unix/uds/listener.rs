@@ -8,7 +8,6 @@ use std::{io, mem};
 use crate::net::UnixStream;
 use crate::sys::unix::net::new_socket;
 use crate::sys::unix::uds::{path_offset, unix_addr};
-use crate::sys::LISTEN_BACKLOG_SIZE;
 
 pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
     let fd = new_socket(libc::AF_UNIX, libc::SOCK_STREAM)?;
@@ -17,7 +16,26 @@ pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
     let (unix_address, addrlen) = unix_addr(address);
     let sockaddr = &unix_address as *const libc::sockaddr_un as *const libc::sockaddr;
     syscall!(bind(fd, sockaddr, addrlen))?;
-    syscall!(listen(fd, LISTEN_BACKLOG_SIZE))?;
+    // Use the same backlog value as the standard libary.
+    // <https://github.com/rust-lang/rust/blob/0028f344ce9f64766259577c998a1959ca1f6a0b/library/std/src/os/unix/net/listener.rs#L75-L106>
+    let backlog = if cfg!(any(
+        target_os = "windows",
+        target_os = "redox",
+        target_os = "espidf",
+        target_os = "horizon"
+    )) {
+        128
+    } else if cfg!(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_vendor = "apple"
+    )) {
+        -1
+    } else {
+        libc::SOMAXCONN
+    };
+    syscall!(listen(fd, backlog))?;
 
     Ok(socket)
 }
