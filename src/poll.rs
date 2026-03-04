@@ -358,7 +358,8 @@ impl Poll {
     ///
     /// Note that the `timeout` will be rounded up to the system clock
     /// granularity (usually 1ms), and kernel scheduling delays mean that
-    /// the blocking interval may be overrun by a small amount.
+    /// the blocking interval may be overrun by a small amount. A timeout
+    /// of [`Duration::ZERO`] is not affected by this rounding.
     ///
     /// See the [struct] level documentation for a higher level discussion of
     /// polling.
