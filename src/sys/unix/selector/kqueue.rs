@@ -1,7 +1,7 @@
 use std::mem;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
-use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd, RawFd};
 use std::slice;
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -318,6 +318,12 @@ cfg_io_source! {
         pub fn id(&self) -> usize {
             self.id
         }
+    }
+}
+
+impl AsFd for Selector {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.kq.as_fd()
     }
 }
 
