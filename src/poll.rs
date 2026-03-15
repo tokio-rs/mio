@@ -14,7 +14,7 @@
         target_os = "cygwin",
     )),
 ))]
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
 #[cfg(all(debug_assertions, not(target_os = "wasi")))]
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(all(debug_assertions, not(target_os = "wasi")))]
@@ -740,6 +740,12 @@ impl Registry {
 impl fmt::Debug for Registry {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Registry").finish()
+    }
+}
+
+impl AsFd for Registry {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.selector.as_fd()
     }
 }
 

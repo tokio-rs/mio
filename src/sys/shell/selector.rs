@@ -1,6 +1,6 @@
 use std::io;
 #[cfg(unix)]
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
 use std::time::Duration;
 
 pub type Event = usize;
@@ -64,6 +64,13 @@ cfg_io_source! {
         pub fn id(&self) -> usize {
             os_required!();
         }
+    }
+}
+
+#[cfg(unix)]
+impl AsFd for Selector {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        os_required!()
     }
 }
 
