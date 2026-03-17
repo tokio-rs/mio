@@ -8,7 +8,7 @@ task:
         image: freebsd-13-5-release-amd64
     - name: Freebsd 14
       freebsd_instance:
-        image: freebsd-14-3-release-amd64-ufs
+        image: freebsd-14-4-release-amd64-ufs
     - name: Freebsd 15
       freebsd_instance:
         image: freebsd-15-0-release-amd64-ufs
