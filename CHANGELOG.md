@@ -1,3 +1,12 @@
+# 1.2.0
+
+* Support was added for WASM Preview 2
+  (https://github.com/tokio-rs/mio/pull/1931).
+* Implement `AsFd` for `Registry`
+  (https://github.com/tokio-rs/mio/pull/1936).
+* The backlog size for listeners were changed to match std lib
+  (https://github.com/tokio-rs/mio/pull/1934).
+
 # 1.1.1
 
 * Handle `ERROR_MORE_DATA` when scheduling reads for Window named pipes
