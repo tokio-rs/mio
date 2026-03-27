@@ -15,8 +15,6 @@ task:
   setup_script:
     - fetch https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile minimal
-    # Workaround https://github.com/rust-lang/cargo/issues/16357
-    - pkg install -y ca_root_nss
   cargo_cache:
     folder: $HOME/.cargo/registry
   build_script:
