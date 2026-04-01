@@ -171,16 +171,16 @@ pub mod event {
         // Both halves of the socket have closed
         event.events as libc::c_int & libc::EPOLLHUP != 0
             // Socket has received FIN or called shutdown(SHUT_RD)
-            || (event.events as libc::c_int & libc::EPOLLIN != 0
-                && event.events as libc::c_int & libc::EPOLLRDHUP != 0)
+            || ((event.events as libc::c_int & libc::EPOLLIN) != 0
+                && (event.events as libc::c_int & libc::EPOLLRDHUP) != 0)
     }
 
     pub fn is_write_closed(event: &Event) -> bool {
         // Both halves of the socket have closed
         event.events as libc::c_int & libc::EPOLLHUP != 0
             // Unix pipe write end has closed
-            || (event.events as libc::c_int & libc::EPOLLOUT != 0
-                && event.events as libc::c_int & libc::EPOLLERR != 0)
+            || ((event.events as libc::c_int & libc::EPOLLOUT) != 0
+                && (event.events as libc::c_int & libc::EPOLLERR) != 0)
             // The other side (read end) of a Unix pipe has closed.
             || event.events as libc::c_int == libc::EPOLLERR
     }
