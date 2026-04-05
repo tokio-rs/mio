@@ -104,5 +104,9 @@ required-features = ["os-poll", "net"]
 name = "udp_server"
 required-features = ["os-poll", "net"]
 
+[[example]]
+name = "ping_pong"
+required-features = ["os-poll", "net"]
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(mio_unsupported_force_poll_poll)', 'cfg(mio_unsupported_force_waker_pipe)'] }
