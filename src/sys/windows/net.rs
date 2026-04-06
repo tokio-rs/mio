@@ -4,9 +4,8 @@ use std::net::SocketAddr;
 use std::sync::Once;
 
 use windows_sys::Win32::Networking::WinSock::{
-    closesocket, ioctlsocket, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0,
     closesocket, ioctlsocket, WSASocketW, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0,
-     INVALID_SOCKET, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0,
+    INVALID_SOCKET, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0,
     SOCKET, WSA_FLAG_NO_HANDLE_INHERIT, WSA_FLAG_OVERLAPPED,
 };
 
