@@ -35,7 +35,6 @@ pub(crate) fn new_socket(domain: u32, socket_type: i32) -> io::Result<SOCKET> {
     init();
 
     let flags = WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT;
-
     let socket = syscall!(
         WSASocketW(domain as i32, socket_type, 0, std::ptr::null(), 0, flags),
         PartialEq::eq,
