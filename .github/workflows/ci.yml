@@ -212,6 +212,46 @@ jobs:
       run: rustup component add rust-src
     - name: Run tests with sanitizer
       run: make test_sanitizer SAN=${{ matrix.sanitizer }}
+  TestFreeBSD:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - freebsd_version: "14.4"
+            target: x86_64-unknown-freebsd
+            arch: x86_64
+          - freebsd_version: "15.0"
+            target: x86_64-unknown-freebsd
+            arch: x86_64
+          - freebsd_version: "14.4"
+            target: i686-unknown-freebsd
+            arch: i686
+    name: FreeBSD/${{ matrix.arch }} ${{ matrix.freebsd_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: ${{ matrix.freebsd_version }}
+          usesh: true
+      - name: Install dependencies
+        shell: freebsd {0}
+        run: |
+          pkg install -y curl
+          fetch https://sh.rustup.rs -o rustup.sh
+          sh rustup.sh -y --profile=minimal
+          if [ "${{ matrix.target }}" = "i686-unknown-freebsd" ]; then
+            . $HOME/.cargo/env
+            rustup target add i686-unknown-freebsd
+          fi
+      - name: Tests
+        shell: freebsd {0}
+        run: |
+          . $HOME/.cargo/env
+          cargo test --target ${{ matrix.target }} --all-features
+
   # Single job required to merge the pr.
   Passed:
     runs-on: ubuntu-latest
@@ -225,5 +265,6 @@ jobs:
       - Docs
       - Rustfmt
       - CheckTargets
+      - TestFreeBSD
     steps:
       - run: exit 0
