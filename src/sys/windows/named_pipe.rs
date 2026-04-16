@@ -906,7 +906,16 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             io.notify_readable(&me, events);
             return;
         }
-        State::None => unreachable!(),
+        // IOCP completion arrived after the state was already consumed
+        // (e.g. pipe deregistered or closed). The Arc refcount is
+        // reclaimed by `Arc::from_raw` above; recover silently in
+        // release, panic in debug to surface unexpected occurrences.
+        State::None => {
+            if cfg!(debug_assertions) {
+                unreachable!("read_done: unexpected State::None");
+            }
+            return;
+        }
     };
     unsafe {
         match me.result(status.overlapped()) {
@@ -960,7 +969,16 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             io.notify_writable(&me, events);
             return;
         }
-        State::None => unreachable!(),
+        // IOCP completion arrived after the state was already consumed
+        // (e.g. pipe deregistered or closed). The Arc refcount is
+        // reclaimed by `Arc::from_raw` above; recover silently in
+        // release, panic in debug to surface unexpected occurrences.
+        State::None => {
+            if cfg!(debug_assertions) {
+                unreachable!("write_done: unexpected State::None");
+            }
+            return;
+        }
     };
 
     unsafe {
