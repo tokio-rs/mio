@@ -12,6 +12,7 @@
         target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
+        target_os = "horizon"
     )),
 ))]
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
@@ -455,6 +456,7 @@ impl Poll {
         target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
+        target_os = "horizon"
     )),
 ))]
 impl AsRawFd for Poll {
@@ -757,6 +759,7 @@ impl fmt::Debug for Registry {
         target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
+        target_os = "horizon"
     )),
 ))]
 impl AsFd for Registry {
@@ -779,6 +782,7 @@ impl AsFd for Registry {
         target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
+        target_os = "horizon"
     )),
 ))]
 impl AsRawFd for Registry {
@@ -800,6 +804,7 @@ cfg_os_poll! {
             target_os = "solaris",
             target_os = "vita",
             target_os = "cygwin",
+            target_os = "horizon"
         )),
     ))]
     #[test]

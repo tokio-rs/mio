@@ -51,6 +51,7 @@ cfg_os_poll! {
         target_os = "vita",
         target_os = "cygwin",
         target_os = "wasi",
+        target_os = "horizon"
     ), path = "selector/poll.rs")]
     mod selector;
     pub(crate) use self::selector::*;
@@ -104,6 +105,7 @@ cfg_os_poll! {
         target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
+         target_os = "horizon",
         all(target_os = "wasi", target_env = "p1")
     ), path = "waker/pipe.rs")]
     #[cfg_attr(all(target_os = "wasi", not(target_env = "p1")), path = "waker/single_threaded.rs")]

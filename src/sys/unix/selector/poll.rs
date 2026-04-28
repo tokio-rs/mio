@@ -490,34 +490,42 @@ impl RegistrationRecord {
     }
 }
 
+#[cfg(not(target_os = "horizon"))]
+type PollFlagInt = libc::c_short;
+#[cfg(target_os = "horizon")]
+type PollFlagInt = libc::c_int;
+
 #[cfg(target_os = "linux")]
-const POLLRDHUP: libc::c_short = libc::POLLRDHUP;
+const POLLRDHUP: PollFlagInt = libc::POLLRDHUP;
 #[cfg(not(target_os = "linux"))]
-const POLLRDHUP: libc::c_short = 0;
+const POLLRDHUP: PollFlagInt = 0;
 
 #[cfg(not(target_os = "wasi"))]
-const POLLPRI: libc::c_short = libc::POLLPRI;
+const POLLPRI: PollFlagInt = libc::POLLPRI;
 #[cfg(target_os = "wasi")]
-const POLLPRI: libc::c_short = 0;
+const POLLPRI: PollFlagInt= 0;
 
 #[cfg(not(target_os = "wasi"))]
-const POLLRDBAND: libc::c_short = libc::POLLRDBAND;
+const POLLRDBAND: PollFlagInt = libc::POLLRDBAND;
 #[cfg(target_os = "wasi")]
-const POLLRDBAND: libc::c_short = 0;
+const POLLRDBAND: PollFlagInt = 0;
 
 #[cfg(not(target_os = "wasi"))]
-const POLLWRBAND: libc::c_short = libc::POLLWRBAND;
+const POLLWRBAND: PollFlagInt = libc::POLLWRBAND;
 #[cfg(target_os = "wasi")]
-const POLLWRBAND: libc::c_short = 0;
+const POLLWRBAND: PollFlagInt = 0;
 
-const READ_EVENTS: libc::c_short = libc::POLLIN | POLLRDHUP;
+#[cfg(not(target_os = "wasi"))]
+const READ_EVENTS: PollFlagInt = libc::POLLIN | POLLRDHUP;
 
-const WRITE_EVENTS: libc::c_short = libc::POLLOUT;
+#[cfg(not(target_os = "wasi"))]
+const WRITE_EVENTS: PollFlagInt = libc::POLLOUT;
 
-const PRIORITY_EVENTS: libc::c_short = POLLPRI;
+#[cfg(not(target_os = "wasi"))]
+const PRIORITY_EVENTS: PollFlagInt = POLLPRI;
 
 /// Get the input poll events for the given event.
-fn interests_to_poll(interest: Interest) -> libc::c_short {
+fn interests_to_poll(interest: Interest) -> PollFlagInt {
     let mut kind = 0;
 
     if interest.is_readable() {
@@ -578,7 +586,10 @@ fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
 #[derive(Debug, Clone)]
 pub struct Event {
     token: Token,
+    #[cfg(not(target_os = "horizon"))]
     events: libc::c_short,
+    #[cfg(target_os = "horizon")]
+    events: libc::c_int
 }
 
 pub type Events = Vec<Event>;
@@ -586,7 +597,7 @@ pub type Events = Vec<Event>;
 pub mod event {
     use std::fmt;
 
-    use crate::sys::Event;
+    use crate::sys::{Event, unix::selector::PollFlagInt};
     use crate::Token;
 
     use super::{POLLPRI, POLLRDHUP};
@@ -639,11 +650,11 @@ pub mod event {
 
     pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
         #[allow(clippy::trivially_copy_pass_by_ref)]
-        fn check_events(got: &libc::c_short, want: &libc::c_short) -> bool {
+        fn check_events(got: &PollFlagInt, want: &PollFlagInt) -> bool {
             (*got & want) != 0
         }
         debug_detail!(
-            EventsDetails(libc::c_short),
+            EventsDetails(PollFlagInt),
             check_events,
             libc::POLLIN,
             super::POLLPRI,
