@@ -573,20 +573,16 @@ fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
             })
             .unwrap_or(-1);
         
-        // println!("polling..."/);
-        if fds.len() > 0 {
-        println!("calling poll with timeout {timeout}, fds: {fds:?}");
+        #[cfg(target_os = "horizon")] // HorizonOS does not support polling without any FDs
+        if fds.is_empty() {
+            break Ok(0);
         }
-
-         let res = if fds.len() == 0 {
-            break Ok(0)
-        } else {
-       syscall!(poll(
+        
+        let res = syscall!(poll(
             fds.as_mut_ptr() as *mut libc::pollfd,
             fds.len() as libc::nfds_t,
             timeout,
-        ))
-        };
+        ));
 
         match res {
             Ok(num_events) => break Ok(num_events as usize),
