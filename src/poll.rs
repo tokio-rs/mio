@@ -16,9 +16,9 @@
     )),
 ))]
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
-#[cfg(all(debug_assertions, not(target_os = "wasi")))]
+#[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(all(debug_assertions, not(target_os = "wasi")))]
+#[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
 use std::sync::Arc;
 use std::time::Duration;
 use std::{fmt, io};
@@ -274,7 +274,7 @@ pub struct Poll {
 pub struct Registry {
     selector: sys::Selector,
     /// Whether this selector currently has an associated waker.
-    #[cfg(all(debug_assertions, not(target_os = "wasi")))]
+    #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
     has_waker: Arc<AtomicBool>,
 }
 
@@ -324,7 +324,7 @@ impl Poll {
             sys::Selector::new().map(|selector| Poll {
                 registry: Registry {
                     selector,
-                    #[cfg(all(debug_assertions, not(target_os = "wasi")))]
+                    #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
                     has_waker: Arc::new(AtomicBool::new(false)),
                 },
             })
@@ -717,14 +717,14 @@ impl Registry {
     pub fn try_clone(&self) -> io::Result<Registry> {
         self.selector.try_clone().map(|selector| Registry {
             selector,
-            #[cfg(all(debug_assertions, not(target_os = "wasi")))]
+            #[cfg(not(any(target_os = "wasi", target_os = "horizon")))]
             has_waker: Arc::clone(&self.has_waker),
         })
     }
 
     /// Internal check to ensure only a single `Waker` is active per [`Poll`]
     /// instance.
-    #[cfg(all(debug_assertions, not(target_os = "wasi")))]
+    #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
     pub(crate) fn register_waker(&self) {
         assert!(
             !self.has_waker.swap(true, Ordering::AcqRel),
@@ -733,7 +733,7 @@ impl Registry {
     }
 
     /// Get access to the `sys::Selector`.
-    #[cfg(any(not(target_os = "wasi"), feature = "net"))]
+    #[cfg(any(not(any(target_os = "wasi", target_os = "horizon")), feature = "net"))]
     pub(crate) fn selector(&self) -> &sys::Selector {
         &self.selector
     }

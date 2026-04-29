@@ -162,6 +162,7 @@ jobs:
           - aarch64-unknown-redox
           - arm-linux-androideabi
           - arm64_32-apple-watchos
+          - armv6k-nintendo-3ds
           - armv7-sony-vita-newlibeabihf
           - i686-unknown-linux-gnu
           - i686-unknown-hurd-gnu

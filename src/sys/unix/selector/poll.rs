@@ -71,7 +71,7 @@ impl Selector {
     }
     }
 
-    #[cfg(not(target_os = "wasi"))]
+    #[cfg(not(any(target_os = "horizon", target_os = "wasi")))]
     pub fn wake(&self, token: Token) -> io::Result<()> {
         self.state.wake(token)
     }
@@ -455,7 +455,7 @@ impl SelectorState {
         })
     }
 
-    #[cfg(not(target_os = "wasi"))]
+    #[cfg(not(any(target_os = "horizon", target_os = "wasi")))]
     pub fn wake(&self, token: Token) -> io::Result<()> {
         self.pending_wake_token.lock().unwrap().replace(token);
         self.notify_waker.wake()
@@ -515,16 +515,9 @@ const POLLWRBAND: PollFlagInt = libc::POLLWRBAND;
 #[cfg(target_os = "wasi")]
 const POLLWRBAND: PollFlagInt = 0;
 
-#[cfg(not(target_os = "wasi"))]
 const READ_EVENTS: PollFlagInt = libc::POLLIN | POLLRDHUP;
 
-#[cfg(not(target_os = "wasi"))]
-const WRITE_EVENTS: PollFlagInt = 0x08;
-
-#[cfg(not(target_os = "horizon"))]
-const POLLOUT: PollFlagInt = libc::POLLOUT;
-#[cfg(target_os = "horizon")]
-const POLLOUT: PollFlagInt = 0x08;
+const WRITE_EVENTS: PollFlagInt = libc::POLLOUT;
 
 #[cfg(not(target_os = "wasi"))]
 const PRIORITY_EVENTS: PollFlagInt = POLLPRI;
@@ -578,11 +571,13 @@ fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
             break Ok(0);
         }
         
+
         let res = syscall!(poll(
             fds.as_mut_ptr() as *mut libc::pollfd,
             fds.len() as libc::nfds_t,
             timeout,
         ));
+
 
         match res {
             Ok(num_events) => break Ok(num_events as usize),
@@ -596,10 +591,7 @@ fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
 #[derive(Debug, Clone)]
 pub struct Event {
     token: Token,
-    #[cfg(not(target_os = "horizon"))]
-    events: libc::c_short,
-    #[cfg(target_os = "horizon")]
-    events: libc::c_int
+    events: PollFlagInt,
 }
 
 pub type Events = Vec<Event>;
@@ -607,7 +599,7 @@ pub type Events = Vec<Event>;
 pub mod event {
     use std::fmt;
 
-    use crate::sys::{Event, unix::selector::PollFlagInt};
+    use crate::sys::Event;
     use crate::Token;
 
     use super::{POLLPRI, POLLRDHUP};
@@ -621,7 +613,7 @@ pub mod event {
     }
 
     pub fn is_writable(event: &Event) -> bool {
-        (event.events & super::POLLOUT) != 0
+        (event.events & libc::POLLOUT) != 0
     }
 
     pub fn is_error(event: &Event) -> bool {
@@ -639,7 +631,7 @@ pub mod event {
         // Both halves of the socket have closed
         (event.events & libc::POLLHUP) != 0
             // Unix pipe write end has closed
-            || ((event.events & super::POLLOUT) != 0 && (event.events & libc::POLLERR) != 0)
+            || ((event.events & libc::POLLOUT) != 0 && (event.events & libc::POLLERR) != 0)
             // The other side (read end) of a Unix pipe has closed.
             || (event.events == libc::POLLERR)
     }
@@ -660,15 +652,15 @@ pub mod event {
 
     pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
         #[allow(clippy::trivially_copy_pass_by_ref)]
-        fn check_events(got: &PollFlagInt, want: &PollFlagInt) -> bool {
+        fn check_events(got: &super::PollFlagInt, want: &super::PollFlagInt) -> bool {
             (*got & want) != 0
         }
         debug_detail!(
-            EventsDetails(PollFlagInt),
+            EventsDetails(super::PollFlagInt),
             check_events,
             libc::POLLIN,
             super::POLLPRI,
-            super::POLLOUT,
+            libc::POLLOUT,
             libc::POLLRDNORM,
             super::POLLRDBAND,
             libc::POLLWRNORM,
@@ -684,14 +676,14 @@ pub mod event {
     }
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(any(target_os = "wasi", target_os = "horizon")))]
 #[derive(Debug)]
 pub(crate) struct Waker {
     selector: Selector,
     token: Token,
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(any(target_os = "wasi", target_os = "horizon")))]
 impl Waker {
     pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
         Ok(Waker {
