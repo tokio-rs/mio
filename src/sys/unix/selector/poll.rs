@@ -519,7 +519,12 @@ const POLLWRBAND: PollFlagInt = 0;
 const READ_EVENTS: PollFlagInt = libc::POLLIN | POLLRDHUP;
 
 #[cfg(not(target_os = "wasi"))]
-const WRITE_EVENTS: PollFlagInt = libc::POLLOUT;
+const WRITE_EVENTS: PollFlagInt = 0x08;
+
+#[cfg(not(target_os = "horizon"))]
+const POLLOUT: PollFlagInt = libc::POLLOUT;
+#[cfg(target_os = "horizon")]
+const POLLOUT: PollFlagInt = 0x08;
 
 #[cfg(not(target_os = "wasi"))]
 const PRIORITY_EVENTS: PollFlagInt = POLLPRI;
@@ -567,12 +572,21 @@ fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
                 cmp::min(MAX_SAFE_TIMEOUT, to_ms) as libc::c_int
             })
             .unwrap_or(-1);
+        
+        // println!("polling..."/);
+        if fds.len() > 0 {
+        println!("calling poll with timeout {timeout}, fds: {fds:?}");
+        }
 
-        let res = syscall!(poll(
+         let res = if fds.len() == 0 {
+            break Ok(0)
+        } else {
+       syscall!(poll(
             fds.as_mut_ptr() as *mut libc::pollfd,
             fds.len() as libc::nfds_t,
             timeout,
-        ));
+        ))
+        };
 
         match res {
             Ok(num_events) => break Ok(num_events as usize),
@@ -611,7 +625,7 @@ pub mod event {
     }
 
     pub fn is_writable(event: &Event) -> bool {
-        (event.events & libc::POLLOUT) != 0
+        (event.events & super::POLLOUT) != 0
     }
 
     pub fn is_error(event: &Event) -> bool {
@@ -629,7 +643,7 @@ pub mod event {
         // Both halves of the socket have closed
         (event.events & libc::POLLHUP) != 0
             // Unix pipe write end has closed
-            || ((event.events & libc::POLLOUT) != 0 && (event.events & libc::POLLERR) != 0)
+            || ((event.events & super::POLLOUT) != 0 && (event.events & libc::POLLERR) != 0)
             // The other side (read end) of a Unix pipe has closed.
             || (event.events == libc::POLLERR)
     }
@@ -658,7 +672,7 @@ pub mod event {
             check_events,
             libc::POLLIN,
             super::POLLPRI,
-            libc::POLLOUT,
+            super::POLLOUT,
             libc::POLLRDNORM,
             super::POLLRDBAND,
             libc::POLLWRNORM,
