@@ -1,6 +1,6 @@
 /// Helper macro to execute a system call that returns an `io::Result`.
 //
-// Macro must be defined before any modules that uses them.
+// Macro must be defined before any modules that use them.
 #[allow(unused_macros)]
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{

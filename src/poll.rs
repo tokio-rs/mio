@@ -72,7 +72,7 @@ use crate::{event, sys, Events, Interest, Token};
 /// // Register the stream with `Poll`
 /// poll.registry().register(&mut stream, Token(0), Interest::READABLE | Interest::WRITABLE)?;
 ///
-/// // Wait for the socket to become ready. This has to happens in a loop to
+/// // Wait for the socket to become ready. This has to happen in a loop to
 /// // handle spurious wakeups.
 /// loop {
 ///     poll.poll(&mut events, None)?;
@@ -419,7 +419,7 @@ impl Poll {
     ///     Token(0),
     ///     Interest::READABLE | Interest::WRITABLE)?;
     ///
-    /// // Wait for the socket to become ready. This has to happens in a loop to
+    /// // Wait for the socket to become ready. This has to happen in a loop to
     /// // handle spurious wakeups.
     /// loop {
     ///     poll.poll(&mut events, None)?;
