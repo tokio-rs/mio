@@ -519,7 +519,6 @@ const READ_EVENTS: PollFlagInt = libc::POLLIN | POLLRDHUP;
 
 const WRITE_EVENTS: PollFlagInt = libc::POLLOUT;
 
-#[cfg(not(target_os = "wasi"))]
 const PRIORITY_EVENTS: PollFlagInt = POLLPRI;
 
 /// Get the input poll events for the given event.
@@ -571,13 +570,11 @@ fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
             break Ok(0);
         }
         
-
         let res = syscall!(poll(
             fds.as_mut_ptr() as *mut libc::pollfd,
             fds.len() as libc::nfds_t,
             timeout,
         ));
-
 
         match res {
             Ok(num_events) => break Ok(num_events as usize),

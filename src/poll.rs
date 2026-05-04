@@ -717,7 +717,7 @@ impl Registry {
     pub fn try_clone(&self) -> io::Result<Registry> {
         self.selector.try_clone().map(|selector| Registry {
             selector,
-            #[cfg(not(any(target_os = "wasi", target_os = "horizon")))]
+            #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
             has_waker: Arc::clone(&self.has_waker),
         })
     }

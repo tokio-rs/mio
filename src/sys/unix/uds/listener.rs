@@ -26,7 +26,6 @@ pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
         target_os = "horizon"
     ))]
     let backlog = 128;
-
     #[cfg(any(
         target_os = "linux",
         target_os = "freebsd",
@@ -34,7 +33,6 @@ pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
         target_vendor = "apple"
     ))] 
     let backlog = -1;
-
     #[cfg(not(any(
         target_os = "linux",
         target_os = "freebsd",
