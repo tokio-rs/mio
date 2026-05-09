@@ -733,7 +733,7 @@ impl Registry {
     }
 
     /// Get access to the `sys::Selector`.
-    #[cfg(any(not(any(target_os = "wasi", target_os = "horizon")), feature = "net"))]
+    #[cfg(any(not(target_os = "wasi"), feature = "net"))]
     pub(crate) fn selector(&self) -> &sys::Selector {
         &self.selector
     }

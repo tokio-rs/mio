@@ -18,7 +18,7 @@ pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
     syscall!(bind(fd, sockaddr, addrlen))?;
     // Use the same backlog value as the standard libary.
     // <https://github.com/rust-lang/rust/blob/0028f344ce9f64766259577c998a1959ca1f6a0b/library/std/src/os/unix/net/listener.rs#L75-L106>
-    
+
     #[cfg(any(
         target_os = "windows",
         target_os = "redox",
@@ -31,7 +31,7 @@ pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
         target_os = "freebsd",
         target_os = "openbsd",
         target_vendor = "apple"
-    ))] 
+    ))]
     let backlog = -1;
     #[cfg(not(any(
         target_os = "linux",
@@ -44,7 +44,7 @@ pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
         target_os = "horizon"
     )))]
     let backlog = libc::SOMAXCONN;
-    
+
     syscall!(listen(fd, backlog))?;
 
     Ok(socket)

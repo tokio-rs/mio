@@ -503,7 +503,7 @@ const POLLRDHUP: PollFlagInt = 0;
 #[cfg(not(target_os = "wasi"))]
 const POLLPRI: PollFlagInt = libc::POLLPRI;
 #[cfg(target_os = "wasi")]
-const POLLPRI: PollFlagInt= 0;
+const POLLPRI: PollFlagInt = 0;
 
 #[cfg(not(target_os = "wasi"))]
 const POLLRDBAND: PollFlagInt = libc::POLLRDBAND;
@@ -564,12 +564,12 @@ fn poll(fds: &mut [PollFd], timeout: Option<Duration>) -> io::Result<usize> {
                 cmp::min(MAX_SAFE_TIMEOUT, to_ms) as libc::c_int
             })
             .unwrap_or(-1);
-        
+
         #[cfg(target_os = "horizon")] // HorizonOS does not support polling without any FDs
         if fds.is_empty() {
             break Ok(0);
         }
-        
+
         let res = syscall!(poll(
             fds.as_mut_ptr() as *mut libc::pollfd,
             fds.len() as libc::nfds_t,
