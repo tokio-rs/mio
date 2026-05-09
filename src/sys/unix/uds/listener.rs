@@ -43,7 +43,7 @@ pub(crate) fn bind_addr(address: &SocketAddr) -> io::Result<net::UnixListener> {
         target_os = "espidf",
         target_os = "horizon"
     )))]
-    let backlog = libc::SOMAXCONNS;
+    let backlog = libc::SOMAXCONN;
     
     syscall!(listen(fd, backlog))?;
 
