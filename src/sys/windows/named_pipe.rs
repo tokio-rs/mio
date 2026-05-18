@@ -423,6 +423,12 @@ impl NamedPipe {
             return Err(would_block());
         }
 
+        // If `connect_overlapped` does not complete immediately then we need
+        // to pass a reference to `self.inner` to the completion handler.
+        // We need to increase the reference count here because `connect_done`
+        // could be called as soon as we call `connect_overlapped`.
+        let inner_for_completion = self.inner.clone();
+
         // Now that we've flagged ourselves in the connecting state, issue the
         // connection attempt. Afterwards interpret the return value and set
         // internal state accordingly.
@@ -448,7 +454,7 @@ impl NamedPipe {
             // `connect_done` function will "reify" this forgotten pointer to
             // drop the refcount on the other side.
             Ok(false) => {
-                mem::forget(self.inner.clone());
+                mem::forget(inner_for_completion);
                 Err(would_block())
             }
 
