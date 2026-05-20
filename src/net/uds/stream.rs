@@ -12,19 +12,16 @@ use std::os::windows::io::{
 use std::path::Path;
 
 use crate::io_source::IoSource;
-use crate::sys;
 #[cfg(windows)]
 use crate::sys::uds::{Socket, SocketAddr};
-use crate::{event, Interest, Registry, Token};
-
-#[cfg(unix)]
-type Inner = net::UnixStream;
-#[cfg(windows)]
-type Inner = Socket;
+use crate::{event, sys, Interest, Registry, Token};
 
 /// A non-blocking Unix stream socket.
 pub struct UnixStream {
-    inner: IoSource<Inner>,
+    #[cfg(unix)]
+    inner: IoSource<net::UnixStream>,
+    #[cfg(windows)]
+    inner: IoSource<Socket>,
 }
 
 impl UnixStream {

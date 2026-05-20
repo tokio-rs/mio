@@ -56,6 +56,7 @@ impl SocketAddr {
 
     /// Returns `true` if the address is unnamed.
     pub fn is_unnamed(&self) -> bool {
+        // Not actually supported at time of writing, but worth being defensive.
         let path_len = self.len as usize - SUN_PATH_OFFSET;
         path_len == 0
     }
@@ -132,8 +133,8 @@ impl Socket {
         cvt(unsafe {
             ws::getsockopt(
                 self.inner.as_raw_socket() as _,
-                ws::SOL_SOCKET as i32,
-                ws::SO_ERROR as i32,
+                ws::SOL_SOCKET,
+                ws::SO_ERROR,
                 &mut optval as *mut _ as *mut _,
                 &mut optlen,
             )

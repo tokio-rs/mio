@@ -11,19 +11,16 @@ use std::{fmt, io};
 
 use crate::io_source::IoSource;
 use crate::net::UnixStream;
-use crate::sys;
 #[cfg(windows)]
 use crate::sys::uds::{Socket, SocketAddr};
-use crate::{event, Interest, Registry, Token};
-
-#[cfg(unix)]
-type Inner = net::UnixListener;
-#[cfg(windows)]
-type Inner = Socket;
+use crate::{event, sys, Interest, Registry, Token};
 
 /// A non-blocking Unix domain socket server.
 pub struct UnixListener {
-    inner: IoSource<Inner>,
+    #[cfg(unix)]
+    inner: IoSource<net::UnixListener>,
+    #[cfg(windows)]
+    inner: IoSource<Socket>,
 }
 
 impl UnixListener {
