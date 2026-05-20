@@ -1,15 +1,29 @@
+#[cfg(unix)]
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+#[cfg(unix)]
 use std::os::unix::net::{self, SocketAddr};
+#[cfg(windows)]
+use std::os::windows::io::{
+    AsRawSocket, AsSocket, BorrowedSocket, FromRawSocket, IntoRawSocket, OwnedSocket, RawSocket,
+};
 use std::path::Path;
 use std::{fmt, io};
 
 use crate::io_source::IoSource;
 use crate::net::UnixStream;
-use crate::{event, sys, Interest, Registry, Token};
+use crate::sys;
+#[cfg(windows)]
+use crate::sys::uds::{Socket, SocketAddr};
+use crate::{event, Interest, Registry, Token};
+
+#[cfg(unix)]
+type Inner = net::UnixListener;
+#[cfg(windows)]
+type Inner = Socket;
 
 /// A non-blocking Unix domain socket server.
 pub struct UnixListener {
-    inner: IoSource<net::UnixListener>,
+    inner: IoSource<Inner>,
 }
 
 impl UnixListener {
@@ -21,7 +35,19 @@ impl UnixListener {
 
     /// Creates a new `UnixListener` bound to the specified socket `address`.
     pub fn bind_addr(address: &SocketAddr) -> io::Result<UnixListener> {
-        sys::uds::listener::bind_addr(address).map(UnixListener::from_std)
+        #[cfg(unix)]
+        {
+            sys::uds::listener::bind_addr(address).map(UnixListener::from_std)
+        }
+
+        // Once std::os::windows::net::UnixListener is stabilized, this can be removed.
+        #[cfg(windows)]
+        {
+            let socket = sys::uds::listener::bind_addr(address)?;
+            Ok(UnixListener {
+                inner: IoSource::new(Socket::from(socket)),
+            })
+        }
     }
 
     /// Creates a new `UnixListener` from a standard `net::UnixListener`.
@@ -30,6 +56,7 @@ impl UnixListener {
     /// standard library in the Mio equivalent. The conversion assumes nothing
     /// about the underlying listener; it is left up to the user to set it in
     /// non-blocking mode.
+    #[cfg(unix)]
     pub fn from_std(listener: net::UnixListener) -> UnixListener {
         UnixListener {
             inner: IoSource::new(listener),
@@ -85,18 +112,21 @@ impl fmt::Debug for UnixListener {
     }
 }
 
+#[cfg(unix)]
 impl IntoRawFd for UnixListener {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl FromRawFd for UnixListener {
     /// Converts a `RawFd` to a `UnixListener`.
     ///
@@ -109,6 +139,7 @@ impl FromRawFd for UnixListener {
     }
 }
 
+#[cfg(unix)]
 impl From<UnixListener> for net::UnixListener {
     fn from(listener: UnixListener) -> Self {
         // Safety: This is safe since we are extracting the raw fd from a well-constructed
@@ -118,20 +149,78 @@ impl From<UnixListener> for net::UnixListener {
     }
 }
 
+#[cfg(unix)]
 impl From<UnixListener> for OwnedFd {
     fn from(unix_listener: UnixListener) -> Self {
         unix_listener.inner.into_inner().into()
     }
 }
 
+#[cfg(unix)]
 impl AsFd for UnixListener {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.inner.as_fd()
     }
 }
 
+#[cfg(unix)]
 impl From<OwnedFd> for UnixListener {
     fn from(fd: OwnedFd) -> Self {
         UnixListener::from_std(From::from(fd))
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for UnixListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for UnixListener {
+    fn into_raw_socket(self) -> RawSocket {
+        self.inner.into_inner().into_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for UnixListener {
+    /// # Safety
+    ///
+    /// The socket must be a valid, bound, listening `AF_UNIX` socket in
+    /// non-blocking mode.
+    unsafe fn from_raw_socket(sock: RawSocket) -> UnixListener {
+        UnixListener {
+            inner: IoSource::new(unsafe { Socket::from_raw_socket(sock) }),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsSocket for UnixListener {
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        // SAFETY: the raw socket is valid for the lifetime of `self`.
+        unsafe { BorrowedSocket::borrow_raw(self.inner.as_raw_socket()) }
+    }
+}
+
+#[cfg(windows)]
+impl From<UnixListener> for OwnedSocket {
+    fn from(listener: UnixListener) -> Self {
+        listener.inner.into_inner().into()
+    }
+}
+
+#[cfg(windows)]
+impl From<OwnedSocket> for UnixListener {
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
+    fn from(socket: OwnedSocket) -> Self {
+        UnixListener {
+            inner: IoSource::new(Socket::from(socket)),
+        }
     }
 }

@@ -33,7 +33,9 @@ mod udp;
 #[cfg(not(all(target_os = "wasi", target_env = "p1")))]
 pub use self::udp::UdpSocket;
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 mod uds;
 #[cfg(unix)]
 pub use self::uds::{UnixDatagram, UnixListener, UnixStream};
+#[cfg(windows)]
+pub use self::uds::{SocketAddr, UnixListener, UnixStream};

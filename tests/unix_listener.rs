@@ -1,12 +1,14 @@
-#![cfg(all(unix, feature = "os-poll", feature = "net"))]
+#![cfg(all(any(unix, windows), feature = "os-poll", feature = "net"))]
 
-use mio::net::UnixListener;
-use mio::{Interest, Token};
 use std::io::{self, Read};
+#[cfg(unix)]
 use std::os::unix::net;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 use std::thread;
+
+use mio::net::{UnixListener, UnixStream};
+use mio::{Interest, Token};
 
 #[macro_use]
 mod util;
@@ -31,6 +33,7 @@ fn unix_listener_smoke() {
 }
 
 #[test]
+#[cfg(unix)]
 fn unix_listener_from_std() {
     smoke_test(
         |path| {
@@ -235,7 +238,7 @@ fn open_connections(
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         for _ in 0..n_connections {
-            let conn = net::UnixStream::connect(path.clone()).unwrap();
+            let conn = UnixStream::connect(path.clone()).unwrap();
             barrier.wait();
             drop(conn);
         }

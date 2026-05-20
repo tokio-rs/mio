@@ -35,6 +35,7 @@ cfg_net! {
 
     pub(crate) mod tcp;
     pub(crate) mod udp;
+    pub(crate) mod uds;
 
     pub use selector::{SelectorInner, SockState};
 }

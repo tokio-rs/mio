@@ -1,14 +1,17 @@
-#![cfg(all(unix, feature = "os-poll", feature = "net"))]
+#![cfg(all(any(unix, windows), feature = "os-poll", feature = "net"))]
 
-use mio::net::UnixStream;
-use mio::{Interest, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
+#[cfg(unix)]
 use std::os::unix::net;
 use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Barrier};
 use std::thread;
+use std::time::Duration;
+
+use mio::net::{SocketAddr, UnixListener, UnixStream};
+use mio::{Interest, Token};
 
 #[macro_use]
 mod util;
@@ -19,11 +22,12 @@ use util::{
 };
 
 const DATA1: &[u8] = b"Hello same host!";
-const DATA2: &[u8] = b"Why hello mio!";
 const DATA1_LEN: usize = 16;
+const DATA2: &[u8] = b"Why hello mio!";
 const DATA2_LEN: usize = 14;
 const DEFAULT_BUF_SIZE: usize = 64;
 const TOKEN_1: Token = Token(0);
+#[cfg(unix)]
 const TOKEN_2: Token = Token(1);
 
 #[test]
@@ -48,12 +52,12 @@ fn unix_stream_connect() {
     let barrier = Arc::new(Barrier::new(2));
     let path = temp_file("unix_stream_connect");
 
-    let listener = net::UnixListener::bind(path.clone()).unwrap();
+    let listener = UnixListener::bind(path.clone()).unwrap();
     let mut stream = UnixStream::connect(path).unwrap();
 
     let barrier_clone = barrier.clone();
     let handle = thread::spawn(move || {
-        let (stream, _) = listener.accept().unwrap();
+        let (stream, _) = accept_blocking(&listener);
         barrier_clone.wait();
         drop(stream);
     });
@@ -91,15 +95,14 @@ fn unix_stream_connect_addr() {
     let barrier = Arc::new(Barrier::new(2));
 
     let path = temp_file("unix_stream_connect_addr");
-    let listener = net::UnixListener::bind(path.clone()).unwrap();
-    let mio_listener = mio::net::UnixListener::from_std(listener);
+    let mio_listener = UnixListener::bind(path).unwrap();
 
     let local_addr = mio_listener.local_addr().unwrap();
     let mut stream = UnixStream::connect_addr(&local_addr).unwrap();
 
     let barrier_clone = barrier.clone();
     let handle = thread::spawn(move || {
-        let (stream, _) = mio_listener.accept().unwrap();
+        let (stream, _) = accept_blocking(&mio_listener);
         barrier_clone.wait();
         drop(stream);
     });
@@ -128,6 +131,7 @@ fn unix_stream_connect_addr() {
 }
 
 #[test]
+#[cfg(unix)]
 #[cfg_attr(
     target_os = "hurd",
     ignore = "getting pathname isn't supported on GNU/Hurd"
@@ -146,6 +150,7 @@ fn unix_stream_from_std() {
 }
 
 #[test]
+#[cfg(unix)]
 fn unix_stream_pair() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -332,7 +337,11 @@ fn unix_stream_shutdown_write() {
     );
 
     let err = stream.write(DATA2).unwrap_err();
+    #[cfg(unix)]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
+    // Windows returns WSAESHUTDOWN (10058) which Rust maps to Uncategorized.
+    #[cfg(windows)]
+    assert_eq!(err.raw_os_error(), Some(10058));
 
     // Read should be ok
     let mut buf = [0; DEFAULT_BUF_SIZE];
@@ -405,7 +414,7 @@ fn unix_stream_shutdown_both() {
     #[cfg(unix)]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
     #[cfg(windows)]
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionAbroted);
+    assert_eq!(err.kind(), io::ErrorKind::ConnectionAborted);
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
@@ -609,16 +618,16 @@ where
 fn new_echo_listener(
     connections: usize,
     test_name: &'static str,
-) -> (thread::JoinHandle<()>, net::SocketAddr) {
+) -> (thread::JoinHandle<()>, SocketAddr) {
     let (addr_sender, addr_receiver) = channel();
     let handle = thread::spawn(move || {
         let path = temp_file(test_name);
-        let listener = net::UnixListener::bind(path).unwrap();
+        let listener = UnixListener::bind(path).unwrap();
         let local_addr = listener.local_addr().unwrap();
         addr_sender.send(local_addr).unwrap();
 
         for _ in 0..connections {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = accept_blocking(&listener);
 
             // On Linux based system it will cause a connection reset
             // error when the reading side of the peer connection is
@@ -631,7 +640,10 @@ fn new_echo_listener(
                         read += amount;
                         amount
                     }
-                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(1));
+                        continue;
+                    }
                     Err(ref err)
                         if matches!(
                             err.kind(),
@@ -647,7 +659,10 @@ fn new_echo_listener(
                 }
                 match stream.write(&buf[..n]) {
                     Ok(amount) => written += amount,
-                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(1));
+                        continue;
+                    }
                     Err(ref err) if err.kind() == io::ErrorKind::BrokenPipe => break,
                     Err(err) => panic!("{}", err),
                 };
@@ -662,16 +677,16 @@ fn new_noop_listener(
     connections: usize,
     barrier: Arc<Barrier>,
     test_name: &'static str,
-) -> (thread::JoinHandle<()>, net::SocketAddr) {
+) -> (thread::JoinHandle<()>, SocketAddr) {
     let (sender, receiver) = channel();
     let handle = thread::spawn(move || {
         let path = temp_file(test_name);
-        let listener = net::UnixListener::bind(path).unwrap();
+        let listener = UnixListener::bind(path).unwrap();
         let local_addr = listener.local_addr().unwrap();
         sender.send(local_addr).unwrap();
 
         for _ in 0..connections {
-            let (stream, _) = listener.accept().unwrap();
+            let (stream, _) = accept_blocking(&listener);
             barrier.wait();
             stream.shutdown(Shutdown::Write).unwrap();
             barrier.wait();
@@ -679,4 +694,21 @@ fn new_noop_listener(
         }
     });
     (handle, receiver.recv().unwrap())
+}
+
+/// Spin on `accept` until a connection is available. The listener is
+/// non-blocking, so we sleep briefly between attempts.
+/// We previously used std:: types to allow us to do blocking accepts,
+/// but, since this isn't stabilized for Windows at time of writing,
+/// we changed to mio types.
+fn accept_blocking(listener: &UnixListener) -> (UnixStream, SocketAddr) {
+    loop {
+        match listener.accept() {
+            Ok(pair) => return pair,
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(1));
+            }
+            Err(e) => panic!("accept failed: {e}"),
+        }
+    }
 }

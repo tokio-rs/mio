@@ -1,16 +1,30 @@
 use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::Shutdown;
+#[cfg(unix)]
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+#[cfg(unix)]
 use std::os::unix::net::{self, SocketAddr};
+#[cfg(windows)]
+use std::os::windows::io::{
+    AsRawSocket, AsSocket, BorrowedSocket, FromRawSocket, IntoRawSocket, OwnedSocket, RawSocket,
+};
 use std::path::Path;
 
 use crate::io_source::IoSource;
-use crate::{event, sys, Interest, Registry, Token};
+use crate::sys;
+#[cfg(windows)]
+use crate::sys::uds::{Socket, SocketAddr};
+use crate::{event, Interest, Registry, Token};
+
+#[cfg(unix)]
+type Inner = net::UnixStream;
+#[cfg(windows)]
+type Inner = Socket;
 
 /// A non-blocking Unix stream socket.
 pub struct UnixStream {
-    inner: IoSource<net::UnixStream>,
+    inner: IoSource<Inner>,
 }
 
 impl UnixStream {
@@ -28,7 +42,19 @@ impl UnixStream {
     /// This may return a `WouldBlock` in which case the socket connection
     /// cannot be completed immediately. Usually it means the backlog is full.
     pub fn connect_addr(address: &SocketAddr) -> io::Result<UnixStream> {
-        sys::uds::stream::connect_addr(address).map(UnixStream::from_std)
+        #[cfg(unix)]
+        {
+            sys::uds::stream::connect_addr(address).map(UnixStream::from_std)
+        }
+
+        // Once std::os::windows::net::UnixStream is stabilized, this can be removed.
+        #[cfg(windows)]
+        {
+            let socket = sys::uds::stream::connect_addr(address)?;
+            Ok(UnixStream {
+                inner: IoSource::new(Socket::from(socket)),
+            })
+        }
     }
 
     /// Creates a new `UnixStream` from a standard `net::UnixStream`.
@@ -43,6 +69,7 @@ impl UnixStream {
     /// The Unix stream here will not have `connect` called on it, so it
     /// should already be connected via some other means (be it manually, or
     /// the standard library).
+    #[cfg(unix)]
     pub fn from_std(stream: net::UnixStream) -> UnixStream {
         UnixStream {
             inner: IoSource::new(stream),
@@ -52,6 +79,7 @@ impl UnixStream {
     /// Creates an unnamed pair of connected sockets.
     ///
     /// Returns two `UnixStream`s which are connected to each other.
+    #[cfg(unix)]
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
         sys::uds::stream::pair().map(|(stream1, stream2)| {
             (UnixStream::from_std(stream1), UnixStream::from_std(stream2))
@@ -95,7 +123,8 @@ impl UnixStream {
     ///
     /// # Examples
     ///
-    /// ```
+    #[cfg_attr(unix, doc = "```")]
+    #[cfg_attr(not(unix), doc = "```ignore")]
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -140,6 +169,61 @@ impl UnixStream {
     ///     }
     /// })?;
     /// eprintln!("read {} bytes", n);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    #[cfg_attr(windows, doc = "```")]
+    #[cfg_attr(not(windows), doc = "```ignore")]
+    /// # use std::error::Error;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// use std::io;
+    /// use std::os::windows::io::AsRawSocket;
+    /// use std::{env, fs, thread, time::Duration};
+    /// use mio::net::{UnixListener, UnixStream};
+    /// use windows_sys::Win32::Networking::WinSock;
+    ///
+    /// let path = env::temp_dir().join("mio-uds-try_io-example");
+    /// let _ = fs::remove_file(&path);
+    /// let listener = UnixListener::bind(&path)?;
+    /// let connect_path = path.clone();
+    /// let handle = thread::spawn(move || UnixStream::connect(&connect_path).unwrap());
+    ///
+    /// // Spin briefly until the connection is accepted.
+    /// let stream = loop {
+    ///     match listener.accept() {
+    ///         Ok((s, _)) => break s,
+    ///         Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///             thread::sleep(Duration::from_millis(10));
+    ///         }
+    ///         Err(e) => return Err(e.into()),
+    ///     }
+    /// };
+    /// let _peer = handle.join().unwrap();
+    ///
+    /// // Write to the stream using a direct WinSock call, of course the
+    /// // `io::Write` implementation would be easier to use.
+    /// let buf = b"hello";
+    /// let n = stream.try_io(|| {
+    ///     let res = unsafe {
+    ///         WinSock::send(
+    ///             stream.as_raw_socket() as _,
+    ///             buf.as_ptr(),
+    ///             buf.len() as i32,
+    ///             0,
+    ///         )
+    ///     };
+    ///     if res != -1 {
+    ///         Ok(res as usize)
+    ///     } else {
+    ///         // If WSAEWOULDBLOCK is set by WinSock::send, the closure
+    ///         // should return `WouldBlock` error.
+    ///         Err(io::Error::last_os_error())
+    ///     }
+    /// })?;
+    /// eprintln!("write {} bytes", n);
+    /// # let _ = fs::remove_file(&path);
     /// # Ok(())
     /// # }
     /// ```
@@ -229,18 +313,21 @@ impl fmt::Debug for UnixStream {
     }
 }
 
+#[cfg(unix)]
 impl IntoRawFd for UnixStream {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_inner().into_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl AsRawFd for UnixStream {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
+#[cfg(unix)]
 impl FromRawFd for UnixStream {
     /// Converts a `RawFd` to a `UnixStream`.
     ///
@@ -253,6 +340,7 @@ impl FromRawFd for UnixStream {
     }
 }
 
+#[cfg(unix)]
 impl From<UnixStream> for net::UnixStream {
     fn from(stream: UnixStream) -> Self {
         // Safety: This is safe since we are extracting the raw fd from a well-constructed
@@ -262,20 +350,78 @@ impl From<UnixStream> for net::UnixStream {
     }
 }
 
+#[cfg(unix)]
 impl From<UnixStream> for OwnedFd {
     fn from(unix_stream: UnixStream) -> Self {
         unix_stream.inner.into_inner().into()
     }
 }
 
+#[cfg(unix)]
 impl AsFd for UnixStream {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.inner.as_fd()
     }
 }
 
+#[cfg(unix)]
 impl From<OwnedFd> for UnixStream {
     fn from(fd: OwnedFd) -> Self {
         UnixStream::from_std(From::from(fd))
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for UnixStream {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl IntoRawSocket for UnixStream {
+    fn into_raw_socket(self) -> RawSocket {
+        self.inner.into_inner().into_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl FromRawSocket for UnixStream {
+    /// # Safety
+    ///
+    /// The socket must be a valid, connected `AF_UNIX` stream socket in
+    /// non-blocking mode.
+    unsafe fn from_raw_socket(sock: RawSocket) -> UnixStream {
+        UnixStream {
+            inner: IoSource::new(unsafe { Socket::from_raw_socket(sock) }),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsSocket for UnixStream {
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        // SAFETY: the raw socket is valid for the lifetime of `self`.
+        unsafe { BorrowedSocket::borrow_raw(self.inner.as_raw_socket()) }
+    }
+}
+
+#[cfg(windows)]
+impl From<UnixStream> for OwnedSocket {
+    fn from(stream: UnixStream) -> Self {
+        stream.inner.into_inner().into()
+    }
+}
+
+#[cfg(windows)]
+impl From<OwnedSocket> for UnixStream {
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode.
+    fn from(socket: OwnedSocket) -> Self {
+        UnixStream {
+            inner: IoSource::new(Socket::from(socket)),
+        }
     }
 }
