@@ -47,7 +47,7 @@ impl Selector {
         self.state.select(events, timeout)
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(target_os = "horizon", allow(dead_code))]
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         self.state.register(fd, token, interests)
     }
