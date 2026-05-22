@@ -51,6 +51,7 @@ cfg_os_poll! {
         target_os = "vita",
         target_os = "cygwin",
         target_os = "wasi",
+        target_os = "horizon"
     ), path = "selector/poll.rs")]
     mod selector;
     pub(crate) use self::selector::*;
@@ -106,7 +107,7 @@ cfg_os_poll! {
         target_os = "cygwin",
         all(target_os = "wasi", target_env = "p1")
     ), path = "waker/pipe.rs")]
-    #[cfg_attr(all(target_os = "wasi", not(target_env = "p1")), path = "waker/single_threaded.rs")]
+    #[cfg_attr(any(target_os = "horizon", all(target_os = "wasi", not(target_env = "p1"))), path = "waker/single_threaded.rs")]
     mod waker;
     // NOTE: the `Waker` type is expected in the selector module as the
     // `poll(2)` implementation needs to do some special stuff.

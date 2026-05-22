@@ -12,12 +12,13 @@
         target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
+        target_os = "horizon"
     )),
 ))]
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
-#[cfg(all(debug_assertions, not(target_os = "wasi")))]
+#[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(all(debug_assertions, not(target_os = "wasi")))]
+#[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
 use std::sync::Arc;
 use std::time::Duration;
 use std::{fmt, io};
@@ -273,7 +274,7 @@ pub struct Poll {
 pub struct Registry {
     selector: sys::Selector,
     /// Whether this selector currently has an associated waker.
-    #[cfg(all(debug_assertions, not(target_os = "wasi")))]
+    #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
     has_waker: Arc<AtomicBool>,
 }
 
@@ -323,7 +324,7 @@ impl Poll {
             sys::Selector::new().map(|selector| Poll {
                 registry: Registry {
                     selector,
-                    #[cfg(all(debug_assertions, not(target_os = "wasi")))]
+                    #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
                     has_waker: Arc::new(AtomicBool::new(false)),
                 },
             })
@@ -455,6 +456,7 @@ impl Poll {
         target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
+        target_os = "horizon"
     )),
 ))]
 impl AsRawFd for Poll {
@@ -715,14 +717,14 @@ impl Registry {
     pub fn try_clone(&self) -> io::Result<Registry> {
         self.selector.try_clone().map(|selector| Registry {
             selector,
-            #[cfg(all(debug_assertions, not(target_os = "wasi")))]
+            #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
             has_waker: Arc::clone(&self.has_waker),
         })
     }
 
     /// Internal check to ensure only a single `Waker` is active per [`Poll`]
     /// instance.
-    #[cfg(all(debug_assertions, not(target_os = "wasi")))]
+    #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
     pub(crate) fn register_waker(&self) {
         assert!(
             !self.has_waker.swap(true, Ordering::AcqRel),
@@ -732,6 +734,7 @@ impl Registry {
 
     /// Get access to the `sys::Selector`.
     #[cfg(any(not(target_os = "wasi"), feature = "net"))]
+    #[cfg_attr(target_os = "horizon", allow(dead_code))]
     pub(crate) fn selector(&self) -> &sys::Selector {
         &self.selector
     }
@@ -757,6 +760,7 @@ impl fmt::Debug for Registry {
         target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
+        target_os = "horizon"
     )),
 ))]
 impl AsFd for Registry {
@@ -779,6 +783,7 @@ impl AsFd for Registry {
         target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
+        target_os = "horizon"
     )),
 ))]
 impl AsRawFd for Registry {
@@ -800,6 +805,7 @@ cfg_os_poll! {
             target_os = "solaris",
             target_os = "vita",
             target_os = "cygwin",
+            target_os = "horizon"
         )),
     ))]
     #[test]
