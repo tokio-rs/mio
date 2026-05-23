@@ -32,7 +32,7 @@ To use `mio`, first add this to your `Cargo.toml`:
 mio = "1"
 ```
 
-Next we can start using Mio. The following is quick introduction using
+Next we can start using Mio. The following is a quick introduction using
 `TcpListener` and `TcpStream`. Note that `features = ["os-poll", "net"]` must be
 specified for this example.
 
