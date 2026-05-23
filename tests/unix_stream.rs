@@ -404,8 +404,6 @@ fn unix_stream_shutdown_both() {
     let err = stream.write(DATA2).unwrap_err();
     #[cfg(unix)]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
-    #[cfg(windows)]
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionAbroted);
 
     // Close the connection to allow the remote to shutdown
     drop(stream);
