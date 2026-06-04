@@ -9,7 +9,7 @@
 * Fixed a casting issue when polling with a timeout larger than ~24.8 days on Linux
   (https://github.com/tokio-rs/mio/pull/1948).
 * Implemented vectored I/O (`write_vectored`/`read_vectored`) for Windows `NamedPipe`
-  (https://github.com/tokio-rs/tokio/issues/6970).
+  (https://github.com/tokio-rs/mio/pull/1959).
 
 # 1.2.0
 
