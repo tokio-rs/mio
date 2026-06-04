@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
@@ -517,11 +517,19 @@ impl Read for NamedPipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         <&NamedPipe as Read>::read(&mut &*self, buf)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        <&NamedPipe as Read>::read_vectored(&mut &*self, bufs)
+    }
 }
 
 impl Write for NamedPipe {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         <&NamedPipe as Write>::write(&mut &*self, buf)
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        <&NamedPipe as Write>::write_vectored(&mut &*self, bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -578,6 +586,55 @@ impl<'a> Read for &'a NamedPipe {
             }
         }
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        let mut state = self.inner.io.lock().unwrap();
+
+        if state.token.is_none() {
+            return Err(would_block());
+        }
+
+        match mem::replace(&mut state.read, State::None) {
+            // In theory not possible with `token` checked above,
+            // but return would block for now.
+            State::None => Err(would_block()),
+
+            // A read is in flight, still waiting for it to finish
+            State::Pending(buf, amt) => {
+                state.read = State::Pending(buf, amt);
+                Err(would_block())
+            }
+
+            // We previously read something into `data`, try to scatter out some
+            // data. If we copy out all the data schedule a new read and
+            // otherwise store the buffer to get read later.
+            State::Ok(data, cur) => {
+                let n = {
+                    let mut remaining = &data[cur..];
+                    Read::read_vectored(&mut remaining, bufs)?
+                };
+                let next = cur + n;
+                if next != data.len() {
+                    state.read = State::Ok(data, next);
+                } else {
+                    self.inner.put_buffer(data);
+                    Inner::schedule_read(&self.inner, &mut state, None);
+                }
+                Ok(n)
+            }
+
+            // Looks like an in-flight read hit an error, return that here while
+            // we schedule a new one.
+            State::Err(e) => {
+                Inner::schedule_read(&self.inner, &mut state, None);
+                if e.raw_os_error() == Some(ERROR_BROKEN_PIPE as i32) {
+                    Ok(0)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
 }
 
 impl<'a> Write for &'a NamedPipe {
@@ -610,6 +667,41 @@ impl<'a> Write for &'a NamedPipe {
             Some(n) => Ok(n),
             // Write operation is enqueued for whole buffer
             None => Ok(buf.len()),
+        }
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        // Make sure there's no writes pending
+        let mut io = self.inner.io.lock().unwrap();
+
+        if io.token.is_none() {
+            return Err(would_block());
+        }
+
+        match io.write {
+            State::None => {}
+            State::Err(_) => match mem::replace(&mut io.write, State::None) {
+                State::Err(e) => return Err(e),
+                // `io` is locked, so this branch is unreachable
+                _ => unreachable!(),
+            },
+            // any other state should be handled in `write_done`
+            _ => {
+                return Err(would_block());
+            }
+        }
+
+        // Move all buffers onto the heap and fire off a single write
+        let mut owned_buf = self.inner.get_buffer();
+        for buf in bufs {
+            owned_buf.extend_from_slice(buf);
+        }
+        let total_len = owned_buf.len();
+        match Inner::maybe_schedule_write(&self.inner, owned_buf, 0, &mut io)? {
+            // Some bytes are written immediately
+            Some(n) => Ok(n),
+            // Write operation is enqueued for whole buffer
+            None => Ok(total_len),
         }
     }
 

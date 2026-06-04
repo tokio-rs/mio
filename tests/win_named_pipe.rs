@@ -1,7 +1,7 @@
 #![cfg(all(windows, feature = "os-poll", feature = "os-ext"))]
 
 use std::fs::OpenOptions;
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{FromRawHandle, IntoRawHandle};
 use std::time::Duration;
@@ -447,4 +447,56 @@ fn read_with_small_buffer_provided() {
     }
 
     assert_eq!(actual_msg, expected_msg);
+}
+
+#[test]
+fn write_vectored_then_read_vectored() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    // Write three slices as a single vectored write
+    let bufs = [
+        IoSlice::new(b"foo"),
+        IoSlice::new(b"bar"),
+        IoSlice::new(b"baz"),
+    ];
+    assert_eq!(t!(client.write_vectored(&bufs)), 9);
+
+    // Spin until server is readable
+    loop {
+        t!(poll.poll(&mut events, None));
+        let events = events.iter().collect::<Vec<_>>();
+        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
+            if event.is_readable() {
+                break;
+            }
+        }
+    }
+
+    // Scatter-read into three separate buffers
+    let mut b0 = [0u8; 3];
+    let mut b1 = [0u8; 3];
+    let mut b2 = [0u8; 3];
+    let mut scatter = [
+        IoSliceMut::new(&mut b0),
+        IoSliceMut::new(&mut b1),
+        IoSliceMut::new(&mut b2),
+    ];
+    assert_eq!(t!(server.read_vectored(&mut scatter)), 9);
+    assert_eq!(&b0, b"foo");
+    assert_eq!(&b1, b"bar");
+    assert_eq!(&b2, b"baz");
 }
