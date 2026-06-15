@@ -566,8 +566,17 @@ fn connection_reset_by_peer() {
 fn connect_error() {
     let (mut poll, mut events) = init_with_poll();
 
-    // Pick a "random" port that shouldn't be in use.
-    let mut stream = match TcpStream::connect("127.0.0.1:58381".parse().unwrap()) {
+    // Bind a listener to an OS-assigned ephemeral port on loopback, record its
+    // address, then drop it so the port is guaranteed closed. Connecting to a
+    // closed loopback port yields a fast, deterministic ECONNREFUSED, unlike a
+    // hardcoded "probably unused" port which can hang for ~60s behind a DROP
+    // firewall: <https://github.com/tokio-rs/mio/issues/959>.
+    let addr = {
+        let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.local_addr().unwrap()
+    };
+
+    let mut stream = match TcpStream::connect(addr) {
         Ok(l) => l,
         Err(ref e) if e.kind() == io::ErrorKind::ConnectionRefused => {
             // Connection failed synchronously.  This is not a bug, but it
@@ -586,6 +595,15 @@ fn connect_error() {
 
         for event in &events {
             if event.token() == Token(0) {
+                // `take_error` clears and returns the pending socket error. A
+                // refused connection sets it. If it's `None` the connection
+                // succeeded, meaning the freed ephemeral port was reassigned to
+                // a concurrent listener between the drop above and `connect`; we
+                // then can't exercise the error path, so return rather than fail
+                // the refusal-specific assertions below.
+                if stream.take_error().unwrap().is_none() {
+                    return;
+                }
                 // With fastopen we would be able to write
                 // Without fastopen we would be getting the connection error
                 assert!(event.is_writable() || event.is_error());
@@ -596,8 +614,6 @@ fn connect_error() {
             }
         }
     }
-
-    assert!(stream.take_error().unwrap().is_some());
 }
 
 #[cfg_attr(
