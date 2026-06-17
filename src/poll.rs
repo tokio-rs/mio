@@ -9,7 +9,6 @@
         target_os = "hermit",
         target_os = "hurd",
         target_os = "nto",
-        target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
         target_os = "horizon"
@@ -243,6 +242,7 @@ use crate::{event, sys, Events, Interest, Token};
 /// | Linux         | [epoll]   |
 /// | NetBSD        | [kqueue]  |
 /// | OpenBSD       | [kqueue]  |
+/// | Solaris       | [event ports] |
 /// | Windows       | [IOCP]    |
 /// | macOS         | [kqueue]  |
 ///
@@ -261,6 +261,7 @@ use crate::{event, sys, Events, Interest, Token};
 /// kernel.
 ///
 /// [epoll]: https://man7.org/linux/man-pages/man7/epoll.7.html
+/// [event ports]: https://docs.oracle.com/cd/E88353_01/html/E37843/port-create-3c.html
 /// [kqueue]: https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
 /// [IOCP]: https://docs.microsoft.com/en-us/windows/win32/fileio/i-o-completion-ports
 /// [`signalfd`]: https://man7.org/linux/man-pages/man2/signalfd.2.html
@@ -453,7 +454,6 @@ impl Poll {
         target_os = "hermit",
         target_os = "hurd",
         target_os = "nto",
-        target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
         target_os = "horizon"
@@ -757,7 +757,6 @@ impl fmt::Debug for Registry {
         target_os = "hermit",
         target_os = "hurd",
         target_os = "nto",
-        target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
         target_os = "horizon"
@@ -780,7 +779,6 @@ impl AsFd for Registry {
         target_os = "hermit",
         target_os = "hurd",
         target_os = "nto",
-        target_os = "solaris",
         target_os = "vita",
         target_os = "cygwin",
         target_os = "horizon"
@@ -802,7 +800,6 @@ cfg_os_poll! {
             target_os = "hermit",
             target_os = "hurd",
             target_os = "nto",
-            target_os = "solaris",
             target_os = "vita",
             target_os = "cygwin",
             target_os = "horizon"

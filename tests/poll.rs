@@ -1,5 +1,6 @@
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
+use std::io::{Read, Write};
 use std::net;
 use std::sync::{Arc, Barrier};
 use std::thread::{self, sleep};
@@ -12,7 +13,8 @@ use mio::{event, Events, Interest, Poll, Registry, Token};
 
 mod util;
 use util::{
-    any_local_address, assert_send, assert_sync, expect_events, init, init_with_poll, ExpectEvent,
+    any_local_address, assert_send, assert_sync, expect_events, expect_no_events, init,
+    init_with_poll, ExpectEvent,
 };
 
 const ID1: Token = Token(1);
@@ -108,6 +110,48 @@ fn poll_closes_fd() {
 
         drop(poll);
     }
+}
+
+#[test]
+fn readiness_is_reregistered_after_would_block() {
+    // Solaris event ports disassociate an fd after delivering an event. Ensure
+    // readiness is observed again after the source is drained to WouldBlock.
+    init();
+
+    let listener = net::TcpListener::bind(any_local_address()).unwrap();
+    let addr = listener.local_addr().unwrap();
+    let client = net::TcpStream::connect(addr).unwrap();
+    let (mut server, _) = listener.accept().unwrap();
+    client.set_nonblocking(true).unwrap();
+    server.set_nonblocking(true).unwrap();
+
+    let mut client = TcpStream::from_std(client);
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+
+    poll.registry()
+        .register(&mut client, ID1, Interest::READABLE)
+        .unwrap();
+
+    server.write_all(b"hello").unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
+
+    let mut buf = [0; 16];
+    assert_eq!(client.read(&mut buf).unwrap(), 5);
+    util::assert_would_block(client.read(&mut buf));
+
+    expect_no_events(&mut poll, &mut events);
+
+    server.write_all(b"again").unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
 }
 
 #[cfg_attr(
