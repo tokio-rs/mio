@@ -253,6 +253,24 @@ jobs:
           . $HOME/.cargo/env
           cargo test --target ${{ matrix.target }} --all-features
 
+  TestSolaris:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests
+        uses: vmactions/solaris-vm@v1
+        with:
+          release: "11.4-gcc"
+          usesh: true
+          copyback: false
+          prepare: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh
+            sh rustup.sh -y --profile=minimal
+          run: |
+            . $HOME/.cargo/env
+            cargo test --all-features
+
   # Single job required to merge the pr.
   Passed:
     runs-on: ubuntu-latest
@@ -267,5 +285,6 @@ jobs:
       - Rustfmt
       - CheckTargets
       - TestFreeBSD
+      - TestSolaris
     steps:
       - run: exit 0
