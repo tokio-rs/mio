@@ -14,10 +14,8 @@ static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 
 type EventMask = libc::c_int;
 
-const POLLRDHUP: EventMask = 0;
 const READ_EVENTS: EventMask = libc::POLLIN as EventMask;
 const WRITE_EVENTS: EventMask = libc::POLLOUT as EventMask;
-const PRIORITY_EVENTS: EventMask = libc::POLLPRI as EventMask;
 const ERROR_EVENTS: EventMask = libc::POLLERR as EventMask | libc::POLLHUP as EventMask;
 
 #[derive(Debug)]
@@ -541,10 +539,6 @@ fn interests_to_port(interests: Interest) -> EventMask {
         events |= WRITE_EVENTS;
     }
 
-    if interests.is_priority() {
-        events |= PRIORITY_EVENTS;
-    }
-
     events
 }
 
@@ -621,7 +615,7 @@ pub mod event {
     use crate::sys::Event;
     use crate::Token;
 
-    use super::{EventMask, POLLRDHUP};
+    use super::EventMask;
 
     pub fn token(event: &Event) -> Token {
         Token(event.0.portev_user as usize)
@@ -642,7 +636,6 @@ pub mod event {
 
     pub fn is_read_closed(event: &Event) -> bool {
         (event.0.portev_events & libc::POLLHUP as EventMask) != 0
-            || (event.0.portev_events & POLLRDHUP) != 0
     }
 
     pub fn is_write_closed(event: &Event) -> bool {
