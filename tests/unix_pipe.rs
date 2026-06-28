@@ -136,6 +136,7 @@ fn event_when_receiver_is_dropped() {
     any(target_os = "hurd", target_os = "nto", target_os = "cygwin"),
     ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
 )]
+#[cfg_attr(miri, ignore = "Miri doesn't support process spawning")]
 fn from_child_process_io() {
     // `cat` simply echo everything that we write via standard in.
     let mut child = Command::new("cat")
@@ -183,6 +184,7 @@ fn from_child_process_io() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "Miri doesn't support process spawning")]
 fn nonblocking_child_process_io() {
     // `cat` simply echo everything that we write via standard in.
     let mut child = Command::new("cat")

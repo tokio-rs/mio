@@ -1,4 +1,4 @@
-#![cfg(all(feature = "os-poll", feature = "net"))]
+#![cfg(all(feature = "os-poll", feature = "net", not(miri)))] // Miri doesn't support UDP sockets.
 
 use log::{debug, info};
 use mio::net::UdpSocket;

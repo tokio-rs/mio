@@ -194,6 +194,7 @@ fn tcp_register_multiple_event_loops() {
 
 #[test]
 #[cfg(debug_assertions)] // Check is only present when debug assertions are enabled.
+#[cfg_attr(miri, ignore = "Miri doesn't support UDP sockets")]
 fn udp_register_multiple_event_loops() {
     init();
 

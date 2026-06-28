@@ -874,6 +874,7 @@ fn start_listener(
     target_os = "wasi",
     ignore = "WASI does not yet support `POLLHUP` or `POLLRDHUP`"
 )]
+#[cfg_attr(miri, ignore = "Miri doesn't support lingering")]
 #[test]
 fn hup_event_on_disconnect() {
     use mio::net::TcpListener;
@@ -918,6 +919,7 @@ fn hup_event_on_disconnect() {
     );
 }
 
+#[cfg_attr(miri, ignore = "Miri doesn't support `Interest::PRIORITY`")]
 #[test]
 #[cfg(any(target_os = "linux", target_os = "android"))]
 fn priority_event_on_oob_data() {
