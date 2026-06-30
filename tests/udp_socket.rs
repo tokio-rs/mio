@@ -640,7 +640,9 @@ fn unconnected_udp_socket_connected_methods() {
     if cfg!(target_os = "windows") {
         assert_error(
             socket1.send(DATA1),
-            "no address was supplied. (os error 10057)",
+            // "no address was supplied. (os error 10057)"
+            // but Wine has a different error message.
+            "(os error 10057)",
         );
     }
 
