@@ -284,7 +284,7 @@ jobs:
     - uses: taiki-e/setup-cross-toolchain-action@v1
       with:
         target: x86_64-pc-windows-gnu
-        runner: wine@7.13
+        runner: wine@8.18
     - name: Tests
       run: cargo test --all-features --target x86_64-pc-windows-gnu
     - name: Tests release build
