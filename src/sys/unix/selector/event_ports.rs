@@ -24,14 +24,27 @@ pub struct Selector {
     id: usize,
     port: OwnedFd,
     state: Arc<SelectorState>,
-    raw_events: EventBuffer,
+    events: EventBuffer,
 }
 
 #[derive(Debug)]
-struct EventBuffer(Vec<libc::port_event>);
+struct EventBuffer {
+    port_events: Vec<libc::port_event>,
+    poll_fds: Vec<libc::pollfd>,
+}
 
-// SAFETY: `EventBuffer` is only scratch storage for `port_getn` results and is
-// only accessed through `Selector::select`, which requires `&mut self`.
+impl EventBuffer {
+    fn new() -> EventBuffer {
+        EventBuffer {
+            port_events: Vec::new(),
+            poll_fds: Vec::new(),
+        }
+    }
+}
+
+// SAFETY: `EventBuffer` is only scratch storage for `port_getn` and `poll`
+// results and is only accessed through `Selector::select`, which requires
+// `&mut self`.
 unsafe impl Send for EventBuffer {}
 unsafe impl Sync for EventBuffer {}
 
@@ -60,7 +73,7 @@ impl Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             port,
-            raw_events: EventBuffer(Vec::new()),
+            events: EventBuffer::new(),
             state: Arc::new(SelectorState {
                 fds: Mutex::new(HashMap::new()),
             }),
@@ -73,14 +86,14 @@ impl Selector {
             #[cfg(debug_assertions)]
             id: self.id,
             port,
-            raw_events: EventBuffer(Vec::new()),
+            events: EventBuffer::new(),
             state: Arc::clone(&self.state),
         })
     }
 
     pub fn select(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         self.state
-            .select(self.port.as_raw_fd(), events, timeout, &mut self.raw_events)
+            .select(self.port.as_raw_fd(), events, timeout, &mut self.events)
     }
 
     cfg_io_source! {
@@ -130,7 +143,7 @@ impl SelectorState {
         port: RawFd,
         events: &mut Events,
         timeout: Option<Duration>,
-        raw_events: &mut EventBuffer,
+        event_buffer: &mut EventBuffer,
     ) -> io::Result<()> {
         events.clear();
 
@@ -138,11 +151,11 @@ impl SelectorState {
             return Ok(());
         }
 
-        raw_events.0.clear();
-        if raw_events.0.capacity() < events.capacity() {
-            raw_events
-                .0
-                .reserve(events.capacity() - raw_events.0.capacity());
+        event_buffer.port_events.clear();
+        if event_buffer.port_events.capacity() < events.capacity() {
+            event_buffer
+                .port_events
+                .reserve(events.capacity() - event_buffer.port_events.capacity());
         }
 
         let start = Instant::now();
@@ -174,13 +187,13 @@ impl SelectorState {
                 .map(|timeout| timeout as *mut _)
                 .unwrap_or(std::ptr::null_mut());
             let mut nget = 1;
-            raw_events.0.clear();
+            event_buffer.port_events.clear();
 
             trace!("waiting for Solaris event port events");
             let res = syscall!(port_getn(
                 port,
-                raw_events.0.as_mut_ptr(),
-                raw_events.0.capacity() as libc::c_uint,
+                event_buffer.port_events.as_mut_ptr(),
+                event_buffer.port_events.capacity() as libc::c_uint,
                 &mut nget,
                 timeout,
             ));
@@ -200,8 +213,8 @@ impl SelectorState {
 
             trace!("Solaris event port returned {nget} events");
             // SAFETY: `port_getn` initialized exactly the first `nget` entries.
-            unsafe { raw_events.0.set_len(nget as usize) };
-            self.process_events(port, raw_events.0.as_slice(), events)?;
+            unsafe { event_buffer.port_events.set_len(nget as usize) };
+            self.process_events(port, event_buffer, events)?;
             if !events.is_empty() {
                 return Ok(());
             }
@@ -211,12 +224,41 @@ impl SelectorState {
     fn process_events(
         &self,
         port: RawFd,
-        raw_events: &[libc::port_event],
+        event_buffer: &mut EventBuffer,
         events: &mut Events,
     ) -> io::Result<()> {
         let mut fds = self.fds.lock().unwrap();
+        let raw_events = event_buffer.port_events.as_slice();
+        let poll_fds = &mut event_buffer.poll_fds;
 
         events.reserve(raw_events.len());
+        poll_fds.clear();
+        poll_fds.reserve(raw_events.len());
+        for event in raw_events {
+            if event.portev_source != libc::PORT_SOURCE_FD as libc::c_ushort {
+                continue;
+            }
+
+            let fd = event.portev_object as RawFd;
+            let Some(data) = fds.get(&fd) else {
+                continue;
+            };
+            poll_fds.push(libc::pollfd {
+                fd,
+                events: interests_to_port(data.interests) as libc::c_short,
+                revents: 0,
+            });
+        }
+
+        if !poll_fds.is_empty() {
+            syscall!(poll(
+                poll_fds.as_mut_ptr(),
+                poll_fds.len() as libc::nfds_t,
+                0
+            ))?;
+        }
+
+        let mut poll_fds = poll_fds.iter();
         for event in raw_events {
             if event.portev_source == libc::PORT_SOURCE_USER as libc::c_ushort {
                 push_event(
@@ -234,7 +276,15 @@ impl SelectorState {
                     continue;
                 };
                 let current_interest_events = interests_to_port(data.interests);
-                let Some(poll_events) = poll_fd_readiness(fd, data.interests)? else {
+                let poll_events = poll_fds.next().and_then(|poll_fd| {
+                    debug_assert_eq!(poll_fd.fd, fd);
+                    if poll_fd.revents == 0 {
+                        None
+                    } else {
+                        Some(EventMask::from(poll_fd.revents))
+                    }
+                });
+                let Some(poll_events) = poll_events else {
                     if event.portev_events & ERROR_EVENTS == 0 {
                         let generation = data.generation.wrapping_add(1).max(1);
                         associate(port, fd, data.interests, generation)?;
@@ -479,20 +529,6 @@ fn push_event(
             portev_object: object,
             portev_user: usize::from(token) as *mut libc::c_void,
         }));
-    }
-}
-
-fn poll_fd_readiness(fd: RawFd, interests: Interest) -> io::Result<Option<EventMask>> {
-    let mut poll_fd = libc::pollfd {
-        fd,
-        events: interests_to_port(interests) as libc::c_short,
-        revents: 0,
-    };
-
-    if syscall!(poll(&mut poll_fd, 1, 0))? == 0 {
-        Ok(None)
-    } else {
-        Ok(Some(EventMask::from(poll_fd.revents)))
     }
 }
 
