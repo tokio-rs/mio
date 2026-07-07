@@ -4,6 +4,7 @@
     not(any(
         target_os = "aix",
         target_os = "espidf",
+        target_os = "nuttx",
         target_os = "fuchsia",
         target_os = "haiku",
         target_os = "hermit",
@@ -448,6 +449,7 @@ impl Poll {
     not(any(
         target_os = "aix",
         target_os = "espidf",
+        target_os = "nuttx",
         target_os = "fuchsia",
         target_os = "haiku",
         target_os = "hermit",
@@ -752,6 +754,7 @@ impl fmt::Debug for Registry {
     not(any(
         target_os = "aix",
         target_os = "espidf",
+        target_os = "nuttx",
         target_os = "haiku",
         target_os = "fuchsia",
         target_os = "hermit",
@@ -775,6 +778,7 @@ impl AsFd for Registry {
     not(any(
         target_os = "aix",
         target_os = "espidf",
+        target_os = "nuttx",
         target_os = "haiku",
         target_os = "fuchsia",
         target_os = "hermit",
@@ -799,6 +803,7 @@ cfg_os_poll! {
         not(any(
             target_os = "aix",
             target_os = "espidf",
+            target_os = "nuttx",
             target_os = "hermit",
             target_os = "hurd",
             target_os = "nto",

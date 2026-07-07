@@ -74,6 +74,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
         target_os = "openbsd",
         target_os = "solaris",
         target_os = "cygwin",
+        target_os = "nuttx",
     ))]
     let stream = {
         syscall!(accept4(
