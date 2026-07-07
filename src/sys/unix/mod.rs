@@ -42,6 +42,7 @@ cfg_os_poll! {
         mio_unsupported_force_poll_poll,
         target_os = "aix",
         target_os = "espidf",
+        target_os = "nuttx",
         target_os = "fuchsia",
         target_os = "haiku",
         target_os = "hermit",
@@ -61,6 +62,7 @@ cfg_os_poll! {
         any(
             target_os = "android",
             target_os = "espidf",
+            target_os = "nuttx",
             target_os = "fuchsia",
             target_os = "hermit",
             target_os = "illumos",
