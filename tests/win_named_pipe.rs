@@ -451,10 +451,10 @@ fn read_with_small_buffer_provided() {
 
 #[test]
 fn write_then_drop_stress_test() {
-    for _ in 0..1000 {
+    for _ in 0..10000 {
         let (mut server, mut client) = pipe();
         let expected_msg = vec![0x5u8; 65536];
-        
+
         // This initiates an overlapped write. Since we haven't read anything on the server,
         // it stays pending in the Windows kernel.
         let _ = client.write(&expected_msg);
