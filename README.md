@@ -137,6 +137,7 @@ Currently supported platforms:
 * iOS
 * macOS
 * Solaris
+* Emscripten
 
 Mio can handle interfacing with each of the event systems of the aforementioned
 platforms. The details of their implementation are further discussed in the

@@ -242,6 +242,11 @@ where
     }
 }
 
+// Emscripten is a single process with no `exec(2)`, so `FD_CLOEXEC` is a no-op
+// (`F_GETFD` always returns 0); the concept doesn't apply.
+#[cfg(target_os = "emscripten")]
+pub fn assert_socket_close_on_exec<S>(_: &S) {}
+
 #[cfg(windows)]
 pub fn assert_socket_close_on_exec<S>(_: &S) {
     // Windows doesn't have this concept.

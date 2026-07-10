@@ -65,6 +65,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
         // See https://github.com/tokio-rs/mio/issues/1445 for details
         all(not(target_arch="x86"), target_os = "android"),
         target_os = "dragonfly",
+        target_os = "emscripten",
         target_os = "freebsd",
         target_os = "fuchsia",
         target_os = "hurd",
