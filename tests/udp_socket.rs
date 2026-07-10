@@ -407,6 +407,10 @@ fn smoke_test_connected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocke
     assert!(socket2.take_error().unwrap().is_none());
 }
 
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "libuv does not re-associate a connected UDP socket on reconnect"
+)]
 #[test]
 fn reconnect_udp_socket_sending() {
     let (mut poll, mut events) = init_with_poll();
@@ -470,6 +474,10 @@ fn reconnect_udp_socket_sending() {
     assert!(socket3.take_error().unwrap().is_none());
 }
 
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "libuv does not re-associate a connected UDP socket on reconnect"
+)]
 #[test]
 fn reconnect_udp_socket_receiving() {
     let (mut poll, mut events) = init_with_poll();
@@ -652,6 +660,7 @@ fn connected_udp_socket_unconnected_methods() {
         target_os = "android",
         target_os = "hurd",
         target_os = "linux",
+        target_os = "emscripten",
         target_os = "windows",
         target_os = "cygwin",
         target_os = "wasi",
@@ -664,6 +673,7 @@ fn connected_udp_socket_unconnected_methods() {
         target_os = "android",
         target_os = "hurd",
         target_os = "linux",
+        target_os = "emscripten",
         target_os = "windows",
         target_os = "cygwin",
         target_os = "wasi",

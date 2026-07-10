@@ -464,6 +464,10 @@ fn shutdown_both() {
 }
 
 #[cfg(unix)]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "local_addr not preserved across from_raw_fd on emscripten"
+)]
 #[test]
 fn raw_fd() {
     init();
@@ -636,6 +640,7 @@ fn tcp_shutdown_client_read_close_event() {
 #[cfg_attr(
     any(
         target_os = "android",
+        target_os = "emscripten",
         target_os = "hurd",
         target_os = "illumos",
         target_os = "solaris",

@@ -238,6 +238,9 @@ pub mod event {
 }
 
 // No special requirement from the implementation around waking.
+// On emscripten the public `Waker` is not compiled (the runtime wakes through
+// its own event loop), so this re-export is unused there.
+#[cfg_attr(target_os = "emscripten", allow(unused_imports))]
 pub(crate) use crate::sys::unix::waker::Waker;
 
 cfg_io_source! {

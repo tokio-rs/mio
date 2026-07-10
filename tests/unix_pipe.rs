@@ -1,12 +1,15 @@
 #![cfg(all(unix, feature = "os-poll", feature = "os-ext", feature = "net"))]
 
 use std::io::{Read, Write};
+#[cfg(not(target_os = "emscripten"))]
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 
-use mio::unix::pipe::{self, Receiver, Sender};
+use mio::unix::pipe;
+#[cfg(not(target_os = "emscripten"))]
+use mio::unix::pipe::{Receiver, Sender};
 use mio::{Events, Interest, Poll, Token};
 
 mod util;
@@ -132,6 +135,8 @@ fn event_when_receiver_is_dropped() {
 }
 
 #[test]
+// Emscripten/wasm has no fork/exec, so no subprocesses.
+#[cfg(not(target_os = "emscripten"))]
 #[cfg_attr(
     any(target_os = "hurd", target_os = "nto", target_os = "cygwin"),
     ignore = "Writer fd close events do not trigger POLLHUP on nto and GNU/Hurd targets"
@@ -184,6 +189,7 @@ fn from_child_process_io() {
 }
 
 #[test]
+#[cfg(not(target_os = "emscripten"))]
 #[cfg_attr(miri, ignore = "Miri doesn't support process spawning")]
 fn nonblocking_child_process_io() {
     // `cat` simply echo everything that we write via standard in.

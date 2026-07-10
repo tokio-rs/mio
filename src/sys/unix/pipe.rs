@@ -11,6 +11,7 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
     #[cfg(any(
         target_os = "android",
         target_os = "dragonfly",
+        target_os = "emscripten",
         target_os = "freebsd",
         target_os = "fuchsia",
         target_os = "hurd",

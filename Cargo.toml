@@ -47,7 +47,7 @@ net = []
 log = { version = "0.4.8", optional = true }
 
 [target.'cfg(any(unix, target_os = "hermit", target_os = "wasi"))'.dependencies]
-libc = "0.2.183"
+libc = { git = "https://github.com/guybedford/libc", branch = "emscripten" }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.61"

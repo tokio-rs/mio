@@ -101,6 +101,44 @@ jobs:
       run: rustup target add wasm32-wasip2
     - name: Tests
       run: cargo test --target wasm32-wasip2 --all-features
+  TestEmscripten:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # TEMPORARY: this job builds against the guybedford/emscripten `cf` fork,
+    # which carries the epoll callback, AF_UNIX pathname sockets, and multicast
+    # getsockopt patches this branch depends on. Once those land upstream the
+    # fork checkout can be dropped and this can move to a released emsdk.
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: rust-src
+    # JSPI is the return-to-host bridge; it needs a Node with JSPI on by
+    # default (V8 13.x+). Recorded here so the cargo runner uses it rather than
+    # the Node bundled with emsdk.
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 26
+    - name: Record JSPI-capable node
+      run: echo "JSPI_NODE=$(which node)" >> "$GITHUB_ENV"
+    - name: Install emsdk (LLVM + binaryen toolchain)
+      run: |
+        git clone --depth 1 https://github.com/emscripten-core/emsdk.git
+        ./emsdk/emsdk install latest
+        ./emsdk/emsdk activate latest
+    - name: Clone guybedford/emscripten (cf) fork over the emsdk tree
+      run: |
+        git clone --depth 1 --branch cf https://github.com/guybedford/emscripten.git em-fork
+        python3 em-fork/bootstrap.py
+        rm -rf ./emsdk/upstream/emscripten
+        ln -s "$(pwd)/em-fork" ./emsdk/upstream/emscripten
+    - name: Tests
+      run: |
+        source ./emsdk/emsdk_env.sh
+        export EM_CONFIG="$EMSDK/.emscripten"
+        CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="$JSPI_NODE" \
+        RUSTFLAGS="-A linker_messages -C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=-pthread -C link-arg=-sPROXY_TO_PTHREAD -C link-arg=-sNODERAWSOCKETS -C link-arg=-sNODERAWFS -C link-arg=-sALLOW_MEMORY_GROWTH=1 -C link-arg=-sEXIT_RUNTIME=1 -C link-arg=-sJSPI" \
+        cargo +nightly test --target wasm32-unknown-emscripten -Zbuild-std --all-features --tests --examples --lib
   Nightly:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -190,6 +228,7 @@ jobs:
           #- powerpc64-ibm-aix
           - riscv32imc-esp-espidf
           - sparcv9-sun-solaris
+          - wasm32-unknown-emscripten
           - wasm32-wasip1
           - x86_64-apple-darwin
           - x86_64-apple-ios
