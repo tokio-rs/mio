@@ -134,6 +134,7 @@ Currently supported platforms:
 * Windows
 * iOS
 * macOS
+* Solaris
 
 Mio can handle interfacing with each of the event systems of the aforementioned
 platforms. The details of their implementation are further discussed in the
