@@ -258,18 +258,22 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - name: Tests
+      - name: Start VM
         uses: vmactions/solaris-vm@v1
         with:
           release: "11.4-gcc"
           usesh: true
           copyback: false
-          prepare: |
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh
-            sh rustup.sh -y --profile=minimal
-          run: |
-            . $HOME/.cargo/env
-            cargo test --all-features
+      - name: Install dependencies
+        shell: solaris {0}
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh
+          sh rustup.sh -y --profile=minimal
+      - name: Tests
+        shell: solaris {0}
+        run: |
+          . $HOME/.cargo/env
+          cargo test --all-features
 
   # Single job required to merge the pr.
   Passed:
