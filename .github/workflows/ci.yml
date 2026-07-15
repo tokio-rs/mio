@@ -275,6 +275,30 @@ jobs:
           . $HOME/.cargo/env
           cargo test --all-features
 
+  Wine:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Install wine
+      run: |
+        # https://gitlab.winehq.org/wine/wine/-/wikis/Debian-Ubuntu
+        wget -O - https://dl.winehq.org/wine-builds/winehq.key | sudo gpg --dearmor -o /etc/apt/keyrings/winehq-archive.key -
+        sudo dpkg --add-architecture i386
+        sudo wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources
+        sudo apt-get update
+        sudo apt-get install -y winehq-stable wine-binfmt
+        echo -1 | sudo tee /proc/sys/fs/binfmt_misc/cli # deregister mono handler for PE files
+    - name: Install linker and libraries
+      run: |
+        sudo apt-get install -y gcc-mingw-w64-x86-64
+    - name: Install target
+      run: rustup target add x86_64-pc-windows-gnu
+    - name: Tests
+      run: cargo test --all-features --target x86_64-pc-windows-gnu
+    - name: Tests release build
+      run: cargo test --release --all-features --target x86_64-pc-windows-gnu
+
   # Single job required to merge the pr.
   Passed:
     runs-on: ubuntu-latest

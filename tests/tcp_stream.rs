@@ -444,8 +444,22 @@ fn shutdown_both() {
     let err = stream.write(DATA2).unwrap_err();
     #[cfg(not(windows))]
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
+    // 10053 WSAECONNABORTED (seen on Windows, maps to `io::ErrorKind::ConnectionAborted`).
+    // 10058 WSAESHUTDOWN (seen in Wine, maps to `io::ErrorKind::BrokenPipe`
+    // from Rust 1.97 onwards (https://github.com/rust-lang/rust/pull/156063)
+    // and to `io::Error::Uncategorized` before).
+    //
+    // Both errors seem reasonable: we have closed the writing side, it's
+    // reasonable to receive an error for writing to the writing side, but the
+    // other party has also closed the socket, so it's reasonable to get an
+    // error because the other side went away.
     #[cfg(windows)]
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionAborted);
+    {
+        use windows_sys::Win32::Networking::WinSock::{WSAECONNABORTED, WSAESHUTDOWN};
+        assert!(
+            err.raw_os_error() == Some(WSAECONNABORTED) || err.raw_os_error() == Some(WSAESHUTDOWN)
+        );
+    }
 
     drop(stream);
     thread_handle.join().expect("unable to join thread");
