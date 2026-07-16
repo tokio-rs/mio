@@ -132,6 +132,7 @@ Currently supported platforms:
 * NetBSD
 * OpenBSD
 * Windows
+* Wine
 * iOS
 * macOS
 * Solaris
@@ -147,12 +148,6 @@ The Windows implementation for polling sockets is using the [wepoll] strategy.
 This uses the Windows AFD system to access socket readiness events.
 
 [wepoll]: https://github.com/piscisaureus/wepoll
-
-### Unsupported
-
-* Wine, see [issue #1444]
-
-[issue #1444]: https://github.com/tokio-rs/mio/issues/1444
 
 ## MSRV Policy
 
