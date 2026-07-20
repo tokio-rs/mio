@@ -687,10 +687,6 @@ macro_rules! wait {
     }};
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
-)]
 #[test]
 fn write_shutdown() {
     init();
@@ -809,10 +805,6 @@ fn local_addr_ready() {
     }
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
-)]
 #[test]
 fn write_then_drop() {
     init();
@@ -869,10 +861,6 @@ fn write_then_drop() {
     expect_read!(s.read(&mut buf), &[1, 2, 3, 4]);
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
-)]
 #[test]
 fn write_then_deregister() {
     init();
@@ -932,10 +920,6 @@ const ID1: Token = Token(1);
 const ID2: Token = Token(2);
 const ID3: Token = Token(3);
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
-)]
 #[test]
 fn tcp_no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();

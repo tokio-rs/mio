@@ -14,14 +14,14 @@ use std::time::Duration;
 #[macro_use]
 mod util;
 use util::{
-    any_local_address, any_local_ipv6_address, assert_error, assert_send, assert_sync,
-    assert_would_block, expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
+    any_local_address, any_local_ipv6_address, assert_error, assert_send,
+    assert_socket_non_blocking, assert_sync, assert_would_block, expect_events, expect_no_events,
+    init, init_with_poll, ExpectEvent,
 };
 
-// Close-on-exec doesn't apply to WASI; non-blocking does, but `wasi-libc`
-// doesn't support it yet (https://github.com/WebAssembly/wasi-libc/pull/742).
+// Close-on-exec doesn't apply to WASI
 #[cfg(not(target_os = "wasi"))]
-use util::{assert_socket_close_on_exec, assert_socket_non_blocking};
+use util::assert_socket_close_on_exec;
 
 const DATA1: &[u8] = b"Hello world!";
 const DATA2: &[u8] = b"Hello mars!";
@@ -44,10 +44,6 @@ fn assert_size() {
     assert_eq!(size_of::<UdpSocket>(), size_of::<std::net::UdpSocket>());
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn empty_datagram() {
     const EMPTY: &[u8] = b"";
@@ -87,10 +83,6 @@ fn is_send_and_sync() {
     assert_sync::<UdpSocket>();
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn unconnected_udp_socket_ipv4() {
     let socket1 = UdpSocket::bind(any_local_address()).unwrap();
@@ -98,10 +90,6 @@ fn unconnected_udp_socket_ipv4() {
     smoke_test_unconnected_udp_socket(socket1, socket2);
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn unconnected_udp_socket_ipv6() {
     let socket1 = UdpSocket::bind(any_local_ipv6_address()).unwrap();
@@ -109,10 +97,6 @@ fn unconnected_udp_socket_ipv6() {
     smoke_test_unconnected_udp_socket(socket1, socket2);
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn unconnected_udp_socket_std() {
     let socket1 = net::UdpSocket::bind(any_local_address()).unwrap();
@@ -131,11 +115,12 @@ fn unconnected_udp_socket_std() {
 fn smoke_test_unconnected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocket) {
     let (mut poll, mut events) = init_with_poll();
 
+    assert_socket_non_blocking(&socket1);
+    assert_socket_non_blocking(&socket2);
+
     #[cfg(not(target_os = "wasi"))]
     {
-        assert_socket_non_blocking(&socket1);
         assert_socket_close_on_exec(&socket1);
-        assert_socket_non_blocking(&socket2);
         assert_socket_close_on_exec(&socket2);
     }
 
@@ -196,10 +181,6 @@ fn smoke_test_unconnected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSoc
     assert!(socket2.take_error().unwrap().is_none());
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn set_get_ttl() {
     let socket1 = UdpSocket::bind(any_local_address()).unwrap();
@@ -321,10 +302,6 @@ fn get_multicast_loop_v6_without_previous_set() {
         .expect("unable to get multicast_loop_v6 for UDP socket");
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn connected_udp_socket_ipv4() {
     let socket1 = UdpSocket::bind(any_local_address()).unwrap();
@@ -339,10 +316,6 @@ fn connected_udp_socket_ipv4() {
     smoke_test_connected_udp_socket(socket1, socket2);
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn connected_udp_socket_ipv6() {
     let socket1 = UdpSocket::bind(any_local_ipv6_address()).unwrap();
@@ -357,10 +330,6 @@ fn connected_udp_socket_ipv6() {
     smoke_test_connected_udp_socket(socket1, socket2);
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn connected_udp_socket_std() {
     let socket1 = net::UdpSocket::bind(any_local_address()).unwrap();
@@ -386,11 +355,12 @@ fn connected_udp_socket_std() {
 fn smoke_test_connected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocket) {
     let (mut poll, mut events) = init_with_poll();
 
+    assert_socket_non_blocking(&socket1);
+    assert_socket_non_blocking(&socket2);
+
     #[cfg(not(target_os = "wasi"))]
     {
-        assert_socket_non_blocking(&socket1);
         assert_socket_close_on_exec(&socket1);
-        assert_socket_non_blocking(&socket2);
         assert_socket_close_on_exec(&socket2);
     }
 
@@ -449,10 +419,6 @@ fn smoke_test_connected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocke
     assert!(socket2.take_error().unwrap().is_none());
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/bytecodealliance/wasmtime/pull/12595"
-)]
 #[test]
 fn reconnect_udp_socket_sending() {
     let (mut poll, mut events) = init_with_poll();
@@ -516,10 +482,6 @@ fn reconnect_udp_socket_sending() {
     assert!(socket3.take_error().unwrap().is_none());
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/bytecodealliance/wasmtime/pull/12595"
-)]
 #[test]
 fn reconnect_udp_socket_receiving() {
     let (mut poll, mut events) = init_with_poll();
@@ -604,10 +566,6 @@ fn reconnect_udp_socket_receiving() {
     assert!(socket3.take_error().unwrap().is_none());
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn unconnected_udp_socket_connected_methods() {
     let (mut poll, mut events) = init_with_poll();
@@ -666,10 +624,6 @@ fn unconnected_udp_socket_connected_methods() {
     assert!(socket2.take_error().unwrap().is_none());
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn connected_udp_socket_unconnected_methods() {
     let (mut poll, mut events) = init_with_poll();
@@ -765,10 +719,6 @@ fn udp_socket_raw_fd() {
     assert_eq!(socket.local_addr().unwrap(), address);
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn udp_socket_register() {
     let (mut poll, mut events) = init_with_poll();
@@ -973,10 +923,6 @@ fn connected_sockets() -> (UdpSocket, UdpSocket) {
     (tx, rx)
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/bytecodealliance/wasmtime/pull/12629"
-)]
 #[test]
 pub fn udp_socket() {
     init();
@@ -987,10 +933,6 @@ pub fn udp_socket() {
     send_recv_udp(tx, rx, false);
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/bytecodealliance/wasmtime/pull/12629"
-)]
 #[test]
 pub fn udp_socket_send_recv() {
     init();
@@ -1000,10 +942,6 @@ pub fn udp_socket_send_recv() {
     send_recv_udp(tx, rx, true);
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/bytecodealliance/wasmtime/pull/12629"
-)]
 #[test]
 pub fn udp_socket_discard() {
     init();
@@ -1162,10 +1100,6 @@ pub fn multicast() {
     }
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn et_behavior_recv() {
     let (mut poll, mut events) = init_with_poll();
@@ -1220,10 +1154,6 @@ fn et_behavior_recv() {
     expect_read!(socket2.recv(&mut buf), DATA1);
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/740"
-)]
 #[test]
 fn et_behavior_recv_from() {
     let (mut poll, mut events) = init_with_poll();
