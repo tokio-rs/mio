@@ -10,7 +10,7 @@ env:
   CI: true
   WASMTIME_VERSION: 47.0.0
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2026-05-30
+  rust_miri_nightly: nightly-2026-07-20
   MIO_MIRI_FEATURES: log,os-ext,os-poll,net
 
 permissions:
