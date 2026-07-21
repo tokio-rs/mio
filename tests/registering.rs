@@ -68,10 +68,6 @@ impl TestHandler {
     }
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
-)]
 #[test]
 pub fn register_deregister() {
     init();
@@ -117,10 +113,6 @@ pub fn register_deregister() {
     assert!(events.iter().next().is_none());
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/737"
-)]
 #[test]
 pub fn reregister_different_interest_without_poll() {
     init();

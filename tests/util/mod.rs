@@ -6,7 +6,7 @@
 use std::mem::size_of;
 use std::net::SocketAddr;
 use std::ops::BitOr;
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "wasi"))]
 use std::os::fd::AsRawFd;
 #[cfg(not(target_os = "wasi"))]
 use std::path::PathBuf;
@@ -209,9 +209,7 @@ pub fn assert_would_block<T>(result: io::Result<T>) {
 }
 
 /// Assert that `NONBLOCK` is set on `socket`.
-// Once https://github.com/WebAssembly/wasi-libc/pull/742 lands and makes
-// it into Rust std, we can enable this for `target_os = "wasi"` as well.
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "wasi"))]
 pub fn assert_socket_non_blocking<S>(socket: &S)
 where
     S: AsRawFd,
@@ -226,13 +224,22 @@ pub fn assert_socket_non_blocking<S>(_: &S) {
 }
 
 /// Assert that `CLOEXEC` is set on `socket`.
-#[cfg(unix)]
+#[cfg(any(unix, target_os = "wasi"))]
 pub fn assert_socket_close_on_exec<S>(socket: &S)
 where
     S: AsRawFd,
 {
-    let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFD) };
-    assert!(flags & libc::FD_CLOEXEC != 0, "socket flag CLOEXEC not set");
+    #[cfg(target_os = "wasi")]
+    {
+        // WASI does not current support `exec` or `FD_CLOEXEC`
+        _ = socket;
+    }
+
+    #[cfg(not(target_os = "wasi"))]
+    {
+        let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFD) };
+        assert!(flags & libc::FD_CLOEXEC != 0, "socket flag CLOEXEC not set");
+    }
 }
 
 #[cfg(windows)]

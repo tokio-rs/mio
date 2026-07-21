@@ -16,14 +16,15 @@ mod util;
 #[cfg(not(any(target_os = "windows", target_os = "wasi")))]
 use util::init;
 use util::{
-    any_local_address, any_local_ipv6_address, assert_send, assert_sync, assert_would_block,
-    expect_events, expect_no_events, init_with_poll, ExpectEvent, Readiness,
+    any_local_address, any_local_ipv6_address, assert_send, assert_socket_close_on_exec,
+    assert_socket_non_blocking, assert_sync, assert_would_block, expect_events, expect_no_events,
+    init_with_poll, ExpectEvent, Readiness,
 };
 
-// Close-on-exec doesn't apply to WASI; non-blocking does, but `wasi-libc`
-// doesn't support it yet (https://github.com/WebAssembly/wasi-libc/pull/742).
+// WASI does not yet support `SO_LINGER` (see
+// https://github.com/WebAssembly/WASI/issues/709).
 #[cfg(not(target_os = "wasi"))]
-use util::{assert_socket_close_on_exec, assert_socket_non_blocking, set_linger_zero};
+use util::set_linger_zero;
 
 const DATA1: &[u8] = b"Hello world!";
 const DATA2: &[u8] = b"Hello mars!";
@@ -82,11 +83,8 @@ where
     let (handle, addr) = echo_listener(addr, 1);
     let mut stream = make_stream(addr).unwrap();
 
-    #[cfg(not(target_os = "wasi"))]
-    {
-        assert_socket_non_blocking(&stream);
-        assert_socket_close_on_exec(&stream);
-    }
+    assert_socket_non_blocking(&stream);
+    assert_socket_close_on_exec(&stream);
 
     poll.registry()
         .register(&mut stream, ID1, Interest::WRITABLE.add(Interest::READABLE))
