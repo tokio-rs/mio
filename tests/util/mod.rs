@@ -224,7 +224,7 @@ pub fn assert_socket_non_blocking<S>(_: &S) {
 }
 
 /// Assert that `CLOEXEC` is set on `socket`.
-#[cfg(any(unix, target_os = "wasi"))]
+#[cfg(any(all(unix, not(target_os = "emscripten")), target_os = "wasi"))]
 pub fn assert_socket_close_on_exec<S>(socket: &S)
 where
     S: AsRawFd,
