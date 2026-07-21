@@ -15,13 +15,9 @@ use std::time::Duration;
 mod util;
 use util::{
     any_local_address, any_local_ipv6_address, assert_error, assert_send,
-    assert_socket_non_blocking, assert_sync, assert_would_block, expect_events, expect_no_events,
-    init, init_with_poll, ExpectEvent,
+    assert_socket_close_on_exec, assert_socket_non_blocking, assert_sync, assert_would_block,
+    expect_events, expect_no_events, init, init_with_poll, ExpectEvent,
 };
-
-// Close-on-exec doesn't apply to WASI
-#[cfg(not(target_os = "wasi"))]
-use util::assert_socket_close_on_exec;
 
 const DATA1: &[u8] = b"Hello world!";
 const DATA2: &[u8] = b"Hello mars!";
@@ -116,13 +112,9 @@ fn smoke_test_unconnected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSoc
     let (mut poll, mut events) = init_with_poll();
 
     assert_socket_non_blocking(&socket1);
+    assert_socket_close_on_exec(&socket1);
     assert_socket_non_blocking(&socket2);
-
-    #[cfg(not(target_os = "wasi"))]
-    {
-        assert_socket_close_on_exec(&socket1);
-        assert_socket_close_on_exec(&socket2);
-    }
+    assert_socket_close_on_exec(&socket2);
 
     let address1 = socket1.local_addr().unwrap();
     let address2 = socket2.local_addr().unwrap();
@@ -356,13 +348,9 @@ fn smoke_test_connected_udp_socket(mut socket1: UdpSocket, mut socket2: UdpSocke
     let (mut poll, mut events) = init_with_poll();
 
     assert_socket_non_blocking(&socket1);
+    assert_socket_close_on_exec(&socket1);
     assert_socket_non_blocking(&socket2);
-
-    #[cfg(not(target_os = "wasi"))]
-    {
-        assert_socket_close_on_exec(&socket1);
-        assert_socket_close_on_exec(&socket2);
-    }
+    assert_socket_close_on_exec(&socket2);
 
     poll.registry()
         .register(
