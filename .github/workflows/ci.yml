@@ -331,8 +331,7 @@ jobs:
       - Clippy
       - Docs
       - Rustfmt
-      - MiriTest
-      - MiriDocs
+      - Miri
       - CheckTargets
       - TestFreeBSD
       - TestSolaris
