@@ -291,6 +291,7 @@ pub fn registry_ops_flow(
     target_os = "wasi",
     ignore = "WASI does not yet support multithreading"
 )]
+#[cfg_attr(miri, ignore = "Miri doesn't support UDP sockets")]
 #[test]
 fn registry_operations_are_thread_safe() {
     let (mut poll, mut events) = init_with_poll();
@@ -381,6 +382,7 @@ fn registry_operations_are_thread_safe() {
     target_os = "wasi",
     ignore = "WASI does not yet support multithreading"
 )]
+#[cfg_attr(miri, ignore = "Miri doesn't support UDP sockets")]
 #[test]
 fn register_during_poll() {
     let (mut poll, mut events) = init_with_poll();
@@ -430,6 +432,7 @@ fn register_during_poll() {
 // - `reregister` can use different token from `register`
 // - multiple `reregister` are ok
 #[test]
+#[cfg_attr(miri, ignore = "Miri doesn't support UDP sockets")]
 fn reregister_interest_token_usage() {
     let (mut poll, mut events) = init_with_poll();
 

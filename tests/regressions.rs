@@ -110,6 +110,7 @@ fn issue_1205() {
 
 #[test]
 #[cfg(unix)]
+#[cfg_attr(miri, ignore = "Miri doesn't support Unix domain sockets")]
 fn issue_1403() {
     use mio::net::UnixDatagram;
     use util::temp_file;

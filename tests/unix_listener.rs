@@ -1,4 +1,4 @@
-#![cfg(all(unix, feature = "os-poll", feature = "net"))]
+#![cfg(all(unix, feature = "os-poll", feature = "net", not(miri)))] // Miri doesn't support Unix domain sockets.
 
 use mio::net::UnixListener;
 use mio::{Interest, Token};

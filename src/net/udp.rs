@@ -31,8 +31,8 @@ use crate::{event, sys, Interest, Registry, Token};
 ///
 /// # Examples
 ///
-#[cfg_attr(feature = "os-poll", doc = "```")]
-#[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
+#[cfg_attr(all(feature = "os-poll", not(miri)), doc = "```")]
+#[cfg_attr(not(all(feature = "os-poll", not(miri))), doc = "```ignore")] // Miri doesn't support UDP sockets.
 /// # use std::error::Error;
 /// #
 /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -101,8 +101,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    #[cfg_attr(feature = "os-poll", doc = "```")]
-    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
+    #[cfg_attr(all(feature = "os-poll", not(miri)), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", not(miri))), doc = "```ignore")] // Miri doesn't support UDP sockets.
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -145,9 +145,12 @@ impl UdpSocket {
     // This assertion is almost, but not quite, universal.  It fails on
     // shared-IP FreeBSD jails.  It's hard for mio to know whether we're jailed,
     // so simply disable the test on FreeBSD.
-    #[cfg_attr(all(feature = "os-poll", not(target_os = "freebsd")), doc = "```")]
     #[cfg_attr(
-        any(not(feature = "os-poll"), target_os = "freebsd"),
+        all(feature = "os-poll", not(target_os = "freebsd"), not(miri)),
+        doc = "```"
+    )]
+    #[cfg_attr(
+        not(all(feature = "os-poll", not(target_os = "freebsd"), not(miri))), // Miri doesn't support UDP sockets.
         doc = "```ignore"
     )]
     /// # use std::error::Error;
@@ -169,8 +172,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    #[cfg_attr(feature = "os-poll", doc = "```")]
-    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
+    #[cfg_attr(all(feature = "os-poll", not(miri)), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", not(miri))), doc = "```ignore")] // Miri doesn't support UDP sockets.
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -339,8 +342,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    #[cfg_attr(feature = "os-poll", doc = "```")]
-    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
+    #[cfg_attr(all(feature = "os-poll", not(miri)), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", not(miri))), doc = "```ignore")] // Miri doesn't support UDP sockets.
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -371,8 +374,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    #[cfg_attr(feature = "os-poll", doc = "```")]
-    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
+    #[cfg_attr(all(feature = "os-poll", not(miri)), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", not(miri))), doc = "```ignore")] // Miri doesn't support UDP sockets.
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -454,8 +457,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    #[cfg_attr(feature = "os-poll", doc = "```")]
-    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
+    #[cfg_attr(all(feature = "os-poll", not(miri)), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", not(miri))), doc = "```ignore")] // Miri doesn't support UDP sockets.
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -483,8 +486,8 @@ impl UdpSocket {
     ///
     /// # Examples
     ///
-    #[cfg_attr(feature = "os-poll", doc = "```")]
-    #[cfg_attr(not(feature = "os-poll"), doc = "```ignore")]
+    #[cfg_attr(all(feature = "os-poll", not(miri)), doc = "```")]
+    #[cfg_attr(not(all(feature = "os-poll", not(miri))), doc = "```ignore")] // Miri doesn't support UDP sockets.
     /// # use std::error::Error;
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {

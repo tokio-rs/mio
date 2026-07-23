@@ -483,6 +483,7 @@ fn multiple_writes_immediate_success() {
     handle.join().unwrap();
 }
 
+#[cfg_attr(miri, ignore = "Miri doesn't support lingering")]
 #[test]
 fn connection_reset_by_peer() {
     init();

@@ -9,6 +9,8 @@ env:
   RUST_BACKTRACE: full
   CI: true
   WASMTIME_VERSION: 47.0.0
+  # Pin a specific miri version
+  rust_miri_nightly: nightly-2026-07-20
 
 permissions:
   contents: read #  to fetch code (actions/checkout)
@@ -138,6 +140,24 @@ jobs:
       # So instead we run `rustfmt` directly on each file.
       #cargo fmt --all -- --check
       run: find src tests examples -type f -iname "*.rs" | xargs rustfmt --check
+  Miri:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust ${{ env.rust_miri_nightly }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_miri_nightly }}
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - name: Run tests with Miri
+        run: cargo miri test --all-features --test '*' --no-fail-fast
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
+      - name: Check docs with Miri
+        run: cargo miri test --doc --all-features --no-fail-fast
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
   CheckTargets:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -311,6 +331,7 @@ jobs:
       - Clippy
       - Docs
       - Rustfmt
+      - Miri
       - CheckTargets
       - TestFreeBSD
       - TestSolaris
