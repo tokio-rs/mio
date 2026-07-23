@@ -131,6 +131,7 @@ Currently supported platforms:
 * Linux
 * NetBSD
 * OpenBSD
+* WASI
 * Windows
 * Wine
 * iOS
