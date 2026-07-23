@@ -670,6 +670,10 @@ impl Registry {
     /// deregistered; however, it must be passed back to the **same** `Poll`
     /// instance, otherwise the behavior is unspecified.
     ///
+    /// After the last file descriptor (or file handle) for a registered event source
+    /// is closed, it will be automatically deregistered if the underlying selector
+    /// provides this behavior.
+    ///
     /// # Examples
     ///
     #[cfg_attr(all(feature = "os-poll", feature = "net"), doc = "```")]
