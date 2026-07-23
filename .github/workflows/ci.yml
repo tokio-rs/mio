@@ -272,7 +272,6 @@ jobs:
         run: |
           . $HOME/.cargo/env
           cargo test --target ${{ matrix.target }} --all-features
-
   TestSolaris:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -294,11 +293,10 @@ jobs:
         run: |
           . $HOME/.cargo/env
           cargo test --all-features
-
   Wine:
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - uses: dtolnay/rust-toolchain@stable
     - name: Install wine
       run: |
@@ -318,7 +316,6 @@ jobs:
       run: cargo test --all-features --target x86_64-pc-windows-gnu
     - name: Tests release build
       run: cargo test --release --all-features --target x86_64-pc-windows-gnu
-
   # Single job required to merge the pr.
   Passed:
     runs-on: ubuntu-latest
