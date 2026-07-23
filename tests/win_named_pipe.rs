@@ -448,3 +448,25 @@ fn read_with_small_buffer_provided() {
 
     assert_eq!(actual_msg, expected_msg);
 }
+
+#[test]
+fn write_then_drop_stress_test() {
+    for _ in 0..1000 {
+        let (mut server, mut client) = pipe();
+        let expected_msg = vec![0x5u8; 65536];
+        
+        // This initiates an overlapped write. Since we haven't read anything on the server,
+        // it stays pending in the Windows kernel.
+        let _ = client.write(&expected_msg);
+
+        // Drop the client while the write is pending.
+        // Without CancelIoEx, the OVERLAPPED struct is freed while the kernel still holds it.
+        drop(client);
+
+        // Read from the server to allow the pending write to finish in the kernel.
+        // If the UAF occurs, the kernel writes the completion status into freed memory,
+        // which will reliably cause an access violation (crash) over 1000 iterations.
+        let mut buf = [0u8; 65536];
+        let _ = server.read(&mut buf);
+    }
+}

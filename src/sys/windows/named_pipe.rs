@@ -692,8 +692,8 @@ impl fmt::Debug for NamedPipe {
 
 impl Drop for NamedPipe {
     fn drop(&mut self) {
-        // Cancel pending reads/connects, but don't cancel writes to ensure that
-        // everything is flushed out.
+        // Cancel pending reads/connects and writes to ensure that all overlapped
+        // operations are aborted before the OVERLAPPED memory is freed.
         unsafe {
             if self.inner.connecting.load(SeqCst) {
                 drop(cancel(&self.inner.handle, &self.inner.connect));
@@ -702,6 +702,9 @@ impl Drop for NamedPipe {
             let io = self.inner.io.lock().unwrap();
             if let State::Pending(..) = io.read {
                 drop(cancel(&self.inner.handle, &self.inner.read));
+            }
+            if let State::Pending(..) = io.write {
+                drop(cancel(&self.inner.handle, &self.inner.write));
             }
         }
     }
