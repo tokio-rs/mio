@@ -466,7 +466,7 @@ fn shutdown_both() {
 #[cfg(unix)]
 #[cfg_attr(
     target_os = "emscripten",
-    ignore = "local_addr not preserved across from_raw_fd on emscripten"
+    ignore = "REMOVE BEFORE LANDING - pending Node.js 26.6.0 in runner"
 )]
 #[test]
 fn raw_fd() {
