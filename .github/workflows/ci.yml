@@ -105,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # TEMPORARY: this job builds against the guybedford/emscripten `cf` fork,
-    # which carries the epoll callback, AF_UNIX pathname sockets, and multicast
+    # which carries the epoll, AF_UNIX pathname sockets, and multicast
     # getsockopt patches this branch depends on. Once those land upstream the
     # fork checkout can be dropped and this can move to a released emsdk.
     steps:
