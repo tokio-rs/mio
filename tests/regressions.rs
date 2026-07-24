@@ -109,7 +109,7 @@ fn issue_1205() {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
 #[cfg_attr(miri, ignore = "Miri doesn't support Unix domain sockets")]
 fn issue_1403() {
     use mio::net::UnixDatagram;

@@ -224,7 +224,7 @@ pub fn assert_socket_non_blocking<S>(_: &S) {
 }
 
 /// Assert that `CLOEXEC` is set on `socket`.
-#[cfg(any(unix, target_os = "wasi"))]
+#[cfg(any(all(unix, not(target_os = "emscripten")), target_os = "wasi"))]
 pub fn assert_socket_close_on_exec<S>(socket: &S)
 where
     S: AsRawFd,
@@ -241,6 +241,11 @@ where
         assert!(flags & libc::FD_CLOEXEC != 0, "socket flag CLOEXEC not set");
     }
 }
+
+// Emscripten is a single process with no `exec(2)`, so `FD_CLOEXEC` is a no-op
+// (`F_GETFD` always returns 0); the concept doesn't apply.
+#[cfg(target_os = "emscripten")]
+pub fn assert_socket_close_on_exec<S>(_: &S) {}
 
 #[cfg(windows)]
 pub fn assert_socket_close_on_exec<S>(_: &S) {

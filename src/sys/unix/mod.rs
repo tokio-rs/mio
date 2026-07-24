@@ -19,6 +19,7 @@ cfg_os_poll! {
         not(mio_unsupported_force_poll_poll),
         any(
             target_os = "android",
+            target_os = "emscripten",
             target_os = "illumos",
             target_os = "linux",
             target_os = "redox",
@@ -105,6 +106,7 @@ cfg_os_poll! {
         ),
         target_os = "aix",
         target_os = "dragonfly",
+        target_os = "emscripten",
         target_os = "haiku",
         target_os = "hurd",
         target_os = "netbsd",
@@ -158,6 +160,7 @@ cfg_os_poll! {
             // NOTE: also add to the list for the `pipe` module below.
             target_os = "aix",
             target_os = "dragonfly",
+            target_os = "emscripten",
             target_os = "haiku",
             target_os = "hurd",
             target_os = "netbsd",
