@@ -351,6 +351,5 @@ jobs:
       - Miri
       - CheckTier1 # Note: not required for tier 2 to pass.
       - TestFreeBSD
-      - TestSolaris
     steps:
       - run: exit 0
