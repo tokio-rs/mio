@@ -79,15 +79,12 @@ cfg_os_poll! {
             target_os = "freebsd",
             target_os = "ios",
             target_os = "macos",
+            target_os = "solaris",
             target_os = "tvos",
             target_os = "visionos",
             target_os = "watchos",
         )
-    ), path = "waker/kqueue.rs")]
-    #[cfg_attr(all(
-        not(mio_unsupported_force_poll_poll),
-        target_os = "solaris",
-    ), path = "waker/event_ports.rs")]
+    ), path = "waker/selector.rs")]
     #[cfg_attr(any(
         // NOTE: also add to the list for the `pipe` module below.
         mio_unsupported_force_waker_pipe,

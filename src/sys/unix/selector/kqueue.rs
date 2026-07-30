@@ -212,7 +212,7 @@ impl Selector {
     }
     }
 
-    // Used by `Waker`.
+    /// Generate a user space event (`EVFILT_USER`) using `token`.
     #[cfg(any(
         target_os = "freebsd",
         target_os = "ios",
