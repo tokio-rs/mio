@@ -163,7 +163,7 @@ jobs:
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
           RUSTFLAGS: --cfg mio_unsupported_force_poll_poll
-  CheckTargets:
+  CheckTier1:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -177,11 +177,32 @@ jobs:
           - aarch64-apple-watchos
           - aarch64-linux-android
           - aarch64-unknown-freebsd
-          - aarch64-unknown-fuchsia
-          - aarch64-unknown-hermit
           - aarch64-unknown-linux-gnu
           - aarch64-unknown-linux-musl
           - aarch64-unknown-netbsd
+          - x86_64-pc-windows-msvc
+          - x86_64-unknown-freebsd
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - x86_64-unknown-netbsd
+          - x86_64-unknown-openbsd
+    steps:
+    - uses: actions/checkout@v7
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: rust-src
+    - uses: taiki-e/install-action@cargo-hack
+    - name: Run check
+      run: cargo hack check -Z build-std=std,panic_abort --feature-powerset --target ${{ matrix.target }}
+  CheckTier2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-unknown-fuchsia
+          - aarch64-unknown-hermit
           - aarch64-unknown-nto-qnx710
           - aarch64-unknown-openbsd
           - aarch64-unknown-redox
@@ -204,17 +225,11 @@ jobs:
           # `Error calling dlltool 'x86_64-w64-mingw32-dlltool'`, build log:
           # <https://github.com/tokio-rs/mio/actions/runs/9436499623/job/25991326487?pr=1794>.
           #- x86_64-pc-windows-gnu
-          - x86_64-pc-windows-msvc
           - x86_64-unknown-dragonfly
-          - x86_64-unknown-freebsd
           - x86_64-unknown-fuchsia
           - x86_64-unknown-haiku
           - x86_64-unknown-hermit
           - x86_64-unknown-illumos
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
-          - x86_64-unknown-netbsd
-          - x86_64-unknown-openbsd
           - x86_64-unknown-redox
     steps:
     - uses: actions/checkout@v7
@@ -334,7 +349,7 @@ jobs:
       - Docs
       - Rustfmt
       - Miri
-      - CheckTargets
+      - CheckTier1 # Note: not required for tier 2 to pass.
       - TestFreeBSD
       - TestSolaris
     steps:
