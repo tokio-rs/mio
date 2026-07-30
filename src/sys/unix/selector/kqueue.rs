@@ -221,51 +221,18 @@ impl Selector {
         target_os = "visionos",
         target_os = "watchos"
     ))]
-    pub fn setup_waker(&self, token: Token) -> io::Result<()> {
-        // First attempt to accept user space notifications.
-        let mut kevent = kevent!(
-            0,
-            libc::EVFILT_USER,
-            libc::EV_ADD | libc::EV_CLEAR | libc::EV_RECEIPT,
-            token.0
-        );
-
-        let kq = self.kq.as_raw_fd();
-        syscall!(kevent(kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
-            if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
-                Err(io::Error::from_raw_os_error(kevent.data as i32))
-            } else {
-                Ok(())
-            }
-        })
-    }
-
-    // Used by `Waker`.
-    #[cfg(any(
-        target_os = "freebsd",
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "visionos",
-        target_os = "watchos"
-    ))]
     pub fn wake(&self, token: Token) -> io::Result<()> {
         let mut kevent = kevent!(
             0,
             libc::EVFILT_USER,
-            libc::EV_ADD | libc::EV_RECEIPT,
+            libc::EV_ADD | libc::EV_ONESHOT,
             token.0
         );
         kevent.fflags = libc::NOTE_TRIGGER;
 
         let kq = self.kq.as_raw_fd();
-        syscall!(kevent(kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
-            if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
-                Err(io::Error::from_raw_os_error(kevent.data as i32))
-            } else {
-                Ok(())
-            }
-        })
+        syscall!(kevent(kq, &kevent, 1, ptr::null_mut(), 0, ptr::null()))?;
+        Ok(())
     }
 }
 

@@ -18,7 +18,6 @@ pub(crate) struct Waker {
 impl Waker {
     pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
         let selector = selector.try_clone()?;
-        selector.setup_waker(token)?;
         Ok(Waker { selector, token })
     }
 
