@@ -243,6 +243,8 @@ impl Selector {
         target_os = "freebsd",
         target_os = "ios",
         target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
         target_os = "tvos",
         target_os = "visionos",
         target_os = "watchos"
