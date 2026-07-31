@@ -4,15 +4,15 @@ Mio is a fast, low-level I/O library for Rust focusing on non-blocking APIs and
 event notification for building high performance I/O apps with as little
 overhead as possible over the OS abstractions.
 
-[![Crates.io][crates-badge]][crates-url]
-[![MIT licensed][mit-badge]][mit-url]
+[![crates.io][crates-badge]][crates-url]
+[![MIT Licensed][mit-badge]][mit-url]
 [![Build Status][actions-badge]][actions-url]
 
 [crates-badge]: https://img.shields.io/crates/v/mio.svg
 [crates-url]: https://crates.io/crates/mio
 [mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
 [mit-url]: LICENSE
-[actions-badge]: https://github.com/tokio-rs/mio/workflows/CI/badge.svg
+[actions-badge]: https://github.com/tokio-rs/mio/actions/workflows/ci.yml/badge.svg
 [actions-url]: https://github.com/tokio-rs/mio/actions?query=workflow%3ACI+branch%3Amaster
 
 **API documentation**
@@ -21,7 +21,7 @@ overhead as possible over the OS abstractions.
 * [v0.8](https://docs.rs/mio/^0.8)
 
 This is a low level library, if you are looking for something easier to get
-started with, see [Tokio](https://tokio.rs).
+started with, see [Tokio](https://tokio.rs/).
 
 ## Usage
 
@@ -114,8 +114,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 ## Non-goals
 
-The following are specifically omitted from Mio and are left to the user
-or higher-level libraries.
+The following are specifically omitted from Mio and are left to the user or
+higher-level libraries.
 
 * File operations
 * Thread pools / multi-threaded event loop
@@ -131,12 +131,12 @@ Currently supported platforms:
 * Linux
 * NetBSD
 * OpenBSD
+* Solaris
 * WASI
 * Windows
 * Wine
 * iOS
 * macOS
-* Solaris
 
 Mio can handle interfacing with each of the event systems of the aforementioned
 platforms. The details of their implementation are further discussed in the
@@ -152,11 +152,11 @@ This uses the Windows AFD system to access socket readiness events.
 
 ## MSRV Policy
 
-The MSRV (Minimum Supported Rust Version) is fixed for a given minor (1.x)
+The MSRV (Minimum supported Rust version) is fixed for a given minor (1.x)
 version. However it can be increased when bumping minor versions, i.e. going
 from 1.0 to 1.1 allows us to increase the MSRV. Users unable to increase their
-Rust version can use an older minor version instead. Below is a list of Mio versions
-and their MSRV:
+Rust version can use an older minor version instead. Below is a list of Mio
+versions and their MSRV:
 
  * v0.8: Rust 1.46.
  * v1.0: Rust 1.70.
@@ -167,7 +167,7 @@ Note however that Mio also has dependencies, which might have different MSRV
 policies. We try to stick to the above policy when updating dependencies, but
 this is not always possible.
 
-## Unsupported flags
+## Unsupported Flags
 
 Mio uses different implementations to support the same functionality depending
 on the platform. Mio generally uses the "best" implementation possible, where
@@ -180,12 +180,13 @@ support secondary implementations on platforms**, however we do have various cfg
 flags to force another implementation for these situations.
 
 Current flags:
+
  * `mio_unsupported_force_poll_poll`, uses an implementation based on `poll(2)`
    for `mio::Poll`.
  * `mio_unsupported_force_waker_pipe`, uses an implementation based on `pipe(2)`
    for `mio::Waker`.
 
-**Again, Mio does not officially supports this**. Furthermore these flags may
+**Again, Mio does not officially support this**. Furthermore these flags may
 disappear in the future.
 
 ## Community
@@ -199,11 +200,12 @@ report bugs or suggest new features.
 
 ## Contributing
 
-Interested in getting involved? We would love to help you! For simple
-bug fixes, just submit a PR with the fix and we can discuss the fix
-directly in the PR. If the fix is more complex, start with an issue.
+Interested in getting involved? We would love to help you! For simple bug fixes,
+just submit a PR with the fix and we can discuss the fix directly in the PR. If
+the fix is more complex, start with an issue.
 
-If you want to propose an API change, create an issue to start a
-discussion with the community. Also, feel free to talk with us in Discord.
+If you want to propose an API change, create an issue to start a discussion with
+the community. Also, feel free to talk with us in Discord.
 
-Finally, be kind. We support the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct).
+Finally, be kind. We support the
+[Rust Code of Conduct](https://rust-lang.org/policies/code-of-conduct/).
