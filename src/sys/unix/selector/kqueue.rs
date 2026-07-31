@@ -240,6 +240,7 @@ impl Selector {
 
     /// Generate a user space event (`EVFILT_USER`) using `token`.
     #[cfg(any(
+        target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "ios",
         target_os = "macos",

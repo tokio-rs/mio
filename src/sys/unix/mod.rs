@@ -76,6 +76,7 @@ cfg_os_poll! {
         not(mio_unsupported_force_waker_pipe),
         not(mio_unsupported_force_poll_poll), // `kqueue(2)` based waker doesn't work with `poll(2)`.
         any(
+            target_os = "dragonfly",
             target_os = "freebsd",
             target_os = "ios",
             target_os = "macos",
@@ -94,6 +95,7 @@ cfg_os_poll! {
             // `kqueue(2)` based waker doesn't work with `poll(2)`.
             mio_unsupported_force_poll_poll,
             any(
+                target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
                 target_os = "macos",
@@ -105,7 +107,6 @@ cfg_os_poll! {
             ),
         ),
         target_os = "aix",
-        target_os = "dragonfly",
         target_os = "haiku",
         target_os = "hurd",
         target_os = "nto",
