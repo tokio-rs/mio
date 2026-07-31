@@ -212,6 +212,32 @@ impl Selector {
     }
     }
 
+    // For Darwin (macOS, iOS, etc.) we don't need any setup.
+    #[cfg(any(
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
+    pub fn setup_waker(&self, token: Token) -> io::Result<()> {
+        // First attempt to accept user space notifications.
+        let mut kevent = kevent!(
+            0,
+            libc::EVFILT_USER,
+            libc::EV_ADD | libc::EV_CLEAR | libc::EV_RECEIPT,
+            token.0
+        );
+
+        let kq = self.kq.as_raw_fd();
+        syscall!(kevent(kq, &kevent, 1, &mut kevent, 1, ptr::null())).and_then(|_| {
+            if (kevent.flags & libc::EV_ERROR) != 0 && kevent.data != 0 {
+                Err(io::Error::from_raw_os_error(kevent.data as i32))
+            } else {
+                Ok(())
+            }
+        })
+    }
+
     /// Generate a user space event (`EVFILT_USER`) using `token`.
     #[cfg(any(
         target_os = "freebsd",

@@ -13,6 +13,13 @@ pub(crate) struct Waker {
 impl Waker {
     pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
         let selector = selector.try_clone()?;
+        #[cfg(any(
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        selector.setup_waker(token)?;
         Ok(Waker { selector, token })
     }
 
