@@ -44,6 +44,39 @@ fn events_all() {
 }
 
 #[test]
+fn iter_size_hint_and_count_report_remaining() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let waker = Waker::new(poll.registry(), WAKE_TOKEN).unwrap();
+
+    waker.wake().expect("unable to wake");
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+
+    let total = events.iter().count();
+    assert!(total > 0, "expected at least one event");
+
+    // A fresh iterator reports everything it is going to yield.
+    let mut iter = events.iter();
+    assert_eq!(iter.size_hint(), (total, Some(total)));
+
+    // Consuming an element leaves one fewer, rather than still reporting the
+    // total.
+    iter.next().expect("expected an event");
+    let remaining = total - 1;
+    assert_eq!(iter.size_hint(), (remaining, Some(remaining)));
+    assert_eq!(iter.count(), remaining);
+
+    // `next` advances the cursor past the end once exhausted, so this also
+    // covers the cursor exceeding the length.
+    let mut iter = events.iter();
+    while iter.next().is_some() {}
+    assert!(iter.next().is_none());
+    assert_eq!(iter.size_hint(), (0, Some(0)));
+    assert_eq!(iter.count(), 0);
+}
+
+#[test]
 fn is_event_send_sync() {
     assert_send::<Event>();
     assert_sync::<Event>();
