@@ -302,7 +302,14 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v7
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        # We need https://github.com/rust-lang/rust/pull/160134 to work around
+        # https://bugs.winehq.org/show_bug.cgi?id=60084,
+        # https://github.com/tokio-rs/mio/issues/1980. Can be removed once 1.99
+        # hits stable or the Wine bug is fixed (the former is likely to happen
+        # earlier).
+        toolchain: nightly-2026-08-01
     - name: Install wine
       run: |
         # https://gitlab.winehq.org/wine/wine/-/wikis/Debian-Ubuntu
