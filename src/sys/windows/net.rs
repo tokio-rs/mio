@@ -4,19 +4,24 @@ use std::net::SocketAddr;
 use std::sync::Once;
 
 use windows_sys::Win32::Networking::WinSock::{
-    closesocket, ioctlsocket, WSASocketW, AF_INET, AF_INET6, FIONBIO, IN6_ADDR, IN6_ADDR_0,
-    INVALID_SOCKET, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0,
-    SOCKET, WSA_FLAG_NO_HANDLE_INHERIT, WSA_FLAG_OVERLAPPED,
+    closesocket, ioctlsocket, WSASocketW, WSAStartup, AF_INET, AF_INET6, FIONBIO, IN6_ADDR,
+    IN6_ADDR_0, INVALID_SOCKET, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6,
+    SOCKADDR_IN6_0, SOCKET, WSADATA, WSA_FLAG_NO_HANDLE_INHERIT, WSA_FLAG_OVERLAPPED,
 };
 
 /// Initialise the network stack for Windows.
+///
+/// We cannot rely on the standard library having set this up for us already
+/// since it only does so lazily once the first networking-related function is
+/// called.
 fn init() {
     static INIT: Once = Once::new();
-    INIT.call_once(|| {
-        // Let standard library call `WSAStartup` for us, we can't do it
-        // ourselves because otherwise using any type in `std::net` would panic
-        // when it tries to call `WSAStartup` a second time.
-        drop(std::net::UdpSocket::bind("127.0.0.1:0"));
+    INIT.call_once_force(|_| {
+        unsafe {
+            let mut data: WSADATA = mem::zeroed();
+            let ret = WSAStartup(0x0202, &mut data); // version 2.2
+            assert_eq!(ret, 0);
+        }
     });
 }
 
