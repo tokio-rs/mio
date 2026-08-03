@@ -2,8 +2,7 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 #[cfg(not(target_os = "hermit"))]
 use std::os::fd::{AsRawFd, FromRawFd, RawFd};
-// TODO: once <https://github.com/rust-lang/rust/issues/126198> is fixed this
-// can use `std::os::fd` and be merged with the above.
+// TODO (MSRV 1.81, #1803): use `std::os::fd` and merge with the above.
 #[cfg(target_os = "hermit")]
 use std::os::hermit::io::{AsRawFd, FromRawFd, RawFd};
 
