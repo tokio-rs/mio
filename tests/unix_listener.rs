@@ -5,7 +5,7 @@ use mio::{Interest, Token};
 use std::io::{self, Read};
 use std::os::unix::net;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Barrier};
+use std::sync::{mpsc, Arc, Barrier};
 use std::thread;
 
 #[macro_use]
@@ -115,6 +115,47 @@ fn unix_listener_reregister() {
     listener.accept().unwrap();
 
     barrier.wait();
+    handle.join().unwrap();
+}
+
+#[test]
+fn unix_listener_reregisters_after_would_block() {
+    let (mut poll, mut events) = init_with_poll();
+    let path = temp_file("unix_listener_reregisters_after_would_block");
+    let mut listener = UnixListener::bind(&path).unwrap();
+    poll.registry()
+        .register(&mut listener, TOKEN_1, Interest::READABLE)
+        .unwrap();
+
+    let first_accepted = Arc::new(Barrier::new(2));
+    let (start_second_tx, start_second_rx) = mpsc::channel();
+    let handle = thread::spawn({
+        let first_accepted = first_accepted.clone();
+        move || {
+            let first = net::UnixStream::connect(&path).unwrap();
+            first_accepted.wait();
+            start_second_rx.recv().unwrap();
+            let second = net::UnixStream::connect(&path).unwrap();
+            drop((first, second));
+        }
+    });
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+    );
+    listener.accept().unwrap();
+    first_accepted.wait();
+    assert_would_block(listener.accept());
+
+    start_second_tx.send(()).unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+    );
+    listener.accept().unwrap();
     handle.join().unwrap();
 }
 
