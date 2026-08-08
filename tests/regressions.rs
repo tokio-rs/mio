@@ -137,10 +137,9 @@ fn issue_1893() {
 
     use mio::windows::NamedPipe;
 
+    let (mut poll, mut events) = init_with_poll();
     let name = format!(r"\\.\pipe\mio-issue-1893-{}", rand::random::<u64>());
     let mut pipe = NamedPipe::new(&name).unwrap();
-    let mut poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(16);
 
     poll.registry()
         .register(
@@ -175,6 +174,7 @@ fn issue_1893() {
         let n = loop {
             match pipe.read(&mut buf) {
                 Ok(n) if n > 0 => break n,
+                // EOF from the previous round leaked
                 Ok(0) => panic!("received EOF before the round {round} message"),
                 Ok(_) => unreachable!(),
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
