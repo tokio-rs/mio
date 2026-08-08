@@ -128,3 +128,76 @@ fn issue_1403() {
     assert_eq!(got, n);
     assert_eq!(addr.as_pathname(), None);
 }
+
+#[test]
+#[cfg(all(windows, feature = "os-ext"))]
+fn issue_1893() {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    use mio::windows::NamedPipe;
+
+    let name = format!(r"\\.\pipe\mio-issue-1893-{}", rand::random::<u64>());
+    let mut pipe = NamedPipe::new(&name).unwrap();
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(16);
+
+    poll.registry()
+        .register(
+            &mut pipe,
+            Token(0),
+            Interest::READABLE | Interest::WRITABLE,
+        )
+        .unwrap();
+
+    // Two rounds of Opening the pipe, opening a client that writes a message and then reading that message from the pipe
+    // The two rounds should behave the same way
+    for round in 0..2 {
+        // Connect to the pipe, no clients are connected so this should return `WouldBlock`.
+        assert_eq!(pipe.connect().unwrap_err().kind(), io::ErrorKind::WouldBlock);
+
+        let mut client = OpenOptions::new().read(true).write(true).open(&name).unwrap();
+        let message = format!("hello-from-round-{round}");
+        client.write_all(message.as_bytes()).unwrap();
+        drop(client);
+
+        loop {
+            poll.poll(&mut events, None).unwrap();
+            if events
+                .iter()
+                .any(|event| event.token() == Token(0) && event.is_readable())
+            {
+                break;
+            }
+        }
+
+        let mut buf = [0; 64];
+        let n = loop {
+            match pipe.read(&mut buf) {
+                Ok(n) if n > 0 => break n,
+                Ok(0) => panic!("received EOF before the round {round} message"),
+                Ok(_) => unreachable!(),
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    poll.poll(&mut events, None).unwrap();
+                }
+                Err(error) => panic!("read round {round} message: {error}"),
+            }
+        };
+        assert_eq!(&buf[..n], message.as_bytes());
+
+        loop {
+            match pipe.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => panic!("unexpected {n} bytes after round {round} message"),
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    poll.poll(&mut events, None).unwrap();
+                }
+                Err(error) => panic!("read round {round} EOF: {error}"),
+            }
+        }
+
+        // Disconnect the pipe to prepare for the next round, when the pipe should behave as new
+        pipe.disconnect().unwrap();
+    }
+
+}
