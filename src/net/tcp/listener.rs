@@ -116,7 +116,7 @@ impl TcpListener {
     /// If an accepted stream is returned, the remote address of the peer is
     /// returned along with it.
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.inner.do_io(|inner| {
+        self.inner.do_io_with(Interest::READABLE, |inner| {
             sys::tcp::accept(inner).map(|(stream, addr)| (TcpStream::from_std(stream), addr))
         })
     }
