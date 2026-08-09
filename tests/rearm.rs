@@ -31,20 +31,6 @@ const ID1: Token = Token(0);
 //   - `poll(2)`, via `--cfg mio_unsupported_force_poll_poll` and on WASI
 //   - `event_ports(2)`, on Solaris and illumos
 
-macro_rules! skip_unnarrowed_selectors {
-    () => {
-        #[cfg_attr(
-            any(
-                mio_unsupported_force_poll_poll,
-                target_os = "solaris",
-                target_os = "illumos",
-                target_os = "wasi",
-            ),
-            ignore = "selector re-arms the full interest, see #1963"
-        )]
-    };
-}
-
 /// A blocked read must not raise write readiness.
 #[test]
 #[cfg_attr(
