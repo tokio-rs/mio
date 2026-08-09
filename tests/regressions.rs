@@ -153,10 +153,11 @@ fn issue_1983() {
     // The two rounds should behave the same way
     for round in 0..2 {
         // Connect to the pipe, no clients are connected so this should return `WouldBlock`.
-        assert_eq!(pipe.connect().unwrap_err().kind(), io::ErrorKind::WouldBlock);
+        use crate::util::assert_would_block;
+        assert_would_block(pipe.connect());
 
         let mut client = OpenOptions::new().read(true).write(true).open(&name).unwrap();
-        let message = format!("hello-from-round-{round}");
+        let message = format!("round-{round}");
         client.write_all(message.as_bytes()).unwrap();
         drop(client);
 
@@ -199,5 +200,68 @@ fn issue_1983() {
         // Disconnect the pipe to prepare for the next round, when the pipe should behave as new
         pipe.disconnect().unwrap();
     }
+}
 
+/// Similar to `issue_1983` but the server does not read the EOF from the first message before disconnecting.
+#[test]
+#[cfg(all(windows, feature = "os-ext"))]
+fn issue_1983_2() {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    use mio::windows::NamedPipe;
+    use crate::util::assert_would_block;
+
+    let (mut poll, mut events) = init_with_poll();
+    let name = format!(r"\\.\pipe\mio-issue-1983-2-{}", rand::random::<u64>());
+    let mut pipe = NamedPipe::new(&name).unwrap();
+
+    poll.registry()
+        .register(
+            &mut pipe,
+            Token(0),
+            Interest::READABLE | Interest::WRITABLE,
+        )
+        .unwrap();
+
+    assert_would_block(pipe.connect());
+
+    let mut first_client = OpenOptions::new().read(true).write(true).open(&name).unwrap();
+    first_client.write_all(b"first").unwrap();
+
+    let mut buf = [0; 64];
+    loop {
+        poll.poll(&mut events, None).unwrap();
+        match pipe.read(&mut buf) {
+            Ok(5) => break,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+            result => panic!("read first message: {result:?}"),
+        }
+    }
+    assert_eq!(&buf[..5], b"first");
+
+    // Reading the entire first message scheduled another overlapped read.
+    // Keep the client open so that read is still pending when the pipe disconnects.
+    pipe.disconnect().unwrap();
+    drop(first_client);
+
+    assert_would_block(pipe.connect());
+
+    let mut second_client = OpenOptions::new().read(true).write(true).open(&name).unwrap();
+    second_client.write_all(b"second").unwrap();
+
+    loop {
+        poll.poll(&mut events, None).unwrap();
+        match pipe.read(&mut buf) {
+            Ok(6) => break,
+            Ok(0) => panic!("read stale EOF before second message"),
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+            // Read result from before second connect
+            Err(error) => panic!(
+                "stale read error before second message: {error} ({:?})",
+                error.raw_os_error()
+            ),
+            result => panic!("read second message: {result:?}"),
+        }
+    }
+    assert_eq!(&buf[..6], b"second");
 }
