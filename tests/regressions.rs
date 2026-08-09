@@ -131,7 +131,7 @@ fn issue_1403() {
 
 #[test]
 #[cfg(all(windows, feature = "os-ext"))]
-fn issue_1893() {
+fn issue_1983() {
     use std::fs::OpenOptions;
     use std::io::Write;
 
