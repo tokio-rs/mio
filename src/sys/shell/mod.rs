@@ -49,13 +49,9 @@ cfg_io_source! {
             f(io)
         }
 
-        #[cfg(feature = "net")]
-        pub fn do_io_with<T, F, R>(
-            &self,
-            _interest: crate::Interest,
-            f: F,
-            io: &T,
-        ) -> io::Result<R>
+        // `IoSource::do_io_with` only forwards to the backend on Windows.
+        #[cfg(all(windows, feature = "net"))]
+        pub fn do_io_with<T, F, R>(&self, _interest: Interest, f: F, io: &T) -> io::Result<R>
         where
             F: FnOnce(&T) -> io::Result<R>,
         {
