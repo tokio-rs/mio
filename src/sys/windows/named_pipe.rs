@@ -567,7 +567,7 @@ impl<'a> Read for &'a NamedPipe {
             }
 
             // Looks like an in-flight read hit an error, return that here while
-            // we schedule a new one.
+            // we schedule a new one if the error is recoverable.
             State::Err(e) => {
                 Inner::schedule_read(&self.inner, &mut state, None);
                 if e.raw_os_error() == Some(ERROR_BROKEN_PIPE as i32) {
