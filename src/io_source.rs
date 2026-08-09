@@ -93,8 +93,13 @@ impl<T> IoSource<T> {
             self.state.do_io_with(interest, f, &self.inner)
         }
 
-        // No other selector re-arms in a way that can raise readiness for the
-        // direction the caller did not block on, so this is exactly `do_io`.
+        // `epoll(7)` and `kqueue(2)` are edge triggered and never re-arm, so
+        // there is nothing to narrow for them.
+        //
+        // `poll(2)` and `event_ports(2)` do re-arm the full interest and have
+        // the same problem, but narrowing them means giving each selector a
+        // re-arm that adds to the requested events rather than replacing them.
+        // That is not done yet, so they still go through `do_io`. See #1963.
         #[cfg(not(windows))]
         {
             let _ = interest;
