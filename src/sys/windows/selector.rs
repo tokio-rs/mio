@@ -285,6 +285,29 @@ cfg_io_source! {
 
             (events & !self.pending_evts) != 0
         }
+
+        /// Like `set_event`, but *adds* to the events already being waited for
+        /// instead of replacing them.
+        ///
+        /// Replacing is right when the user changes the interest they
+        /// registered, but wrong when re-arming after a blocked operation:
+        /// re-arming a single direction must not drop readiness the caller is
+        /// still waiting for in the other one.
+        ///
+        /// This composes with `feed_event`, which clears delivered events from
+        /// `user_evts`, so re-arming restores exactly what was consumed.
+        ///
+        /// True if need to be added on update queue, false otherwise.
+        #[cfg(feature = "net")]
+        fn add_event(&mut self, ev: Event) -> bool {
+            /* afd::POLL_CONNECT_FAIL and afd::POLL_ABORT are always reported, even when not requested by the caller. */
+            let events = self.user_evts | ev.flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
+
+            self.user_evts = events;
+            self.user_data = ev.data;
+
+            (events & !self.pending_evts) != 0
+        }
     }
 }
 
@@ -577,6 +600,34 @@ cfg_io_source! {
                 };
 
                 state.lock().unwrap().set_event(event);
+            }
+
+            // FIXME: a sock which has_error true should not be re-added to
+            // the update queue because it's already there.
+            self.queue_state(state);
+            unsafe { self.update_sockets_events_if_polling() }
+        }
+
+        // Directly accessed in `IoSourceState::do_io_with`.
+        //
+        // Unlike `reregister` this adds `interests` to the events the socket is
+        // already waiting for rather than replacing them, so re-arming a single
+        // direction after a blocked operation cannot drop readiness the caller
+        // still wants in the other one.
+        #[cfg(feature = "net")]
+        pub(super) fn rearm(
+            &self,
+            state: Pin<Arc<Mutex<SockState>>>,
+            token: Token,
+            interests: Interest,
+        ) -> io::Result<()> {
+            {
+                let event = Event {
+                    flags: interests_to_afd_flags(interests),
+                    data: token.0 as u64,
+                };
+
+                state.lock().unwrap().add_event(event);
             }
 
             // FIXME: a sock which has_error true should not be re-added to
