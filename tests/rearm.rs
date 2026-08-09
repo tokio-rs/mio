@@ -22,14 +22,23 @@ const ID1: Token = Token(0);
 /// socket that is reported straight back, producing a writable event on every
 /// blocked read.
 ///
-/// The `poll(2)` selector re-arms the same way and still has this problem:
-/// `SelectorState::reregister` overwrites the `pollfd` event mask, so narrowing
-/// the re-arm there needs a separate change. It is shared with `event_ports(2)`
-/// and left for a follow-up, so this test does not run against it.
+/// `epoll(7)` and `kqueue(2)` are edge triggered and never re-arm, so they
+/// already hold to this. The selectors that do re-arm all replace the
+/// requested events rather than adding to them, so narrowing them needs a
+/// change per selector; only the Windows one is done here. The test is skipped
+/// on the others rather than dropping the invariant:
+///
+///   - `poll(2)`, via `--cfg mio_unsupported_force_poll_poll` and on WASI
+///   - `event_ports(2)`, on Solaris and illumos
 #[test]
 #[cfg_attr(
-    mio_unsupported_force_poll_poll,
-    ignore = "the poll(2) selector re-arms the full interest, see #1963"
+    any(
+        mio_unsupported_force_poll_poll,
+        target_os = "solaris",
+        target_os = "illumos",
+        target_os = "wasi",
+    ),
+    ignore = "selector re-arms the full interest, see #1963"
 )]
 fn read_would_block_does_not_produce_a_writable_event() {
     let (mut poll, mut events) = init_with_poll();
