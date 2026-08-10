@@ -340,3 +340,79 @@ fn issue_1983_3() {
     // Buffered data from the first client must not be handed to the second.
     assert_eq!(&buf[..n], b"second");
 }
+
+/// Same staleness as `issue_1983` but on the write half: the first client goes
+/// away while a write is in flight, so `write_done` parks its error in the pipe
+/// and the next client is handed that error.
+#[test]
+#[cfg(all(windows, feature = "os-ext"))]
+fn issue_1983_4() {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    use crate::util::assert_would_block;
+    use mio::windows::NamedPipe;
+
+    let (mut poll, mut events) = init_with_poll();
+    let name = format!(r"\\.\pipe\mio-issue-1983-4-{}", rand::random::<u64>());
+    let mut pipe = NamedPipe::new(&name).unwrap();
+
+    poll.registry()
+        .register(&mut pipe, Token(0), Interest::READABLE | Interest::WRITABLE)
+        .unwrap();
+
+    assert_would_block(pipe.connect());
+
+    let first_client = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&name)
+        .unwrap();
+
+    loop {
+        poll.poll(&mut events, Some(Duration::from_secs(5))).unwrap();
+        if events
+            .iter()
+            .any(|event| event.token() == Token(0) && event.is_writable())
+        {
+            break;
+        }
+    }
+
+    // Larger than the pipe's 64 KiB outbound buffer, so the write stays in
+    // flight instead of completing into the kernel buffer.
+    let payload = vec![0xab; 65536 + 1];
+    assert_eq!(pipe.write(&payload).unwrap(), payload.len());
+
+    // The client never drains the pipe, so the in-flight write fails here.
+    drop(first_client);
+    // await_writable(&mut poll, &mut events);
+
+    pipe.disconnect().unwrap();
+
+    assert_would_block(pipe.connect());
+
+    let _second_client = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&name)
+        .unwrap();
+
+    loop {
+        poll.poll(&mut events, Some(Duration::from_secs(5))).unwrap();
+        if events
+            .iter()
+            .any(|event| event.token() == Token(0) && event.is_writable())
+        {
+            break;
+        }
+    }
+
+    match pipe.write(b"second") {
+        Ok(n) => assert_eq!(n, 6),
+        Err(error) => panic!(
+            "stale write error from the first client: {error} ({:?})",
+            error.raw_os_error()
+        ),
+    }
+}
