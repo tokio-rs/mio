@@ -265,3 +265,76 @@ fn issue_1983_2() {
     }
     assert_eq!(&buf[..6], b"second");
 }
+
+/// Similar to `issue_1983` but this time, the server never reads the first message, so the
+/// completed read is buffered in `State::Ok` rather than left pending when the
+/// pipe disconnects.
+#[test]
+#[cfg(all(windows, feature = "os-ext"))]
+fn issue_1983_3() {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    use crate::util::assert_would_block;
+    use mio::windows::NamedPipe;
+
+    let (mut poll, mut events) = init_with_poll();
+    let name = format!(r"\\.\pipe\mio-issue-1983-3-{}", rand::random::<u64>());
+    let mut pipe = NamedPipe::new(&name).unwrap();
+
+    poll.registry()
+        .register(
+            &mut pipe,
+            Token(0),
+            Interest::READABLE | Interest::WRITABLE,
+        )
+        .unwrap();
+
+    assert_would_block(pipe.connect());
+
+    let mut first_client = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&name)
+        .unwrap();
+    first_client.write_all(b"first").unwrap();
+    drop(first_client);
+
+    // Wait for the readable notification, which means `read_done` has already
+    // buffered the first client's bytes. Deliberately don't read them.
+    loop {
+        poll.poll(&mut events, Some(Duration::from_secs(5))).unwrap();
+        if events
+            .iter()
+            .any(|event| event.token() == Token(0) && event.is_readable())
+        {
+            break;
+        }
+    }
+
+    pipe.disconnect().unwrap();
+
+    assert_would_block(pipe.connect());
+
+    let mut second_client = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&name)
+        .unwrap();
+    second_client.write_all(b"second").unwrap();
+
+    let mut buf = [0; 64];
+    let n = loop {
+        match pipe.read(&mut buf) {
+            Ok(n) if n > 0 => break n,
+            Ok(0) => panic!("read stale EOF before second message"),
+            Ok(_) => unreachable!(),
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                poll.poll(&mut events, Some(Duration::from_secs(5))).unwrap();
+            }
+            Err(error) => panic!("read second message: {error}"),
+        }
+    };
+    // Buffered data from the first client must not be handed to the second.
+    assert_eq!(&buf[..n], b"second");
+}
