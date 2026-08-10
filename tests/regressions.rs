@@ -142,11 +142,7 @@ fn issue_1983() {
     let mut pipe = NamedPipe::new(&name).unwrap();
 
     poll.registry()
-        .register(
-            &mut pipe,
-            Token(0),
-            Interest::READABLE | Interest::WRITABLE,
-        )
+        .register(&mut pipe, Token(0), Interest::READABLE | Interest::WRITABLE)
         .unwrap();
 
     // Two rounds of Opening the pipe, opening a client that writes a message and then reading that message from the pipe
@@ -156,7 +152,11 @@ fn issue_1983() {
         use crate::util::assert_would_block;
         assert_would_block(pipe.connect());
 
-        let mut client = OpenOptions::new().read(true).write(true).open(&name).unwrap();
+        let mut client = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&name)
+            .unwrap();
         let message = format!("round-{round}");
         client.write_all(message.as_bytes()).unwrap();
         drop(client);
@@ -206,26 +206,26 @@ fn issue_1983() {
 #[test]
 #[cfg(all(windows, feature = "os-ext"))]
 fn issue_1983_2() {
+    use crate::util::assert_would_block;
+    use mio::windows::NamedPipe;
     use std::fs::OpenOptions;
     use std::io::Write;
-    use mio::windows::NamedPipe;
-    use crate::util::assert_would_block;
 
     let (mut poll, mut events) = init_with_poll();
     let name = format!(r"\\.\pipe\mio-issue-1983-2-{}", rand::random::<u64>());
     let mut pipe = NamedPipe::new(&name).unwrap();
 
     poll.registry()
-        .register(
-            &mut pipe,
-            Token(0),
-            Interest::READABLE | Interest::WRITABLE,
-        )
+        .register(&mut pipe, Token(0), Interest::READABLE | Interest::WRITABLE)
         .unwrap();
 
     assert_would_block(pipe.connect());
 
-    let mut first_client = OpenOptions::new().read(true).write(true).open(&name).unwrap();
+    let mut first_client = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&name)
+        .unwrap();
     first_client.write_all(b"first").unwrap();
 
     let mut buf = [0; 64];
@@ -246,7 +246,11 @@ fn issue_1983_2() {
 
     assert_would_block(pipe.connect());
 
-    let mut second_client = OpenOptions::new().read(true).write(true).open(&name).unwrap();
+    let mut second_client = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&name)
+        .unwrap();
     second_client.write_all(b"second").unwrap();
 
     loop {
@@ -283,11 +287,7 @@ fn issue_1983_3() {
     let mut pipe = NamedPipe::new(&name).unwrap();
 
     poll.registry()
-        .register(
-            &mut pipe,
-            Token(0),
-            Interest::READABLE | Interest::WRITABLE,
-        )
+        .register(&mut pipe, Token(0), Interest::READABLE | Interest::WRITABLE)
         .unwrap();
 
     assert_would_block(pipe.connect());
@@ -303,7 +303,8 @@ fn issue_1983_3() {
     // Wait for the readable notification, which means `read_done` has already
     // buffered the first client's bytes. Deliberately don't read them.
     loop {
-        poll.poll(&mut events, Some(Duration::from_secs(5))).unwrap();
+        poll.poll(&mut events, Some(Duration::from_secs(5)))
+            .unwrap();
         if events
             .iter()
             .any(|event| event.token() == Token(0) && event.is_readable())
@@ -330,7 +331,8 @@ fn issue_1983_3() {
             Ok(0) => panic!("read stale EOF before second message"),
             Ok(_) => unreachable!(),
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                poll.poll(&mut events, Some(Duration::from_secs(5))).unwrap();
+                poll.poll(&mut events, Some(Duration::from_secs(5)))
+                    .unwrap();
             }
             Err(error) => panic!("read second message: {error}"),
         }
