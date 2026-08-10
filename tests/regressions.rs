@@ -386,7 +386,6 @@ fn issue_1983_4() {
 
     // The client never drains the pipe, so the in-flight write fails here.
     drop(first_client);
-    // await_writable(&mut poll, &mut events);
 
     pipe.disconnect().unwrap();
 
