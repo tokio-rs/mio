@@ -522,7 +522,9 @@ impl NamedPipe {
                 let _ = cancel(&self.inner.handle, &self.inner.read);
             }
         } else {
-            if let State::Ok(buf, _) = mem::replace(&mut io.read, State::None) { self.inner.put_buffer(buf) }
+            if let State::Ok(buf, _) = mem::replace(&mut io.read, State::None) {
+                self.inner.put_buffer(buf)
+            }
         }
 
         if let State::Pending(..) = io.write {
@@ -530,7 +532,9 @@ impl NamedPipe {
                 let _ = cancel(&self.inner.handle, &self.inner.write);
             }
         } else {
-            if let State::Ok(buf, _) = mem::replace(&mut io.write, State::None) { self.inner.put_buffer(buf)}
+            if let State::Ok(buf, _) = mem::replace(&mut io.write, State::None) {
+                self.inner.put_buffer(buf)
+            }
         }
 
         self.inner.disconnect()?;
@@ -925,7 +929,7 @@ fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let mut io = me.io.lock().unwrap();
     let generation = match mem::replace(&mut io.connection, ConnectionState::None) {
         ConnectionState::Connecting(generation) => generation,
-        _ => unreachable!("NamedPipe was not previously connecting")
+        _ => unreachable!("NamedPipe was not previously connecting"),
     };
 
     // Stash away our connect error if one happened and the operation isn't
@@ -947,7 +951,7 @@ fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             io.connection = ConnectionState::Error(error);
         }
         // drops lock for so that `post_register` can acquire it again
-    drop(io);
+        drop(io);
         Inner::post_register(&me, events);
     }
 }
@@ -961,7 +965,7 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let me = unsafe { Arc::from_raw(Inner::ptr_from_read_overlapped(status.overlapped())) };
 
     let mut io = me.io.lock().unwrap();
-    let (mut buf , generation) = match mem::replace(&mut io.read, State::None) {
+    let (mut buf, generation) = match mem::replace(&mut io.read, State::None) {
         State::Ok(buf, pos) => {
             io.read = State::Ok(buf, pos);
 
