@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::{fmt, mem, slice};
 
 use windows_sys::Win32::Foundation::{
-    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NOT_FOUND,
+    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_MORE_DATA,
     ERROR_NO_DATA, ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
@@ -349,7 +349,14 @@ struct Io {
     generation: usize,
     read: State,
     write: State,
-    connect_error: Option<io::Error>,
+    connection: ConnectionState,
+}
+
+#[derive(Debug)]
+enum ConnectionState {
+    None,
+    Connecting(usize),
+    Error(io::Error),
 }
 
 #[derive(Debug)]
@@ -424,6 +431,13 @@ impl NamedPipe {
             return Err(would_block());
         }
 
+        let generation = {
+            let mut io = self.inner.io.lock().unwrap();
+            let generation = io.generation;
+            io.connection = ConnectionState::Connecting(generation);
+            generation
+        };
+
         // If `connect_overlapped` does not complete immediately then we need
         // to pass a reference to `self.inner` to the completion handler.
         // We need to increase the reference count here because `connect_done`
@@ -443,6 +457,7 @@ impl NamedPipe {
             // reads/writes and such.
             Ok(true) => {
                 self.inner.connecting.store(false, SeqCst);
+                self.inner.io.lock().unwrap().connection = ConnectionState::None;
                 Inner::post_register(&self.inner, None);
                 Ok(())
             }
@@ -461,6 +476,11 @@ impl NamedPipe {
 
             Err(e) => {
                 self.inner.connecting.store(false, SeqCst);
+                let mut io = self.inner.io.lock().unwrap();
+                if matches!(io.connection, ConnectionState::Connecting(current) if current == generation)
+                {
+                    io.connection = ConnectionState::None;
+                }
                 Err(e)
             }
         }
@@ -476,7 +496,14 @@ impl NamedPipe {
     /// otherwise it returns an error of what happened and a client shouldn't be
     /// connected.
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        Ok(self.inner.io.lock().unwrap().connect_error.take())
+        let mut io = self.inner.io.lock().unwrap();
+        match mem::replace(&mut io.connection, ConnectionState::None) {
+            ConnectionState::Error(error) => Ok(Some(error)),
+            state => {
+                io.connection = state;
+                Ok(None)
+            }
+        }
     }
 
     /// Disconnects this named pipe from a connected client.
@@ -492,32 +519,18 @@ impl NamedPipe {
 
         if let State::Pending(..) = io.read {
             unsafe {
-                match cancel(&self.inner.handle, &self.inner.read) {
-                    Ok(()) => {}
-                    Err(error) if error.raw_os_error() == Some(ERROR_NOT_FOUND as i32) => {}
-                    Err(error) => return Err(error),
-                }
+                let _ = cancel(&self.inner.handle, &self.inner.read);
             }
         } else {
-            match mem::replace(&mut io.read, State::None) {
-                State::Ok(buf, _) => self.inner.put_buffer(buf),
-                _ => {}
-            }
+            if let State::Ok(buf, _) = mem::replace(&mut io.read, State::None) { self.inner.put_buffer(buf) }
         }
 
         if let State::Pending(..) = io.write {
             unsafe {
-                match cancel(&self.inner.handle, &self.inner.write) {
-                    Ok(()) => {}
-                    Err(error) if error.raw_os_error() == Some(ERROR_NOT_FOUND as i32) => {}
-                    Err(error) => return Err(error),
-                }
+                let _ = cancel(&self.inner.handle, &self.inner.write);
             }
         } else {
-            match mem::replace(&mut io.write, State::None) {
-                State::Ok(buf, _) => self.inner.put_buffer(buf),
-                _ => {}
-            }
+            if let State::Ok(buf, _) = mem::replace(&mut io.write, State::None) { self.inner.put_buffer(buf)}
         }
 
         self.inner.disconnect()?;
@@ -541,7 +554,7 @@ impl FromRawHandle for NamedPipe {
                     generation: 0,
                     read: State::None,
                     write: State::None,
-                    connect_error: None,
+                    connection: ConnectionState::None,
                 }),
                 pool: Mutex::new(BufferPool::with_capacity(2)),
             }),
@@ -909,18 +922,34 @@ fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let prev = me.connecting.swap(false, SeqCst);
     assert!(prev, "NamedPipe was not previously connecting");
 
-    // Stash away our connect error if one happened
-    debug_assert_eq!(status.bytes_transferred(), 0);
-    unsafe {
-        match me.result(status.overlapped()) {
-            Ok(n) => debug_assert_eq!(n, 0),
-            Err(e) => me.io.lock().unwrap().connect_error = Some(e),
-        }
-    }
+    let mut io = me.io.lock().unwrap();
+    let generation = match mem::replace(&mut io.connection, ConnectionState::None) {
+        ConnectionState::Connecting(generation) => generation,
+        _ => unreachable!("NamedPipe was not previously connecting")
+    };
 
-    // We essentially just finished a registration, so kick off a
-    // read and register write readiness.
-    Inner::post_register(&me, events);
+    // Stash away our connect error if one happened and the operation isn't
+    // from a connection invalidated by `disconnect`.
+    debug_assert_eq!(status.bytes_transferred(), 0);
+    let result = unsafe {
+        match me.result(status.overlapped()) {
+            Ok(n) => {
+                debug_assert_eq!(n, 0);
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    };
+
+    let is_current = generation == io.generation;
+    if is_current {
+        if let Err(error) = result {
+            io.connection = ConnectionState::Error(error);
+        }
+        // drops lock for so that `post_register` can acquire it again
+    drop(io);
+        Inner::post_register(&me, events);
+    }
 }
 
 fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
@@ -951,10 +980,8 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
         State::None => unreachable!(),
     };
 
-    // got a stale read, schedule a read in case the pipe will be connected again
     if generation != io.generation {
         me.put_buffer(buf);
-        Inner::schedule_read(&me, &mut io, events);
         return;
     }
 
@@ -1015,7 +1042,6 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 
     if generation != io.generation {
         me.put_buffer(buf);
-        io.notify_writable(&me, events);
         return;
     }
 
@@ -1056,7 +1082,7 @@ fn event_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
         // cleanup. In this case, `events` is `None` and we don't need to track
         // the event.
         if let Some(events) = events {
-            let mut ev = Event::from_completion_status(&status);
+            let mut ev = Event::from_completion_status(status);
             // Reverse the `.data` alteration done in `schedule_event`. This
             // alteration was done so the selector recognized the event as one from
             // a named pipe.
