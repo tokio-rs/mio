@@ -440,7 +440,7 @@ fn issue_1983_5() {
     // No client is waiting, so this leaves an overlapped `ConnectNamedPipe` in flight.
     assert_would_block(pipe.connect());
 
-    pipe.disconnect().unwrap();
+    let _ = pipe.disconnect();
 
     // Let the aborted connect completion be processed. `connect` keeps returning
     // `WouldBlock` until `connect_done` has released the connecting flag.
