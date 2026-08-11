@@ -370,7 +370,8 @@ fn issue_1983_4() {
         .unwrap();
 
     loop {
-        poll.poll(&mut events, Some(Duration::from_secs(5))).unwrap();
+        poll.poll(&mut events, Some(Duration::from_secs(5)))
+            .unwrap();
         if events
             .iter()
             .any(|event| event.token() == Token(0) && event.is_writable())
@@ -398,7 +399,8 @@ fn issue_1983_4() {
         .unwrap();
 
     loop {
-        poll.poll(&mut events, Some(Duration::from_secs(5))).unwrap();
+        poll.poll(&mut events, Some(Duration::from_secs(5)))
+            .unwrap();
         if events
             .iter()
             .any(|event| event.token() == Token(0) && event.is_writable())
