@@ -415,3 +415,65 @@ fn issue_1983_4() {
         ),
     }
 }
+
+/// Same staleness as `issue_1983` but for the connect half: a `ConnectNamedPipe`
+/// that is aborted by `disconnect` parks its error in `connect_error`, and the
+/// next successfully connected client is handed that error by `take_error`.
+#[test]
+#[cfg(all(windows, feature = "os-ext"))]
+fn issue_1983_5() {
+    use std::fs::OpenOptions;
+
+    use crate::util::assert_would_block;
+    use mio::windows::NamedPipe;
+
+    let (mut poll, mut events) = init_with_poll();
+    let name = format!(r"\\.\pipe\mio-issue-1983-5-{}", rand::random::<u64>());
+    let mut pipe = NamedPipe::new(&name).unwrap();
+
+    poll.registry()
+        .register(&mut pipe, Token(0), Interest::READABLE | Interest::WRITABLE)
+        .unwrap();
+
+    // No client is waiting, so this leaves an overlapped `ConnectNamedPipe` in flight.
+    assert_would_block(pipe.connect());
+
+    pipe.disconnect().unwrap();
+
+    // Let the aborted connect completion be processed. `connect` keeps returning
+    // `WouldBlock` until `connect_done` has released the connecting flag.
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let mut client = None;
+    loop {
+        poll.poll(&mut events, Some(Duration::from_millis(100)))
+            .unwrap();
+        match pipe.connect() {
+            Ok(()) => break,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+            Err(error) => panic!("second connect: {error}"),
+        }
+        if client.is_none() {
+            client = Some(
+                OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(&name)
+                    .unwrap(),
+            );
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "timed out waiting for the second connect"
+        );
+    }
+    let _client = client.expect("client should have been opened");
+
+    // A client is connected, so there is no error to report.
+    match pipe.take_error().unwrap() {
+        None => {}
+        Some(error) => panic!(
+            "stale connect error from the aborted connect: {error} ({:?})",
+            error.raw_os_error()
+        ),
+    }
+}
