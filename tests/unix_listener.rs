@@ -5,7 +5,7 @@ use mio::{Interest, Token};
 use std::io::{self, Read};
 use std::os::unix::net;
 use std::path::{Path, PathBuf};
-use std::sync::{mpsc, Arc, Barrier};
+use std::sync::{Arc, Barrier};
 use std::thread;
 
 #[macro_use]
@@ -127,14 +127,13 @@ fn unix_listener_reregisters_after_would_block() {
         .register(&mut listener, TOKEN_1, Interest::READABLE)
         .unwrap();
 
-    let first_accepted = Arc::new(Barrier::new(2));
-    let (start_second_tx, start_second_rx) = mpsc::channel();
+    let barrier = Arc::new(Barrier::new(2));
     let handle = thread::spawn({
-        let first_accepted = first_accepted.clone();
+        let barrier = barrier.clone();
         move || {
             let first = net::UnixStream::connect(&path).unwrap();
-            first_accepted.wait();
-            start_second_rx.recv().unwrap();
+            barrier.wait();
+            barrier.wait();
             let second = net::UnixStream::connect(&path).unwrap();
             drop((first, second));
         }
@@ -146,10 +145,10 @@ fn unix_listener_reregisters_after_would_block() {
         vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
     );
     listener.accept().unwrap();
-    first_accepted.wait();
+    barrier.wait();
     assert_would_block(listener.accept());
 
-    start_second_tx.send(()).unwrap();
+    barrier.wait();
     expect_events(
         &mut poll,
         &mut events,
