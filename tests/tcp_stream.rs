@@ -466,7 +466,7 @@ fn shutdown_both() {
 #[cfg(unix)]
 #[cfg_attr(
     target_os = "emscripten",
-    ignore = "REMOVE BEFORE LANDING - pending Node.js 26.6.0 in runner"
+    ignore = "getsockname after a non-blocking connect can transiently report an unbound local address"
 )]
 #[test]
 fn raw_fd() {
