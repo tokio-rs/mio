@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::{fmt, mem, slice};
 
 use windows_sys::Win32::Foundation::{
-    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA,
+    ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA,
     ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
@@ -221,12 +221,14 @@ impl Inner {
         let mut bytes = 0;
         let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
         if res == 0 {
-            let err = io::Error::last_os_error();
-            if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
-                Ok(None)
-            } else {
-                Err(err)
-            }
+            // The operation was submitted (`ReadFile` returned success or
+            // ERROR_IO_PENDING above), so a completion packet will reach the
+            // port no matter how the operation ends; the status is not even
+            // written into the OVERLAPPED until that packet is dequeued.
+            // Returning `Err` here would make the caller skip reserving the
+            // strong reference that the completion callback unconditionally
+            // consumes, corrupting the reference count of `Inner`.
+            Ok(None)
         } else {
             Ok(Some(bytes as usize))
         }
@@ -281,12 +283,10 @@ impl Inner {
         let mut bytes = 0;
         let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
         if res == 0 {
-            let err = io::Error::last_os_error();
-            if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
-                Ok(None)
-            } else {
-                Err(err)
-            }
+            // See `read_overlapped`: the operation was submitted, so its
+            // completion packet is in flight and the caller must reserve the
+            // reference that the completion callback consumes.
+            Ok(None)
         } else {
             Ok(Some(bytes as usize))
         }
