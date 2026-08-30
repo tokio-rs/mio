@@ -2,8 +2,7 @@
 
 use std::ffi::OsStr;
 use std::fs::OpenOptions;
-use std::io::{self, ErrorKind, Read, Write};
-use std::iter;
+use std::io::{self, Read, Write};
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{FromRawHandle, IntoRawHandle, RawHandle};
@@ -57,7 +56,7 @@ fn client(name: &str) -> NamedPipe {
 }
 
 fn pipe_msg_mode() -> (NamedPipe, NamedPipe) {
-    let num: u64 = rand::thread_rng().gen();
+    let num: u64 = rand::rng().random();
     let name = format!(r"\\.\pipe\my-pipe-{}", num);
     let name: Vec<_> = OsStr::new(&name).encode_wide().chain(Some(0)).collect();
     unsafe {
@@ -81,7 +80,7 @@ fn pipe_msg_mode() -> (NamedPipe, NamedPipe) {
             std::ptr::null_mut(),
             OPEN_EXISTING,
             FILE_FLAG_OVERLAPPED,
-            0,
+            std::ptr::null_mut(),
         );
         let client = NamedPipe::from_raw_handle(h as RawHandle);
         (server, client)
@@ -193,6 +192,44 @@ fn read_sz_greater_than_default_buf_size() {
 }
 
 #[test]
+fn read_sz_greater_than_max_buf_size() {
+    let (mut server, mut client) = pipe_msg_mode();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    let msg = (0..1000000)
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("");
+
+    t!(poll.poll(&mut events, None));
+    assert_eq!(t!(client.write(msg.as_bytes())), 5888890);
+
+    loop {
+        t!(poll.poll(&mut events, None));
+        let events = events.iter().collect::<Vec<_>>();
+        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
+            if event.is_readable() {
+                break;
+            }
+        }
+    }
+
+    let mut buf = [0; 65535];
+    assert_eq!(t!(server.read(&mut buf)), 65535);
+}
+
+#[test]
 fn multi_read_sz_greater_than_default_buf_size() {
     let (mut server, mut client) = pipe_msg_mode();
     let mut poll = t!(Poll::new());
@@ -225,7 +262,7 @@ fn multi_read_sz_greater_than_default_buf_size() {
         loop {
             t!(poll.poll(&mut events, None));
             let events = events.iter().collect::<Vec<_>>();
-            if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
+            if events.iter().find(|e| e.token() == Token(0)).is_some() {
                 let mut buf = [0; 3000];
                 let Ok(read) = server.read(&mut buf) else {
                     continue;

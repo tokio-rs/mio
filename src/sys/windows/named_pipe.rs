@@ -554,7 +554,6 @@ impl Write for NamedPipe {
 impl<'a> Read for &'a NamedPipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut state = self.inner.io.lock().unwrap();
-
         if state.token.is_none() {
             return Err(would_block());
         }
@@ -746,15 +745,18 @@ impl Inner {
     /// returned and no read is scheduled.
     fn schedule_read(me: &Arc<Inner>, io: &mut Io, events: Option<&mut Vec<Event>>) -> bool {
         // Check to see if a read is already scheduled/completed
-
         let mut buf = match mem::replace(&mut io.read, State::None) {
             State::None => me.get_buffer(),
             State::InsufficientBufferSize(mut buf, rem) => {
-                let sz_rem = std::cmp::min(rem, MAX_BUFFER_SZ);
-                buf.reserve_exact(sz_rem);
+                let sz_rem = std::cmp::min(rem, MAX_BUFFER_SZ - buf.len());
+                if buf.try_reserve_exact(sz_rem).is_err() {
+                    io.read = State::Ok(buf, 0);
+                    return true;
+                }
+
                 buf
             }
-            e @ _ => {
+            e => {
                 io.read = e;
                 return true;
             }
@@ -766,6 +768,7 @@ impl Inner {
             let slice = slice::from_raw_parts_mut(buf.as_mut_ptr(), buf.capacity());
             me.read_overlapped(&mut slice[buf.len()..], overlapped)
         };
+
         match e {
             // See `NamedPipe::connect` above for the rationale behind `forget`
             Ok(_) => {
@@ -779,15 +782,11 @@ impl Inner {
             Err(ref e) if e.raw_os_error() == Some(ERROR_PIPE_LISTENING as i32) => false,
 
             // If ERROR_MORE_DATA is returned, it means the slice of unused capacity of the
-            // buffer provided is less than the amount of data available to be read. So
-            // prioritize draining the buffer before scheduling a new read.
-            //
-            // Return `true` to indicate that an overlapped read was scheduled "successfully",
-            // without actually scheduling it. Instead, update `io.read` to `State::Ok(buf, 0)`
-            // to ensure that the next `std::io::Read::read` call is presented still with the
-            // unread data to read from.
+            // buffer provided is less than the amount of data available to be read.
+            // We might be able to resize the buffer to accommodate this,
+            // so put to `Pending` and let `read_done` handle it.
             Err(ref e) if e.raw_os_error() == Some(ERROR_MORE_DATA as i32) => {
-                io.read = State::Ok(buf, 0);
+                io.read = State::Pending(buf, 0);
                 mem::forget(me.clone());
                 true
             }
@@ -930,22 +929,9 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 
     let mut io = me.io.lock().unwrap();
     let mut buf = match mem::replace(&mut io.read, State::None) {
-        State::Ok(buf, pos) => {
-            io.read = State::Ok(buf, pos);
-
-            // Flag readiness that we have undelivered data to be read.
-            io.notify_readable(&me, events);
-            return;
-        }
+        // The state after a read should always be `Pending`. Other states means that we have some logic error.
         State::Pending(buf, _) => buf,
-        State::Err(e) => {
-            io.read = State::Err(e);
-
-            // Flag readiness that the error needs to be delivered.
-            io.notify_readable(&me, events);
-            return;
-        }
-        State::None => unreachable!(),
+        _ => unreachable!(),
     };
     unsafe {
         match me.result(status.overlapped()) {
@@ -958,21 +944,18 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
                 io.read = State::Ok(buf, 0);
             }
             Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as i32) => {
-                buf.set_len(status.bytes_transferred() as usize);
-                match me.remaining_size() {
-                    Ok(rem) if rem == 0 => {
-                        io.read = State::Ok(buf, 0);
-                    }
-                    Ok(rem) => {
-                        io.read = State::InsufficientBufferSize(buf, rem);
-                        Inner::schedule_read(&me, &mut io, None);
-                        return;
-                    }
-                    Err(_e) => {
-                        // When `PeekNamedPipe` encountered an error, truncate and return whatever is recoverable from the bytes
-                        io.read = State::Ok(buf, 0);
+                buf.set_len(buf.len() +  status.bytes_transferred() as usize);
+                if buf.len() < MAX_BUFFER_SZ {
+                    if let Ok(rem) = me.remaining_size() {
+                        if rem > 0 {
+                            // Our default buffer size is too small. Schedule another read, but with a bigger buffer capacity.
+                            io.read = State::InsufficientBufferSize(buf, rem);
+                            Inner::schedule_read(&me, &mut io, None);
+                            return;
+                        }
                     }
                 }
+                io.read = State::Ok(buf, 0);
             }
             Err(e) => {
                 debug_assert_eq!(status.bytes_transferred(), 0);
@@ -1012,7 +995,7 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             io.notify_writable(&me, events);
             return;
         }
-        State::None => unreachable!(),
+        State::InsufficientBufferSize(..) | State::None => unreachable!(),
     };
 
     unsafe {
