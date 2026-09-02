@@ -4,7 +4,7 @@ use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{FromRawHandle, IntoRawHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use mio::windows::NamedPipe;
 use mio::{Events, Interest, Poll, Token};
@@ -267,19 +267,21 @@ fn connect_twice() {
 
     let mut events = Events::with_capacity(128);
 
-    loop {
-        t!(poll.poll(&mut events, None));
-        let events = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
-            if event.is_readable() {
-                let mut buf = [0; 10];
-
-                match server.read(&mut buf) {
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                    Ok(0) => break,
-                    res => panic!("{:?}", res),
+    'wait_for_eof: loop {
+        'wait_for_readable: loop {
+            t!(poll.poll(&mut events, None));
+            let events = events.iter().collect::<Vec<_>>();
+            for event in &events {
+                if event.is_readable() && event.token() == Token(0) {
+                    break 'wait_for_readable;
                 }
             }
+        }
+        let mut buf = [0; 10];
+        match server.read(&mut buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue 'wait_for_eof,
+            Ok(0) => break 'wait_for_eof,
+            res => panic!("{:?}", res),
         }
     }
 
@@ -447,4 +449,74 @@ fn read_with_small_buffer_provided() {
     }
 
     assert_eq!(actual_msg, expected_msg);
+}
+
+#[test]
+fn handle_closed_on_drop() {
+    const TIMEOUT: Duration = Duration::from_secs(2);
+
+    let (mut server, mut client) = pipe();
+    let mut server_poll = t!(Poll::new());
+
+    t!(server_poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(server.connect());
+
+    {
+        // Create another Poll as if we are in a separate process running a separate event loop.
+        let client_poll = t!(Poll::new());
+        t!(client_poll.registry().register(
+            &mut client,
+            Token(1),
+            Interest::READABLE | Interest::WRITABLE,
+        ));
+
+        let mut spam = b"spam".to_vec();
+        spam.resize(1024 * 1024, 0); // 1MiB to make sure it blocks on server-side read
+
+        // first write should not return WouldBlock
+        t!(client.write(&spam));
+        // now there's an OVERLAPPED that will hold a ref to Arc<Inner> indefinitely
+
+        // order and presence of these 3 lines makes no difference:
+        let _ = client_poll.registry().deregister(&mut client);
+        drop(client);
+        drop(client_poll);
+        // Either way, client_poll will get dropped by the end of this block.
+        // Inside the drop, client_poll will make a (vain) attempt to drain the IOCP of all events
+        // and release all references to `client` named pipe.
+        // But the large write we just submited will not complete in this timeframe, and there will be
+        // one reference to `client.inner` that will never get released.
+        //
+        // Doing a large write is the reliable way to reproduce this, but writing thru `server` pipe in busy loop
+        // in a separate process and reading from `client` can also lead to leaked handles (race condition
+        // between CancelIoEx and GetQueuedCompletionStatusEx).
+    }
+
+    // As server, read until eof.
+    // Since client's NamedPipe and even Poll got dropped, we should eventually get an EOF.
+    let mut events = Events::with_capacity(128);
+    let mut buf = vec![0; 1024];
+    let start_time = Instant::now();
+    'wait_for_eof: loop {
+        t!(server_poll.poll(&mut events, Some(TIMEOUT)));
+        if events.is_empty() {
+            panic!(
+                "timed out waiting for eof after {}ms",
+                start_time.elapsed().as_millis()
+            );
+        }
+        'drain: loop {
+            match server.read(&mut buf) {
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    break 'drain;
+                }
+                Err(_) | Ok(0) => break 'wait_for_eof,
+                Ok(_) => (),
+            }
+        }
+    }
 }

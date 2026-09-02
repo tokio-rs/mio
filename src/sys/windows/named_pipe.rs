@@ -3,7 +3,7 @@ use std::io::{self, Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::{fmt, mem, slice};
 
 use windows_sys::Win32::Foundation::{
@@ -86,7 +86,9 @@ struct Inner {
     write: Overlapped,
     event: Overlapped,
     // END NOTE.
-    handle: Handle,
+    // `None` once the owning `NamedPipe` has been dropped and the handle
+    // closed; in-flight completions may still reference this `Inner`.
+    handle: Mutex<Option<Handle>>,
     connecting: AtomicBool,
     io: Mutex<Io>,
     pool: Mutex<BufferPool>,
@@ -99,6 +101,18 @@ unsafe impl Send for Inner {}
 // SAFETY: `Handles`s are, in general, not thread-safe. However, we only used `Handle`s for
 // resources that are thread-safe in `Inner`.
 unsafe impl Sync for Inner {}
+
+/// Borrow the handle from a locked `Inner::handle`, failing if it was already
+/// closed by `NamedPipe::drop`.
+fn check_handle<'a>(guard: &'a MutexGuard<'_, Option<Handle>>) -> io::Result<&'a Handle> {
+    match &**guard {
+        Some(handle) => Ok(handle),
+        None => Err(io::Error::new(
+            io::ErrorKind::BrokenPipe,
+            "named pipe handle is closed",
+        )),
+    }
+}
 
 impl Inner {
     /// Converts a pointer to `Inner.connect` to a pointer to `Inner`.
@@ -149,7 +163,9 @@ impl Inner {
     /// valid until the I/O operation is completed, typically via completion
     /// ports and waiting to receive the completion notification on the port.
     pub unsafe fn connect_overlapped(&self, overlapped: *mut OVERLAPPED) -> io::Result<bool> {
-        if ConnectNamedPipe(self.handle.raw(), overlapped) != 0 {
+        let guard = self.handle.lock().unwrap();
+        let handle = check_handle(&guard)?;
+        if ConnectNamedPipe(handle.raw(), overlapped) != 0 {
             return Ok(true);
         }
 
@@ -165,7 +181,9 @@ impl Inner {
 
     /// Disconnects this named pipe from any connected client.
     pub fn disconnect(&self) -> io::Result<()> {
-        if unsafe { DisconnectNamedPipe(self.handle.raw()) } == 0 {
+        let guard = self.handle.lock().unwrap();
+        let handle = check_handle(&guard)?;
+        if unsafe { DisconnectNamedPipe(handle.raw()) } == 0 {
             Err(io::Error::last_os_error())
         } else {
             Ok(())
@@ -203,9 +221,11 @@ impl Inner {
         buf: &mut [u8],
         overlapped: *mut OVERLAPPED,
     ) -> io::Result<Option<usize>> {
+        let guard = self.handle.lock().unwrap();
+        let handle = check_handle(&guard)?;
         let len = std::cmp::min(buf.len(), u32::MAX as usize) as u32;
         let res = ReadFile(
-            self.handle.raw(),
+            handle.raw(),
             buf.as_mut_ptr() as *mut _,
             len,
             std::ptr::null_mut(),
@@ -219,7 +239,7 @@ impl Inner {
         }
 
         let mut bytes = 0;
-        let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
+        let res = GetOverlappedResult(handle.raw(), overlapped, &mut bytes, 0);
         if res == 0 {
             let err = io::Error::last_os_error();
             if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
@@ -263,9 +283,11 @@ impl Inner {
         buf: &[u8],
         overlapped: *mut OVERLAPPED,
     ) -> io::Result<Option<usize>> {
+        let guard = self.handle.lock().unwrap();
+        let handle = check_handle(&guard)?;
         let len = std::cmp::min(buf.len(), u32::MAX as usize) as u32;
         let res = WriteFile(
-            self.handle.raw(),
+            handle.raw(),
             buf.as_ptr() as *const _,
             len,
             std::ptr::null_mut(),
@@ -279,7 +301,7 @@ impl Inner {
         }
 
         let mut bytes = 0;
-        let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
+        let res = GetOverlappedResult(handle.raw(), overlapped, &mut bytes, 0);
         if res == 0 {
             let err = io::Error::last_os_error();
             if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
@@ -305,14 +327,20 @@ impl Inner {
     /// This function is unsafe as `overlapped` must have previously been used
     /// to execute an operation for this handle, and it must also be a valid
     /// pointer to an `Overlapped` instance.
+    ///
+    /// Returns `None` if the handle has already been closed by
+    /// `NamedPipe::drop`, in which case no result can be retrieved and the
+    /// completion should simply be discarded.
     #[inline]
-    unsafe fn result(&self, overlapped: *mut OVERLAPPED) -> io::Result<usize> {
+    unsafe fn result(&self, overlapped: *mut OVERLAPPED) -> Option<io::Result<usize>> {
+        let guard = self.handle.lock().unwrap();
+        let handle = check_handle(&guard).ok()?;
         let mut transferred = 0;
-        let r = GetOverlappedResult(self.handle.raw(), overlapped, &mut transferred, 0);
+        let r = GetOverlappedResult(handle.raw(), overlapped, &mut transferred, 0);
         if r == 0 {
-            Err(io::Error::last_os_error())
+            Some(Err(io::Error::last_os_error()))
         } else {
-            Ok(transferred as usize)
+            Some(Ok(transferred as usize))
         }
     }
 }
@@ -494,7 +522,7 @@ impl FromRawHandle for NamedPipe {
     unsafe fn from_raw_handle(handle: RawHandle) -> NamedPipe {
         NamedPipe {
             inner: Arc::new(Inner {
-                handle: Handle::new(handle as HANDLE),
+                handle: Mutex::new(Some(Handle::new(handle as HANDLE))),
                 connect: Overlapped::new(connect_done),
                 connecting: AtomicBool::new(false),
                 read: Overlapped::new(read_done),
@@ -680,7 +708,10 @@ impl Source for NamedPipe {
 
 impl AsRawHandle for NamedPipe {
     fn as_raw_handle(&self) -> RawHandle {
-        self.inner.handle.raw() as RawHandle
+        let guard = self.inner.handle.lock().unwrap();
+        // Cannot panic: the handle is only taken by `NamedPipe::drop`, and this
+        // `NamedPipe` is still alive.
+        guard.as_ref().unwrap().raw() as RawHandle
     }
 }
 
@@ -692,18 +723,35 @@ impl fmt::Debug for NamedPipe {
 
 impl Drop for NamedPipe {
     fn drop(&mut self) {
-        // Cancel pending reads/connects, but don't cancel writes to ensure that
-        // everything is flushed out.
+        // NOTE: `io` must be locked before `handle`; every other code path
+        // takes the locks in that order.
+        let io = self.inner.io.lock().unwrap();
+        let mut handle = self.inner.handle.lock().unwrap();
+        // Cannot panic: the handle is only taken here, and this `NamedPipe` is
+        // still alive.
+        let raw_handle = handle.as_ref().unwrap();
+
+        // Cancel pending reads/connects.
         unsafe {
             if self.inner.connecting.load(SeqCst) {
-                drop(cancel(&self.inner.handle, &self.inner.connect));
+                drop(cancel(raw_handle, &self.inner.connect));
             }
 
-            let io = self.inner.io.lock().unwrap();
             if let State::Pending(..) = io.read {
-                drop(cancel(&self.inner.handle, &self.inner.read));
+                drop(cancel(raw_handle, &self.inner.read));
             }
         }
+
+        // Close the handle here rather than relying on the last `Arc<Inner>`
+        // reference going away. A pending overlapped operation holds a
+        // reference that is only returned when its completion is witnessed,
+        // which is not guaranteed to happen (for example when `Poll` is dropped
+        // with operations still in flight). Leaving the close to that reference
+        // leaks the handle permanently.
+        //
+        // Closing the handle also ends any in-flight write, so a write is no
+        // longer guaranteed to be flushed out after the `NamedPipe` is dropped.
+        *handle = None;
     }
 }
 
@@ -877,8 +925,11 @@ fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     debug_assert_eq!(status.bytes_transferred(), 0);
     unsafe {
         match me.result(status.overlapped()) {
-            Ok(n) => debug_assert_eq!(n, 0),
-            Err(e) => me.io.lock().unwrap().connect_error = Some(e),
+            Some(Ok(n)) => debug_assert_eq!(n, 0),
+            Some(Err(e)) => me.io.lock().unwrap().connect_error = Some(e),
+            // The `NamedPipe` was dropped and the handle closed; there is
+            // nobody left to deliver an event to.
+            None => return,
         }
     }
 
@@ -916,7 +967,7 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     };
     unsafe {
         match me.result(status.overlapped()) {
-            Ok(n) => {
+            Some(Ok(n)) => {
                 debug_assert_eq!(status.bytes_transferred() as usize, n);
                 buf.set_len(status.bytes_transferred() as usize);
                 io.read = State::Ok(buf, 0);
@@ -924,14 +975,17 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             // This is non-fatal. The buffer was simply too small for the entire message.
             // Deliver the bytes we got, and if the caller wants to read the rest of the
             // message, they can initiate another read.
-            Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as i32) => {
+            Some(Err(e)) if e.raw_os_error() == Some(ERROR_MORE_DATA as i32) => {
                 buf.set_len(status.bytes_transferred() as usize);
                 io.read = State::Ok(buf, 0);
             }
-            Err(e) => {
+            Some(Err(e)) => {
                 debug_assert_eq!(status.bytes_transferred(), 0);
                 io.read = State::Err(e);
             }
+            // The `NamedPipe` was dropped and the handle closed; there is
+            // nobody left to deliver an event to.
+            None => return,
         }
     }
 
@@ -971,7 +1025,7 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 
     unsafe {
         match me.result(status.overlapped()) {
-            Ok(n) => {
+            Some(Ok(n)) => {
                 debug_assert_eq!(status.bytes_transferred() as usize, n);
                 let new_pos = pos + (status.bytes_transferred() as usize);
                 if new_pos == buf.len() {
@@ -981,11 +1035,14 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
                     Inner::schedule_write(&me, buf, new_pos, &mut io, events);
                 }
             }
-            Err(e) => {
+            Some(Err(e)) => {
                 debug_assert_eq!(status.bytes_transferred(), 0);
                 io.write = State::Err(e);
                 io.notify_writable(&me, events);
             }
+            // The `NamedPipe` was dropped and the handle closed; there is
+            // nobody left to deliver an event to.
+            None => {}
         }
     }
 }
