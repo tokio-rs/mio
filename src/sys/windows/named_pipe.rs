@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::{fmt, mem, slice};
 
 use windows_sys::Win32::Foundation::{
-    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA,
+    ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA,
     ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
@@ -218,15 +218,20 @@ impl Inner {
             }
         }
 
+        #[cfg(test)]
+        tests::run_submit_hook();
+
         let mut bytes = 0;
         let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
         if res == 0 {
-            let err = io::Error::last_os_error();
-            if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
-                Ok(None)
-            } else {
-                Err(err)
-            }
+            // The operation was submitted (`ReadFile` returned success or
+            // ERROR_IO_PENDING above), so a completion packet will reach the
+            // port no matter how the operation ends; the status is not even
+            // written into the OVERLAPPED until that packet is dequeued.
+            // Returning `Err` here would make the caller skip reserving the
+            // strong reference that the completion callback unconditionally
+            // consumes, corrupting the reference count of `Inner`.
+            Ok(None)
         } else {
             Ok(Some(bytes as usize))
         }
@@ -278,15 +283,16 @@ impl Inner {
             }
         }
 
+        #[cfg(test)]
+        tests::run_submit_hook();
+
         let mut bytes = 0;
         let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
         if res == 0 {
-            let err = io::Error::last_os_error();
-            if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
-                Ok(None)
-            } else {
-                Err(err)
-            }
+            // See `read_overlapped`: the operation was submitted, so its
+            // completion packet is in flight and the caller must reserve the
+            // reference that the completion callback consumes.
+            Ok(None)
         } else {
             Ok(Some(bytes as usize))
         }
@@ -1107,5 +1113,199 @@ impl BufferPool {
             }
             self.pool.push(buf);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Every submitted overlapped operation must reserve the strong reference
+    //! that its completion callback unconditionally consumes - even when the
+    //! operation fails while it is being submitted.
+
+    use super::*;
+    use std::cell::RefCell;
+    use std::fs::{File, OpenOptions};
+    use std::time::Duration;
+
+    // A buggy completion callback can over-release at most one strong
+    // reference per dispatched packet, and `deliver_completions` dispatches
+    // at most one batch of this size per call. `connected` leaks this many
+    // padding references so `Inner` stays allocated even then, making a
+    // regression fail with a readable assertion instead of a use-after-free.
+    // The padding is never returned: giving it back after a miscount would
+    // itself double-free.
+    const DISPATCH_BATCH: usize = 4;
+
+    thread_local! {
+        // One-shot hook that `read_overlapped` / `write_overlapped` run after
+        // submitting the operation, right before peeking at its result.
+        static SUBMIT_HOOK: RefCell<Option<Box<dyn FnMut()>>> = RefCell::new(None);
+    }
+
+    pub(super) fn run_submit_hook() {
+        if let Some(mut hook) = SUBMIT_HOOK.with(|hook| hook.borrow_mut().take()) {
+            hook();
+        }
+    }
+
+    /// A server pipe with a connected client, registered to a completion port
+    /// that the test drains manually, playing the selector's role.
+    struct TestPipe {
+        pipe: NamedPipe,
+        cp: Arc<CompletionPort>,
+        client: RefCell<Option<File>>,
+        baseline_refs: usize,
+    }
+
+    impl TestPipe {
+        fn connected(name: &str) -> TestPipe {
+            // A pipe name unique to this process and test, so parallel test
+            // runs cannot collide.
+            let name = format!(
+                r"\\.\pipe\mio-named-pipe-test-{}-{}",
+                std::process::id(),
+                name
+            );
+
+            // Create the server end and associate it with a completion port,
+            // so the kernel delivers its completion packets there.
+            let pipe = NamedPipe::new(&name).unwrap();
+            let cp = Arc::new(CompletionPort::new(1).unwrap());
+            cp.add_handle(1, &pipe).unwrap();
+
+            // Mirror what `Source::register` does, without going through a
+            // `Poll`: record the port and hand out a token so the pipe can
+            // schedule I/O and generate readiness notifications.
+            {
+                let mut io = pipe.inner.io.lock().unwrap();
+                io.cp = Some(cp.clone());
+                io.token = Some(Token(1));
+            }
+
+            // Deliberately leaked padding; see `DISPATCH_BATCH`.
+            for _ in 0..DISPATCH_BATCH {
+                mem::forget(pipe.inner.clone());
+            }
+
+            // The client end; `fail_next_submission_before_the_peek` drops it
+            // to fail the operation in flight at that point.
+            let client = OpenOptions::new().read(true).write(true).open(&name).unwrap();
+            let baseline_refs = Arc::strong_count(&pipe.inner);
+            TestPipe {
+                pipe,
+                cp,
+                client: RefCell::new(Some(client)),
+                baseline_refs,
+            }
+        }
+
+        /// Arranges the interleaving under test: the next submitted operation
+        /// fails (the client disconnects) and its completion is dequeued
+        /// before the submitter peeks at the result - dequeuing is what
+        /// publishes the failure into the OVERLAPPED, making it visible to
+        /// the peek. The packet is re-posted so `deliver_completions` can
+        /// consume it later, the way the selector would.
+        fn fail_next_submission_before_the_peek(&self) {
+            let mut client = self.client.borrow_mut().take();
+            let cp = self.cp.clone();
+            SUBMIT_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    drop(client.take());
+                    let mut statuses = [CompletionStatus::zero()];
+                    let timeout = Some(Duration::from_secs(10));
+                    assert_eq!(cp.get_many(&mut statuses, timeout).unwrap().len(), 1);
+                    cp.post(statuses[0]).unwrap();
+                }));
+            });
+        }
+
+        /// Strong references currently held beyond the baseline, i.e. the
+        /// references reserved for in-flight completions. Negative means a
+        /// reference was released that was never reserved.
+        fn reserved_refs(&self) -> isize {
+            Arc::strong_count(&self.pipe.inner) as isize - self.baseline_refs as isize
+        }
+
+        fn schedule_read(&self) -> bool {
+            let mut io = self.pipe.inner.io.lock().unwrap();
+            Inner::schedule_read(&self.pipe.inner, &mut io, None)
+        }
+
+        fn read_is_pending(&self) -> bool {
+            matches!(self.pipe.inner.io.lock().unwrap().read, State::Pending(..))
+        }
+
+        fn read_failed(&self) -> bool {
+            matches!(self.pipe.inner.io.lock().unwrap().read, State::Err(_))
+        }
+
+        fn write_failed(&self) -> bool {
+            matches!(self.pipe.inner.io.lock().unwrap().write, State::Err(_))
+        }
+
+        /// Dispatches queued packets the way `Selector::feed_events` does.
+        fn deliver_completions(&self) -> usize {
+            let mut statuses = [CompletionStatus::zero(); DISPATCH_BATCH];
+            let mut events = Vec::new();
+            let statuses = self.cp.get_many(&mut statuses, Some(Duration::from_secs(10))).unwrap();
+            for status in statuses.iter() {
+                let callback = unsafe { (*(status.overlapped() as *mut Overlapped)).callback };
+                callback(status.entry(), Some(&mut events));
+            }
+            statuses.len()
+        }
+    }
+
+    #[test]
+    fn submitted_read_that_fails_before_the_peek_reserves_a_reference() {
+        let pipe = TestPipe::connected("read");
+        pipe.fail_next_submission_before_the_peek();
+
+        // The read stays tracked as in flight, with one reference reserved
+        // for the already-dispatched completion packet.
+        assert!(pipe.schedule_read());
+        assert!(
+            pipe.read_is_pending(),
+            "a submitted read was treated as failed-to-submit, leaving its \
+             completion packet without a reserved reference"
+        );
+        assert_eq!(pipe.reserved_refs(), 1);
+
+        // Delivering the packet redeems exactly that reference and still
+        // surfaces the read's failure.
+        assert_eq!(pipe.deliver_completions(), 1);
+        assert_eq!(
+            pipe.reserved_refs(),
+            0,
+            "the completion must redeem exactly the reserved reference"
+        );
+        assert!(pipe.read_failed(), "the read's failure must still be delivered");
+    }
+
+    #[test]
+    fn submitted_write_that_fails_before_the_peek_reserves_a_reference() {
+        let pipe = TestPipe::connected("write");
+        pipe.fail_next_submission_before_the_peek();
+
+        // Larger than the pipe's outbound buffer, so the write must pend; the
+        // caller still sees it as accepted, with one reference reserved for
+        // the already-dispatched completion packet.
+        let data = vec![0u8; 128 * 1024];
+        let written = (&pipe.pipe).write(&data).expect(
+            "a submitted write must be reported as accepted; its failure \
+             arrives via the completion",
+        );
+        assert_eq!(written, data.len());
+        assert_eq!(pipe.reserved_refs(), 1);
+
+        // Delivering the packet redeems exactly that reference and still
+        // surfaces the write's failure.
+        assert_eq!(pipe.deliver_completions(), 1);
+        assert_eq!(
+            pipe.reserved_refs(),
+            0,
+            "the completion must redeem exactly the reserved reference"
+        );
+        assert!(pipe.write_failed(), "the write's failure must still be delivered");
     }
 }
