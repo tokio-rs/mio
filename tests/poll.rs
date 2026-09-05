@@ -9,6 +9,8 @@ use std::{fmt, io};
 
 use mio::event::Source;
 use mio::net::{TcpListener, TcpStream, UdpSocket};
+#[cfg(not(any(target_os = "horizon", target_os = "wasi")))]
+use mio::Waker;
 use mio::{event, Events, Interest, Poll, Registry, Token};
 
 mod util;
@@ -41,6 +43,30 @@ fn run_once_with_nothing() {
     let mut poll = Poll::new().unwrap();
     poll.poll(&mut events, Some(Duration::from_millis(100)))
         .unwrap();
+}
+
+#[cfg(not(any(target_os = "horizon", target_os = "wasi")))]
+#[cfg_attr(miri, ignore = "Miri doesn't support UDP sockets")]
+#[test]
+fn poll_without_timeout_waits_for_waker() {
+    init();
+
+    let mut socket = UdpSocket::bind(any_local_address()).unwrap();
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+    poll.registry()
+        .register(&mut socket, ID1, Interest::READABLE)
+        .unwrap();
+
+    let waker = Waker::new(poll.registry(), ID2).unwrap();
+    let handle = thread::spawn(move || {
+        sleep(Duration::from_millis(50));
+        waker.wake().unwrap();
+    });
+
+    poll.poll(&mut events, None).unwrap();
+    handle.join().unwrap();
+    assert!(events.iter().any(|event| event.token() == ID2));
 }
 
 #[test]
@@ -151,6 +177,107 @@ fn readiness_is_reregistered_after_would_block() {
         &mut poll,
         &mut events,
         vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
+}
+
+#[cfg(all(target_os = "solaris", feature = "os-ext"))]
+#[test]
+fn fallback_readiness_is_not_starved_by_port_events() {
+    use mio::unix::SourceFd;
+    use std::os::fd::AsRawFd;
+    use std::os::unix::net::UnixStream;
+
+    init();
+
+    let (mut receiver, mut sender) = UnixStream::pair().unwrap();
+    receiver.set_nonblocking(true).unwrap();
+    sender.set_nonblocking(true).unwrap();
+
+    let fd = receiver.as_raw_fd();
+    let mut source = SourceFd(&fd);
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+    poll.registry()
+        .register(&mut source, ID1, Interest::READABLE)
+        .unwrap();
+
+    sender.write_all(b"first").unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
+
+    let mut buf = [0; 16];
+    assert_eq!(receiver.read(&mut buf).unwrap(), 5);
+    util::assert_would_block(receiver.read(&mut buf));
+
+    // SourceFd I/O does not go through Mio, so event ports have to use the
+    // fallback path to observe readiness again. A queued port event must not
+    // prevent that fallback readiness from being returned in the same poll.
+    sender.write_all(b"again").unwrap();
+    let waker = Waker::new(poll.registry(), ID2).unwrap();
+    waker.wake().unwrap();
+
+    poll.poll(&mut events, Some(Duration::from_secs(1)))
+        .unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|event| event.token() == ID1 && event.is_readable()),
+        "fallback readiness was starved by the waker event: {events:?}"
+    );
+    assert!(events.iter().any(|event| event.token() == ID2));
+}
+
+#[cfg(all(target_os = "solaris", feature = "os-ext"))]
+#[test]
+fn fallback_interests_are_rearmed_independently() {
+    use mio::unix::SourceFd;
+    use std::os::fd::AsRawFd;
+    use std::os::unix::net::UnixStream;
+
+    init();
+
+    let (mut receiver, mut sender) = UnixStream::pair().unwrap();
+    receiver.set_nonblocking(true).unwrap();
+    sender.set_nonblocking(true).unwrap();
+
+    let fd = receiver.as_raw_fd();
+    let mut source = SourceFd(&fd);
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+    poll.registry()
+        .register(&mut source, ID1, Interest::READABLE | Interest::WRITABLE)
+        .unwrap();
+
+    sender.write_all(b"first").unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
+
+    let mut buf = [0; 16];
+    assert_eq!(receiver.read(&mut buf).unwrap(), 5);
+    util::assert_would_block(receiver.read(&mut buf));
+
+    // Let the fallback check observe that readable has been drained while the
+    // socket remains writable. It must re-associate only readable interests.
+    poll.poll(&mut events, Some(Duration::ZERO)).unwrap();
+
+    sender.write_all(b"again").unwrap();
+    sleep(Duration::from_millis(10));
+    let waker = Waker::new(poll.registry(), ID2).unwrap();
+    waker.wake().unwrap();
+
+    poll.poll(&mut events, Some(Duration::from_secs(1)))
+        .unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|event| event.token() == ID1 && event.is_readable()),
+        "readable interest was not re-associated: {events:?}"
     );
 }
 
