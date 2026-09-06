@@ -76,6 +76,109 @@ fn unix_listener_local_addr() {
     handle.join().unwrap();
 }
 
+/// Connect to the unix socket at `connect_path` from a socket that is itself
+/// bound to `bind_path`. Mio (and std) don't expose bind-before-connect for
+/// `UnixStream`, so this uses libc directly.
+#[cfg(unix)]
+fn connect_from_bound_socket(bind_path: &Path, connect_path: &Path) -> net::UnixStream {
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::io::FromRawFd;
+
+    fn pack_sockaddr_un(path: &Path) -> libc::sockaddr_un {
+        let mut addr: libc::sockaddr_un = unsafe { std::mem::zeroed() };
+        addr.sun_family = libc::AF_UNIX as libc::sa_family_t;
+        let bytes = path.as_os_str().as_bytes();
+        assert!(bytes.len() < addr.sun_path.len());
+        // SAFETY: sun_path is large enough (checked above) and doesn't
+        // overlap with the path bytes.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                bytes.as_ptr(),
+                addr.sun_path.as_mut_ptr().cast(),
+                bytes.len(),
+            );
+        }
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "tvos",
+            target_os = "watchos",
+            target_os = "visionos",
+            target_os = "freebsd",
+            target_os = "dragonfly",
+            target_os = "netbsd",
+            target_os = "openbsd",
+        ))]
+        {
+            addr.sun_len = std::mem::size_of::<libc::sockaddr_un>() as u8;
+        }
+        addr
+    }
+
+    unsafe {
+        let fd = libc::socket(libc::AF_UNIX, libc::SOCK_STREAM, 0);
+        assert!(
+            fd >= 0,
+            "failed to create socket: {}",
+            io::Error::last_os_error()
+        );
+
+        let bind_addr = pack_sockaddr_un(bind_path);
+        let len = std::mem::size_of::<libc::sockaddr_un>() as libc::socklen_t;
+        let res = libc::bind(
+            fd,
+            &bind_addr as *const libc::sockaddr_un as *const libc::sockaddr,
+            len,
+        );
+        assert!(res == 0, "failed to bind: {}", io::Error::last_os_error());
+
+        let connect_addr = pack_sockaddr_un(connect_path);
+        let res = libc::connect(
+            fd,
+            &connect_addr as *const libc::sockaddr_un as *const libc::sockaddr,
+            len,
+        );
+        assert!(
+            res == 0,
+            "failed to connect: {}",
+            io::Error::last_os_error()
+        );
+
+        net::UnixStream::from_raw_fd(fd)
+    }
+}
+
+/// On Darwin, accept(2) reports the length of the entire sockaddr_un
+/// structure (with the peer path padded with null bytes) rather than the
+/// length of the peer path. Accepting a connection from a peer bound to a
+/// named path must still work.
+#[test]
+fn unix_listener_accept_named_peer() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let listener_path = temp_file("unix_listener_accept_named_peer_listener");
+    let client_path = temp_file("unix_listener_accept_named_peer_client");
+    let mut listener = UnixListener::bind(&listener_path).unwrap();
+    poll.registry()
+        .register(&mut listener, TOKEN_1, Interest::READABLE)
+        .unwrap();
+
+    let client = connect_from_bound_socket(&client_path, &listener_path);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+    );
+
+    let (_stream, addr) = listener.accept().unwrap();
+    // getting pathname isn't supported on GNU/Hurd
+    #[cfg(not(target_os = "hurd"))]
+    assert_eq!(addr.as_pathname().unwrap(), &client_path);
+
+    drop(client);
+}
+
 #[test]
 fn unix_listener_register() {
     let (mut poll, mut events) = init_with_poll();
