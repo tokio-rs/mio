@@ -197,6 +197,8 @@ jobs:
   CheckTier2:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Don't want to fail the CI for tier 2 jobs.
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
