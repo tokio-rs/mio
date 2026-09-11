@@ -2,6 +2,7 @@
 
 use mio::net::UnixListener;
 use mio::{Interest, Token};
+use socket2::{Domain, SockAddr, Socket, Type};
 use std::io::{self, Read};
 use std::os::unix::net;
 use std::path::{Path, PathBuf};
@@ -78,74 +79,14 @@ fn unix_listener_local_addr() {
 
 /// Connect to the unix socket at `connect_path` from a socket that is itself
 /// bound to `bind_path`. Mio (and std) don't expose bind-before-connect for
-/// `UnixStream`, so this uses libc directly.
-#[cfg(unix)]
+/// `UnixStream`, so this uses socket2 directly.
 fn connect_from_bound_socket(bind_path: &Path, connect_path: &Path) -> net::UnixStream {
-    use std::os::unix::ffi::OsStrExt;
-    use std::os::unix::io::FromRawFd;
-
-    fn pack_sockaddr_un(path: &Path) -> libc::sockaddr_un {
-        let mut addr: libc::sockaddr_un = unsafe { std::mem::zeroed() };
-        addr.sun_family = libc::AF_UNIX as libc::sa_family_t;
-        let bytes = path.as_os_str().as_bytes();
-        assert!(bytes.len() < addr.sun_path.len());
-        // SAFETY: sun_path is large enough (checked above) and doesn't
-        // overlap with the path bytes.
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                bytes.as_ptr(),
-                addr.sun_path.as_mut_ptr().cast(),
-                bytes.len(),
-            );
-        }
-        #[cfg(any(
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "tvos",
-            target_os = "watchos",
-            target_os = "visionos",
-            target_os = "freebsd",
-            target_os = "dragonfly",
-            target_os = "netbsd",
-            target_os = "openbsd",
-        ))]
-        {
-            addr.sun_len = std::mem::size_of::<libc::sockaddr_un>() as u8;
-        }
-        addr
-    }
-
-    unsafe {
-        let fd = libc::socket(libc::AF_UNIX, libc::SOCK_STREAM, 0);
-        assert!(
-            fd >= 0,
-            "failed to create socket: {}",
-            io::Error::last_os_error()
-        );
-
-        let bind_addr = pack_sockaddr_un(bind_path);
-        let len = std::mem::size_of::<libc::sockaddr_un>() as libc::socklen_t;
-        let res = libc::bind(
-            fd,
-            &bind_addr as *const libc::sockaddr_un as *const libc::sockaddr,
-            len,
-        );
-        assert!(res == 0, "failed to bind: {}", io::Error::last_os_error());
-
-        let connect_addr = pack_sockaddr_un(connect_path);
-        let res = libc::connect(
-            fd,
-            &connect_addr as *const libc::sockaddr_un as *const libc::sockaddr,
-            len,
-        );
-        assert!(
-            res == 0,
-            "failed to connect: {}",
-            io::Error::last_os_error()
-        );
-
-        net::UnixStream::from_raw_fd(fd)
-    }
+    let socket = Socket::new(Domain::UNIX, Type::STREAM, None).unwrap();
+    socket.bind(&SockAddr::unix(bind_path).unwrap()).unwrap();
+    socket
+        .connect(&SockAddr::unix(connect_path).unwrap())
+        .unwrap();
+    net::UnixStream::from(socket)
 }
 
 /// On Darwin, accept(2) reports the length of the entire sockaddr_un
