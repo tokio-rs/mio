@@ -2,6 +2,7 @@
 
 use mio::net::UnixListener;
 use mio::{Interest, Token};
+use socket2::{Domain, SockAddr, Socket, Type};
 use std::io::{self, Read};
 use std::os::unix::net;
 use std::path::{Path, PathBuf};
@@ -74,6 +75,49 @@ fn unix_listener_local_addr() {
 
     barrier.wait();
     handle.join().unwrap();
+}
+
+/// Connect to the unix socket at `connect_path` from a socket that is itself
+/// bound to `bind_path`. Mio (and std) don't expose bind-before-connect for
+/// `UnixStream`, so this uses socket2 directly.
+fn connect_from_bound_socket(bind_path: &Path, connect_path: &Path) -> net::UnixStream {
+    let socket = Socket::new(Domain::UNIX, Type::STREAM, None).unwrap();
+    socket.bind(&SockAddr::unix(bind_path).unwrap()).unwrap();
+    socket
+        .connect(&SockAddr::unix(connect_path).unwrap())
+        .unwrap();
+    net::UnixStream::from(socket)
+}
+
+/// On Darwin, accept(2) reports the length of the entire sockaddr_un
+/// structure (with the peer path padded with null bytes) rather than the
+/// length of the peer path. Accepting a connection from a peer bound to a
+/// named path must still work.
+#[test]
+fn unix_listener_accept_named_peer() {
+    let (mut poll, mut events) = init_with_poll();
+
+    let listener_path = temp_file("unix_listener_accept_named_peer_listener");
+    let client_path = temp_file("unix_listener_accept_named_peer_client");
+    let mut listener = UnixListener::bind(&listener_path).unwrap();
+    poll.registry()
+        .register(&mut listener, TOKEN_1, Interest::READABLE)
+        .unwrap();
+
+    let client = connect_from_bound_socket(&client_path, &listener_path);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+    );
+
+    let (_stream, addr) = listener.accept().unwrap();
+    // getting pathname isn't supported on GNU/Hurd
+    #[cfg(not(target_os = "hurd"))]
+    assert_eq!(addr.as_pathname().unwrap(), &client_path);
+
+    drop(client);
 }
 
 #[test]

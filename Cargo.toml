@@ -70,6 +70,9 @@ wasi = "0.11.0"
 env_logger = { version = "0.11", default-features = false }
 rand = "0.9"
 
+[target.'cfg(unix)'.dev-dependencies]
+socket2 = { version = "0.5", features = ["all"] }
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs", "--generate-link-to-definition"]
