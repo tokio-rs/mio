@@ -124,8 +124,8 @@ jobs:
     - name: Install emsdk (LLVM + binaryen toolchain)
       run: |
         git clone --depth 1 https://github.com/emscripten-core/emsdk.git
-        ./emsdk/emsdk install latest
-        ./emsdk/emsdk activate latest
+        ./emsdk/emsdk install tot
+        ./emsdk/emsdk activate tot
     - name: Clone emscripten blocking-socket-ops branch over the emsdk tree
       run: |
         git clone --depth 1 --branch blocking-socket-ops https://github.com/guybedford/emscripten.git em-fork
