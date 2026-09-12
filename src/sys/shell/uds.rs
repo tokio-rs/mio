@@ -1,3 +1,5 @@
+// Emscripten's node-backed AF_UNIX is stream-only (no datagram primitive).
+#[cfg(not(target_os = "emscripten"))]
 pub(crate) mod datagram {
     use std::io;
     use std::os::unix::net::{self, SocketAddr};
@@ -38,6 +40,8 @@ pub(crate) mod stream {
         os_required!()
     }
 
+    // Emscripten has no `socketpair(2)` (no `uv_socketpair` exposed by node).
+    #[cfg(not(target_os = "emscripten"))]
     pub(crate) fn pair() -> io::Result<(net::UnixStream, net::UnixStream)> {
         os_required!()
     }

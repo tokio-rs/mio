@@ -1,4 +1,12 @@
-#![cfg(all(unix, feature = "os-poll", feature = "net", not(miri)))] // Miri doesn't support Unix domain sockets.
+// Emscripten's node-backed AF_UNIX is stream-only (no datagram sockets).
+// Miri doesn't support Unix domain sockets.
+#![cfg(all(
+    unix,
+    not(target_os = "emscripten"),
+    feature = "os-poll",
+    feature = "net",
+    not(miri)
+))]
 
 use mio::net::UnixDatagram;
 use mio::{Interest, Token};

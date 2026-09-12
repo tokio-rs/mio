@@ -20,6 +20,7 @@ pub(crate) fn connect_addr(address: &SocketAddr) -> io::Result<net::UnixStream> 
     Ok(socket)
 }
 
+#[cfg(not(target_os = "emscripten"))]
 pub(crate) fn pair() -> io::Result<(net::UnixStream, net::UnixStream)> {
     super::pair(libc::SOCK_STREAM)
 }
