@@ -113,7 +113,7 @@ fn connect() {
     let (tx, rx) = channel();
     let (tx2, rx2) = channel();
     let handle = thread::spawn(move || {
-        let stream = listener.accept().unwrap();
+        let stream = util::accept(&listener).unwrap();
         rx.recv().unwrap();
         drop(stream);
         tx2.send(()).unwrap();
@@ -191,7 +191,7 @@ fn read() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = listener.accept().unwrap().0;
+        let mut stream = util::accept(&listener).unwrap().0;
         let buf = [0; 1024];
         let mut amt = 0;
         while amt < N {
@@ -250,7 +250,7 @@ fn peek() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = listener.accept().unwrap().0;
+        let mut stream = util::accept(&listener).unwrap().0;
         let buf = [0; 1024];
         let mut amt = 0;
         while amt < N {
@@ -315,11 +315,11 @@ fn write() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = listener.accept().unwrap().0;
+        let mut stream = util::accept(&listener).unwrap().0;
         let mut buf = [0; 1024];
         let mut amt = 0;
         while amt < N {
-            amt += stream.read(&mut buf).unwrap();
+            amt += util::read(&mut stream, &mut buf).unwrap();
         }
     });
 
@@ -444,14 +444,14 @@ fn multiple_writes_immediate_success() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut s = listener.accept().unwrap().0;
+        let mut s = util::accept(&listener).unwrap().0;
         let mut b = [0; 1024];
         let mut amt = 0;
         while amt < 1024 * N {
             for byte in b.iter_mut() {
                 *byte = 0;
             }
-            let n = s.read(&mut b).unwrap();
+            let n = util::read(&mut s, &mut b).unwrap();
             amt += n;
             for byte in b[..n].iter() {
                 assert_eq!(*byte, 1);
@@ -616,7 +616,7 @@ fn write_error() {
     let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let handle = thread::spawn(move || {
-        let (conn, _addr) = listener.accept().unwrap();
+        let (conn, _addr) = util::accept(&listener).unwrap();
         rx.recv().unwrap();
         drop(conn);
     });
@@ -706,7 +706,7 @@ fn write_shutdown() {
         )
         .unwrap();
 
-    let (socket, _) = listener.accept().unwrap();
+    let (socket, _) = util::accept(&listener).unwrap();
 
     wait!(poll, is_writable, false);
 

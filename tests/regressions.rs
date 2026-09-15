@@ -10,7 +10,7 @@ use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token, Waker};
 
 mod util;
-use util::{any_local_address, init, init_with_poll};
+use util::{accept, any_local_address, init, init_with_poll, read};
 
 const ID1: Token = Token(1);
 const WAKE_TOKEN: Token = Token(10);
@@ -23,13 +23,13 @@ fn issue_776() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = listener.accept().expect("accept").0;
+        let mut stream = accept(&listener).expect("accept").0;
         // SO_RCVTIMEO not supported on GNU/Hurd
         #[cfg(not(target_os = "hurd"))]
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("set_read_timeout");
-        let _ = stream.read(&mut [0; 16]).expect("read");
+        let _ = read(&mut stream, &mut [0; 16]).expect("read");
     });
 
     let mut poll = Poll::new().unwrap();
@@ -109,7 +109,7 @@ fn issue_1205() {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
 #[cfg_attr(miri, ignore = "Miri doesn't support Unix domain sockets")]
 fn issue_1403() {
     use mio::net::UnixDatagram;

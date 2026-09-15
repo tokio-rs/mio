@@ -101,6 +101,24 @@ jobs:
       run: rustup target add wasm32-wasip2
     - name: Tests
       run: cargo test --target wasm32-wasip2 --all-features
+  TestEmscripten:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v7
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: rust-src
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 6.0.9
+    # Sockets are Node raw sockets; the test peers run on pthreads under
+    # PROXY_TO_PTHREAD so their blocking waits can park the worker.
+    - name: Tests
+      run: |
+        CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER=node \
+        RUSTFLAGS="-A linker_messages -C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=-pthread -C link-arg=-sPROXY_TO_PTHREAD -C link-arg=-sNODERAWSOCKETS -C link-arg=-sNODERAWFS -C link-arg=-sALLOW_MEMORY_GROWTH=1 -C link-arg=-sEXIT_RUNTIME=1" \
+        cargo +nightly test --target wasm32-unknown-emscripten -Zbuild-std --all-features --tests --examples --lib
   Nightly:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -216,6 +234,7 @@ jobs:
           #- powerpc64-ibm-aix
           - riscv32imc-esp-espidf
           - sparcv9-sun-solaris
+          - wasm32-unknown-emscripten
           - wasm32-wasip1
           - x86_64-apple-darwin
           - x86_64-apple-ios
