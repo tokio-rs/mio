@@ -121,7 +121,7 @@ fn readiness_is_reregistered_after_would_block() {
     let listener = net::TcpListener::bind(any_local_address()).unwrap();
     let addr = listener.local_addr().unwrap();
     let client = net::TcpStream::connect(addr).unwrap();
-    let (mut server, _) = listener.accept().unwrap();
+    let (mut server, _) = util::accept(&listener).unwrap();
     client.set_nonblocking(true).unwrap();
     server.set_nonblocking(true).unwrap();
 
@@ -172,13 +172,13 @@ fn drop_cancels_interest_and_shuts_down() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = listener.incoming().next().unwrap().unwrap();
+        let mut stream = util::accept(&listener).unwrap().0;
         // SO_RCVTIMEO not supported on GNU/Hurd
         #[cfg(not(target_os = "hurd"))]
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("set_read_timeout");
-        match stream.read(&mut [0; 16]) {
+        match util::read(&mut stream, &mut [0; 16]) {
             Ok(0) => (),
             Ok(n) => panic!("unexpected read of {n} bytes"),
             Err(err) => {

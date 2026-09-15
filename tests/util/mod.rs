@@ -208,6 +208,79 @@ pub fn assert_would_block<T>(result: io::Result<T>) {
     }
 }
 
+/// A blocking `std` listener used as the peer of a Mio socket in tests.
+pub trait Accept {
+    type Conn;
+    fn accept(&self) -> io::Result<Self::Conn>;
+}
+
+impl Accept for std::net::TcpListener {
+    type Conn = (std::net::TcpStream, SocketAddr);
+    fn accept(&self) -> io::Result<Self::Conn> {
+        std::net::TcpListener::accept(self)
+    }
+}
+
+#[cfg(unix)]
+impl Accept for std::os::unix::net::UnixListener {
+    type Conn = (
+        std::os::unix::net::UnixStream,
+        std::os::unix::net::SocketAddr,
+    );
+    fn accept(&self) -> io::Result<Self::Conn> {
+        std::os::unix::net::UnixListener::accept(self)
+    }
+}
+
+/// Blocking `accept` on a `std` peer listener.
+#[cfg(not(target_os = "emscripten"))]
+pub fn accept<L: Accept>(listener: &L) -> io::Result<L::Conn> {
+    listener.accept()
+}
+
+/// Blocking `read` on a `std` peer stream.
+#[cfg(not(target_os = "emscripten"))]
+pub fn read<S: io::Read>(stream: &mut S, buf: &mut [u8]) -> io::Result<usize> {
+    stream.read(buf)
+}
+
+// Emscripten sockets never block: a call that would block returns `EAGAIN`
+// and the caller is expected to wait for readiness itself. `poll(2)` does
+// block on a pthread, which is where these peers run.
+#[cfg(target_os = "emscripten")]
+pub fn accept<L: Accept + AsRawFd>(listener: &L) -> io::Result<L::Conn> {
+    let fd = listener.as_raw_fd();
+    retry_readable(fd, || listener.accept())
+}
+
+#[cfg(target_os = "emscripten")]
+pub fn read<S: io::Read + AsRawFd>(stream: &mut S, buf: &mut [u8]) -> io::Result<usize> {
+    let fd = stream.as_raw_fd();
+    retry_readable(fd, || stream.read(buf))
+}
+
+#[cfg(target_os = "emscripten")]
+fn retry_readable<T>(
+    fd: std::os::fd::RawFd,
+    mut op: impl FnMut() -> io::Result<T>,
+) -> io::Result<T> {
+    loop {
+        match op() {
+            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
+                let mut pfd = libc::pollfd {
+                    fd,
+                    events: libc::POLLIN,
+                    revents: 0,
+                };
+                if unsafe { libc::poll(&mut pfd, 1, -1) } == -1 {
+                    return Err(io::Error::last_os_error());
+                }
+            }
+            result => return result,
+        }
+    }
+}
+
 /// Assert that `NONBLOCK` is set on `socket`.
 #[cfg(any(unix, target_os = "wasi"))]
 pub fn assert_socket_non_blocking<S>(socket: &S)
@@ -224,7 +297,7 @@ pub fn assert_socket_non_blocking<S>(_: &S) {
 }
 
 /// Assert that `CLOEXEC` is set on `socket`.
-#[cfg(any(unix, target_os = "wasi"))]
+#[cfg(any(all(unix, not(target_os = "emscripten")), target_os = "wasi"))]
 pub fn assert_socket_close_on_exec<S>(socket: &S)
 where
     S: AsRawFd,
@@ -241,6 +314,11 @@ where
         assert!(flags & libc::FD_CLOEXEC != 0, "socket flag CLOEXEC not set");
     }
 }
+
+// Emscripten is a single process with no `exec(2)`, so `FD_CLOEXEC` is a no-op
+// (`F_GETFD` always returns 0); the concept doesn't apply.
+#[cfg(target_os = "emscripten")]
+pub fn assert_socket_close_on_exec<S>(_: &S) {}
 
 #[cfg(windows)]
 pub fn assert_socket_close_on_exec<S>(_: &S) {

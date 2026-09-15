@@ -36,4 +36,7 @@ pub use self::udp::UdpSocket;
 #[cfg(unix)]
 mod uds;
 #[cfg(unix)]
-pub use self::uds::{UnixDatagram, UnixListener, UnixStream};
+pub use self::uds::{UnixListener, UnixStream};
+// Emscripten's node-backed AF_UNIX is stream-only (no datagram primitive).
+#[cfg(all(unix, not(target_os = "emscripten")))]
+pub use self::uds::UnixDatagram;

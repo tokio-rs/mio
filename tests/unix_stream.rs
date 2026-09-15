@@ -13,7 +13,7 @@ use std::thread;
 #[macro_use]
 mod util;
 use util::{
-    assert_send, assert_socket_close_on_exec, assert_socket_non_blocking, assert_sync,
+    accept, assert_send, assert_socket_close_on_exec, assert_socket_non_blocking, assert_sync,
     assert_would_block, expect_events, expect_no_events, init, init_with_poll, temp_file,
     ExpectEvent, Readiness,
 };
@@ -24,6 +24,7 @@ const DATA1_LEN: usize = 16;
 const DATA2_LEN: usize = 14;
 const DEFAULT_BUF_SIZE: usize = 64;
 const TOKEN_1: Token = Token(0);
+#[cfg(not(target_os = "emscripten"))]
 const TOKEN_2: Token = Token(1);
 
 #[test]
@@ -53,7 +54,7 @@ fn unix_stream_connect() {
 
     let barrier_clone = barrier.clone();
     let handle = thread::spawn(move || {
-        let (stream, _) = listener.accept().unwrap();
+        let (stream, _) = accept(&listener).unwrap();
         barrier_clone.wait();
         drop(stream);
     });
@@ -145,6 +146,8 @@ fn unix_stream_from_std() {
     )
 }
 
+// Emscripten has no `socketpair(2)`.
+#[cfg(not(target_os = "emscripten"))]
 #[test]
 fn unix_stream_pair() {
     let (mut poll, mut events) = init_with_poll();
@@ -616,7 +619,7 @@ fn new_echo_listener(
         addr_sender.send(local_addr).unwrap();
 
         for _ in 0..connections {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = accept(&listener).unwrap();
 
             // On Linux based system it will cause a connection reset
             // error when the reading side of the peer connection is
@@ -624,7 +627,7 @@ fn new_echo_listener(
             let (mut read, mut written) = (0, 0);
             let mut buf = [0; DEFAULT_BUF_SIZE];
             loop {
-                let n = match stream.read(&mut buf) {
+                let n = match util::read(&mut stream, &mut buf) {
                     Ok(amount) => {
                         read += amount;
                         amount
@@ -669,7 +672,7 @@ fn new_noop_listener(
         sender.send(local_addr).unwrap();
 
         for _ in 0..connections {
-            let (stream, _) = listener.accept().unwrap();
+            let (stream, _) = accept(&listener).unwrap();
             barrier.wait();
             stream.shutdown(Shutdown::Write).unwrap();
             barrier.wait();
