@@ -56,8 +56,11 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
     }
 
     // Darwin (and others) doesn't have SOCK_NONBLOCK or SOCK_CLOEXEC.
+    // Emscripten's `socket(2)` silently strips both flags, so set `O_NONBLOCK`
+    // via `fcntl(2)` instead (`FD_CLOEXEC` is a no-op there).
     #[cfg(any(
         target_os = "aix",
+        target_os = "emscripten",
         target_os = "ios",
         target_os = "macos",
         target_os = "tvos",

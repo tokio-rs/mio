@@ -16,9 +16,9 @@ mod util;
 #[cfg(not(any(target_os = "windows", target_os = "wasi")))]
 use util::init;
 use util::{
-    any_local_address, any_local_ipv6_address, assert_send, assert_socket_close_on_exec,
+    accept, any_local_address, any_local_ipv6_address, assert_send, assert_socket_close_on_exec,
     assert_socket_non_blocking, assert_sync, assert_would_block, expect_events, expect_no_events,
-    init_with_poll, ExpectEvent, Readiness,
+    init_with_poll, read, ExpectEvent, Readiness,
 };
 
 // WASI does not yet support `SO_LINGER` (see
@@ -464,6 +464,10 @@ fn shutdown_both() {
 }
 
 #[cfg(unix)]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "getsockname after a non-blocking connect can transiently report an unbound local address"
+)]
 #[test]
 fn raw_fd() {
     init();
@@ -636,6 +640,7 @@ fn tcp_shutdown_client_read_close_event() {
 #[cfg_attr(
     any(
         target_os = "android",
+        target_os = "emscripten",
         target_os = "hurd",
         target_os = "illumos",
         target_os = "solaris",
@@ -726,7 +731,7 @@ fn tcp_reset_close_event() {
         .register(&mut stream, ID1, Interest::READABLE.add(Interest::WRITABLE))
         .unwrap();
 
-    let server_stream = listener.accept().unwrap();
+    let server_stream = accept(&listener).unwrap();
 
     expect_events(
         &mut poll,
@@ -810,11 +815,10 @@ fn echo_listener(addr: SocketAddr, n_connections: usize) -> (thread::JoinHandle<
 
         let mut buf = [0; 128];
         for _ in 0..n_connections {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = accept(&listener).unwrap();
 
             loop {
-                let n = stream
-                    .read(&mut buf)
+                let n = read(&mut stream, &mut buf)
                     // On Linux based system it will cause a connection reset
                     // error when the reading side of the peer connection is
                     // shutdown, we don't consider it an actual here.
@@ -855,7 +859,7 @@ fn start_listener(
         sender.send(local_address).unwrap();
 
         for _ in 0..n_connections {
-            let (stream, _) = listener.accept().unwrap();
+            let (stream, _) = accept(&listener).unwrap();
             if let Some(ref barrier) = barrier {
                 barrier.wait();
 
@@ -938,7 +942,7 @@ fn priority_event_on_oob_data() {
         )
         .unwrap();
 
-    let (stream, _) = listener.accept().unwrap();
+    let (stream, _) = accept(&listener).unwrap();
 
     // Sending out of bound data should trigger priority event.
     send_oob_data(&stream, DATA1).unwrap();
@@ -977,7 +981,7 @@ fn peek_ok() {
 
     let listener = net::TcpListener::bind(any_local_address()).unwrap();
     let sockaddr = listener.local_addr().unwrap();
-    let thread_handle = thread::spawn(move || listener.accept().unwrap());
+    let thread_handle = thread::spawn(move || accept(&listener).unwrap());
     let stream1 = net::TcpStream::connect(sockaddr).unwrap();
     let (mut stream2, _) = thread_handle.join().unwrap();
 
@@ -1024,7 +1028,7 @@ fn peek_would_block() {
 
     let listener = net::TcpListener::bind(any_local_address()).unwrap();
     let sockaddr = listener.local_addr().unwrap();
-    let thread_handle = thread::spawn(move || listener.accept().unwrap());
+    let thread_handle = thread::spawn(move || accept(&listener).unwrap());
     let stream1 = net::TcpStream::connect(sockaddr).unwrap();
     let (mut stream2, _) = thread_handle.join().unwrap();
 
@@ -1064,7 +1068,7 @@ fn read_peek_would_block() {
 
     let listener = net::TcpListener::bind(any_local_address()).unwrap();
     let sockaddr = listener.local_addr().unwrap();
-    let thread_handle = thread::spawn(move || listener.accept().unwrap());
+    let thread_handle = thread::spawn(move || accept(&listener).unwrap());
     let stream1 = net::TcpStream::connect(sockaddr).unwrap();
     let (mut stream2, _) = thread_handle.join().unwrap();
 
