@@ -1,6 +1,9 @@
 #[cfg(all(
     unix,
-    not(mio_unsupported_force_poll_poll),
+    not(any(
+        mio_unsupported_force_poll_poll,
+        all(target_os = "emscripten", not(target_feature = "atomics"))
+    )),
     not(any(
         target_os = "aix",
         target_os = "espidf",
@@ -442,7 +445,10 @@ impl Poll {
 
 #[cfg(all(
     unix,
-    not(mio_unsupported_force_poll_poll),
+    not(any(
+        mio_unsupported_force_poll_poll,
+        all(target_os = "emscripten", not(target_feature = "atomics"))
+    )),
     not(any(
         target_os = "aix",
         target_os = "espidf",
@@ -746,7 +752,10 @@ impl fmt::Debug for Registry {
 
 #[cfg(all(
     unix,
-    not(mio_unsupported_force_poll_poll),
+    not(any(
+        mio_unsupported_force_poll_poll,
+        all(target_os = "emscripten", not(target_feature = "atomics"))
+    )),
     not(any(
         target_os = "aix",
         target_os = "espidf",
@@ -769,7 +778,10 @@ impl AsFd for Registry {
 
 #[cfg(all(
     unix,
-    not(mio_unsupported_force_poll_poll),
+    not(any(
+        mio_unsupported_force_poll_poll,
+        all(target_os = "emscripten", not(target_feature = "atomics"))
+    )),
     not(any(
         target_os = "aix",
         target_os = "espidf",
@@ -793,7 +805,10 @@ impl AsRawFd for Registry {
 cfg_os_poll! {
     #[cfg(all(
         unix,
-        not(mio_unsupported_force_poll_poll),
+        not(any(
+            mio_unsupported_force_poll_poll,
+            all(target_os = "emscripten", not(target_feature = "atomics"))
+        )),
         not(any(
             target_os = "aix",
             target_os = "espidf",

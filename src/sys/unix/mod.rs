@@ -15,14 +15,20 @@ macro_rules! syscall {
 }
 
 cfg_os_poll! {
+    // Emscripten without atomics has no threads at all, so the epoll backend's condvar-based
+    // wait/notify coordination doesn't apply; see selector/emscripten_poll.rs's module comment.
+    #[cfg_attr(
+        all(target_os = "emscripten", not(target_feature = "atomics")),
+        path = "selector/emscripten_poll.rs"
+    )]
     #[cfg_attr(all(
         not(mio_unsupported_force_poll_poll),
         any(
             target_os = "android",
-            target_os = "emscripten",
             target_os = "illumos",
             target_os = "linux",
             target_os = "redox",
+            all(target_os = "emscripten", target_feature = "atomics"),
         )
     ), path = "selector/epoll.rs")]
     #[cfg_attr(all(
