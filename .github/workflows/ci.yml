@@ -114,10 +114,11 @@ jobs:
         version: 6.0.9
     # Sockets are Node raw sockets; the test peers run on pthreads under
     # PROXY_TO_PTHREAD so their blocking waits can park the worker.
+    # -Wno-deprecated: rustc's target spec passes the deprecated -sWASM_BIGINT.
     - name: Tests
       run: |
         CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER=node \
-        RUSTFLAGS="-A linker_messages -C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=-pthread -C link-arg=-sPROXY_TO_PTHREAD -C link-arg=-sNODERAWSOCKETS -C link-arg=-sNODERAWFS -C link-arg=-sALLOW_MEMORY_GROWTH=1 -C link-arg=-sEXIT_RUNTIME=1" \
+        RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=-pthread -C link-arg=-sPROXY_TO_PTHREAD -C link-arg=-sNODERAWSOCKETS -C link-arg=-sNODERAWFS -C link-arg=-sINITIAL_MEMORY=64MB -C link-arg=-sEXIT_RUNTIME=1 -C link-arg=-Wno-deprecated" \
         cargo +nightly test --target wasm32-unknown-emscripten -Zbuild-std --all-features --tests --examples --lib
   Nightly:
     runs-on: ubuntu-latest
