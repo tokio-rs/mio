@@ -727,3 +727,51 @@ pub fn assert_error<T, E: fmt::Display>(result: Result<T, E>, expected_msg: &str
         ),
     }
 }
+
+#[test]
+fn deregister_after_hup() {
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+    let registry = poll.registry();
+
+    let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let mut stream = TcpStream::connect(addr).unwrap();
+    registry
+        .register(
+            &mut stream,
+            Token(0),
+            Interest::READABLE | Interest::WRITABLE,
+        )
+        .unwrap();
+
+    let (peer, _) = listener.accept().unwrap();
+    (&peer).write_all(&[1]).unwrap();
+    drop(peer);
+    stream.shutdown(net::Shutdown::Write).unwrap();
+
+    // Poll until the connection is seen as closed, then drain it to EOF.
+    for _ in 0..10 {
+        poll.poll(&mut events, Some(Duration::from_millis(100)))
+            .unwrap();
+        if events.iter().any(|event| event.is_read_closed()) {
+            break;
+        }
+    }
+    let mut buf = [0; 16];
+    while let Ok(n) = stream.read(&mut buf) {
+        if n == 0 {
+            break;
+        }
+    }
+
+    // The source is still alive and its fd is still valid, so both calls must
+    // succeed even though the selector saw POLLHUP/POLLERR.
+    poll.registry()
+        .reregister(&mut stream, Token(0), Interest::READABLE)
+        .expect("reregister after hup");
+    poll.registry()
+        .deregister(&mut stream)
+        .expect("deregister after hup");
+}

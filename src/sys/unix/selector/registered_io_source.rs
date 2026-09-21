@@ -38,7 +38,6 @@ impl RegistrationRecord {
         self.is_unregistered.store(true, Ordering::Relaxed);
     }
 
-    #[allow(dead_code)]
     pub(crate) fn is_registered(&self) -> bool {
         !self.is_unregistered.load(Ordering::Relaxed)
     }
@@ -73,9 +72,15 @@ impl IoSourceState {
         if let Err(err) = &result {
             if err.kind() == io::ErrorKind::WouldBlock {
                 self.inner.as_ref().map_or(Ok(()), |state| {
-                    state
-                        .selector
-                        .reregister(state.fd, state.token, state.interests)
+                    if state.shared_record.is_registered() {
+                        state
+                            .selector
+                            .reregister(state.fd, state.token, state.interests)
+                    } else {
+                        // The selector internally deregistered the fd after
+                        // POLLHUP/POLLERR, so there is nothing to re-arm.
+                        Ok(())
+                    }
                 })?;
             }
         }
@@ -119,6 +124,16 @@ impl IoSourceState {
         fd: RawFd,
     ) -> io::Result<()> {
         match self.inner.as_mut() {
+            // The selector internally deregistered the fd after POLLHUP/POLLERR,
+            // so re-add it instead of failing with `NotFound`.
+            Some(state) if !state.shared_record.is_registered() => registry
+                .selector()
+                .register_internal(fd, token, interests)
+                .map(|record| {
+                    state.token = token;
+                    state.interests = interests;
+                    state.shared_record = record;
+                }),
             Some(state) => registry
                 .selector()
                 .reregister(fd, token, interests)
@@ -132,9 +147,15 @@ impl IoSourceState {
 
     pub(crate) fn deregister(&mut self, registry: &Registry, fd: RawFd) -> io::Result<()> {
         if let Some(state) = self.inner.take() {
+            let was_registered = state.shared_record.is_registered();
             // Marking unregistered will short circuit the drop behaviour of calling
             // deregister so the call to deregister below is strictly required.
             state.shared_record.mark_unregistered();
+            if !was_registered {
+                // Already removed from the selector internally after
+                // POLLHUP/POLLERR.
+                return Ok(());
+            }
         }
 
         registry.selector().deregister(fd)
