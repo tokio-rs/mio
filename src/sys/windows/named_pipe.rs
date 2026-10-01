@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::{fmt, iter, mem, slice};
 
 use windows_sys::Win32::Foundation::{
-    ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA,
-    ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
+    ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA, ERROR_PIPE_CONNECTED,
+    ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
@@ -181,8 +181,8 @@ impl Inner {
     ///
     /// If the operation succeeds immediately, `Ok(Some(n))` is returned where
     /// `n` is the number of bytes read. If an asynchronous operation is
-    /// enqueued, then `Ok(None)` is returned. Otherwise if an error occurred
-    /// it is returned.
+    /// enqueued, then `Ok(None)` is returned. `Err` means the operation was not
+    /// submitted and no completion packet will be queued.
     ///
     /// When this operation completes (or if it completes immediately), another
     /// mechanism must be used to learn how many bytes were transferred (such as
@@ -213,20 +213,21 @@ impl Inner {
         );
         if res == 0 {
             let err = io::Error::last_os_error();
-            if err.raw_os_error() != Some(ERROR_IO_PENDING as i32) {
+            // `ERROR_MORE_DATA` is only a warning (the message didn't fit), the
+            // read still completes through its packet.
+            if err.raw_os_error() != Some(ERROR_IO_PENDING as i32)
+                && err.raw_os_error() != Some(ERROR_MORE_DATA as i32)
+            {
                 return Err(err);
             }
+            // Submitted: a completion packet will be queued, so this must not return Err.
+            return Ok(None);
         }
 
+        // Completed, but the completion still delivers the outcome, so this must not return Err.
         let mut bytes = 0;
-        let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
-        if res == 0 {
-            let err = io::Error::last_os_error();
-            if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
-                Ok(None)
-            } else {
-                Err(err)
-            }
+        if GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0) == 0 {
+            Ok(None)
         } else {
             Ok(Some(bytes as usize))
         }
@@ -241,8 +242,8 @@ impl Inner {
     ///
     /// If the operation succeeds immediately, `Ok(Some(n))` is returned where
     /// `n` is the number of bytes written. If an asynchronous operation is
-    /// enqueued, then `Ok(None)` is returned. Otherwise if an error occurred
-    /// it is returned.
+    /// enqueued, then `Ok(None)` is returned. `Err` means the operation was not
+    /// submitted and no completion packet will be queued.
     ///
     /// When this operation completes (or if it completes immediately), another
     /// mechanism must be used to learn how many bytes were transferred (such as
@@ -276,17 +277,14 @@ impl Inner {
             if err.raw_os_error() != Some(ERROR_IO_PENDING as i32) {
                 return Err(err);
             }
+            // Submitted: a completion packet will be queued, so this must not return Err.
+            return Ok(None);
         }
 
+        // Completed, but the completion still delivers the outcome, so this must not return Err.
         let mut bytes = 0;
-        let res = GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0);
-        if res == 0 {
-            let err = io::Error::last_os_error();
-            if err.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
-                Ok(None)
-            } else {
-                Err(err)
-            }
+        if GetOverlappedResult(self.handle.raw(), overlapped, &mut bytes, 0) == 0 {
+            Ok(None)
         } else {
             Ok(Some(bytes as usize))
         }
@@ -746,7 +744,6 @@ impl Inner {
     /// This function returns `true` if either of the following conditions are met:
     /// * A normal error happens
     /// * The read is scheduled in the background
-    /// * Data is already available to be read (ERROR_MORE_DATA)
     ///
     /// If the pipe is no longer connected (ERROR_PIPE_LISTENING) then `false` is
     /// returned and no read is scheduled.
@@ -776,20 +773,6 @@ impl Inner {
             // If ERROR_PIPE_LISTENING happens then it's not a real read error,
             // we just need to wait for a connect.
             Err(ref e) if e.raw_os_error() == Some(ERROR_PIPE_LISTENING as i32) => false,
-
-            // If ERROR_MORE_DATA is returned, it means the slice of unused capacity of the
-            // buffer provided is less than the amount of data available to be read. So
-            // prioritize draining the buffer before scheduling a new read.
-            //
-            // Return `true` to indicate that an overlapped read was scheduled "successfully",
-            // without actually scheduling it. Instead, update `io.read` to `State::Ok(buf, 0)`
-            // to ensure that the next `std::io::Read::read` call is presented still with the
-            // unread data to read from.
-            Err(ref e) if e.raw_os_error() == Some(ERROR_MORE_DATA as i32) => {
-                io.read = State::Ok(buf, 0);
-                mem::forget(me.clone());
-                true
-            }
 
             // If some other error happened, though, we're now readable to give
             // out the error.

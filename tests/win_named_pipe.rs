@@ -1,14 +1,27 @@
 #![cfg(all(windows, feature = "os-poll", feature = "os-ext"))]
 
-use std::fs::OpenOptions;
+use std::ffi::OsStr;
+use std::fs::{File, OpenOptions};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
+use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::OpenOptionsExt;
-use std::os::windows::io::{FromRawHandle, IntoRawHandle};
-use std::time::Duration;
+use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::{mpsc, Arc};
+use std::time::{Duration, Instant};
+use std::{mem, panic, ptr, thread};
 
 use mio::windows::NamedPipe;
-use mio::{Events, Interest, Poll, Token};
-use windows_sys::Win32::{Foundation::ERROR_NO_DATA, Storage::FileSystem::FILE_FLAG_OVERLAPPED};
+use mio::{Events, Interest, Poll, Registry, Token, Waker};
+use windows_sys::Win32::Foundation::{
+    GetHandleInformation, ERROR_ACCESS_DENIED, ERROR_NO_DATA, INVALID_HANDLE_VALUE,
+};
+use windows_sys::Win32::Storage::FileSystem::{
+    FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
+};
+use windows_sys::Win32::System::Pipes::{
+    CreateNamedPipeW, PIPE_READMODE_MESSAGE, PIPE_TYPE_MESSAGE, PIPE_UNLIMITED_INSTANCES,
+};
 
 mod util;
 use util::{expect_events, ExpectEvent};
@@ -50,6 +63,31 @@ fn pipe() -> (NamedPipe, NamedPipe) {
     (pipe, client(&name))
 }
 
+/// Like `server`, but in message mode.
+fn message_server() -> (NamedPipe, String) {
+    let num: u64 = rand::random();
+    let name = format!(r"\\.\pipe\my-pipe-{}", num);
+    let wide: Vec<u16> = OsStr::new(&name).encode_wide().chain(Some(0)).collect();
+    let handle = unsafe {
+        CreateNamedPipeW(
+            wide.as_ptr(),
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
+            PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE,
+            PIPE_UNLIMITED_INSTANCES,
+            65536,
+            65536,
+            0,
+            ptr::null(),
+        )
+    };
+    assert!(
+        handle != INVALID_HANDLE_VALUE,
+        "{}",
+        io::Error::last_os_error()
+    );
+    let pipe = unsafe { NamedPipe::from_raw_handle(handle) };
+    (pipe, name)
+}
 #[test]
 fn writable_after_register() {
     let (mut server, mut client) = pipe();
@@ -526,4 +564,303 @@ fn write_then_read_vectored() {
     assert_eq!(&buf1, b"12");
     assert_eq!(&buf3, b"345");
     assert_eq!(&buf4[..4], b"6789");
+}
+
+// A message larger than the internal buffer arrives in pieces, all but the last
+// read completing with `ERROR_MORE_DATA`, whether the message is sent before
+// or after the read is submitted.
+#[test]
+fn read_message_mode_larger_than_internal_buffer() {
+    for send_first in [false, true] {
+        let (mut server, name) = message_server();
+        let mut client = blocking_client(&name);
+        let mut poll = t!(Poll::new());
+        let msg: Vec<u8> = (0..10000).map(|i| i as u8).collect();
+        let mut send = || {
+            assert_eq!(t!(client.write(&msg)), msg.len());
+        };
+        if send_first {
+            send();
+        }
+        t!(poll
+            .registry()
+            .register(&mut server, Token(0), Interest::READABLE));
+        if !send_first {
+            send();
+        }
+        // Turns a lost byte into an early EOF.
+        drop(client);
+
+        let mut events = Events::with_capacity(16);
+        let mut buf = [0; 8192];
+        let mut read = Vec::new();
+        let timeout = Instant::now() + Duration::from_secs(10);
+        loop {
+            match server.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => read.extend_from_slice(&buf[..n]),
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+                }
+                Err(e) => panic!("unexpected error: {e}"),
+            }
+            assert!(Instant::now() < timeout, "EOF never delivered");
+        }
+        assert!(read == msg, "got {} of {} bytes", read.len(), msg.len());
+    }
+}
+
+// A pending write that fails is reported as writable, then as the error.
+#[test]
+fn write_fails_after_submit() {
+    let (mut server, name) = server();
+    let client = blocking_client(&name);
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(0), Interest::WRITABLE));
+    let mut events = Events::with_capacity(16);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+
+    // Larger than the pipe's buffer, so the write pends until the client goes.
+    let data = vec![0; 128 * 1024];
+    assert_eq!(t!(server.write(&data)), data.len());
+    drop(client);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    match server.write(&data) {
+        Err(e) if e.kind() != io::ErrorKind::WouldBlock => {}
+        res => panic!("expected the write's error, got {res:?}"),
+    }
+}
+
+const WAKE: Token = Token(1);
+
+/// Polls on a dedicated thread, blocking until a completion or wake-up arrives.
+/// A separate peer thread disconnects clients, so polling can race with both
+/// the disconnect and the submission, rather than waiting for the close to return.
+struct Driver {
+    clients: Option<mpsc::Sender<(File, Vec<u8>)>>,
+    waker: Waker,
+    wakes: mpsc::Receiver<()>,
+    stop: Arc<AtomicBool>,
+    thread: Option<thread::JoinHandle<()>>,
+    peer: Option<thread::JoinHandle<()>>,
+}
+
+impl Driver {
+    fn new(mut poll: Poll) -> Driver {
+        let waker = t!(Waker::new(poll.registry(), WAKE));
+        let (clients, rx) = mpsc::channel::<(File, Vec<u8>)>();
+        let peer = thread::spawn(move || {
+            for (mut client, after) in rx {
+                t!(client.write_all(&after));
+                drop(client);
+            }
+        });
+        let (done, wakes) = mpsc::channel();
+        let stop = Arc::new(AtomicBool::new(false));
+        let stopped = stop.clone();
+        let thread = thread::spawn(move || {
+            let mut events = Events::with_capacity(16);
+            while !stopped.load(Relaxed) {
+                t!(poll.poll(&mut events, None));
+                for event in &events {
+                    if event.token() == WAKE {
+                        let _ = done.send(());
+                    }
+                }
+            }
+        });
+        Driver {
+            clients: Some(clients),
+            waker,
+            wakes,
+            stop,
+            thread: Some(thread),
+            peer: Some(peer),
+        }
+    }
+
+    fn disconnect(&self, client: File, after: Vec<u8>) {
+        assert!(
+            self.clients.as_ref().unwrap().send((client, after)).is_ok(),
+            "peer thread panicked"
+        );
+    }
+
+    /// Waits until everything queued so far has been handled: the wake-up is
+    /// queued after it.
+    fn sync(&self) {
+        assert!(
+            !self.peer.as_ref().unwrap().is_finished(),
+            "peer thread panicked"
+        );
+        t!(self.waker.wake());
+        match self.wakes.recv_timeout(Duration::from_secs(10)) {
+            Ok(()) => {}
+            Err(mpsc::RecvTimeoutError::Timeout) => panic!("poll thread stuck"),
+            Err(mpsc::RecvTimeoutError::Disconnected) => panic!("poll thread panicked"),
+        }
+    }
+}
+
+impl Drop for Driver {
+    fn drop(&mut self) {
+        drop(self.clients.take());
+        self.stop.store(true, Relaxed);
+        let _ = self.waker.wake();
+        // If the test is already failing don't wait, the thread may be stuck in
+        // broken code.
+        if !thread::panicking() {
+            for thread in [self.peer.take().unwrap(), self.thread.take().unwrap()] {
+                if let Err(err) = thread.join() {
+                    panic::resume_unwind(err);
+                }
+            }
+        }
+    }
+}
+
+/// Runs `round` on three threads, each with its own driver, until `budget`
+/// runs out. The races need some contention, parallel rounds provide it.
+fn race(budget: Duration, round: fn(&Registry, &Driver)) {
+    let threads: Vec<_> = (0..3)
+        .map(|_| {
+            thread::spawn(move || {
+                let poll = t!(Poll::new());
+                let registry = t!(poll.registry().try_clone());
+                let driver = Driver::new(poll);
+                let deadline = Instant::now() + budget;
+                while Instant::now() < deadline {
+                    round(&registry, &driver);
+                }
+            })
+        })
+        .collect();
+    for thread in threads {
+        if let Err(err) = thread.join() {
+            panic::resume_unwind(err);
+        }
+    }
+}
+
+fn blocking_client(name: &str) -> File {
+    t!(OpenOptions::new().read(true).write(true).open(name))
+}
+
+/// Reads until EOF, letting `driver` catch up whenever the read would block.
+fn read_to_end(server: &mut NamedPipe, driver: &Driver) -> Vec<u8> {
+    let timeout = Instant::now() + Duration::from_secs(10);
+    let mut buf = [0; 8192];
+    let mut read = Vec::new();
+    loop {
+        match server.read(&mut buf) {
+            Ok(0) => return read,
+            Ok(n) => read.extend_from_slice(&buf[..n]),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => driver.sync(),
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+        assert!(Instant::now() < timeout, "EOF never delivered");
+    }
+}
+
+/// Waits until the pipe `name` is gone, i.e. no reference to it leaked. Every
+/// server is its first instance, so creating it again fails while it exists.
+fn wait_freed(name: &str, driver: &Driver) {
+    let timeout = Instant::now() + Duration::from_secs(10);
+    loop {
+        match NamedPipe::new(name) {
+            Ok(_) => return,
+            Err(e) if e.raw_os_error() == Some(ERROR_ACCESS_DENIED as i32) => {}
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+        assert!(Instant::now() < timeout, "pipe leaked");
+        driver.sync();
+    }
+}
+
+// Issue #2011: the peer disconnects right as a read is resubmitted, and the
+// driver dequeues the failed completion before `read` returns. Its callback
+// then redeems a reference that was never reserved, freeing the pipe, and so
+// closing its handle, while `server` still uses it.
+#[test]
+fn read_disconnect_race() {
+    race(Duration::from_secs(3), |registry, driver| {
+        let (mut server, name) = server();
+        let handle = server.as_raw_handle();
+        let mut client = blocking_client(&name);
+        t!(registry.register(&mut server, Token(0), Interest::READABLE));
+        t!(client.write_all(&[1]));
+        // Handle the byte's completion, so the next `read` consumes it and
+        // resubmits.
+        driver.sync();
+        driver.disconnect(client, Vec::new());
+        assert_eq!(read_to_end(&mut server, driver), [1]);
+
+        driver.sync();
+        let mut flags = 0;
+        if unsafe { GetHandleInformation(handle, &mut flags) } == 0 {
+            let err = io::Error::last_os_error();
+            // Don't touch the freed pipe again.
+            mem::forget(server);
+            panic!("pipe freed while still in use: {err}");
+        }
+        drop(server);
+        wait_freed(&name, driver);
+    });
+}
+
+// Same race for writes: the failed completion then finds no write in flight.
+#[test]
+fn write_disconnect_race() {
+    race(Duration::from_secs(3), |registry, driver| {
+        let (mut server, name) = server();
+        let client = blocking_client(&name);
+        t!(registry.register(&mut server, Token(0), Interest::WRITABLE));
+        driver.sync();
+        // Larger than the pipe's buffer, so the write pends. The random size
+        // varies how long copying it takes, and so when the write is submitted.
+        let data = vec![0; rand::random_range(66_000..130_000)];
+        driver.disconnect(client, Vec::new());
+
+        let timeout = Instant::now() + Duration::from_secs(10);
+        loop {
+            match server.write(&data) {
+                Ok(_) => {}
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => driver.sync(),
+                Err(_) => break,
+            }
+            assert!(Instant::now() < timeout, "write never failed");
+        }
+        drop(server);
+        wait_freed(&name, driver);
+    });
+}
+
+// A message arrives right as a read is submitted, and the driver handles its
+// `ERROR_MORE_DATA` completion before the submit returns. Treating that as a
+// failed submit loses the data.
+#[test]
+fn read_more_data_race() {
+    race(Duration::from_secs(1), |registry, driver| {
+        let msg: Vec<u8> = (0..6000).map(|i| i as u8).collect();
+        let (mut server, name) = message_server();
+        let client = blocking_client(&name);
+        // Sent while `register` submits the first read.
+        driver.disconnect(client, msg.clone());
+        t!(registry.register(&mut server, Token(0), Interest::READABLE));
+        let read = read_to_end(&mut server, driver);
+        assert!(read == msg, "got {} of {} bytes", read.len(), msg.len());
+        drop(server);
+        wait_freed(&name, driver);
+    });
 }
