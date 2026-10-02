@@ -114,6 +114,7 @@ jobs:
         version: 6.0.9
     # PROXY_TO_PTHREAD allows blocking poll calls on a worker.
     # -Wno-deprecated: rustc's target spec passes the deprecated -sWASM_BIGINT.
+    # Remove once https://github.com/rust-lang/rust/pull/162839 reaches Rust stable.
     - name: Tests
       run: |
         CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER=node \
