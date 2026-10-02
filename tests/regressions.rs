@@ -10,12 +10,16 @@ use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token, Waker};
 
 mod util;
-use util::{accept, any_local_address, init, init_with_poll, read};
+use util::{any_local_address, init, init_with_poll};
 
 const ID1: Token = Token(1);
 const WAKE_TOKEN: Token = Token(10);
 
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn issue_776() {
     init();
 
@@ -23,13 +27,13 @@ fn issue_776() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = accept(&listener).expect("accept").0;
+        let mut stream = listener.accept().expect("accept").0;
         // SO_RCVTIMEO not supported on GNU/Hurd
         #[cfg(not(target_os = "hurd"))]
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("set_read_timeout");
-        let _ = read(&mut stream, &mut [0; 16]).expect("read");
+        let _ = stream.read(&mut [0; 16]).expect("read");
     });
 
     let mut poll = Poll::new().unwrap();

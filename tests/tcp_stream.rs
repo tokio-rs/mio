@@ -16,9 +16,9 @@ mod util;
 #[cfg(not(any(target_os = "windows", target_os = "wasi")))]
 use util::init;
 use util::{
-    accept, any_local_address, any_local_ipv6_address, assert_send, assert_socket_close_on_exec,
+    any_local_address, any_local_ipv6_address, assert_send, assert_socket_close_on_exec,
     assert_socket_non_blocking, assert_sync, assert_would_block, expect_events, expect_no_events,
-    init_with_poll, read, ExpectEvent, Readiness,
+    init_with_poll, ExpectEvent, Readiness,
 };
 
 // WASI does not yet support `SO_LINGER` (see
@@ -46,6 +46,10 @@ fn is_send_and_sync() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn tcp_stream_ipv4() {
     smoke_test_tcp_stream(any_local_address(), TcpStream::connect);
 }
@@ -55,6 +59,10 @@ fn tcp_stream_ipv4() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn tcp_stream_ipv6() {
     smoke_test_tcp_stream(any_local_ipv6_address(), TcpStream::connect);
 }
@@ -64,6 +72,10 @@ fn tcp_stream_ipv6() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn tcp_stream_std() {
     smoke_test_tcp_stream(any_local_address(), |addr| {
         let stream = net::TcpStream::connect(addr).unwrap();
@@ -157,6 +169,10 @@ where
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn set_get_ttl() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -193,6 +209,10 @@ fn set_get_ttl() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn get_ttl_without_previous_set() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -227,6 +247,10 @@ fn get_ttl_without_previous_set() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn set_get_nodelay() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -263,6 +287,10 @@ fn set_get_nodelay() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn get_nodelay_without_previous_set() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -299,6 +327,10 @@ fn get_nodelay_without_previous_set() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn shutdown_read() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -394,6 +426,10 @@ fn shutdown_write() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn shutdown_both() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -466,7 +502,7 @@ fn shutdown_both() {
 #[cfg(unix)]
 #[cfg_attr(
     target_os = "emscripten",
-    ignore = "getsockname after a non-blocking connect can transiently report an unbound local address"
+    ignore = "Emscripten does not support blocking accept"
 )]
 #[test]
 fn raw_fd() {
@@ -493,6 +529,10 @@ fn raw_fd() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn registering() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -517,6 +557,10 @@ fn registering() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn reregistering() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -549,6 +593,10 @@ fn reregistering() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn no_events_after_deregister() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -598,6 +646,10 @@ fn no_events_after_deregister() {
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn tcp_shutdown_client_read_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -640,7 +692,6 @@ fn tcp_shutdown_client_read_close_event() {
 #[cfg_attr(
     any(
         target_os = "android",
-        target_os = "emscripten",
         target_os = "hurd",
         target_os = "illumos",
         target_os = "solaris",
@@ -648,6 +699,10 @@ fn tcp_shutdown_client_read_close_event() {
         target_os = "nto"
     ),
     ignore = "fails; client write_closed events are not found"
+)]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
 )]
 fn tcp_shutdown_client_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
@@ -685,6 +740,10 @@ fn tcp_shutdown_client_write_close_event() {
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
 #[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn tcp_shutdown_server_write_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -720,6 +779,10 @@ fn tcp_shutdown_server_write_close_event() {
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
 #[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
 #[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn tcp_reset_close_event() {
     let (mut poll, mut events) = init_with_poll();
 
@@ -731,7 +794,7 @@ fn tcp_reset_close_event() {
         .register(&mut stream, ID1, Interest::READABLE.add(Interest::WRITABLE))
         .unwrap();
 
-    let server_stream = accept(&listener).unwrap();
+    let server_stream = listener.accept().unwrap();
 
     expect_events(
         &mut poll,
@@ -775,6 +838,10 @@ fn tcp_reset_close_event() {
     any(target_os = "hurd", target_os = "illumos", target_os = "solaris"),
     ignore = "fails; client write_closed events are not found"
 )]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn tcp_shutdown_client_both_close_event() {
     let (mut poll, mut events) = init_with_poll();
     let barrier = Arc::new(Barrier::new(2));
@@ -815,10 +882,11 @@ fn echo_listener(addr: SocketAddr, n_connections: usize) -> (thread::JoinHandle<
 
         let mut buf = [0; 128];
         for _ in 0..n_connections {
-            let (mut stream, _) = accept(&listener).unwrap();
+            let (mut stream, _) = listener.accept().unwrap();
 
             loop {
-                let n = read(&mut stream, &mut buf)
+                let n = stream
+                    .read(&mut buf)
                     // On Linux based system it will cause a connection reset
                     // error when the reading side of the peer connection is
                     // shutdown, we don't consider it an actual here.
@@ -859,7 +927,7 @@ fn start_listener(
         sender.send(local_address).unwrap();
 
         for _ in 0..n_connections {
-            let (stream, _) = accept(&listener).unwrap();
+            let (stream, _) = listener.accept().unwrap();
             if let Some(ref barrier) = barrier {
                 barrier.wait();
 
@@ -942,7 +1010,7 @@ fn priority_event_on_oob_data() {
         )
         .unwrap();
 
-    let (stream, _) = accept(&listener).unwrap();
+    let (stream, _) = listener.accept().unwrap();
 
     // Sending out of bound data should trigger priority event.
     send_oob_data(&stream, DATA1).unwrap();
@@ -975,13 +1043,17 @@ fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
 
 #[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn peek_ok() {
     let mut buf = [0; 2];
     let (mut poll, mut events) = init_with_poll();
 
     let listener = net::TcpListener::bind(any_local_address()).unwrap();
     let sockaddr = listener.local_addr().unwrap();
-    let thread_handle = thread::spawn(move || accept(&listener).unwrap());
+    let thread_handle = thread::spawn(move || listener.accept().unwrap());
     let stream1 = net::TcpStream::connect(sockaddr).unwrap();
     let (mut stream2, _) = thread_handle.join().unwrap();
 
@@ -1022,13 +1094,17 @@ fn peek_until_ok<const N: usize>(buf: &mut [u8; N], stream1: &mut TcpStream, exp
 
 #[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn peek_would_block() {
     let mut buf = [0; 1];
     let (mut poll, mut events) = init_with_poll();
 
     let listener = net::TcpListener::bind(any_local_address()).unwrap();
     let sockaddr = listener.local_addr().unwrap();
-    let thread_handle = thread::spawn(move || accept(&listener).unwrap());
+    let thread_handle = thread::spawn(move || listener.accept().unwrap());
     let stream1 = net::TcpStream::connect(sockaddr).unwrap();
     let (mut stream2, _) = thread_handle.join().unwrap();
 
@@ -1062,13 +1138,17 @@ fn peek_would_block() {
 
 #[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn read_peek_would_block() {
     let mut buf = [0; 1];
     let (mut poll, mut events) = init_with_poll();
 
     let listener = net::TcpListener::bind(any_local_address()).unwrap();
     let sockaddr = listener.local_addr().unwrap();
-    let thread_handle = thread::spawn(move || accept(&listener).unwrap());
+    let thread_handle = thread::spawn(move || listener.accept().unwrap());
     let stream1 = net::TcpStream::connect(sockaddr).unwrap();
     let (mut stream2, _) = thread_handle.join().unwrap();
 

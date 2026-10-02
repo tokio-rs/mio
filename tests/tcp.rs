@@ -99,6 +99,10 @@ fn accept() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn connect() {
     init();
 
@@ -113,7 +117,7 @@ fn connect() {
     let (tx, rx) = channel();
     let (tx2, rx2) = channel();
     let handle = thread::spawn(move || {
-        let stream = util::accept(&listener).unwrap();
+        let stream = listener.accept().unwrap();
         rx.recv().unwrap();
         drop(stream);
         tx2.send(()).unwrap();
@@ -177,6 +181,10 @@ fn connect() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn read() {
     init();
 
@@ -191,7 +199,7 @@ fn read() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = util::accept(&listener).unwrap().0;
+        let mut stream = listener.accept().unwrap().0;
         let buf = [0; 1024];
         let mut amt = 0;
         while amt < N {
@@ -236,6 +244,10 @@ fn read() {
     ignore = "WASI does not yet support multithreading or peeking"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn peek() {
     init();
 
@@ -250,7 +262,7 @@ fn peek() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = util::accept(&listener).unwrap().0;
+        let mut stream = listener.accept().unwrap().0;
         let buf = [0; 1024];
         let mut amt = 0;
         while amt < N {
@@ -301,6 +313,10 @@ fn peek() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn write() {
     init();
 
@@ -315,11 +331,11 @@ fn write() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = util::accept(&listener).unwrap().0;
+        let mut stream = listener.accept().unwrap().0;
         let mut buf = [0; 1024];
         let mut amt = 0;
         while amt < N {
-            amt += util::read(&mut stream, &mut buf).unwrap();
+            amt += stream.read(&mut buf).unwrap();
         }
     });
 
@@ -436,6 +452,10 @@ fn bind_twice_bad() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn multiple_writes_immediate_success() {
     init();
 
@@ -444,14 +464,14 @@ fn multiple_writes_immediate_success() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut s = util::accept(&listener).unwrap().0;
+        let mut s = listener.accept().unwrap().0;
         let mut b = [0; 1024];
         let mut amt = 0;
         while amt < 1024 * N {
             for byte in b.iter_mut() {
                 *byte = 0;
             }
-            let n = util::read(&mut s, &mut b).unwrap();
+            let n = s.read(&mut b).unwrap();
             amt += n;
             for byte in b[..n].iter() {
                 assert_eq!(*byte, 1);
@@ -606,6 +626,10 @@ fn connect_error() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn write_error() {
     init();
 
@@ -616,7 +640,7 @@ fn write_error() {
     let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let handle = thread::spawn(move || {
-        let (conn, _addr) = util::accept(&listener).unwrap();
+        let (conn, _addr) = listener.accept().unwrap();
         rx.recv().unwrap();
         drop(conn);
     });
@@ -689,6 +713,10 @@ macro_rules! wait {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn write_shutdown() {
     init();
 
@@ -706,7 +734,7 @@ fn write_shutdown() {
         )
         .unwrap();
 
-    let (socket, _) = util::accept(&listener).unwrap();
+    let (socket, _) = listener.accept().unwrap();
 
     wait!(poll, is_writable, false);
 
