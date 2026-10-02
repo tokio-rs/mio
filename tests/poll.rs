@@ -113,6 +113,10 @@ fn poll_closes_fd() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn readiness_is_reregistered_after_would_block() {
     // Solaris event ports disassociate an fd after delivering an event. Ensure
     // readiness is observed again after the source is drained to WouldBlock.
@@ -121,7 +125,7 @@ fn readiness_is_reregistered_after_would_block() {
     let listener = net::TcpListener::bind(any_local_address()).unwrap();
     let addr = listener.local_addr().unwrap();
     let client = net::TcpStream::connect(addr).unwrap();
-    let (mut server, _) = util::accept(&listener).unwrap();
+    let (mut server, _) = listener.accept().unwrap();
     client.set_nonblocking(true).unwrap();
     server.set_nonblocking(true).unwrap();
 
@@ -159,6 +163,10 @@ fn readiness_is_reregistered_after_would_block() {
     ignore = "WASI does not yet support multithreading"
 )]
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "Emscripten does not support blocking accept"
+)]
 fn drop_cancels_interest_and_shuts_down() {
     init();
 
@@ -172,13 +180,13 @@ fn drop_cancels_interest_and_shuts_down() {
     let addr = listener.local_addr().unwrap();
 
     let handle = thread::spawn(move || {
-        let mut stream = util::accept(&listener).unwrap().0;
+        let mut stream = listener.incoming().next().unwrap().unwrap();
         // SO_RCVTIMEO not supported on GNU/Hurd
         #[cfg(not(target_os = "hurd"))]
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("set_read_timeout");
-        match util::read(&mut stream, &mut [0; 16]) {
+        match stream.read(&mut [0; 16]) {
             Ok(0) => (),
             Ok(n) => panic!("unexpected read of {n} bytes"),
             Err(err) => {

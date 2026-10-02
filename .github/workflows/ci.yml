@@ -109,11 +109,10 @@ jobs:
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: rust-src
-    - uses: mymindstorm/setup-emsdk@v14
+    - uses: emscripten-core/setup-emsdk@v15
       with:
         version: 6.0.9
-    # Sockets are Node raw sockets; the test peers run on pthreads under
-    # PROXY_TO_PTHREAD so their blocking waits can park the worker.
+    # PROXY_TO_PTHREAD allows blocking poll calls on a worker.
     # -Wno-deprecated: rustc's target spec passes the deprecated -sWASM_BIGINT.
     - name: Tests
       run: |
