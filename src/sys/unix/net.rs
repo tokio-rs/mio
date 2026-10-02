@@ -16,6 +16,7 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
     #[cfg(any(
         target_os = "android",
         target_os = "dragonfly",
+        target_os = "emscripten",
         target_os = "freebsd",
         target_os = "hurd",
         target_os = "illumos",
