@@ -113,12 +113,10 @@ jobs:
       with:
         version: 6.0.9
     # PROXY_TO_PTHREAD allows blocking poll calls on a worker.
-    # -Wno-deprecated: rustc's target spec passes the deprecated -sWASM_BIGINT.
-    # Remove once https://github.com/rust-lang/rust/pull/162839 reaches Rust stable.
     - name: Tests
       run: |
         CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER=node \
-        RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=-pthread -C link-arg=-sPROXY_TO_PTHREAD -C link-arg=-sNODERAWSOCKETS -C link-arg=-sNODERAWFS -C link-arg=-sINITIAL_MEMORY=64MB -C link-arg=-sEXIT_RUNTIME=1 -C link-arg=-Wno-deprecated" \
+        RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=-pthread -C link-arg=-sPROXY_TO_PTHREAD -C link-arg=-sNODERAWSOCKETS -C link-arg=-sNODERAWFS -C link-arg=-sINITIAL_MEMORY=64MB -C link-arg=-sEXIT_RUNTIME=1" \
         cargo +nightly test --target wasm32-unknown-emscripten -Zbuild-std --all-features --tests --examples --lib
   Nightly:
     runs-on: ubuntu-latest
