@@ -9,6 +9,8 @@ use std::{fmt, io};
 
 use mio::event::Source;
 use mio::net::{TcpListener, TcpStream, UdpSocket};
+#[cfg(not(any(target_os = "horizon", target_os = "wasi")))]
+use mio::Waker;
 use mio::{event, Events, Interest, Poll, Registry, Token};
 
 mod util;
@@ -41,6 +43,31 @@ fn run_once_with_nothing() {
     let mut poll = Poll::new().unwrap();
     poll.poll(&mut events, Some(Duration::from_millis(100)))
         .unwrap();
+}
+
+#[cfg(not(any(target_os = "horizon", target_os = "wasi")))]
+#[cfg_attr(miri, ignore = "Miri doesn't support UDP sockets")]
+#[test]
+fn poll_without_timeout_waits_for_waker() {
+    init();
+
+    let mut socket = UdpSocket::bind(any_local_address()).unwrap();
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+    poll.registry()
+        .register(&mut socket, ID1, Interest::READABLE)
+        .unwrap();
+
+    let waker = Arc::new(Waker::new(poll.registry(), ID2).unwrap());
+    let thread_waker = Arc::clone(&waker);
+    let handle = thread::spawn(move || {
+        sleep(Duration::from_millis(50));
+        thread_waker.wake().unwrap();
+    });
+
+    poll.poll(&mut events, None).unwrap();
+    handle.join().unwrap();
+    assert!(events.iter().any(|event| event.token() == ID2));
 }
 
 #[test]
@@ -151,6 +178,215 @@ fn readiness_is_reregistered_after_would_block() {
         &mut poll,
         &mut events,
         vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
+}
+
+#[cfg(all(target_os = "solaris", feature = "os-ext"))]
+#[test]
+fn fallback_readiness_is_not_starved_by_port_events() {
+    use mio::unix::SourceFd;
+    use std::os::fd::AsRawFd;
+    use std::os::unix::net::UnixStream;
+
+    init();
+
+    let (mut receiver, mut sender) = UnixStream::pair().unwrap();
+    receiver.set_nonblocking(true).unwrap();
+    sender.set_nonblocking(true).unwrap();
+
+    let fd = receiver.as_raw_fd();
+    let mut source = SourceFd(&fd);
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+    poll.registry()
+        .register(&mut source, ID1, Interest::READABLE)
+        .unwrap();
+
+    sender.write_all(b"first").unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
+
+    let mut buf = [0; 16];
+    assert_eq!(receiver.read(&mut buf).unwrap(), 5);
+    util::assert_would_block(receiver.read(&mut buf));
+
+    // SourceFd I/O does not go through Mio, so event ports have to use the
+    // fallback path to observe readiness again. A queued port event must not
+    // prevent that fallback readiness from being returned in the same poll.
+    sender.write_all(b"again").unwrap();
+    let waker = Waker::new(poll.registry(), ID2).unwrap();
+    waker.wake().unwrap();
+
+    poll.poll(&mut events, Some(Duration::from_secs(1)))
+        .unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|event| event.token() == ID1 && event.is_readable()),
+        "fallback readiness was starved by the waker event: {events:?}"
+    );
+    assert!(events.iter().any(|event| event.token() == ID2));
+}
+
+#[cfg(all(target_os = "solaris", feature = "os-ext"))]
+#[test]
+fn fallback_interests_are_rearmed_independently() {
+    use mio::unix::SourceFd;
+    use std::os::fd::AsRawFd;
+    use std::os::unix::net::UnixStream;
+
+    init();
+
+    let (mut receiver, mut sender) = UnixStream::pair().unwrap();
+    receiver.set_nonblocking(true).unwrap();
+    sender.set_nonblocking(true).unwrap();
+
+    let fd = receiver.as_raw_fd();
+    let mut source = SourceFd(&fd);
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+    poll.registry()
+        .register(&mut source, ID1, Interest::READABLE | Interest::WRITABLE)
+        .unwrap();
+
+    sender.write_all(b"first").unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::READABLE)],
+    );
+
+    let mut buf = [0; 16];
+    assert_eq!(receiver.read(&mut buf).unwrap(), 5);
+    util::assert_would_block(receiver.read(&mut buf));
+
+    // Let the fallback check observe that readable has been drained while the
+    // socket remains writable. It must re-associate only readable interests.
+    poll.poll(&mut events, Some(Duration::ZERO)).unwrap();
+
+    sender.write_all(b"again").unwrap();
+    sleep(Duration::from_millis(10));
+    let waker = Waker::new(poll.registry(), ID2).unwrap();
+    waker.wake().unwrap();
+
+    poll.poll(&mut events, Some(Duration::from_secs(1)))
+        .unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|event| event.token() == ID1 && event.is_readable()),
+        "readable interest was not re-associated: {events:?}"
+    );
+}
+
+#[cfg(all(target_os = "solaris", feature = "os-ext"))]
+#[test]
+fn continuously_writable_pipe_is_renotified_at_a_bounded_rate() {
+    use mio::unix::pipe;
+    use std::sync::mpsc;
+    use std::time::Instant;
+
+    init();
+
+    let (mut sender, _receiver) = pipe::new().unwrap();
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+    poll.registry()
+        .register(&mut sender, ID1, Interest::WRITABLE)
+        .unwrap();
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
+    );
+
+    // A consumer can clear previously observed readiness before a later write.
+    // For an indefinite wait, keep re-notifying it, but do not let a
+    // continuously writable pipe make the selector spin without reaching the
+    // bounded event-port wait.
+    let waker = Waker::new(poll.registry(), ID2).unwrap();
+    let (done_tx, done_rx) = mpsc::channel();
+    let watchdog = thread::spawn(move || {
+        if done_rx.recv_timeout(Duration::from_millis(250)).is_err() {
+            waker.wake().unwrap();
+        }
+    });
+
+    let start = Instant::now();
+    for _ in 0..5 {
+        poll.poll(&mut events, None).unwrap();
+        assert!(
+            events
+                .iter()
+                .any(|event| event.token() == ID1 && event.is_writable()),
+            "continuously writable source was not re-notified: {events:?}"
+        );
+    }
+    assert!(
+        start.elapsed() >= Duration::from_millis(40),
+        "writable re-notification was not bounded: {:?}",
+        start.elapsed()
+    );
+    done_tx.send(()).unwrap();
+    watchdog.join().unwrap();
+}
+
+#[cfg(all(target_os = "solaris", feature = "os-ext"))]
+#[test]
+fn zero_timeout_polls_renotify_writable_at_a_bounded_rate() {
+    use mio::unix::pipe;
+    use std::time::Instant;
+
+    init();
+
+    let (mut sender, _receiver) = pipe::new().unwrap();
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(8);
+    poll.registry()
+        .register(&mut sender, ID1, Interest::WRITABLE)
+        .unwrap();
+
+    let start = Instant::now();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(ID1, Interest::WRITABLE)],
+    );
+
+    // Tokio may keep polling with a zero timeout after clearing its cached
+    // writable readiness. The fallback must eventually re-notify it without
+    // returning writable on every poll and creating a busy loop.
+    loop {
+        poll.poll(&mut events, Some(Duration::ZERO)).unwrap();
+        if events
+            .iter()
+            .any(|event| event.token() == ID1 && event.is_writable())
+        {
+            break;
+        }
+        assert!(
+            start.elapsed() < Duration::from_millis(250),
+            "writable source was not re-notified across zero-timeout polls"
+        );
+    }
+    assert!(
+        start.elapsed() >= Duration::from_millis(5),
+        "writable re-notification was not bounded: {:?}",
+        start.elapsed()
+    );
+
+    // Positive finite-timeout polls retain their edge-like writable behavior.
+    poll.poll(&mut events, Some(Duration::from_millis(20)))
+        .unwrap();
+    assert!(
+        !events
+            .iter()
+            .any(|event| event.token() == ID1 && event.is_writable()),
+        "positive finite-timeout poll unexpectedly repeated writable readiness"
     );
 }
 
