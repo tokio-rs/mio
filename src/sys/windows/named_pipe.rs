@@ -1,10 +1,10 @@
 use std::ffi::OsStr;
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
-use std::{fmt, mem, slice};
+use std::{fmt, iter, mem, slice};
 
 use windows_sys::Win32::Foundation::{
     ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA, ERROR_PIPE_CONNECTED,
@@ -515,6 +515,10 @@ impl Read for NamedPipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         <&NamedPipe as Read>::read(&mut &*self, buf)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        <&NamedPipe as Read>::read_vectored(&mut &*self, bufs)
+    }
 }
 
 impl Write for NamedPipe {
@@ -522,13 +526,19 @@ impl Write for NamedPipe {
         <&NamedPipe as Write>::write(&mut &*self, buf)
     }
 
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        <&NamedPipe as Write>::write_vectored(&mut &*self, bufs)
+    }
+
     fn flush(&mut self) -> io::Result<()> {
         <&NamedPipe as Write>::flush(&mut &*self)
     }
 }
 
-impl<'a> Read for &'a NamedPipe {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+impl NamedPipe {
+    /// Reads from the internal read buffer using `f`, shared by `read` and
+    /// `read_vectored`.
+    fn read_with(&self, f: impl FnOnce(&mut &[u8]) -> io::Result<usize>) -> io::Result<usize> {
         let mut state = self.inner.io.lock().unwrap();
 
         if state.token.is_none() {
@@ -552,7 +562,7 @@ impl<'a> Read for &'a NamedPipe {
             State::Ok(data, cur) => {
                 let n = {
                     let mut remaining = &data[cur..];
-                    remaining.read(buf)?
+                    f(&mut remaining)?
                 };
                 let next = cur + n;
                 if next != data.len() {
@@ -576,10 +586,9 @@ impl<'a> Read for &'a NamedPipe {
             }
         }
     }
-}
 
-impl<'a> Write for &'a NamedPipe {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    /// Writes all of `bufs`, shared by `write` and `write_vectored`.
+    fn write_bufs<'b>(&self, bufs: impl Iterator<Item = &'b [u8]>) -> io::Result<usize> {
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
 
@@ -600,15 +609,38 @@ impl<'a> Write for &'a NamedPipe {
             }
         }
 
-        // Move `buf` onto the heap and fire off the write
+        // Move `bufs` onto the heap and fire off the write
         let mut owned_buf = self.inner.get_buffer();
-        owned_buf.extend(buf);
+        for buf in bufs {
+            owned_buf.extend(buf);
+        }
+        let len = owned_buf.len();
         match Inner::maybe_schedule_write(&self.inner, owned_buf, 0, &mut io)? {
             // Some bytes are written immediately
             Some(n) => Ok(n),
             // Write operation is enqueued for whole buffer
-            None => Ok(buf.len()),
+            None => Ok(len),
         }
+    }
+}
+
+impl<'a> Read for &'a NamedPipe {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.read_with(|data| data.read(buf))
+    }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        self.read_with(|data| data.read_vectored(bufs))
+    }
+}
+
+impl<'a> Write for &'a NamedPipe {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.write_bufs(iter::once(buf))
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        self.write_bufs(bufs.iter().map(|buf| &**buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {

@@ -2,7 +2,7 @@
 
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
@@ -485,6 +485,85 @@ fn read_with_small_buffer_provided() {
     }
 
     assert_eq!(actual_msg, expected_msg);
+}
+
+#[test]
+fn write_vectored_then_read() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    let bufs = [
+        IoSlice::new(b"12"),
+        IoSlice::new(b""),
+        IoSlice::new(b"345"),
+        IoSlice::new(b"6789"),
+    ];
+    assert_eq!(t!(client.write_vectored(&bufs)), 9);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf = [0; 16];
+    assert_eq!(t!(server.read(&mut buf)), 9);
+    assert_eq!(&buf[..9], b"123456789");
+}
+
+#[test]
+fn write_then_read_vectored() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    assert_eq!(t!(client.write(b"123456789")), 9);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf1 = [0; 2];
+    let mut buf2 = [0; 0];
+    let mut buf3 = [0; 3];
+    let mut buf4 = [0; 8];
+    let mut bufs = [
+        IoSliceMut::new(&mut buf1),
+        IoSliceMut::new(&mut buf2),
+        IoSliceMut::new(&mut buf3),
+        IoSliceMut::new(&mut buf4),
+    ];
+    assert_eq!(t!(server.read_vectored(&mut bufs)), 9);
+    assert_eq!(&buf1, b"12");
+    assert_eq!(&buf3, b"345");
+    assert_eq!(&buf4[..4], b"6789");
 }
 
 // A message larger than the internal buffer arrives in pieces, all but the last
