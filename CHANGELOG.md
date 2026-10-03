@@ -4,6 +4,8 @@
   (https://github.com/tokio-rs/mio/pull/2016).
 * Fix named pipe use-after-free when I/O fails right after submit
   (https://github.com/tokio-rs/mio/pull/2014).
+* Fix non-blocking socket creation on Haiku
+  (https://github.com/tokio-rs/mio/pull/2015).
 
 # 1.2.3
 
