@@ -141,12 +141,17 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
         path_len = 0;
     }
     // SAFETY: going from i8 to u8 is fine in this context.
-    let mut path =
+    let path =
         unsafe { &*(&sockaddr.sun_path[..path_len] as *const [libc::c_char] as *const [u8]) };
-    // Remove last null as `SocketAddr::from_pathname` doesn't accept it.
-    if let Some(0) = path.last() {
-        path = &path[..path.len() - 1];
-    }
+    // On Darwin, accept(2) reports the length of the entire sockaddr_un
+    // structure, leaving the path padded with null bytes. Other systems report
+    // the length of the path including at most one null terminator. Either
+    // way, `SocketAddr::from_pathname` doesn't accept (interior) null bytes,
+    // so truncate the path at the first null byte.
+    let path = match path.iter().position(|&byte| byte == 0) {
+        Some(null) => &path[..null],
+        None => path,
+    };
     let address = SocketAddr::from_pathname(Path::new(OsStr::from_bytes(path)))?;
     Ok((socket, address))
 }
