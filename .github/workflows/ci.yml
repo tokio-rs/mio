@@ -111,7 +111,7 @@ jobs:
         components: rust-src
     - uses: emscripten-core/setup-emsdk@v15
       with:
-        version: 6.0.9
+        version: 6.0.11
     # PROXY_TO_PTHREAD allows blocking poll calls on a worker.
     - name: Tests
       run: |
