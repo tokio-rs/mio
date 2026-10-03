@@ -730,8 +730,6 @@ pub mod event {
             ))]
             libc::NOTE_EXIT_DETAIL,
             libc::NOTE_PDATAMASK,
-            #[cfg(not(target_os = "freebsd"))]
-            libc::NOTE_PCTRLMASK,
             #[cfg(any(
                 target_os = "dragonfly",
                 target_os = "freebsd",
