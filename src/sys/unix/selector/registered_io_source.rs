@@ -10,7 +10,7 @@ use std::os::fd::RawFd;
 // can use `std::os::fd` and be merged with the above.
 #[cfg(target_os = "hermit")]
 use std::os::hermit::io::RawFd;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::sys::Selector;
 use crate::{Interest, Registry, Token};
@@ -53,7 +53,7 @@ struct InternalState {
     token: Token,
     interests: Interest,
     fd: RawFd,
-    shared_record: Arc<RegistrationRecord>,
+    shared_record: Mutex<Arc<RegistrationRecord>>,
 }
 }
 
@@ -72,15 +72,7 @@ impl IoSourceState {
         if let Err(err) = &result {
             if err.kind() == io::ErrorKind::WouldBlock {
                 self.inner.as_ref().map_or(Ok(()), |state| {
-                    if state.shared_record.is_registered() {
-                        state
-                            .selector
-                            .reregister(state.fd, state.token, state.interests)
-                    } else {
-                        // The selector internally deregistered the fd after
-                        // POLLHUP/POLLERR, so there is nothing to re-arm.
-                        Ok(())
-                    }
+                    state.rearm(&state.selector, state.fd, state.token, state.interests)
                 })?;
             }
         }
@@ -108,7 +100,7 @@ impl IoSourceState {
                         token,
                         interests,
                         fd,
-                        shared_record,
+                        shared_record: Mutex::new(shared_record),
                     };
 
                     self.inner = Some(Box::new(state));
@@ -124,19 +116,8 @@ impl IoSourceState {
         fd: RawFd,
     ) -> io::Result<()> {
         match self.inner.as_mut() {
-            // The selector internally deregistered the fd after POLLHUP/POLLERR,
-            // so re-add it instead of failing with `NotFound`.
-            Some(state) if !state.shared_record.is_registered() => registry
-                .selector()
-                .register_internal(fd, token, interests)
-                .map(|record| {
-                    state.token = token;
-                    state.interests = interests;
-                    state.shared_record = record;
-                }),
-            Some(state) => registry
-                .selector()
-                .reregister(fd, token, interests)
+            Some(state) => state
+                .rearm(registry.selector(), fd, token, interests)
                 .map(|()| {
                     state.token = token;
                     state.interests = interests;
@@ -146,27 +127,120 @@ impl IoSourceState {
     }
 
     pub(crate) fn deregister(&mut self, registry: &Registry, fd: RawFd) -> io::Result<()> {
-        if let Some(state) = self.inner.take() {
-            let was_registered = state.shared_record.is_registered();
-            // Marking unregistered will short circuit the drop behaviour of calling
-            // deregister so the call to deregister below is strictly required.
-            state.shared_record.mark_unregistered();
-            if !was_registered {
-                // Already removed from the selector internally after
-                // POLLHUP/POLLERR.
-                return Ok(());
-            }
-        }
+        let Some(mut state) = self.inner.take() else {
+            return Err(io::ErrorKind::NotFound.into());
+        };
+        let result = registry.selector().deregister(fd);
+        let record = state.shared_record.get_mut().unwrap_or_else(|err| err.into_inner());
+        let internally_removed = !record.is_registered();
+        // The explicit selector call performed cleanup; Drop must not
+        // deregister this source again.
+        record.mark_unregistered();
 
-        registry.selector().deregister(fd)
+        match result {
+            Err(err) if internally_removed && err.kind() == io::ErrorKind::NotFound => Ok(()),
+            result => result,
+        }
+    }
+}
+
+impl InternalState {
+    fn rearm(&self, selector: &Selector, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
+        // Serialize replacement of the shared record when concurrent I/O calls
+        // re-arm a source removed internally by the selector.
+        let mut record = self.shared_record.lock().unwrap_or_else(|err| err.into_inner());
+        match selector.reregister(fd, token, interests) {
+            Err(err) if err.kind() == io::ErrorKind::NotFound && !record.is_registered() => {
+                *record = selector.register_internal(fd, token, interests)?;
+                Ok(())
+            }
+            result => result,
+        }
     }
 }
 
 impl Drop for InternalState {
     fn drop(&mut self) {
-        if self.shared_record.is_registered() {
+        if self.shared_record.get_mut().unwrap_or_else(|err| err.into_inner()).is_registered() {
             let _ = self.selector.deregister(self.fd);
         }
     }
 }
+}
+
+#[cfg(all(test, mio_unsupported_force_poll_poll, feature = "net"))]
+mod tests {
+    use super::*;
+    use crate::{Events, Poll};
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    #[cfg(not(target_os = "hermit"))]
+    use std::os::fd::AsRawFd;
+    #[cfg(target_os = "hermit")]
+    use std::os::hermit::io::AsRawFd;
+    use std::time::Duration;
+
+    #[test]
+    fn would_block_rearms_after_internal_removal() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let stream = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        stream.set_nonblocking(true).unwrap();
+        let (mut peer, _) = listener.accept().unwrap();
+        let mut poll = Poll::new().unwrap();
+        let mut state = IoSourceState::new();
+        let fd = stream.as_raw_fd();
+        state
+            .register(poll.registry(), Token(1), Interest::READABLE, fd)
+            .unwrap();
+
+        // Exercise the selector's internal-removal path without deregistering
+        // the live source. HUP/ERR calls this same selector operation.
+        poll.registry().selector().deregister(fd).unwrap();
+        let mut buf = [0; 1];
+        assert_eq!(
+            state
+                .do_io(|mut stream| stream.read(&mut buf), &stream)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::WouldBlock
+        );
+        peer.write_all(&[2]).unwrap();
+        let mut events = Events::with_capacity(8);
+        poll.poll(&mut events, Some(Duration::from_secs(1)))
+            .unwrap();
+        assert!(events
+            .iter()
+            .any(|event| event.token() == Token(1) && event.is_readable()));
+        assert_eq!(
+            state
+                .do_io(|mut stream| stream.read(&mut buf), &stream)
+                .unwrap(),
+            1
+        );
+        assert_eq!(buf, [2]);
+
+        // Explicit reregistration also replaces the removed record and token.
+        poll.registry().selector().deregister(fd).unwrap();
+        state
+            .reregister(poll.registry(), Token(2), Interest::READABLE, fd)
+            .unwrap();
+        peer.write_all(&[3]).unwrap();
+        poll.poll(&mut events, Some(Duration::from_secs(1)))
+            .unwrap();
+        assert!(events
+            .iter()
+            .any(|event| event.token() == Token(2) && event.is_readable()));
+        assert_eq!(
+            state
+                .do_io(|mut stream| stream.read(&mut buf), &stream)
+                .unwrap(),
+            1
+        );
+        assert_eq!(buf, [3]);
+        state.deregister(poll.registry(), fd).unwrap();
+        assert_eq!(
+            state.deregister(poll.registry(), fd).unwrap_err().kind(),
+            io::ErrorKind::NotFound
+        );
+    }
 }
