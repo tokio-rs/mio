@@ -591,10 +591,7 @@ impl NamedPipe {
     ///
     /// Takes byte slices, not `IoSlice`s: `IoSlice::new` panics on Windows for
     /// buffers over 4 GiB, and `write` must not panic.
-    fn write_bufs<'b>(
-        &self,
-        bufs: impl Iterator<Item = &'b [u8]> + Clone,
-    ) -> io::Result<usize> {
+    fn write_bufs<'b>(&self, bufs: impl Iterator<Item = &'b [u8]> + Clone) -> io::Result<usize> {
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
 
