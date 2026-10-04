@@ -588,7 +588,13 @@ impl NamedPipe {
     }
 
     /// Writes all of `bufs`, shared by `write` and `write_vectored`.
-    fn write_bufs<'b>(&self, bufs: impl Iterator<Item = &'b [u8]>) -> io::Result<usize> {
+    ///
+    /// Takes byte slices, not `IoSlice`s: `IoSlice::new` panics on Windows for
+    /// buffers over 4 GiB, and `write` must not panic.
+    fn write_bufs<'b>(
+        &self,
+        bufs: impl Iterator<Item = &'b [u8]> + Clone,
+    ) -> io::Result<usize> {
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
 
@@ -611,6 +617,7 @@ impl NamedPipe {
 
         // Move `bufs` onto the heap and fire off the write
         let mut owned_buf = self.inner.get_buffer();
+        owned_buf.reserve(bufs.clone().map(<[u8]>::len).fold(0, usize::saturating_add));
         for buf in bufs {
             owned_buf.extend(buf);
         }
