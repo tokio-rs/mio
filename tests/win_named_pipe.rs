@@ -305,21 +305,9 @@ fn connect_twice() {
 
     let mut events = Events::with_capacity(128);
 
-    loop {
-        t!(poll.poll(&mut events, None));
-        let events = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
-            if event.is_readable() {
-                let mut buf = [0; 10];
-
-                match server.read(&mut buf) {
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                    Ok(0) => break,
-                    res => panic!("{:?}", res),
-                }
-            }
-        }
-    }
+    // Don't wait for the readable event: it can be behind a writable one for
+    // the same token, in the same poll.
+    assert!(read_to_eof(&mut server, &mut poll, &mut events).is_empty());
 
     t!(server.disconnect());
     assert_eq!(
@@ -957,4 +945,77 @@ fn reconnect_after_aborted_connect() {
         Ok(None) => {}
         res => panic!("expected no error, got {res:?}"),
     }
+}
+
+// Dropping a pipe doesn't cancel its write in flight, it's still delivered.
+#[test]
+fn drop_flushes_write_in_flight() {
+    let (mut server, name) = server();
+    let client = blocking_client(&name);
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(0), Interest::WRITABLE));
+    let mut events = Events::with_capacity(16);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+
+    // Larger than the pipe's buffer, so the write pends until the client reads.
+    let data = vec![1; 1024 * 1024];
+    assert_eq!(t!(server.write(&data)), data.len());
+    drop(server);
+
+    let reader = thread::spawn(move || {
+        let mut client = client;
+        let mut read = Vec::new();
+        t!(client.read_to_end(&mut read));
+        read
+    });
+    // The write only finishes, and closes the pipe, while polling.
+    let timeout = Instant::now() + Duration::from_secs(10);
+    while !reader.is_finished() {
+        t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+        assert!(Instant::now() < timeout, "EOF never delivered");
+    }
+    let read = reader.join().unwrap();
+    assert!(read == data, "got {} of {} bytes", read.len(), data.len());
+}
+
+// Issue #1944: dropping a pipe with a write in flight, and then its `Poll`,
+// must still close the pipe. Nothing dequeues the write's completion anymore,
+// so the pipe can't wait for it.
+//
+// Ignored until we agree on #1944. The plan: close the handle on drop, and
+// make `flush` wait for the write in flight, so a write is only guaranteed
+// once `flush` returns `Ok`.
+#[test]
+#[ignore = "fails until #1944 is fixed"]
+fn drop_with_write_in_flight_then_poll_closes() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(server.connect());
+
+    // As if the client were another process, with its own event loop.
+    let client_poll = t!(Poll::new());
+    t!(client_poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    // Larger than the pipe's buffer, so the write pends until the server reads.
+    let data = vec![1; 1024 * 1024];
+    assert_eq!(t!(client.write(&data)), data.len());
+    drop(client);
+    drop(client_poll);
+
+    let mut events = Events::with_capacity(16);
+    read_to_eof(&mut server, &mut poll, &mut events);
 }
