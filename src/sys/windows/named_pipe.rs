@@ -11,7 +11,8 @@ use windows_sys::Win32::Foundation::{
     ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
+    GetFileType, ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED,
+    FILE_TYPE_PIPE, PIPE_ACCESS_DUPLEX,
 };
 use windows_sys::Win32::System::Pipes::{
     ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_TYPE_BYTE,
@@ -90,6 +91,8 @@ struct Inner {
     connecting: AtomicBool,
     io: Mutex<Io>,
     pool: Mutex<BufferPool>,
+    // Largest read size, see `MAX_READ_SIZE`.
+    max_read_size: usize,
 }
 
 // SAFETY: `Handles`s are, in general, not thread-safe. However, we only used `Handle`s for
@@ -345,6 +348,8 @@ struct Io {
     // Token used to identify events
     token: Option<Token>,
     read: State,
+    // Size of the next read, from the length of the caller's last read buffer
+    read_size: usize,
     write: State,
     connect_error: Option<io::Error>,
 }
@@ -356,6 +361,17 @@ enum State {
     Ok(Vec<u8>, usize),
     Err(io::Error),
 }
+
+/// Capacity of new buffers, and the size of reads until the caller's buffer
+/// size is known. Also the minimum read size, so that small reads (e.g. of a
+/// length prefix) don't turn into small reads from the pipe.
+const DEFAULT_BUF_SIZE: usize = 4 * 1024;
+
+/// Maximum read size, the pipe buffer size `NamedPipe::new` uses. Limits the
+/// memory held by the read that is always pending. Only used for pipes: other
+/// handles, such as serial ports, can wait for the whole buffer to fill before
+/// a read completes, so a larger read delays the data.
+const MAX_READ_SIZE: usize = 64 * 1024;
 
 // Odd tokens are for named pipes
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
@@ -490,6 +506,11 @@ impl NamedPipe {
 
 impl FromRawHandle for NamedPipe {
     unsafe fn from_raw_handle(handle: RawHandle) -> NamedPipe {
+        let max_read_size = if GetFileType(handle as HANDLE) == FILE_TYPE_PIPE {
+            MAX_READ_SIZE
+        } else {
+            DEFAULT_BUF_SIZE
+        };
         NamedPipe {
             inner: Arc::new(Inner {
                 handle: Handle::new(handle as HANDLE),
@@ -502,10 +523,12 @@ impl FromRawHandle for NamedPipe {
                     cp: None,
                     token: None,
                     read: State::None,
+                    read_size: DEFAULT_BUF_SIZE,
                     write: State::None,
                     connect_error: None,
                 }),
                 pool: Mutex::new(BufferPool::with_capacity(2)),
+                max_read_size,
             }),
         }
     }
@@ -537,13 +560,21 @@ impl Write for NamedPipe {
 
 impl NamedPipe {
     /// Reads from the internal read buffer using `f`, shared by `read` and
-    /// `read_vectored`.
-    fn read_with(&self, f: impl FnOnce(&mut &[u8]) -> io::Result<usize>) -> io::Result<usize> {
+    /// `read_vectored`. `len` is the size of the caller's buffer(s).
+    fn read_with(
+        &self,
+        len: usize,
+        f: impl FnOnce(&mut &[u8]) -> io::Result<usize>,
+    ) -> io::Result<usize> {
         let mut state = self.inner.io.lock().unwrap();
 
         if state.token.is_none() {
             return Err(would_block());
         }
+
+        // Size the next read from the pipe like the caller's buffer, so it can
+        // be filled in one call.
+        state.read_size = len.clamp(DEFAULT_BUF_SIZE, self.inner.max_read_size);
 
         match mem::replace(&mut state.read, State::None) {
             // In theory not possible with `token` checked above,
@@ -613,7 +644,7 @@ impl NamedPipe {
         }
 
         // Move `bufs` onto the heap and fire off the write
-        let mut owned_buf = self.inner.get_buffer();
+        let mut owned_buf = self.inner.get_buffer(DEFAULT_BUF_SIZE);
         owned_buf.reserve(bufs.clone().map(<[u8]>::len).fold(0, usize::saturating_add));
         for buf in bufs {
             owned_buf.extend(buf);
@@ -630,11 +661,12 @@ impl NamedPipe {
 
 impl<'a> Read for &'a NamedPipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.read_with(|data| data.read(buf))
+        self.read_with(buf.len(), |data| data.read(buf))
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.read_with(|data| data.read_vectored(bufs))
+        let len = bufs.iter().map(|buf| buf.len()).sum();
+        self.read_with(len, |data| data.read_vectored(bufs))
     }
 }
 
@@ -759,10 +791,10 @@ impl Inner {
         }
 
         // Allocate a buffer and schedule the read.
-        let mut buf = me.get_buffer();
+        let mut buf = me.get_buffer(io.read_size);
         let e = unsafe {
             let overlapped = me.read.as_ptr() as *mut _;
-            let slice = slice::from_raw_parts_mut(buf.as_mut_ptr(), buf.capacity());
+            let slice = slice::from_raw_parts_mut(buf.as_mut_ptr(), io.read_size);
             me.read_overlapped(slice, overlapped)
         };
 
@@ -860,8 +892,8 @@ impl Inner {
         }
     }
 
-    fn get_buffer(&self) -> Vec<u8> {
-        self.pool.lock().unwrap().get(4 * 1024)
+    fn get_buffer(&self, capacity: usize) -> Vec<u8> {
+        self.pool.lock().unwrap().get(capacity)
     }
 
     fn put_buffer(&self, buf: Vec<u8>) {
@@ -1113,10 +1145,11 @@ impl BufferPool {
         }
     }
 
-    fn get(&mut self, default_cap: usize) -> Vec<u8> {
-        self.pool
-            .pop()
-            .unwrap_or_else(|| Vec::with_capacity(default_cap))
+    /// Returns an empty buffer with a capacity of at least `cap`.
+    fn get(&mut self, cap: usize) -> Vec<u8> {
+        let mut buf = self.pool.pop().unwrap_or_default();
+        buf.reserve_exact(cap);
+        buf
     }
 
     fn put(&mut self, mut buf: Vec<u8>) {
