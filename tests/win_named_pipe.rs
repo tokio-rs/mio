@@ -825,7 +825,6 @@ fn registered_server() -> (NamedPipe, String, Poll, Events) {
 // not hand anything of the previous client to the next one. Here the previous
 // client's EOF.
 #[test]
-#[ignore = "fails until #1983 is fixed"]
 fn reconnect_after_eof() {
     let (mut server, name, mut poll, mut events) = registered_server();
     for round in 0..2 {
@@ -845,7 +844,6 @@ fn reconnect_after_eof() {
 
 // Same, with a read still in flight when the pipe disconnects.
 #[test]
-#[ignore = "fails until #1983 is fixed"]
 fn reconnect_with_read_in_flight() {
     let (mut server, name, mut poll, mut events) = registered_server();
     assert_would_block(server.connect());
@@ -866,7 +864,6 @@ fn reconnect_with_read_in_flight() {
 
 // Same, with read data not handed out yet when the pipe disconnects.
 #[test]
-#[ignore = "fails until #1983 is fixed"]
 fn reconnect_with_unread_data() {
     let (mut server, name, mut poll, mut events) = registered_server();
     assert_would_block(server.connect());
