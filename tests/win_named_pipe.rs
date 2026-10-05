@@ -2,7 +2,7 @@
 
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
@@ -20,7 +20,8 @@ use windows_sys::Win32::Storage::FileSystem::{
     FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
 };
 use windows_sys::Win32::System::Pipes::{
-    CreateNamedPipeW, PIPE_READMODE_MESSAGE, PIPE_TYPE_MESSAGE, PIPE_UNLIMITED_INSTANCES,
+    CreateNamedPipeW, SetNamedPipeHandleState, PIPE_READMODE_MESSAGE, PIPE_TYPE_MESSAGE,
+    PIPE_UNLIMITED_INSTANCES,
 };
 
 mod util;
@@ -485,6 +486,168 @@ fn read_with_small_buffer_provided() {
     }
 
     assert_eq!(actual_msg, expected_msg);
+}
+
+#[test]
+fn write_vectored_then_read() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    let bufs = [
+        IoSlice::new(b"12"),
+        IoSlice::new(b""),
+        IoSlice::new(b"345"),
+        IoSlice::new(b"6789"),
+    ];
+    assert_eq!(t!(client.write_vectored(&bufs)), 9);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf = [0; 16];
+    assert_eq!(t!(server.read(&mut buf)), 9);
+    assert_eq!(&buf[..9], b"123456789");
+}
+
+#[test]
+fn write_then_read_vectored() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    assert_eq!(t!(client.write(b"123456789")), 9);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf1 = [0; 2];
+    let mut buf2 = [0; 0];
+    let mut buf3 = [0; 3];
+    let mut buf4 = [0; 8];
+    let mut bufs = [
+        IoSliceMut::new(&mut buf1),
+        IoSliceMut::new(&mut buf2),
+        IoSliceMut::new(&mut buf3),
+        IoSliceMut::new(&mut buf4),
+    ];
+    assert_eq!(t!(server.read_vectored(&mut bufs)), 9);
+    assert_eq!(&buf1, b"12");
+    assert_eq!(&buf3, b"345");
+    assert_eq!(&buf4[..4], b"6789");
+}
+
+#[test]
+fn read_vectored_keeps_remainder() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    assert_eq!(t!(client.write(b"123456789")), 9);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf1 = [0; 2];
+    let mut buf2 = [0; 0];
+    let mut buf3 = [0; 3];
+    let mut bufs = [
+        IoSliceMut::new(&mut buf1),
+        IoSliceMut::new(&mut buf2),
+        IoSliceMut::new(&mut buf3),
+    ];
+    assert_eq!(t!(server.read_vectored(&mut bufs)), 5);
+    assert_eq!(&buf1, b"12");
+    assert_eq!(&buf3, b"345");
+
+    // The rest is kept for the next read.
+    let mut buf = [0; 16];
+    assert_eq!(t!(server.read(&mut buf)), 4);
+    assert_eq!(&buf[..4], b"6789");
+    match server.read(&mut buf) {
+        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+        res => panic!("expected the data to be used up, got {res:?}"),
+    }
+}
+
+// A vectored write is sent as a single message.
+#[test]
+fn write_vectored_message_mode() {
+    let (mut server, name) = message_server();
+    let mut client = blocking_client(&name);
+    // Read whole messages, so a split write shows up as a short read.
+    let mode = PIPE_READMODE_MESSAGE;
+    let ok =
+        unsafe { SetNamedPipeHandleState(client.as_raw_handle(), &mode, ptr::null(), ptr::null()) };
+    assert!(ok != 0, "{}", io::Error::last_os_error());
+
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(0), Interest::WRITABLE));
+    let mut events = Events::with_capacity(16);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+
+    let bufs = [
+        IoSlice::new(b"12"),
+        IoSlice::new(b""),
+        IoSlice::new(b"345"),
+        IoSlice::new(b"6789"),
+    ];
+    assert_eq!(t!(server.write_vectored(&bufs)), 9);
+
+    let mut buf = [0; 16];
+    assert_eq!(t!(client.read(&mut buf)), 9);
+    assert_eq!(&buf[..9], b"123456789");
 }
 
 // A message larger than the internal buffer arrives in pieces, all but the last
