@@ -22,6 +22,11 @@ use crate::{event, Interest, Registry, Token};
 /// that the `SourceFd` is constructed right before a call to
 /// [`Registry::register`]. See the examples for more detail.
 ///
+/// On platforms using the `poll(2)` selector, `SourceFd` registrations are
+/// level-triggered: readiness events may be repeated until the I/O operation
+/// would block. Unlike Mio's own I/O types, `SourceFd` cannot notify the selector
+/// when an I/O operation returns [`io::ErrorKind::WouldBlock`].
+///
 /// [`event::Source`]: ../event/trait.Source.html
 /// [`Poll`]: ../struct.Poll.html
 /// [`Registry::register`]: ../struct.Registry.html#method.register
