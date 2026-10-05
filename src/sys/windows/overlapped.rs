@@ -19,10 +19,6 @@ impl Overlapped {
             callback: cb,
         }
     }
-
-    pub(crate) fn as_ptr(&self) -> *const OVERLAPPED {
-        self.inner.get()
-    }
 }
 
 impl fmt::Debug for Overlapped {

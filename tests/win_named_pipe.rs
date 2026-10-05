@@ -682,9 +682,10 @@ fn read_to_end(server: &mut NamedPipe, driver: &Driver) -> Vec<u8> {
     }
 }
 
-/// Waits until the pipe `name` is gone, i.e. no reference to it leaked. Every
-/// server is its first instance, so creating it again fails while it exists.
-fn wait_freed(name: &str, driver: &Driver) {
+/// Waits until the pipe `name` is gone, i.e. no reference to it leaked, calling
+/// `sync` to let completions be handled. Every server is its first instance, so
+/// creating it again fails while it exists.
+fn wait_freed(name: &str, mut sync: impl FnMut()) {
     let timeout = Instant::now() + Duration::from_secs(10);
     loop {
         match NamedPipe::new(name) {
@@ -693,7 +694,7 @@ fn wait_freed(name: &str, driver: &Driver) {
             Err(e) => panic!("unexpected error: {e}"),
         }
         assert!(Instant::now() < timeout, "pipe leaked");
-        driver.sync();
+        sync();
     }
 }
 
@@ -724,7 +725,7 @@ fn read_disconnect_race() {
             panic!("pipe freed while still in use: {err}");
         }
         drop(server);
-        wait_freed(&name, driver);
+        wait_freed(&name, || driver.sync());
     });
 }
 
@@ -751,7 +752,7 @@ fn write_disconnect_race() {
             assert!(Instant::now() < timeout, "write never failed");
         }
         drop(server);
-        wait_freed(&name, driver);
+        wait_freed(&name, || driver.sync());
     });
 }
 
@@ -770,7 +771,7 @@ fn read_more_data_race() {
         let read = read_to_end(&mut server, driver);
         assert!(read == msg, "got {} of {} bytes", read.len(), msg.len());
         drop(server);
-        wait_freed(&name, driver);
+        wait_freed(&name, || driver.sync());
     });
 }
 
@@ -887,7 +888,6 @@ fn reconnect_with_unread_data() {
 
 // Same, with a write in flight when the client goes away, which then fails.
 #[test]
-#[ignore = "fails until #1983 is fixed"]
 fn reconnect_with_write_in_flight() {
     let (mut server, name, mut poll, mut events) = registered_server();
     assert_would_block(server.connect());
@@ -916,7 +916,6 @@ fn reconnect_with_write_in_flight() {
 
 // Same, with a connect in flight when the pipe disconnects, which then fails.
 #[test]
-#[ignore = "fails until #1983 is fixed"]
 fn reconnect_after_aborted_connect() {
     let (server, name, mut poll, mut events) = registered_server();
     assert_would_block(server.connect());
@@ -942,6 +941,57 @@ fn reconnect_after_aborted_connect() {
         Ok(None) => {}
         res => panic!("expected no error, got {res:?}"),
     }
+}
+
+// A reply written right before disconnecting, as servers typically do: its
+// completion is handled after the disconnect.
+#[test]
+fn write_then_disconnect() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    for round in 0..2 {
+        assert_would_block(server.connect());
+        let _client = blocking_client(&name);
+        expect_events(
+            &mut poll,
+            &mut events,
+            vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+        );
+        let reply = format!("reply-{round}");
+        assert_eq!(t!(server.write(reply.as_bytes())), reply.len());
+        t!(server.disconnect());
+    }
+    t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+}
+
+// Many clients in turn on one pipe: each only sees its own data, and nothing
+// leaks.
+#[test]
+fn reconnect_many_clients() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    for round in 0..50 {
+        assert_would_block(server.connect());
+        let mut client = blocking_client(&name);
+        let ping = format!("ping-{round}");
+        t!(client.write_all(ping.as_bytes()));
+        assert_eq!(
+            read_some(&mut server, &mut poll, &mut events),
+            ping.as_bytes()
+        );
+
+        let pong = format!("pong-{round}");
+        assert_eq!(t!(server.write(pong.as_bytes())), pong.len());
+        let mut buf = [0; 16];
+        let n = t!(client.read(&mut buf));
+        assert_eq!(&buf[..n], pong.as_bytes());
+
+        drop(client);
+        assert!(read_to_eof(&mut server, &mut poll, &mut events).is_empty());
+        t!(server.disconnect());
+    }
+    drop(server);
+    wait_freed(&name, || {
+        t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+    });
 }
 
 // Dropping a pipe doesn't cancel its write in flight, it's still delivered.
