@@ -24,7 +24,7 @@ use windows_sys::Win32::System::Pipes::{
 };
 
 mod util;
-use util::{expect_events, ExpectEvent};
+use util::{assert_would_block, expect_events, ExpectEvent};
 
 fn _assert_kinds() {
     fn _assert_send<T: Send>() {}
@@ -784,4 +784,177 @@ fn read_more_data_race() {
         drop(server);
         wait_freed(&name, driver);
     });
+}
+
+/// Reads until EOF, polling whenever the read would block.
+fn read_to_eof(pipe: &mut NamedPipe, poll: &mut Poll, events: &mut Events) -> Vec<u8> {
+    let timeout = Instant::now() + Duration::from_secs(10);
+    let mut buf = [0; 8192];
+    let mut read = Vec::new();
+    loop {
+        match pipe.read(&mut buf) {
+            Ok(0) => return read,
+            Ok(n) => read.extend_from_slice(&buf[..n]),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                t!(poll.poll(events, Some(Duration::from_millis(100))));
+            }
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+        assert!(Instant::now() < timeout, "EOF never delivered");
+    }
+}
+
+/// Reads the first data that arrives, polling whenever the read would block.
+fn read_some(pipe: &mut NamedPipe, poll: &mut Poll, events: &mut Events) -> Vec<u8> {
+    let timeout = Instant::now() + Duration::from_secs(10);
+    let mut buf = [0; 8192];
+    loop {
+        match pipe.read(&mut buf) {
+            Ok(0) => panic!("unexpected EOF"),
+            Ok(n) => return buf[..n].to_vec(),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                t!(poll.poll(events, Some(Duration::from_millis(100))));
+            }
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+        assert!(Instant::now() < timeout, "data never delivered");
+    }
+}
+
+/// A server registered for both readiness kinds, with nothing connected yet.
+fn registered_server() -> (NamedPipe, String, Poll, Events) {
+    let (mut server, name) = server();
+    let poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    (server, name, poll, Events::with_capacity(16))
+}
+
+// Issue #1983: a pipe instance reused through `disconnect` and `connect` must
+// not hand anything of the previous client to the next one. Here the previous
+// client's EOF.
+#[test]
+#[ignore = "fails until #1983 is fixed"]
+fn reconnect_after_eof() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    for round in 0..2 {
+        assert_would_block(server.connect());
+        let msg = format!("round-{round}");
+        let mut client = blocking_client(&name);
+        t!(client.write_all(msg.as_bytes()));
+        drop(client);
+
+        assert_eq!(
+            read_to_eof(&mut server, &mut poll, &mut events),
+            msg.as_bytes()
+        );
+        t!(server.disconnect());
+    }
+}
+
+// Same, with a read still in flight when the pipe disconnects.
+#[test]
+#[ignore = "fails until #1983 is fixed"]
+fn reconnect_with_read_in_flight() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    let mut first = blocking_client(&name);
+    t!(first.write_all(b"first"));
+    // Using up the data submits the next read, which stays in flight as the
+    // client is still connected.
+    assert_eq!(read_some(&mut server, &mut poll, &mut events), b"first");
+    t!(server.disconnect());
+    drop(first);
+
+    assert_would_block(server.connect());
+    let mut second = blocking_client(&name);
+    t!(second.write_all(b"second"));
+    drop(second);
+    assert_eq!(read_to_eof(&mut server, &mut poll, &mut events), b"second");
+}
+
+// Same, with read data not handed out yet when the pipe disconnects.
+#[test]
+#[ignore = "fails until #1983 is fixed"]
+fn reconnect_with_unread_data() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    let mut first = blocking_client(&name);
+    t!(first.write_all(b"first"));
+    drop(first);
+    // Readable means the data is read into the internal buffer, leave it there.
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+    t!(server.disconnect());
+
+    assert_would_block(server.connect());
+    let mut second = blocking_client(&name);
+    t!(second.write_all(b"second"));
+    drop(second);
+    assert_eq!(read_to_eof(&mut server, &mut poll, &mut events), b"second");
+}
+
+// Same, with a write in flight when the client goes away, which then fails.
+#[test]
+#[ignore = "fails until #1983 is fixed"]
+fn reconnect_with_write_in_flight() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    let first = blocking_client(&name);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    // Larger than the pipe's buffer, so the write pends as the client never
+    // reads.
+    let data = vec![0; 128 * 1024];
+    assert_eq!(t!(server.write(&data)), data.len());
+    drop(first);
+    t!(server.disconnect());
+
+    assert_would_block(server.connect());
+    let _second = blocking_client(&name);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    assert_eq!(t!(server.write(b"second")), 6);
+}
+
+// Same, with a connect in flight when the pipe disconnects, which then fails.
+#[test]
+#[ignore = "fails until #1983 is fixed"]
+fn reconnect_after_aborted_connect() {
+    let (server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    // Wine doesn't abort the connect, but fails here instead.
+    let _ = server.disconnect();
+
+    let timeout = Instant::now() + Duration::from_secs(10);
+    let mut client = None;
+    loop {
+        t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+        match server.connect() {
+            Ok(()) => break,
+            // A client can only open the pipe while a connect is in flight.
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock && client.is_none() => {
+                client = Some(blocking_client(&name));
+            }
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+        assert!(Instant::now() < timeout, "never connected");
+    }
+    match server.take_error() {
+        Ok(None) => {}
+        res => panic!("expected no error, got {res:?}"),
+    }
 }
