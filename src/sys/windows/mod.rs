@@ -98,6 +98,46 @@ cfg_io_source! {
             result
         }
 
+        /// Same as [`do_io`], for an operation known to only involve
+        /// `interest`.
+        ///
+        /// Re-arming the full registered interest after a blocked read also
+        /// re-requests write readiness. The AFD poll completes immediately for
+        /// a writable socket, so that produces a writable event the caller
+        /// never asked for, on every blocked read. See #1963.
+        ///
+        /// [`do_io`]: IoSourceState::do_io
+        #[cfg(feature = "net")]
+        pub fn do_io_with<T, F, R>(&self, interest: Interest, f: F, io: &T) -> io::Result<R>
+        where
+            F: FnOnce(&T) -> io::Result<R>,
+        {
+            let result = f(io);
+            if let Err(ref e) = result {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.inner.as_ref().map_or(Ok(()), |state| {
+                        // Never re-arm more than the source is registered for.
+                        // If the blocked direction is not registered at all
+                        // there is nothing to narrow to, so fall back to the
+                        // full interest, which is what `do_io` would do.
+                        let interests = match (
+                            interest.is_readable() && state.interests.is_readable(),
+                            interest.is_writable() && state.interests.is_writable(),
+                        ) {
+                            (true, false) => Interest::READABLE,
+                            (false, true) => Interest::WRITABLE,
+                            _ => state.interests,
+                        };
+
+                        state
+                            .selector
+                            .rearm(state.sock_state.clone(), state.token, interests)
+                    })?;
+                }
+            }
+            result
+        }
+
         pub fn register(
             &mut self,
             registry: &Registry,
