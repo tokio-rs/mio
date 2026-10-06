@@ -16,6 +16,8 @@
     )),
 ))]
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, RawHandle};
 #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
@@ -463,6 +465,31 @@ impl AsRawFd for Poll {
     }
 }
 
+/// Returns the handle of the underlying I/O completion port.
+///
+/// This is the Windows counterpart of the `AsRawFd` implementation on Unix,
+/// allowing `Poll` to be driven by an external event loop. The completion
+/// port is a waitable kernel object, so the handle can be passed to e.g.
+/// `WaitForMultipleObjects` or `MsgWaitForMultipleObjectsEx`. It is signaled
+/// while completion packets are queued, which includes both I/O readiness
+/// and [`Waker::wake`] calls, and waiting on it does not dequeue any packets.
+///
+/// Note that a signaled handle does not guarantee that [`Poll::poll`] returns
+/// an event; a packet may be consumed internally, e.g. the completion of a
+/// cancelled readiness poll after deregistration. Callers should poll with a
+/// zero timeout when the handle is signaled and tolerate an empty result.
+///
+/// Wait completion packets and `RegisterWaitForSingleObject` are not
+/// supported on completion port handles.
+///
+/// [`Waker::wake`]: crate::Waker::wake
+#[cfg(windows)]
+impl AsRawHandle for Poll {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.registry.as_raw_handle()
+    }
+}
+
 impl fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Poll").finish()
@@ -787,6 +814,18 @@ impl AsFd for Registry {
 impl AsRawFd for Registry {
     fn as_raw_fd(&self) -> RawFd {
         self.selector.as_raw_fd()
+    }
+}
+
+/// Returns the handle of the underlying I/O completion port.
+///
+/// See the [`AsRawHandle` implementation for `Poll`] for details.
+///
+/// [`AsRawHandle` implementation for `Poll`]: struct.Poll.html#impl-AsRawHandle-for-Poll
+#[cfg(windows)]
+impl AsRawHandle for Registry {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.selector.as_raw_handle()
     }
 }
 
