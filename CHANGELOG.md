@@ -1,11 +1,3 @@
-# Unreleased
-
-## Added
-
-* `AsRawHandle` implementation for `Poll` and `Registry` on Windows, exposing
-  the I/O completion port handle so `Poll` can be driven from a host event loop
-  (https://github.com/tokio-rs/mio/pull/2023).
-
 # 1.2.4
 
 * Fix FreeBSD build with libc v0.2.190.

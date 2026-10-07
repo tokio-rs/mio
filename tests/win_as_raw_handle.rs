@@ -6,12 +6,12 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use mio::net::TcpListener;
-use mio::{Events, Interest, Poll, Token, Waker};
+use mio::{Interest, Token, Waker};
 use windows_sys::Win32::Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows_sys::Win32::System::Threading::WaitForSingleObject;
 
 mod util;
-use util::{any_local_address, init};
+use util::{any_local_address, expect_events, init_with_poll, ExpectEvent, Readiness};
 
 const ZERO: Option<Duration> = Some(Duration::ZERO);
 
@@ -21,9 +21,7 @@ fn wait(handle: RawHandle, timeout_ms: u32) -> u32 {
 
 #[test]
 fn handle_is_signaled_by_waker() {
-    init();
-    let mut poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(8);
+    let (mut poll, mut events) = init_with_poll();
     let handle = poll.as_raw_handle();
     assert_eq!(handle, poll.registry().as_raw_handle());
 
@@ -36,18 +34,18 @@ fn handle_is_signaled_by_waker() {
     assert_eq!(wait(handle, 0), WAIT_OBJECT_0);
     assert_eq!(wait(handle, 0), WAIT_OBJECT_0);
 
-    poll.poll(&mut events, ZERO).unwrap();
-    let tokens: Vec<_> = events.iter().map(|e| e.token()).collect();
-    assert_eq!(tokens, [Token(10)]);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(10), Readiness::READABLE)],
+    );
 
     assert_eq!(wait(handle, 0), WAIT_TIMEOUT);
 }
 
 #[test]
 fn handle_is_signaled_by_socket_readiness() {
-    init();
-    let mut poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(8);
+    let (mut poll, mut events) = init_with_poll();
     let handle = poll.as_raw_handle();
 
     let mut listener = TcpListener::bind(any_local_address()).unwrap();
@@ -71,10 +69,11 @@ fn handle_is_signaled_by_socket_readiness() {
         );
     }
 
-    poll.poll(&mut events, ZERO).unwrap();
-    let event = events.iter().next().expect("expected readable event");
-    assert_eq!(event.token(), Token(1));
-    assert!(event.is_readable());
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(1), Readiness::READABLE)],
+    );
 
     let _stream = connect.join().unwrap();
 }
