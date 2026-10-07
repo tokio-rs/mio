@@ -10,7 +10,7 @@ env:
   CI: true
   WASMTIME_VERSION: 47.0.0
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2026-07-20
+  rust_miri_nightly: nightly-2026-10-05
 
 permissions:
   contents: read #  to fetch code (actions/checkout)
