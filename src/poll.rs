@@ -465,22 +465,11 @@ impl AsRawFd for Poll {
     }
 }
 
-/// Returns the handle of the underlying I/O completion port.
-///
-/// This is the Windows counterpart of the `AsRawFd` implementation on Unix,
-/// allowing `Poll` to be driven by an external event loop. The completion
-/// port is a waitable kernel object, so the handle can be passed to e.g.
-/// `WaitForMultipleObjects` or `MsgWaitForMultipleObjectsEx`. It is signaled
-/// while completion packets are queued, which includes both I/O readiness
-/// and [`Waker::wake`] calls, and waiting on it does not dequeue any packets.
-///
-/// Note that a signaled handle does not guarantee that [`Poll::poll`] returns
-/// an event; a packet may be consumed internally, e.g. the completion of a
-/// cancelled readiness poll after deregistration. Callers should poll with a
-/// zero timeout when the handle is signaled and tolerate an empty result.
-///
-/// Wait completion packets and `RegisterWaitForSingleObject` are not
-/// supported on completion port handles.
+/// Returns the handle of the underlying I/O completion port on Windows,
+/// supported with `WaitForMultipleObjects` or `MsgWaitForMultipleObjectsEx`.
+/// It is signaled while completion packets are queued, which includes both I/O
+/// readiness and [`Waker::wake`] calls, and waiting on it does not dequeue any
+/// packets.
 ///
 /// [`Waker::wake`]: crate::Waker::wake
 #[cfg(windows)]
