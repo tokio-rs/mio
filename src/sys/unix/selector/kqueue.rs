@@ -395,9 +395,12 @@ pub mod event {
     pub fn is_readable(event: &Event) -> bool {
         event.0.filter == libc::EVFILT_READ || {
             #[cfg(any(
+                target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
                 target_os = "macos",
+                target_os = "netbsd",
+                target_os = "openbsd",
                 target_os = "tvos",
                 target_os = "visionos",
                 target_os = "watchos"
@@ -409,9 +412,12 @@ pub mod event {
                 event.filter == libc::EVFILT_USER
             }
             #[cfg(not(any(
+                target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "ios",
                 target_os = "macos",
+                target_os = "netbsd",
+                target_os = "openbsd",
                 target_os = "tvos",
                 target_os = "visionos",
                 target_os = "watchos"
