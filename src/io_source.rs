@@ -69,6 +69,44 @@ impl<T> IoSource<T> {
         self.state.do_io(f, &self.inner)
     }
 
+    /// Same as [`do_io`], for an operation known to only involve `interest`.
+    ///
+    /// Selectors that have to re-arm a source after a blocked operation re-arm
+    /// only `interest`, instead of everything the source is registered for.
+    /// Re-arming a direction the caller did not block on can raise readiness
+    /// nothing asked for: on Windows a blocked read would otherwise re-request
+    /// write readiness, which the AFD poll completes immediately for a writable
+    /// socket.
+    ///
+    /// Only use this when the direction is actually known. An operation driven
+    /// by a caller-supplied closure, such as `try_io`, must keep using
+    /// [`do_io`].
+    ///
+    /// [`do_io`]: IoSource::do_io
+    #[cfg(feature = "net")]
+    pub(crate) fn do_io_with<F, R>(&self, interest: Interest, f: F) -> io::Result<R>
+    where
+        F: FnOnce(&T) -> io::Result<R>,
+    {
+        #[cfg(windows)]
+        {
+            self.state.do_io_with(interest, f, &self.inner)
+        }
+
+        // `epoll(7)` and `kqueue(2)` are edge triggered and never re-arm, so
+        // there is nothing to narrow for them.
+        //
+        // `poll(2)` and `event_ports(2)` do re-arm the full interest and have
+        // the same problem, but narrowing them means giving each selector a
+        // re-arm that adds to the requested events rather than replacing them.
+        // That is not done yet, so they still go through `do_io`. See #1963.
+        #[cfg(not(windows))]
+        {
+            let _ = interest;
+            self.state.do_io(f, &self.inner)
+        }
+    }
+
     /// Returns the I/O source, dropping the state.
     ///
     /// # Notes
