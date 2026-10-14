@@ -414,10 +414,10 @@ impl NamedPipe {
     /// Attempts to call `ConnectNamedPipe`, if possible.
     ///
     /// This function will attempt to connect this pipe to a client in an
-    /// asynchronous fashion. If the function immediately establishes a
-    /// connection to a client then `Ok(())` is returned. Otherwise if a
-    /// connection attempt was issued and is now in progress then a "would
-    /// block" error is returned.
+    /// asynchronous fashion. If a client is already connected then `Ok(())` is
+    /// returned. Otherwise a connection attempt is issued and a "would block"
+    /// error is returned, also if Windows finishes it right away: its
+    /// completion is still handled by the event loop.
     ///
     /// When the connection is finished then this object will be flagged as
     /// being ready for a write, or otherwise in the writable state.
@@ -427,7 +427,7 @@ impl NamedPipe {
     /// This function will return a "would block" error if the pipe has not yet
     /// been registered with an event loop, if the connection operation has
     /// previously been issued but has not yet completed, or if the connect
-    /// itself was issued and didn't finish immediately.
+    /// itself was issued.
     ///
     /// Normal I/O errors from the call to `ConnectNamedPipe` are returned
     /// immediately.
@@ -926,6 +926,12 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             let pos = pos + n;
             if pos == op.buf.len() {
                 io.recycle(op);
+                io.notify_writable(&me, events);
+            } else if n == 0 {
+                // Nothing written, say to a full `PIPE_NOWAIT` pipe. Writing the
+                // rest again would do the same, forever.
+                io.recycle(op);
+                io.write = WriteState::Failed(io::ErrorKind::WriteZero.into());
                 io.notify_writable(&me, events);
             } else if let Err(e) = Inner::schedule_write(&me, &mut io, op, pos) {
                 io.write = WriteState::Failed(e);

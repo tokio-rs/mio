@@ -20,8 +20,8 @@ use windows_sys::Win32::Storage::FileSystem::{
     FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
 };
 use windows_sys::Win32::System::Pipes::{
-    CreateNamedPipeW, SetNamedPipeHandleState, PIPE_READMODE_MESSAGE, PIPE_TYPE_MESSAGE,
-    PIPE_UNLIMITED_INSTANCES,
+    CreateNamedPipeW, SetNamedPipeHandleState, PIPE_NOWAIT, PIPE_READMODE_MESSAGE,
+    PIPE_TYPE_MESSAGE, PIPE_UNLIMITED_INSTANCES,
 };
 
 mod util;
@@ -836,6 +836,47 @@ fn write_fails_after_submit() {
     match server.write(&data) {
         Err(e) if e.kind() != io::ErrorKind::WouldBlock => {}
         res => panic!("expected the write's error, got {res:?}"),
+    }
+}
+
+// A write that completes without writing anything, as to a full `PIPE_NOWAIT`
+// pipe, fails instead of being written again forever.
+#[test]
+fn write_without_progress_fails() {
+    let (mut server, name) = message_server();
+    let _client = blocking_client(&name);
+    let mode = PIPE_NOWAIT | PIPE_READMODE_MESSAGE;
+    let ok =
+        unsafe { SetNamedPipeHandleState(server.as_raw_handle(), &mode, ptr::null(), ptr::null()) };
+    assert!(ok != 0, "{}", io::Error::last_os_error());
+
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(0), Interest::WRITABLE));
+    let mut events = Events::with_capacity(16);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+
+    // Larger than the pipe's buffer, so nothing of it is written.
+    let data = vec![1; 128 * 1024];
+    assert_eq!(t!(server.write(&data)), data.len());
+    t!(poll.poll(&mut events, Some(Duration::from_secs(1))));
+    let writable = events
+        .iter()
+        .any(|e| e.token() == Token(0) && e.is_writable());
+    let res = server.write(b"next");
+    // Stops a write that's written again forever, which would hang dropping
+    // `poll` instead of failing.
+    t!(server.disconnect());
+
+    assert!(writable, "not writable after the write");
+    match res {
+        Err(e) if e.kind() == io::ErrorKind::WriteZero => {}
+        res => panic!("expected a `WriteZero` error, got {res:?}"),
     }
 }
 
