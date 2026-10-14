@@ -316,12 +316,17 @@ const SPARE_OPS: usize = 2;
 /// large write. Writes larger than this allocate their buffer every time.
 const MAX_IDLE_BUF_SIZE: usize = 1024 * 1024;
 
+/// The state of a pipe, behind `Inner::io`.
+///
+/// Operations are only submitted, and their completions only handled, with it
+/// locked. So while it's locked an operation that's in flight stays in flight,
+/// which is what lets `disconnect` and `drop` cancel and forget them.
 struct Io {
     // Uniquely identifies the selector associated with this named pipe
     cp: Option<Arc<CompletionPort>>,
     // Token used to identify events
     token: Option<Token>,
-    /// The connect in flight, if any.
+    // The connect in flight, if any
     connect: Option<OpId>,
     connect_error: Option<io::Error>,
     read: ReadState,
@@ -731,7 +736,8 @@ impl Drop for NamedPipe {
         io.token = None;
 
         // Cancel pending reads/connects, but don't cancel writes to ensure that
-        // everything is flushed out.
+        // everything is flushed out. That only happens while the event loop
+        // runs, see #1944.
         if let Some(op) = io.connect.take() {
             self.inner.cancel(op);
         }
