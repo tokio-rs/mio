@@ -145,7 +145,14 @@ impl Inner {
         overlapped: *mut OVERLAPPED,
     ) -> io::Result<()> {
         let len = cmp::min(len, u32::MAX as usize) as u32;
-        if ReadFile(self.handle.raw(), buf.cast(), len, ptr::null_mut(), overlapped) == 0 {
+        if ReadFile(
+            self.handle.raw(),
+            buf.cast(),
+            len,
+            ptr::null_mut(),
+            overlapped,
+        ) == 0
+        {
             let err = io::Error::last_os_error();
             match err.raw_os_error().map(|e| e as u32) {
                 // `ERROR_MORE_DATA` is only a warning (the message didn't fit),
@@ -174,7 +181,14 @@ impl Inner {
         overlapped: *mut OVERLAPPED,
     ) -> io::Result<()> {
         let len = cmp::min(len, u32::MAX as usize) as u32;
-        if WriteFile(self.handle.raw(), buf.cast(), len, ptr::null_mut(), overlapped) == 0 {
+        if WriteFile(
+            self.handle.raw(),
+            buf.cast(),
+            len,
+            ptr::null_mut(),
+            overlapped,
+        ) == 0
+        {
             let err = io::Error::last_os_error();
             if err.raw_os_error() != Some(ERROR_IO_PENDING as i32) {
                 return Err(err);
@@ -290,7 +304,10 @@ impl Op {
     /// `Io::submit`.
     unsafe fn complete(overlapped: *mut OVERLAPPED) -> (Box<Op>, Arc<Inner>) {
         let mut op = Box::from_raw(overlapped.cast::<Op>());
-        let pipe = op.pipe.take().expect("operation in flight without its pipe");
+        let pipe = op
+            .pipe
+            .take()
+            .expect("operation in flight without its pipe");
         (op, pipe)
     }
 }
