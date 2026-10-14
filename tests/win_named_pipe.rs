@@ -2,7 +2,7 @@
 
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
@@ -20,7 +20,8 @@ use windows_sys::Win32::Storage::FileSystem::{
     FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
 };
 use windows_sys::Win32::System::Pipes::{
-    CreateNamedPipeW, PIPE_READMODE_MESSAGE, PIPE_TYPE_MESSAGE, PIPE_UNLIMITED_INSTANCES,
+    CreateNamedPipeW, SetNamedPipeHandleState, PIPE_READMODE_MESSAGE, PIPE_TYPE_MESSAGE,
+    PIPE_UNLIMITED_INSTANCES,
 };
 
 mod util;
@@ -475,6 +476,168 @@ fn read_with_small_buffer_provided() {
     assert_eq!(actual_msg, expected_msg);
 }
 
+#[test]
+fn write_vectored_then_read() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    let bufs = [
+        IoSlice::new(b"12"),
+        IoSlice::new(b""),
+        IoSlice::new(b"345"),
+        IoSlice::new(b"6789"),
+    ];
+    assert_eq!(t!(client.write_vectored(&bufs)), 9);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf = [0; 16];
+    assert_eq!(t!(server.read(&mut buf)), 9);
+    assert_eq!(&buf[..9], b"123456789");
+}
+
+#[test]
+fn write_then_read_vectored() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    assert_eq!(t!(client.write(b"123456789")), 9);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf1 = [0; 2];
+    let mut buf2 = [0; 0];
+    let mut buf3 = [0; 3];
+    let mut buf4 = [0; 8];
+    let mut bufs = [
+        IoSliceMut::new(&mut buf1),
+        IoSliceMut::new(&mut buf2),
+        IoSliceMut::new(&mut buf3),
+        IoSliceMut::new(&mut buf4),
+    ];
+    assert_eq!(t!(server.read_vectored(&mut bufs)), 9);
+    assert_eq!(&buf1, b"12");
+    assert_eq!(&buf3, b"345");
+    assert_eq!(&buf4[..4], b"6789");
+}
+
+#[test]
+fn read_vectored_keeps_remainder() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+
+    let mut events = Events::with_capacity(128);
+    t!(poll.poll(&mut events, None));
+
+    assert_eq!(t!(client.write(b"123456789")), 9);
+
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+
+    let mut buf1 = [0; 2];
+    let mut buf2 = [0; 0];
+    let mut buf3 = [0; 3];
+    let mut bufs = [
+        IoSliceMut::new(&mut buf1),
+        IoSliceMut::new(&mut buf2),
+        IoSliceMut::new(&mut buf3),
+    ];
+    assert_eq!(t!(server.read_vectored(&mut bufs)), 5);
+    assert_eq!(&buf1, b"12");
+    assert_eq!(&buf3, b"345");
+
+    // The rest is kept for the next read.
+    let mut buf = [0; 16];
+    assert_eq!(t!(server.read(&mut buf)), 4);
+    assert_eq!(&buf[..4], b"6789");
+    match server.read(&mut buf) {
+        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+        res => panic!("expected the data to be used up, got {res:?}"),
+    }
+}
+
+// A vectored write is sent as a single message.
+#[test]
+fn write_vectored_message_mode() {
+    let (mut server, name) = message_server();
+    let mut client = blocking_client(&name);
+    // Read whole messages, so a split write shows up as a short read.
+    let mode = PIPE_READMODE_MESSAGE;
+    let ok =
+        unsafe { SetNamedPipeHandleState(client.as_raw_handle(), &mode, ptr::null(), ptr::null()) };
+    assert!(ok != 0, "{}", io::Error::last_os_error());
+
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(0), Interest::WRITABLE));
+    let mut events = Events::with_capacity(16);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+
+    let bufs = [
+        IoSlice::new(b"12"),
+        IoSlice::new(b""),
+        IoSlice::new(b"345"),
+        IoSlice::new(b"6789"),
+    ];
+    assert_eq!(t!(server.write_vectored(&bufs)), 9);
+
+    let mut buf = [0; 16];
+    assert_eq!(t!(client.read(&mut buf)), 9);
+    assert_eq!(&buf[..9], b"123456789");
+}
+
 // A message larger than the internal buffer arrives in pieces, all but the last
 // read completing with `ERROR_MORE_DATA`, whether the message is sent before
 // or after the read is submitted.
@@ -516,6 +679,131 @@ fn read_message_mode_larger_than_internal_buffer() {
             assert!(Instant::now() < timeout, "EOF never delivered");
         }
         assert!(read == msg, "got {} of {} bytes", read.len(), msg.len());
+    }
+}
+
+// Once the size of the caller's buffer is known, reads from the pipe use it.
+#[test]
+fn read_with_large_buffer() {
+    for vectored in [false, true] {
+        let (mut server, name) = server();
+        let mut client = blocking_client(&name);
+        let mut poll = t!(Poll::new());
+        t!(poll
+            .registry()
+            .register(&mut server, Token(0), Interest::READABLE));
+
+        // Returns once all of it is read or in the pipe's buffer.
+        let data: Vec<u8> = (0..64 * 1024).map(|i| (i % 251) as u8).collect();
+        t!(client.write_all(&data));
+
+        // The first read was submitted on register, at the default size. The
+        // next one is sized like `buf` and gets all the rest.
+        let mut buf = vec![0; 64 * 1024];
+        let mut read = Vec::new();
+        for _ in 0..2 {
+            let n = read_when_ready(&mut poll, || {
+                if vectored {
+                    let (a, b) = buf.split_at_mut(32 * 1024);
+                    server.read_vectored(&mut [IoSliceMut::new(a), IoSliceMut::new(b)])
+                } else {
+                    server.read(&mut buf)
+                }
+            });
+            read.extend_from_slice(&buf[..n]);
+        }
+        assert!(read == data, "got {} of {} bytes", read.len(), data.len());
+    }
+}
+
+// The read size follows the caller's buffer as it changes, and data read for a
+// larger buffer is kept for the next calls.
+#[test]
+fn read_buffer_size_changes() {
+    let (mut server, name) = server();
+    let mut client = blocking_client(&name);
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(0), Interest::READABLE));
+    let data: Vec<u8> = (0..64 * 1024).map(|i| (i % 251) as u8).collect();
+    let mut buf = vec![0; 64 * 1024];
+    let mut read = Vec::new();
+
+    t!(client.write_all(&data));
+    // Submitted on register, at the default size.
+    let n = read_when_ready(&mut poll, || server.read(&mut buf));
+    read.extend_from_slice(&buf[..n]);
+    // The next read is sized like `buf` and gets all the rest, which smaller
+    // buffers then take in parts.
+    for len in [1024, 16 * 1024] {
+        let n = read_when_ready(&mut poll, || server.read(&mut buf[..len]));
+        assert_eq!(n, len);
+        read.extend_from_slice(&buf[..n]);
+    }
+    while read.len() < data.len() {
+        let n = read_when_ready(&mut poll, || server.read(&mut buf[..1024]));
+        read.extend_from_slice(&buf[..n]);
+    }
+    assert!(read == data, "got {} of {} bytes", read.len(), data.len());
+
+    // The last 1 KiB read sized the next one down to the minimum, the one
+    // after it is sized like `buf` again.
+    read.clear();
+    t!(client.write_all(&data));
+    let n = read_when_ready(&mut poll, || server.read(&mut buf));
+    assert_eq!(n, 4096);
+    read.extend_from_slice(&buf[..n]);
+    let n = read_when_ready(&mut poll, || server.read(&mut buf));
+    read.extend_from_slice(&buf[..n]);
+    assert!(read == data, "got {} of {} bytes", read.len(), data.len());
+}
+
+// In message mode, a message larger than the default read size arrives in one
+// read once the size of the caller's buffer is known.
+#[test]
+fn read_message_mode_with_large_buffer() {
+    let (mut server, name) = message_server();
+    let mut client = blocking_client(&name);
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(0), Interest::READABLE));
+    let first: Vec<u8> = (0..10000).map(|i| (i % 251) as u8).collect();
+    let second: Vec<u8> = (0..10000).map(|i| (i % 241) as u8).collect();
+    for msg in [&first, &second] {
+        assert_eq!(t!(client.write(msg)), msg.len());
+    }
+
+    // The first message arrives in parts: the first read was submitted on
+    // register, at the default size.
+    let mut buf = vec![0; 16 * 1024];
+    let mut read = Vec::new();
+    while read.len() < first.len() {
+        let n = read_when_ready(&mut poll, || server.read(&mut buf));
+        read.extend_from_slice(&buf[..n]);
+    }
+    assert!(read == first, "got {} of {} bytes", read.len(), first.len());
+    // The second one in a single read.
+    let n = read_when_ready(&mut poll, || server.read(&mut buf));
+    assert_eq!(n, second.len());
+    assert!(buf[..n] == second[..]);
+}
+
+/// Calls `read` until it returns data, polling while it would block.
+fn read_when_ready(poll: &mut Poll, mut read: impl FnMut() -> io::Result<usize>) -> usize {
+    let mut events = Events::with_capacity(16);
+    let timeout = Instant::now() + Duration::from_secs(10);
+    loop {
+        match read() {
+            Ok(0) => panic!("unexpected EOF"),
+            Ok(n) => return n,
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+            }
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+        assert!(Instant::now() < timeout, "no data to read");
     }
 }
 

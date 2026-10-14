@@ -127,7 +127,6 @@ fn readiness_is_reregistered_after_would_block() {
     let client = net::TcpStream::connect(addr).unwrap();
     let (mut server, _) = listener.accept().unwrap();
     client.set_nonblocking(true).unwrap();
-    server.set_nonblocking(true).unwrap();
 
     let mut client = TcpStream::from_std(client);
     let mut poll = Poll::new().unwrap();

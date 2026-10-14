@@ -1,18 +1,19 @@
 use std::ffi::OsStr;
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::ptr::{self, NonNull};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Mutex};
-use std::{cmp, fmt, mem};
+use std::{cmp, fmt, iter, mem};
 
 use windows_sys::Win32::Foundation::{
     ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA, ERROR_PIPE_CONNECTED,
     ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
+    GetFileType, ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED,
+    FILE_TYPE_PIPE, PIPE_ACCESS_DUPLEX,
 };
 use windows_sys::Win32::System::Pipes::{
     ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_TYPE_BYTE,
@@ -83,6 +84,8 @@ struct Inner {
     event: Overlapped,
     handle: Handle,
     io: Mutex<Io>,
+    // Largest read size, see `MAX_READ_SIZE`.
+    max_read_size: usize,
 }
 
 // SAFETY: `Handles`s are, in general, not thread-safe. However, we only used `Handle`s for
@@ -246,8 +249,16 @@ struct Op {
     buf: Vec<u8>,
 }
 
-/// Minimum size of a read.
-const READ_SIZE: usize = 4 * 1024;
+/// Size of reads until the caller's buffer size is known. Also the minimum
+/// read size, so that small reads (e.g. of a length prefix) don't turn into
+/// small reads from the pipe.
+const DEFAULT_READ_SIZE: usize = 4 * 1024;
+
+/// Maximum read size, the pipe buffer size `NamedPipe::new` uses. Limits the
+/// memory held by the read that is always pending. Only used for pipes: other
+/// handles, such as serial ports, can wait for the whole buffer to fill before
+/// a read completes, so a larger read delays the data.
+const MAX_READ_SIZE: usize = 64 * 1024;
 
 impl Op {
     fn new() -> Box<Op> {
@@ -310,6 +321,8 @@ struct Io {
     connect: Option<OpId>,
     connect_error: Option<io::Error>,
     read: ReadState,
+    // Size of the next read, from the length of the caller's last read buffer
+    read_size: usize,
     write: WriteState,
     spare: [Option<Box<Op>>; SPARE_OPS],
 }
@@ -471,6 +484,11 @@ impl NamedPipe {
 
 impl FromRawHandle for NamedPipe {
     unsafe fn from_raw_handle(handle: RawHandle) -> NamedPipe {
+        let max_read_size = if GetFileType(handle as HANDLE) == FILE_TYPE_PIPE {
+            MAX_READ_SIZE
+        } else {
+            DEFAULT_READ_SIZE
+        };
         NamedPipe {
             inner: Arc::new(Inner {
                 event: Overlapped::new(event_done),
@@ -481,9 +499,11 @@ impl FromRawHandle for NamedPipe {
                     connect: None,
                     connect_error: None,
                     read: ReadState::Idle,
+                    read_size: DEFAULT_READ_SIZE,
                     write: WriteState::Idle,
                     spare: [None, None],
                 }),
+                max_read_size,
             }),
         }
     }
@@ -493,6 +513,10 @@ impl Read for NamedPipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         <&NamedPipe as Read>::read(&mut &*self, buf)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        <&NamedPipe as Read>::read_vectored(&mut &*self, bufs)
+    }
 }
 
 impl Write for NamedPipe {
@@ -500,18 +524,32 @@ impl Write for NamedPipe {
         <&NamedPipe as Write>::write(&mut &*self, buf)
     }
 
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        <&NamedPipe as Write>::write_vectored(&mut &*self, bufs)
+    }
+
     fn flush(&mut self) -> io::Result<()> {
         <&NamedPipe as Write>::flush(&mut &*self)
     }
 }
 
-impl<'a> Read for &'a NamedPipe {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+impl NamedPipe {
+    /// Reads from the internal read buffer using `f`, shared by `read` and
+    /// `read_vectored`. `len` is the size of the caller's buffer(s).
+    fn read_with(
+        &self,
+        len: usize,
+        f: impl FnOnce(&mut &[u8]) -> io::Result<usize>,
+    ) -> io::Result<usize> {
         let mut state = self.inner.io.lock().unwrap();
 
         if state.token.is_none() {
             return Err(would_block());
         }
+
+        // Size the next read from the pipe like the caller's buffer, so it can
+        // be filled in one call.
+        state.read_size = len.clamp(DEFAULT_READ_SIZE, self.inner.max_read_size);
 
         match mem::replace(&mut state.read, ReadState::Idle) {
             // Not connected, or a read is in flight, still waiting for it to
@@ -527,7 +565,7 @@ impl<'a> Read for &'a NamedPipe {
             ReadState::Ready(op, cur) => {
                 let n = {
                     let mut remaining = &op.buf[cur..];
-                    remaining.read(buf)?
+                    f(&mut remaining)?
                 };
                 let next = cur + n;
                 if next != op.buf.len() {
@@ -551,10 +589,12 @@ impl<'a> Read for &'a NamedPipe {
             }
         }
     }
-}
 
-impl<'a> Write for &'a NamedPipe {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    /// Writes all of `bufs`, shared by `write` and `write_vectored`.
+    ///
+    /// Takes byte slices, not `IoSlice`s: `IoSlice::new` panics on Windows for
+    /// buffers over 4 GiB, and `write` must not panic.
+    fn write_bufs<'b>(&self, bufs: impl Iterator<Item = &'b [u8]> + Clone) -> io::Result<usize> {
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
 
@@ -572,12 +612,38 @@ impl<'a> Write for &'a NamedPipe {
             }
         }
 
-        // Move `buf` onto the heap and fire off the write, which writes all of
+        // Move `bufs` onto the heap and fire off the write, which writes all of
         // it. If that fails the next write returns the error.
         let mut op = io.op();
-        op.buf.extend_from_slice(buf);
+        op.buf
+            .reserve(bufs.clone().map(<[u8]>::len).fold(0, usize::saturating_add));
+        for buf in bufs {
+            op.buf.extend_from_slice(buf);
+        }
+        let len = op.buf.len();
         Inner::schedule_write(&self.inner, &mut io, op, 0)?;
-        Ok(buf.len())
+        Ok(len)
+    }
+}
+
+impl<'a> Read for &'a NamedPipe {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.read_with(buf.len(), |data| data.read(buf))
+    }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        let len = bufs.iter().map(|buf| buf.len()).sum();
+        self.read_with(len, |data| data.read_vectored(bufs))
+    }
+}
+
+impl<'a> Write for &'a NamedPipe {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.write_bufs(iter::once(buf))
+    }
+
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        self.write_bufs(bufs.iter().map(|buf| &**buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -687,14 +753,13 @@ impl Inner {
             return true;
         }
 
-        // Read as much as the buffer holds, at least `READ_SIZE`.
+        let len = io.read_size;
         let mut op = io.op();
-        op.buf.reserve(READ_SIZE);
-        // SAFETY: `submit` keeps the buffer and `OVERLAPPED` alive until the
-        // read completes.
+        op.buf.reserve_exact(len);
+        // SAFETY: `submit` keeps the buffer, of at least `len` bytes, and the
+        // `OVERLAPPED` alive until the read completes.
         let res = io.submit(op, me, read_done, |op| unsafe {
-            let buf = &mut (*op).buf;
-            me.read_overlapped(buf.as_mut_ptr(), buf.capacity(), Op::overlapped(op))
+            me.read_overlapped((*op).buf.as_mut_ptr(), len, Op::overlapped(op))
         });
 
         match res {
