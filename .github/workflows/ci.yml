@@ -127,8 +127,12 @@ jobs:
     - name: Tests
       run: cargo test --all-features
   Clippy:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "windows-latest"]
     steps:
     - uses: actions/checkout@v7
     - uses: dtolnay/rust-toolchain@stable
