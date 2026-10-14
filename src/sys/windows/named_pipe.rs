@@ -312,6 +312,10 @@ impl OpId {
 /// Number of idle `Op`s kept for reuse, so operations don't allocate.
 const SPARE_OPS: usize = 2;
 
+/// Largest buffer an idle `Op` keeps, so a pipe doesn't hold on to the memory of a
+/// large write. Writes larger than this allocate their buffer every time.
+const MAX_IDLE_BUF_SIZE: usize = 1024 * 1024;
+
 struct Io {
     // Uniquely identifies the selector associated with this named pipe
     cp: Option<Arc<CompletionPort>>,
@@ -952,7 +956,11 @@ impl Io {
     /// Keeps the idle `op` for reuse, if there's room.
     fn recycle(&mut self, mut op: Box<Op>) {
         if let Some(spare) = self.spare.iter_mut().find(|spare| spare.is_none()) {
-            op.buf.clear();
+            if op.buf.capacity() > MAX_IDLE_BUF_SIZE {
+                op.buf = Vec::new();
+            } else {
+                op.buf.clear();
+            }
             *spare = Some(op);
         }
     }
