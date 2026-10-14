@@ -109,7 +109,8 @@ impl CompletionPort {
         let ret = unsafe {
             GetQueuedCompletionStatusEx(
                 self.handle.raw(),
-                list.as_ptr() as *mut _,
+                // Written to, so it must come from a mutable borrow.
+                list.as_mut_ptr().cast(),
                 len,
                 &mut removed,
                 timeout,

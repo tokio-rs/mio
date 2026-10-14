@@ -14,7 +14,7 @@ use std::{mem, panic, ptr, thread};
 use mio::windows::NamedPipe;
 use mio::{Events, Interest, Poll, Registry, Token, Waker};
 use windows_sys::Win32::Foundation::{
-    GetHandleInformation, ERROR_ACCESS_DENIED, ERROR_NO_DATA, INVALID_HANDLE_VALUE,
+    CloseHandle, GetHandleInformation, ERROR_ACCESS_DENIED, ERROR_NO_DATA, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
@@ -23,6 +23,7 @@ use windows_sys::Win32::System::Pipes::{
     CreateNamedPipeW, SetNamedPipeHandleState, PIPE_NOWAIT, PIPE_READMODE_MESSAGE,
     PIPE_TYPE_MESSAGE, PIPE_UNLIMITED_INSTANCES,
 };
+use windows_sys::Win32::System::IO::CreateIoCompletionPort;
 
 mod util;
 use util::{assert_would_block, expect_events, ExpectEvent};
@@ -376,6 +377,77 @@ fn reregister_deregister_different_poll() {
         poll2.registry().deregister(&mut pipe).unwrap_err().kind(),
         io::ErrorKind::AlreadyExists,
     );
+}
+
+// Registering again announces data that's read but not handed out yet.
+#[test]
+fn readable_after_registering_again() {
+    let (mut server, name) = server();
+    let mut client = blocking_client(&name);
+    let mut poll = t!(Poll::new());
+    let mut events = Events::with_capacity(16);
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    t!(client.write_all(b"data"));
+    // Readable means the data is read into the internal buffer, leave it there.
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+    t!(poll.registry().deregister(&mut server));
+
+    t!(poll
+        .registry()
+        .register(&mut server, Token(1), Interest::READABLE));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(1), Interest::READABLE)],
+    );
+    let mut buf = [0; 16];
+    assert_eq!(t!(server.read(&mut buf)), 4);
+    assert_eq!(&buf[..4], b"data");
+}
+
+// A failed registration leaves the pipe unregistered, so registering again
+// fails again rather than pretending it worked.
+#[test]
+fn register_fails_again_after_failure() {
+    let (mut pipe, _name) = server();
+    // A handle can only be associated with one completion port.
+    let port = unsafe { CreateIoCompletionPort(INVALID_HANDLE_VALUE, ptr::null_mut(), 0, 0) };
+    assert!(!port.is_null(), "{}", io::Error::last_os_error());
+    let associated = unsafe { CreateIoCompletionPort(pipe.as_raw_handle(), port, 0, 0) };
+    assert!(!associated.is_null(), "{}", io::Error::last_os_error());
+
+    let poll = t!(Poll::new());
+    for _ in 0..2 {
+        assert!(poll
+            .registry()
+            .register(&mut pipe, Token(0), Interest::READABLE)
+            .is_err());
+    }
+    unsafe { CloseHandle(port) };
+}
+
+// A connect before registering would never finish, and keep the pipe alive.
+#[test]
+fn connect_before_register() {
+    let (pipe, name) = server();
+    assert_would_block(pipe.connect());
+    drop(pipe);
+    // Every server is its pipe's first instance, so this fails while it's kept
+    // alive.
+    t!(NamedPipe::new(&name));
 }
 
 #[test]

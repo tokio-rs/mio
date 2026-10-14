@@ -71,6 +71,11 @@ use crate::{Interest, Token};
 /// with the `NamedPipe::from_raw_handle` method to convert that to a named pipe
 /// that can operate asynchronously. Don't forget to pass the
 /// `FILE_FLAG_OVERLAPPED` flag when opening the `File`.
+///
+/// A handle passed to `NamedPipe::from_raw_handle` must also not be associated
+/// with an I/O completion port yet, nor use
+/// `FILE_SKIP_COMPLETION_PORT_ON_SUCCESS`: every operation must complete
+/// through the completion port the pipe is registered with.
 pub struct NamedPipe {
     inner: Arc<Inner>,
 }
@@ -197,23 +202,20 @@ impl Inner {
         Ok(())
     }
 
-    /// Calls the `GetOverlappedResult` function to get the result of an
-    /// overlapped operation for this handle.
+    /// Calls the `GetOverlappedResult` function to get the result of the
+    /// completed operation `op` on this pipe: the number of bytes transferred,
+    /// or the error it failed with.
     ///
-    /// This function takes the `OVERLAPPED` argument which must have been used
-    /// to initiate an overlapped I/O operation, and returns either the
-    /// successful number of bytes transferred during the operation or an error
-    /// if one occurred.
-    ///
-    /// # Unsafety
-    ///
-    /// This function is unsafe as `overlapped` must have previously been used
-    /// to execute an operation for this handle, and it must also be a valid
-    /// pointer to an `Overlapped` instance.
+    /// Takes the `Op` itself, as handed back by `Op::complete`, so the
+    /// `OVERLAPPED` is accessed through the `Box` that owns it.
     #[inline]
-    unsafe fn result(&self, overlapped: *mut OVERLAPPED) -> io::Result<usize> {
+    fn result(&self, op: &mut Op) -> io::Result<usize> {
         let mut transferred = 0;
-        let r = GetOverlappedResult(self.handle.raw(), overlapped, &mut transferred, 0);
+        // SAFETY: `op` is borrowed for the call, and without waiting
+        // `GetOverlappedResult` only reads the `OVERLAPPED`.
+        let r = unsafe {
+            GetOverlappedResult(self.handle.raw(), Op::overlapped(op), &mut transferred, 0)
+        };
         if r == 0 {
             Err(io::Error::last_os_error())
         } else {
@@ -301,7 +303,8 @@ impl Op {
     /// # Unsafety
     ///
     /// `overlapped` must be from the completion of an operation started by
-    /// `Io::submit`.
+    /// `Io::submit`. Afterwards only access the `Op` through the returned
+    /// `Box`, not `overlapped`.
     unsafe fn complete(overlapped: *mut OVERLAPPED) -> (Box<Op>, Arc<Inner>) {
         let mut op = Box::from_raw(overlapped.cast::<Op>());
         let pipe = op
@@ -335,9 +338,12 @@ const MAX_IDLE_BUF_SIZE: usize = 1024 * 1024;
 
 /// The state of a pipe, behind `Inner::io`.
 ///
-/// Operations are only submitted, and their completions only handled, with it
-/// locked. So while it's locked an operation that's in flight stays in flight,
-/// which is what lets `disconnect` and `drop` cancel and forget them.
+/// Operations are submitted, and `Io` is changed, only with it locked. A
+/// completion first takes back its `Op` and the pipe reference it holds, then
+/// locks `Io` before it compares the operation, changes any state or recycles
+/// the `Op`. So while it's locked, an `Op` that `Io` tracks as in flight isn't
+/// freed or reused, which is what lets `disconnect` and `drop` cancel and
+/// forget operations.
 struct Io {
     // Uniquely identifies the selector associated with this named pipe
     cp: Option<Arc<CompletionPort>>,
@@ -434,17 +440,26 @@ impl NamedPipe {
     pub fn connect(&self) -> io::Result<()> {
         let mut io = self.inner.io.lock().unwrap();
 
+        // Not registered: nothing would receive the connect's readiness event,
+        // or before the first registration even its completion, leaking it.
+        if io.token.is_none() {
+            return Err(would_block());
+        }
+
         // Make sure we're the only connect in flight.
         if io.connect.is_some() {
             return Err(would_block());
         }
 
         let op = io.op();
-        // SAFETY: `submit` keeps the `OVERLAPPED` alive until the connect
-        // completes.
-        let res = io.submit(op, &self.inner, connect_done, |op| unsafe {
-            self.inner.connect_overlapped(Op::overlapped(op))
-        });
+        // SAFETY: `connect_overlapped` returns `Ok` only if it submitted the
+        // connect, `connect_done` takes the `Op` back. The `Op` is only used
+        // for its `OVERLAPPED` pointer, before submitting.
+        let res = unsafe {
+            io.submit(op, &self.inner, connect_done, |op| {
+                self.inner.connect_overlapped(Op::overlapped(op))
+            })
+        };
 
         match res {
             // `connect_done` flags the pipe writable once a client connects.
@@ -693,10 +708,11 @@ impl Source for NamedPipe {
         if io.cp.is_none() {
             let selector = registry.selector();
 
-            io.cp = Some(selector.clone_port());
-
             let inner_token = NEXT_TOKEN.fetch_add(2, Relaxed) + 2;
             selector.inner.cp.add_handle(inner_token, self)?;
+
+            // Only once associated, so a failed registration can be retried.
+            io.cp = Some(selector.clone_port());
         }
 
         io.token = Some(token);
@@ -783,11 +799,15 @@ impl Inner {
         let len = io.read_size;
         let mut op = io.op();
         op.buf.reserve_exact(len);
-        // SAFETY: `submit` keeps the buffer, of at least `len` bytes, and the
-        // `OVERLAPPED` alive until the read completes.
-        let res = io.submit(op, me, read_done, |op| unsafe {
-            me.read_overlapped((*op).buf.as_mut_ptr(), len, Op::overlapped(op))
-        });
+        // SAFETY: `read_overlapped` returns `Ok` only if it submitted the read,
+        // `read_done` takes the `Op` back. The `Op` is only used for its
+        // pointers, before submitting. The kernel owns the `Op`, and so its
+        // buffer of at least `len` bytes, until the read completes.
+        let res = unsafe {
+            io.submit(op, me, read_done, |op| {
+                me.read_overlapped((*op).buf.as_mut_ptr(), len, Op::overlapped(op))
+            })
+        };
 
         match res {
             Ok(op) => {
@@ -812,20 +832,30 @@ impl Inner {
     /// Schedules a write of the `op`'s buffer from `pos` onward to happen in
     /// the background, executing an overlapped operation.
     fn schedule_write(me: &Arc<Inner>, io: &mut Io, op: Box<Op>, pos: usize) -> io::Result<()> {
-        // SAFETY: `submit` keeps the buffer and `OVERLAPPED` alive until the
-        // write completes.
-        let op = io.submit(op, me, write_done, |op| unsafe {
-            let buf = &(*op).buf;
-            me.write_overlapped(buf.as_ptr().add(pos), buf.len() - pos, Op::overlapped(op))
-        })?;
+        // SAFETY: `write_overlapped` returns `Ok` only if it submitted the
+        // write, `write_done` takes the `Op` back. The `Op` is only used for its
+        // pointers, before submitting. The kernel owns the `Op`, and so its
+        // buffer, until the write completes.
+        let op = unsafe {
+            io.submit(op, me, write_done, |op| {
+                let buf = &(*op).buf;
+                me.write_overlapped(buf.as_ptr().add(pos), buf.len() - pos, Op::overlapped(op))
+            })
+        }?;
         io.write = WriteState::InFlight(op, pos);
         Ok(())
     }
 
     fn post_register(me: &Arc<Inner>, io: &mut Io, mut events: Option<&mut Vec<Event>>) {
+        // Data or an error read while not registered, its event went nowhere.
+        let readable = matches!(io.read, ReadState::Ready(..) | ReadState::Failed(_));
         #[allow(clippy::needless_option_as_deref)]
         if Inner::schedule_read(me, io, events.as_deref_mut()) {
-            if let WriteState::Idle = io.write {
+            if readable {
+                io.notify_readable(me, events.as_deref_mut());
+            }
+            // Also when a write failed, so its error gets handed out.
+            if !matches!(io.write, WriteState::InFlight(..)) {
                 io.notify_writable(me, events);
             }
         }
@@ -836,7 +866,7 @@ fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let status = CompletionStatus::from_entry(status);
 
     // SAFETY: connects are started by `Io::submit`.
-    let (op, me) = unsafe { Op::complete(status.overlapped()) };
+    let (mut op, me) = unsafe { Op::complete(status.overlapped()) };
 
     let mut io = me.io.lock().unwrap();
     if io.connect != Some(op.id()) {
@@ -848,8 +878,7 @@ fn connect_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 
     // Stash away our connect error if one happened
     debug_assert_eq!(status.bytes_transferred(), 0);
-    // SAFETY: the `OVERLAPPED` is of a completed connect on this pipe.
-    if let Err(e) = unsafe { me.result(status.overlapped()) } {
+    if let Err(e) = me.result(&mut op) {
         io.connect_error = Some(e);
     }
     io.recycle(op);
@@ -872,8 +901,7 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
         return;
     }
 
-    // SAFETY: the `OVERLAPPED` is of a completed read on this pipe.
-    io.read = match unsafe { me.result(status.overlapped()) } {
+    io.read = match me.result(&mut op) {
         Ok(n) => {
             debug_assert_eq!(status.bytes_transferred() as usize, n);
             // SAFETY: the kernel read `n` bytes into the buffer, at most its
@@ -904,7 +932,7 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let status = CompletionStatus::from_entry(status);
 
     // SAFETY: writes are started by `Io::submit`.
-    let (op, me) = unsafe { Op::complete(status.overlapped()) };
+    let (mut op, me) = unsafe { Op::complete(status.overlapped()) };
 
     let mut io = me.io.lock().unwrap();
     let pos = match io.write {
@@ -919,8 +947,7 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
 
     // If we wrote the entire buffer then we're writable again and otherwise we
     // schedule another write.
-    // SAFETY: the `OVERLAPPED` is of a completed write on this pipe.
-    match unsafe { me.result(status.overlapped()) } {
+    match me.result(&mut op) {
         Ok(n) => {
             debug_assert_eq!(status.bytes_transferred() as usize, n);
             let pos = pos + n;
@@ -996,9 +1023,19 @@ impl Io {
 
     /// Hands `op` to the kernel and submits an operation with `start`.
     ///
-    /// `start` must return `Ok` only if the operation is submitted, its
-    /// completion then calls `done` with `op`. Otherwise `op` is recycled.
-    fn submit(
+    /// If `start` returns `Ok` the operation is in flight, until its completion
+    /// calls `done`, which takes `op` back. Otherwise `op` is recycled.
+    ///
+    /// # Unsafety
+    ///
+    /// `start` must return `Ok` if, and only if, it submitted an operation on
+    /// this pipe using the `OVERLAPPED` of the `Op` it's given, so that exactly
+    /// one completion for it is queued to the pipe's completion port. On `Err`
+    /// nothing may still access the `Op`. `done` must take the `Op` back with
+    /// `Op::complete`, exactly once. And `start` must not access the `Op` once
+    /// the operation is submitted, as its completion may already be handled on
+    /// another thread.
+    unsafe fn submit(
         &mut self,
         mut op: Box<Op>,
         pipe: &Arc<Inner>,
@@ -1009,11 +1046,11 @@ impl Io {
         op.pipe = Some(pipe.clone());
         let op = Box::into_raw(op);
         match start(op) {
-            // SAFETY: `Box::into_raw` doesn't return null.
-            Ok(()) => Ok(OpId(unsafe { NonNull::new_unchecked(op) })),
+            // `Box::into_raw` doesn't return null.
+            Ok(()) => Ok(OpId(NonNull::new_unchecked(op))),
             Err(e) => {
-                // SAFETY: not submitted, so nothing else takes it back.
-                let mut op = unsafe { Box::from_raw(op) };
+                // Not submitted, so nothing else takes it back.
+                let mut op = Box::from_raw(op);
                 op.pipe = None;
                 self.recycle(op);
                 Err(e)
