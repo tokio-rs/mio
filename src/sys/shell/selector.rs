@@ -18,6 +18,16 @@ impl Selector {
     pub fn select(&self, _: &mut Events, _: Option<Duration>) -> io::Result<()> {
         os_required!();
     }
+
+    #[cfg(unix)]
+    pub fn prepare_external_wait(&self) -> io::Result<BorrowedFd<'_>> {
+        os_required!();
+    }
+
+    #[cfg(windows)]
+    pub fn prepare_external_wait(&self) -> io::Result<std::os::windows::io::BorrowedHandle<'_>> {
+        os_required!();
+    }
 }
 
 #[cfg(unix)]

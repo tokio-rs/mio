@@ -73,6 +73,10 @@ impl Selector {
         })
     }
 
+    pub fn prepare_external_wait(&self) -> io::Result<BorrowedFd<'_>> {
+        Ok(self.ep.as_fd())
+    }
+
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let mut event = libc::epoll_event {
             events: interests_to_epoll(interests),
