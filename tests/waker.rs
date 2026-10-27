@@ -1,13 +1,14 @@
 #![cfg(not(target_os = "wasi"))]
 #![cfg(all(feature = "os-poll", feature = "net"))]
 
-use mio::{Events, Poll, Token, Waker};
+use mio::net::TcpListener;
+use mio::{Events, Interest, Poll, Token, Waker};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 
 mod util;
-use util::{assert_send, assert_sync, expect_no_events, init};
+use util::{any_local_address, assert_send, assert_sync, expect_no_events, init};
 
 #[test]
 fn is_send_and_sync() {
@@ -150,6 +151,29 @@ fn using_multiple_wakers_panics_different_cloned_registries() {
 
     drop(waker1);
     drop(waker2);
+}
+
+#[test]
+fn waker_wakeup_before_registry_change() {
+    init();
+
+    let mut poll = Poll::new().expect("unable to create new Poll instance");
+    let mut events = Events::with_capacity(10);
+
+    let token = Token(10);
+    let waker = Waker::new(poll.registry(), token).expect("unable to create waker");
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
+
+    // Changing the registry must not swallow a pending wake-up.
+    waker.wake().expect("unable to wake");
+    poll.registry()
+        .register(&mut listener, Token(0), Interest::READABLE)
+        .unwrap();
+    expect_waker_event(&mut poll, &mut events, token);
+
+    waker.wake().expect("unable to wake");
+    poll.registry().deregister(&mut listener).unwrap();
+    expect_waker_event(&mut poll, &mut events, token);
 }
 
 fn expect_waker_event(poll: &mut Poll, events: &mut Events, token: Token) {
