@@ -17,6 +17,8 @@ type EventMask = libc::c_int;
 const READ_EVENTS: EventMask = libc::POLLIN as EventMask;
 const WRITE_EVENTS: EventMask = libc::POLLOUT as EventMask;
 const ERROR_EVENTS: EventMask = libc::POLLERR as EventMask | libc::POLLHUP as EventMask;
+// Bound the event-port wait while descriptors need fallback poll(2) checks.
+const FALLBACK_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 #[derive(Debug)]
 pub struct Selector {
@@ -59,8 +61,13 @@ struct FdData {
     interests: Interest,
     generation: usize,
     associated: bool,
-    needs_fallback: bool,
-    fallback_writable: bool,
+    // Interests that also need to be checked with poll(2).
+    fallback_interests: Option<Interest>,
+    // Readiness observed by the previous fallback poll. This suppresses
+    // duplicate edge notifications before the bounded event-port wait.
+    fallback_ready: EventMask,
+    // Limit writable re-notification across separate zero-timeout polls.
+    last_writable_report: Option<Instant>,
 }
 
 impl Selector {
@@ -138,6 +145,32 @@ cfg_io_source! {
 }
 
 impl SelectorState {
+    fn update_port_association(port: RawFd, fd: RawFd, data: &mut FdData) -> io::Result<()> {
+        let generation = data.generation.wrapping_add(1).max(1);
+        let port_interests = if data.fallback_ready & ERROR_EVENTS != 0 {
+            None
+        } else {
+            let ready_interests =
+                interests_from_event(data.fallback_ready & interests_to_port(data.interests));
+            match ready_interests {
+                Some(ready_interests) => data.interests.remove(ready_interests),
+                None => Some(data.interests),
+            }
+        };
+
+        if let Some(port_interests) = port_interests {
+            associate(port, fd, port_interests, generation)?;
+            data.associated = true;
+        } else {
+            if data.associated {
+                dissociate(port, fd)?;
+            }
+            data.associated = false;
+        }
+        data.generation = generation;
+        Ok(())
+    }
+
     fn select(
         &self,
         port: RawFd,
@@ -160,7 +193,7 @@ impl SelectorState {
 
         let start = Instant::now();
         let mut attempted = false;
-
+        let report_writable_fallback = timeout.is_none() || timeout == Some(Duration::ZERO);
         loop {
             let current_timeout = if attempted {
                 match timeout {
@@ -173,14 +206,31 @@ impl SelectorState {
             } else {
                 timeout
             };
-            let poll_fallback_on_timeout = current_timeout.is_none() && self.has_fallback_fds();
-            let current_timeout = current_timeout.or_else(|| {
-                if poll_fallback_on_timeout {
-                    Some(Duration::ZERO)
-                } else {
-                    None
-                }
-            });
+            // Check fallback readiness both before and after every port batch so
+            // unrelated port events cannot starve it.
+            let initial_repeat_events = if report_writable_fallback {
+                WRITE_EVENTS
+            } else {
+                0
+            };
+            let has_fallback = self.poll_registered_fds(port, events, initial_repeat_events)?;
+            let fallback_timeout = events.is_empty()
+                && has_fallback
+                && match current_timeout {
+                    Some(timeout) => timeout > FALLBACK_POLL_INTERVAL,
+                    None => true,
+                };
+            let current_timeout = if !events.is_empty() {
+                Some(Duration::ZERO)
+            } else if has_fallback {
+                Some(
+                    current_timeout
+                        .unwrap_or(FALLBACK_POLL_INTERVAL)
+                        .min(FALLBACK_POLL_INTERVAL),
+                )
+            } else {
+                current_timeout
+            };
             let mut timeout = timeout_to_timespec(current_timeout);
             let timeout = timeout
                 .as_mut()
@@ -206,16 +256,26 @@ impl SelectorState {
                 }
             }
 
-            if nget == 0 {
-                self.poll_registered_fds(events, poll_fallback_on_timeout)?;
-                return Ok(());
+            if nget != 0 {
+                trace!("Solaris event port returned {nget} events");
+                // SAFETY: `port_getn` initialized exactly the first `nget` entries.
+                unsafe { event_buffer.port_events.set_len(nget as usize) };
+                self.process_events(port, event_buffer, events)?;
             }
-
-            trace!("Solaris event port returned {nget} events");
-            // SAFETY: `port_getn` initialized exactly the first `nget` entries.
-            unsafe { event_buffer.port_events.set_len(nget as usize) };
-            self.process_events(port, event_buffer, events)?;
-            if !events.is_empty() {
+            // Readable fallback readiness is repeated after every port batch
+            // so an unrelated port event cannot starve it. Writable readiness
+            // is repeated at a bounded rate for indefinite and zero-timeout
+            // polls; positive finite-timeout polls retain edge-like behavior.
+            let mut repeat_events = if nget == 0 || !events.is_empty() {
+                READ_EVENTS
+            } else {
+                0
+            };
+            if report_writable_fallback && nget == 0 {
+                repeat_events |= WRITE_EVENTS;
+            }
+            self.poll_registered_fds(port, events, repeat_events)?;
+            if !events.is_empty() || (nget == 0 && !fallback_timeout) {
                 return Ok(());
             }
         }
@@ -286,76 +346,73 @@ impl SelectorState {
                 });
                 let Some(poll_events) = poll_events else {
                     if event.portev_events & ERROR_EVENTS == 0 {
-                        let generation = data.generation.wrapping_add(1).max(1);
-                        associate(port, fd, data.interests, generation)?;
-                        data.generation = generation;
-                        data.associated = true;
-                        data.needs_fallback = false;
-                        data.fallback_writable = false;
+                        data.fallback_ready = 0;
+                        data.last_writable_report = None;
+                        data.fallback_interests = Some(data.interests);
+                        Self::update_port_association(port, fd, data)?;
                         continue;
                     }
 
                     let poll_events = event.portev_events;
                     if data.generation != generation && poll_events & current_interest_events == 0 {
-                        let generation = data.generation.wrapping_add(1).max(1);
-                        associate(port, fd, data.interests, generation)?;
-                        data.generation = generation;
-                        data.associated = true;
-                        data.needs_fallback = false;
-                        data.fallback_writable = false;
+                        data.fallback_ready = 0;
+                        data.last_writable_report = None;
+                        data.fallback_interests = Some(data.interests);
+                        Self::update_port_association(port, fd, data)?;
                         continue;
                     }
 
-                    let generation = data.generation.wrapping_add(1).max(1);
-                    associate(port, fd, data.interests, generation)?;
-                    data.generation = generation;
-                    data.associated = true;
-                    data.needs_fallback = false;
-                    data.fallback_writable = false;
+                    let previous_ready = data.fallback_ready;
+                    data.fallback_ready =
+                        poll_events & (interests_to_port(data.interests) | ERROR_EVENTS);
+                    data.fallback_interests = Some(data.interests);
+                    Self::update_port_association(port, fd, data)?;
+                    let report_events = poll_events & !previous_ready;
+                    if report_events != 0 {
+                        if report_events & WRITE_EVENTS != 0 {
+                            data.last_writable_report = Some(Instant::now());
+                        }
+                        push_event(
+                            events,
+                            libc::PORT_SOURCE_FD as libc::c_ushort,
+                            fd as libc::uintptr_t,
+                            data.token,
+                            report_events,
+                        );
+                    }
+                    continue;
+                };
+                let poll_events = poll_events | (event.portev_events & ERROR_EVENTS);
+                if data.generation != generation && poll_events & current_interest_events == 0 {
+                    data.fallback_ready = 0;
+                    data.last_writable_report = None;
+                    data.fallback_interests = Some(data.interests);
+                    Self::update_port_association(port, fd, data)?;
+                    continue;
+                }
+
+                // Keep ready directions out of the event port until fallback
+                // polling observes that they have drained. Re-associating a
+                // still-ready fd would immediately queue duplicate events.
+                let previous_ready = data.fallback_ready;
+                data.fallback_ready =
+                    poll_events & (interests_to_port(data.interests) | ERROR_EVENTS);
+                data.fallback_interests = Some(data.interests);
+                Self::update_port_association(port, fd, data)?;
+
+                let report_events = poll_events & !previous_ready;
+                if report_events != 0 {
+                    if report_events & WRITE_EVENTS != 0 {
+                        data.last_writable_report = Some(Instant::now());
+                    }
                     push_event(
                         events,
                         libc::PORT_SOURCE_FD as libc::c_ushort,
                         fd as libc::uintptr_t,
                         data.token,
-                        poll_events,
+                        report_events,
                     );
-                    continue;
-                };
-                if data.generation != generation && poll_events & current_interest_events == 0 {
-                    let generation = data.generation.wrapping_add(1).max(1);
-                    associate(port, fd, data.interests, generation)?;
-                    data.generation = generation;
-                    data.associated = true;
-                    data.needs_fallback = false;
-                    data.fallback_writable = false;
-                    continue;
                 }
-
-                // Event ports disassociate an fd after delivery. Re-associate
-                // only interests that were not delivered, and use fallback
-                // polling for delivered interests so sources that clear
-                // readiness without reregistering can observe future events.
-                let generation = data.generation.wrapping_add(1).max(1);
-                let remaining_interests = data
-                    .interests
-                    .remove(interests_from_event(poll_events).unwrap_or(data.interests));
-                if let Some(remaining_interests) = remaining_interests {
-                    associate(port, fd, remaining_interests, generation)?;
-                    data.associated = true;
-                } else {
-                    data.associated = false;
-                }
-                data.generation = generation;
-                data.needs_fallback = true;
-                data.fallback_writable = false;
-
-                push_event(
-                    events,
-                    libc::PORT_SOURCE_FD as libc::c_ushort,
-                    fd as libc::uintptr_t,
-                    data.token,
-                    poll_events,
-                );
             }
         }
 
@@ -364,33 +421,30 @@ impl SelectorState {
 
     fn poll_registered_fds(
         &self,
+        port: RawFd,
         events: &mut Events,
-        include_writable_only: bool,
-    ) -> io::Result<()> {
+        repeat_events: EventMask,
+    ) -> io::Result<bool> {
         let mut fds = self.fds.lock().unwrap();
         if fds.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
 
         let mut poll_fds = Vec::new();
-        let mut tokens = Vec::new();
-        let mut fallback_writable = Vec::new();
         for (&fd, data) in fds.iter() {
-            if !data.needs_fallback {
+            let Some(fallback_interests) = data.fallback_interests else {
                 continue;
-            }
+            };
 
             poll_fds.push(libc::pollfd {
                 fd,
-                events: interests_to_port(data.interests) as libc::c_short,
+                events: interests_to_port(fallback_interests) as libc::c_short,
                 revents: 0,
             });
-            tokens.push(data.token);
-            fallback_writable.push(data.fallback_writable);
         }
 
         if poll_fds.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
 
         syscall!(poll(
@@ -400,38 +454,44 @@ impl SelectorState {
         ))?;
 
         events.reserve(poll_fds.len());
-        for ((poll_fd, token), fallback_writable) in
-            poll_fds.iter().zip(tokens).zip(fallback_writable)
-        {
-            if poll_fd.revents != 0 {
-                let revents = EventMask::from(poll_fd.revents);
-                let writable_only = revents & !WRITE_EVENTS == 0;
-                if include_writable_only || fallback_writable || !writable_only {
-                    push_event(
-                        events,
-                        libc::PORT_SOURCE_FD as libc::c_ushort,
-                        poll_fd.fd as libc::uintptr_t,
-                        token,
-                        revents,
-                    );
-                    if writable_only {
-                        if let Some(data) = fds.get_mut(&poll_fd.fd) {
-                            data.fallback_writable = false;
-                        }
-                    }
-                }
+        for poll_fd in poll_fds {
+            let data = fds.get_mut(&poll_fd.fd).unwrap();
+            let fallback_interests = data.fallback_interests.unwrap();
+            let revents = EventMask::from(poll_fd.revents);
+            let event_mask = revents & (interests_to_port(fallback_interests) | ERROR_EVENTS);
+            let previous_ready = data.fallback_ready;
+            data.fallback_ready = event_mask;
+            if event_mask & WRITE_EVENTS == 0 {
+                data.last_writable_report = None;
+            }
+            if (event_mask ^ previous_ready) & (READ_EVENTS | WRITE_EVENTS | ERROR_EVENTS) != 0 {
+                Self::update_port_association(port, poll_fd.fd, data)?;
+            }
+
+            let mut report_events = event_mask & !previous_ready;
+            report_events |= event_mask & repeat_events & !WRITE_EVENTS;
+            if report_events & WRITE_EVENTS != 0 {
+                data.last_writable_report = Some(Instant::now());
+            } else if event_mask & repeat_events & WRITE_EVENTS != 0
+                && data.last_writable_report.map_or(true, |last_report| {
+                    last_report.elapsed() >= FALLBACK_POLL_INTERVAL
+                })
+            {
+                report_events |= event_mask & WRITE_EVENTS;
+                data.last_writable_report = Some(Instant::now());
+            }
+            if report_events != 0 {
+                push_event(
+                    events,
+                    libc::PORT_SOURCE_FD as libc::c_ushort,
+                    poll_fd.fd as libc::uintptr_t,
+                    data.token,
+                    report_events,
+                );
             }
         }
 
-        Ok(())
-    }
-
-    fn has_fallback_fds(&self) -> bool {
-        self.fds
-            .lock()
-            .unwrap()
-            .values()
-            .any(|data| data.needs_fallback)
+        Ok(fds.values().any(|data| data.fallback_interests.is_some()))
     }
 
     cfg_io_source! {
@@ -454,8 +514,9 @@ impl SelectorState {
                 interests,
                 generation: 1,
                 associated: true,
-                needs_fallback: true,
-                fallback_writable: true,
+                fallback_interests: Some(interests),
+                fallback_ready: 0,
+                last_writable_report: None,
             },
         );
         Ok(record)
@@ -472,16 +533,16 @@ impl SelectorState {
     ) -> io::Result<()> {
         let mut fds = self.fds.lock().unwrap();
         let data = fds.get_mut(&fd).ok_or(io::ErrorKind::NotFound)?;
-        let generation = data.generation.wrapping_add(1).max(1);
-
-        associate(port, fd, interests, generation)?;
-
+        let fallback_ready =
+            data.fallback_ready & (interests_to_port(interests) | ERROR_EVENTS);
         data.token = token;
         data.interests = interests;
-        data.generation = generation;
-        data.associated = true;
-        data.needs_fallback = true;
-        data.fallback_writable = true;
+        data.fallback_interests = Some(interests);
+        data.fallback_ready = fallback_ready;
+        if fallback_ready & WRITE_EVENTS == 0 {
+            data.last_writable_report = None;
+        }
+        Self::update_port_association(port, fd, data)?;
         Ok(())
     }
 
@@ -543,18 +604,20 @@ fn associate(port: RawFd, fd: RawFd, interests: Interest, generation: usize) -> 
     .map(|_| ())
 }
 
-cfg_any_os_ext! {
 fn dissociate(port: RawFd, fd: RawFd) -> io::Result<()> {
-    syscall!(port_dissociate(port, libc::PORT_SOURCE_FD, fd as libc::uintptr_t))
-        .map(|_| ())
-        .or_else(|err| {
-            if err.raw_os_error() == Some(libc::ENOENT) {
-                Ok(())
-            } else {
-                Err(err)
-            }
-        })
-}
+    syscall!(port_dissociate(
+        port,
+        libc::PORT_SOURCE_FD,
+        fd as libc::uintptr_t
+    ))
+    .map(|_| ())
+    .or_else(|err| {
+        if err.raw_os_error() == Some(libc::ENOENT) {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    })
 }
 
 fn timeout_to_timespec(timeout: Option<Duration>) -> Option<libc::timespec> {
@@ -581,11 +644,11 @@ fn interests_to_port(interests: Interest) -> EventMask {
 fn interests_from_event(events: EventMask) -> Option<Interest> {
     let mut interests = None;
 
-    if (events & READ_EVENTS) != 0 {
+    if events & READ_EVENTS != 0 {
         interests = Some(Interest::READABLE);
     }
 
-    if (events & WRITE_EVENTS) != 0 {
+    if events & WRITE_EVENTS != 0 {
         interests = Some(match interests {
             Some(interests) => interests.add(Interest::WRITABLE),
             None => Interest::WRITABLE,
