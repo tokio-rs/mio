@@ -439,15 +439,53 @@ fn register_fails_again_after_failure() {
     unsafe { CloseHandle(port) };
 }
 
-// A connect before registering would never finish, and keep the pipe alive.
+// Starting I/O before registering fails, as its event would never come. A
+// connect started anyway would also keep the pipe alive.
 #[test]
-fn connect_before_register() {
-    let (pipe, name) = server();
-    assert_would_block(pipe.connect());
+fn io_before_register() {
+    let (mut pipe, name) = server();
+    let results = [
+        pipe.connect().map(|()| 0),
+        pipe.read(&mut [0; 8]),
+        pipe.write(b"data"),
+    ];
+    for res in results {
+        match res {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            res => panic!("expected a `NotFound` error, got {res:?}"),
+        }
+    }
     drop(pipe);
     // Every server is its pipe's first instance, so this fails while it's kept
     // alive.
     t!(NamedPipe::new(&name));
+}
+
+// After deregistering, I/O already in flight still would block.
+#[test]
+fn io_in_flight_after_deregister() {
+    let (mut server, name) = server();
+    let _client = blocking_client(&name);
+    let mut poll = t!(Poll::new());
+    let mut events = Events::with_capacity(16);
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    // Larger than the pipe's buffer, so the write stays in flight.
+    let data = vec![0; 128 * 1024];
+    assert_eq!(t!(server.write(&data)), data.len());
+    t!(poll.registry().deregister(&mut server));
+
+    assert_would_block(server.write(b"next"));
+    // The client wrote nothing, so the read is still in flight too.
+    assert_would_block(server.read(&mut [0; 8]));
 }
 
 #[test]

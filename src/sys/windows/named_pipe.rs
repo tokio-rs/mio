@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex};
 use std::{cmp, fmt, iter, mem};
 
 use windows_sys::Win32::Foundation::{
-    ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NO_DATA, ERROR_PIPE_CONNECTED,
-    ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
+    ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_NOT_FOUND, ERROR_NO_DATA,
+    ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     GetFileType, ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED,
@@ -51,8 +51,9 @@ use crate::{Interest, Token};
 /// however.
 ///
 /// Note that for I/O operations on a named pipe to succeed then the named pipe
-/// needs to be associated with an event loop. Until this happens all I/O
-/// operations will return a "would block" error.
+/// needs to be associated with an event loop. While it's not registered, an
+/// operation that has to start new I/O returns a `NotFound` error. Data, or an
+/// error, from I/O started earlier is still returned.
 ///
 /// # Managing connections
 ///
@@ -223,11 +224,23 @@ impl Inner {
         }
     }
 
-    /// Cancels the operation `op`, if it's still in flight.
-    fn cancel(&self, op: OpId) {
-        // Fails if `op` already completed, then there's nothing to cancel.
-        // SAFETY: `CancelIoEx` doesn't dereference the `OVERLAPPED`.
-        let _ = unsafe { CancelIoEx(self.handle.raw(), op.overlapped()) };
+    /// Cancels the operation `op_id`, if it's still in flight.
+    ///
+    /// Called with `Io` locked, for an operation it tracks as in flight, so
+    /// its `Op` isn't freed or reused meanwhile.
+    fn cancel(&self, op_id: OpId) {
+        // `Op` and `Overlapped` are `repr(C)` and start with the `OVERLAPPED`.
+        let overlapped = op_id.0.as_ptr().cast::<OVERLAPPED>();
+        // SAFETY: `CancelIoEx` uses the pointer to find the operation to
+        // cancel. Even so, it points to a live `OVERLAPPED`, see above.
+        if unsafe { CancelIoEx(self.handle.raw(), overlapped) } == 0 {
+            let err = io::Error::last_os_error();
+            // `ERROR_NOT_FOUND` means it already completed, then there's
+            // nothing to cancel.
+            if err.raw_os_error() != Some(ERROR_NOT_FOUND as i32) {
+                error!("error cancelling named pipe operation: {err}");
+            }
+        }
     }
 }
 
@@ -287,6 +300,8 @@ impl Op {
         })
     }
 
+    /// The address of the `Op`, which doesn't change as an `Op` only lives in
+    /// a `Box`.
     fn id(&self) -> OpId {
         OpId(NonNull::from(self))
     }
@@ -304,7 +319,7 @@ impl Op {
     ///
     /// `overlapped` must be from the completion of an operation started by
     /// `Io::submit`. Afterwards only access the `Op` through the returned
-    /// `Box`, not `overlapped`.
+    /// `Box`, not `overlapped`. The `overlapped` pointer is invalidated.
     unsafe fn complete(overlapped: *mut OVERLAPPED) -> (Box<Op>, Arc<Inner>) {
         let mut op = Box::from_raw(overlapped.cast::<Op>());
         let pipe = op
@@ -322,12 +337,6 @@ struct OpId(NonNull<Op>);
 // SAFETY: an `OpId` is only compared and passed to `CancelIoEx`, never
 // dereferenced.
 unsafe impl Send for OpId {}
-
-impl OpId {
-    fn overlapped(self) -> *mut OVERLAPPED {
-        Op::overlapped(self.0.as_ptr())
-    }
-}
 
 /// Number of idle `Op`s kept for reuse, so operations don't allocate.
 const SPARE_OPS: usize = 2;
@@ -387,6 +396,13 @@ fn would_block() -> io::Error {
     io::ErrorKind::WouldBlock.into()
 }
 
+fn not_registered() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::NotFound,
+        "I/O source not registered with `Registry`",
+    )
+}
+
 impl NamedPipe {
     /// Creates a new named pipe at the specified `addr` given a "reasonable
     /// set" of initial configuration options.
@@ -430,25 +446,25 @@ impl NamedPipe {
     ///
     /// # Errors
     ///
-    /// This function will return a "would block" error if the pipe has not yet
-    /// been registered with an event loop, if the connection operation has
-    /// previously been issued but has not yet completed, or if the connect
-    /// itself was issued.
+    /// This function will return a "would block" error if the connection
+    /// operation has previously been issued but has not yet completed, or if
+    /// the connect itself was issued. If the pipe isn't registered with an
+    /// event loop it returns a `NotFound` error.
     ///
     /// Normal I/O errors from the call to `ConnectNamedPipe` are returned
     /// immediately.
     pub fn connect(&self) -> io::Result<()> {
         let mut io = self.inner.io.lock().unwrap();
 
-        // Not registered: nothing would receive the connect's readiness event,
-        // or before the first registration even its completion, leaking it.
-        if io.token.is_none() {
-            return Err(would_block());
-        }
-
         // Make sure we're the only connect in flight.
         if io.connect.is_some() {
             return Err(would_block());
+        }
+
+        // Not registered: nothing would receive the connect's readiness event,
+        // or before the first registration even its completion, leaking it.
+        if io.token.is_none() {
+            return Err(not_registered());
         }
 
         let op = io.op();
@@ -463,8 +479,8 @@ impl NamedPipe {
 
         match res {
             // `connect_done` flags the pipe writable once a client connects.
-            Ok(op) => {
-                io.connect = Some(op);
+            Ok(op_id) => {
+                io.connect = Some(op_id);
                 Err(would_block())
             }
 
@@ -508,16 +524,17 @@ impl NamedPipe {
         // Nothing of this client may reach the next one: cancel what's in
         // flight, and drop what isn't handed out yet.
         io.connect_error = None;
-        if let Some(op) = io.connect.take() {
-            self.inner.cancel(op);
+        if let Some(op_id) = io.connect.take() {
+            self.inner.cancel(op_id);
         }
         match mem::replace(&mut io.read, ReadState::Idle) {
-            ReadState::InFlight(op) => self.inner.cancel(op),
+            ReadState::InFlight(op_id) => self.inner.cancel(op_id),
             ReadState::Ready(op, _) => io.recycle(op),
             ReadState::Idle | ReadState::Failed(_) => {}
         }
-        if let WriteState::InFlight(op, _) = mem::replace(&mut io.write, WriteState::Idle) {
-            self.inner.cancel(op);
+        match mem::replace(&mut io.write, WriteState::Idle) {
+            WriteState::InFlight(op_id, _) => self.inner.cancel(op_id),
+            WriteState::Idle | WriteState::Failed(_) => {}
         }
         Ok(())
     }
@@ -584,15 +601,14 @@ impl NamedPipe {
     ) -> io::Result<usize> {
         let mut state = self.inner.io.lock().unwrap();
 
-        if state.token.is_none() {
-            return Err(would_block());
-        }
-
         // Size the next read from the pipe like the caller's buffer, so it can
         // be filled in one call.
         state.read_size = len.clamp(DEFAULT_READ_SIZE, self.inner.max_read_size);
 
         match mem::replace(&mut state.read, ReadState::Idle) {
+            // Not registered: the event of a new read would never come.
+            ReadState::Idle if state.token.is_none() => Err(not_registered()),
+
             // Not connected, or a read is in flight, still waiting for it to
             // finish.
             read @ (ReadState::Idle | ReadState::InFlight(_)) => {
@@ -639,11 +655,9 @@ impl NamedPipe {
         // Make sure there's no writes pending
         let mut io = self.inner.io.lock().unwrap();
 
-        if io.token.is_none() {
-            return Err(would_block());
-        }
-
         match mem::replace(&mut io.write, WriteState::Idle) {
+            // Not registered: the write's event would never come.
+            WriteState::Idle if io.token.is_none() => return Err(not_registered()),
             WriteState::Idle => {}
             WriteState::Failed(e) => return Err(e),
             // `write_done` flags the pipe writable once the write finished.
@@ -738,10 +752,7 @@ impl Source for NamedPipe {
         io.check_association(registry, true)?;
 
         if io.token.is_none() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "I/O source not registered with `Registry`",
-            ));
+            return Err(not_registered());
         }
 
         io.token = None;
@@ -771,25 +782,24 @@ impl Drop for NamedPipe {
         // Cancel pending reads/connects, but don't cancel writes to ensure that
         // everything is flushed out. That only happens while the event loop
         // runs, see #1944.
-        if let Some(op) = io.connect.take() {
-            self.inner.cancel(op);
+        if let Some(op_id) = io.connect.take() {
+            self.inner.cancel(op_id);
         }
-        if let ReadState::InFlight(op) = mem::replace(&mut io.read, ReadState::Idle) {
-            self.inner.cancel(op);
+        match mem::replace(&mut io.read, ReadState::Idle) {
+            ReadState::InFlight(op_id) => self.inner.cancel(op_id),
+            // Nothing reads it anymore.
+            ReadState::Ready(..) | ReadState::Idle | ReadState::Failed(_) => {}
         }
     }
 }
 
 impl Inner {
     /// Schedules a read to happen in the background, executing an overlapped
-    /// operation.
+    /// operation, unless a read is in flight, done or failed already.
     ///
-    /// This function returns `true` if either of the following conditions are met:
-    /// * A normal error happens
-    /// * The read is scheduled in the background
-    ///
-    /// If the pipe is no longer connected (ERROR_PIPE_LISTENING) then `false` is
-    /// returned and no read is scheduled.
+    /// Returns `false` only if the pipe isn't connected (`ERROR_PIPE_LISTENING`),
+    /// then no read is scheduled. A read that fails otherwise makes the pipe
+    /// readable, to hand out the error.
     fn schedule_read(me: &Arc<Inner>, io: &mut Io, events: Option<&mut Vec<Event>>) -> bool {
         // Check to see if a read is already scheduled/completed
         if !matches!(io.read, ReadState::Idle) {
@@ -810,8 +820,8 @@ impl Inner {
         };
 
         match res {
-            Ok(op) => {
-                io.read = ReadState::InFlight(op);
+            Ok(op_id) => {
+                io.read = ReadState::InFlight(op_id);
                 true
             }
 
@@ -836,28 +846,39 @@ impl Inner {
         // write, `write_done` takes the `Op` back. The `Op` is only used for its
         // pointers, before submitting. The kernel owns the `Op`, and so its
         // buffer, until the write completes.
-        let op = unsafe {
+        let op_id = unsafe {
             io.submit(op, me, write_done, |op| {
                 let buf = &(*op).buf;
                 me.write_overlapped(buf.as_ptr().add(pos), buf.len() - pos, Op::overlapped(op))
             })
         }?;
-        io.write = WriteState::InFlight(op, pos);
+        io.write = WriteState::InFlight(op_id, pos);
         Ok(())
     }
 
+    /// Starts reading, and announces what's ready, once the pipe is registered
+    /// or connected.
+    ///
+    /// A read is always kept in flight, as its completion is what makes the
+    /// pipe readable. So this starts one, unless there is one already.
     fn post_register(me: &Arc<Inner>, io: &mut Io, mut events: Option<&mut Vec<Event>>) {
         // Data or an error read while not registered, its event went nowhere.
         let readable = matches!(io.read, ReadState::Ready(..) | ReadState::Failed(_));
+
+        // Not connected yet: nothing is readable or writable until a client
+        // connects, then `connect_done` calls this again.
         #[allow(clippy::needless_option_as_deref)]
-        if Inner::schedule_read(me, io, events.as_deref_mut()) {
-            if readable {
-                io.notify_readable(me, events.as_deref_mut());
-            }
-            // Also when a write failed, so its error gets handed out.
-            if !matches!(io.write, WriteState::InFlight(..)) {
-                io.notify_writable(me, events);
-            }
+        if !Inner::schedule_read(me, io, events.as_deref_mut()) {
+            return;
+        }
+
+        if readable {
+            io.notify_readable(me, events.as_deref_mut());
+        }
+        // Also when a write failed, so its error gets handed out. A write in
+        // flight makes the pipe writable once it's done.
+        if !matches!(io.write, WriteState::InFlight(..)) {
+            io.notify_writable(me, events);
         }
     }
 }
@@ -952,6 +973,7 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
             debug_assert_eq!(status.bytes_transferred() as usize, n);
             let pos = pos + n;
             if pos == op.buf.len() {
+                // All written.
                 io.recycle(op);
                 io.notify_writable(&me, events);
             } else if n == 0 {
@@ -960,9 +982,13 @@ fn write_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
                 io.recycle(op);
                 io.write = WriteState::Failed(io::ErrorKind::WriteZero.into());
                 io.notify_writable(&me, events);
-            } else if let Err(e) = Inner::schedule_write(&me, &mut io, op, pos) {
-                io.write = WriteState::Failed(e);
-                io.notify_writable(&me, events);
+            } else {
+                // A short write, write the rest.
+                let res = Inner::schedule_write(&me, &mut io, op, pos);
+                if let Err(e) = res {
+                    io.write = WriteState::Failed(e);
+                    io.notify_writable(&me, events);
+                }
             }
         }
         Err(e) => {
@@ -1031,10 +1057,11 @@ impl Io {
     /// `start` must return `Ok` if, and only if, it submitted an operation on
     /// this pipe using the `OVERLAPPED` of the `Op` it's given, so that exactly
     /// one completion for it is queued to the pipe's completion port. On `Err`
-    /// nothing may still access the `Op`. `done` must take the `Op` back with
-    /// `Op::complete`, exactly once. And `start` must not access the `Op` once
+    /// nothing may still access the `Op`. `start` must not access the `Op` once
     /// the operation is submitted, as its completion may already be handled on
     /// another thread.
+    ///
+    /// `done` must take the `Op` back with `Op::complete`, exactly once.
     unsafe fn submit(
         &mut self,
         mut op: Box<Op>,
@@ -1042,15 +1069,18 @@ impl Io {
         done: fn(&OVERLAPPED_ENTRY, Option<&mut Vec<Event>>),
         start: impl FnOnce(*mut Op) -> io::Result<()>,
     ) -> io::Result<OpId> {
+        // Owning the `Box` means the `Op` is idle: in flight it has no `Box`.
+        debug_assert!(op.pipe.is_none(), "submitting an `Op` in flight");
         op.overlapped.callback = done;
         op.pipe = Some(pipe.clone());
-        let op = Box::into_raw(op);
-        match start(op) {
-            // `Box::into_raw` doesn't return null.
-            Ok(()) => Ok(OpId(NonNull::new_unchecked(op))),
+        // Taken before submitting, as afterwards the completion may already
+        // own the `Op`. The pointer is also the `OpId`.
+        let op = NonNull::from(Box::leak(op));
+        match start(op.as_ptr()) {
+            Ok(()) => Ok(OpId(op)),
             Err(e) => {
                 // Not submitted, so nothing else takes it back.
-                let mut op = Box::from_raw(op);
+                let mut op = Box::from_raw(op.as_ptr());
                 op.pipe = None;
                 self.recycle(op);
                 Err(e)
@@ -1064,10 +1094,7 @@ impl Io {
                 io::ErrorKind::AlreadyExists,
                 "I/O source already registered with a different `Registry`",
             )),
-            None if required => Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "I/O source not registered with `Registry`",
-            )),
+            None if required => Err(not_registered()),
             _ => Ok(()),
         }
     }
