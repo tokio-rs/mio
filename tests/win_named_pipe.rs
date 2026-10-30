@@ -14,18 +14,19 @@ use std::{mem, panic, ptr, thread};
 use mio::windows::NamedPipe;
 use mio::{Events, Interest, Poll, Registry, Token, Waker};
 use windows_sys::Win32::Foundation::{
-    GetHandleInformation, ERROR_ACCESS_DENIED, ERROR_NO_DATA, INVALID_HANDLE_VALUE,
+    CloseHandle, GetHandleInformation, ERROR_ACCESS_DENIED, ERROR_NO_DATA, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
 };
 use windows_sys::Win32::System::Pipes::{
-    CreateNamedPipeW, SetNamedPipeHandleState, PIPE_READMODE_MESSAGE, PIPE_TYPE_MESSAGE,
-    PIPE_UNLIMITED_INSTANCES,
+    CreateNamedPipeW, SetNamedPipeHandleState, PIPE_NOWAIT, PIPE_READMODE_MESSAGE,
+    PIPE_TYPE_MESSAGE, PIPE_UNLIMITED_INSTANCES,
 };
+use windows_sys::Win32::System::IO::CreateIoCompletionPort;
 
 mod util;
-use util::{expect_events, ExpectEvent};
+use util::{assert_would_block, expect_events, ExpectEvent};
 
 fn _assert_kinds() {
     fn _assert_send<T: Send>() {}
@@ -306,21 +307,9 @@ fn connect_twice() {
 
     let mut events = Events::with_capacity(128);
 
-    loop {
-        t!(poll.poll(&mut events, None));
-        let events = events.iter().collect::<Vec<_>>();
-        if let Some(event) = events.iter().find(|e| e.token() == Token(0)) {
-            if event.is_readable() {
-                let mut buf = [0; 10];
-
-                match server.read(&mut buf) {
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                    Ok(0) => break,
-                    res => panic!("{:?}", res),
-                }
-            }
-        }
-    }
+    // Don't wait for the readable event: it can be behind a writable one for
+    // the same token, in the same poll.
+    assert!(read_to_eof(&mut server, &mut poll, &mut events).is_empty());
 
     t!(server.disconnect());
     assert_eq!(
@@ -388,6 +377,117 @@ fn reregister_deregister_different_poll() {
         poll2.registry().deregister(&mut pipe).unwrap_err().kind(),
         io::ErrorKind::AlreadyExists,
     );
+}
+
+// Registering again announces data that's read but not handed out yet.
+#[test]
+fn readable_after_registering_again() {
+    let (mut server, name) = server();
+    let mut client = blocking_client(&name);
+    let mut poll = t!(Poll::new());
+    let mut events = Events::with_capacity(16);
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    t!(client.write_all(b"data"));
+    // Readable means the data is read into the internal buffer, leave it there.
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+    t!(poll.registry().deregister(&mut server));
+
+    t!(poll
+        .registry()
+        .register(&mut server, Token(1), Interest::READABLE));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(1), Interest::READABLE)],
+    );
+    let mut buf = [0; 16];
+    assert_eq!(t!(server.read(&mut buf)), 4);
+    assert_eq!(&buf[..4], b"data");
+}
+
+// A failed registration leaves the pipe unregistered, so registering again
+// fails again rather than pretending it worked.
+#[test]
+fn register_fails_again_after_failure() {
+    let (mut pipe, _name) = server();
+    // A handle can only be associated with one completion port.
+    let port = unsafe { CreateIoCompletionPort(INVALID_HANDLE_VALUE, ptr::null_mut(), 0, 0) };
+    assert!(!port.is_null(), "{}", io::Error::last_os_error());
+    let associated = unsafe { CreateIoCompletionPort(pipe.as_raw_handle(), port, 0, 0) };
+    assert!(!associated.is_null(), "{}", io::Error::last_os_error());
+
+    let poll = t!(Poll::new());
+    for _ in 0..2 {
+        assert!(poll
+            .registry()
+            .register(&mut pipe, Token(0), Interest::READABLE)
+            .is_err());
+    }
+    unsafe { CloseHandle(port) };
+}
+
+// Starting I/O before registering fails, as its event would never come. A
+// connect started anyway would also keep the pipe alive.
+#[test]
+fn io_before_register() {
+    let (mut pipe, name) = server();
+    let results = [
+        pipe.connect().map(|()| 0),
+        pipe.read(&mut [0; 8]),
+        pipe.read_vectored(&mut [IoSliceMut::new(&mut [0; 8])]),
+        pipe.write(b"data"),
+        pipe.write_vectored(&[IoSlice::new(b"data")]),
+    ];
+    for res in results {
+        match res {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            res => panic!("expected a `NotFound` error, got {res:?}"),
+        }
+    }
+    drop(pipe);
+    // Every server is its pipe's first instance, so this fails while it's kept
+    // alive.
+    t!(NamedPipe::new(&name));
+}
+
+// After deregistering, I/O already in flight still would block.
+#[test]
+fn io_in_flight_after_deregister() {
+    let (mut server, name) = server();
+    let _client = blocking_client(&name);
+    let mut poll = t!(Poll::new());
+    let mut events = Events::with_capacity(16);
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    // Larger than the pipe's buffer, so the write stays in flight.
+    let data = vec![0; 128 * 1024];
+    assert_eq!(t!(server.write(&data)), data.len());
+    t!(poll.registry().deregister(&mut server));
+
+    assert_would_block(server.write(b"next"));
+    // The client wrote nothing, so the read is still in flight too.
+    assert_would_block(server.read(&mut [0; 8]));
 }
 
 #[test]
@@ -851,6 +951,47 @@ fn write_fails_after_submit() {
     }
 }
 
+// A write that completes without writing anything, as to a full `PIPE_NOWAIT`
+// pipe, fails instead of being written again forever.
+#[test]
+fn write_without_progress_fails() {
+    let (mut server, name) = message_server();
+    let _client = blocking_client(&name);
+    let mode = PIPE_NOWAIT | PIPE_READMODE_MESSAGE;
+    let ok =
+        unsafe { SetNamedPipeHandleState(server.as_raw_handle(), &mode, ptr::null(), ptr::null()) };
+    assert!(ok != 0, "{}", io::Error::last_os_error());
+
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(0), Interest::WRITABLE));
+    let mut events = Events::with_capacity(16);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+
+    // Larger than the pipe's buffer, so nothing of it is written.
+    let data = vec![1; 128 * 1024];
+    assert_eq!(t!(server.write(&data)), data.len());
+    t!(poll.poll(&mut events, Some(Duration::from_secs(1))));
+    let writable = events
+        .iter()
+        .any(|e| e.token() == Token(0) && e.is_writable());
+    let res = server.write(b"next");
+    // Stops a write that's written again forever, which would hang dropping
+    // `poll` instead of failing.
+    t!(server.disconnect());
+
+    assert!(writable, "not writable after the write");
+    match res {
+        Err(e) if e.kind() == io::ErrorKind::WriteZero => {}
+        res => panic!("expected a `WriteZero` error, got {res:?}"),
+    }
+}
+
 const WAKE: Token = Token(1);
 
 /// Polls on a dedicated thread, blocking until a completion or wake-up arrives.
@@ -982,9 +1123,10 @@ fn read_to_end(server: &mut NamedPipe, driver: &Driver) -> Vec<u8> {
     }
 }
 
-/// Waits until the pipe `name` is gone, i.e. no reference to it leaked. Every
-/// server is its first instance, so creating it again fails while it exists.
-fn wait_freed(name: &str, driver: &Driver) {
+/// Waits until the pipe `name` is gone, i.e. no reference to it leaked, calling
+/// `sync` to let completions be handled. Every server is its first instance, so
+/// creating it again fails while it exists.
+fn wait_freed(name: &str, mut sync: impl FnMut()) {
     let timeout = Instant::now() + Duration::from_secs(10);
     loop {
         match NamedPipe::new(name) {
@@ -993,7 +1135,7 @@ fn wait_freed(name: &str, driver: &Driver) {
             Err(e) => panic!("unexpected error: {e}"),
         }
         assert!(Instant::now() < timeout, "pipe leaked");
-        driver.sync();
+        sync();
     }
 }
 
@@ -1024,7 +1166,7 @@ fn read_disconnect_race() {
             panic!("pipe freed while still in use: {err}");
         }
         drop(server);
-        wait_freed(&name, driver);
+        wait_freed(&name, || driver.sync());
     });
 }
 
@@ -1051,7 +1193,7 @@ fn write_disconnect_race() {
             assert!(Instant::now() < timeout, "write never failed");
         }
         drop(server);
-        wait_freed(&name, driver);
+        wait_freed(&name, || driver.sync());
     });
 }
 
@@ -1070,6 +1212,384 @@ fn read_more_data_race() {
         let read = read_to_end(&mut server, driver);
         assert!(read == msg, "got {} of {} bytes", read.len(), msg.len());
         drop(server);
-        wait_freed(&name, driver);
+        wait_freed(&name, || driver.sync());
     });
+}
+
+/// Reads until EOF, polling whenever the read would block.
+fn read_to_eof(pipe: &mut NamedPipe, poll: &mut Poll, events: &mut Events) -> Vec<u8> {
+    let timeout = Instant::now() + Duration::from_secs(10);
+    let mut buf = [0; 8192];
+    let mut read = Vec::new();
+    loop {
+        match pipe.read(&mut buf) {
+            Ok(0) => return read,
+            Ok(n) => read.extend_from_slice(&buf[..n]),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                t!(poll.poll(events, Some(Duration::from_millis(100))));
+            }
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+        assert!(Instant::now() < timeout, "EOF never delivered");
+    }
+}
+
+/// Reads the first data that arrives, polling whenever the read would block.
+fn read_some(pipe: &mut NamedPipe, poll: &mut Poll, events: &mut Events) -> Vec<u8> {
+    let timeout = Instant::now() + Duration::from_secs(10);
+    let mut buf = [0; 8192];
+    loop {
+        match pipe.read(&mut buf) {
+            Ok(0) => panic!("unexpected EOF"),
+            Ok(n) => return buf[..n].to_vec(),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                t!(poll.poll(events, Some(Duration::from_millis(100))));
+            }
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+        assert!(Instant::now() < timeout, "data never delivered");
+    }
+}
+
+/// A server registered for both readiness kinds, with nothing connected yet.
+fn registered_server() -> (NamedPipe, String, Poll, Events) {
+    let (mut server, name) = server();
+    let poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    (server, name, poll, Events::with_capacity(16))
+}
+
+// Issue #1983: a pipe instance reused through `disconnect` and `connect` must
+// not hand anything of the previous client to the next one. Here the previous
+// client's EOF.
+#[test]
+fn reconnect_after_eof() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    for round in 0..2 {
+        assert_would_block(server.connect());
+        let msg = format!("round-{round}");
+        let mut client = blocking_client(&name);
+        t!(client.write_all(msg.as_bytes()));
+        drop(client);
+
+        assert_eq!(
+            read_to_eof(&mut server, &mut poll, &mut events),
+            msg.as_bytes()
+        );
+        t!(server.disconnect());
+    }
+}
+
+// Same, with a read still in flight when the pipe disconnects.
+#[test]
+fn reconnect_with_read_in_flight() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    let mut first = blocking_client(&name);
+    t!(first.write_all(b"first"));
+    // Using up the data submits the next read, which stays in flight as the
+    // client is still connected.
+    assert_eq!(read_some(&mut server, &mut poll, &mut events), b"first");
+    t!(server.disconnect());
+    drop(first);
+
+    assert_would_block(server.connect());
+    let mut second = blocking_client(&name);
+    t!(second.write_all(b"second"));
+    drop(second);
+    assert_eq!(read_to_eof(&mut server, &mut poll, &mut events), b"second");
+}
+
+// Same, with read data not handed out yet when the pipe disconnects.
+#[test]
+fn reconnect_with_unread_data() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    let mut first = blocking_client(&name);
+    t!(first.write_all(b"first"));
+    drop(first);
+    // Readable means the data is read into the internal buffer, leave it there.
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+    );
+    t!(server.disconnect());
+
+    assert_would_block(server.connect());
+    let mut second = blocking_client(&name);
+    t!(second.write_all(b"second"));
+    drop(second);
+    assert_eq!(read_to_eof(&mut server, &mut poll, &mut events), b"second");
+}
+
+// Same, with a write in flight when the client goes away, which then fails.
+#[test]
+fn reconnect_with_write_in_flight() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    let first = blocking_client(&name);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    // Larger than the pipe's buffer, so the write pends as the client never
+    // reads.
+    let data = vec![0; 128 * 1024];
+    assert_eq!(t!(server.write(&data)), data.len());
+    drop(first);
+    t!(server.disconnect());
+
+    assert_would_block(server.connect());
+    let _second = blocking_client(&name);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    assert_eq!(t!(server.write(b"second")), 6);
+}
+
+// Same, with a connect in flight when the pipe disconnects, which then fails.
+#[test]
+fn reconnect_after_aborted_connect() {
+    let (server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    // Wine doesn't abort the connect, but fails here instead.
+    let _ = server.disconnect();
+
+    let timeout = Instant::now() + Duration::from_secs(10);
+    let mut client = None;
+    loop {
+        t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+        match server.connect() {
+            Ok(()) => break,
+            // A client can only open the pipe while a connect is in flight.
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock && client.is_none() => {
+                client = Some(blocking_client(&name));
+            }
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+        assert!(Instant::now() < timeout, "never connected");
+    }
+    match server.take_error() {
+        Ok(None) => {}
+        res => panic!("expected no error, got {res:?}"),
+    }
+}
+
+// A reply written right before disconnecting, as servers typically do. Its
+// completion, handled after the disconnect, doesn't hold up the next client.
+#[test]
+fn write_then_disconnect() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    let first = blocking_client(&name);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    assert_eq!(t!(server.write(b"first")), 5);
+    t!(server.disconnect());
+    drop(first);
+
+    // Without polling, so the first write's completion is still to be handled.
+    assert_would_block(server.connect());
+    let mut second = blocking_client(&name);
+    assert_eq!(t!(server.write(b"second")), 6);
+    let mut buf = [0; 6];
+    t!(second.read_exact(&mut buf));
+    assert_eq!(&buf, b"second");
+    // Handles the completions, including the first write's.
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+}
+
+// Data read before deregistering is still handed out, but then reading fails
+// instead of starting a read nothing would announce.
+#[test]
+fn read_after_deregister() {
+    for vectored in [false, true] {
+        let (mut server, name, mut poll, mut events) = registered_server();
+        assert_would_block(server.connect());
+        let mut client = blocking_client(&name);
+        expect_events(
+            &mut poll,
+            &mut events,
+            vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+        );
+        t!(client.write_all(b"data"));
+        // Readable means the data is read into the internal buffer.
+        expect_events(
+            &mut poll,
+            &mut events,
+            vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+        );
+        t!(poll.registry().deregister(&mut server));
+
+        let mut buf = [0; 4];
+        let n = if vectored {
+            t!(server.read_vectored(&mut [IoSliceMut::new(&mut buf)]))
+        } else {
+            t!(server.read(&mut buf))
+        };
+        assert_eq!(&buf[..n], b"data");
+        match server.read(&mut buf) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            res => panic!("expected a `NotFound` error, got {res:?}"),
+        }
+
+        // Reading starts again once registered.
+        t!(poll
+            .registry()
+            .register(&mut server, Token(1), Interest::READABLE));
+        t!(client.write_all(b"next"));
+        assert_eq!(read_some(&mut server, &mut poll, &mut events), b"next");
+    }
+}
+
+// A connect in flight when deregistering still would block. Once it completes,
+// still deregistered, reading only starts after registering again.
+#[test]
+fn connect_completes_while_deregistered() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    t!(poll.registry().deregister(&mut server));
+    assert_would_block(server.connect());
+
+    let mut client = blocking_client(&name);
+    // Handles the connect's completion, its event goes nowhere.
+    t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+    assert!(events.is_empty());
+    for res in [server.connect().map(|()| 0), server.read(&mut [0; 4])] {
+        match res {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            res => panic!("expected a `NotFound` error, got {res:?}"),
+        }
+    }
+
+    t!(poll
+        .registry()
+        .register(&mut server, Token(1), Interest::READABLE));
+    t!(client.write_all(b"data"));
+    assert_eq!(read_some(&mut server, &mut poll, &mut events), b"data");
+    t!(server.connect());
+    match server.take_error() {
+        Ok(None) => {}
+        res => panic!("expected no error, got {res:?}"),
+    }
+}
+
+// Many clients in turn on one pipe: each only sees its own data, and nothing
+// leaks.
+#[test]
+fn reconnect_many_clients() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    for round in 0..50 {
+        assert_would_block(server.connect());
+        let mut client = blocking_client(&name);
+        let ping = format!("ping-{round}");
+        t!(client.write_all(ping.as_bytes()));
+        assert_eq!(
+            read_some(&mut server, &mut poll, &mut events),
+            ping.as_bytes()
+        );
+
+        let pong = format!("pong-{round}");
+        assert_eq!(t!(server.write(pong.as_bytes())), pong.len());
+        let mut buf = [0; 16];
+        let n = t!(client.read(&mut buf));
+        assert_eq!(&buf[..n], pong.as_bytes());
+
+        drop(client);
+        assert!(read_to_eof(&mut server, &mut poll, &mut events).is_empty());
+        t!(server.disconnect());
+    }
+    drop(server);
+    wait_freed(&name, || {
+        t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+    });
+}
+
+// Dropping a pipe doesn't cancel its write in flight, it's still delivered.
+#[test]
+fn drop_flushes_write_in_flight() {
+    let (mut server, name) = server();
+    let client = blocking_client(&name);
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(0), Interest::WRITABLE));
+    let mut events = Events::with_capacity(16);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+
+    // Larger than the pipe's buffer, so the write pends until the client reads.
+    let data = vec![1; 1024 * 1024];
+    assert_eq!(t!(server.write(&data)), data.len());
+    drop(server);
+
+    let reader = thread::spawn(move || {
+        let mut client = client;
+        let mut read = Vec::new();
+        t!(client.read_to_end(&mut read));
+        read
+    });
+    // The write only finishes, and closes the pipe, while polling.
+    let timeout = Instant::now() + Duration::from_secs(10);
+    while !reader.is_finished() {
+        t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+        assert!(Instant::now() < timeout, "EOF never delivered");
+    }
+    let read = reader.join().unwrap();
+    assert!(read == data, "got {} of {} bytes", read.len(), data.len());
+}
+
+// Issue #1944: dropping a pipe with a write in flight, and then its `Poll`,
+// must still close the pipe. Nothing dequeues the write's completion anymore,
+// so the pipe can't wait for it.
+//
+// Ignored until we agree on #1944. The plan: close the handle on drop, and
+// make `flush` wait for the write in flight, so a write is only guaranteed
+// once `flush` returns `Ok`.
+#[test]
+#[ignore = "fails until #1944 is fixed"]
+fn drop_with_write_in_flight_then_poll_closes() {
+    let (mut server, mut client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll.registry().register(
+        &mut server,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    t!(server.connect());
+
+    // As if the client were another process, with its own event loop.
+    let client_poll = t!(Poll::new());
+    t!(client_poll.registry().register(
+        &mut client,
+        Token(1),
+        Interest::READABLE | Interest::WRITABLE,
+    ));
+    // Larger than the pipe's buffer, so the write pends until the server reads.
+    let data = vec![1; 1024 * 1024];
+    assert_eq!(t!(client.write(&data)), data.len());
+    drop(client);
+    drop(client_poll);
+
+    let mut events = Events::with_capacity(16);
+    read_to_eof(&mut server, &mut poll, &mut events);
 }
