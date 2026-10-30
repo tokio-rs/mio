@@ -447,7 +447,9 @@ fn io_before_register() {
     let results = [
         pipe.connect().map(|()| 0),
         pipe.read(&mut [0; 8]),
+        pipe.read_vectored(&mut [IoSliceMut::new(&mut [0; 8])]),
         pipe.write(b"data"),
+        pipe.write_vectored(&[IoSlice::new(b"data")]),
     ];
     for res in results {
         match res {
@@ -1382,24 +1384,110 @@ fn reconnect_after_aborted_connect() {
     }
 }
 
-// A reply written right before disconnecting, as servers typically do: its
-// completion is handled after the disconnect.
+// A reply written right before disconnecting, as servers typically do. Its
+// completion, handled after the disconnect, doesn't hold up the next client.
 #[test]
 fn write_then_disconnect() {
     let (mut server, name, mut poll, mut events) = registered_server();
-    for round in 0..2 {
+    assert_would_block(server.connect());
+    let first = blocking_client(&name);
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+    assert_eq!(t!(server.write(b"first")), 5);
+    t!(server.disconnect());
+    drop(first);
+
+    // Without polling, so the first write's completion is still to be handled.
+    assert_would_block(server.connect());
+    let mut second = blocking_client(&name);
+    assert_eq!(t!(server.write(b"second")), 6);
+    let mut buf = [0; 6];
+    t!(second.read_exact(&mut buf));
+    assert_eq!(&buf, b"second");
+    // Handles the completions, including the first write's.
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
+    );
+}
+
+// Data read before deregistering is still handed out, but then reading fails
+// instead of starting a read nothing would announce.
+#[test]
+fn read_after_deregister() {
+    for vectored in [false, true] {
+        let (mut server, name, mut poll, mut events) = registered_server();
         assert_would_block(server.connect());
-        let _client = blocking_client(&name);
+        let mut client = blocking_client(&name);
         expect_events(
             &mut poll,
             &mut events,
             vec![ExpectEvent::new(Token(0), Interest::WRITABLE)],
         );
-        let reply = format!("reply-{round}");
-        assert_eq!(t!(server.write(reply.as_bytes())), reply.len());
-        t!(server.disconnect());
+        t!(client.write_all(b"data"));
+        // Readable means the data is read into the internal buffer.
+        expect_events(
+            &mut poll,
+            &mut events,
+            vec![ExpectEvent::new(Token(0), Interest::READABLE)],
+        );
+        t!(poll.registry().deregister(&mut server));
+
+        let mut buf = [0; 4];
+        let n = if vectored {
+            t!(server.read_vectored(&mut [IoSliceMut::new(&mut buf)]))
+        } else {
+            t!(server.read(&mut buf))
+        };
+        assert_eq!(&buf[..n], b"data");
+        match server.read(&mut buf) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            res => panic!("expected a `NotFound` error, got {res:?}"),
+        }
+
+        // Reading starts again once registered.
+        t!(poll
+            .registry()
+            .register(&mut server, Token(1), Interest::READABLE));
+        t!(client.write_all(b"next"));
+        assert_eq!(read_some(&mut server, &mut poll, &mut events), b"next");
     }
+}
+
+// A connect in flight when deregistering still would block. Once it completes,
+// still deregistered, reading only starts after registering again.
+#[test]
+fn connect_completes_while_deregistered() {
+    let (mut server, name, mut poll, mut events) = registered_server();
+    assert_would_block(server.connect());
+    t!(poll.registry().deregister(&mut server));
+    assert_would_block(server.connect());
+
+    let mut client = blocking_client(&name);
+    // Handles the connect's completion, its event goes nowhere.
     t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+    assert!(events.is_empty());
+    for res in [server.connect().map(|()| 0), server.read(&mut [0; 4])] {
+        match res {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            res => panic!("expected a `NotFound` error, got {res:?}"),
+        }
+    }
+
+    t!(poll
+        .registry()
+        .register(&mut server, Token(1), Interest::READABLE));
+    t!(client.write_all(b"data"));
+    assert_eq!(read_some(&mut server, &mut poll, &mut events), b"data");
+    t!(server.connect());
+    match server.take_error() {
+        Ok(None) => {}
+        res => panic!("expected no error, got {res:?}"),
+    }
 }
 
 // Many clients in turn on one pipe: each only sees its own data, and nothing

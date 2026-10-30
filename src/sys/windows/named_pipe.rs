@@ -257,7 +257,7 @@ fn is_connected(err: &io::Error) -> bool {
 /// buffer it reads into or writes from.
 ///
 /// While the operation is in flight the kernel owns its `Op`. `Io::submit`
-/// hands it over with `Box::into_raw` right before the syscall, and the
+/// hands it over with `Box::leak` right before the syscall, and the
 /// completion callback takes it back with `Box::from_raw` (`Op::complete`).
 /// An operation that isn't submitted gets no completion, so `Io::submit` takes
 /// its `Op` back right away.
@@ -449,7 +449,7 @@ impl NamedPipe {
     /// This function will return a "would block" error if the connection
     /// operation has previously been issued but has not yet completed, or if
     /// the connect itself was issued. If the pipe isn't registered with an
-    /// event loop it returns a `NotFound` error.
+    /// event loop, and no connect is in flight, it returns a `NotFound` error.
     ///
     /// Normal I/O errors from the call to `ConnectNamedPipe` are returned
     /// immediately.
@@ -668,7 +668,8 @@ impl NamedPipe {
         }
 
         // Move `bufs` onto the heap and fire off the write, which writes all of
-        // it. If that fails the next write returns the error.
+        // it. If it can't be submitted the error is returned now, if it fails
+        // later the next write returns the error.
         let mut op = io.op();
         op.buf
             .reserve(bufs.clone().map(<[u8]>::len).fold(0, usize::saturating_add));
@@ -795,7 +796,8 @@ impl Drop for NamedPipe {
 
 impl Inner {
     /// Schedules a read to happen in the background, executing an overlapped
-    /// operation, unless a read is in flight, done or failed already.
+    /// operation, unless a read is in flight, done or failed already, or the
+    /// pipe isn't registered.
     ///
     /// Returns `false` only if the pipe isn't connected (`ERROR_PIPE_LISTENING`),
     /// then no read is scheduled. A read that fails otherwise makes the pipe
@@ -803,6 +805,13 @@ impl Inner {
     fn schedule_read(me: &Arc<Inner>, io: &mut Io, events: Option<&mut Vec<Event>>) -> bool {
         // Check to see if a read is already scheduled/completed
         if !matches!(io.read, ReadState::Idle) {
+            return true;
+        }
+
+        // Not registered: the read's event would never come, so `post_register`
+        // starts it once registered. Meanwhile, after handing out data or an
+        // error left from before, the next read returns `NotFound`.
+        if io.token.is_none() {
             return true;
         }
 
