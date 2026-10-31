@@ -127,6 +127,7 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
             all(target_arch = "x86", target_os = "android"),
             target_os = "emscripten",
             target_os = "espidf",
+            target_os = "haiku",
             target_os = "vita",
             target_os = "nto",
         ))]
