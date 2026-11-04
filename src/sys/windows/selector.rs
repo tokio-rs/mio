@@ -55,7 +55,7 @@ cfg_io_source! {
     impl AfdGroup {
         pub fn acquire(&self) -> io::Result<Arc<Afd>> {
             let mut afd_group = self.afd_group.lock().unwrap();
-            if afd_group.len() == 0 {
+            if afd_group.is_empty() {
                 self._alloc_afd_group(&mut afd_group)?;
             } else {
                 // + 1 reference in Vec

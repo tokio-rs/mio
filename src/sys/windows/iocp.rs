@@ -109,7 +109,8 @@ impl CompletionPort {
         let ret = unsafe {
             GetQueuedCompletionStatusEx(
                 self.handle.raw(),
-                list.as_ptr() as *mut _,
+                // Written to, so it must come from a mutable borrow.
+                list.as_mut_ptr().cast(),
                 len,
                 &mut removed,
                 timeout,
@@ -215,7 +216,7 @@ impl CompletionStatus {
     /// A completion key is a per-handle key that is specified when it is added
     /// to an I/O completion port via `add_handle` or `add_socket`.
     pub fn token(&self) -> usize {
-        self.0.lpCompletionKey as usize
+        self.0.lpCompletionKey
     }
 
     /// Returns a pointer to the `Overlapped` structure that was specified when
@@ -277,6 +278,6 @@ mod tests {
         }
         assert_eq!(s[2].bytes_transferred(), 0);
         assert_eq!(s[2].token(), 0);
-        assert_eq!(s[2].overlapped(), 0 as *mut _);
+        assert_eq!(s[2].overlapped(), std::ptr::null_mut());
     }
 }
