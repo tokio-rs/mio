@@ -214,7 +214,8 @@ impl TcpStream {
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         // Need to re-register if `peek` returns `WouldBlock`
         // to ensure the socket will receive more events once it is ready again.
-        self.inner.do_io(|inner| inner.peek(buf))
+        self.inner
+            .do_io_with(Interest::READABLE, |inner| inner.peek(buf))
     }
 
     /// Execute an I/O operation ensuring that the socket receives more events
@@ -272,55 +273,67 @@ impl TcpStream {
     where
         F: FnOnce() -> io::Result<T>,
     {
+        // The closure is opaque, so the direction that may block is not known
+        // here. Keep re-arming everything the stream is registered for.
         self.inner.do_io(|_| f())
     }
 }
 
 impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.do_io(|mut inner| inner.read(buf))
+        self.inner
+            .do_io_with(Interest::READABLE, |mut inner| inner.read(buf))
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|mut inner| inner.read_vectored(bufs))
+        self.inner
+            .do_io_with(Interest::READABLE, |mut inner| inner.read_vectored(bufs))
     }
 }
 
 impl Read for &'_ TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.do_io(|mut inner| inner.read(buf))
+        self.inner
+            .do_io_with(Interest::READABLE, |mut inner| inner.read(buf))
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|mut inner| inner.read_vectored(bufs))
+        self.inner
+            .do_io_with(Interest::READABLE, |mut inner| inner.read_vectored(bufs))
     }
 }
 
 impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.do_io(|mut inner| inner.write(buf))
+        self.inner
+            .do_io_with(Interest::WRITABLE, |mut inner| inner.write(buf))
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|mut inner| inner.write_vectored(bufs))
+        self.inner
+            .do_io_with(Interest::WRITABLE, |mut inner| inner.write_vectored(bufs))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.do_io(|mut inner| inner.flush())
+        self.inner
+            .do_io_with(Interest::WRITABLE, |mut inner| inner.flush())
     }
 }
 
 impl Write for &'_ TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.do_io(|mut inner| inner.write(buf))
+        self.inner
+            .do_io_with(Interest::WRITABLE, |mut inner| inner.write(buf))
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.do_io(|mut inner| inner.write_vectored(bufs))
+        self.inner
+            .do_io_with(Interest::WRITABLE, |mut inner| inner.write_vectored(bufs))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.do_io(|mut inner| inner.flush())
+        self.inner
+            .do_io_with(Interest::WRITABLE, |mut inner| inner.flush())
     }
 }
 
