@@ -122,6 +122,9 @@ jobs:
     - uses: emscripten-core/setup-emsdk@v15
       with:
         version: 6.0.11
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 22
     # PROXY_TO_PTHREAD allows blocking poll calls on a worker.
     - name: Tests
       run: |
