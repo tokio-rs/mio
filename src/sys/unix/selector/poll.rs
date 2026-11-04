@@ -407,6 +407,11 @@ impl SelectorState {
         // If there was no caller of `wait` our notification was not removed from the pipe.
         if sent_notification {
             self.notify_waker.ack_and_reset();
+            // The reset above also removed any notification sent by `wake`,
+            // so send it again to not lose the wake-up.
+            if self.pending_wake_token.lock().unwrap().is_some() {
+                let _ = self.notify_waker.wake();
+            }
         }
 
         let res = f(&mut *fds);
