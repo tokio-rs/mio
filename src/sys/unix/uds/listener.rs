@@ -137,6 +137,15 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
 
     let socket = socket.map(UnixStream::from_std)?;
 
+    // Linux accepts a pathname filling `sun_path` without a null terminator,
+    // then includes the appended terminator in the returned address length.
+    // If that length exceeds our buffer, let the standard library recover the
+    // peer address: `from_pathname` cannot represent this full-length path.
+    if socklen as usize > mem::size_of_val(&sockaddr) {
+        let address = socket.peer_addr()?;
+        return Ok((socket, address));
+    }
+
     #[allow(unused_mut)] // See below.
     let mut path_len = socklen as usize - path_offset(&sockaddr);
     // On FreeBSD and Darwin, it returns a length of 14/16, but an unnamed (all
