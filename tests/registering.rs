@@ -190,6 +190,41 @@ fn tcp_register_multiple_event_loops() {
         Interest::READABLE | Interest::WRITABLE,
     );
     assert_error(res, "I/O source already registered with a `Registry`");
+
+    // The rejected registrations leave the sources registered with `poll1`.
+    poll1.registry().deregister(&mut listener).unwrap();
+    poll1.registry().deregister(&mut stream).unwrap();
+}
+
+#[test]
+#[cfg(all(feature = "os-ext", any(target_os = "linux", target_os = "android")))]
+fn tcp_register_retry_after_failure() {
+    use std::os::fd::AsRawFd;
+
+    init();
+
+    let listener = std::net::TcpListener::bind(any_local_address()).unwrap();
+    let mut stream = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    let poll = Poll::new().unwrap();
+
+    // Registering the descriptor directly makes registering the stream fail.
+    let fd = stream.as_raw_fd();
+    let mut fd = mio::unix::SourceFd(&fd);
+    poll.registry()
+        .register(&mut fd, Token(0), Interest::READABLE)
+        .unwrap();
+    let err = poll
+        .registry()
+        .register(&mut stream, Token(1), Interest::READABLE)
+        .unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
+
+    // The failed registration does not count as one.
+    poll.registry().deregister(&mut fd).unwrap();
+    poll.registry()
+        .register(&mut stream, Token(1), Interest::READABLE)
+        .unwrap();
+    poll.registry().deregister(&mut stream).unwrap();
 }
 
 #[test]
