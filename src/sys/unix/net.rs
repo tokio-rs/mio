@@ -32,7 +32,7 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
     // `SOCK_CLOEXEC` neither exists nor is relevant:
     #[cfg(target_os = "wasi")]
     let socket_type = socket_type | libc::SOCK_NONBLOCK;
-    #[cfg(target_os = "nto")]
+    #[cfg(any(target_os = "nto", target_os = "qnx"))]
     let socket_type = socket_type | libc::SOCK_CLOEXEC;
 
     let socket = syscall!(socket(domain, socket_type, 0))?;
@@ -68,13 +68,19 @@ pub(crate) fn new_socket(domain: libc::c_int, socket_type: libc::c_int) -> io::R
         target_os = "haiku",
         target_os = "vita",
         target_os = "nto",
+        target_os = "qnx",
     ))]
     {
         if let Err(err) = syscall!(fcntl(socket, libc::F_SETFL, libc::O_NONBLOCK)) {
             let _ = syscall!(close(socket));
             return Err(err);
         }
-        #[cfg(not(any(target_os = "espidf", target_os = "vita", target_os = "nto")))]
+        #[cfg(not(any(
+            target_os = "espidf",
+            target_os = "vita",
+            target_os = "nto",
+            target_os = "qnx"
+        )))]
         if let Err(err) = syscall!(fcntl(socket, libc::F_SETFD, libc::FD_CLOEXEC)) {
             let _ = syscall!(close(socket));
             return Err(err);
@@ -137,6 +143,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "vita",
                     target_os = "hermit",
                     target_os = "nto",
+                    target_os = "qnx",
                 ))]
                 sin_len: 0,
                 #[cfg(target_os = "vita")]
@@ -172,6 +179,7 @@ pub(crate) fn socket_addr(addr: &SocketAddr) -> (SocketAddrCRepr, libc::socklen_
                     target_os = "espidf",
                     target_os = "vita",
                     target_os = "nto",
+                    target_os = "qnx",
                     target_os = "hermit",
                 ))]
                 sin6_len: 0,

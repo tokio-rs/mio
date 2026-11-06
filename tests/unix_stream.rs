@@ -242,7 +242,10 @@ fn unix_stream_peer_addr() {
 #[test]
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
-#[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(
+    any(target_os = "nto", target_os = "qnx"),
+    ignore = "POLLRDHUP isn't supported on NTO"
+)]
 #[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
 #[cfg_attr(
     target_os = "emscripten",
@@ -444,7 +447,10 @@ fn unix_stream_shutdown_both() {
 #[test]
 #[cfg_attr(target_os = "hurd", ignore = "POLLRDHUP isn't supported on GNU/Hurd")]
 #[cfg_attr(target_os = "solaris", ignore = "POLLRDHUP isn't supported on Solaris")]
-#[cfg_attr(target_os = "nto", ignore = "POLLRDHUP isn't supported on NTO")]
+#[cfg_attr(
+    any(target_os = "nto", target_os = "qnx"),
+    ignore = "POLLRDHUP isn't supported on NTO"
+)]
 #[cfg_attr(target_os = "cygwin", ignore = "POLLRDHUP isn't supported on Cygwin")]
 #[cfg_attr(
     target_os = "emscripten",
