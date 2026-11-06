@@ -183,6 +183,22 @@ fn unix_listener_deregister() {
 
 #[test]
 #[cfg(any(target_os = "android", target_os = "linux"))]
+fn unix_listener_abstract_namespace_leading_null() {
+    use std::os::linux::net::SocketAddrExt;
+    use std::os::unix::net::SocketAddr;
+
+    let num: u64 = rand::random();
+    let name = format!("\0mio-abstract-uds-{num}");
+    let address = SocketAddr::from_abstract_name(name.as_bytes()).unwrap();
+    let listener = UnixListener::bind_addr(&address).unwrap();
+    assert_eq!(
+        listener.local_addr().unwrap().as_abstract_name(),
+        Some(name.as_bytes()),
+    );
+}
+
+#[test]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 fn unix_listener_abstract_namespace() {
     use std::os::linux::net::SocketAddrExt;
     use std::os::unix::net::SocketAddr;
