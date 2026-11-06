@@ -227,6 +227,79 @@ fn unix_listener_abstract_namespace() {
     handle.join().unwrap();
 }
 
+#[test]
+#[cfg(any(target_os = "android", target_os = "linux"))]
+fn unix_listener_accept_abstract_peer() {
+    #[cfg(target_os = "android")]
+    use std::os::android::net::SocketAddrExt;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    #[cfg(target_os = "linux")]
+    use std::os::linux::net::SocketAddrExt;
+    use std::os::unix::ffi::OsStrExt;
+
+    fn sockaddr(bytes: &[u8]) -> (libc::sockaddr_un, libc::socklen_t) {
+        // SAFETY: zero is valid for every field of `sockaddr_un`.
+        let mut addr: libc::sockaddr_un = unsafe { std::mem::zeroed() };
+        addr.sun_family = libc::AF_UNIX as _;
+        assert!(bytes.len() <= addr.sun_path.len());
+        for (dst, src) in addr.sun_path.iter_mut().zip(bytes) {
+            *dst = *src as _;
+        }
+        let offset = addr.sun_path.as_ptr() as usize - &addr as *const _ as usize;
+        (addr, (offset + bytes.len()) as libc::socklen_t)
+    }
+
+    let (mut poll, mut events) = init_with_poll();
+    let path = temp_file("unix_listener_accept_abstract_peer");
+    let mut listener = UnixListener::bind(&path).unwrap();
+    poll.registry()
+        .register(&mut listener, TOKEN_1, Interest::READABLE)
+        .unwrap();
+    let server_path = [path.as_os_str().as_bytes(), &[0]].concat();
+
+    let name = format!("mio-abstract-peer-{}", rand::random::<u64>()).into_bytes();
+    let nul_name = [&[0][..], name.as_slice(), b"\0peer\0"].concat();
+    let mut maximum_name = name.clone();
+    maximum_name.resize(107, b'x');
+    for name in [
+        Some(name.as_slice()),
+        Some(&[][..]),
+        Some(nul_name.as_slice()),
+        Some(maximum_name.as_slice()),
+        None,
+    ] {
+        // Neither Mio nor std exposes bind-before-connect for Unix streams.
+        let fd = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_STREAM, 0) };
+        assert!(fd >= 0, "{}", io::Error::last_os_error());
+        // SAFETY: `socket` returned a valid, uniquely owned socket.
+        let client = unsafe { net::UnixStream::from_raw_fd(fd) };
+        if let Some(name) = name {
+            let (addr, len) = sockaddr(&[&[0][..], name].concat());
+            let result =
+                unsafe { libc::bind(client.as_raw_fd(), &addr as *const _ as *const _, len) };
+            assert_eq!(result, 0, "{}", io::Error::last_os_error());
+        }
+        let (addr, len) = sockaddr(&server_path);
+        let result =
+            unsafe { libc::connect(client.as_raw_fd(), &addr as *const _ as *const _, len) };
+        assert_eq!(result, 0, "{}", io::Error::last_os_error());
+        expect_events(
+            &mut poll,
+            &mut events,
+            vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+        );
+
+        let (stream, address) = listener.accept().unwrap();
+        assert_eq!(address.as_abstract_name(), name);
+        assert_eq!(address.is_unnamed(), name.is_none());
+        assert_eq!(
+            address.as_abstract_name(),
+            stream.peer_addr().unwrap().as_abstract_name()
+        );
+        assert_would_block(listener.accept());
+    }
+}
+
 fn smoke_test<F>(new_listener: F, test_name: &'static str)
 where
     F: FnOnce(&Path) -> io::Result<UnixListener>,
