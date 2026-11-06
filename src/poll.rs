@@ -723,11 +723,12 @@ impl Registry {
     /// Internal check to ensure only a single `Waker` is active per [`Poll`]
     /// instance.
     #[cfg(all(debug_assertions, not(any(target_os = "wasi", target_os = "horizon"))))]
-    pub(crate) fn register_waker(&self) {
+    pub(crate) fn register_waker(&self) -> Arc<AtomicBool> {
         assert!(
             !self.has_waker.swap(true, Ordering::AcqRel),
             "Only a single `Waker` can be active per `Poll` instance"
         );
+        Arc::clone(&self.has_waker)
     }
 
     /// Get access to the `sys::Selector`.

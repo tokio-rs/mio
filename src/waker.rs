@@ -1,6 +1,10 @@
 use crate::{sys, Registry, Token};
 
 use std::io;
+#[cfg(debug_assertions)]
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(debug_assertions)]
+use std::sync::Arc;
 
 /// Waker allows cross-thread waking of [`Poll`].
 ///
@@ -77,14 +81,35 @@ use std::io;
 #[derive(Debug)]
 pub struct Waker {
     inner: sys::Waker,
+    // Fields are dropped in declaration order: release the registration only
+    // after the OS waker has been dropped.
+    #[cfg(debug_assertions)]
+    _registration: WakerRegistration,
+}
+
+#[cfg(debug_assertions)]
+#[derive(Debug)]
+struct WakerRegistration(Arc<AtomicBool>);
+
+#[cfg(debug_assertions)]
+impl Drop for WakerRegistration {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
 }
 
 impl Waker {
     /// Create a new `Waker`.
     pub fn new(registry: &Registry, token: Token) -> io::Result<Waker> {
         #[cfg(debug_assertions)]
-        registry.register_waker();
-        sys::Waker::new(registry.selector(), token).map(|inner| Waker { inner })
+        let registration = WakerRegistration(registry.register_waker());
+        // The registration is also released if creating the OS waker fails.
+        let inner = sys::Waker::new(registry.selector(), token)?;
+        Ok(Waker {
+            inner,
+            #[cfg(debug_assertions)]
+            _registration: registration,
+        })
     }
 
     /// Wake up the [`Poll`] associated with this `Waker`.

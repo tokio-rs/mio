@@ -30,6 +30,82 @@ fn waker() {
 }
 
 #[test]
+fn waker_after_drop() {
+    init();
+
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(10);
+    let first = Waker::new(poll.registry(), Token(0)).unwrap();
+    first.wake().unwrap();
+    expect_waker_event(&mut poll, &mut events, Token(0));
+    drop(first);
+
+    for token in (1..4).map(Token) {
+        let registry = poll.registry().try_clone().unwrap();
+        let waker = Waker::new(&registry, token).unwrap();
+        drop(registry);
+
+        waker.wake().unwrap();
+        expect_waker_event(&mut poll, &mut events, token);
+        drop(waker);
+    }
+}
+
+#[test]
+#[cfg(all(
+    any(target_os = "linux", target_os = "macos"),
+    not(mio_unsupported_force_poll_poll),
+))]
+#[cfg_attr(miri, ignore = "Miri doesn't support spawning a subprocess")]
+fn waker_after_creation_failure() {
+    const CHILD: &str = "MIO_TEST_WAKER_CREATION_FAILURE";
+    if std::env::var_os(CHILD).is_none() {
+        // Changing the fd limit must not interfere with other tests.
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "waker_after_creation_failure", "--nocapture"])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "child failed: {}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        return;
+    }
+
+    let mut poll = Poll::new().unwrap();
+    let mut limit = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    // SAFETY: `limit` is valid storage for the current resource limit.
+    assert_eq!(
+        unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) },
+        0
+    );
+    let exhausted = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: limit.rlim_max,
+    };
+    // SAFETY: only this subprocess's soft limit is changed, and restored below.
+    assert_eq!(
+        unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &exhausted) },
+        0
+    );
+    let failed = Waker::new(poll.registry(), Token(0));
+    // SAFETY: restore the original valid resource limit before checking results.
+    assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &limit) }, 0);
+    assert!(failed.is_err());
+
+    let waker = Waker::new(poll.registry(), Token(1)).unwrap();
+    waker.wake().unwrap();
+    let mut events = Events::with_capacity(10);
+    expect_waker_event(&mut poll, &mut events, Token(1));
+}
+
+#[test]
 fn waker_multiple_wakeups_same_thread() {
     init();
 
