@@ -77,6 +77,83 @@ fn unix_listener_local_addr() {
 }
 
 #[test]
+#[cfg(any(target_os = "android", target_os = "linux"))]
+fn unix_listener_accept_maximum_length_pathname() {
+    use std::io::Write;
+    use std::mem;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::ffi::OsStrExt;
+
+    fn sockaddr(path: &Path) -> (libc::sockaddr_un, usize) {
+        // SAFETY: zero is valid for every field in `sockaddr_un`.
+        let mut addr: libc::sockaddr_un = unsafe { mem::zeroed() };
+        addr.sun_family = libc::AF_UNIX as _;
+        let bytes = path.as_os_str().as_bytes();
+        assert!(bytes.len() <= addr.sun_path.len());
+        for (dst, src) in addr.sun_path.iter_mut().zip(bytes) {
+            *dst = *src as _;
+        }
+        let offset = addr.sun_path.as_ptr() as usize - &addr as *const _ as usize;
+        (addr, offset + bytes.len())
+    }
+
+    let (mut poll, mut events) = init_with_poll();
+    let listener_path = temp_file("unix_listener_accept_maximum_length_pathname");
+    let mut listener = UnixListener::bind(&listener_path).unwrap();
+    poll.registry()
+        .register(&mut listener, TOKEN_1, Interest::READABLE)
+        .unwrap();
+
+    let path = temp_file("unix_listener_accept_maximum_length_pathname_peer");
+    let path = path.as_os_str().as_bytes();
+    assert!(path.len() <= 108);
+    let mut bytes = path.to_vec();
+    bytes.resize(108, b'x');
+    let peer_path = Path::new(std::ffi::OsStr::from_bytes(&bytes));
+    let (addr, len) = sockaddr(peer_path);
+    assert_eq!(peer_path.as_os_str().as_bytes().len(), addr.sun_path.len());
+
+    // `SocketAddr::from_pathname` reserves space for a terminator, but Linux
+    // also accepts a pathname occupying all 108 bytes of `sun_path`.
+    let fd = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_STREAM, 0) };
+    assert!(fd >= 0, "{}", io::Error::last_os_error());
+    // SAFETY: `socket` returned a valid, uniquely owned socket.
+    let mut client = unsafe { net::UnixStream::from_raw_fd(fd) };
+    let result = unsafe {
+        libc::bind(
+            client.as_raw_fd(),
+            &addr as *const _ as *const libc::sockaddr,
+            len as libc::socklen_t,
+        )
+    };
+    assert_eq!(result, 0, "{}", io::Error::last_os_error());
+
+    let (addr, len) = sockaddr(&listener_path);
+    let result = unsafe {
+        libc::connect(
+            client.as_raw_fd(),
+            &addr as *const _ as *const libc::sockaddr,
+            (len + 1) as libc::socklen_t,
+        )
+    };
+    assert_eq!(result, 0, "{}", io::Error::last_os_error());
+    client.write_all(b"hello").unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+    );
+
+    let (mut accepted, address) = listener.accept().unwrap();
+    assert_eq!(address.as_pathname(), Some(peer_path));
+    assert_socket_non_blocking(&accepted);
+    assert_socket_close_on_exec(&accepted);
+    let mut buf = [0; 5];
+    accepted.read_exact(&mut buf).unwrap();
+    assert_eq!(&buf, b"hello");
+}
+
+#[test]
 fn unix_listener_register() {
     let (mut poll, mut events) = init_with_poll();
 
