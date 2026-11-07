@@ -15,11 +15,11 @@ use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::io;
 use std::marker::PhantomPinned;
-use std::os::windows::io::RawSocket;
+use std::os::windows::io::{AsRawHandle, BorrowedHandle, RawSocket};
 use std::pin::Pin;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -359,6 +359,12 @@ impl Selector {
         self.inner.select(events, timeout)
     }
 
+    pub fn prepare_external_wait(&self) -> io::Result<BorrowedHandle<'_>> {
+        self.inner.prepare_external_wait()?;
+        // SAFETY: `self.inner` keeps the port open for the borrow of `self`.
+        Ok(unsafe { BorrowedHandle::borrow_raw(self.inner.cp.as_raw_handle()) })
+    }
+
     pub(super) fn clone_port(&self) -> Arc<CompletionPort> {
         self.inner.cp.clone()
     }
@@ -399,12 +405,20 @@ cfg_io_source! {
     }
 }
 
+/// No one is waiting on the port: socket interest is queued and submitted at
+/// the start of the next `select2`.
+const IDLE: u8 = 0;
+/// A thread is in `select2`.
+const POLLING: u8 = 1;
+/// The port is waited on outside of `select2`, see `prepare_external_wait`.
+const EXTERNAL: u8 = 2;
+
 #[derive(Debug)]
 pub struct SelectorInner {
     pub(super) cp: Arc<CompletionPort>,
     update_queue: Mutex<VecDeque<Pin<Arc<Mutex<SockState>>>>>,
     afd_group: AfdGroup,
-    is_polling: AtomicBool,
+    wait_state: AtomicU8,
 }
 
 // We have ensured thread safety by introducing lock manually.
@@ -420,7 +434,7 @@ impl SelectorInner {
                 cp,
                 update_queue: Mutex::new(VecDeque::new()),
                 afd_group: AfdGroup::new(cp_afd),
-                is_polling: AtomicBool::new(false),
+                wait_state: AtomicU8::new(IDLE),
             }
         })
     }
@@ -451,19 +465,27 @@ impl SelectorInner {
         events: &mut Vec<Event>,
         timeout: Option<Duration>,
     ) -> io::Result<usize> {
-        assert!(!self.is_polling.swap(true, Ordering::AcqRel));
+        assert_ne!(self.wait_state.swap(POLLING, Ordering::AcqRel), POLLING);
 
         unsafe { self.update_sockets_events() }?;
 
         let result = self.cp.get_many(statuses, timeout);
 
-        self.is_polling.store(false, Ordering::Relaxed);
+        self.wait_state.store(IDLE, Ordering::Relaxed);
 
         match result {
             Ok(iocp_events) => Ok(unsafe { self.feed_events(events, iocp_events) }),
             Err(ref e) if e.raw_os_error() == Some(WAIT_TIMEOUT as i32) => Ok(0),
             Err(e) => Err(e),
         }
+    }
+
+    pub fn prepare_external_wait(&self) -> io::Result<()> {
+        // Set before draining the queue: a concurrent (re)registration either
+        // is queued before the drain or, ordered after it by the queue lock,
+        // observes `EXTERNAL` and submits itself.
+        self.wait_state.store(EXTERNAL, Ordering::Relaxed);
+        unsafe { self.update_sockets_events() }
     }
 
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
@@ -600,10 +622,10 @@ cfg_io_source! {
         /// until just before the GetQueuedCompletionStatusEx() syscall is made.
         ///
         /// However, when another thread is already blocked on
-        /// GetQueuedCompletionStatusEx() we tell the kernel about the registered
-        /// socket event(s) immediately.
+        /// GetQueuedCompletionStatusEx(), or the port is waited on externally,
+        /// we tell the kernel about the registered socket event(s) immediately.
         unsafe fn update_sockets_events_if_polling(&self) -> io::Result<()> {
-            if self.is_polling.load(Ordering::Acquire) {
+            if self.wait_state.load(Ordering::Acquire) != IDLE {
                 self.update_sockets_events()
             } else {
                 Ok(())

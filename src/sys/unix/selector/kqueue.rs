@@ -122,6 +122,10 @@ impl Selector {
         })
     }
 
+    pub fn prepare_external_wait(&self) -> io::Result<BorrowedFd<'_>> {
+        Ok(self.kq.as_fd())
+    }
+
     #[cfg_attr(not(feature = "os-ext"), allow(dead_code))]
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         let flags = libc::EV_CLEAR | libc::EV_RECEIPT | libc::EV_ADD;

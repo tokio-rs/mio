@@ -440,6 +440,35 @@ impl Poll {
     }
 }
 
+macro_rules! prepare_external_wait {
+    ($platform: meta, $handle: ty) => {
+        #[cfg($platform)]
+        #[cfg_attr(docsrs, doc(cfg($platform)))]
+        /// Prepares for a wait outside of [`Poll::poll`], e.g. by a host event
+        /// loop, returning the selector's handle: the `epoll`/`kqueue` fd, or
+        /// the I/O completion port on Windows.
+        ///
+        /// Until the next [`Poll::poll`], the handle becomes ready whenever
+        /// events may be available, including for sources (re)registered or
+        /// returning `WouldBlock` on any thread. Waiting does not consume
+        /// events, and readiness does not guarantee any. Call this after every
+        /// [`Poll::poll`]: on Windows, waiting without doing so can block
+        /// forever. Only direct waits on the port are supported, not
+        /// `RegisterWaitForSingleObject` or thread pool waits.
+        ///
+        /// Returns [`io::ErrorKind::Unsupported`] for the `poll(2)` and Solaris
+        /// event ports selectors.
+        pub fn prepare_external_wait(&self) -> io::Result<$handle> {
+            self.registry.selector.prepare_external_wait()
+        }
+    };
+}
+
+impl Poll {
+    prepare_external_wait!(unix, std::os::fd::BorrowedFd<'_>);
+    prepare_external_wait!(windows, std::os::windows::io::BorrowedHandle<'_>);
+}
+
 #[cfg(all(
     unix,
     not(mio_unsupported_force_poll_poll),

@@ -47,6 +47,11 @@ impl Selector {
         self.state.select(events, timeout)
     }
 
+    #[cfg(unix)]
+    pub fn prepare_external_wait(&self) -> io::Result<std::os::fd::BorrowedFd<'_>> {
+        Err(io::ErrorKind::Unsupported.into())
+    }
+
     #[cfg_attr(target_os = "horizon", allow(dead_code))]
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
         self.state.register(fd, token, interests)

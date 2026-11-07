@@ -96,6 +96,12 @@ impl Selector {
             .select(self.port.as_raw_fd(), events, timeout, &mut self.events)
     }
 
+    /// Delivered interests are watched by a `poll(2)` call in `select` rather
+    /// than by the port, so the port does not reflect them.
+    pub fn prepare_external_wait(&self) -> io::Result<BorrowedFd<'_>> {
+        Err(io::ErrorKind::Unsupported.into())
+    }
+
     cfg_io_source! {
     #[allow(dead_code)]
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
