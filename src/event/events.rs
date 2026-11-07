@@ -214,12 +214,12 @@ impl<'a> Iterator for Iter<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self.inner.inner.len();
+        let size = self.inner.inner.len().saturating_sub(self.pos);
         (size, Some(size))
     }
 
     fn count(self) -> usize {
-        self.inner.inner.len()
+        self.inner.inner.len().saturating_sub(self.pos)
     }
 }
 

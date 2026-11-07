@@ -51,3 +51,32 @@ fn is_event_send_sync() {
     assert_send::<Events>();
     assert_sync::<Events>();
 }
+
+#[test]
+fn iter_size_hint_and_count() {
+    let (mut poll, mut events) = init_with_poll();
+    let waker = Waker::new(poll.registry(), WAKE_TOKEN).unwrap();
+
+    waker.wake().expect("unable to wake");
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+
+    let total = events.iter().count();
+    assert!(total > 0);
+
+    let mut iter = events.iter();
+    assert_eq!(iter.size_hint(), (total, Some(total)));
+    assert_eq!(iter.by_ref().count(), total);
+
+    let mut iter = events.iter();
+    assert!(iter.next().is_some());
+    let remaining = total - 1;
+    assert_eq!(iter.size_hint(), (remaining, Some(remaining)));
+    assert_eq!(iter.count(), remaining);
+
+    let mut iter = events.iter();
+    while iter.next().is_some() {}
+    // Beyond exhaustion
+    assert_eq!(iter.size_hint(), (0, Some(0)));
+    assert_eq!(iter.count(), 0);
+}
