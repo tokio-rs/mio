@@ -1,3 +1,17 @@
+# 1.2.5
+
+* Add support for wasm32-unknown-emscripten
+  (https://github.com/tokio-rs/mio/pull/1969).
+* Implement vectored I/O for Windows NamedPipe
+  (https://github.com/tokio-rs/mio/pull/2013).
+* Size Windows `NamedPipe` reads like the caller's buffer
+  (https://github.com/tokio-rs/mio/pull/2028).
+* Fix `Waker` events not being marked as readable on NetBSD, OpenBSD and DragonFly
+  (https://github.com/tokio-rs/mio/pull/2027).
+* Rewrite of Windows `NamedPipe` that makes the code simpler and should make it
+  (slightly faster
+  (https://github.com/tokio-rs/mio/pull/2022).
+
 # 1.2.4
 
 * Fix FreeBSD build with libc v0.2.190.
