@@ -93,6 +93,13 @@ impl UnixDatagram {
         self.inner.do_io(|inner| inner.send_to(buf, path))
     }
 
+    /// Sends data on the socket to the specified [SocketAddr].
+    ///
+    /// On success, returns the number of bytes written.
+    pub fn send_to_addr(&self, buf: &[u8], socket_addr: &SocketAddr) -> io::Result<usize> {
+        self.inner.do_io(|inner| inner.send_to_addr(buf, socket_addr))
+    }
+
     /// Sends data on the socket to the socket's peer.
     ///
     /// The peer address may be set by the `connect` method, and this method

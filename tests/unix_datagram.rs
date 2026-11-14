@@ -307,6 +307,212 @@ fn unix_datagram_deregister() {
     expect_no_events(&mut poll, &mut events);
 }
 
+#[test]
+#[cfg_attr(
+    target_os = "hurd",
+    ignore = "getting pathname isn't supported on GNU/Hurd"
+)]
+#[cfg_attr(
+    target_os = "cygwin",
+    ignore = "getting pathname isn't supported on Cygwin"
+)]
+fn unix_datagram_send_to_addr() {
+    let (mut poll, mut events) = init_with_poll();
+    let path1 = temp_file("unix_datagram_send_to_addr1");
+    let path2 = temp_file("unix_datagram_send_to_addr2");
+
+    let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
+    let mut datagram2 = UnixDatagram::bind(&path2).unwrap();
+
+    let addr1 = datagram1.local_addr().unwrap();
+    let addr2 = datagram2.local_addr().unwrap();
+
+    poll.registry()
+        .register(
+            &mut datagram1,
+            TOKEN_1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
+        .unwrap();
+    poll.registry()
+        .register(
+            &mut datagram2,
+            TOKEN_2,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
+        .unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(TOKEN_1, Interest::WRITABLE),
+            ExpectEvent::new(TOKEN_2, Interest::WRITABLE),
+        ],
+    );
+
+    let mut buf = [0; DEFAULT_BUF_SIZE];
+    assert_would_block(datagram1.recv_from(&mut buf));
+    assert_would_block(datagram2.recv_from(&mut buf));
+
+    checked_write!(datagram1.send_to_addr(DATA1, &addr2));
+    checked_write!(datagram2.send_to_addr(DATA2, &addr1));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
+        ],
+    );
+
+    expect_read!(datagram1.recv_from(&mut buf), DATA2, path: path2);
+    expect_read!(datagram2.recv_from(&mut buf), DATA1, path: path1);
+
+    assert!(datagram1.take_error().unwrap().is_none());
+    assert!(datagram2.take_error().unwrap().is_none());
+}
+
+#[test]
+#[cfg(any(target_os = "android", target_os = "linux"))]
+fn unix_datagram_send_to_addr_abstract_namespace() {
+    #[cfg(target_os = "android")]
+    use std::os::android::net::SocketAddrExt;
+    #[cfg(target_os = "linux")]
+    use std::os::linux::net::SocketAddrExt;
+    use std::os::unix::net::SocketAddr;
+
+    let (mut poll, mut events) = init_with_poll();
+
+    let num: u64 = rand::random();
+    let name1 = format!("mio-abstract-uds-dgram1-{num}");
+    let name2 = format!("mio-abstract-uds-dgram2-{num}");
+    let addr1 = SocketAddr::from_abstract_name(name1.as_bytes()).unwrap();
+    let addr2 = SocketAddr::from_abstract_name(name2.as_bytes()).unwrap();
+
+    let mut datagram1 = UnixDatagram::bind_addr(&addr1).unwrap();
+    let mut datagram2 = UnixDatagram::bind_addr(&addr2).unwrap();
+
+    poll.registry()
+        .register(
+            &mut datagram1,
+            TOKEN_1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
+        .unwrap();
+    poll.registry()
+        .register(
+            &mut datagram2,
+            TOKEN_2,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
+        .unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(TOKEN_1, Interest::WRITABLE),
+            ExpectEvent::new(TOKEN_2, Interest::WRITABLE),
+        ],
+    );
+
+    let mut buf = [0; DEFAULT_BUF_SIZE];
+    assert_would_block(datagram1.recv_from(&mut buf));
+    assert_would_block(datagram2.recv_from(&mut buf));
+
+    checked_write!(datagram1.send_to_addr(DATA1, &addr2));
+    checked_write!(datagram2.send_to_addr(DATA2, &addr1));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(TOKEN_1, Interest::READABLE),
+            ExpectEvent::new(TOKEN_2, Interest::READABLE),
+        ],
+    );
+
+    let (n, peer1) = datagram1.recv_from(&mut buf).unwrap();
+    assert_eq!(&buf[..n], DATA2);
+    assert_eq!(peer1.as_abstract_name(), addr2.as_abstract_name());
+
+    let (n, peer2) = datagram2.recv_from(&mut buf).unwrap();
+    assert_eq!(&buf[..n], DATA1);
+    assert_eq!(peer2.as_abstract_name(), addr1.as_abstract_name());
+
+    assert!(datagram1.take_error().unwrap().is_none());
+    assert!(datagram2.take_error().unwrap().is_none());
+}
+
+#[test]
+#[cfg_attr(
+    target_os = "hurd",
+    ignore = "getting pathname isn't supported on GNU/Hurd"
+)]
+#[cfg_attr(
+    target_os = "cygwin",
+    ignore = "getting pathname isn't supported on Cygwin"
+)]
+fn unix_datagram_recv_from_and_send_to_addr() {
+    let (mut poll, mut events) = init_with_poll();
+    let path1 = temp_file("unix_datagram_recv_from_and_send_to_addr1");
+    let path2 = temp_file("unix_datagram_recv_from_and_send_to_addr2");
+
+    let mut datagram1 = UnixDatagram::bind(&path1).unwrap();
+    let mut datagram2 = UnixDatagram::bind(&path2).unwrap();
+
+    poll.registry()
+        .register(
+            &mut datagram1,
+            TOKEN_1,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
+        .unwrap();
+    poll.registry()
+        .register(
+            &mut datagram2,
+            TOKEN_2,
+            Interest::READABLE.add(Interest::WRITABLE),
+        )
+        .unwrap();
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![
+            ExpectEvent::new(TOKEN_1, Interest::WRITABLE),
+            ExpectEvent::new(TOKEN_2, Interest::WRITABLE),
+        ],
+    );
+
+    let mut buf = [0; DEFAULT_BUF_SIZE];
+    assert_would_block(datagram1.recv_from(&mut buf));
+    assert_would_block(datagram2.recv_from(&mut buf));
+
+    checked_write!(datagram2.send_to(DATA1, &path1));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_1, Interest::READABLE)],
+    );
+
+    let (n, peer_addr) = datagram1.recv_from(&mut buf).unwrap();
+    assert_eq!(&buf[..n], DATA1);
+    assert_eq!(
+        peer_addr.as_pathname().expect("failed to get pathname"),
+        path2.as_path()
+    );
+
+    checked_write!(datagram1.send_to_addr(DATA2, &peer_addr));
+    expect_events(
+        &mut poll,
+        &mut events,
+        vec![ExpectEvent::new(TOKEN_2, Interest::READABLE)],
+    );
+
+    expect_read!(datagram2.recv_from(&mut buf), DATA2, path: path1);
+
+    assert!(datagram1.take_error().unwrap().is_none());
+    assert!(datagram2.take_error().unwrap().is_none());
+}
+
 fn smoke_test_unconnected(mut datagram1: UnixDatagram, mut datagram2: UnixDatagram) {
     let (mut poll, mut events) = init_with_poll();
 
