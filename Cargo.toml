@@ -70,6 +70,10 @@ wasi = "0.11.0"
 env_logger = { version = "0.11", default-features = false }
 rand = "0.9"
 
+[target.'cfg(windows)'.dev-dependencies.windows-sys]
+version = "0.61"
+features = ["Win32_System_Threading"] # WaitForSingleObject in tests.
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs", "--generate-link-to-definition"]

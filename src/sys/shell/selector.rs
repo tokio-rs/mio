@@ -1,6 +1,8 @@
 use std::io;
 #[cfg(unix)]
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, RawHandle};
 use std::time::Duration;
 
 pub type Event = usize;
@@ -77,6 +79,13 @@ impl AsFd for Selector {
 #[cfg(unix)]
 impl AsRawFd for Selector {
     fn as_raw_fd(&self) -> RawFd {
+        os_required!()
+    }
+}
+
+#[cfg(windows)]
+impl AsRawHandle for Selector {
+    fn as_raw_handle(&self) -> RawHandle {
         os_required!()
     }
 }
