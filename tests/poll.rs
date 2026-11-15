@@ -2,9 +2,10 @@
 
 use std::io::{Read, Write};
 use std::net;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Barrier};
 use std::thread::{self, sleep};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{fmt, io};
 
 use mio::event::Source;
@@ -428,6 +429,48 @@ fn register_during_poll() {
 
     barrier.wait();
     handle1.join().unwrap();
+}
+
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
+#[test]
+fn registry_operations_during_poll_dont_extend_timeout() {
+    let (mut poll, mut events) = init_with_poll();
+    let registry = poll.registry().try_clone().unwrap();
+
+    let mut listener = TcpListener::bind(any_local_address()).unwrap();
+    registry
+        .register(&mut listener, ID1, Interest::READABLE)
+        .unwrap();
+
+    let done = Arc::new(AtomicBool::new(false));
+    let done1 = Arc::clone(&done);
+    let handle1 = thread::spawn(move || {
+        let start = Instant::now();
+        // Keep changing the registry while the main thread polls, without
+        // causing any events.
+        while !done1.load(Ordering::SeqCst) && start.elapsed() < Duration::from_secs(5) {
+            registry
+                .reregister(&mut listener, ID1, Interest::READABLE)
+                .unwrap();
+            sleep(Duration::from_millis(10));
+        }
+    });
+
+    let start = Instant::now();
+    poll.poll(&mut events, Some(Duration::from_millis(100)))
+        .unwrap();
+    let elapsed = start.elapsed();
+    done.store(true, Ordering::SeqCst);
+    handle1.join().unwrap();
+
+    assert!(events.is_empty(), "unexpected events: {events:?}");
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "poll timeout of 100ms took {elapsed:?}"
+    );
 }
 
 // This test checks the following reregister constraints:

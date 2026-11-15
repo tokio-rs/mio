@@ -13,7 +13,7 @@ use std::os::fd::RawFd;
 use std::os::hermit::io::RawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{cmp, fmt, io};
 
 use crate::sys::unix::waker::Waker as WakerInternal;
@@ -202,6 +202,10 @@ impl SelectorState {
         // when this state occurs.
         let mut closed_raw_fds = Vec::new();
 
+        // Internal wake-ups (e.g. registering an fd) restart the poll below, so
+        // keep track of the deadline to not extend the caller's timeout.
+        let deadline = timeout.and_then(|timeout| Instant::now().checked_add(timeout));
+
         loop {
             // Complete all current operations.
             loop {
@@ -210,6 +214,10 @@ impl SelectorState {
                 }
 
                 fds = self.operations_complete.wait(fds).unwrap();
+            }
+
+            if let Some(deadline) = deadline {
+                timeout = Some(deadline.saturating_duration_since(Instant::now()));
             }
 
             if self.notify_waker.woken() {
