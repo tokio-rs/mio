@@ -59,7 +59,7 @@ impl Selector {
         token: Token,
         interests: Interest,
     ) -> io::Result<Arc<RegistrationRecord>> {
-        self.state.register_internal(fd, token, interests)
+        self.state.register_internal(fd, token, interests, true)
     }
     }
 
@@ -162,6 +162,15 @@ struct FdData {
     /// Used to communicate with IoSourceState when we need to internally deregister
     /// based on a closed fd.
     shared_record: Arc<RegistrationRecord>,
+    /// Whether the interest that just fired should be cleared until it is
+    /// added back by the caller.
+    ///
+    /// This is only true for registrations made through `IoSourceState`,
+    /// whose `do_io` wrapper re-registers the interest when the I/O
+    /// operation returns `WouldBlock`. Registrations made directly, e.g.
+    /// through `SourceFd`, have no such wrapper, so their interests must
+    /// be left in place or later events would never be reported.
+    clear_on_event: bool,
 }
 
 impl SelectorState {
@@ -287,10 +296,15 @@ impl SelectorState {
                             closed_raw_fds.push(poll_fd.fd);
                         }
 
-                        // Remove the interest which just got triggered the IoSourceState's do_io
-                        // wrapper used with this selector will add back the interest using
-                        // reregister.
-                        poll_fd.events &= !poll_fd.revents;
+                        // Remove the interest which just got triggered, but only for
+                        // registrations whose IoSourceState's do_io wrapper will add
+                        // it back using reregister. Registrations made directly
+                        // (e.g. through `SourceFd`) have no such wrapper, so their
+                        // interests are left in place, matching the
+                        // level-triggered behaviour of the other selectors.
+                        if fd_data.clear_on_event {
+                            poll_fd.events &= !poll_fd.revents;
+                        }
 
                         // Minor optimization to potentially avoid looping n times where n is the
                         // number of input fds (i.e. we might loop between m and n times where m is
@@ -314,7 +328,8 @@ impl SelectorState {
     }
 
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        self.register_internal(fd, token, interests).map(|_| ())
+        self.register_internal(fd, token, interests, false)
+            .map(|_| ())
     }
 
     pub fn register_internal(
@@ -322,6 +337,7 @@ impl SelectorState {
         fd: RawFd,
         token: Token,
         interests: Interest,
+        clear_on_event: bool,
     ) -> io::Result<Arc<RegistrationRecord>> {
         #[cfg(all(debug_assertions, not(target_os = "wasi")))]
         if Some(fd) == self.notify_waker.fd() {
@@ -363,6 +379,7 @@ impl SelectorState {
                     poll_fds_index,
                     token,
                     shared_record: record.clone(),
+                    clear_on_event,
                 },
             );
 
