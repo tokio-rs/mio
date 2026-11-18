@@ -116,6 +116,66 @@ fn writable_after_register() {
 }
 
 #[test]
+fn writable_after_register_preserves_full_token() {
+    for token in [
+        Token(0),
+        Token(1),
+        Token(1 << (usize::BITS - 1)),
+        Token(usize::MAX),
+    ] {
+        let (mut server, _client) = pipe();
+        let mut poll = t!(Poll::new());
+        t!(poll
+            .registry()
+            .register(&mut server, token, Interest::WRITABLE));
+
+        let mut events = Events::with_capacity(8);
+        t!(poll.poll(&mut events, Some(Duration::from_secs(1))));
+
+        assert!(events.iter().any(|event| event.is_writable()));
+        for event in &events {
+            assert_eq!(event.token(), token);
+        }
+    }
+}
+
+#[test]
+fn queued_events_use_reregistered_token() {
+    let (mut server, _client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(7), Interest::WRITABLE));
+    // Registration queued a writable event, but it hasn't been polled yet.
+    let token = Token(usize::MAX);
+    t!(poll
+        .registry()
+        .reregister(&mut server, token, Interest::WRITABLE));
+
+    let mut events = Events::with_capacity(8);
+    t!(poll.poll(&mut events, Some(Duration::from_secs(1))));
+
+    assert!(events.iter().any(|event| event.is_writable()));
+    for event in &events {
+        assert_eq!(event.token(), token);
+    }
+}
+
+#[test]
+fn queued_events_are_ignored_after_deregister() {
+    let (mut server, _client) = pipe();
+    let mut poll = t!(Poll::new());
+    t!(poll
+        .registry()
+        .register(&mut server, Token(usize::MAX), Interest::WRITABLE));
+    t!(poll.registry().deregister(&mut server));
+
+    let mut events = Events::with_capacity(8);
+    t!(poll.poll(&mut events, Some(Duration::from_millis(100))));
+    assert!(events.is_empty());
+}
+
+#[test]
 fn write_then_read() {
     let (mut server, mut client) = pipe();
     let mut poll = t!(Poll::new());

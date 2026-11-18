@@ -1018,16 +1018,15 @@ fn event_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let io = me.io.lock().unwrap();
 
     // Make sure the I/O handle is still registered with the selector
-    if io.token.is_some() {
+    if let Some(token) = io.token {
         // This method is also called during `Selector::drop` to perform
         // cleanup. In this case, `events` is `None` and we don't need to track
         // the event.
         if let Some(events) = events {
             let mut ev = Event::from_completion_status(status);
-            // Reverse the `.data` alteration done in `schedule_event`. This
-            // alteration was done so the selector recognized the event as one from
-            // a named pipe.
-            ev.data >>= 1;
+            // The completion key only identifies this as a named pipe event.
+            // Use the current registration's token, just as I/O completions do.
+            ev.data = token.0 as u64;
             events.push(ev);
         }
     }
@@ -1135,15 +1134,10 @@ impl Io {
     }
 
     fn schedule_event(&self, me: &Arc<Inner>, mut event: Event) {
-        // Alter the token so that the selector will identify the IOCP event as
-        // one for a named pipe. This will be reversed in `event_done`
-        //
-        // `data` for named pipes is an auto-incrementing counter. Because
-        // `data` is `u64` we do not risk losing the most-significant bit
-        // (unless a user creates 2^62 named pipes during the lifetime of the
-        // process).
-        event.data <<= 1;
-        event.data += 1;
+        // An odd completion key makes the selector dispatch this as a named
+        // pipe event. `event_done` gets the user token from `Io`, so all its
+        // bits are preserved instead of reserving one for this marker.
+        event.data = 1;
 
         // The event holds a reference to `Inner` until `event_done` takes it
         // back. `event` is the first field of `Inner`, so the pointer to
