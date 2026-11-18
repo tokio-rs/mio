@@ -20,7 +20,6 @@ cfg_os_poll! {
         any(
             target_os = "android",
             target_os = "emscripten",
-            target_os = "illumos",
             target_os = "linux",
             target_os = "redox",
         )
@@ -42,6 +41,7 @@ cfg_os_poll! {
     #[cfg_attr(all(
         not(mio_unsupported_force_poll_poll),
         target_os = "solaris",
+        target_os = "illumos", 
     ), path = "selector/event_ports.rs")]
     #[cfg_attr(any(
         mio_unsupported_force_poll_poll,
