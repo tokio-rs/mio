@@ -1,5 +1,9 @@
 use std::ffi::OsStr;
+#[cfg(target_os = "android")]
+use std::os::android::net::SocketAddrExt;
 use std::os::fd::{AsRawFd, FromRawFd};
+#[cfg(target_os = "linux")]
+use std::os::linux::net::SocketAddrExt;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
@@ -141,12 +145,20 @@ pub(crate) fn accept(listener: &net::UnixListener) -> io::Result<(UnixStream, So
     let mut path_len = socklen as usize - path_offset(&sockaddr);
     // On FreeBSD and Darwin, it returns a length of 14/16, but an unnamed (all
     // zero) address. Map that to a length of 0 to match other OS.
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
     if sockaddr.sun_path[0] == 0 {
         path_len = 0;
     }
     // SAFETY: going from i8 to u8 is fine in this context.
     let mut path =
         unsafe { &*(&sockaddr.sun_path[..path_len] as *const [libc::c_char] as *const [u8]) };
+    #[cfg(any(target_os = "android", target_os = "linux"))]
+    if path.first() == Some(&0) {
+        // Abstract names start after the leading null and use the reported
+        // length. Any other null bytes are part of the name, not terminators.
+        let address = SocketAddr::from_abstract_name(&path[1..])?;
+        return Ok((socket, address));
+    }
     // Remove last null as `SocketAddr::from_pathname` doesn't accept it.
     if let Some(0) = path.last() {
         path = &path[..path.len() - 1];
