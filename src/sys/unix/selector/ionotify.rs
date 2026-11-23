@@ -8,11 +8,13 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::mem::{size_of, MaybeUninit};
 use std::os::fd::RawFd;
+use std::ptr;
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::{Interest, Token};
 
@@ -48,7 +50,7 @@ impl Selector {
     }
 
     pub fn select(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
-        todo!()
+        self.state.select(events, timeout)
     }
 
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
@@ -261,6 +263,75 @@ impl SelectorState {
         slots.free.push(index);
         slots.rearm.retain(|&i| i != index);
         res.map(|_| ())
+    }
+
+    /// Wait for pulses and turn them into events. Blocks until the first one
+    /// arrives or `timeout` passes, then only takes pulses already queued.
+    fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
+        events.clear();
+
+        // A timeout too large to add to `now` waits forever.
+        let deadline = timeout.and_then(|timeout| Instant::now().checked_add(timeout));
+        while events.len() < events.capacity() {
+            let wait = if events.is_empty() {
+                deadline.map(|deadline| deadline.saturating_duration_since(Instant::now()))
+            } else {
+                Some(Duration::ZERO)
+            };
+            match self.receive(wait)? {
+                Some(pulse) => self.handle(&pulse, events),
+                None => break, // timeout
+            }
+        }
+        Ok(())
+    }
+
+    /// Receive one pulse on our channel, waiting at most `wait` (`None` waits
+    /// forever). Returns `None` on timeout.
+    fn receive(&self, wait: Option<Duration>) -> io::Result<Option<ffi::Pulse>> {
+        if let Some(wait) = wait {
+            let ns = u64::try_from(wait.as_nanos()).unwrap_or(u64::MAX);
+            // Applies to the next receive-blocking call on this thread only; a
+            // null event means just unblock with ETIMEDOUT.
+            syscall!(TimerTimeout(
+                libc::CLOCK_MONOTONIC,
+                libc::_NTO_TIMEOUT_RECEIVE,
+                ptr::null(),
+                &ns,
+                ptr::null_mut(),
+            ))?;
+        }
+
+        let mut pulse = MaybeUninit::<ffi::Pulse>::uninit();
+        match syscall!(MsgReceivePulse(
+            self.chid,
+            pulse.as_mut_ptr().cast(),
+            size_of::<ffi::Pulse>(),
+            ptr::null_mut()
+        )) {
+            // SAFETY: MsgReceivePulse succeeded, so it filled the buffer.
+            Ok(_) => Ok(Some(unsafe { pulse.assume_init() })),
+            Err(err) if err.raw_os_error() == Some(libc::ETIMEDOUT) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Turn one pulse into at most one event.
+    fn handle(&self, pulse: &ffi::Pulse, events: &mut Events) {
+        // SAFETY: both of our pulse kinds are sent with a pointer-sized value.
+        let value = unsafe { pulse.value.sival_ptr } as usize;
+        match pulse.code {
+            // Reported as readable, like the other selectors' wakers.
+            WAKE => {
+                events.push(Event {
+                    token: Token(value),
+                    conds: ffi::NOTIFY_COND_INPUT,
+                });
+            }
+            READY => {} // the slot lookup comes next
+            // Kernel pulses use negative codes; none are ours.
+            _ => {}
+        }
     }
 
     /// Send ourselves a READY pulse for slot `index`, so `select` looks at it.
