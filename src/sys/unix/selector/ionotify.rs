@@ -69,11 +69,11 @@ impl Selector {
     }
 
     pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        todo!()
+        self.state.reregister(fd, token, interests)
     }
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        todo!()
+        self.state.deregister(fd)
     }
 
     pub fn wake(&self, token: Token) -> io::Result<()> {
@@ -197,6 +197,70 @@ impl SelectorState {
         }
 
         Ok(())
+    }
+
+    /// Update the slot of `fd` and arm it again. `IoSourceState::do_io` calls
+    /// this on `WouldBlock`, so a condition just went false: `reported` is
+    /// cleared, because a spurious event is harmless and a missed one hangs
+    /// the task.
+    fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
+        let mut slots = self.slots.lock().unwrap();
+        let index = match slots.by_fd.get(&fd) {
+            Some(&index) => index,
+            None => return Err(io::ErrorKind::NotFound.into()),
+        };
+        let slot = slots.entries[index]
+            .as_mut()
+            .expect("`by_fd` only points to used slots");
+
+        let conds = interests_to_conds(interests);
+        let met = arm(fd, &slot.event, conds)?;
+
+        slot.token = token;
+        slot.interests = interests;
+        slot.reported = 0;
+        // Keep unreported conditions that are still wanted, add the new ones.
+        slot.pending = (slot.pending & conds) | met;
+        drop(slots);
+
+        if met != 0 {
+            self.notify(index)?;
+        }
+        Ok(())
+    }
+
+    /// Disarm `fd`, unregister its event and free its slot. A pulse already in
+    /// flight for the slot is dropped by `select` if the slot is still free,
+    /// or reported as a spurious event if it was reused, which mio allows.
+    fn deregister(&self, fd: RawFd) -> io::Result<()> {
+        let mut slots = self.slots.lock().unwrap();
+        let index = match slots.by_fd.remove(&fd) {
+            Some(index) => index,
+            None => return Err(io::ErrorKind::NotFound.into()),
+        };
+        let slot = slots.entries[index]
+            .take()
+            .expect("`by_fd` only points to used slots");
+
+        // POLL cancels anything still armed. The fd may already be closed or
+        // its server may not support notify, so the result is ignored.
+        // SAFETY: POLL takes no event.
+        let _ = unsafe {
+            ffi::ionotify(
+                fd,
+                ffi::NOTIFY_ACTION_POLL,
+                interests_to_conds(slot.interests),
+                std::ptr::null(),
+            )
+        };
+        let res = syscall!(MsgUnregisterEvent(
+            (&slot.event as *const ffi::SigEvent).cast()
+        ));
+
+        // Free the slot only after its event is unregistered.
+        slots.free.push(index);
+        slots.rearm.retain(|&i| i != index);
+        res.map(|_| ())
     }
 
     /// Send ourselves a READY pulse for slot `index`, so `select` looks at it.
