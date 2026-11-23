@@ -502,31 +502,34 @@ pub mod event {
     use crate::Token;
 
     pub fn token(event: &Event) -> Token {
-        todo!()
+        event.token
     }
 
-    pub fn is_readable(_: &Event) -> bool {
-        todo!()
+    pub fn is_readable(event: &Event) -> bool {
+        event.conds & super::ffi::NOTIFY_COND_INPUT != 0
     }
 
-    pub fn is_writable(_: &Event) -> bool {
-        todo!()
+    pub fn is_writable(event: &Event) -> bool {
+        event.conds & super::ffi::NOTIFY_COND_OUTPUT != 0
     }
 
+    // Errors and hang-ups are only reported through the extended conditions
+    // (`_NOTIFY_COND_EXTEN`), which aren't armed. A closed peer shows up as
+    // readable, and the following read returns 0.
     pub fn is_error(_: &Event) -> bool {
-        todo!()
+        false
     }
 
     pub fn is_read_closed(_: &Event) -> bool {
-        todo!()
+        false
     }
 
     pub fn is_write_closed(_: &Event) -> bool {
-        todo!()
+        false
     }
 
-    pub fn is_priority(_: &Event) -> bool {
-        todo!()
+    pub fn is_priority(event: &Event) -> bool {
+        event.conds & super::ffi::NOTIFY_COND_OBAND != 0
     }
 
     pub fn is_aio(_: &Event) -> bool {
