@@ -52,17 +52,19 @@ impl Selector {
     }
 
     pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        todo!()
+        self.state.register(fd, token, interests, false)
     }
 
     cfg_io_source! {
         pub(crate) fn register_internal(
             &self,
-            fd:RawFd,
-            token:Token,
+            fd: RawFd,
+            token: Token,
             interests: Interest,
-        ) -> io::Result<std::sync::Arc<RegistrationRecord>> {
-            todo!()
+        ) -> io::Result<Arc<RegistrationRecord>> {
+            self.state
+                .register(fd, token, interests, true)
+                .map(|()| Arc::new(RegistrationRecord::new()))
         }
     }
 
@@ -128,6 +130,85 @@ impl SelectorState {
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             slots: Mutex::new(Slots::default()),
         })
+    }
+
+    /// Give `fd` a slot and a pulse event aimed at our channel, then arm it.
+    /// Conditions already met are kept in the slot's `pending`, and a READY
+    /// pulse is sent so `select` reports them.
+    fn register(
+        &self,
+        fd: RawFd,
+        token: Token,
+        interests: Interest,
+        internal: bool,
+    ) -> io::Result<()> {
+        let mut slots = self.slots.lock().unwrap();
+
+        if slots.by_fd.contains_key(&fd) {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "I/O source already registered with this `Registry` \
+                (an old file descriptor might have been closed without deregistration)",
+            ));
+        }
+
+        let index = match slots.free.pop() {
+            Some(index) => index,
+            None => {
+                slots.entries.push(None);
+                slots.entries.len() - 1
+            }
+        };
+
+        let mut event = ffi::SigEvent::pulse(self.coid, PRIO_INHERIT as i16, READY, index);
+        // `fd` names the server allowed to deliver the event; the kernel rewrites
+        // `event`. EAGAIN here means the RLIMIT_SIGEVENT_NP limit is reached.
+        if let Err(err) = syscall!(MsgRegisterEvent(
+            (&mut event as *mut ffi::SigEvent).cast(),
+            fd
+        )) {
+            slots.free.push(index);
+            return Err(err);
+        }
+
+        let pending = match arm(fd, &event, interests_to_conds(interests)) {
+            Ok(met) => met,
+            Err(err) => {
+                let _ = syscall!(MsgUnregisterEvent((&event as *const ffi::SigEvent).cast()));
+                slots.free.push(index);
+                return Err(err);
+            }
+        };
+
+        slots.entries[index] = Some(Slot {
+            fd,
+            token,
+            interests,
+            event,
+            reported: 0,
+            pending,
+            internal,
+        });
+        slots.by_fd.insert(fd, index);
+        drop(slots);
+
+        if pending != 0 {
+            self.notify(index)?;
+        }
+
+        Ok(())
+    }
+
+    /// Send ourselves a READY pulse for slot `index`, so `select` looks at it.
+    fn notify(&self, index: usize) -> io::Result<()> {
+        // The value is pointer sized, so any slot index fits.
+        syscall!(MsgSendPulsePtr(
+            self.coid,
+            PRIO_INHERIT,
+            READY.into(),
+            index as *mut libc::c_void,
+        ))
+        .map(|_| ())
     }
 }
 
@@ -198,6 +279,9 @@ struct Slot {
     /// Registered through `register_internal`: `IoSourceState::do_io` re-arms it
     /// on `WouldBlock`. Other fds are re-armed by `select`.
     internal: bool,
+    /// Conditions found met while arming and not reported yet. A READY pulse
+    /// is sent for the slot, so `select` reports them.
+    pending: libc::c_int,
 }
 
 /// The slot table.
