@@ -269,6 +269,7 @@ impl SelectorState {
     /// arrives or `timeout` passes, then only takes pulses already queued.
     fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         events.clear();
+        self.rearm_raw()?;
 
         // A timeout too large to add to `now` waits forever.
         let deadline = timeout.and_then(|timeout| Instant::now().checked_add(timeout));
@@ -316,22 +317,55 @@ impl SelectorState {
         }
     }
 
-    /// Turn one pulse into at most one event.
-    fn handle(&self, pulse: &ffi::Pulse, events: &mut Events) {
-        // SAFETY: both of our pulse kinds are sent with a pointer-sized value.
-        let value = unsafe { pulse.value.sival_ptr } as usize;
-        match pulse.code {
-            // Reported as readable, like the other selectors' wakers.
-            WAKE => {
-                events.push(Event {
-                    token: Token(value),
-                    conds: ffi::NOTIFY_COND_INPUT,
-                });
-            }
-            READY => {} // the slot lookup comes next
-            // Kernel pulses use negative codes; none are ours.
-            _ => {}
+    /// Report what is ready on slot `index`. A READY pulse doesn't say which
+    /// condition fired, so `arm` is asked: it returns what is met now and
+    /// arms the rest again.
+    fn ready(&self, index: usize, events: &mut Events) {
+        let slots = &mut *self.slots.lock().unwrap();
+        let Some(Some(slot)) = slots.entries.get_mut(index) else {
+            return; // deregistered; the pulse was already in flight
+        };
+
+        let want = interests_to_conds(slot.interests);
+        // An fd closed without deregistering fails here; wake its owner, whose
+        // next I/O call reports the error.
+        let met = arm(slot.fd, &slot.event, want).unwrap_or(want) | slot.pending;
+        slot.pending = 0;
+
+        // Only report what isn't reported yet (edge-triggered emulation).
+        let report = met & want & !slot.reported;
+        if report == 0 {
+            return;
         }
+        slot.reported |= report;
+        if !slot.internal {
+            slots.rearm.push(index);
+        }
+        events.push(Event {
+            token: slot.token,
+            conds: report,
+        });
+    }
+
+    /// Re-arm the raw fds reported by the previous `select`. Nothing else
+    /// re-arms them: they have no `IoSourceState::do_io`. Clearing `reported`
+    /// reports a still-ready fd again, as `event_ports.rs` does.
+    fn rearm_raw(&self) -> io::Result<()> {
+        let slots = &mut *self.slots.lock().unwrap();
+        for index in slots.rearm.drain(..) {
+            let Some(slot) = slots.entries[index].as_mut() else {
+                continue;
+            };
+
+            slot.reported = 0;
+            let met = arm(slot.fd, &slot.event, interests_to_conds(slot.interests))?;
+            if met != 0 {
+                slot.pending |= met;
+                self.notify(index)?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Send ourselves a READY pulse for slot `index`, so `select` looks at it.
@@ -344,6 +378,24 @@ impl SelectorState {
             index as *mut libc::c_void,
         ))
         .map(|_| ())
+    }
+
+    /// Turn one pulse into at most one event.
+    fn handle(&self, pulse: &ffi::Pulse, events: &mut Events) {
+        // SAFETY: both of our pulse kinds are sent with a pointer-sized value.
+        let value = unsafe { pulse.value.sival_ptr } as usize;
+        match pulse.code {
+            // Reported as readable, like the other selectors' wakers.
+            WAKE => {
+                events.push(Event {
+                    token: Token(value),
+                    conds: ffi::NOTIFY_COND_INPUT,
+                });
+            }
+            READY => self.ready(value, events),
+            // Kernel pulses use negative codes; none are ours.
+            _ => {}
+        }
     }
 }
 
