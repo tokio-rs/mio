@@ -139,6 +139,50 @@ impl Drop for SelectorState {
     }
 }
 
+/// Map mio interests to `ionotify()` conditions.
+fn interests_to_conds(interests: Interest) -> libc::c_int {
+    let mut conds = 0;
+    if interests.is_readable() {
+        conds |= ffi::NOTIFY_COND_INPUT;
+    }
+    if interests.is_writable() {
+        conds |= ffi::NOTIFY_COND_OUTPUT;
+    }
+    conds
+}
+
+/// Arm `event` for the conditions in `conds` that aren't met yet, and return
+/// the ones that are met now.
+///
+/// `POLLARM` arms nothing if any requested condition is already met, so the
+/// met ones are removed and the rest are armed again, until one call succeeds.
+/// That one call arms every remaining condition. A resource manager without
+/// notify support answers `ENOSYS`; such an fd is treated as always ready.
+fn arm(fd: RawFd, ev: &ffi::SigEvent, conds: libc::c_int) -> io::Result<libc::c_int> {
+    let mut want = conds;
+    let mut met = 0;
+    while want != 0 {
+        // SAFETY: `ev` was registered for `fd` with `MsgRegisterEvent` and
+        // outlives the call.
+        let res = unsafe { ffi::ionotify(fd, ffi::NOTIFY_ACTION_POLLARM, want, ev) };
+        if res == -1 {
+            let err = io::Error::last_os_error();
+            if err.raw_os_error() == Some(libc::ENOSYS) {
+                return Ok(conds);
+            }
+            return Err(err);
+        }
+
+        let hit = want & res;
+        if hit == 0 {
+            break; // everything left in `want` is armed
+        }
+        met |= hit;
+        want &= !hit;
+    }
+    Ok(met)
+}
+
 /// One registered fd.
 #[derive(Debug)]
 struct Slot {
