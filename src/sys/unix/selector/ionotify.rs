@@ -111,7 +111,7 @@ cfg_io_source! {
 /// The channel pulses are delivered to, and our own connection to it.
 #[derive(Debug)]
 struct SelectorState {
-    /// Channel id: the mailbox `select` receives pulses on.
+    /// The channel `select` receives pulses on.
     chid: libc::c_int,
     /// Side-channel connection to `chid`; pulse events and the Waker send through it.
     coid: libc::c_int,
@@ -579,7 +579,7 @@ pub mod event {
     }
 
     // `ionotify()` can't report hang-ups or errors, so these read `revents`,
-    // filled in by `poll_flags`. Same mapping as the poll selector; QNX has
+    // filled in by `report`. Same mapping as the poll selector; QNX has
     // no POLLRDHUP, so a peer's half-close shows up only as readable.
     pub fn is_error(event: &Event) -> bool {
         event.revents & libc::POLLERR != 0
@@ -655,24 +655,23 @@ cfg_io_source! {
 }
 
 /// QNX 8 items the libc crate doesn't provide yet.
-/// Headers: <SDP>/target/qnx/usr/include/
 mod ffi {
     #![allow(dead_code)]
     use libc::{c_int, c_long, c_uint, c_ulong, c_void};
 
-    // ---- sys/iomgr.h  conditions (the "what") ----
+    // sys/iomgr.h: conditions.
     pub(super) const NOTIFY_COND_OBAND: c_int = 0x4000_0000;
     pub(super) const NOTIFY_COND_OUTPUT: c_int = 0x2000_0000;
     pub(super) const NOTIFY_COND_INPUT: c_int = 0x1000_0000;
 
-    // ---- sys/iomgr.h  actions (the "how") ----
+    // sys/iomgr.h: actions.
     pub(super) const NOTIFY_ACTION_POLL: c_int = 0x2;
     pub(super) const NOTIFY_ACTION_POLLARM: c_int = 0x3;
 
-    // ---- sys/siginfo.h ----
+    // sys/siginfo.h
     pub(super) const SIGEV_PULSE: c_int = 4;
 
-    // ---- sys/siginfo.h  union sigval ----
+    // sys/siginfo.h: union sigval.
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub(super) union SigVal {
@@ -682,7 +681,7 @@ mod ffi {
         pub(super) sival_ulong: c_ulong,
     }
 
-    // ---- sys/siginfo.h  struct sigevent: union __sigev_un1 ----
+    // sys/siginfo.h: struct sigevent, union __sigev_un1.
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub(super) union SigevUn1 {
@@ -694,7 +693,7 @@ mod ffi {
         pub(super) sigev_handle: c_uint,
     }
 
-    // ---- sys/siginfo.h  struct sigevent: __sigev_un2.__st ----
+    // sys/siginfo.h: struct sigevent, __sigev_un2.__st.
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub(super) struct SigevSt {
@@ -702,7 +701,7 @@ mod ffi {
         pub(super) sigev_priority: i16, // short
     }
 
-    // ---- sys/siginfo.h  struct sigevent: union __sigev_un2 ----
+    // sys/siginfo.h: struct sigevent, union __sigev_un2.
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub(super) union SigevUn2 {
@@ -711,7 +710,7 @@ mod ffi {
         pub(super) sigev_memop: c_int,
     }
 
-    // ---- sys/siginfo.h  struct sigevent ----
+    // sys/siginfo.h: struct sigevent.
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub(super) struct SigEvent {
@@ -749,7 +748,7 @@ mod ffi {
         }
     }
 
-    // ---- sys/neutrino.h  struct _pulse ----
+    // sys/neutrino.h: struct _pulse.
     #[repr(C)]
     pub(super) struct Pulse {
         pub(super) r#type: u16,
@@ -760,7 +759,7 @@ mod ffi {
         pub(super) scoid: i32,
     }
 
-    // ---- unistd.h ----
+    // unistd.h
     extern "C" {
         pub(super) fn ionotify(
             fd: c_int,
