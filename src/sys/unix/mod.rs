@@ -41,6 +41,10 @@ cfg_os_poll! {
     ), path = "selector/kqueue.rs")]
     #[cfg_attr(all(
         not(mio_unsupported_force_poll_poll),
+        target_os = "qnx",
+    ), path = "selector/ionotify.rs")]
+    #[cfg_attr(all(
+        not(mio_unsupported_force_poll_poll),
         target_os = "solaris",
     ), path = "selector/event_ports.rs")]
     #[cfg_attr(any(
@@ -83,6 +87,7 @@ cfg_os_poll! {
             target_os = "macos",
             target_os = "netbsd",
             target_os = "openbsd",
+            target_os = "qnx",
             target_os = "solaris",
             target_os = "tvos",
             target_os = "visionos",
@@ -112,6 +117,7 @@ cfg_os_poll! {
         target_os = "haiku",
         target_os = "hurd",
         target_os = "nto",
+        all(mio_unsupported_force_poll_poll, target_os = "qnx"),
         target_os = "redox",
         all(mio_unsupported_force_poll_poll, target_os = "solaris"),
         target_os = "vita",
@@ -165,6 +171,7 @@ cfg_os_poll! {
             target_os = "hurd",
             target_os = "netbsd",
             target_os = "nto",
+            target_os = "qnx",
             target_os = "openbsd",
             target_os = "redox",
             all(mio_unsupported_force_poll_poll, target_os = "solaris"),
