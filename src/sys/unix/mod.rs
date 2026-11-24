@@ -41,12 +41,12 @@ cfg_os_poll! {
     ), path = "selector/kqueue.rs")]
     #[cfg_attr(all(
         not(mio_unsupported_force_poll_poll),
-        target_os = "solaris",
-    ), path = "selector/event_ports.rs")]
-    #[cfg_attr(all(
-        not(mio_unsupported_force_poll_poll),
         target_os = "qnx",
     ), path = "selector/ionotify.rs")]
+    #[cfg_attr(all(
+        not(mio_unsupported_force_poll_poll),
+        target_os = "solaris",
+    ), path = "selector/event_ports.rs")]
     #[cfg_attr(any(
         mio_unsupported_force_poll_poll,
         target_os = "aix",
