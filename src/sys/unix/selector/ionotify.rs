@@ -344,6 +344,7 @@ impl SelectorState {
         events.push(Event {
             token: slot.token,
             conds: report,
+            revents: 0,
         });
     }
 
@@ -390,6 +391,7 @@ impl SelectorState {
                 events.push(Event {
                     token: Token(value),
                     conds: ffi::NOTIFY_COND_INPUT,
+                    revents: 0,
                 });
             }
             READY => self.ready(value, events),
@@ -491,12 +493,17 @@ pub struct Event {
     token: Token,
     /// `NOTIFY_COND_*` bits, as returned by `ionotify()`.
     conds: libc::c_int,
+    /// `POLL*` bits from a zero-timeout `poll()` after the pulse: the only
+    /// public way to learn about hang-ups and errors.
+    revents: libc::c_short,
 }
 
 pub type Events = Vec<Event>;
 
 pub mod event {
     use std::fmt;
+
+    use super::ffi;
 
     use crate::sys::Event;
     use crate::Token;
@@ -506,11 +513,11 @@ pub mod event {
     }
 
     pub fn is_readable(event: &Event) -> bool {
-        event.conds & super::ffi::NOTIFY_COND_INPUT != 0
+        event.conds & ffi::NOTIFY_COND_INPUT != 0
     }
 
     pub fn is_writable(event: &Event) -> bool {
-        event.conds & super::ffi::NOTIFY_COND_OUTPUT != 0
+        event.conds & ffi::NOTIFY_COND_OUTPUT != 0
     }
 
     // Errors and hang-ups are only reported through the extended conditions
@@ -529,7 +536,7 @@ pub mod event {
     }
 
     pub fn is_priority(event: &Event) -> bool {
-        event.conds & super::ffi::NOTIFY_COND_OBAND != 0
+        event.conds & ffi::NOTIFY_COND_OBAND != 0
     }
 
     pub fn is_aio(_: &Event) -> bool {
@@ -541,7 +548,36 @@ pub mod event {
     }
 
     pub fn debug_details(f: &mut fmt::Formatter<'_>, event: &Event) -> fmt::Result {
-        fmt::Debug::fmt(event, f)
+        #[allow(clippy::trivially_copy_pass_by_ref)]
+        fn check_conds(got: &libc::c_int, want: &libc::c_int) -> bool {
+            got & want != 0
+        }
+        debug_detail!(
+            CondsDetails(libc::c_int),
+            check_conds,
+            ffi::NOTIFY_COND_INPUT,
+            ffi::NOTIFY_COND_OUTPUT,
+            ffi::NOTIFY_COND_OBAND,
+        );
+
+        #[allow(clippy::trivially_copy_pass_by_ref)]
+        fn check_revents(got: &libc::c_short, want: &libc::c_short) -> bool {
+            got & want != 0
+        }
+        debug_detail!(
+            ReventsDetails(libc::c_short),
+            check_revents,
+            libc::POLLIN,
+            libc::POLLOUT,
+            libc::POLLERR,
+            libc::POLLHUP,
+        );
+
+        f.debug_struct("ionotify_event")
+            .field("token", &event.token)
+            .field("conds", &CondsDetails(event.conds))
+            .field("revents", &ReventsDetails(event.revents))
+            .finish()
     }
 }
 
