@@ -552,19 +552,25 @@ pub mod event {
         event.conds & ffi::NOTIFY_COND_OUTPUT != 0
     }
 
-    // Errors and hang-ups are only reported through the extended conditions
-    // (`_NOTIFY_COND_EXTEN`), which aren't armed. A closed peer shows up as
-    // readable, and the following read returns 0.
-    pub fn is_error(_: &Event) -> bool {
-        false
+    // `ionotify()` can't report hang-ups or errors, so these read `revents`,
+    // filled in by `poll_flags`. Same mapping as the poll selector; QNX has
+    // no POLLRDHUP, so a peer's half-close shows up only as readable.
+    pub fn is_error(event: &Event) -> bool {
+        event.revents & libc::POLLERR != 0
     }
 
-    pub fn is_read_closed(_: &Event) -> bool {
-        false
+    pub fn is_read_closed(event: &Event) -> bool {
+        // Both halves of the socket have closed.
+        event.revents & libc::POLLHUP != 0
     }
 
-    pub fn is_write_closed(_: &Event) -> bool {
-        false
+    pub fn is_write_closed(event: &Event) -> bool {
+        // Both halves of the socket have closed.
+        event.revents & libc::POLLHUP != 0
+            // Unix pipe write end has closed.
+            || (event.revents & libc::POLLOUT != 0 && event.revents & libc::POLLERR != 0)
+            // The other side (read end) of a Unix pipe has closed.
+            || event.revents == libc::POLLERR
     }
 
     pub fn is_priority(event: &Event) -> bool {
