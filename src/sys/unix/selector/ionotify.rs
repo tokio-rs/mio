@@ -59,11 +59,14 @@ impl Selector {
         self.state.select(events, timeout)
     }
 
-    pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        self.state.register(fd, token, interests, false)
-    }
-
     cfg_io_source! {
+        // Only `SourceFd` (os-ext) uses plain `register`; `net` sources use
+        // `register_internal`.
+        #[allow(dead_code)]
+        pub fn register(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
+            self.state.register(fd, token, interests, false)
+        }
+
         pub(crate) fn register_internal(
             &self,
             fd: RawFd,
@@ -74,14 +77,14 @@ impl Selector {
                 .register(fd, token, interests, true)
                 .map(|()| Arc::new(RegistrationRecord::new()))
         }
-    }
 
-    pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        self.state.reregister(fd, token, interests)
-    }
+        pub fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
+            self.state.reregister(fd, token, interests)
+        }
 
-    pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        self.state.deregister(fd)
+        pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
+            self.state.deregister(fd)
+        }
     }
 
     pub fn wake(&self, token: Token) -> io::Result<()> {
@@ -112,7 +115,9 @@ struct SelectorState {
     chid: libc::c_int,
     /// Side-channel connection to `chid`; pulse events and the Waker send through it.
     coid: libc::c_int,
+    /// Read only by `Selector::id`, which exists only with `net` or `os-ext`.
     #[cfg(debug_assertions)]
+    #[allow(dead_code)]
     id: usize,
     /// Registered fds; the value of a READY pulse indexes `entries`.
     slots: Mutex<Slots>,
@@ -140,135 +145,137 @@ impl SelectorState {
         })
     }
 
-    /// Give `fd` a slot and a pulse event aimed at our channel, then arm it.
-    /// Conditions already met are kept in the slot's `pending`, and a READY
-    /// pulse is sent so `select` reports them.
-    fn register(
-        &self,
-        fd: RawFd,
-        token: Token,
-        interests: Interest,
-        internal: bool,
-    ) -> io::Result<()> {
-        let mut slots = self.slots.lock().unwrap();
+    cfg_io_source! {
+        /// Give `fd` a slot and a pulse event aimed at our channel, then arm it.
+        /// Conditions already met are kept in the slot's `pending`, and a READY
+        /// pulse is sent so `select` reports them.
+        fn register(
+            &self,
+            fd: RawFd,
+            token: Token,
+            interests: Interest,
+            internal: bool,
+        ) -> io::Result<()> {
+            let mut slots = self.slots.lock().unwrap();
 
-        if slots.by_fd.contains_key(&fd) {
-            return Err(io::Error::new(
-                io::ErrorKind::AlreadyExists,
-                "I/O source already registered with this `Registry` \
-                (an old file descriptor might have been closed without deregistration)",
-            ));
-        }
-
-        let index = match slots.free.pop() {
-            Some(index) => index,
-            None => {
-                slots.entries.push(None);
-                slots.entries.len() - 1
+            if slots.by_fd.contains_key(&fd) {
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "I/O source already registered with this `Registry` \
+                    (an old file descriptor might have been closed without deregistration)",
+                ));
             }
-        };
 
-        let mut event = ffi::SigEvent::pulse(self.coid, PRIO_INHERIT as i16, READY, index);
-        // `fd` names the server allowed to deliver the event; the kernel rewrites
-        // `event`. EAGAIN here means the RLIMIT_SIGEVENT_NP limit is reached.
-        if let Err(err) = syscall!(MsgRegisterEvent(
-            (&mut event as *mut ffi::SigEvent).cast(),
-            fd
-        )) {
-            slots.free.push(index);
-            return Err(err);
-        }
+            let index = match slots.free.pop() {
+                Some(index) => index,
+                None => {
+                    slots.entries.push(None);
+                    slots.entries.len() - 1
+                }
+            };
 
-        let pending = match arm(fd, &event, interests_to_conds(interests)) {
-            Ok(met) => met,
-            Err(err) => {
-                let _ = syscall!(MsgUnregisterEvent((&event as *const ffi::SigEvent).cast()));
+            let mut event = ffi::SigEvent::pulse(self.coid, PRIO_INHERIT as i16, READY, index);
+            // `fd` names the server allowed to deliver the event; the kernel rewrites
+            // `event`. EAGAIN here means the RLIMIT_SIGEVENT_NP limit is reached.
+            if let Err(err) = syscall!(MsgRegisterEvent(
+                (&mut event as *mut ffi::SigEvent).cast(),
+                fd
+            )) {
                 slots.free.push(index);
                 return Err(err);
             }
-        };
 
-        slots.entries[index] = Some(Slot {
-            fd,
-            token,
-            interests,
-            event,
-            reported: 0,
-            pending,
-            internal,
-        });
-        slots.by_fd.insert(fd, index);
-        drop(slots);
+            let pending = match arm(fd, &event, interests_to_conds(interests)) {
+                Ok(met) => met,
+                Err(err) => {
+                    let _ = syscall!(MsgUnregisterEvent((&event as *const ffi::SigEvent).cast()));
+                    slots.free.push(index);
+                    return Err(err);
+                }
+            };
 
-        if pending != 0 {
-            self.notify(index)?;
-        }
-
-        Ok(())
-    }
-
-    /// Update the slot of `fd` and arm it again. `IoSourceState::do_io` calls
-    /// this on `WouldBlock`, so a condition just went false: `reported` is
-    /// cleared, because a spurious event is harmless and a missed one hangs
-    /// the task.
-    fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
-        let mut slots = self.slots.lock().unwrap();
-        let index = match slots.by_fd.get(&fd) {
-            Some(&index) => index,
-            None => return Err(io::ErrorKind::NotFound.into()),
-        };
-        let slot = slots.entries[index]
-            .as_mut()
-            .expect("`by_fd` only points to used slots");
-
-        let conds = interests_to_conds(interests);
-        let met = arm(fd, &slot.event, conds)?;
-
-        slot.token = token;
-        slot.interests = interests;
-        slot.reported = 0;
-        // Keep unreported conditions that are still wanted, add the new ones.
-        slot.pending = (slot.pending & conds) | met;
-        drop(slots);
-
-        if met != 0 {
-            self.notify(index)?;
-        }
-        Ok(())
-    }
-
-    /// Disarm `fd`, unregister its event and free its slot. A pulse already in
-    /// flight for the slot is dropped by `select` if the slot is still free,
-    /// or reported as a spurious event if it was reused, which mio allows.
-    fn deregister(&self, fd: RawFd) -> io::Result<()> {
-        let mut slots = self.slots.lock().unwrap();
-        let index = match slots.by_fd.remove(&fd) {
-            Some(index) => index,
-            None => return Err(io::ErrorKind::NotFound.into()),
-        };
-        let slot = slots.entries[index]
-            .take()
-            .expect("`by_fd` only points to used slots");
-
-        // POLL cancels anything still armed. The fd may already be closed or
-        // its server may not support notify, so the result is ignored.
-        // SAFETY: POLL takes no event.
-        let _ = unsafe {
-            ffi::ionotify(
+            slots.entries[index] = Some(Slot {
                 fd,
-                ffi::NOTIFY_ACTION_POLL,
-                interests_to_conds(slot.interests),
-                std::ptr::null(),
-            )
-        };
-        let res = syscall!(MsgUnregisterEvent(
-            (&slot.event as *const ffi::SigEvent).cast()
-        ));
+                token,
+                interests,
+                event,
+                reported: 0,
+                pending,
+                internal,
+            });
+            slots.by_fd.insert(fd, index);
+            drop(slots);
 
-        // Free the slot only after its event is unregistered.
-        slots.free.push(index);
-        slots.rearm.retain(|&i| i != index);
-        res.map(|_| ())
+            if pending != 0 {
+                self.notify(index)?;
+            }
+
+            Ok(())
+        }
+
+        /// Update the slot of `fd` and arm it again. `IoSourceState::do_io` calls
+        /// this on `WouldBlock`, so a condition just went false: `reported` is
+        /// cleared, because a spurious event is harmless and a missed one hangs
+        /// the task.
+        fn reregister(&self, fd: RawFd, token: Token, interests: Interest) -> io::Result<()> {
+            let mut slots = self.slots.lock().unwrap();
+            let index = match slots.by_fd.get(&fd) {
+                Some(&index) => index,
+                None => return Err(io::ErrorKind::NotFound.into()),
+            };
+            let slot = slots.entries[index]
+                .as_mut()
+                .expect("`by_fd` only points to used slots");
+
+            let conds = interests_to_conds(interests);
+            let met = arm(fd, &slot.event, conds)?;
+
+            slot.token = token;
+            slot.interests = interests;
+            slot.reported = 0;
+            // Keep unreported conditions that are still wanted, add the new ones.
+            slot.pending = (slot.pending & conds) | met;
+            drop(slots);
+
+            if met != 0 {
+                self.notify(index)?;
+            }
+            Ok(())
+        }
+
+        /// Disarm `fd`, unregister its event and free its slot. A pulse already in
+        /// flight for the slot is dropped by `select` if the slot is still free,
+        /// or reported as a spurious event if it was reused, which mio allows.
+        fn deregister(&self, fd: RawFd) -> io::Result<()> {
+            let mut slots = self.slots.lock().unwrap();
+            let index = match slots.by_fd.remove(&fd) {
+                Some(index) => index,
+                None => return Err(io::ErrorKind::NotFound.into()),
+            };
+            let slot = slots.entries[index]
+                .take()
+                .expect("`by_fd` only points to used slots");
+
+            // POLL cancels anything still armed. The fd may already be closed or
+            // its server may not support notify, so the result is ignored.
+            // SAFETY: POLL takes no event.
+            let _ = unsafe {
+                ffi::ionotify(
+                    fd,
+                    ffi::NOTIFY_ACTION_POLL,
+                    interests_to_conds(slot.interests),
+                    std::ptr::null(),
+                )
+            };
+            let res = syscall!(MsgUnregisterEvent(
+                (&slot.event as *const ffi::SigEvent).cast()
+            ));
+
+            // Free the slot only after its event is unregistered.
+            slots.free.push(index);
+            slots.rearm.retain(|&i| i != index);
+            res.map(|_| ())
+        }
     }
 
     /// Wait for pulses and turn them into events. Blocks until the first one
@@ -529,8 +536,10 @@ struct Slots {
     /// index is the value of an already registered pulse.
     entries: Vec<Option<Slot>>,
     /// Free slot indexes, reused before `entries` grows.
+    #[cfg_attr(not(any(feature = "net", feature = "os-ext")), allow(dead_code))]
     free: Vec<usize>,
     /// fd to slot index; `reregister` and `deregister` only get the fd.
+    #[cfg_attr(not(any(feature = "net", feature = "os-ext")), allow(dead_code))]
     by_fd: HashMap<RawFd, usize>,
     /// Slots that `select` must re-arm before it blocks again.
     rearm: Vec<usize>,
