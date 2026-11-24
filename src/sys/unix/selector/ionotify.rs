@@ -271,20 +271,32 @@ impl SelectorState {
         events.clear();
         self.rearm_raw()?;
 
+        // READY pulses are only collected here; `report` turns them into events.
+        let mut pulsed = Vec::new();
         // A timeout too large to add to `now` waits forever.
         let deadline = timeout.and_then(|timeout| Instant::now().checked_add(timeout));
-        while events.len() < events.capacity() {
-            let wait = if events.is_empty() {
-                deadline.map(|deadline| deadline.saturating_duration_since(Instant::now()))
-            } else {
-                Some(Duration::ZERO)
-            };
-            match self.receive(wait)? {
-                Some(pulse) => self.handle(&pulse, events),
-                None => break, // timeout
+        loop {
+            while events.len() + pulsed.len() < events.capacity() {
+                let wait = if events.is_empty() && pulsed.is_empty() {
+                    deadline.map(|deadline| deadline.saturating_duration_since(Instant::now()))
+                } else {
+                    Some(Duration::ZERO)
+                };
+                match self.receive(wait)? {
+                    Some(pulse) => self.handle(&pulse, events, &mut pulsed),
+                    None => break, // timeout
+                }
+            }
+            self.report(&pulsed, events);
+            pulsed.clear();
+
+            // A pulse for a deregistered slot, or for conditions already
+            // reported, gives no event; keep waiting rather than return empty.
+            let timed_out = deadline.is_some_and(|deadline| Instant::now() >= deadline);
+            if !events.is_empty() || timed_out {
+                return Ok(());
             }
         }
-        poll_flags(events)
     }
 
     /// Receive one pulse on our channel, waiting at most `wait` (`None` waits
@@ -317,11 +329,42 @@ impl SelectorState {
         }
     }
 
+    /// Turn the pulsed slots into events. `poll()` reads hang-ups and errors,
+    /// which `ionotify()` can't report. It runs before `ready` re-arms the
+    /// slots, because QNX's `poll()` cancels the fds' armed notifications.
+    fn report(&self, pulsed: &[usize], events: &mut Events) {
+        let slots = &mut *self.slots.lock().unwrap();
+        // Deregistered slots have no fd any more; their pulse was in flight.
+        let pulsed: Vec<usize> = pulsed
+            .iter()
+            .copied()
+            .filter(|&index| matches!(slots.entries.get(index), Some(Some(_))))
+            .collect();
+        let mut fds: Vec<libc::pollfd> = pulsed
+            .iter()
+            .map(|&index| libc::pollfd {
+                fd: slots.entries[index].as_ref().map_or(-1, |slot| slot.fd),
+                events: libc::POLLIN | libc::POLLOUT,
+                revents: 0,
+            })
+            .collect();
+        if fds.is_empty() {
+            return;
+        }
+
+        // On failure every `revents` stays 0: the events still go out, just
+        // without hang-up or error flags.
+        let _ = syscall!(poll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, 0));
+
+        for (&index, fd) in pulsed.iter().zip(&fds) {
+            Self::ready(slots, index, fd.revents, events);
+        }
+    }
+
     /// Report what is ready on slot `index`. A READY pulse doesn't say which
     /// condition fired, so `arm` is asked: it returns what is met now and
     /// arms the rest again.
-    fn ready(&self, index: usize, events: &mut Events) {
-        let slots = &mut *self.slots.lock().unwrap();
+    fn ready(slots: &mut Slots, index: usize, revents: libc::c_short, events: &mut Events) {
         let Some(Some(slot)) = slots.entries.get_mut(index) else {
             return; // deregistered; the pulse was already in flight
         };
@@ -343,9 +386,8 @@ impl SelectorState {
         }
         events.push(Event {
             token: slot.token,
-            fd: slot.fd,
             conds: report,
-            revents: 0,
+            revents,
         });
     }
 
@@ -383,7 +425,7 @@ impl SelectorState {
     }
 
     /// Turn one pulse into at most one event.
-    fn handle(&self, pulse: &ffi::Pulse, events: &mut Events) {
+    fn handle(&self, pulse: &ffi::Pulse, events: &mut Events, pulsed: &mut Vec<usize>) {
         // SAFETY: both of our pulse kinds are sent with a pointer-sized value.
         let value = unsafe { pulse.value.sival_ptr } as usize;
         match pulse.code {
@@ -391,12 +433,11 @@ impl SelectorState {
             WAKE => {
                 events.push(Event {
                     token: Token(value),
-                    fd: -1, // Waker event has no fd
                     conds: ffi::NOTIFY_COND_INPUT,
                     revents: 0,
                 });
             }
-            READY => self.ready(value, events),
+            READY => pulsed.push(value),
             // Kernel pulses use negative codes; none are ours.
             _ => {}
         }
@@ -421,34 +462,6 @@ fn interests_to_conds(interests: Interest) -> libc::c_int {
         conds |= ffi::NOTIFY_COND_OUTPUT;
     }
     conds
-}
-
-/// Fill in `revents` for every fd event with one zero-timeout `poll()`.
-/// `ionotify()` can't report hang-ups or errors; `poll()` can. Only the fds
-/// that just pulsed are passed, and it never waits.
-fn poll_flags(events: &mut Events) -> io::Result<()> {
-    let mut fds: Vec<libc::pollfd> = events
-        .iter()
-        .filter(|event| event.fd != -1)
-        .map(|event| libc::pollfd {
-            fd: event.fd,
-            events: libc::POLLIN | libc::POLLOUT,
-            revents: 0,
-        })
-        .collect();
-
-    if fds.is_empty() {
-        return Ok(());
-    }
-
-    syscall!(poll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, 0))?;
-
-    // `fds` is in the same order as the fd events.
-    for (event, fd) in events.iter_mut().filter(|event| event.fd != -1).zip(fds) {
-        event.revents = fd.revents;
-    }
-
-    Ok(())
 }
 
 /// Arm `event` for the conditions in `conds` that aren't met yet, and return
@@ -521,8 +534,6 @@ struct Slots {
 #[derive(Debug, Clone)]
 pub struct Event {
     token: Token,
-    /// The registered fd, or -1 for a waker event (no fd).
-    fd: RawFd,
     /// `NOTIFY_COND_*` bits, as returned by `ionotify()`.
     conds: libc::c_int,
     /// `POLL*` bits from a zero-timeout `poll()` after the pulse: the only
