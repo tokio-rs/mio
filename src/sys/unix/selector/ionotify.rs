@@ -5,6 +5,12 @@
 //! pulse once the requested conditions are met; `select` receives the pulses.
 //! Arming is one-shot, so readiness is re-armed through `IoSourceState`
 //! (`registered_io_source.rs`) when an operation returns `WouldBlock`.
+//!
+//! `ionotify()` can't report hang-ups or errors, so a zero-timeout `poll()` on
+//! the fds that just pulsed reads them, before they are armed again (QNX's
+//! `poll()` cancels armed notifications). A hang-up alone can't be waited for:
+//! once a source is both readable and writable and nothing was read or written
+//! since, it gets no further event until an operation returns `WouldBlock`.
 
 use std::collections::HashMap;
 use std::io;

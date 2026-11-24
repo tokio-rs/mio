@@ -409,8 +409,13 @@ fn unix_stream_shutdown_both() {
     );
 
     stream.shutdown(Shutdown::Both).unwrap();
-    // Solaris never returns POLLHUP  for sockets.
-    #[cfg(not(any(target_os = "solaris", target_os = "cygwin")))]
+    // Solaris never returns POLLHUP  for sockets. On QNX, ionotify() can't wait
+    // for a hang-up while the stream is still readable and writable.
+    #[cfg(not(any(
+        target_os = "solaris",
+        target_os = "cygwin",
+        all(target_os = "qnx", not(mio_unsupported_force_poll_poll))
+    )))]
     expect_events(
         &mut poll,
         &mut events,
