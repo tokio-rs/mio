@@ -284,7 +284,7 @@ impl SelectorState {
                 None => break, // timeout
             }
         }
-        Ok(())
+        poll_flags(events)
     }
 
     /// Receive one pulse on our channel, waiting at most `wait` (`None` waits
@@ -343,6 +343,7 @@ impl SelectorState {
         }
         events.push(Event {
             token: slot.token,
+            fd: slot.fd,
             conds: report,
             revents: 0,
         });
@@ -390,6 +391,7 @@ impl SelectorState {
             WAKE => {
                 events.push(Event {
                     token: Token(value),
+                    fd: -1, // Waker event has no fd
                     conds: ffi::NOTIFY_COND_INPUT,
                     revents: 0,
                 });
@@ -419,6 +421,34 @@ fn interests_to_conds(interests: Interest) -> libc::c_int {
         conds |= ffi::NOTIFY_COND_OUTPUT;
     }
     conds
+}
+
+/// Fill in `revents` for every fd event with one zero-timeout `poll()`.
+/// `ionotify()` can't report hang-ups or errors; `poll()` can. Only the fds
+/// that just pulsed are passed, and it never waits.
+fn poll_flags(events: &mut Events) -> io::Result<()> {
+    let mut fds: Vec<libc::pollfd> = events
+        .iter()
+        .filter(|event| event.fd != -1)
+        .map(|event| libc::pollfd {
+            fd: event.fd,
+            events: libc::POLLIN | libc::POLLOUT,
+            revents: 0,
+        })
+        .collect();
+
+    if fds.is_empty() {
+        return Ok(());
+    }
+
+    syscall!(poll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, 0))?;
+
+    // `fds` is in the same order as the fd events.
+    for (event, fd) in events.iter_mut().filter(|event| event.fd != -1).zip(fds) {
+        event.revents = fd.revents;
+    }
+
+    Ok(())
 }
 
 /// Arm `event` for the conditions in `conds` that aren't met yet, and return
@@ -491,6 +521,8 @@ struct Slots {
 #[derive(Debug, Clone)]
 pub struct Event {
     token: Token,
+    /// The registered fd, or -1 for a waker event (no fd).
+    fd: RawFd,
     /// `NOTIFY_COND_*` bits, as returned by `ionotify()`.
     conds: libc::c_int,
     /// `POLL*` bits from a zero-timeout `poll()` after the pulse: the only
