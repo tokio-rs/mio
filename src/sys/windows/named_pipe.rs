@@ -372,7 +372,11 @@ enum ReadState {
     /// Not reading: not connected or registered yet, or the read is cancelled.
     Idle,
     /// A read is in flight.
-    InFlight(OpId),
+    InFlight {
+        id: OpId,
+        // A later registration or connect requested a read.
+        read_requested: bool,
+    },
     /// Data read into the `Op`'s buffer, of which the bytes from the position
     /// onward aren't handed out yet.
     Ready(Box<Op>, usize),
@@ -528,7 +532,7 @@ impl NamedPipe {
             self.inner.cancel(op_id);
         }
         match mem::replace(&mut io.read, ReadState::Idle) {
-            ReadState::InFlight(op_id) => self.inner.cancel(op_id),
+            ReadState::InFlight { id, .. } => self.inner.cancel(id),
             ReadState::Ready(op, _) => io.recycle(op),
             ReadState::Idle | ReadState::Failed(_) => {}
         }
@@ -611,7 +615,7 @@ impl NamedPipe {
 
             // Not connected, or a read is in flight, still waiting for it to
             // finish.
-            read @ (ReadState::Idle | ReadState::InFlight(_)) => {
+            read @ (ReadState::Idle | ReadState::InFlight { .. }) => {
                 state.read = read;
                 Err(would_block())
             }
@@ -787,7 +791,7 @@ impl Drop for NamedPipe {
             self.inner.cancel(op_id);
         }
         match mem::replace(&mut io.read, ReadState::Idle) {
-            ReadState::InFlight(op_id) => self.inner.cancel(op_id),
+            ReadState::InFlight { id, .. } => self.inner.cancel(id),
             // Nothing reads it anymore.
             ReadState::Ready(..) | ReadState::Idle | ReadState::Failed(_) => {}
         }
@@ -830,7 +834,10 @@ impl Inner {
 
         match res {
             Ok(op_id) => {
-                io.read = ReadState::InFlight(op_id);
+                io.read = ReadState::InFlight {
+                    id: op_id,
+                    read_requested: false,
+                };
                 true
             }
 
@@ -874,6 +881,12 @@ impl Inner {
         // Data or an error read while not registered, its event went nowhere.
         let readable = matches!(io.read, ReadState::Ready(..) | ReadState::Failed(_));
 
+        // Keep the pending read: it may already have consumed client data.
+        // If it instead reports that the pipe was listening, replay this request.
+        if let ReadState::InFlight { read_requested, .. } = &mut io.read {
+            *read_requested = true;
+        }
+
         // Not connected yet: nothing is readable or writable until a client
         // connects, then `connect_done` calls this again.
         #[allow(clippy::needless_option_as_deref)]
@@ -888,6 +901,29 @@ impl Inner {
         // flight makes the pipe writable once it's done.
         if !matches!(io.write, WriteState::InFlight(..)) {
             io.notify_writable(me, events);
+        }
+    }
+
+    fn read_error(
+        me: &Arc<Inner>,
+        io: &mut Io,
+        op: Box<Op>,
+        err: io::Error,
+        events: Option<&mut Vec<Event>>,
+    ) {
+        io.recycle(op);
+        if err.raw_os_error() == Some(ERROR_PIPE_LISTENING as i32) {
+            // Wait for a connect or registration, or honor one deferred read.
+            if let ReadState::InFlight {
+                read_requested: true,
+                ..
+            } = mem::replace(&mut io.read, ReadState::Idle)
+            {
+                Inner::schedule_read(me, io, events);
+            }
+        } else {
+            io.read = ReadState::Failed(err);
+            io.notify_readable(me, events);
         }
     }
 }
@@ -925,7 +961,7 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
     let (mut op, me) = unsafe { Op::complete(status.overlapped()) };
 
     let mut io = me.io.lock().unwrap();
-    if !matches!(io.read, ReadState::InFlight(id) if id == op.id()) {
+    if !matches!(io.read, ReadState::InFlight { id, .. } if id == op.id()) {
         // Cancelled by `disconnect`, or by dropping the pipe.
         io.recycle(op);
         return;
@@ -949,8 +985,8 @@ fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
         }
         Err(e) => {
             debug_assert_eq!(status.bytes_transferred(), 0);
-            io.recycle(op);
-            ReadState::Failed(e)
+            Inner::read_error(&me, &mut io, op, e, events);
+            return;
         }
     };
 
@@ -1155,5 +1191,134 @@ impl Io {
             // SAFETY: not posted, so `event_done` doesn't take it back.
             drop(unsafe { Arc::from_raw(overlapped as *const Inner) });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Events, Poll};
+    use std::fs::OpenOptions;
+    use std::time::Duration;
+
+    enum ReadRequest {
+        ConnectBeforeClient,
+        ConnectAfterClient,
+        Reregister,
+    }
+
+    #[test]
+    fn listening_read_error_before_connect() {
+        listening_read_error(false, ReadRequest::ConnectBeforeClient);
+        listening_read_error(false, ReadRequest::ConnectAfterClient);
+    }
+
+    #[test]
+    fn listening_read_error_after_connect() {
+        listening_read_error(true, ReadRequest::ConnectBeforeClient);
+        listening_read_error(true, ReadRequest::ConnectAfterClient);
+    }
+
+    #[test]
+    fn listening_read_error_after_reregister() {
+        listening_read_error(true, ReadRequest::Reregister);
+    }
+
+    fn listening_read_error(request_first: bool, request: ReadRequest) {
+        let name = format!(r"\\.\pipe\mio-listening-{}", rand::random::<u64>());
+        // Keep the test-owned Op alive until its completion is modeled or
+        // the pipe is dropped.
+        let mut pending = Some(Op::new());
+        let mut pipe = NamedPipe::new(&name).unwrap();
+        let mut poll = Poll::new().unwrap();
+        let token = Token(0);
+        let interests = Interest::READABLE | Interest::WRITABLE;
+
+        // Model just the pending read, since Windows can instead return
+        // ERROR_PIPE_LISTENING inline.
+        let initial_read = || ReadState::InFlight {
+            id: pending.as_ref().unwrap().id(),
+            read_requested: false,
+        };
+        pipe.inner.io.lock().unwrap().read = initial_read();
+        poll.registry()
+            .register(&mut pipe, token, interests)
+            .unwrap();
+        // The modeled read stands for the one requested by this registration.
+        pipe.inner.io.lock().unwrap().read = initial_read();
+        let mut events = Events::with_capacity(8);
+        let timeout = Some(Duration::from_secs(5));
+        poll.poll(&mut events, Some(Duration::ZERO)).unwrap();
+
+        let finish_read = |pipe: &NamedPipe, op| {
+            let mut events = Vec::new();
+            let err = io::Error::from_raw_os_error(ERROR_PIPE_LISTENING as i32);
+            Inner::read_error(
+                &pipe.inner,
+                &mut pipe.inner.io.lock().unwrap(),
+                op,
+                err,
+                Some(&mut events),
+            );
+            assert!(events.is_empty());
+        };
+        if !request_first {
+            finish_read(&pipe, pending.take().unwrap());
+            let idle = matches!(pipe.inner.io.lock().unwrap().read, ReadState::Idle);
+            assert!(idle);
+        }
+
+        let open_client = || {
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&name)
+                .unwrap()
+        };
+        let mut client = match request {
+            ReadRequest::ConnectBeforeClient => {
+                assert_eq!(
+                    pipe.connect().unwrap_err().kind(),
+                    io::ErrorKind::WouldBlock
+                );
+                open_client()
+            }
+            ReadRequest::ConnectAfterClient => {
+                let client = open_client();
+                pipe.connect().unwrap();
+                client
+            }
+            ReadRequest::Reregister => {
+                let client = open_client();
+                poll.registry()
+                    .reregister(&mut pipe, token, interests)
+                    .unwrap();
+                client
+            }
+        };
+
+        poll.poll(&mut events, timeout).unwrap();
+        assert!(events
+            .iter()
+            .any(|event| event.token() == token && event.is_writable()));
+        assert!(pipe.take_error().unwrap().is_none());
+        assert_eq!(
+            pipe.read(&mut [0; 4]).unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+
+        client.write_all(b"data").unwrap();
+        if let Some(pending) = pending.take() {
+            finish_read(&pipe, pending);
+        }
+
+        poll.poll(&mut events, timeout).unwrap();
+        assert!(events
+            .iter()
+            .any(|event| event.token() == token && event.is_readable()));
+        poll.registry().deregister(&mut pipe).unwrap();
+        let mut buf = [0; 4];
+        assert_eq!(pipe.read(&mut buf).unwrap(), buf.len());
+        assert_eq!(&buf, b"data");
     }
 }
