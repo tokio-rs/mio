@@ -1263,6 +1263,24 @@ fn registered_server() -> (NamedPipe, String, Poll, Events) {
     (server, name, poll, Events::with_capacity(16))
 }
 
+#[test]
+fn first_read_after_connect() {
+    for client_first in [false, true] {
+        let (mut server, name, mut poll, mut events) = registered_server();
+        let mut client = if client_first {
+            let client = blocking_client(&name);
+            t!(server.connect());
+            client
+        } else {
+            assert_would_block(server.connect());
+            blocking_client(&name)
+        };
+
+        t!(client.write_all(b"first"));
+        assert_eq!(read_some(&mut server, &mut poll, &mut events), b"first");
+    }
+}
+
 // Issue #1983: a pipe instance reused through `disconnect` and `connect` must
 // not hand anything of the previous client to the next one. Here the previous
 // client's EOF.
